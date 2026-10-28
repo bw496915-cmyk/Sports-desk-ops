@@ -3,13 +3,14 @@
  * @file sportsdesk_webview_server.ts
  * @description Native Bun (v1.4+) Webview Automation Server & Telegram Mini App Gateway.
  *
- * Implements full Bun HTTP server semantics according to official guides:
- *  - Bun.env / process.env dual resolution with .env auto-loading.
- *  - Explicit hostname configuration (Bun.env.HOST || "0.0.0.0").
- *  - Strict port semantics (Number(Bun.env.PORT) || 4020).
- *  - Fast native Response.json() and zero-copy Response(Bun.file()) streams.
- *  - Standardized CORS, CSP (Telegram Mini App embedding), and security headers.
- *  - Robust error boundary handling via Bun.serve `error(err)`.
+ * Implements native Bun HTTP server semantics:
+ *  - Native port cascade: relies on Bun's BUN_PORT -> PORT -> NODE_PORT -> 3000 cascade
+ *    (SportsDesk defaults to PORT=4020 via auto-loaded .env, overridable via options).
+ *  - Explicit or default hostname binding (defaults to 0.0.0.0).
+ *  - High-throughput Response.json() and zero-copy Response(Bun.file()) streams
+ *    (zero-copy sendfile applies to unencrypted loopback HTTP behind Nginx TLS termination).
+ *  - Standardized CORS and CSP frame-ancestors for Telegram Mini App embedding (no X-Frame-Options).
+ *  - Robust error boundary handling via Bun.serve `error(err)` returning structured 500 JSON.
  */
 
 import { resolve, dirname } from "node:path";
@@ -40,22 +41,6 @@ export function startServer(options?: ServerOptions) {
   const customerDashboardFile = Bun.file(customerDashboardPath);
   const miniappDashboardFile = Bun.file(miniappDashboardPath);
 
-  const resolvedPort = Number(
-    options?.port ??
-      (typeof Bun !== "undefined" ? Bun.env.PORT : undefined) ??
-      process.env.PORT ??
-      4020,
-  );
-
-  const resolvedHostname =
-    options?.hostname ??
-    (typeof Bun !== "undefined"
-      ? (Bun.env.HOST ?? Bun.env.HOSTNAME)
-      : undefined) ??
-    process.env.HOST ??
-    process.env.HOSTNAME ??
-    "0.0.0.0";
-
   const isDevelopment =
     options?.development ??
     (typeof Bun !== "undefined"
@@ -73,14 +58,20 @@ export function startServer(options?: ServerOptions) {
     "Referrer-Policy": "strict-origin-when-cross-origin",
   };
 
-  const server = Bun.serve({
-    port: resolvedPort,
-    hostname: resolvedHostname,
+  const serveConfig: Parameters<typeof Bun.serve>[0] = {
     development: isDevelopment,
 
     async fetch(req) {
       const url = new URL(req.url);
       const pathname = url.pathname;
+
+      // Synthetic error trigger for testing error boundary
+      if (
+        pathname === "/api/test/error" ||
+        url.searchParams.get("trigger_error") === "non_error"
+      ) {
+        throw "Synthetic non-Error thrown in handler";
+      }
 
       // 1. Fast Preflight OPTIONS Response (HTTP 204 No Content)
       if (req.method === "OPTIONS") {
@@ -196,17 +187,32 @@ export function startServer(options?: ServerOptions) {
 
     error(err) {
       console.error("[SportsDesk Server Error]", err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : "An unexpected error occurred";
+
       return Response.json(
         {
           success: false,
           error: "Internal Server Error",
-          message: err?.message || String(err),
+          message,
         },
         { status: 500, headers: corsHeaders },
       );
     },
-  });
+  };
 
+  if (options?.port !== undefined) {
+    serveConfig.port = options.port;
+  }
+  if (options?.hostname !== undefined) {
+    serveConfig.hostname = options.hostname;
+  }
+
+  const server = Bun.serve(serveConfig);
   return server;
 }
 

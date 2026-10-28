@@ -33,6 +33,6 @@
   "author": "bw496915-cmyk",
   "license": "MIT",
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "1.4.4"
   }
 }

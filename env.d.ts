@@ -41,3 +41,9 @@ declare module "bun" {
     readonly TELEGRAM_REPORT_SCHEDULE?: string;
   }
 }
+
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv extends Bun.Env {}
+  }
+}

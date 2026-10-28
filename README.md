@@ -4,8 +4,6 @@ Production intelligence, downline risk surveillance, Cloudflare R2 backup, Qwen3
 
 Repository: [bw496915-cmyk/Sports-desk-ops](https://github.com/bw496915-cmyk/Sports-desk-ops.git)
 
----
-
 ## Quick Start
 
 ```bash
@@ -23,17 +21,65 @@ bun test tests/verify_tokens.test.ts
 # 4. Compile tokens across TypeScript, Webview, and TMA dashboards (Zero-Drift SSOT)
 bun run gen:tokens
 
-# 5. Run 24h sniper surveillance
+# 5. Run all test suites including headers, port cascade, errors, and benchmarks
+bun test
+
+# 6. Run 24h sniper surveillance
 bun run sportsdesk_cli.ts winners -p 24h --limit 25
 
-# 6. Generate all 7 auditable surveillance reports
+# 7. Generate all 7 auditable surveillance reports
 ./run_reports.sh --format table
 
-# 7. Run 52-week bettor churn simulation
+# 8. Run 52-week bettor churn simulation
 bun run simulate_bettor_churn_suite.ts
 ```
 
----
+## Runtime Architecture & Server Policies
+
+### Server Port & Hostname Binding Policy
+
+Server binding in `sportsdesk_webview_server.ts` adheres to Bun's native port resolution cascade:
+
+1. `BUN_PORT`
+2. `PORT`
+3. `NODE_PORT`
+4. Default fallback: `3000`
+
+**SportsDesk Operational Policy**: Rather than overriding Bun's cascade in code, SportsDesk relies directly on native resolution. Production deployments configure `PORT=4020` inside `.env`, which Bun loads automatically at process initialization. When `startServer(options)` is called programmatically, `{ port, hostname, development }` options allow explicit test or proxy overrides; when omitted, Bun resolves port and hostname natively (defaulting hostname to `0.0.0.0`).
+
+### Zero-Copy Static File Streaming Policy
+
+Static HTML surfaces (`customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`) are streamed via `new Response(Bun.file(path))`.
+
+- **No-TLS-on-Bun Precondition**: Kernel zero-copy file transfer (`sendfile(2)`) functions exclusively on unencrypted HTTP sockets. If TLS is terminated directly inside the Bun process (`tls: { ... }`), bytes must be copied into user-space memory for encryption before transmission, negating zero-copy benefits.
+- **Nginx TLS Preservation**: In production VPS topology, Nginx terminates TLS (HTTPS 443 via Let's Encrypt) at the edge and proxies requests over loopback to Bun (`http://127.0.0.1:4020`). This architecture preserves Bun's zero-copy kernel streaming over the loopback interface without double-encryption or user-space memory buffer overhead.
+
+### Environment Variable Precedence & Type Merging
+
+Bun automatically loads environment files at startup in strict order of increasing precedence:
+
+1. `.env` (base configuration)
+2. `.env.production`, `.env.development`, `.env.test` (evaluated based on `NODE_ENV`)
+3. `.env.local` (**Exception**: strictly skipped when `NODE_ENV=test` to ensure deterministic test isolation)
+4. `.env.production.local`, `.env.development.local`, `.env.test.local` (mode-specific local overrides)
+
+TypeScript declaration merging in `env.d.ts` extends both `Bun.Env` and `NodeJS.ProcessEnv` with strict typing for all SportsDesk credentials (`PORT`, `F402_*`, `CLOUDFLARE_*`, `R2_*`, `TELEGRAM_*`), verified via `tests/env_types.test-d.ts`.
+
+### Security Headers & Telegram Mini App Embedding
+
+To ensure seamless embedding inside Telegram Web (`https://web.telegram.org`), Telegram mobile apps, and desktop clients without frame hijacking vulnerabilities:
+
+- `X-Frame-Options` is **strictly absent** from all server response headers (the deprecated `ALLOWALL` directive is never sent).
+- Embedding is governed exclusively by modern standards: `Content-Security-Policy: frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:;`.
+
+## Performance Telemetry & Micro-Benchmarks
+
+Empirical measurements recorded via `tests/bench_server.test.ts` on Bun v1.4.4 (macOS arm64):
+
+| Surface / Operation                     | Manual Baseline Path             | Native Bun Path            | Measured Latency    | Throughput Ratio              |
+| :-------------------------------------- | :------------------------------- | :------------------------- | :------------------ | :---------------------------- |
+| **JSON Serialization** (25 accounts)    | `JSON.stringify` + headers       | `Response.json(data)`      | 1.05 µs vs 0.81 µs  | 1.29x faster                  |
+| **HTML File Serving** (21.5 KB payload) | `readFileSync` buffer allocation | `new Response(Bun.file())` | 45.66 µs vs 0.46 µs | 99.94x faster handle creation |
 
 ## Qwen3.5-4B (Layers 18–28) Token Architecture & Single Source of Truth
 
@@ -76,19 +122,36 @@ export enum TriggerPredicateKind { ... }
 export enum MitigationActionKind { ... }
 ```
 
----
-
 ## Verification & CI Quality Gates
 
-All tokens and contracts are verified continuously through `validation/token_validator.ts` and `tests/verify_tokens.test.ts`:
+All tokens and contracts are verified continuously through `validation/token_validator.ts` and `tests/`:
 
-1. **Zero Drift**: `bun run gen:tokens && git diff --exit-code` guarantees that `tokens.toml`, `domain-branded-types.ts`, `customer-churn-simulation-dashboard.html`, and `telegram-miniapp-dashboard.html` remain perfectly synchronized.
+1. **Zero Drift**: `bun run gen:tokens && git diff --exit-code` guarantees that `tokens.toml`, `domain-branded-types.ts`, `customer-churn-simulation-dashboard.html`, and `telegram-miniapp-dashboard.html` remain synchronized.
 2. **24-bit Exact Uniqueness**: 13 unique `ColorHexInt` values derived from `Bun.color()`.
 3. **CIEDE2000 Perceptual Separation ($\Delta E\_{00} \ge 7.0$)**: Mathematically verified color distance floor across all token pairs, preventing indistinguishable UI swatches.
 4. **WCAG 2.1 Contrast Standards**: $\ge 3.0:1$ for graphical UI badges against dark surfaces (`#070b14` / `#0b1329`) and $\ge 4.5:1$ for typography.
 5. **Zero Dead Tokens**: Asserts bidirectional reference consistency (all declared tokens used, all used tokens declared).
 
----
+### Test Suite Classification (629 Assertions Total)
+
+The test suite consists of 6 test suites across 20 tests and 629 total assertions:
+
+- **Token Verification Suite (`tests/verify_tokens.test.ts`, 592 assertions)**:
+  - **Table-Driven & Structural Tests (242 assertions)**:
+    - Single Source of Truth & Zero-Drift Regeneration: 85 assertions
+    - Color Uniqueness & Pairwise Evaluation: 11 assertions
+    - WCAG 2.1 Contrast & Readability: 48 assertions
+    - Discriminated Union Guardrails: 46 assertions
+    - Dead-Token & Bi-Directional Reference Consistency: 52 assertions
+  - **Generative Property-Based Tests (350 assertions)**:
+    - `test_property_ciede2000_metric_axioms`: 150 assertions evaluating identity of indiscernibles, non-negativity, and symmetry across randomized color vectors.
+    - `test_property_wcag_contrast_ratio_bounds`: 200 assertions evaluating contrast ratio bounds `[1.0, 21.0]` and monotonicity across randomized luminance pairs.
+- **Server Runtime Suites (37 assertions)**:
+  - `tests/server_headers.test.ts`: 21 assertions verifying absence of `X-Frame-Options` and presence of required Telegram Mini App `frame-ancestors`.
+  - `tests/server_port.test.ts`: 2 assertions verifying `BUN_PORT=4100` cascade resolution without code overrides.
+  - `tests/server_error.test.ts`: 14 assertions verifying non-Error exceptions in production return structured 500 JSON without stack traces.
+  - `tests/env_types.test-d.ts`: Type assertion verifying `expectTypeOf<typeof Bun.env.KEY>().toEqualTypeOf<typeof process.env.KEY>()`.
+  - `tests/bench_server.test.ts`: 6 assertions benchmark-testing latency numbers for JSON and file responses.
 
 ## Project Structure
 
@@ -99,8 +162,16 @@ All tokens and contracts are verified continuously through `validation/token_val
 ├── validation/
 │   └── token_validator.ts                   # CIEDE2000, WCAG 2.1, and token invariant validators
 ├── tests/
-│   └── verify_tokens.test.ts                # 13 test suites (592 assertions) for token verification
+│   ├── verify_tokens.test.ts                # Token verification (242 table-driven, 350 property-based assertions)
+│   ├── server_headers.test.ts               # Header snapshot: no X-Frame-Options, CSP frame-ancestors
+│   ├── server_port.test.ts                  # BUN_PORT=4100 cascade verification
+│   ├── server_error.test.ts                 # Production error boundary without stack traces
+│   ├── env_types.test-d.ts                  # Bun.env vs process.env type parity
+│   ├── env_types.test.ts                    # Test runner for env_types
+│   └── bench_server.test.ts                 # Latency benchmarks: Response.json & Bun.file
 ├── domain-branded-types.ts                  # Nominal branded primitives, discriminated unions & tables
+├── env.d.ts                                 # Bun.Env & NodeJS.ProcessEnv interface merging
+├── sportsdesk_webview_server.ts             # Native Bun HTTP server & Telegram Mini App gateway
 ├── sportsdesk_cli.ts                        # Surveillance CLI, TrueColor neuron registry (-N), R2 sync
 ├── simulate_bettor_churn_suite.ts           # 52-week dual-basis bettor churn simulation suite
 ├── customer-churn-simulation-dashboard.html # Webview executive churn dashboard
@@ -116,8 +187,6 @@ All tokens and contracts are verified continuously through `validation/token_val
 ├── os_bun_cron_integration_guide.md         # OS crontab and Bun cron integration guide
 └── vps_domain_setup_runbook.md              # Production VPS domain deployment runbook
 ```
-
----
 
 ## Documentation Runbooks
 
