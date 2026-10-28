@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SportsDesk & Fantasy402 Telegram Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: #070b14;
+      --card-bg: #0d1527;
+      --card-border: #1e293b;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --accent: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 14px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .kpi-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .kpi-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+    .kpi-num { font-size: 18px; font-weight: 700; font-family: var(--mono); color: #fff; }
+    .btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+    <h2>SportsDesk Ops TMA</h2>
+    <span style="font-size: 11px; color: var(--accent); font-family: var(--mono);">● BILLY666</span>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="kpi-lbl">Sports Handle</div>
+      <div class="kpi-num">$2.79M</div>
+    </div>
+    <div class="kpi-box" style="border-color: rgba(239, 68, 68, 0.4);">
+      <div class="kpi-lbl" style="color: #ef4444;">Net Hold Deficit</div>
+      <div class="kpi-num" style="color: #ef4444;">-$63,467</div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="font-weight: 700; color: #fff;">Whale Surveillance: RF2003</div>
+    <div style="font-size: 12px; color: var(--text-muted); margin: 4px 0;">33.7% of total handle ($940k handle). Net: +$25k win.</div>
+    <button class="btn" onclick="alert('Cap $5,000 sent')">Cap Max Bet to $5,000</button>
+  </div>
+  <div class="card">
+    <div style="font-weight: 700; color: #fff;">Execution Sniper: BGD101</div>
+    <div style="font-size: 12px; color: var(--text-muted); margin: 4px 0;">2 max straight bets cashed clean (+$40k win).</div>
+    <button class="btn" style="background: #ef4444;" onclick="alert('Limit slashed to $1,000')">Slash Limit to $1,000</button>
+  </div>
+</body>
+</html>

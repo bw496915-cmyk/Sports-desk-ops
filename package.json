@@ -1,0 +1,35 @@
+{
+  "name": "sportsdesk-ops",
+  "version": "1.0.0",
+  "description": "SportsDesk & Fantasy402 Downline Risk Surveillance, Bettor Churn Simulation, and Cloudflare R2 Sync Suite",
+  "main": "sportsdesk_cli.ts",
+  "type": "module",
+  "scripts": {
+    "cli": "bun run sportsdesk_cli.ts",
+    "sim": "bun run simulate_bettor_churn_suite.ts",
+    "reports": "./run_reports.sh",
+    "reports:r2": "./run_reports.sh --sync-r2",
+    "r2:info": "bun run sportsdesk_r2_sync.ts --info",
+    "r2:verify": "bun run sportsdesk_r2_sync.ts --verify",
+    "r2:sync": "bun run sportsdesk_r2_sync.ts --sync reports/",
+    "r2:list": "bun run sportsdesk_r2_sync.ts --list",
+    "bot": "bun run sportsdesk_telegram_bot.ts",
+    "scheduler": "bun run reporting_scheduler_service.ts",
+    "onepass": "bun run agent_onepass_plugin.ts",
+    "deploy": "./deploy_to_vps.sh"
+  },
+  "keywords": [
+    "sportsdesk",
+    "fantasy402",
+    "risk-surveillance",
+    "churn-prediction",
+    "cloudflare-r2",
+    "telegram-bot",
+    "bun"
+  ],
+  "author": "bw496915-cmyk",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
