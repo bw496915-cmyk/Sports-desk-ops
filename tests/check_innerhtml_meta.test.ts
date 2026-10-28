@@ -1,0 +1,82 @@
+import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+/**
+ * Gate Integrity Meta-Test for no-unsafe-innerhtml
+ * Verifies that bin/check-innerhtml.ts accurately detects:
+ * 1. Simple dynamic variable assignment (must fail, exit 1)
+ * 2. Template literal with interpolation (must fail, exit 1)
+ * 3. String concatenation (must fail, exit 1)
+ * 4. Static string literal assignment (must pass, exit 0)
+ * 5. Sanitized assignment with structured comment (must pass, exit 0)
+ */
+
+describe("check-innerhtml 5-case meta-test suite", () => {
+  async function runLinter(
+    codeLine: string,
+  ): Promise<{ exitCode: number; stdout: string }> {
+    const root = await mkdtemp(path.join(tmpdir(), "check-innerhtml-"));
+    try {
+      const content = `// Scratch test\nexport function test(container: HTMLElement, untrusted: string, a: string, b: string, x: string) {\n  ${codeLine}\n}\n`;
+      await Bun.write(path.join(root, "lib/scratch.ts"), content);
+
+      const proc = Bun.spawnSync([
+        process.execPath,
+        path.join(import.meta.dir, "../bin/check-innerhtml.ts"),
+        root,
+      ], {
+        env: {
+          PATH: process.env.PATH ?? "",
+          HOME: process.env.HOME ?? "",
+        },
+      });
+
+      return {
+        exitCode: proc.exitCode,
+        stdout: proc.stdout.toString(),
+      };
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+
+  test("Case 1: Simple dynamic variable assignment fails with exit code 1", async () => {
+    const res = await runLinter("container.innerHTML = untrusted;");
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain(
+      "Unsafe innerHTML assignment with dynamic expression 'untrusted'",
+    );
+  });
+
+  test("Case 2: Template literal with interpolation fails with exit code 1", async () => {
+    const res = await runLinter("container.innerHTML = `<div>${x}</div>`;");
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain(
+      "Unsafe innerHTML assignment with dynamic expression",
+    );
+  });
+
+  test("Case 3: String concatenation expression fails with exit code 1", async () => {
+    const res = await runLinter("container.innerHTML = a + b;");
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain(
+      "Unsafe innerHTML assignment with dynamic expression 'a + b'",
+    );
+  });
+
+  test("Case 4: Static string literal passes with exit code 0", async () => {
+    const res = await runLinter('container.innerHTML = "<div>static</div>";');
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("Zero unsafe innerHTML assignments");
+  });
+
+  test("Case 5: Explicitly annotated assignment passes with exit code 0", async () => {
+    const res = await runLinter(
+      "container.innerHTML = untrusted; // sanitized: SEC-101 — trusted upstream render",
+    );
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("Zero unsafe innerHTML assignments");
+  });
+});

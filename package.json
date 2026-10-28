@@ -7,6 +7,8 @@
   "scripts": {
     "test": "bun test",
     "gen:tokens": "bun run scripts/generate_tokens.ts",
+    "check:fetch-init": "bun run bin/check-fetch-init.ts",
+    "check:innerhtml": "bun run bin/check-innerhtml.ts",
     "cli": "bun run sportsdesk_cli.ts",
     "sim": "bun run simulate_bettor_churn_suite.ts",
     "reports": "./run_reports.sh",
