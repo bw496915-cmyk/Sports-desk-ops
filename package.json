@@ -18,6 +18,7 @@
     "bot": "bun run sportsdesk_telegram_bot.ts",
     "scheduler": "bun run reporting_scheduler_service.ts",
     "onepass": "bun run agent_onepass_plugin.ts",
+    "serve": "bun run sportsdesk_webview_server.ts",
     "deploy": "./deploy_to_vps.sh"
   },
   "keywords": [
