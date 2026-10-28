@@ -21,7 +21,7 @@ bun test tests/verify_tokens.test.ts
 # 4. Compile tokens across TypeScript, Webview, and TMA dashboards (Zero-Drift SSOT)
 bun run gen:tokens
 
-# 5. Run all 10 test suites across headers, port cascade, proxy isolation, timeouts, and benchmarks (806 assertions)
+# 5. Run all 10 test suites across headers, port cascade, proxy isolation, timeouts, and benchmarks (813 assertions)
 bun test
 
 # 6. Run 24h sniper surveillance
@@ -64,7 +64,7 @@ Static HTML surfaces (`customer-churn-simulation-dashboard.html` and `telegram-m
 Outbound network operations across Telegram alerts, Cloudflare R2 backup, and Fantasy402 feeds are hardened against proxy hijacking, hanging connections, and transport vulnerabilities:
 
 - **Bounded Execution Windows (`AbortSignal.timeout`)**: All outbound requests enforce strict timeouts via `signal: AbortSignal.timeout(timeoutMs)` (e.g., 5,000 ms for Telegram dispatch, 10,000 ms for R2 verification). Unbounded `fetch` awaits are eliminated.
-- **Loopback Proxy Isolation (`NO_PROXY`)**: Bun resolves `HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY` on a per-request basis. If an external or CI proxy is configured, loopback calls (`http://127.0.0.1:4020`) risk being trapped and proxied. SportsDesk configures `NO_PROXY=127.0.0.1,localhost,::1` across `.env`, `.env.example`, and `deploy_to_vps.sh` (verified by `tests/fetch_proxy_isolation.test.ts`).
+- **Loopback Proxy Isolation (`NO_PROXY` / `proxy: false`)**: Bun resolves `HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY` on a per-request basis (`ALL_PROXY` acts as scheme-agnostic fallback). Ambient corporate or CI proxies trap loopback calls unless bypassed. SportsDesk configures `NO_PROXY=127.0.0.1,localhost,::1` across `.env`, `.env.example`, and `deploy_to_vps.sh`. In addition, internal services pass `{ proxy: false }` for guaranteed direct socket connections, explicit proxy objects respect `NO_PROXY` by default (overridable via `respectNoProxy: false`), and tunnel failures reject with `ERR_PROXY_TUNNEL` (verified by `tests/fetch_proxy_isolation.test.ts`).
 - **HTTP Connection Pool Bounds (`BUN_CONFIG_MAX_HTTP_REQUESTS`)**: Set to `256` to align Bun's shared connection pool with peak alert burst throughput, preventing resource starvation.
 - **Dedicated `Bun.FetchSession` & Pre-Warming**: `SportsDeskTelegramService` initializes a dedicated `Bun.FetchSession` with `tls: { rejectUnauthorized: true }`, isolating session credentials and connection reuse. Outbound connections are pre-warmed at boot via `fetch.preconnect("https://api.telegram.org")` to eliminate initial TLS handshake latency.
 - **Zero Embedded Credentials & Insecure TLS Protection**: Validated by `tests/fetch_url_credentials.test.ts`, ensuring 0 plaintext `http(s)://user:pass@` strings in source code and 0 occurrences of `rejectUnauthorized: false`.
@@ -153,9 +153,9 @@ All tokens and contracts are verified continuously through `validation/token_val
 4. **WCAG 2.1 Contrast Standards**: $\ge 3.0:1$ for graphical UI badges against dark surfaces (`#070b14` / `#0b1329`) and $\ge 4.5:1$ for typography.
 5. **Zero Dead Tokens**: Asserts bidirectional reference consistency (all declared tokens used, all used tokens declared).
 
-### Test Suite Classification (806 Assertions Total)
+### Test Suite Classification (813 Assertions Total)
 
-The test suite consists of 10 test suites across 31 tests and 806 total assertions:
+The test suite consists of 10 test suites across 34 tests and 813 total assertions:
 
 - **Token Verification Suite (`tests/verify_tokens.test.ts`, 592 assertions)**:
   - **Table-Driven & Structural Tests (242 assertions)**:
@@ -167,13 +167,13 @@ The test suite consists of 10 test suites across 31 tests and 806 total assertio
   - **Generative Property-Based Tests (350 assertions)**:
     - `test_property_ciede2000_metric_axioms`: 150 assertions evaluating identity of indiscernibles, non-negativity, and symmetry across randomized color vectors.
     - `test_property_wcag_contrast_ratio_bounds`: 200 assertions evaluating contrast ratio bounds `[1.0, 21.0]` and monotonicity across randomized luminance pairs.
-- **Server Runtime & Network Hardening Suites (214 assertions)**:
+- **Server Runtime & Network Hardening Suites (221 assertions)**:
   - `tests/sendfile_threshold.test.ts`: 156 assertions evaluating 16 KB, 64 KB, and 1 MB lazy handle construction latency vs end-to-end socket throughput.
   - `tests/server_headers.test.ts`: 21 assertions verifying absence of `X-Frame-Options` and presence of required Telegram Mini App `frame-ancestors`.
   - `tests/server_error.test.ts`: 14 assertions verifying non-Error exceptions in production return structured 500 JSON without stack traces.
+  - `tests/fetch_proxy_isolation.test.ts`: 12 assertions verifying `NO_PROXY`, `{ proxy: false }` direct bypass, and `respectNoProxy: false` overrides.
   - `tests/fetch_timeout.test.ts`: 7 assertions verifying `AbortSignal.timeout` aborts slow upstreams and validates service bounds.
   - `tests/bench_server.test.ts`: 6 assertions benchmarking latency numbers for JSON serialization and file handle creation.
-  - `tests/fetch_proxy_isolation.test.ts`: 5 assertions verifying `NO_PROXY` bypasses proxy on loopback calls and prevents proxy hijacking.
   - `tests/fetch_url_credentials.test.ts`: 3 assertions auditing codebase for 0 embedded URL credentials and 0 `rejectUnauthorized: false` occurrences.
   - `tests/server_port.test.ts`: 2 assertions verifying `BUN_PORT=4100` cascade resolution without code overrides.
   - `tests/env_types.test-d.ts` / `tests/env_types.test.ts`: Type assertion verifying `expectTypeOf<typeof Bun.env.KEY>().toEqualTypeOf<typeof process.env.KEY>()`.

@@ -423,12 +423,16 @@ const res = await this.fetchSession.fetch(url, {
 
 If the remote upstream fails to respond within `timeoutMs`, the request aborts with a `TimeoutError`, caught and logged without stalling downstream alert processing.
 
-### 7.2 Loopback Proxy Isolation (`NO_PROXY`)
+### 7.2 Proxy Routing, Loopback Isolation & Direct Connect Rules
 
-Bun resolves environment proxies (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`) dynamically on a per-request basis. In VPN, CI, or corporate environments where global proxy variables are injected:
+Bun provides built-in HTTP/HTTPS proxy capabilities with per-request dynamic evaluation and strict isolation semantics:
 
-- A request to `http://127.0.0.1:4020` or `http://localhost:4020` would silently route through the external proxy, leaking local tokens or failing connection handshakes.
-- SportsDesk enforces `NO_PROXY=127.0.0.1,localhost,::1` in all deployment environments. Verified continuously via `tests/fetch_proxy_isolation.test.ts`.
+- **Per-Request Environment Resolution**: Bun reads `HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY` (upper or lower case) each time `fetch` runs. Any runtime modification to `process.env` immediately applies to the next request. `ALL_PROXY` serves as a fallback for both `http:` and `https:` targets when scheme-specific variables are omitted.
+- **Loopback Trapping & `NO_PROXY` Matching**: Without explicit bypasses, requests to loopback addresses (`http://127.0.0.1:4020`) are trapped by ambient corporate or CI VPN proxies. Bun evaluates `NO_PROXY` (or `no_proxy`) separated by commas or whitespace, supporting exact hosts, wildcards (`*.example.com`), CIDR ranges (`10.0.0.0/8`, `fd00::/8`), bracketed IPv6 (`[::1]`), and port specifiers (`127.0.0.1:4020`). SportsDesk enforces `NO_PROXY=127.0.0.1,localhost,::1` across `.env`, `.env.example`, and deployment profiles.
+- **Direct Connect Guarantee (`{ proxy: false }`)**: In security-critical or internal channels where proxying must never occur regardless of ambient environment variables, callers pass `{ proxy: false }` to mandate direct socket connection.
+- **Explicit Proxy Invariants & `respectNoProxy`**: When an explicit proxy is provided (`fetch(url, { proxy: "http://proxy.com" })`), Bun continues to respect `NO_PROXY` rules by default. Callers can override this behavior using `{ proxy: { url: "...", respectNoProxy: false } }`.
+- **Unix Domain Socket Isolation**: Requests using Bun's `unix` socket option (`{ unix: "/path/to.sock" }`) strictly bypass all proxy environment variables by design.
+- **Tunnel Error Classification (`ERR_PROXY_TUNNEL`)**: When an upstream proxy answers a `CONNECT` request with a non-2xx status, Bun rejects with `error.code === "ERR_PROXY_TUNNEL"`, attaching `error.status`, `error.statusText`, and `error.headers` for diagnostic inspection. Verified continuously via `tests/fetch_proxy_isolation.test.ts`.
 
 ### 7.3 Dedicated `Bun.FetchSession` & Pre-Warming
 

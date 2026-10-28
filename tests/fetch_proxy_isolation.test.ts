@@ -79,4 +79,52 @@ describe("Outbound Fetch Proxy Isolation (NO_PROXY Verification)", () => {
 
     expect(hasTrapped).toBe(true);
   });
+
+  test("test_explicit_proxy_false_bypasses_environment_proxy", async () => {
+    // With HTTP_PROXY set and NO_PROXY unset, passing { proxy: false } connects directly
+    process.env.HTTP_PROXY = "http://127.0.0.1:59999";
+    delete process.env.NO_PROXY;
+
+    const response = await fetch(`http://127.0.0.1:${server.port}/health`, {
+      proxy: false,
+      signal: AbortSignal.timeout(3000),
+    });
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+    expect(body.status).toBe("isolated");
+    expect(body.pathname).toBe("/health");
+  });
+
+  test("test_explicit_proxy_respects_no_proxy_by_default", async () => {
+    // NO_PROXY also applies to an explicit proxy option by default
+    process.env.NO_PROXY = "127.0.0.1,localhost,::1";
+
+    const response = await fetch(`http://127.0.0.1:${server.port}/health`, {
+      proxy: "http://127.0.0.1:59999",
+      signal: AbortSignal.timeout(3000),
+    });
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+    expect(body.status).toBe("isolated");
+  });
+
+  test("test_respect_no_proxy_false_forces_proxy", async () => {
+    // Setting respectNoProxy: false forces request through the proxy despite NO_PROXY
+    process.env.NO_PROXY = "127.0.0.1,localhost,::1";
+
+    let hasTrapped = false;
+    try {
+      await fetch(`http://127.0.0.1:${server.port}/health`, {
+        proxy: { url: "http://127.0.0.1:59999", respectNoProxy: false },
+        signal: AbortSignal.timeout(1000),
+      });
+    } catch (caughtError: any) {
+      hasTrapped = true;
+      expect(caughtError).toBeDefined();
+    }
+
+    expect(hasTrapped).toBe(true);
+  });
 });
