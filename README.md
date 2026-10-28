@@ -183,6 +183,7 @@ The test suite consists of 6 test suites across 20 tests and 629 total assertion
 ├── run_reports.sh                           # 7-report auditable surveillance pipeline
 ├── deploy_to_vps.sh                         # Production Systemd, Nginx, Let's Encrypt installer
 ├── token_architecture_and_verification_runbook.md # Detailed token taxonomy and CI mathematics
+├── bun_server_runtime_shapes_runbook.md     # Bun HTTP Server, WebSocketHandler & TLSOptions specification
 ├── cloudflare_r2_and_api_runbook.md         # Cloudflare API & R2 credentials guide
 ├── os_bun_cron_integration_guide.md         # OS crontab and Bun cron integration guide
 └── vps_domain_setup_runbook.md              # Production VPS domain deployment runbook
@@ -190,6 +191,7 @@ The test suite consists of 6 test suites across 20 tests and 629 total assertion
 
 ## Documentation Runbooks
 
+- [Bun Server Runtime Shapes Runbook](bun_server_runtime_shapes_runbook.md) — Comprehensive specification of `Server extends Disposable`, `WebSocketHandler<T>`, and `TLSOptions`.
 - [Token Architecture & Verification Runbook](token_architecture_and_verification_runbook.md) — Mathematical specification of CIEDE2000, WCAG contrast, and token code generation.
 - [Cloudflare R2 & API Runbook](cloudflare_r2_and_api_runbook.md) — Complete Cloudflare API & R2 storage guide.
 - [OS Bun Cron Integration Guide](os_bun_cron_integration_guide.md) — OS crontab and systemd timer integration guide.
