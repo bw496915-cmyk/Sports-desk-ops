@@ -100,7 +100,7 @@
     @property --sd-route-pending {
       syntax: '<color>';
       inherits: true;
-      initial-value: #f59e0b; /* L27.N0912 Route 01 Pending Amber */
+      initial-value: #d97706; /* L27.N0912 Route 01 Liquidity Breaker Dark Amber */
     }
     @property --sd-route-manager {
       syntax: '<color>';
@@ -158,7 +158,7 @@
       --sd-tier-rec-bias: #38bdf8;
       --sd-route-devig: #06b6d4;
       --sd-route-sharp: #a855f7;
-      --sd-route-pending: #f59e0b;
+      --sd-route-pending: #d97706;
       --sd-route-manager: #f43f5e;
 
       --sd-primary: #38bdf8;
@@ -426,6 +426,9 @@
     </span>
     <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-route-sharp) 15%, transparent); color: var(--sd-route-sharp);">
       <span class="neuron-dot" style="background: var(--sd-route-sharp);"></span> L26.N3104 Sharp (#a855f7)
+    </span>
+    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-route-pending) 15%, transparent); color: var(--sd-route-pending);">
+      <span class="neuron-dot" style="background: var(--sd-route-pending);"></span> L27.N0912 Breaker (#d97706)
     </span>
     <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-route-manager) 15%, transparent); color: var(--sd-route-manager);">
       <span class="neuron-dot" style="background: var(--sd-route-manager);"></span> L28.N2501 Manager (#f43f5e)

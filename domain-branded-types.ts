@@ -448,3 +448,291 @@ export function parseAsBasisPoints(ratioOrBps: number, isAlreadyBps: boolean = f
 export function basisPointsToPercentage(bps: BasisPoints): number {
   return bps / 100;
 }
+
+// ============================================================================
+// 7. QWEN3.5-4B NEURON REGISTRY & DECOUPLED THREE-AXIS SCHEMAS (LAYERS 18-28)
+// ============================================================================
+
+export type SignalChannelCode =
+  | "Internet"
+  | "BLOCKED"
+  | "GATEWAY"
+  | "ALERT"
+  | "GSBUILDER"
+  | "GSLIVE"
+  | "CSLEVEL2";
+
+export type SignalChannelStatus =
+  | "ACTIVE"
+  | "DROPPED"
+  | "ALERT"
+  | "STEERABLE"
+  | "CRITICAL"
+  | "SUPPRESSED";
+
+export type DecisionMoveFlag =
+  | "STEAM_CONVERGENCE"
+  | "SHRINKAGE_SHARP"
+  | "LIQUIDITY_HALT"
+  | "TERMINAL_ENFORCE";
+
+/**
+ * Axis 1: Ingestion Signal Channels (Layers 18–24).
+ * Strictly typed by physical transport network latency SLA in milliseconds (transportLatencySlaMs: number).
+ */
+export interface IngestionChannelDefinition {
+  readonly layerId: `L${number}.N${string}`;
+  readonly tokenName: string;
+  readonly hex: string;
+  readonly channelCode: SignalChannelCode;
+  readonly signalTier: string;
+  readonly transportUri: string;
+  readonly transportLatencySlaMs: number;
+  readonly channelStatus: SignalChannelStatus;
+  readonly volumeRule: string;
+  readonly operationalRole: string;
+}
+
+/**
+ * Axis 2: Risk Decision & Route Continuum (Layers 25–28).
+ * Strictly typed by algorithmic trigger predicates, move flags, and mitigation enforcement actions.
+ */
+export interface RouteCircuitDefinition {
+  readonly layerId: `L${number}.N${string}`;
+  readonly tokenName: string;
+  readonly hex: string;
+  readonly routeName: string;
+  readonly moveFlag: DecisionMoveFlag;
+  readonly triggerPredicate: string;
+  readonly algorithmicThreshold: string;
+  readonly mitigationAction: string;
+  readonly operationalRole: string;
+}
+
+/**
+ * Axis 3: Telemetry Viewports & Rendering Surfaces.
+ * Strictly typed by target viewport dimensions, color depth, and display context.
+ */
+export interface SurfaceDefinition {
+  readonly layerId: "SURFACE.DOM" | "SURFACE.CLI";
+  readonly tokenName: string;
+  readonly hex: string;
+  readonly surfaceName: string;
+  readonly targetViewport: string;
+  readonly colorDepth: string;
+  readonly operationalRole: string;
+}
+
+export type AnyQwenNeuronDefinition =
+  | IngestionChannelDefinition
+  | RouteCircuitDefinition
+  | SurfaceDefinition;
+
+/**
+ * Ingestion Signal Channels (Layers 18-24).
+ * Every channel has a strictly typed integer transportLatencySlaMs (milliseconds).
+ */
+export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
+  {
+    layerId: "L18.N0204",
+    tokenName: "--sd-tier-retail",
+    hex: "#1d84b5",
+    channelCode: "Internet",
+    signalTier: "SIGNAL_INTERNET",
+    transportUri: "portal://ticker/live-stream",
+    transportLatencySlaMs: 1500,
+    channelStatus: "ACTIVE",
+    volumeRule: "TARGET_TWIN (gapDurationSeconds = Internet - ALERT)",
+    operationalRole: "Retail Pregame Baseline Gate",
+  },
+  {
+    layerId: "L19.N0518",
+    tokenName: "--sd-tier-blocked",
+    hex: "#64748b",
+    channelCode: "BLOCKED",
+    signalTier: "SIGNAL_SENTINEL_DROP",
+    transportUri: "portal://pending/noise-filter",
+    transportLatencySlaMs: 0,
+    channelStatus: "DROPPED",
+    volumeRule: "DROP_BEFORE_GROUPING (unconditionally dropped on getPending)",
+    operationalRole: "Blocked Sentinel & Zero-Stake Filter",
+  },
+  {
+    layerId: "L20.N1105",
+    tokenName: "--sd-theme-emerald",
+    hex: "#10b981",
+    channelCode: "GATEWAY",
+    signalTier: "SIGNAL_EQUILIBRIUM_GATE",
+    transportUri: "portal://gateway/equilibrium-gate",
+    transportLatencySlaMs: 1000,
+    channelStatus: "ACTIVE",
+    volumeRule: "EQUILIBRIUM_SWEEP (+15c/+20c vig persist read-backs)",
+    operationalRole: "Equilibrium Confirm & Vig Gate",
+  },
+  {
+    layerId: "L21.N0884",
+    tokenName: "--sd-tier-alert",
+    hex: "#ef4444",
+    channelCode: "ALERT",
+    signalTier: "SIGNAL_ALERT_TWIN",
+    transportUri: "portal://ticker/alert-twins",
+    transportLatencySlaMs: 250,
+    channelStatus: "ALERT",
+    volumeRule: "SOURCE_ALERT (canonicalVolumeCents = 0; skip Bayes scoring)",
+    operationalRole: "Syndicate Sub-acct Syntax & Twin Buffer",
+  },
+  {
+    layerId: "L22.N1402",
+    tokenName: "--sd-tier-steam",
+    hex: "#f59e0b",
+    channelCode: "GSBUILDER",
+    signalTier: "SIGNAL_SGP_BUILDER",
+    transportUri: "portal://ticker/sgp-builder",
+    transportLatencySlaMs: 1000,
+    channelStatus: "STEERABLE",
+    volumeRule: "GS118_JOIN (joined via M.G<betGroupId>; steerable via --steer)",
+    operationalRole: "Steam / Line Chase Phrasing & SGP Builder",
+  },
+  {
+    layerId: "L23.N0412",
+    tokenName: "--sd-tier-whale",
+    hex: "#28a745",
+    channelCode: "GSLIVE",
+    signalTier: "SIGNAL_GS_INPLAY",
+    transportUri: "portal://ticker/gs-partner-118",
+    transportLatencySlaMs: 500,
+    channelStatus: "CRITICAL",
+    volumeRule: "GS118_JOIN (forces rotationGrade='LIVE'; extracts M.G<id>; +20c tax)",
+    operationalRole: "Whale Sizing Anomaly & In-Play Live Move",
+  },
+  {
+    layerId: "L24.N2019",
+    tokenName: "--sd-tier-rec-bias",
+    hex: "#38bdf8",
+    channelCode: "CSLEVEL2",
+    signalTier: "SIGNAL_SYNDICATE_L2",
+    transportUri: "portal://ticker/cslevel2-feed",
+    transportLatencySlaMs: 2000,
+    channelStatus: "SUPPRESSED",
+    volumeRule: "NONE (secondary syndicate/tennis/prop feed; steerable via --steer)",
+    operationalRole: "Recreational Longshot Bias Ingestion",
+  },
+];
+
+/**
+ * Decision & Route Continuum (Layers 25-28).
+ * L27.N0912 is assigned dedicated #d97706 (Amber-600) to eliminate collision with L22.N1402 (#f59e0b).
+ */
+export const ROUTE_CIRCUITS: readonly RouteCircuitDefinition[] = [
+  {
+    layerId: "L25.N1882",
+    tokenName: "--sd-route-devig",
+    hex: "#06b6d4",
+    routeName: "Route 04 Devig Consensus",
+    moveFlag: "STEAM_CONVERGENCE",
+    triggerPredicate: "Adverse selection vs PINNACLE_REF",
+    algorithmicThreshold: "Consensus Lag <= 5,000 ms",
+    mitigationAction: "Dynamic Quote Reprice & Spread Realignment",
+    operationalRole: "Steam Convergence & Consensus Price Arbitration",
+  },
+  {
+    layerId: "L26.N3104",
+    tokenName: "--sd-route-sharp",
+    hex: "#a855f7",
+    routeName: "Route 02 Sharp Shrinkage",
+    moveFlag: "SHRINKAGE_SHARP",
+    triggerPredicate: "CLV margin decay across settled wagers",
+    algorithmicThreshold: "tau* = 0.68, N_min >= 8 tickets",
+    mitigationAction: "Empirical Bayes Score Recalibration & Limit Shading",
+    operationalRole: "Bayesian Sharp Detection & Margin Decay Guard",
+  },
+  {
+    layerId: "L27.N0912",
+    tokenName: "--sd-route-pending",
+    hex: "#d97706",
+    routeName: "Route 01 Liquidity Breaker",
+    moveFlag: "LIQUIDITY_HALT",
+    triggerPredicate: "Order book depth exhaustion during active steam",
+    algorithmicThreshold: "Market Depth < $1,000 USD",
+    mitigationAction: "Automated Circuit Breaker Trading Halt & Pending Queue Hold",
+    operationalRole: "Liquidity Exhaustion Protection & Breaker Trip",
+  },
+  {
+    layerId: "L28.N2501",
+    tokenName: "--sd-route-manager",
+    hex: "#f43f5e",
+    routeName: "Route 03 Manager Terminal",
+    moveFlag: "TERMINAL_ENFORCE",
+    triggerPredicate: "Terminal downline deficit or toxic syndicate escalation",
+    algorithmicThreshold: "Toxicity >= 80 || Hold <= -50% || Deficit > $100k",
+    mitigationAction: "Manager/updateByColumn Limit Slash to $1k & Upfront Escrow",
+    operationalRole: "Terminal Risk Containment & Manager Write-Gate",
+  },
+];
+
+/**
+ * Telemetry Viewports & Rendering Surfaces.
+ */
+export const TELEMETRY_SURFACES: readonly SurfaceDefinition[] = [
+  {
+    layerId: "SURFACE.DOM",
+    tokenName: "--sd-surface-bg",
+    hex: "#070b14",
+    surfaceName: "Dark Obsidian Shell",
+    targetViewport: "1440x900 (Desktop) / 375x812 (Mobile)",
+    colorDepth: "24-bit TrueColor RGB",
+    operationalRole: "Main Dashboard DOM Surface Background",
+  },
+  {
+    layerId: "SURFACE.CLI",
+    tokenName: "--sd-surface-cli",
+    hex: "#04070e",
+    surfaceName: "Deterministic Dark ANSI",
+    targetViewport: "Standard VT100 / xterm-256color / ANSI Terminal",
+    colorDepth: "24-bit TrueColor RGB",
+    operationalRole: "CLI Terminal Telemetry Surface Background",
+  },
+];
+
+/**
+ * Complete 13-entity registry across all 3 decoupled axes.
+ */
+export const ALL_QWEN_TOKENS: readonly AnyQwenNeuronDefinition[] = [
+  ...INGESTION_CHANNELS,
+  ...ROUTE_CIRCUITS,
+  ...TELEMETRY_SURFACES,
+];
+
+/**
+ * CI Guardrail: Asserts 1-to-1 uniqueness between CSS tokens, layer IDs, and ColorHexInt values.
+ * Throws immediately if duplicate hex codes or tokens are detected across distinct operational entities.
+ */
+export function assertUniqueTokenColors(
+  tokens: readonly { readonly layerId: string; readonly tokenName: string; readonly hex: string }[]
+): void {
+  const seenHex = new Map<number, string>();
+  const seenTokens = new Set<string>();
+  const seenLayers = new Set<string>();
+
+  for (const t of tokens) {
+    if (seenTokens.has(t.tokenName)) {
+      throw new Error(`Duplicate CSS tokenName detected in registry: '${t.tokenName}' (Layer: ${t.layerId})`);
+    }
+    seenTokens.add(t.tokenName);
+
+    if (seenLayers.has(t.layerId)) {
+      throw new Error(`Duplicate layerId detected in registry: '${t.layerId}' (Token: ${t.tokenName})`);
+    }
+    seenLayers.add(t.layerId);
+
+    const colorInt = parseAsColorHexInt(t.hex);
+    if (seenHex.has(colorInt)) {
+      const prior = seenHex.get(colorInt)!;
+      throw new Error(
+        `Color Hex Collision Detected! Color 0x${colorInt.toString(16).padStart(6, "0")} (${t.hex}) is shared between '${prior}' and '${t.tokenName}' (${t.layerId}). Each entity must have a distinct ColorHexInt.`
+      );
+    }
+    seenHex.set(colorInt, `${t.tokenName} (${t.layerId})`);
+  }
+}
+

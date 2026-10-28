@@ -38,9 +38,17 @@ import {
   formatHalfPointLine,
   computeBayesSharp,
   parseAsBasisPoints,
+  INGESTION_CHANNELS,
+  ROUTE_CIRCUITS,
+  TELEMETRY_SURFACES,
+  ALL_QWEN_TOKENS,
+  assertUniqueTokenColors,
   type Cents,
   type CustomerIdentifier,
   type AgentIdentifier,
+  type IngestionChannelDefinition,
+  type RouteCircuitDefinition,
+  type SurfaceDefinition,
 } from "./domain-branded-types.ts";
 
 interface DownlineMetadata {
@@ -210,52 +218,84 @@ export function printDomainBrandedTypes(): void {
   console.log("================================================================================\n");
 }
 
-export interface NeuronTokenDefinition {
-  readonly layerId: string;
-  readonly tokenName: string;
-  readonly hex: string;
-  readonly channelOrRoute: string;
-  readonly roleDescription: string;
-}
-
-export const QWEN_NEURON_TOKENS: readonly NeuronTokenDefinition[] = [
-  { layerId: "L18.N0204", tokenName: "--sd-tier-retail", hex: "#1d84b5", channelOrRoute: "Internet (SIGNAL_INTERNET)", roleDescription: "Retail Pregame Baseline Gate (SLA 1500ms)" },
-  { layerId: "L19.N0518", tokenName: "--sd-tier-blocked", hex: "#64748b", channelOrRoute: "BLOCKED (SIGNAL_SENTINEL_DROP)", roleDescription: "Blocked Sentinel & Zero-Stake Filter (0ms)" },
-  { layerId: "L20.N1105", tokenName: "--sd-theme-emerald", hex: "#10b981", channelOrRoute: "GATEWAY (SIGNAL_EQUILIBRIUM_GATE)", roleDescription: "Equilibrium Confirm & Vig Gate (SLA 1000ms)" },
-  { layerId: "L21.N0884", tokenName: "--sd-tier-alert", hex: "#ef4444", channelOrRoute: "ALERT (SIGNAL_ALERT_TWIN)", roleDescription: "Syndicate Sub-acct Syntax & Twin Buffer (250ms)" },
-  { layerId: "L22.N1402", tokenName: "--sd-tier-steam", hex: "#f59e0b", channelOrRoute: "GSBUILDER (SIGNAL_SGP_BUILDER)", roleDescription: "Steam / Line Chase Phrasing & SGP (1000ms)" },
-  { layerId: "L23.N0412", tokenName: "--sd-tier-whale", hex: "#28a745", channelOrRoute: "GSLIVE (SIGNAL_GS_INPLAY)", roleDescription: "Whale Sizing Anomaly & Live Move (500ms)" },
-  { layerId: "L24.N2019", tokenName: "--sd-tier-rec-bias", hex: "#38bdf8", channelOrRoute: "CSLEVEL2 (SIGNAL_SYNDICATE_L2)", roleDescription: "Recreational Longshot Bias (SLA 2000ms)" },
-  { layerId: "L25.N1882", tokenName: "--sd-route-devig", hex: "#06b6d4", channelOrRoute: "Route 04 Devig Consensus", roleDescription: "Adverse Selection & Steam Convergence (<=5s lag)" },
-  { layerId: "L26.N3104", tokenName: "--sd-route-sharp", hex: "#a855f7", channelOrRoute: "Route 02 Sharp Shrinkage", roleDescription: "CLV Margin Decay & Posterior Shrinkage (tau*=0.68)" },
-  { layerId: "L27.N0912", tokenName: "--sd-route-pending", hex: "#f59e0b", channelOrRoute: "Route 01 Liquidity Breaker", roleDescription: "Liquidity Exhaustion & Circuit Breaker (<$1k depth)" },
-  { layerId: "L28.N2501", tokenName: "--sd-route-manager", hex: "#f43f5e", channelOrRoute: "Route 03 Manager Terminal", roleDescription: "Terminal Risk Mitigation & Execution Write-Gate" },
-  { layerId: "SURFACE.DOM", tokenName: "--sd-surface-bg", hex: "#070b14", channelOrRoute: "Dark Obsidian Shell", roleDescription: "Main Dashboard DOM Surface Background" },
-  { layerId: "SURFACE.CLI", tokenName: "--sd-surface-cli", hex: "#04070e", channelOrRoute: "Deterministic Dark ANSI", roleDescription: "CLI Terminal Surface & Telemetry Background" },
-];
+export const QWEN_NEURON_TOKENS = ALL_QWEN_TOKENS;
 
 export function printNeuronRegistry(): void {
-  console.log("================================================================================");
-  console.log("13-ENTITY QWEN3.5-4B (LAYERS 18-28) NEURON REGISTRY & CSS TOKEN PALETTE");
-  console.log("================================================================================");
-  console.log(" # | Layer / ID    | Token Name         | Hex Code | ANSI Preview  | Signal Channel / Route & SLA");
-  console.log("---+---------------+--------------------+----------+---------------+-------------------------------------------------");
-  QWEN_NEURON_TOKENS.forEach((n, idx) => {
+  // 1. CI Integrity Assertion: Enforce 1-to-1 uniqueness across tokens, layers, and hex codes
+  assertUniqueTokenColors(ALL_QWEN_TOKENS);
+
+  const reset = "\x1b[0m";
+
+  console.log("========================================================================================================================");
+  console.log("QWEN3.5-4B (LAYERS 18-28) NEURON REGISTRY & DECOUPLED THREE-AXIS ARCHITECTURE");
+  console.log("========================================================================================================================");
+
+  // Table 1: Ingestion Signal Channels (Layers 18-24)
+  console.log("\n--- AXIS 1: INGESTION SIGNAL CHANNELS (LAYERS 18-24) • TRANSPORT LATENCY SLA (ms) ---");
+  console.log(" # | Layer ID    | CSS Token          | Hex Code | ANSI Preview  | Channel Code | Latency SLA (ms) | Status     | Twin / Volume Rule");
+  console.log("---+-------------+--------------------+----------+---------------+--------------+------------------+------------+------------------------------------------");
+  INGESTION_CHANNELS.forEach((n, idx) => {
     const num = String(idx + 1).padStart(2);
     const colorInt = parseAsColorHexInt(n.hex);
     const ansi = colorHexIntToAnsiEscape(colorInt);
-    const reset = "\x1b[0m";
     const preview = `${ansi}████████${reset}`;
+    const slaStr = n.transportLatencySlaMs === 0 ? "0 ms (Drop)" : `${n.transportLatencySlaMs.toLocaleString()} ms`;
     console.log(
       `${num} | ` +
-      `${n.layerId.padEnd(13)} | ` +
+      `${n.layerId.padEnd(11)} | ` +
       `${n.tokenName.padEnd(18)} | ` +
       `${n.hex.padEnd(8)} | ` +
       `${preview.padEnd(17)} | ` +
-      `${n.channelOrRoute} • ${n.roleDescription}`
+      `${n.channelCode.padEnd(12)} | ` +
+      `${slaStr.padEnd(16)} | ` +
+      `${n.channelStatus.padEnd(10)} | ` +
+      `${n.volumeRule}`
     );
   });
-  console.log("================================================================================\n");
+
+  // Table 2: Risk Decision & Route Continuum (Layers 25-28)
+  console.log("\n--- AXIS 2: RISK DECISION & ROUTE CONTINUUM (LAYERS 25-28) • ALGORITHMIC THRESHOLDS & ACTIONS ---");
+  console.log(" # | Layer ID    | CSS Token          | Hex Code | ANSI Preview  | Decision Route              | Move Flag           | Algorithmic Threshold       | Mitigation Action");
+  console.log("---+-------------+--------------------+----------+---------------+-----------------------------+---------------------+-----------------------------+-----------------------------------------------");
+  ROUTE_CIRCUITS.forEach((n, idx) => {
+    const num = String(idx + 8).padStart(2);
+    const colorInt = parseAsColorHexInt(n.hex);
+    const ansi = colorHexIntToAnsiEscape(colorInt);
+    const preview = `${ansi}████████${reset}`;
+    console.log(
+      `${num} | ` +
+      `${n.layerId.padEnd(11)} | ` +
+      `${n.tokenName.padEnd(18)} | ` +
+      `${n.hex.padEnd(8)} | ` +
+      `${preview.padEnd(17)} | ` +
+      `${n.routeName.padEnd(27)} | ` +
+      `${n.moveFlag.padEnd(19)} | ` +
+      `${n.algorithmicThreshold.padEnd(27)} | ` +
+      `${n.mitigationAction}`
+    );
+  });
+
+  // Table 3: Telemetry Viewports & Rendering Surfaces
+  console.log("\n--- AXIS 3: TELEMETRY VIEWPORTS & RENDERING SURFACES ---");
+  console.log(" # | Surface ID   | CSS Token          | Hex Code | ANSI Preview  | Surface Name                 | Target Viewport                           | Color Depth");
+  console.log("---+--------------+--------------------+----------+---------------+------------------------------+-------------------------------------------+-----------------------");
+  TELEMETRY_SURFACES.forEach((n, idx) => {
+    const num = String(idx + 12).padStart(2);
+    const colorInt = parseAsColorHexInt(n.hex);
+    const ansi = colorHexIntToAnsiEscape(colorInt);
+    const preview = `${ansi}████████${reset}`;
+    console.log(
+      `${num} | ` +
+      `${n.layerId.padEnd(12)} | ` +
+      `${n.tokenName.padEnd(18)} | ` +
+      `${n.hex.padEnd(8)} | ` +
+      `${preview.padEnd(17)} | ` +
+      `${n.surfaceName.padEnd(28)} | ` +
+      `${n.targetViewport.padEnd(41)} | ` +
+      `${n.colorDepth}`
+    );
+  });
+  console.log("========================================================================================================================\n");
 }
 
 export function printWinners(args: string[]): void {
