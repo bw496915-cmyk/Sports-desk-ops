@@ -21,7 +21,7 @@ bun test tests/verify_tokens.test.ts
 # 4. Compile tokens across TypeScript, Webview, and TMA dashboards (Zero-Drift SSOT)
 bun run gen:tokens
 
-# 5. Run all test suites including headers, port cascade, errors, and benchmarks
+# 5. Run all 10 test suites across headers, port cascade, proxy isolation, timeouts, and benchmarks (806 assertions)
 bun test
 
 # 6. Run 24h sniper surveillance
@@ -45,14 +45,29 @@ Server binding in `sportsdesk_webview_server.ts` adheres to Bun's native port re
 3. `NODE_PORT`
 4. Default fallback: `3000`
 
-**SportsDesk Operational Policy**: Rather than overriding Bun's cascade in code, SportsDesk relies directly on native resolution. Production deployments configure `PORT=4020` inside `.env`, which Bun loads automatically at process initialization. When `startServer(options)` is called programmatically, `{ port, hostname, development }` options allow explicit test or proxy overrides; when omitted, Bun resolves port and hostname natively (defaulting hostname to `0.0.0.0`).
+**SportsDesk Operational Policy**: Rather than overriding Bun's cascade in code, SportsDesk relies directly on native resolution. Production deployments configure `PORT=4020` inside `.env`, which Bun loads automatically at process initialization. When `startServer(options)` is called programmatically, `{ port, hostname, unix, development }` options allow explicit test or proxy overrides; when omitted, Bun resolves port and hostname natively (defaulting hostname to `0.0.0.0`).
 
-### Zero-Copy Static File Streaming Policy
+### Static File Serving & Zero-Copy Policy
 
-Static HTML surfaces (`customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`) are streamed via `new Response(Bun.file(path))`.
+Static HTML surfaces (`customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`) are served via native `new Response(Bun.file(path))` lazy handles.
 
-- **No-TLS-on-Bun Precondition**: Kernel zero-copy file transfer (`sendfile(2)`) functions exclusively on unencrypted HTTP sockets. If TLS is terminated directly inside the Bun process (`tls: { ... }`), bytes must be copied into user-space memory for encryption before transmission, negating zero-copy benefits.
-- **Nginx TLS Preservation**: In production VPS topology, Nginx terminates TLS (HTTPS 443 via Let's Encrypt) at the edge and proxies requests over loopback to Bun (`http://127.0.0.1:4020`). This architecture preserves Bun's zero-copy kernel streaming over the loopback interface without double-encryption or user-space memory buffer overhead.
+- **Zero-Copy Specification & Boundary Conditions**: Official Bun runtime documentation specifies kernel zero-copy transfer (`sendfile(2)` on Linux, `copyfile` on macOS) specifically for outbound client file uploads (`fetch(url, { method: "POST", body: Bun.file(...) })`). This optimization activates exclusively under four strict preconditions:
+  1. Payload size strictly exceeds 32 KB (under 32 KB, direct in-memory buffer reads outperform kernel syscall setup).
+  2. Unencrypted HTTP transport (no TLS encryption).
+  3. Direct TCP connection (no intermediate HTTP/HTTPS proxy).
+  4. Uncompressed transmission (no gzip/brotli transfer encoding).
+- **Server Response Path Distinction**: On the server response path (`new Response(Bun.file(path))`), Bun constructs a lazy file handle pointer in user space without eagerly reading file bytes into memory buffers. Handle allocation takes ~0.38 µs (compared to 45.9 µs for `readFileSync`). However, whether the subsequent socket transmission leverages `sendfile(2)` or `writev`/`pread` is unproven in Bun's published documentation. SportsDesk avoids conflating upload zero-copy claims with response streaming.
+- **Nginx Reverse Proxy & Unix Domain Socket Offloading**: In production, Nginx terminates public TLS 1.3 at port 443 and proxies traffic to Bun over an unencrypted local Unix domain socket (`/run/sportsdesk/webview.sock`) or loopback HTTP (`127.0.0.1:4020`). This topology eliminates TLS encryption overhead and TCP port exposure on the host.
+
+### Outbound Fetch Hardening & Network Isolation
+
+Outbound network operations across Telegram alerts, Cloudflare R2 backup, and Fantasy402 feeds are hardened against proxy hijacking, hanging connections, and transport vulnerabilities:
+
+- **Bounded Execution Windows (`AbortSignal.timeout`)**: All outbound requests enforce strict timeouts via `signal: AbortSignal.timeout(timeoutMs)` (e.g., 5,000 ms for Telegram dispatch, 10,000 ms for R2 verification). Unbounded `fetch` awaits are eliminated.
+- **Loopback Proxy Isolation (`NO_PROXY`)**: Bun resolves `HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY` on a per-request basis. If an external or CI proxy is configured, loopback calls (`http://127.0.0.1:4020`) risk being trapped and proxied. SportsDesk configures `NO_PROXY=127.0.0.1,localhost,::1` across `.env`, `.env.example`, and `deploy_to_vps.sh` (verified by `tests/fetch_proxy_isolation.test.ts`).
+- **HTTP Connection Pool Bounds (`BUN_CONFIG_MAX_HTTP_REQUESTS`)**: Set to `256` to align Bun's shared connection pool with peak alert burst throughput, preventing resource starvation.
+- **Dedicated `Bun.FetchSession` & Pre-Warming**: `SportsDeskTelegramService` initializes a dedicated `Bun.FetchSession` with `tls: { rejectUnauthorized: true }`, isolating session credentials and connection reuse. Outbound connections are pre-warmed at boot via `fetch.preconnect("https://api.telegram.org")` to eliminate initial TLS handshake latency.
+- **Zero Embedded Credentials & Insecure TLS Protection**: Validated by `tests/fetch_url_credentials.test.ts`, ensuring 0 plaintext `http(s)://user:pass@` strings in source code and 0 occurrences of `rejectUnauthorized: false`.
 
 ### Environment Variable Precedence & Type Merging
 
@@ -63,7 +78,7 @@ Bun automatically loads environment files at startup in strict order of increasi
 3. `.env.local` (**Exception**: strictly skipped when `NODE_ENV=test` to ensure deterministic test isolation)
 4. `.env.production.local`, `.env.development.local`, `.env.test.local` (mode-specific local overrides)
 
-TypeScript declaration merging in `env.d.ts` extends both `Bun.Env` and `NodeJS.ProcessEnv` with strict typing for all SportsDesk credentials (`PORT`, `F402_*`, `CLOUDFLARE_*`, `R2_*`, `TELEGRAM_*`), verified via `tests/env_types.test-d.ts`.
+TypeScript declaration merging in `env.d.ts` extends both `Bun.Env` and `NodeJS.ProcessEnv` with strict typing for all SportsDesk credentials (`PORT`, `BUN_SOCKET`, `NO_PROXY`, `BUN_CONFIG_MAX_HTTP_REQUESTS`, `F402_*`, `CLOUDFLARE_*`, `R2_*`, `TELEGRAM_*`), verified via `tests/env_types.test-d.ts`.
 
 ### Security Headers & Telegram Mini App Embedding
 
@@ -74,12 +89,18 @@ To ensure seamless embedding inside Telegram Web (`https://web.telegram.org`), T
 
 ## Performance Telemetry & Micro-Benchmarks
 
-Empirical measurements recorded via `tests/bench_server.test.ts` on Bun v1.4.4 (macOS arm64):
+Empirical measurements recorded via `tests/bench_server.test.ts` and `tests/sendfile_threshold.test.ts` on Bun v1.4.4 (macOS arm64):
 
-| Surface / Operation                     | Manual Baseline Path             | Native Bun Path            | Measured Latency    | Throughput Ratio              |
-| :-------------------------------------- | :------------------------------- | :------------------------- | :------------------ | :---------------------------- |
-| **JSON Serialization** (25 accounts)    | `JSON.stringify` + headers       | `Response.json(data)`      | 1.05 µs vs 0.81 µs  | 1.29x faster                  |
-| **HTML File Serving** (21.5 KB payload) | `readFileSync` buffer allocation | `new Response(Bun.file())` | 45.66 µs vs 0.46 µs | 99.94x faster handle creation |
+| Surface / Operation | Manual Baseline Path | Native Bun Path | Measured Latency | Throughput / Speedup |
+| :--- | :--- | :--- | :--- | :--- |
+| **JSON Serialization** (25 accounts) | `JSON.stringify` + headers | `Response.json(data)` | 0.99 µs vs 0.82 µs | 1.21x faster |
+| **Response Handle Construction** (21.5 KB payload) | `readFileSync` buffer allocation | `new Response(Bun.file())` | 45.91 µs vs 0.38 µs | 119.88x faster lazy handle creation |
+| **Handle Construction Latency** (16 KB) | Buffer allocation | `new Response(Bun.file())` | 0.49 µs/op | Sub-microsecond lazy handle |
+| **Handle Construction Latency** (64 KB) | Buffer allocation | `new Response(Bun.file())` | 0.47 µs/op | Sub-microsecond lazy handle |
+| **Handle Construction Latency** (1 MB) | Buffer allocation | `new Response(Bun.file())` | 0.21 µs/op | Sub-microsecond lazy handle |
+| **End-to-End Socket Transfer** (16 KB payload) | `fetch` socket transfer | `new Response(Bun.file())` | 0.149 ms/req | Direct loopback socket transfer |
+| **End-to-End Socket Transfer** (64 KB payload) | `fetch` socket transfer | `new Response(Bun.file())` | 0.191 ms/req | Direct loopback socket transfer |
+| **End-to-End Socket Transfer** (1 MB payload) | `fetch` socket transfer | `new Response(Bun.file())` | 0.489 ms/req | Direct loopback socket transfer |
 
 ## Qwen3.5-4B (Layers 18–28) Token Architecture & Single Source of Truth
 
@@ -132,9 +153,9 @@ All tokens and contracts are verified continuously through `validation/token_val
 4. **WCAG 2.1 Contrast Standards**: $\ge 3.0:1$ for graphical UI badges against dark surfaces (`#070b14` / `#0b1329`) and $\ge 4.5:1$ for typography.
 5. **Zero Dead Tokens**: Asserts bidirectional reference consistency (all declared tokens used, all used tokens declared).
 
-### Test Suite Classification (629 Assertions Total)
+### Test Suite Classification (806 Assertions Total)
 
-The test suite consists of 6 test suites across 20 tests and 629 total assertions:
+The test suite consists of 10 test suites across 31 tests and 806 total assertions:
 
 - **Token Verification Suite (`tests/verify_tokens.test.ts`, 592 assertions)**:
   - **Table-Driven & Structural Tests (242 assertions)**:
@@ -146,12 +167,16 @@ The test suite consists of 6 test suites across 20 tests and 629 total assertion
   - **Generative Property-Based Tests (350 assertions)**:
     - `test_property_ciede2000_metric_axioms`: 150 assertions evaluating identity of indiscernibles, non-negativity, and symmetry across randomized color vectors.
     - `test_property_wcag_contrast_ratio_bounds`: 200 assertions evaluating contrast ratio bounds `[1.0, 21.0]` and monotonicity across randomized luminance pairs.
-- **Server Runtime Suites (37 assertions)**:
+- **Server Runtime & Network Hardening Suites (214 assertions)**:
+  - `tests/sendfile_threshold.test.ts`: 156 assertions evaluating 16 KB, 64 KB, and 1 MB lazy handle construction latency vs end-to-end socket throughput.
   - `tests/server_headers.test.ts`: 21 assertions verifying absence of `X-Frame-Options` and presence of required Telegram Mini App `frame-ancestors`.
-  - `tests/server_port.test.ts`: 2 assertions verifying `BUN_PORT=4100` cascade resolution without code overrides.
   - `tests/server_error.test.ts`: 14 assertions verifying non-Error exceptions in production return structured 500 JSON without stack traces.
-  - `tests/env_types.test-d.ts`: Type assertion verifying `expectTypeOf<typeof Bun.env.KEY>().toEqualTypeOf<typeof process.env.KEY>()`.
-  - `tests/bench_server.test.ts`: 6 assertions benchmark-testing latency numbers for JSON and file responses.
+  - `tests/fetch_timeout.test.ts`: 7 assertions verifying `AbortSignal.timeout` aborts slow upstreams and validates service bounds.
+  - `tests/bench_server.test.ts`: 6 assertions benchmarking latency numbers for JSON serialization and file handle creation.
+  - `tests/fetch_proxy_isolation.test.ts`: 5 assertions verifying `NO_PROXY` bypasses proxy on loopback calls and prevents proxy hijacking.
+  - `tests/fetch_url_credentials.test.ts`: 3 assertions auditing codebase for 0 embedded URL credentials and 0 `rejectUnauthorized: false` occurrences.
+  - `tests/server_port.test.ts`: 2 assertions verifying `BUN_PORT=4100` cascade resolution without code overrides.
+  - `tests/env_types.test-d.ts` / `tests/env_types.test.ts`: Type assertion verifying `expectTypeOf<typeof Bun.env.KEY>().toEqualTypeOf<typeof process.env.KEY>()`.
 
 ## Project Structure
 
@@ -168,7 +193,11 @@ The test suite consists of 6 test suites across 20 tests and 629 total assertion
 │   ├── server_error.test.ts                 # Production error boundary without stack traces
 │   ├── env_types.test-d.ts                  # Bun.env vs process.env type parity
 │   ├── env_types.test.ts                    # Test runner for env_types
-│   └── bench_server.test.ts                 # Latency benchmarks: Response.json & Bun.file
+│   ├── bench_server.test.ts                 # Latency benchmarks: Response.json & Bun.file lazy handles
+│   ├── sendfile_threshold.test.ts           # 16KB, 64KB, 1MB handle latency vs socket transfer benchmark
+│   ├── fetch_timeout.test.ts                # Outbound AbortSignal.timeout enforcement tests
+│   ├── fetch_proxy_isolation.test.ts        # NO_PROXY loopback isolation tests
+│   └── fetch_url_credentials.test.ts        # Codebase audit: 0 URL credentials, 0 rejectUnauthorized: false
 ├── domain-branded-types.ts                  # Nominal branded primitives, discriminated unions & tables
 ├── env.d.ts                                 # Bun.Env & NodeJS.ProcessEnv interface merging
 ├── sportsdesk_webview_server.ts             # Native Bun HTTP server & Telegram Mini App gateway

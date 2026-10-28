@@ -81,6 +81,7 @@ export class SportsDeskTelegramService {
   private readonly watchListMap: Map<string, WatchListAccount> = new Map();
   private readonly scheduledReports: ScheduledReportTask[] = [];
   private schedulerIntervalTimer: any = null;
+  private readonly fetchSession: Bun.FetchSession;
 
   constructor(options?: {
     botToken?: string;
@@ -99,6 +100,20 @@ export class SportsDeskTelegramService {
       this.botToken.trim().length > 0 &&
       this.defaultChatId.trim().length > 0,
     );
+
+    this.fetchSession = new Bun.FetchSession({
+      tls: {
+        rejectUnauthorized: true,
+      },
+    });
+
+    if (this.isLiveMode && typeof fetch.preconnect === "function") {
+      try {
+        fetch.preconnect("https://api.telegram.org");
+      } catch {
+        // Non-blocking preconnect failure
+      }
+    }
 
     this.initWatchListRegistry();
     this.initScheduleDefinitions();
@@ -369,7 +384,7 @@ export class SportsDeskTelegramService {
   public async sendMessage(
     chatId: string,
     htmlText: string,
-    options?: TelegramSendMessageOptions,
+    options?: TelegramSendMessageOptions & { readonly timeoutMs?: number },
   ): Promise<{ ok: boolean; message_id?: number; description?: string }> {
     const targetChat = chatId || this.defaultChatId;
 
@@ -389,6 +404,7 @@ export class SportsDeskTelegramService {
 
     try {
       const endpoint = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+      const timeoutMs = options?.timeoutMs ?? 10_000;
       const body = {
         chat_id: targetChat,
         text: htmlText,
@@ -397,10 +413,11 @@ export class SportsDeskTelegramService {
         reply_markup: options?.reply_markup,
       };
 
-      const res = await fetch(endpoint, {
+      const res = await this.fetchSession.fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
       });
 
       return (await res.json()) as any;

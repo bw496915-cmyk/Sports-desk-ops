@@ -60,7 +60,9 @@ export function getR2ConfigInfo(): void {
   );
 }
 
-export async function verifyR2Connection(): Promise<boolean> {
+export async function verifyR2Connection(
+  timeoutMs: number = 10_000,
+): Promise<boolean> {
   const cfg = getR2Config();
   console.log(
     `[Cloudflare API] Verifying token status for account ${cfg.accountId}...`,
@@ -72,6 +74,7 @@ export async function verifyR2Connection(): Promise<boolean> {
         headers: {
           Authorization: `Bearer ${cfg.apiToken}`,
         },
+        signal: AbortSignal.timeout(timeoutMs),
       },
     );
     const json = (await res.json()) as any;

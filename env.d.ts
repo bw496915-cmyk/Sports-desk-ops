@@ -13,6 +13,12 @@ declare module "bun" {
     readonly HOST?: string;
     readonly HOSTNAME?: string;
     readonly NODE_ENV?: "production" | "development" | "test";
+    readonly NO_PROXY?: string;
+    readonly HTTP_PROXY?: string;
+    readonly HTTPS_PROXY?: string;
+    readonly ALL_PROXY?: string;
+    readonly BUN_CONFIG_MAX_HTTP_REQUESTS?: string;
+    readonly BUN_SOCKET?: string;
 
     // Fantasy402 Portal Gateway
     readonly F402_BASE_URL?: string;

@@ -58,7 +58,7 @@ describe("Server Latency & Throughput Benchmark", () => {
     expect(nativeAvgUs).toBeLessThan(100); // Expect sub-100µs per operation
   });
 
-  test("bench_bun_file_vs_manual_read_file_sync", () => {
+  test("bench_bun_file_lazy_handle_vs_manual_read_file_sync", () => {
     const filePath = resolve(
       import.meta.dir,
       "../customer-churn-simulation-dashboard.html",
@@ -85,7 +85,7 @@ describe("Server Latency & Throughput Benchmark", () => {
     const manualMs = performance.now() - t0;
     const manualAvgUs = (manualMs / iterations) * 1000;
 
-    // 2. Native Path: Bun.file handle + new Response (lazy / zero-copy kernel transfer)
+    // 2. Native Path: Bun.file lazy handle construction (Response wrapping Bun.file pointer)
     const t1 = performance.now();
     for (let i = 0; i < iterations; i++) {
       const file = Bun.file(filePath);
@@ -98,16 +98,19 @@ describe("Server Latency & Throughput Benchmark", () => {
     const speedup = manualMs / bunFileMs;
 
     console.log(
-      `\n[Benchmark: Static HTML Serving] ${iterations} iterations (${fileSizeKb} KB):`,
+      `\n[Benchmark: Response Handle Construction] ${iterations} iterations (${fileSizeKb} KB):`,
     );
     console.log(
-      ` • Manual (readFileSync + headers)   : ${manualMs.toFixed(3)} ms total (${manualAvgUs.toFixed(2)} µs/op)`,
+      ` • Manual (readFileSync + headers)        : ${manualMs.toFixed(3)} ms total (${manualAvgUs.toFixed(2)} µs/op)`,
     );
     console.log(
-      ` • Native (Bun.file lazy handle)      : ${bunFileMs.toFixed(3)} ms total (${bunFileAvgUs.toFixed(2)} µs/op)`,
+      ` • Native (Bun.file lazy handle creation) : ${bunFileMs.toFixed(3)} ms total (${bunFileAvgUs.toFixed(2)} µs/op)`,
     );
     console.log(
-      ` • Handle Creation Speedup            : ${speedup.toFixed(2)}x faster`,
+      ` • Handle Construction Speedup            : ${speedup.toFixed(2)}x faster (lazy handle vs buffer allocation)`,
+    );
+    console.log(
+      ` Note: Measures user-space handle construction. For end-to-end socket transfers (16KB, 64KB, 1MB), see tests/sendfile_threshold.test.ts.`,
     );
 
     expect(bunFileMs).toBeGreaterThan(0);

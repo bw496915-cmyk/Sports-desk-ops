@@ -7,8 +7,9 @@
  *  - Native port cascade: relies on Bun's BUN_PORT -> PORT -> NODE_PORT -> 3000 cascade
  *    (SportsDesk defaults to PORT=4020 via auto-loaded .env, overridable via options).
  *  - Explicit or default hostname binding (defaults to 0.0.0.0).
- *  - High-throughput Response.json() and zero-copy Response(Bun.file()) streams
- *    (zero-copy sendfile applies to unencrypted loopback HTTP behind Nginx TLS termination).
+ *  - Unix domain socket support via `unix` option or `BUN_SOCKET` environment variable
+ *    (removes TCP port exposure for local Nginx upstream proxying).
+ *  - High-throughput Response.json() and lazy Response(Bun.file()) static file handle serving.
  *  - Standardized CORS and CSP frame-ancestors for Telegram Mini App embedding (no X-Frame-Options).
  *  - Robust error boundary handling via Bun.serve `error(err)` returning structured 500 JSON.
  */
@@ -24,6 +25,7 @@ const currentDir =
 export interface ServerOptions {
   readonly port?: number;
   readonly hostname?: string;
+  readonly unix?: string;
   readonly development?: boolean;
 }
 
@@ -85,7 +87,7 @@ export function startServer(options?: ServerOptions) {
             status: "healthy",
             port: server.port,
             hostname: server.hostname,
-            url: server.url.toString(),
+            url: server.url ? server.url.toString() : "unix://socket",
             timestamp: new Date().toISOString(),
             uptimeSeconds: Math.floor(process.uptime()),
             runtime: `Bun v${Bun.version} (${process.arch}-${process.platform})`,
@@ -205,11 +207,21 @@ export function startServer(options?: ServerOptions) {
     },
   };
 
-  if (options?.port !== undefined) {
-    serveConfig.port = options.port;
-  }
-  if (options?.hostname !== undefined) {
-    serveConfig.hostname = options.hostname;
+  const unixSocket =
+    options?.unix ||
+    (typeof Bun !== "undefined"
+      ? Bun.env.BUN_SOCKET
+      : process.env.BUN_SOCKET);
+
+  if (unixSocket) {
+    (serveConfig as any).unix = unixSocket;
+  } else {
+    if (options?.port !== undefined) {
+      serveConfig.port = options.port;
+    }
+    if (options?.hostname !== undefined) {
+      serveConfig.hostname = options.hostname;
+    }
   }
 
   const server = Bun.serve(serveConfig);
@@ -218,9 +230,10 @@ export function startServer(options?: ServerOptions) {
 
 if (import.meta.main) {
   const server = startServer();
-  console.log(`[SportsDesk Webview Server] Active on ${server.url.toString()}`);
-  console.log(` • Master Dashboard : ${server.url.toString()}`);
-  console.log(` • Mini App (TMA)   : ${server.url.toString()}miniapp`);
-  console.log(` • Health Probe     : ${server.url.toString()}health`);
-  console.log(` • Watch List API   : ${server.url.toString()}api/watchlist`);
+  const location = server.url ? server.url.toString() : "unix domain socket";
+  console.log(`[SportsDesk Webview Server] Active on ${location}`);
+  console.log(` • Master Dashboard : ${location}`);
+  console.log(` • Mini App (TMA)   : ${location}miniapp`);
+  console.log(` • Health Probe     : ${location}health`);
+  console.log(` • Watch List API   : ${location}api/watchlist`);
 }

@@ -108,6 +108,10 @@ F402_INITIAL_WATERMARK=0
 PORT=\${LOCAL_PORT}
 NODE_ENV=production
 
+# Network & Proxy Isolation (Prevents proxy trapping of local loopback calls)
+NO_PROXY=127.0.0.1,localhost,::1
+BUN_CONFIG_MAX_HTTP_REQUESTS=256
+
 # Cloudflare R2 Storage & API
 CLOUDFLARE_ACCOUNT_ID=\${CLOUDFLARE_ACCOUNT_ID:-7a470541a704caaf91e71efccc78fd36}
 CLOUDFLARE_API_TOKEN=\${CLOUDFLARE_API_TOKEN:-}
@@ -144,6 +148,9 @@ Type=simple
 User=root
 WorkingDirectory=${APP_DIR}
 EnvironmentFile=${APP_DIR}/.env
+Environment="BUN_SOCKET=/run/sportsdesk/webview.sock"
+RuntimeDirectory=sportsdesk
+RuntimeDirectoryMode=0755
 ExecStart=${BUN_BIN} run sportsdesk_webview_server.ts
 Restart=always
 RestartSec=5s
@@ -179,7 +186,8 @@ NGINX_SITE_CONF="/etc/nginx/sites-available/${DOMAIN}.conf"
 
 cat <<EOF > "$NGINX_SITE_CONF"
 upstream sportsdesk_backend {
-    server 127.0.0.1:${LOCAL_PORT};
+    server unix:/run/sportsdesk/webview.sock fail_timeout=0;
+    server 127.0.0.1:${LOCAL_PORT} backup;
     keepalive 32;
 }
 

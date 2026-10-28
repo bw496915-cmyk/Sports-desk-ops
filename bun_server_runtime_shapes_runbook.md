@@ -354,40 +354,102 @@ A critical design decision in SportsDesk is **where** TLS termination occurs:
 │                                                                             │
 │ Client (HTTPS 443) ──► [ Nginx (Edge TLS 1.3 / Let's Encrypt) ]             │
 │                                │                                            │
-│                        Unencrypted HTTP/1.1 Loopback (127.0.0.1:4020)       │
+│                        Unix Domain Socket / Plaintext Loopback              │
 │                                ▼                                            │
-│                        [ Bun.serve({ port: 4020 }) ]                        │
-│                        ├── Plaintext HTTP Loopback Socket                   │
-│                        └── ✅ Zero-Copy sendfile(2) ACTIVE                   │
-│                            (File bytes streamed directly via kernel cache)  │
+│                        [ Bun.serve({ unix: "/run/sportsdesk/webview.sock" })│
+│                        ├── Local Plaintext Socket (No TLS Overhead)         │
+│                        └── ✅ Sub-Microsecond Lazy Handle Allocation         │
+│                            (0.38 µs handle creation vs 45 µs readFileSync)  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 5.1 The Zero-Copy Precondition
+### 5.1 The Zero-Copy Invariant & Boundary Conditions
 
-- Native zero-copy streaming (`new Response(Bun.file(path))`) relies on the OS `sendfile(2)` syscall.
-- `sendfile(2)` transfers file data directly from the OS page cache to the network socket descriptor within kernel space.
-- **Why Standalone TLS Disables Zero-Copy**: In TLS sockets, payload bytes must be encrypted before transmission. Because the kernel cannot encrypt payload bytes with user-space TLS keys directly in the standard `sendfile` path, the runtime must read disk bytes into user space memory, encrypt them, and write the encrypted ciphertext back to the socket.
-- **SportsDesk Benchmark Evidence**:
-  - Unencrypted `Bun.file` lazy handle response: **0.46 µs** (measured in `tests/bench_server.test.ts`).
-  - Memory-buffered `readFileSync` + stringify: **45.66 µs** (99.94x slower).
+- **Client Upload Specification**: In official Bun documentation, kernel zero-copy transfer (`sendfile(2)` on Linux, `copyfile` on macOS) is specified for **outbound client file uploads** (`fetch(url, { method: "POST", body: Bun.file(...) })`). This optimization activates exclusively under four strict conditions:
+  1. File payload strictly exceeds 32 KB (under 32 KB, direct in-memory buffer reads outperform kernel syscall overhead).
+  2. Unencrypted plain HTTP transport (no TLS encryption).
+  3. Direct TCP connection (no intermediate HTTP/HTTPS proxy).
+  4. Uncompressed transmission (no transfer compression).
+- **Server Response Path Distinction**: On the server response path (`new Response(Bun.file(path))`), Bun constructs a lazy file handle pointer in user space without eagerly buffering disk bytes into memory. Handle construction requires ~0.38 µs (compared to 45.91 µs for `readFileSync`). However, whether the subsequent socket write employs `sendfile(2)` or `writev`/`pread` is unproven in Bun's published documentation. SportsDesk avoids conflating outbound upload zero-copy claims with response streaming.
+- **Micro-Benchmark Telemetry** (measured in `tests/bench_server.test.ts` and `tests/sendfile_threshold.test.ts` on Bun v1.4.4):
+  - **Handle Construction**: 0.49 µs (16 KB), 0.47 µs (64 KB), 0.21 µs (1 MB). Sub-microsecond and independent of payload size.
+  - **End-to-End Socket Transfer**: 0.149 ms (16 KB), 0.191 ms (64 KB), 0.489 ms (1 MB).
 
 ### 5.2 Why SportsDesk Chooses Option B
 
-1. **Preserves Zero-Copy File Transfers**: High-frequency dashboard delivery (`customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`) operates at maximum kernel throughput over loopback.
-2. **Standardized Edge Security**: Nginx manages rate-limiting, DDoS mitigation, and automatic Let's Encrypt renewal (`certbot`) without restarting or redeploying the Bun application.
-3. **When Standalone Bun TLS is Appropriate**: Standalone `TLSOptions` is reserved for internal microservice-to-microservice mutual TLS (mTLS) across private VPC boundaries where no edge reverse proxy exists.
+1. **Eliminates TLS Encryption Overhead on the Event Loop**: Edge Nginx terminates TLS 1.3, allowing Bun to process requests over a local Unix domain socket (`/run/sportsdesk/webview.sock`) or loopback HTTP (`127.0.0.1:4020`) without CPU-intensive cryptographic framing.
+2. **Removes Host TCP Port Exposure**: Using Unix domain sockets eliminates open TCP ports on the loopback interface, removing network attack surface and preventing local port collisions.
+3. **Standardized Edge Security**: Nginx manages rate-limiting, DDoS mitigation, and automated Let's Encrypt certificate renewal (`certbot`) without requiring Bun process restarts.
+4. **When Standalone Bun TLS is Appropriate**: Standalone `TLSOptions` is reserved for internal microservice-to-microservice mutual TLS (mTLS) across private VPC boundaries where no edge reverse proxy exists.
 
 ---
 
 ## 6. SportsDesk Production Server Alignment Matrix
 
-| Interface / Feature            | SportsDesk Implementation Module                           | Operational Policy & Configuration                                                                                                                                   |
-| ------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Port Cascade**               | `sportsdesk_webview_server.ts`                             | Resolves via `BUN_PORT` → `PORT` → `NODE_PORT` → `3000`. Production defaults to `PORT=4020` in `.env`.                                                               |
-| **Hostname Binding**           | `sportsdesk_webview_server.ts`                             | Default `0.0.0.0` (all interfaces), configurable to `127.0.0.1` for strict loopback.                                                                                 |
-| **Error Boundary**             | `sportsdesk_webview_server.ts`                             | Implements `error(err)` hook returning structured 500 JSON, suppressing stack traces when `NODE_ENV=production`.                                                     |
-| **Security Headers**           | `sportsdesk_webview_server.ts`                             | Omits deprecated `X-Frame-Options: ALLOWALL`; enforces `Content-Security-Policy: frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:;`. |
-| **In-Memory Testing**          | `tests/server_error.test.ts`, `tests/bench_server.test.ts` | Evaluates routes via `server.fetch(req)` to eliminate port contention in sandboxes and CI.                                                                           |
-| **WebSocket Ticker (Roadmap)** | `fantasy402-ticker-watch`                                  | Implements `WebSocketHandler<TickerSessionContext>` with `perMessageDeflate: true`, `backpressureLimit: 16MB`, and topic pub/sub (`ticker:steam`, `ticker:whale`).   |
-| **TLS Policy**                 | `deploy_to_vps.sh`                                         | Nginx terminates TLS 1.3 at port 443; Bun listens on plaintext HTTP loopback `127.0.0.1:4020` to preserve zero-copy kernel streaming.                                |
+| Interface / Feature | SportsDesk Implementation Module | Operational Policy & Configuration |
+| :--- | :--- | :--- |
+| **Port Cascade** | `sportsdesk_webview_server.ts` | Resolves via `BUN_PORT` → `PORT` → `NODE_PORT` → `3000`. Production defaults to `PORT=4020` in `.env`. |
+| **Hostname Binding** | `sportsdesk_webview_server.ts` | Default `0.0.0.0` (all interfaces), configurable to `127.0.0.1` for strict loopback. |
+| **Unix Domain Socket** | `sportsdesk_webview_server.ts`, `deploy_to_vps.sh` | Binds to `BUN_SOCKET=/run/sportsdesk/webview.sock` for zero-TCP-port Nginx upstream proxying. |
+| **Error Boundary** | `sportsdesk_webview_server.ts` | Implements `error(err)` hook returning structured 500 JSON, suppressing stack traces when `NODE_ENV=production`. |
+| **Security Headers** | `sportsdesk_webview_server.ts` | Omits deprecated `X-Frame-Options: ALLOWALL`; enforces `Content-Security-Policy: frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:;`. |
+| **In-Memory Testing** | `tests/server_error.test.ts`, `tests/bench_server.test.ts` | Evaluates routes via `server.fetch(req)` to eliminate port contention in sandboxes and CI. |
+| **Loopback Proxy Isolation** | `.env`, `.env.example`, `deploy_to_vps.sh` | Sets `NO_PROXY=127.0.0.1,localhost,::1` to prevent corporate/CI proxy interception of loopback calls. |
+| **Outbound Timeouts** | `sportsdesk_telegram_bot.ts`, `sportsdesk_r2_sync.ts` | Enforces `signal: AbortSignal.timeout(...)` across all outbound calls to prevent hanging event loops. |
+| **FetchSession & Preconnect** | `sportsdesk_telegram_bot.ts` | Uses `Bun.FetchSession` with `rejectUnauthorized: true` and boot-time `fetch.preconnect("https://api.telegram.org")`. |
+| **Connection Pool Bounds** | `.env`, `deploy_to_vps.sh` | Sets `BUN_CONFIG_MAX_HTTP_REQUESTS=256` to size the shared connection pool to SportsDesk throughput. |
+| **WebSocket Ticker (Roadmap)** | `fantasy402-ticker-watch` | Implements `WebSocketHandler<TickerSessionContext>` with `perMessageDeflate: true`, `backpressureLimit: 16MB`, and topic pub/sub (`ticker:steam`, `ticker:whale`). |
+| **TLS Policy** | `deploy_to_vps.sh` | Nginx terminates TLS 1.3 at port 443; Bun listens on Unix socket or plaintext loopback. |
+
+---
+
+## 7. Outbound Fetch Hardening & Network Isolation Specification
+
+High-frequency surveillance operations dispatch outbound HTTP requests across Telegram Bot APIs, Cloudflare R2 backup endpoints, and Fantasy402 feeds. To ensure resiliency against network latency, proxy traps, and credential leaks, all outbound operations adhere to five strict runtime specifications:
+
+### 7.1 Bounded Execution Windows (`AbortSignal.timeout`)
+
+Every outbound network call must pass an explicit abort signal. Unbounded `await fetch(...)` calls are strictly prohibited:
+
+```typescript
+// Bounded Telegram dispatch with 5,000 ms timeout window
+const res = await this.fetchSession.fetch(url, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload),
+  signal: AbortSignal.timeout(timeoutMs),
+});
+```
+
+If the remote upstream fails to respond within `timeoutMs`, the request aborts with a `TimeoutError`, caught and logged without stalling downstream alert processing.
+
+### 7.2 Loopback Proxy Isolation (`NO_PROXY`)
+
+Bun resolves environment proxies (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`) dynamically on a per-request basis. In VPN, CI, or corporate environments where global proxy variables are injected:
+
+- A request to `http://127.0.0.1:4020` or `http://localhost:4020` would silently route through the external proxy, leaking local tokens or failing connection handshakes.
+- SportsDesk enforces `NO_PROXY=127.0.0.1,localhost,::1` in all deployment environments. Verified continuously via `tests/fetch_proxy_isolation.test.ts`.
+
+### 7.3 Dedicated `Bun.FetchSession` & Pre-Warming
+
+Rather than using global unpooled `fetch`, `SportsDeskTelegramService` initializes an isolated `Bun.FetchSession`:
+
+```typescript
+this.fetchSession = new Bun.FetchSession({
+  tls: {
+    rejectUnauthorized: true, // Strict certificate validation
+  },
+});
+
+// Boot-time pre-warming
+if (typeof fetch !== "undefined" && typeof (fetch as any).preconnect === "function") {
+  (fetch as any).preconnect("https://api.telegram.org");
+}
+```
+
+Pre-warming establishes the TCP connection and TLS 1.3 handshake at service startup, ensuring that the first high-urgency syndicate alert dispatches with zero handshake delay.
+
+### 7.4 Zero Embedded Credentials & Strict TLS Policy
+
+- **No Embedded Credentials in URLs**: URLs of the form `http(s)://user:password@hostname` are forbidden across the codebase to prevent credential exposure in access logs and error traces.
+- **No `rejectUnauthorized: false`**: Disabling TLS verification creates CVE-vulnerable transport channels. SportsDesk enforces strict certificate validation across all runtime services. Verified continuously via `tests/fetch_url_credentials.test.ts`.
