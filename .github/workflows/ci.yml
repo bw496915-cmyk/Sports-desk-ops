@@ -24,12 +24,23 @@ jobs:
         with:
           bun-version: "1.4.4"
       - name: Install dependencies
-        run: bun install --frozen-lockfile || bun install
+        timeout-minutes: 5
+        run: bun install --frozen-lockfile
       - name: Token SSOT Zero-Drift Gate
+        timeout-minutes: 3
         run: bun run gen:tokens && git diff --exit-code
       - name: RequestInit Wire Linter Gate
+        timeout-minutes: 3
         run: bun bin/check-fetch-init.ts --verbose
       - name: Safe innerHTML Linter Gate
+        timeout-minutes: 3
         run: bun bin/check-innerhtml.ts --verbose
       - name: Execute Full Verification Test Suite
-        run: bun test tests/
+        timeout-minutes: 5
+        run: bun test tests/ --reporter=junit --output=junit-report.xml
+      - name: Archive Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: junit-report.xml
