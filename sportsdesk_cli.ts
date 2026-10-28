@@ -30,6 +30,7 @@ import {
   parseAsEpochMs,
   parseAsColorHexInt,
   colorHexIntToHexString,
+  colorHexIntToAnsiEscape,
   betGroupIdentifier,
   parlayLegCount,
   rotationNumber,
@@ -209,6 +210,54 @@ export function printDomainBrandedTypes(): void {
   console.log("================================================================================\n");
 }
 
+export interface NeuronTokenDefinition {
+  readonly layerId: string;
+  readonly tokenName: string;
+  readonly hex: string;
+  readonly channelOrRoute: string;
+  readonly roleDescription: string;
+}
+
+export const QWEN_NEURON_TOKENS: readonly NeuronTokenDefinition[] = [
+  { layerId: "L18.N0204", tokenName: "--sd-tier-retail", hex: "#1d84b5", channelOrRoute: "Internet (SIGNAL_INTERNET)", roleDescription: "Retail Pregame Baseline Gate (SLA 1500ms)" },
+  { layerId: "L19.N0518", tokenName: "--sd-tier-blocked", hex: "#64748b", channelOrRoute: "BLOCKED (SIGNAL_SENTINEL_DROP)", roleDescription: "Blocked Sentinel & Zero-Stake Filter (0ms)" },
+  { layerId: "L20.N1105", tokenName: "--sd-theme-emerald", hex: "#10b981", channelOrRoute: "GATEWAY (SIGNAL_EQUILIBRIUM_GATE)", roleDescription: "Equilibrium Confirm & Vig Gate (SLA 1000ms)" },
+  { layerId: "L21.N0884", tokenName: "--sd-tier-alert", hex: "#ef4444", channelOrRoute: "ALERT (SIGNAL_ALERT_TWIN)", roleDescription: "Syndicate Sub-acct Syntax & Twin Buffer (250ms)" },
+  { layerId: "L22.N1402", tokenName: "--sd-tier-steam", hex: "#f59e0b", channelOrRoute: "GSBUILDER (SIGNAL_SGP_BUILDER)", roleDescription: "Steam / Line Chase Phrasing & SGP (1000ms)" },
+  { layerId: "L23.N0412", tokenName: "--sd-tier-whale", hex: "#28a745", channelOrRoute: "GSLIVE (SIGNAL_GS_INPLAY)", roleDescription: "Whale Sizing Anomaly & Live Move (500ms)" },
+  { layerId: "L24.N2019", tokenName: "--sd-tier-rec-bias", hex: "#38bdf8", channelOrRoute: "CSLEVEL2 (SIGNAL_SYNDICATE_L2)", roleDescription: "Recreational Longshot Bias (SLA 2000ms)" },
+  { layerId: "L25.N1882", tokenName: "--sd-route-devig", hex: "#06b6d4", channelOrRoute: "Route 04 Devig Consensus", roleDescription: "Adverse Selection & Steam Convergence (<=5s lag)" },
+  { layerId: "L26.N3104", tokenName: "--sd-route-sharp", hex: "#a855f7", channelOrRoute: "Route 02 Sharp Shrinkage", roleDescription: "CLV Margin Decay & Posterior Shrinkage (tau*=0.68)" },
+  { layerId: "L27.N0912", tokenName: "--sd-route-pending", hex: "#f59e0b", channelOrRoute: "Route 01 Liquidity Breaker", roleDescription: "Liquidity Exhaustion & Circuit Breaker (<$1k depth)" },
+  { layerId: "L28.N2501", tokenName: "--sd-route-manager", hex: "#f43f5e", channelOrRoute: "Route 03 Manager Terminal", roleDescription: "Terminal Risk Mitigation & Execution Write-Gate" },
+  { layerId: "SURFACE.DOM", tokenName: "--sd-surface-bg", hex: "#070b14", channelOrRoute: "Dark Obsidian Shell", roleDescription: "Main Dashboard DOM Surface Background" },
+  { layerId: "SURFACE.CLI", tokenName: "--sd-surface-cli", hex: "#04070e", channelOrRoute: "Deterministic Dark ANSI", roleDescription: "CLI Terminal Surface & Telemetry Background" },
+];
+
+export function printNeuronRegistry(): void {
+  console.log("================================================================================");
+  console.log("13-ENTITY QWEN3.5-4B (LAYERS 18-28) NEURON REGISTRY & CSS TOKEN PALETTE");
+  console.log("================================================================================");
+  console.log(" # | Layer / ID    | Token Name         | Hex Code | ANSI Preview  | Signal Channel / Route & SLA");
+  console.log("---+---------------+--------------------+----------+---------------+-------------------------------------------------");
+  QWEN_NEURON_TOKENS.forEach((n, idx) => {
+    const num = String(idx + 1).padStart(2);
+    const colorInt = parseAsColorHexInt(n.hex);
+    const ansi = colorHexIntToAnsiEscape(colorInt);
+    const reset = "\x1b[0m";
+    const preview = `${ansi}████████${reset}`;
+    console.log(
+      `${num} | ` +
+      `${n.layerId.padEnd(13)} | ` +
+      `${n.tokenName.padEnd(18)} | ` +
+      `${n.hex.padEnd(8)} | ` +
+      `${preview.padEnd(17)} | ` +
+      `${n.channelOrRoute} • ${n.roleDescription}`
+    );
+  });
+  console.log("================================================================================\n");
+}
+
 export function printWinners(args: string[]): void {
   const period = getArgValue(args, ["-p", "--period"], "24h");
   const limit = parseInt(getArgValue(args, ["--limit"], "10"), 10);
@@ -376,6 +425,11 @@ export async function main(): Promise<void> {
 
   if (rawArgs.includes("-b") || rawArgs.includes("--brands") || cmd === "brands" || cmd === "types") {
     printDomainBrandedTypes();
+    return;
+  }
+
+  if (rawArgs.includes("-N") || rawArgs.includes("--neurons") || rawArgs.includes("--layers") || cmd === "neurons" || cmd === "layers") {
+    printNeuronRegistry();
     return;
   }
 

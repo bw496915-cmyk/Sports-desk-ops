@@ -6,24 +6,210 @@
   <title>SportsDesk & Fantasy402 Telegram Mini App</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
+    /* ==========================================================================
+       1. CSS Houdini @property Declarations (Type: <color>, Inherits: true)
+       Prevents silent CSS property dropping in compliant web engines (Safari/Chrome).
+       ========================================================================== */
+    @property --sd-surface-bg {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #070b14;
+    }
+    @property --sd-surface-cli {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #04070e;
+    }
+    @property --sd-surface-card {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #0d1527;
+    }
+    @property --sd-surface-border {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #1e293b;
+    }
+    @property --sd-surface-hover {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #131f38;
+    }
+    @property --sd-text-primary {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #f1f5f9;
+    }
+    @property --sd-text-muted {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #94a3b8;
+    }
+    @property --sd-text-dim {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #64748b;
+    }
+
+    /* 13-Entity Qwen3.5-4B (Layers 18-28) Neuron Palette & Route Colors */
+    @property --sd-tier-retail {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #1d84b5; /* L18.N0204 Retail Cyan */
+    }
+    @property --sd-tier-blocked {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #64748b; /* L19.N0518 Blocked Sentinel Slate */
+    }
+    @property --sd-theme-emerald {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #10b981; /* L20.N1105 SportsDesk Emerald */
+    }
+    @property --sd-tier-alert {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #ef4444; /* L21.N0884 Red Alert Twin */
+    }
+    @property --sd-tier-steam {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #f59e0b; /* L22.N1402 Amber Steam */
+    }
+    @property --sd-tier-whale {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #28a745; /* L23.N0412 Green Whale */
+    }
+    @property --sd-tier-rec-bias {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #38bdf8; /* L24.N2019 Recreational Longshot Bias */
+    }
+    @property --sd-route-devig {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #06b6d4; /* L25.N1882 Route 04 Devig Cyan */
+    }
+    @property --sd-route-sharp {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #a855f7; /* L26.N3104 Route 02 Sharp Purple */
+    }
+    @property --sd-route-pending {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #f59e0b; /* L27.N0912 Route 01 Pending Amber */
+    }
+    @property --sd-route-manager {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #f43f5e; /* L28.N2501 Route 03 Manager Rose */
+    }
+
+    @property --sd-primary {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #38bdf8;
+    }
+    @property --sd-accent {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #10b981;
+    }
+    @property --sd-danger {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #ef4444;
+    }
+    @property --sd-warning {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #f59e0b;
+    }
+    @property --sd-purple {
+      syntax: '<color>';
+      inherits: true;
+      initial-value: #a855f7;
+    }
+
+    /* ==========================================================================
+       2. TMA Theme Mapping with Fallback to Canonical Tokens
+       ========================================================================== */
     :root {
-      --bg: #070b14;
-      --card-bg: #0d1527;
-      --card-border: #1e293b;
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
-      --primary: #38bdf8;
-      --accent: #10b981;
-      --danger: #ef4444;
-      --warning: #f59e0b;
+      /* Canonical SportsDesk Tokens */
+      --sd-surface-bg: #070b14;
+      --sd-surface-cli: #04070e;
+      --sd-surface-card: #0d1527;
+      --sd-surface-border: #1e293b;
+      --sd-surface-hover: #131f38;
+      --sd-text-primary: #f1f5f9;
+      --sd-text-muted: #94a3b8;
+      --sd-text-dim: #64748b;
+
+      --sd-tier-retail: #1d84b5;
+      --sd-tier-blocked: #64748b;
+      --sd-theme-emerald: #10b981;
+      --sd-tier-alert: #ef4444;
+      --sd-tier-steam: #f59e0b;
+      --sd-tier-whale: #28a745;
+      --sd-tier-rec-bias: #38bdf8;
+      --sd-route-devig: #06b6d4;
+      --sd-route-sharp: #a855f7;
+      --sd-route-pending: #f59e0b;
+      --sd-route-manager: #f43f5e;
+
+      --sd-primary: #38bdf8;
+      --sd-accent: #10b981;
+      --sd-danger: #ef4444;
+      --sd-warning: #f59e0b;
+      --sd-purple: #a855f7;
+
+      /* Telegram WebApp Theme Integration */
+      --bg: var(--tg-theme-bg-color, var(--sd-surface-bg));
+      --card-bg: var(--tg-theme-secondary-bg-color, var(--sd-surface-card));
+      --card-border: var(--tg-theme-section-separator-color, var(--sd-surface-border));
+      --card-hover: var(--tg-theme-header-bg-color, var(--sd-surface-hover));
+      --text: var(--tg-theme-text-color, var(--sd-text-primary));
+      --text-muted: var(--tg-theme-hint-color, var(--sd-text-muted));
+      --primary: var(--tg-theme-button-color, var(--sd-primary));
+      --primary-text: var(--tg-theme-button-text-color, #ffffff);
+      --accent: var(--sd-accent);
+      --danger: var(--sd-danger);
+      --warning: var(--sd-warning);
+      --purple: var(--sd-purple);
+
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       padding: 14px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .header-bar h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .header-pill {
+      font-size: 11px;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-weight: 600;
     }
     .card {
       background: var(--card-bg);
@@ -44,45 +230,94 @@
       border-radius: 8px;
       padding: 10px;
     }
-    .kpi-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
-    .kpi-num { font-size: 18px; font-weight: 700; font-family: var(--mono); color: #fff; }
+    .kpi-lbl {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .kpi-num {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--text);
+      margin-top: 2px;
+    }
+    .badge-pill {
+      font-size: 10px;
+      font-family: var(--mono);
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+    }
     .btn {
       background: var(--primary);
-      color: #fff;
+      color: var(--primary-text);
       border: none;
       padding: 8px 12px;
       border-radius: 6px;
       font-weight: 600;
+      font-size: 12px;
       cursor: pointer;
       width: 100%;
       margin-top: 8px;
+      transition: opacity 0.15s ease;
     }
+    .btn:hover { opacity: 0.9; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-warning { background: var(--warning); color: #000; }
   </style>
 </head>
 <body>
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+  <div class="header-bar">
     <h2>SportsDesk Ops TMA</h2>
-    <span style="font-size: 11px; color: var(--accent); font-family: var(--mono);">● BILLY666</span>
+    <span class="header-pill">● BILLY666 • BUN v1.4+</span>
   </div>
+  
   <div class="kpi-row">
     <div class="kpi-box">
       <div class="kpi-lbl">Sports Handle</div>
       <div class="kpi-num">$2.79M</div>
     </div>
-    <div class="kpi-box" style="border-color: rgba(239, 68, 68, 0.4);">
-      <div class="kpi-lbl" style="color: #ef4444;">Net Hold Deficit</div>
-      <div class="kpi-num" style="color: #ef4444;">-$63,467</div>
+    <div class="kpi-box" style="border-color: color-mix(in srgb, var(--danger) 40%, var(--card-border));">
+      <div class="kpi-lbl" style="color: var(--danger);">Net Hold Deficit</div>
+      <div class="kpi-num" style="color: var(--danger);">-$63,467</div>
     </div>
   </div>
+
   <div class="card">
-    <div style="font-weight: 700; color: #fff;">Whale Surveillance: RF2003</div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 700; color: var(--text);">Whale Surveillance: RF2003</span>
+      <span class="badge-pill" style="background: color-mix(in srgb, var(--sd-tier-whale) 20%, transparent); color: var(--sd-tier-whale);">L23 Whale</span>
+    </div>
     <div style="font-size: 12px; color: var(--text-muted); margin: 4px 0;">33.7% of total handle ($940k handle). Net: +$25k win.</div>
-    <button class="btn" onclick="alert('Cap $5,000 sent')">Cap Max Bet to $5,000</button>
+    <button class="btn btn-warning" onclick="alert('Cap $5,000 sent')">Cap Max Bet to $5,000</button>
   </div>
+
   <div class="card">
-    <div style="font-weight: 700; color: #fff;">Execution Sniper: BGD101</div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 700; color: var(--text);">Execution Sniper: BGD101</span>
+      <span class="badge-pill" style="background: color-mix(in srgb, var(--sd-tier-alert) 20%, transparent); color: var(--sd-tier-alert);">L21 Alert</span>
+    </div>
     <div style="font-size: 12px; color: var(--text-muted); margin: 4px 0;">2 max straight bets cashed clean (+$40k win).</div>
-    <button class="btn" style="background: #ef4444;" onclick="alert('Limit slashed to $1,000')">Slash Limit to $1,000</button>
+    <button class="btn btn-danger" onclick="alert('Limit slashed to $1,000')">Slash Limit to $1,000</button>
   </div>
+
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 700; color: var(--text);">Steam Chaser: GP300</span>
+      <span class="badge-pill" style="background: color-mix(in srgb, var(--sd-tier-steam) 20%, transparent); color: var(--sd-tier-steam);">L22 Steam</span>
+    </div>
+    <div style="font-size: 12px; color: var(--text-muted); margin: 4px 0;">22 tickets in NFL totals. Net: +$33,858 win.</div>
+    <button class="btn" style="background: var(--sd-tier-steam); color: #000;" onclick="alert('6s Delay Applied')">Apply 6s Delay Gate</button>
+  </div>
+
+  <script>
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
+  </script>
 </body>
 </html>

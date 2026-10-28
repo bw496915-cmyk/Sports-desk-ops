@@ -271,6 +271,22 @@ export function parseAsColorHexInt(cssOrNumber: string | number): ColorHexInt {
   }
 
   const clean = cssOrNumber.trim();
+
+  // 1. Primary: Native Bun.color parser (Bun v1.4+)
+  if (typeof Bun !== "undefined" && typeof (Bun as any).color === "function") {
+    try {
+      const parsed = (Bun as any).color(clean, "number");
+      if (typeof parsed === "number" && !Number.isNaN(parsed)) {
+        // Bun returns 32-bit rgba number; mask down to 24-bit RGB packed integer discarding alpha
+        const masked = parsed > 0xffffff ? (parsed >>> 8) & 0xffffff : parsed & 0xffffff;
+        return masked as ColorHexInt;
+      }
+    } catch {
+      // Fall through to manual parsing
+    }
+  }
+
+  // 2. Strict hex parsing fallback
   if (clean.startsWith("#")) {
     const hexDigits = clean.slice(1);
     if (hexDigits.length === 6) {
@@ -285,16 +301,23 @@ export function parseAsColorHexInt(cssOrNumber: string | number): ColorHexInt {
     }
   }
 
-  if (typeof Bun !== "undefined" && typeof (Bun as any).color === "function") {
-    const parsed = (Bun as any).color(clean, "number");
-    if (typeof parsed === "number") {
-      const masked = parsed > 0xffffff ? (parsed >>> 8) & 0xffffff : parsed & 0xffffff;
-      return masked as ColorHexInt;
-    }
-  }
-
   const fallback = parseInt(clean.replace(/[^0-9a-fA-F]/g, "").slice(0, 6), 16) || 0;
   return fallback as ColorHexInt;
+}
+
+export function parseAsColorCssString(cssOrNumber: string | number): string {
+  if (typeof Bun !== "undefined" && typeof (Bun as any).color === "function") {
+    try {
+      const css = (Bun as any).color(cssOrNumber, "css");
+      if (typeof css === "string" && css.length > 0) {
+        return css;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+  const hexInt = parseAsColorHexInt(cssOrNumber);
+  return colorHexIntToHexString(hexInt);
 }
 
 export function colorHexIntToRgbChannels(color: ColorHexInt): { readonly red: number; readonly green: number; readonly blue: number } {
