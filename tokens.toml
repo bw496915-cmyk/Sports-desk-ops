@@ -1,0 +1,181 @@
+# ==============================================================================
+# SportsDesk & Fantasy402 Design Token & Neuron Registry (Single Source of Truth)
+# Evaluated and generated via: bun run gen:tokens
+# ==============================================================================
+
+[meta]
+version = "1.1.0"
+generated_at = "2026-10-28T15:30:00Z"
+author = "bw496915-cmyk"
+
+# ------------------------------------------------------------------------------
+# Surfaces & Base Design Canvas
+# ------------------------------------------------------------------------------
+[surfaces.dom]
+layer_id = "SURFACE.DOM"
+token_name = "--sd-surface-bg"
+hex = "#070b14"
+surface_name = "Dark Obsidian Shell"
+role = "Main Dashboard DOM Surface Background"
+viewport = "1440x900 (Desktop) / 375x812 (Mobile)"
+protocol = "W3C DOM / Canvas WebGL"
+color_depth = "24-bit TrueColor RGB"
+
+[surfaces.cli]
+layer_id = "SURFACE.CLI"
+token_name = "--sd-surface-cli"
+hex = "#04070e"
+surface_name = "Deterministic Dark ANSI"
+role = "CLI Terminal Telemetry Surface Background"
+viewport = "DirectColor VT (Ghostty / xterm-direct)"
+protocol = "ANSI 24-bit TrueColor (\\x1b[38;2;R;G;Bm)"
+color_depth = "24-bit TrueColor RGB"
+
+# ------------------------------------------------------------------------------
+# Axis 1: Ingestion Signal Channels (Layers 18-24)
+# SLA is strictly discriminated: latency (ms) vs sentinel_drop policy
+# ------------------------------------------------------------------------------
+[ingestion.L18_N0204]
+layer_id = "L18.N0204"
+token_name = "--sd-tier-retail"
+hex = "#1d84b5"
+channel_code = "Internet"
+signal_tier = "SIGNAL_INTERNET"
+transport_uri = "portal://ticker/live-stream"
+channel_status = "ACTIVE"
+volume_rule = "TARGET_TWIN (gapDurationSeconds = Internet - ALERT)"
+operational_role = "Retail Pregame Baseline Gate"
+sla_kind = "latency"
+sla_ms = 1500
+
+[ingestion.L19_N0518]
+layer_id = "L19.N0518"
+token_name = "--sd-tier-blocked"
+hex = "#64748b"
+channel_code = "BLOCKED"
+signal_tier = "SIGNAL_SENTINEL_DROP"
+transport_uri = "portal://pending/noise-filter"
+channel_status = "DROPPED"
+volume_rule = "DROP_BEFORE_GROUPING (unconditionally dropped on getPending)"
+operational_role = "Blocked Sentinel & Zero-Stake Filter"
+sla_kind = "sentinel_drop"
+
+[ingestion.L20_N1105]
+layer_id = "L20.N1105"
+token_name = "--sd-theme-emerald"
+hex = "#10b981"
+channel_code = "GATEWAY"
+signal_tier = "SIGNAL_EQUILIBRIUM_GATE"
+transport_uri = "portal://gateway/equilibrium-gate"
+channel_status = "ACTIVE"
+volume_rule = "EQUILIBRIUM_SWEEP (+15c/+20c vig persist read-backs)"
+operational_role = "Equilibrium Confirm & Vig Gate"
+sla_kind = "latency"
+sla_ms = 1000
+
+[ingestion.L21_N0884]
+layer_id = "L21.N0884"
+token_name = "--sd-tier-alert"
+hex = "#ef4444"
+channel_code = "ALERT"
+signal_tier = "SIGNAL_ALERT_TWIN"
+transport_uri = "portal://ticker/alert-twins"
+channel_status = "ALERT"
+volume_rule = "SOURCE_ALERT (canonicalVolumeCents = 0; skip Bayes scoring)"
+operational_role = "Syndicate Sub-acct Syntax & Twin Buffer"
+sla_kind = "latency"
+sla_ms = 250
+
+[ingestion.L22_N1402]
+layer_id = "L22.N1402"
+token_name = "--sd-tier-steam"
+hex = "#f59e0b"
+channel_code = "GSBUILDER"
+signal_tier = "SIGNAL_SGP_BUILDER"
+transport_uri = "portal://ticker/sgp-builder"
+channel_status = "STEERABLE"
+volume_rule = "GS118_JOIN (joined via M.G<betGroupId>; steerable via --steer)"
+operational_role = "Steam / Line Chase Phrasing & SGP Builder"
+sla_kind = "latency"
+sla_ms = 1000
+
+[ingestion.L23_N0412]
+layer_id = "L23.N0412"
+token_name = "--sd-tier-whale"
+hex = "#28a745"
+channel_code = "GSLIVE"
+signal_tier = "SIGNAL_GS_INPLAY"
+transport_uri = "portal://ticker/gs-partner-118"
+channel_status = "CRITICAL"
+volume_rule = "GS118_JOIN (forces rotationGrade='LIVE'; extracts M.G<id>; +20c tax)"
+operational_role = "Whale Sizing Anomaly & In-Play Live Move"
+sla_kind = "latency"
+sla_ms = 500
+
+[ingestion.L24_N2019]
+layer_id = "L24.N2019"
+token_name = "--sd-tier-rec-bias"
+hex = "#38bdf8"
+channel_code = "CSLEVEL2"
+signal_tier = "SIGNAL_SYNDICATE_L2"
+transport_uri = "portal://ticker/cslevel2-feed"
+channel_status = "SUPPRESSED"
+volume_rule = "NONE (secondary syndicate/tennis/prop feed; steerable via --steer)"
+operational_role = "Recreational Longshot Bias Ingestion"
+sla_kind = "latency"
+sla_ms = 2000
+
+# ------------------------------------------------------------------------------
+# Axis 2: Risk Decision & Route Continuum (Layers 25-28)
+# Strongly typed predicates, move flags, and mathematical thresholds
+# ------------------------------------------------------------------------------
+[routes.L25_N1882]
+layer_id = "L25.N1882"
+token_name = "--sd-route-devig"
+hex = "#06b6d4"
+route_name = "Route 04 Devig Consensus"
+move_flag = "STEAM_CONVERGENCE"
+trigger_kind = "ADVERSE_SELECTION"
+threshold_kind = "consensus_lag"
+max_lag_ms = 5000
+mitigation_kind = "DYNAMIC_REPRICE"
+operational_role = "Steam Convergence & Consensus Price Arbitration"
+
+[routes.L26_N3104]
+layer_id = "L26.N3104"
+token_name = "--sd-route-sharp"
+hex = "#a855f7"
+route_name = "Route 02 Sharp Shrinkage"
+move_flag = "SHRINKAGE_SHARP"
+trigger_kind = "CLV_MARGIN_DECAY"
+threshold_kind = "bayes_shrinkage"
+tau_star = 0.68
+min_tickets = 8
+mitigation_kind = "SHRINKAGE_RECALIBRATE"
+operational_role = "Bayesian Sharp Detection & Margin Decay Guard"
+
+[routes.L27_N0912]
+layer_id = "L27.N0912"
+token_name = "--sd-route-pending"
+hex = "#d97706"
+route_name = "Route 01 Liquidity Breaker"
+move_flag = "LIQUIDITY_HALT"
+trigger_kind = "ORDER_BOOK_EXHAUSTION"
+threshold_kind = "liquidity_depth"
+min_depth_cents = 100000
+mitigation_kind = "CIRCUIT_BREAKER_HALT"
+operational_role = "Liquidity Exhaustion Protection & Breaker Trip"
+
+[routes.L28_N2501]
+layer_id = "L28.N2501"
+token_name = "--sd-route-manager"
+hex = "#f43f5e"
+route_name = "Route 03 Manager Terminal"
+move_flag = "TERMINAL_ENFORCE"
+trigger_kind = "TERMINAL_DEFICIT_ESCALATION"
+threshold_kind = "composite_risk_gate"
+min_toxicity_score = 80
+max_hold_rate_basis_points = -5000
+max_deficit_cents = 10000000
+mitigation_kind = "MANAGER_LIMIT_CLAMP"
+operational_role = "Terminal Risk Containment & Manager Write-Gate"

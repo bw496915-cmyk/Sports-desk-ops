@@ -25,42 +25,60 @@ export interface R2Config {
 
 export function getR2Config(): R2Config {
   return {
-    accountId: process.env.CLOUDFLARE_ACCOUNT_ID || "7a470541a704caaf91e71efccc78fd36",
+    accountId:
+      process.env.CLOUDFLARE_ACCOUNT_ID || "7a470541a704caaf91e71efccc78fd36",
     apiToken: process.env.CLOUDFLARE_API_TOKEN || "",
     accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
-    endpoint: process.env.R2_ENDPOINT || "https://7a470541a704caaf91e71efccc78fd36.r2.cloudflarestorage.com",
+    endpoint:
+      process.env.R2_ENDPOINT ||
+      "https://7a470541a704caaf91e71efccc78fd36.r2.cloudflarestorage.com",
     bucketName: process.env.R2_BUCKET_NAME || "sportsdesk-ops-reports",
-    publicUrl: process.env.R2_PUBLIC_URL || "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev",
+    publicUrl:
+      process.env.R2_PUBLIC_URL ||
+      "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev",
   };
 }
 
 export function getR2ConfigInfo(): void {
   const cfg = getR2Config();
-  console.log("================================================================================");
+  console.log(
+    "================================================================================",
+  );
   console.log("CLOUDFLARE R2 OBJECT STORAGE & GATEWAY CONFIGURATION");
-  console.log("================================================================================");
+  console.log(
+    "================================================================================",
+  );
   console.log(`  Cloudflare Account ID : ${cfg.accountId}`);
   console.log(`  R2 S3 API Endpoint    : ${cfg.endpoint}`);
   console.log(`  Target R2 Bucket      : ${cfg.bucketName}`);
   console.log(`  Public Gateway Base   : ${cfg.publicUrl}`);
   console.log(`  Access Key ID         : ${cfg.accessKeyId.slice(0, 8)}...`);
   console.log(`  API Token             : ${cfg.apiToken.slice(0, 10)}...`);
-  console.log("================================================================================\n");
+  console.log(
+    "================================================================================\n",
+  );
 }
 
 export async function verifyR2Connection(): Promise<boolean> {
   const cfg = getR2Config();
-  console.log(`[Cloudflare API] Verifying token status for account ${cfg.accountId}...`);
+  console.log(
+    `[Cloudflare API] Verifying token status for account ${cfg.accountId}...`,
+  );
   try {
-    const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfg.accountId}/tokens/verify`, {
-      headers: {
-        Authorization: `Bearer ${cfg.apiToken}`,
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${cfg.accountId}/tokens/verify`,
+      {
+        headers: {
+          Authorization: `Bearer ${cfg.apiToken}`,
+        },
       },
-    });
-    const json = await res.json() as any;
+    );
+    const json = (await res.json()) as any;
     if (json.success) {
-      console.log(`[Cloudflare API] Token verification SUCCESS: status = active`);
+      console.log(
+        `[Cloudflare API] Token verification SUCCESS: status = active`,
+      );
       return true;
     } else {
       console.log(`[Cloudflare API] Token response:`, json);
@@ -82,10 +100,16 @@ export async function syncReportsDirectory(dirPath: string): Promise<void> {
   }
 
   const files = readdirSync(absPath);
-  console.log("================================================================================");
-  console.log(`CLOUDFLARE R2 SYNC: Uploading ${files.length} report objects to '${cfg.bucketName}'`);
+  console.log(
+    "================================================================================",
+  );
+  console.log(
+    `CLOUDFLARE R2 SYNC: Uploading ${files.length} report objects to '${cfg.bucketName}'`,
+  );
   console.log(`Base Public Gateway: ${cfg.publicUrl}`);
-  console.log("================================================================================");
+  console.log(
+    "================================================================================",
+  );
 
   for (const file of files) {
     const filePath = join(absPath, file);
@@ -95,7 +119,9 @@ export async function syncReportsDirectory(dirPath: string): Promise<void> {
     const publicLink = `${cfg.publicUrl}/${r2Key}`;
     console.log(` [UPLOADED] ${file.padEnd(30)} -> ${publicLink}`);
   }
-  console.log("================================================================================\n");
+  console.log(
+    "================================================================================\n",
+  );
 }
 
 if (import.meta.main) {

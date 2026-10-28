@@ -1,525 +1,750 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <title>SportsDesk & Fantasy402 Bettor Churn Simulation & Real-Time Intelligence Dashboard</title>
-  <style>
-    /* ==========================================================================
-       1. CSS Houdini @property Declarations (Type: <color>, Inherits: true)
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>
+      SportsDesk & Fantasy402 Bettor Churn Simulation & Real-Time Intelligence
+      Dashboard
+    </title>
+    <style>
+      /* ==========================================================================
+       1. CSS Houdini @property Declarations (Generated from tokens.toml)
        Enforces specification-grade design tokens and prevents silent property drop.
        ========================================================================== */
-    @property --sd-surface-bg {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #070b14;
-    }
-    @property --sd-surface-cli {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #04070e;
-    }
-    @property --sd-surface-card {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #0d1527;
-    }
-    @property --sd-surface-border {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #1e293b;
-    }
-    @property --sd-surface-hover {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #131f38;
-    }
-    @property --sd-text-primary {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #f1f5f9;
-    }
-    @property --sd-text-muted {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #94a3b8;
-    }
-    @property --sd-text-dim {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #64748b;
-    }
+      @property --sd-surface-bg {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #070b14;
+      }
+      @property --sd-surface-cli {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #04070e;
+      }
+      @property --sd-tier-retail {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #1d84b5;
+      }
+      @property --sd-tier-blocked {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #64748b;
+      }
+      @property --sd-theme-emerald {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #10b981;
+      }
+      @property --sd-tier-alert {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #ef4444;
+      }
+      @property --sd-tier-steam {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #f59e0b;
+      }
+      @property --sd-tier-whale {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #28a745;
+      }
+      @property --sd-tier-rec-bias {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #38bdf8;
+      }
+      @property --sd-route-devig {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #06b6d4;
+      }
+      @property --sd-route-sharp {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #a855f7;
+      }
+      @property --sd-route-pending {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #d97706;
+      }
+      @property --sd-route-manager {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #f43f5e;
+      }
 
-    /* 13 Qwen3.5-4B (Layers 18-28) Neuron Palette & Route Colors */
-    @property --sd-tier-retail {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #1d84b5; /* L18.N0204 Retail Cyan */
-    }
-    @property --sd-tier-blocked {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #64748b; /* L19.N0518 Blocked Sentinel Slate */
-    }
-    @property --sd-theme-emerald {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #10b981; /* L20.N1105 SportsDesk Emerald */
-    }
-    @property --sd-tier-alert {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #ef4444; /* L21.N0884 Red Alert Twin */
-    }
-    @property --sd-tier-steam {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #f59e0b; /* L22.N1402 Amber Steam */
-    }
-    @property --sd-tier-whale {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #28a745; /* L23.N0412 Green Whale */
-    }
-    @property --sd-tier-rec-bias {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #38bdf8; /* L24.N2019 Recreational Longshot Bias */
-    }
-    @property --sd-route-devig {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #06b6d4; /* L25.N1882 Route 04 Devig Cyan */
-    }
-    @property --sd-route-sharp {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #a855f7; /* L26.N3104 Route 02 Sharp Purple */
-    }
-    @property --sd-route-pending {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #d97706; /* L27.N0912 Route 01 Liquidity Breaker Dark Amber */
-    }
-    @property --sd-route-manager {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #f43f5e; /* L28.N2501 Route 03 Manager Rose */
-    }
+      /* Core Status and Component Tokens */
+      @property --sd-primary {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #38bdf8;
+      }
+      @property --sd-accent {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #10b981;
+      }
+      @property --sd-danger {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #ef4444;
+      }
+      @property --sd-warning {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #f59e0b;
+      }
+      @property --sd-purple {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #a855f7;
+      }
 
-    /* Core Status and Component Tokens */
-    @property --sd-primary {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #38bdf8;
-    }
-    @property --sd-accent {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #10b981;
-    }
-    @property --sd-danger {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #ef4444;
-    }
-    @property --sd-warning {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #f59e0b;
-    }
-    @property --sd-purple {
-      syntax: '<color>';
-      inherits: true;
-      initial-value: #a855f7;
-    }
-
-    /* ==========================================================================
+      /* ==========================================================================
        2. Canonical :root Variables and Backward-Compatible Aliases
        ========================================================================== */
-    :root {
-      /* Canonical SportsDesk Semantic Tokens */
-      --sd-surface-bg: #070b14;
-      --sd-surface-cli: #04070e;
-      --sd-surface-card: #0d1527;
-      --sd-surface-border: #1e293b;
-      --sd-surface-hover: #131f38;
-      --sd-text-primary: #f1f5f9;
-      --sd-text-muted: #94a3b8;
-      --sd-text-dim: #64748b;
+      :root {
+        /* Generated from tokens.toml (v1.1.0) */
+        --sd-surface-bg: #070b14;
+        --sd-surface-cli: #04070e;
+        --sd-tier-retail: #1d84b5;
+        --sd-tier-blocked: #64748b;
+        --sd-theme-emerald: #10b981;
+        --sd-tier-alert: #ef4444;
+        --sd-tier-steam: #f59e0b;
+        --sd-tier-whale: #28a745;
+        --sd-tier-rec-bias: #38bdf8;
+        --sd-route-devig: #06b6d4;
+        --sd-route-sharp: #a855f7;
+        --sd-route-pending: #d97706;
+        --sd-route-manager: #f43f5e;
 
-      --sd-tier-retail: #1d84b5;
-      --sd-tier-blocked: #64748b;
-      --sd-theme-emerald: #10b981;
-      --sd-tier-alert: #ef4444;
-      --sd-tier-steam: #f59e0b;
-      --sd-tier-whale: #28a745;
-      --sd-tier-rec-bias: #38bdf8;
-      --sd-route-devig: #06b6d4;
-      --sd-route-sharp: #a855f7;
-      --sd-route-pending: #d97706;
-      --sd-route-manager: #f43f5e;
+        --sd-primary: #38bdf8;
+        --sd-accent: #10b981;
+        --sd-danger: #ef4444;
+        --sd-warning: #f59e0b;
+        --sd-purple: #a855f7;
 
-      --sd-primary: #38bdf8;
-      --sd-accent: #10b981;
-      --sd-danger: #ef4444;
-      --sd-warning: #f59e0b;
-      --sd-purple: #a855f7;
+        /* Surface and Semantic Variable Mapping */
+        --bg: var(--sd-surface-bg);
+        --card-bg: var(--sd-surface-card);
+        --card-border: var(--sd-surface-border);
+        --card-hover: var(--sd-surface-hover);
+        --text: var(--sd-text-primary);
+        --text-muted: var(--sd-text-muted);
+        --text-dim: var(--sd-text-dim);
+        --primary: var(--sd-primary);
+        --accent: var(--sd-accent);
+        --danger: var(--sd-danger);
+        --warning: var(--sd-warning);
+        --purple: var(--sd-purple);
 
-      /* Surface and Semantic Variable Mapping */
-      --bg: var(--sd-surface-bg);
-      --card-bg: var(--sd-surface-card);
-      --card-border: var(--sd-surface-border);
-      --card-hover: var(--sd-surface-hover);
-      --text: var(--sd-text-primary);
-      --text-muted: var(--sd-text-muted);
-      --text-dim: var(--sd-text-dim);
-      --primary: var(--sd-primary);
-      --accent: var(--sd-accent);
-      --danger: var(--sd-danger);
-      --warning: var(--sd-warning);
-      --purple: var(--sd-purple);
+        --primary-glow: color-mix(in srgb, var(--sd-primary) 15%, transparent);
+        --accent-glow: color-mix(in srgb, var(--sd-accent) 15%, transparent);
+        --danger-glow: color-mix(in srgb, var(--sd-danger) 15%, transparent);
+        --warning-glow: color-mix(in srgb, var(--sd-warning) 15%, transparent);
+        --purple-glow: color-mix(in srgb, var(--sd-purple) 15%, transparent);
 
-      --primary-glow: color-mix(in srgb, var(--sd-primary) 15%, transparent);
-      --accent-glow: color-mix(in srgb, var(--sd-accent) 15%, transparent);
-      --danger-glow: color-mix(in srgb, var(--sd-danger) 15%, transparent);
-      --warning-glow: color-mix(in srgb, var(--sd-warning) 15%, transparent);
-      --purple-glow: color-mix(in srgb, var(--sd-purple) 15%, transparent);
+        --font:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        --mono:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+      }
 
-      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--sd-surface-bg);
+        color: var(--sd-text-primary);
+        font-family: var(--font);
+        line-height: 1.5;
+        padding: 24px;
+        -webkit-font-smoothing: antialiased;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--sd-surface-border);
+        padding-bottom: 18px;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .header-left h1 {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--sd-text-primary);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        letter-spacing: -0.02em;
+      }
+      .header-left .subtitle {
+        color: var(--sd-text-muted);
+        font-size: 13px;
+        margin-top: 4px;
+      }
+      .status-badges {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .badge {
+        font-size: 11px;
+        font-family: var(--mono);
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 4px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .badge-primary {
+        background: var(--primary-glow);
+        color: var(--sd-primary);
+        border: 1px solid color-mix(in srgb, var(--sd-primary) 30%, transparent);
+      }
+      .badge-accent {
+        background: var(--accent-glow);
+        color: var(--sd-accent);
+        border: 1px solid color-mix(in srgb, var(--sd-accent) 30%, transparent);
+      }
+      .badge-warning {
+        background: var(--warning-glow);
+        color: var(--sd-warning);
+        border: 1px solid color-mix(in srgb, var(--sd-warning) 30%, transparent);
+      }
+      .badge-purple {
+        background: var(--purple-glow);
+        color: var(--sd-purple);
+        border: 1px solid color-mix(in srgb, var(--sd-purple) 30%, transparent);
+      }
+      .badge-retail {
+        background: color-mix(in srgb, var(--sd-tier-retail) 15%, transparent);
+        color: var(--sd-tier-retail);
+        border: 1px solid
+          color-mix(in srgb, var(--sd-tier-retail) 30%, transparent);
+      }
+      .badge-whale {
+        background: color-mix(in srgb, var(--sd-tier-whale) 15%, transparent);
+        color: var(--sd-tier-whale);
+        border: 1px solid
+          color-mix(in srgb, var(--sd-tier-whale) 30%, transparent);
+      }
+      .badge-steam {
+        background: color-mix(in srgb, var(--sd-tier-steam) 15%, transparent);
+        color: var(--sd-tier-steam);
+        border: 1px solid
+          color-mix(in srgb, var(--sd-tier-steam) 30%, transparent);
+      }
+      .badge-alert {
+        background: color-mix(in srgb, var(--sd-tier-alert) 15%, transparent);
+        color: var(--sd-tier-alert);
+        border: 1px solid
+          color-mix(in srgb, var(--sd-tier-alert) 30%, transparent);
+      }
+      .badge-devig {
+        background: color-mix(in srgb, var(--sd-route-devig) 15%, transparent);
+        color: var(--sd-route-devig);
+        border: 1px solid
+          color-mix(in srgb, var(--sd-route-devig) 30%, transparent);
+      }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: var(--sd-surface-bg);
-      color: var(--sd-text-primary);
-      font-family: var(--font);
-      line-height: 1.5;
-      padding: 24px;
-      -webkit-font-smoothing: antialiased;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 24px;
-      border-bottom: 1px solid var(--sd-surface-border);
-      padding-bottom: 18px;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-    .header-left h1 {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--sd-text-primary);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      letter-spacing: -0.02em;
-    }
-    .header-left .subtitle {
-      color: var(--sd-text-muted);
-      font-size: 13px;
-      margin-top: 4px;
-    }
-    .status-badges {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .badge {
-      font-size: 11px;
-      font-family: var(--mono);
-      font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 4px;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .badge-primary { background: var(--primary-glow); color: var(--sd-primary); border: 1px solid color-mix(in srgb, var(--sd-primary) 30%, transparent); }
-    .badge-accent { background: var(--accent-glow); color: var(--sd-accent); border: 1px solid color-mix(in srgb, var(--sd-accent) 30%, transparent); }
-    .badge-warning { background: var(--warning-glow); color: var(--sd-warning); border: 1px solid color-mix(in srgb, var(--sd-warning) 30%, transparent); }
-    .badge-purple { background: var(--purple-glow); color: var(--sd-purple); border: 1px solid color-mix(in srgb, var(--sd-purple) 30%, transparent); }
-    .badge-retail { background: color-mix(in srgb, var(--sd-tier-retail) 15%, transparent); color: var(--sd-tier-retail); border: 1px solid color-mix(in srgb, var(--sd-tier-retail) 30%, transparent); }
-    .badge-whale { background: color-mix(in srgb, var(--sd-tier-whale) 15%, transparent); color: var(--sd-tier-whale); border: 1px solid color-mix(in srgb, var(--sd-tier-whale) 30%, transparent); }
-    .badge-steam { background: color-mix(in srgb, var(--sd-tier-steam) 15%, transparent); color: var(--sd-tier-steam); border: 1px solid color-mix(in srgb, var(--sd-tier-steam) 30%, transparent); }
-    .badge-alert { background: color-mix(in srgb, var(--sd-tier-alert) 15%, transparent); color: var(--sd-tier-alert); border: 1px solid color-mix(in srgb, var(--sd-tier-alert) 30%, transparent); }
-    .badge-devig { background: color-mix(in srgb, var(--sd-route-devig) 15%, transparent); color: var(--sd-route-devig); border: 1px solid color-mix(in srgb, var(--sd-route-devig) 30%, transparent); }
+      /* Neuron Telemetry Strip */
+      .telemetry-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 20px;
+        padding: 10px 14px;
+        background: var(--sd-surface-cli);
+        border: 1px solid var(--sd-surface-border);
+        border-radius: 6px;
+        align-items: center;
+      }
+      .telemetry-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--sd-text-muted);
+        text-transform: uppercase;
+        margin-right: 6px;
+        font-family: var(--mono);
+      }
+      .neuron-pill {
+        font-size: 10px;
+        font-family: var(--mono);
+        padding: 2px 7px;
+        border-radius: 3px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .neuron-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+      }
 
-    /* Neuron Telemetry Strip */
-    .telemetry-strip {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 20px;
-      padding: 10px 14px;
-      background: var(--sd-surface-cli);
-      border: 1px solid var(--sd-surface-border);
-      border-radius: 6px;
-      align-items: center;
-    }
-    .telemetry-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--sd-text-muted);
-      text-transform: uppercase;
-      margin-right: 6px;
-      font-family: var(--mono);
-    }
-    .neuron-pill {
-      font-size: 10px;
-      font-family: var(--mono);
-      padding: 2px 7px;
-      border-radius: 3px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .neuron-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      display: inline-block;
-    }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+      .kpi-card {
+        background: var(--sd-surface-card);
+        border: 1px solid var(--sd-surface-border);
+        border-radius: 8px;
+        padding: 16px;
+        transition:
+          background 0.2s ease,
+          border-color 0.2s ease;
+      }
+      .kpi-card:hover {
+        background: var(--sd-surface-hover);
+        border-color: color-mix(
+          in srgb,
+          var(--sd-primary) 40%,
+          var(--sd-surface-border)
+        );
+      }
+      .kpi-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        font-weight: 600;
+        color: var(--sd-text-muted);
+      }
+      .kpi-val {
+        font-size: 24px;
+        font-weight: 700;
+        color: #fff;
+        margin: 4px 0 2px 0;
+        font-family: var(--mono);
+      }
+      .kpi-sub {
+        font-size: 12px;
+        color: var(--sd-accent);
+        font-weight: 500;
+      }
 
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: 14px;
-      margin-bottom: 24px;
-    }
-    .kpi-card {
-      background: var(--sd-surface-card);
-      border: 1px solid var(--sd-surface-border);
-      border-radius: 8px;
-      padding: 16px;
-      transition: background 0.2s ease, border-color 0.2s ease;
-    }
-    .kpi-card:hover {
-      background: var(--sd-surface-hover);
-      border-color: color-mix(in srgb, var(--sd-primary) 40%, var(--sd-surface-border));
-    }
-    .kpi-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      font-weight: 600;
-      color: var(--sd-text-muted);
-    }
-    .kpi-val {
-      font-size: 24px;
-      font-weight: 700;
-      color: #fff;
-      margin: 4px 0 2px 0;
-      font-family: var(--mono);
-    }
-    .kpi-sub {
-      font-size: 12px;
-      color: var(--sd-accent);
-      font-weight: 500;
-    }
-
-    /* Section Cards & Tables */
-    .section-card {
-      background: var(--sd-surface-card);
-      border: 1px solid var(--sd-surface-border);
-      border-radius: 8px;
-      padding: 18px;
-      margin-bottom: 24px;
-    }
-    .section-title {
-      font-size: 15px;
-      font-weight: 700;
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: #fff;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
-    th {
-      text-align: left;
-      padding: 8px 10px;
-      background: color-mix(in srgb, var(--sd-surface-bg) 60%, var(--sd-surface-card));
-      color: var(--sd-text-muted);
-      font-size: 11px;
-      text-transform: uppercase;
-      font-weight: 600;
-      border-bottom: 1px solid var(--sd-surface-border);
-    }
-    td {
-      padding: 10px;
-      border-bottom: 1px solid color-mix(in srgb, var(--sd-surface-border) 60%, transparent);
-      color: var(--sd-text-primary);
-    }
-    tr:hover td {
-      background: var(--sd-surface-hover);
-    }
-    .mono-cell {
-      font-family: var(--mono);
-      font-weight: 600;
-    }
-    .btn {
-      background: var(--sd-primary);
-      color: #fff;
-      border: none;
-      padding: 7px 12px;
-      border-radius: 5px;
-      font-weight: 600;
-      font-size: 11px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: opacity 0.15s ease;
-    }
-    .btn:hover { opacity: 0.9; }
-    .btn-danger { background: var(--sd-danger); }
-    .btn-warning { background: var(--sd-warning); color: #000; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="header-left">
-      <h1>SportsDesk &amp; Fantasy402 Bettor Churn &amp; Agent Risk Monitor</h1>
-      <div class="subtitle">Dual-basis Empirical Bayes simulation, 4-tier exit taxonomy, downline agent tree grouping, and Qwen3.5-4B token architecture.</div>
+      /* Section Cards & Tables */
+      .section-card {
+        background: var(--sd-surface-card);
+        border: 1px solid var(--sd-surface-border);
+        border-radius: 8px;
+        padding: 18px;
+        margin-bottom: 24px;
+      }
+      .section-title {
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #fff;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th {
+        text-align: left;
+        padding: 8px 10px;
+        background: color-mix(
+          in srgb,
+          var(--sd-surface-bg) 60%,
+          var(--sd-surface-card)
+        );
+        color: var(--sd-text-muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        font-weight: 600;
+        border-bottom: 1px solid var(--sd-surface-border);
+      }
+      td {
+        padding: 10px;
+        border-bottom: 1px solid
+          color-mix(in srgb, var(--sd-surface-border) 60%, transparent);
+        color: var(--sd-text-primary);
+      }
+      tr:hover td {
+        background: var(--sd-surface-hover);
+      }
+      .mono-cell {
+        font-family: var(--mono);
+        font-weight: 600;
+      }
+      .btn {
+        background: var(--sd-primary);
+        color: #fff;
+        border: none;
+        padding: 7px 12px;
+        border-radius: 5px;
+        font-weight: 600;
+        font-size: 11px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: opacity 0.15s ease;
+      }
+      .btn:hover {
+        opacity: 0.9;
+      }
+      .btn-danger {
+        background: var(--sd-danger);
+      }
+      .btn-warning {
+        background: var(--sd-warning);
+        color: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="header-left">
+        <h1>
+          SportsDesk &amp; Fantasy402 Bettor Churn &amp; Agent Risk Monitor
+        </h1>
+        <div class="subtitle">
+          Dual-basis Empirical Bayes simulation, 4-tier exit taxonomy, downline
+          agent tree grouping, and Qwen3.5-4B token architecture.
+        </div>
+      </div>
+      <div class="status-badges">
+        <span class="badge badge-accent">● LIVE ENGINE</span>
+        <span class="badge badge-primary">BUN v1.4+</span>
+        <span class="badge badge-purple">50% SHARED AGENT</span>
+      </div>
     </div>
-    <div class="status-badges">
-      <span class="badge badge-accent">● LIVE ENGINE</span>
-      <span class="badge badge-primary">BUN v1.4+</span>
-      <span class="badge badge-purple">50% SHARED AGENT</span>
-    </div>
-  </div>
 
-  <!-- Qwen3.5-4B (Layers 18-28) Design Token & Neuron Telemetry Strip -->
-  <div class="telemetry-strip">
-    <span class="telemetry-label">Neuron Tokens:</span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-tier-retail) 15%, transparent); color: var(--sd-tier-retail);">
-      <span class="neuron-dot" style="background: var(--sd-tier-retail);"></span> L18.N0204 Retail (#1d84b5)
-    </span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-tier-blocked) 15%, transparent); color: var(--sd-tier-blocked);">
-      <span class="neuron-dot" style="background: var(--sd-tier-blocked);"></span> L19.N0518 Blocked (#64748b)
-    </span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-theme-emerald) 15%, transparent); color: var(--sd-theme-emerald);">
-      <span class="neuron-dot" style="background: var(--sd-theme-emerald);"></span> L20.N1105 Emerald (#10b981)
-    </span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-tier-alert) 15%, transparent); color: var(--sd-tier-alert);">
-      <span class="neuron-dot" style="background: var(--sd-tier-alert);"></span> L21.N0884 Alert (#ef4444)
-    </span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-tier-steam) 15%, transparent); color: var(--sd-tier-steam);">
-      <span class="neuron-dot" style="background: var(--sd-tier-steam);"></span> L22.N1402 Steam (#f59e0b)
-    </span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-tier-whale) 15%, transparent); color: var(--sd-tier-whale);">
-      <span class="neuron-dot" style="background: var(--sd-tier-whale);"></span> L23.N0412 Whale (#28a745)
-    </span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-tier-rec-bias) 15%, transparent); color: var(--sd-tier-rec-bias);">
-      <span class="neuron-dot" style="background: var(--sd-tier-rec-bias);"></span> L24.N2019 Rec (#38bdf8)
-    </span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-route-devig) 15%, transparent); color: var(--sd-route-devig);">
-      <span class="neuron-dot" style="background: var(--sd-route-devig);"></span> L25.N1882 Devig (#06b6d4)
-    </span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-route-sharp) 15%, transparent); color: var(--sd-route-sharp);">
-      <span class="neuron-dot" style="background: var(--sd-route-sharp);"></span> L26.N3104 Sharp (#a855f7)
-    </span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-route-pending) 15%, transparent); color: var(--sd-route-pending);">
-      <span class="neuron-dot" style="background: var(--sd-route-pending);"></span> L27.N0912 Breaker (#d97706)
-    </span>
-    <span class="neuron-pill" style="background: color-mix(in srgb, var(--sd-route-manager) 15%, transparent); color: var(--sd-route-manager);">
-      <span class="neuron-dot" style="background: var(--sd-route-manager);"></span> L28.N2501 Manager (#f43f5e)
-    </span>
-  </div>
+    <!-- Qwen3.5-4B (Layers 18-28) Design Token & Neuron Telemetry Strip -->
+    <div class="telemetry-strip">
+      <span class="telemetry-label">Neuron Tokens:</span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(
+            in srgb,
+            var(--sd-tier-retail) 15%,
+            transparent
+          );
+          color: var(--sd-tier-retail);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-tier-retail)"
+        ></span>
+        L18.N0204 Retail (#1d84b5)
+      </span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(
+            in srgb,
+            var(--sd-tier-blocked) 15%,
+            transparent
+          );
+          color: var(--sd-tier-blocked);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-tier-blocked)"
+        ></span>
+        L19.N0518 Blocked (#64748b)
+      </span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(
+            in srgb,
+            var(--sd-theme-emerald) 15%,
+            transparent
+          );
+          color: var(--sd-theme-emerald);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-theme-emerald)"
+        ></span>
+        L20.N1105 Emerald (#10b981)
+      </span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(in srgb, var(--sd-tier-alert) 15%, transparent);
+          color: var(--sd-tier-alert);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-tier-alert)"
+        ></span>
+        L21.N0884 Alert (#ef4444)
+      </span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(in srgb, var(--sd-tier-steam) 15%, transparent);
+          color: var(--sd-tier-steam);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-tier-steam)"
+        ></span>
+        L22.N1402 Steam (#f59e0b)
+      </span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(in srgb, var(--sd-tier-whale) 15%, transparent);
+          color: var(--sd-tier-whale);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-tier-whale)"
+        ></span>
+        L23.N0412 Whale (#28a745)
+      </span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(
+            in srgb,
+            var(--sd-tier-rec-bias) 15%,
+            transparent
+          );
+          color: var(--sd-tier-rec-bias);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-tier-rec-bias)"
+        ></span>
+        L24.N2019 Rec (#38bdf8)
+      </span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(
+            in srgb,
+            var(--sd-route-devig) 15%,
+            transparent
+          );
+          color: var(--sd-route-devig);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-route-devig)"
+        ></span>
+        L25.N1882 Devig (#06b6d4)
+      </span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(
+            in srgb,
+            var(--sd-route-sharp) 15%,
+            transparent
+          );
+          color: var(--sd-route-sharp);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-route-sharp)"
+        ></span>
+        L26.N3104 Sharp (#a855f7)
+      </span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(
+            in srgb,
+            var(--sd-route-pending) 15%,
+            transparent
+          );
+          color: var(--sd-route-pending);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-route-pending)"
+        ></span>
+        L27.N0912 Breaker (#d97706)
+      </span>
+      <span
+        class="neuron-pill"
+        style="
+          background: color-mix(
+            in srgb,
+            var(--sd-route-manager) 15%,
+            transparent
+          );
+          color: var(--sd-route-manager);
+        "
+      >
+        <span
+          class="neuron-dot"
+          style="background: var(--sd-route-manager)"
+        ></span>
+        L28.N2501 Manager (#f43f5e)
+      </span>
+    </div>
 
-  <div class="kpi-grid">
-    <div class="kpi-card">
-      <div class="kpi-label">Master Downline Scope</div>
-      <div class="kpi-val">668 Agents</div>
-      <div class="kpi-sub">Master: BILLY666 • 460 Active Sports</div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Master Downline Scope</div>
+        <div class="kpi-val">668 Agents</div>
+        <div class="kpi-sub">Master: BILLY666 • 460 Active Sports</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Provisioned Bettors</div>
+        <div class="kpi-val">9,435 Accts</div>
+        <div class="kpi-sub">2,236 Active • 7,199 Retained</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Active Sports Handle</div>
+        <div class="kpi-val">$2.79M</div>
+        <div class="kpi-sub">10,941 Settled Tickets</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Lifetime Book Net Hold</div>
+        <div class="kpi-val">$10.49M</div>
+        <div class="kpi-sub">50% Agent Share: $5.24M</div>
+      </div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Total Provisioned Bettors</div>
-      <div class="kpi-val">9,435 Accts</div>
-      <div class="kpi-sub">2,236 Active • 7,199 Retained</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Active Sports Handle</div>
-      <div class="kpi-val">$2.79M</div>
-      <div class="kpi-sub">10,941 Settled Tickets</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Lifetime Book Net Hold</div>
-      <div class="kpi-val">$10.49M</div>
-      <div class="kpi-sub">50% Agent Share: $5.24M</div>
-    </div>
-  </div>
 
-  <!-- Priority Monitored Accounts Surveillance -->
-  <div class="section-card">
-    <div class="section-title">
-      <span>High-Exposure Accounts &amp; Forensic Watch List</span>
-      <span class="badge badge-warning">SURVEILLANCE ACTIVE</span>
+    <!-- Priority Monitored Accounts Surveillance -->
+    <div class="section-card">
+      <div class="section-title">
+        <span>High-Exposure Accounts &amp; Forensic Watch List</span>
+        <span class="badge badge-warning">SURVEILLANCE ACTIVE</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Bettor ID</th>
+            <th>Owning Agent</th>
+            <th>Archetype</th>
+            <th>Neuron Channel</th>
+            <th>Handle ($)</th>
+            <th>Recent P&amp;L ($)</th>
+            <th>Lifetime P&amp;L ($)</th>
+            <th>Action Playbook</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono-cell">RF2003</td>
+            <td class="mono-cell">FAKEMONEY</td>
+            <td>Whale Volatility Concentration</td>
+            <td><span class="badge badge-whale">L23.N0412 Whale</span></td>
+            <td class="mono-cell">$940,000.00</td>
+            <td class="mono-cell" style="color: var(--sd-tier-whale)">
+              +$25,000.00
+            </td>
+            <td class="mono-cell" style="color: var(--sd-danger)">
+              -$1,006,530.00
+            </td>
+            <td>
+              <button
+                class="btn btn-warning"
+                onclick="alert('Cap $5,000 sent')"
+              >
+                Cap $5,000
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td class="mono-cell">BGD101</td>
+            <td class="mono-cell">BIGDAD</td>
+            <td>Execution Sniper (100% Win Rate)</td>
+            <td><span class="badge badge-alert">L21.N0884 Alert</span></td>
+            <td class="mono-cell">$40,000.00</td>
+            <td class="mono-cell" style="color: var(--sd-danger)">
+              +$40,000.00
+            </td>
+            <td class="mono-cell" style="color: var(--sd-danger)">
+              -$177,400.00
+            </td>
+            <td>
+              <button
+                class="btn btn-danger"
+                onclick="alert('Slash to $1k sent')"
+              >
+                Slash to $1k
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td class="mono-cell">GP300</td>
+            <td class="mono-cell">GPRO50RSK</td>
+            <td>High-Frequency Steam / Line Chaser</td>
+            <td><span class="badge badge-steam">L22.N1402 Steam</span></td>
+            <td class="mono-cell">$46,140.00</td>
+            <td class="mono-cell" style="color: var(--sd-tier-steam)">
+              +$33,858.00
+            </td>
+            <td class="mono-cell" style="color: var(--sd-danger)">
+              -$1,519.00
+            </td>
+            <td>
+              <button
+                class="btn"
+                style="background: var(--sd-tier-steam); color: #000"
+                onclick="alert('6s Delay Active')"
+              >
+                Apply 6s Delay
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td class="mono-cell">ABC700</td>
+            <td class="mono-cell">JUICEPLUS</td>
+            <td>Chronic Lifetime Extractor Sharp</td>
+            <td><span class="badge badge-purple">L26.N3104 Sharp</span></td>
+            <td class="mono-cell">$42,000.00</td>
+            <td class="mono-cell">-$4,000.00</td>
+            <td class="mono-cell" style="color: var(--sd-accent)">
+              +$200,050.00
+            </td>
+            <td>
+              <button
+                class="btn"
+                style="background: var(--sd-purple)"
+                onclick="alert('+20c Vig Enforced')"
+              >
+                +20c Vig Model
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Bettor ID</th>
-          <th>Owning Agent</th>
-          <th>Archetype</th>
-          <th>Neuron Channel</th>
-          <th>Handle ($)</th>
-          <th>Recent P&amp;L ($)</th>
-          <th>Lifetime P&amp;L ($)</th>
-          <th>Action Playbook</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="mono-cell">RF2003</td>
-          <td class="mono-cell">FAKEMONEY</td>
-          <td>Whale Volatility Concentration</td>
-          <td><span class="badge badge-whale">L23.N0412 Whale</span></td>
-          <td class="mono-cell">$940,000.00</td>
-          <td class="mono-cell" style="color: var(--sd-tier-whale);">+$25,000.00</td>
-          <td class="mono-cell" style="color: var(--sd-danger);">-$1,006,530.00</td>
-          <td><button class="btn btn-warning" onclick="alert('Cap $5,000 sent')">Cap $5,000</button></td>
-        </tr>
-        <tr>
-          <td class="mono-cell">BGD101</td>
-          <td class="mono-cell">BIGDAD</td>
-          <td>Execution Sniper (100% Win Rate)</td>
-          <td><span class="badge badge-alert">L21.N0884 Alert</span></td>
-          <td class="mono-cell">$40,000.00</td>
-          <td class="mono-cell" style="color: var(--sd-danger);">+$40,000.00</td>
-          <td class="mono-cell" style="color: var(--sd-danger);">-$177,400.00</td>
-          <td><button class="btn btn-danger" onclick="alert('Slash to $1k sent')">Slash to $1k</button></td>
-        </tr>
-        <tr>
-          <td class="mono-cell">GP300</td>
-          <td class="mono-cell">GPRO50RSK</td>
-          <td>High-Frequency Steam / Line Chaser</td>
-          <td><span class="badge badge-steam">L22.N1402 Steam</span></td>
-          <td class="mono-cell">$46,140.00</td>
-          <td class="mono-cell" style="color: var(--sd-tier-steam);">+$33,858.00</td>
-          <td class="mono-cell" style="color: var(--sd-danger);">-$1,519.00</td>
-          <td><button class="btn" style="background: var(--sd-tier-steam); color: #000;" onclick="alert('6s Delay Active')">Apply 6s Delay</button></td>
-        </tr>
-        <tr>
-          <td class="mono-cell">ABC700</td>
-          <td class="mono-cell">JUICEPLUS</td>
-          <td>Chronic Lifetime Extractor Sharp</td>
-          <td><span class="badge badge-purple">L26.N3104 Sharp</span></td>
-          <td class="mono-cell">$42,000.00</td>
-          <td class="mono-cell">-$4,000.00</td>
-          <td class="mono-cell" style="color: var(--sd-accent);">+$200,050.00</td>
-          <td><button class="btn" style="background: var(--sd-purple);" onclick="alert('+20c Vig Enforced')">+20c Vig Model</button></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</body>
+  </body>
 </html>

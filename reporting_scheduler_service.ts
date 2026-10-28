@@ -14,7 +14,11 @@
 
 import { SportsDeskTelegramService } from "./sportsdesk_telegram_bot.ts";
 
-export type ReportType = "MORNING_BRIEFING" | "MIDDAY_STEAM" | "EVENING_SETTLEMENT" | "CUSTOM_HOURLY_PULSE";
+export type ReportType =
+  | "MORNING_BRIEFING"
+  | "MIDDAY_STEAM"
+  | "EVENING_SETTLEMENT"
+  | "CUSTOM_HOURLY_PULSE";
 
 export interface ScheduleDefinition {
   readonly id: string;
@@ -52,7 +56,8 @@ export class ReportingSchedulerService {
         name: "Morning Risk Briefing",
         scheduleTime: "08:00",
         reportType: "MORNING_BRIEFING",
-        description: "Overnight open pending exposure, active whale check (RF2003), and sniper watch ahead of afternoon games.",
+        description:
+          "Overnight open pending exposure, active whale check (RF2003), and sniper watch ahead of afternoon games.",
         enabled: true,
       },
       {
@@ -60,7 +65,8 @@ export class ReportingSchedulerService {
         name: "Midday Steam & Volatility Pulse",
         scheduleTime: "13:00",
         reportType: "MIDDAY_STEAM",
-        description: "Line movement alerts, steam originations from GP300 and AT10359, and in-play ticket velocity.",
+        description:
+          "Line movement alerts, steam originations from GP300 and AT10359, and in-play ticket velocity.",
         enabled: true,
       },
       {
@@ -68,7 +74,8 @@ export class ReportingSchedulerService {
         name: "Evening Settlement Recap",
         scheduleTime: "23:00",
         reportType: "EVENING_SETTLEMENT",
-        description: "Settled volume ($2.79M), customer payout/loss, net book hold (-$63.5k), and agent 50% liability shares.",
+        description:
+          "Settled volume ($2.79M), customer payout/loss, net book hold (-$63.5k), and agent 50% liability shares.",
         enabled: true,
       },
     ];
@@ -83,7 +90,8 @@ export class ReportingSchedulerService {
   }
 
   public generateReport(type: ReportType): GeneratedReport {
-    const nowStr = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC-5";
+    const nowStr =
+      new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC-5";
 
     if (type === "MORNING_BRIEFING") {
       const html = `
@@ -166,12 +174,21 @@ Master Agent: <code>BILLY666</code> • Generated: <code>${nowStr}</code>
     };
   }
 
-  public async dispatchReportNow(type: ReportType, chatId?: string): Promise<boolean> {
+  public async dispatchReportNow(
+    type: ReportType,
+    chatId?: string,
+  ): Promise<boolean> {
     const rep = this.generateReport(type);
-    console.log(`[Reporting Scheduler] Dispatching ${rep.title} to Telegram...`);
-    const res = await this.telegramService.sendMessage(chatId || "", rep.contentHtml, {
-      parse_mode: "HTML",
-    });
+    console.log(
+      `[Reporting Scheduler] Dispatching ${rep.title} to Telegram...`,
+    );
+    const res = await this.telegramService.sendMessage(
+      chatId || "",
+      rep.contentHtml,
+      {
+        parse_mode: "HTML",
+      },
+    );
     return res.ok;
   }
 }

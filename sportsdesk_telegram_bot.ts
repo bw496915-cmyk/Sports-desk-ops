@@ -26,7 +26,12 @@ export interface WatchListAccount {
   readonly lifetimeNetUSD: number;
   readonly sportsHandleUSD: number;
   readonly ticketsCount: number;
-  readonly riskTier: "CRITICAL_WHALE" | "EXECUTION_SNIPER" | "STEAM_CHASER" | "CHRONIC_SHARP" | "HIT_AND_RUN_DORMANT";
+  readonly riskTier:
+    | "CRITICAL_WHALE"
+    | "EXECUTION_SNIPER"
+    | "STEAM_CHASER"
+    | "CHRONIC_SHARP"
+    | "HIT_AND_RUN_DORMANT";
   readonly recommendedAction: string;
 }
 
@@ -63,7 +68,8 @@ export interface ScheduledReportTask {
   readonly id: string;
   readonly name: string;
   readonly cronExpression: string; // e.g. "08:00", "13:00", "23:00"
-  readonly reportType: "MORNING_BRIEFING" | "MIDDAY_STEAM" | "EVENING_SETTLEMENT";
+  readonly reportType:
+    "MORNING_BRIEFING" | "MIDDAY_STEAM" | "EVENING_SETTLEMENT";
   readonly description: string;
 }
 
@@ -83,8 +89,16 @@ export class SportsDeskTelegramService {
   }) {
     this.botToken = options?.botToken ?? process.env.TELEGRAM_BOT_TOKEN ?? "";
     this.defaultChatId = options?.chatId ?? process.env.TELEGRAM_CHAT_ID ?? "";
-    this.miniappBaseUrl = (options?.miniappUrl ?? process.env.TELEGRAM_MINIAPP_URL ?? "http://localhost:4020").replace(/\/+$/, "");
-    this.isLiveMode = Boolean(this.botToken && this.botToken.trim().length > 0 && this.defaultChatId.trim().length > 0);
+    this.miniappBaseUrl = (
+      options?.miniappUrl ??
+      process.env.TELEGRAM_MINIAPP_URL ??
+      "http://localhost:4020"
+    ).replace(/\/+$/, "");
+    this.isLiveMode = Boolean(
+      this.botToken &&
+      this.botToken.trim().length > 0 &&
+      this.defaultChatId.trim().length > 0,
+    );
 
     this.initWatchListRegistry();
     this.initScheduleDefinitions();
@@ -102,20 +116,84 @@ export class SportsDeskTelegramService {
       sportsHandleUSD: 940000.0,
       ticketsCount: 47,
       riskTier: "CRITICAL_WHALE",
-      recommendedAction: "Cap max single bet to $5,000.00 / require split approvals",
+      recommendedAction:
+        "Cap max single bet to $5,000.00 / require split approvals",
     });
 
     // 2. Execution Snipers
     const snipers = [
-      { id: "BGD101", agent: "BIGDAD", won: 40000.0, handle: 40000.0, tix: 2, lt: -177400.0 },
-      { id: "MJ102", agent: "MJ2026", won: 30000.0, handle: 20000.0, tix: 1, lt: 24000.0 },
-      { id: "GX195", agent: "GOLD22", won: 10000.0, handle: 10000.0, tix: 1, lt: 4403.0 },
-      { id: "PEY101", agent: "MACHR", won: 10000.0, handle: 10000.0, tix: 1, lt: -102666.0 },
-      { id: "MJ101", agent: "MJ2026", won: 10000.0, handle: 10000.0, tix: 1, lt: -77115.0 },
-      { id: "TEX500", agent: "TEXANS", won: 8000.0, handle: 8000.0, tix: 2, lt: -7860.0 },
-      { id: "AL1279", agent: "AA2300C", won: 6600.0, handle: 6000.0, tix: 2, lt: -125484.0 },
-      { id: "BB5127", agent: "ATEAM", won: 5000.0, handle: 15000.0, tix: 3, lt: -1750.0 },
-      { id: "19902", agent: "RALPHAH", won: 5000.0, handle: 5000.0, tix: 1, lt: 30650.0 },
+      {
+        id: "BGD101",
+        agent: "BIGDAD",
+        won: 40000.0,
+        handle: 40000.0,
+        tix: 2,
+        lt: -177400.0,
+      },
+      {
+        id: "MJ102",
+        agent: "MJ2026",
+        won: 30000.0,
+        handle: 20000.0,
+        tix: 1,
+        lt: 24000.0,
+      },
+      {
+        id: "GX195",
+        agent: "GOLD22",
+        won: 10000.0,
+        handle: 10000.0,
+        tix: 1,
+        lt: 4403.0,
+      },
+      {
+        id: "PEY101",
+        agent: "MACHR",
+        won: 10000.0,
+        handle: 10000.0,
+        tix: 1,
+        lt: -102666.0,
+      },
+      {
+        id: "MJ101",
+        agent: "MJ2026",
+        won: 10000.0,
+        handle: 10000.0,
+        tix: 1,
+        lt: -77115.0,
+      },
+      {
+        id: "TEX500",
+        agent: "TEXANS",
+        won: 8000.0,
+        handle: 8000.0,
+        tix: 2,
+        lt: -7860.0,
+      },
+      {
+        id: "AL1279",
+        agent: "AA2300C",
+        won: 6600.0,
+        handle: 6000.0,
+        tix: 2,
+        lt: -125484.0,
+      },
+      {
+        id: "BB5127",
+        agent: "ATEAM",
+        won: 5000.0,
+        handle: 15000.0,
+        tix: 3,
+        lt: -1750.0,
+      },
+      {
+        id: "19902",
+        agent: "RALPHAH",
+        won: 5000.0,
+        handle: 5000.0,
+        tix: 1,
+        lt: 30650.0,
+      },
     ];
     for (const s of snipers) {
       this.watchListMap.set(s.id, {
@@ -134,11 +212,46 @@ export class SportsDeskTelegramService {
 
     // 3. Steam Chasers & Originators
     const steam = [
-      { id: "GP300", agent: "GPRO50RSK", won: 33858.0, handle: 46140.0, tix: 22, lt: -1519.0 },
-      { id: "AT10359", agent: "ATEAM", won: 19024.0, handle: 26500.0, tix: 21, lt: 45525.0 },
-      { id: "BCC1530", agent: "SPEN", won: 10514.0, handle: 19722.0, tix: 31, lt: 3401.0 },
-      { id: "AT811", agent: "ATEAM", won: 3967.0, handle: 5990.0, tix: 30, lt: 7854.0 },
-      { id: "AYM59007", agent: "AYMAN", won: 3001.0, handle: 8925.0, tix: 24, lt: 2130.0 },
+      {
+        id: "GP300",
+        agent: "GPRO50RSK",
+        won: 33858.0,
+        handle: 46140.0,
+        tix: 22,
+        lt: -1519.0,
+      },
+      {
+        id: "AT10359",
+        agent: "ATEAM",
+        won: 19024.0,
+        handle: 26500.0,
+        tix: 21,
+        lt: 45525.0,
+      },
+      {
+        id: "BCC1530",
+        agent: "SPEN",
+        won: 10514.0,
+        handle: 19722.0,
+        tix: 31,
+        lt: 3401.0,
+      },
+      {
+        id: "AT811",
+        agent: "ATEAM",
+        won: 3967.0,
+        handle: 5990.0,
+        tix: 30,
+        lt: 7854.0,
+      },
+      {
+        id: "AYM59007",
+        agent: "AYMAN",
+        won: 3001.0,
+        handle: 8925.0,
+        tix: 24,
+        lt: 2130.0,
+      },
     ];
     for (const st of steam) {
       this.watchListMap.set(st.id, {
@@ -151,17 +264,53 @@ export class SportsDeskTelegramService {
         sportsHandleUSD: st.handle,
         ticketsCount: st.tix,
         riskTier: "STEAM_CHASER",
-        recommendedAction: "Apply 6-second dynamic delay gate & shade juice to -115",
+        recommendedAction:
+          "Apply 6-second dynamic delay gate & shade juice to -115",
       });
     }
 
     // 4. Chronic Lifetime Sharps
     const chronic = [
-      { id: "ABC700", agent: "JUICEPLUS", won: -4000.0, handle: 42000.0, tix: 5, lt: 200050.0 },
-      { id: "DAN245", agent: "DAN318", won: 14000.0, handle: 14000.0, tix: 7, lt: 16049.0 },
-      { id: "LG237", agent: "ROBERTL", won: 2500.0, handle: 2500.0, tix: 1, lt: 38550.0 },
-      { id: "MM1012", agent: "MOOSEM", won: 2000.0, handle: 2000.0, tix: 2, lt: 10659.0 },
-      { id: "MM1023", agent: "MOOSEM", won: 1900.0, handle: 6000.0, tix: 3, lt: 14000.0 },
+      {
+        id: "ABC700",
+        agent: "JUICEPLUS",
+        won: -4000.0,
+        handle: 42000.0,
+        tix: 5,
+        lt: 200050.0,
+      },
+      {
+        id: "DAN245",
+        agent: "DAN318",
+        won: 14000.0,
+        handle: 14000.0,
+        tix: 7,
+        lt: 16049.0,
+      },
+      {
+        id: "LG237",
+        agent: "ROBERTL",
+        won: 2500.0,
+        handle: 2500.0,
+        tix: 1,
+        lt: 38550.0,
+      },
+      {
+        id: "MM1012",
+        agent: "MOOSEM",
+        won: 2000.0,
+        handle: 2000.0,
+        tix: 2,
+        lt: 10659.0,
+      },
+      {
+        id: "MM1023",
+        agent: "MOOSEM",
+        won: 1900.0,
+        handle: 6000.0,
+        tix: 3,
+        lt: 14000.0,
+      },
     ];
     for (const c of chronic) {
       this.watchListMap.set(c.id, {
@@ -174,7 +323,8 @@ export class SportsDeskTelegramService {
         sportsHandleUSD: c.handle,
         ticketsCount: c.tix,
         riskTier: "CHRONIC_SHARP",
-        recommendedAction: "Shift to +15c/+20c vig model (-120/-110) or restrict markets",
+        recommendedAction:
+          "Shift to +15c/+20c vig model (-120/-110) or restrict markets",
       });
     }
   }
@@ -186,22 +336,25 @@ export class SportsDeskTelegramService {
         name: "Morning Risk Briefing",
         cronExpression: "08:00 EDT",
         reportType: "MORNING_BRIEFING",
-        description: "Overnight risk exposure, dormant re-activations, top 5 toxic branches, and daily game slate.",
+        description:
+          "Overnight risk exposure, dormant re-activations, top 5 toxic branches, and daily game slate.",
       },
       {
         id: "rep_midday_1300",
         name: "Midday Steam & Volatility Pulse",
         cronExpression: "13:00 EDT",
         reportType: "MIDDAY_STEAM",
-        description: "Line movement alerts, steam originations from GP300/AT10359, and in-play ticket velocity.",
+        description:
+          "Line movement alerts, steam originations from GP300/AT10359, and in-play ticket velocity.",
       },
       {
         id: "rep_evening_2300",
         name: "Evening Settlement Recap",
         cronExpression: "23:00 EDT",
         reportType: "EVENING_SETTLEMENT",
-        description: "Day's settled handle, customer won/lost, net house hold, and agent 50% liability balance.",
-      }
+        description:
+          "Day's settled handle, customer won/lost, net house hold, and agent 50% liability balance.",
+      },
     );
   }
 
@@ -216,14 +369,20 @@ export class SportsDeskTelegramService {
   public async sendMessage(
     chatId: string,
     htmlText: string,
-    options?: TelegramSendMessageOptions
+    options?: TelegramSendMessageOptions,
   ): Promise<{ ok: boolean; message_id?: number; description?: string }> {
     const targetChat = chatId || this.defaultChatId;
 
     if (!this.isLiveMode) {
-      console.log("\n================================================================================");
-      console.log(`[TELEGRAM OUTBOUND SIMULATION] Target Chat: ${targetChat || "DEFAULT_CHANNEL"}`);
-      console.log("================================================================================");
+      console.log(
+        "\n================================================================================",
+      );
+      console.log(
+        `[TELEGRAM OUTBOUND SIMULATION] Target Chat: ${targetChat || "DEFAULT_CHANNEL"}`,
+      );
+      console.log(
+        "================================================================================",
+      );
       console.log(htmlText.replace(/<[^>]*>/g, ""));
       return { ok: true, message_id: Math.floor(Math.random() * 100000) };
     }
@@ -244,21 +403,27 @@ export class SportsDeskTelegramService {
         body: JSON.stringify(body),
       });
 
-      return await res.json() as any;
+      return (await res.json()) as any;
     } catch (err: any) {
       console.error("[Telegram API Error] Failed to send message:", err);
       return { ok: false, description: err?.message || String(err) };
     }
   }
 
-  public async dispatchWatchListAlert(wager: WagerAlertPayload, targetChatId?: string): Promise<boolean> {
-    const watchAcct = wager.watchAccount || this.watchListMap.get(wager.customerId);
+  public async dispatchWatchListAlert(
+    wager: WagerAlertPayload,
+    targetChatId?: string,
+  ): Promise<boolean> {
+    const watchAcct =
+      wager.watchAccount || this.watchListMap.get(wager.customerId);
     const chatId = targetChatId || this.defaultChatId;
 
     const riskFormatted = `$${wager.riskUSD.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
     const winFormatted = `$${wager.toWinUSD.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
     const archetype = watchAcct?.archetype || "High-Stake Exposure Threshold";
-    const action = watchAcct?.recommendedAction || "Review account wagering limits and confirmation delay";
+    const action =
+      watchAcct?.recommendedAction ||
+      "Review account wagering limits and confirmation delay";
 
     const alertHtml = `
 🚨 <b>SPORTSDESK WATCH LIST WAGER ALERT</b> 🚨
@@ -288,8 +453,14 @@ ${action}
         },
       ],
       [
-        { text: "⚡ Slash to $1k", callback_data: `slash:${wager.customerId}:1000` },
-        { text: "⏱ Apply 6s Delay", callback_data: `delay:${wager.customerId}:6` },
+        {
+          text: "⚡ Slash to $1k",
+          callback_data: `slash:${wager.customerId}:1000`,
+        },
+        {
+          text: "⏱ Apply 6s Delay",
+          callback_data: `delay:${wager.customerId}:6`,
+        },
       ],
     ];
 
@@ -301,7 +472,10 @@ ${action}
     return result.ok;
   }
 
-  public async dispatchTestAlert(targetCustomerId: string = "RF2003", targetChatId?: string): Promise<boolean> {
+  public async dispatchTestAlert(
+    targetCustomerId: string = "RF2003",
+    targetChatId?: string,
+  ): Promise<boolean> {
     const custId = targetCustomerId.trim().toUpperCase();
     const watch = this.watchListMap.get(custId);
 
@@ -310,12 +484,20 @@ ${action}
       agentId: watch?.agentId || "FAKEMONEY",
       masterAgentId: "BILLY666",
       wagerNumber: Math.floor(Math.random() * 900000) + 100000,
-      riskUSD: custId === "RF2003" ? 20000.0 : custId === "BGD101" ? 20000.0 : 2500.0,
-      toWinUSD: custId === "RF2003" ? 18181.82 : custId === "BGD101" ? 18181.82 : 2272.73,
+      riskUSD:
+        custId === "RF2003" ? 20000.0 : custId === "BGD101" ? 20000.0 : 2500.0,
+      toWinUSD:
+        custId === "RF2003"
+          ? 18181.82
+          : custId === "BGD101"
+            ? 18181.82
+            : 2272.73,
       odds: "-110",
-      marketDescription: "NFL • Kansas City Chiefs -3½ vs Denver Broncos (Point Spread)",
+      marketDescription:
+        "NFL • Kansas City Chiefs -3½ vs Denver Broncos (Point Spread)",
       wagerType: "Straight (Point Spread)",
-      acceptedAt: new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC-5",
+      acceptedAt:
+        new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC-5",
       watchAccount: watch,
     };
 
@@ -323,7 +505,9 @@ ${action}
   }
 
   public startScheduledReportingService(): void {
-    console.log("[Telegram Schedule Service] Service active. Reports scheduled for 08:00, 13:00, and 23:00 EDT.");
+    console.log(
+      "[Telegram Schedule Service] Service active. Reports scheduled for 08:00, 13:00, and 23:00 EDT.",
+    );
   }
 }
 

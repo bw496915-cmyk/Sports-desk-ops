@@ -7,11 +7,13 @@ This guide details the deployment of the **SportsDesk & Fantasy402 Ops Daemon**,
 The included script `deploy_to_vps.sh` automates the entire installation:
 
 1. Copy the project files to your VPS:
+
 ```bash
 scp -r sportsdesk-ops/* root@<YOUR_VPS_IP>:/opt/sportsdesk-ops/
 ```
 
 2. Run the deployment script on the VPS:
+
 ```bash
 ssh root@<YOUR_VPS_IP>
 cd /opt/sportsdesk-ops
@@ -20,6 +22,7 @@ chmod +x deploy_to_vps.sh
 ```
 
 The script automatically:
+
 - Installs `curl`, `unzip`, `nginx`, and `certbot`.
 - Installs the native **Bun** runtime.
 - Configures production environment variables in `.env`.
@@ -29,8 +32,8 @@ The script automatically:
 
 ## 2. Verification & Diagnostics
 
-| Component | Command / URL | Expected Result |
-| :--- | :--- | :--- |
-| **Systemd Service** | `systemctl status sportsdesk-ops` | `Active: active (running)` |
-| **Public Health** | `curl -s https://desk.yourdomain.com/health` | `HTTP 200 OK` |
-| **Telegram Bot** | `https://t.me/demodevdeskbot` | Interactive `/start` menu and Mini App |
+| Component           | Command / URL                                | Expected Result                        |
+| :------------------ | :------------------------------------------- | :------------------------------------- |
+| **Systemd Service** | `systemctl status sportsdesk-ops`            | `Active: active (running)`             |
+| **Public Health**   | `curl -s https://desk.yourdomain.com/health` | `HTTP 200 OK`                          |
+| **Telegram Bot**    | `https://t.me/demodevdeskbot`                | Interactive `/start` menu and Mini App |

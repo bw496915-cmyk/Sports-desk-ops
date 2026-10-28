@@ -60,32 +60,39 @@ export interface AgentOnePassAlertNotification {
 }
 
 export class AgentOnePassPlugin {
-  private readonly agentPortfolios: Map<AgentId, {
-    masterAgentId: AgentId;
-    activeBettors: Set<CustomerId>;
-    dormantBettors: Set<CustomerId>;
-    bettorVolumeMap: Map<CustomerId, Cents>;
-    bettorRiskMap: Map<CustomerId, number>;
-    bettorModeMap: Map<CustomerId, ChurnClassificationMode>;
-    totalVolumeCents: number;
-    totalGrossHoldCents: number;
-  }> = new Map();
+  private readonly agentPortfolios: Map<
+    AgentId,
+    {
+      masterAgentId: AgentId;
+      activeBettors: Set<CustomerId>;
+      dormantBettors: Set<CustomerId>;
+      bettorVolumeMap: Map<CustomerId, Cents>;
+      bettorRiskMap: Map<CustomerId, number>;
+      bettorModeMap: Map<CustomerId, ChurnClassificationMode>;
+      totalVolumeCents: number;
+      totalGrossHoldCents: number;
+    }
+  > = new Map();
 
-  private readonly alertSubscribers: ((alert: AgentOnePassAlertNotification) => void)[] = [];
+  private readonly alertSubscribers: ((
+    alert: AgentOnePassAlertNotification,
+  ) => void)[] = [];
   private readonly liabilityShareRatio: number;
 
   constructor(liabilityShareRatio: number = 0.5) {
     this.liabilityShareRatio = liabilityShareRatio;
   }
 
-  public registerAlertCallback(callback: (alert: AgentOnePassAlertNotification) => void): void {
+  public registerAlertCallback(
+    callback: (alert: AgentOnePassAlertNotification) => void,
+  ): void {
     this.alertSubscribers.push(callback);
   }
 
   public ingestWagerTickOnePass(
     ticket: ReconstructedTicketSummary,
     agentId: AgentId,
-    masterAgentId: AgentId = "BILLY666" as AgentId
+    masterAgentId: AgentId = "BILLY666" as AgentId,
   ): void {
     let portfolio = this.agentPortfolios.get(agentId);
     if (!portfolio) {
@@ -109,8 +116,12 @@ export class AgentOnePassPlugin {
     portfolio.totalVolumeCents += stakeCents;
     portfolio.totalGrossHoldCents += Math.round(stakeCents * 0.082);
 
-    const currentBettorVol = portfolio.bettorVolumeMap.get(ticket.customerId) ?? (0 as Cents);
-    portfolio.bettorVolumeMap.set(ticket.customerId, (currentBettorVol + stakeCents) as Cents);
+    const currentBettorVol =
+      portfolio.bettorVolumeMap.get(ticket.customerId) ?? (0 as Cents);
+    portfolio.bettorVolumeMap.set(
+      ticket.customerId,
+      (currentBettorVol + stakeCents) as Cents,
+    );
   }
 
   public updateBettorChurnStateOnePass(
@@ -120,7 +131,7 @@ export class AgentOnePassPlugin {
     mode: ChurnClassificationMode,
     weeklyVolumeCents: Cents,
     rootCause: string,
-    playbook: string
+    playbook: string,
   ): void {
     let portfolio = this.agentPortfolios.get(agentId);
     if (!portfolio) {
@@ -141,7 +152,9 @@ export class AgentOnePassPlugin {
     portfolio.bettorModeMap.set(customerId, mode);
 
     if (riskScore >= 0.65) {
-      const weeklyHoldAtRisk = Math.round(weeklyVolumeCents * 0.085 * this.liabilityShareRatio) as Cents;
+      const weeklyHoldAtRisk = Math.round(
+        weeklyVolumeCents * 0.085 * this.liabilityShareRatio,
+      ) as Cents;
       const alert: AgentOnePassAlertNotification = {
         agentId,
         bettorId: customerId,
@@ -170,7 +183,7 @@ export class AgentOnePassPlugin {
       const modeFrequencies: Record<string, number> = {};
 
       for (const bettorId of portfolio.activeBettors) {
-        const risk = portfolio.bettorRiskMap.get(bettorId) ?? 0.10;
+        const risk = portfolio.bettorRiskMap.get(bettorId) ?? 0.1;
         const vol = portfolio.bettorVolumeMap.get(bettorId) ?? 10000;
         const mode = portfolio.bettorModeMap.get(bettorId) ?? "ACTIVE_RETAINED";
 
@@ -183,7 +196,10 @@ export class AgentOnePassPlugin {
         }
       }
 
-      const hazardIndex = totalBettorVol > 0 ? Number((weightedRiskSum / totalBettorVol).toFixed(3)) : 0;
+      const hazardIndex =
+        totalBettorVol > 0
+          ? Number((weightedRiskSum / totalBettorVol).toFixed(3))
+          : 0;
       let topMode: ChurnClassificationMode = "ACTIVE_RETAINED";
       let maxCount = 0;
       for (const [m, count] of Object.entries(modeFrequencies)) {
@@ -195,7 +211,9 @@ export class AgentOnePassPlugin {
 
       const volCents = Math.round(portfolio.totalVolumeCents) as Cents;
       const grossHoldCents = Math.round(portfolio.totalGrossHoldCents) as Cents;
-      const agentLiabilityCents = Math.round(portfolio.totalGrossHoldCents * this.liabilityShareRatio) as Cents;
+      const agentLiabilityCents = Math.round(
+        portfolio.totalGrossHoldCents * this.liabilityShareRatio,
+      ) as Cents;
 
       snapshots.push({
         agentId,

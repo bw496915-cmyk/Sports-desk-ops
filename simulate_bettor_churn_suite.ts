@@ -33,7 +33,10 @@ export type BetGroupId = Brand<string, "BetGroupId">; // M.G<id> live join key
 export type EpochMs = Brand<number, "EpochMs">;
 export type BasisPoints = Brand<number, "BasisPoints">;
 
-export function parseAsCents(dollarsOrCents: number, isAlreadyCents: boolean = true): Cents {
+export function parseAsCents(
+  dollarsOrCents: number,
+  isAlreadyCents: boolean = true,
+): Cents {
   if (isAlreadyCents) {
     return Math.round(dollarsOrCents) as Cents;
   }
@@ -48,7 +51,9 @@ export function createCanonicalCustomerId(rawIdentifier: string): CustomerId {
   return rawIdentifier.trim().toUpperCase() as CustomerId;
 }
 
-export function createPaddedCustomerId(rawIdentifier: string): PaddedCustomerId {
+export function createPaddedCustomerId(
+  rawIdentifier: string,
+): PaddedCustomerId {
   return rawIdentifier.trim().toUpperCase().padEnd(11, " ") as PaddedCustomerId;
 }
 
@@ -56,7 +61,10 @@ export function createCanonicalAgentId(rawIdentifier: string): AgentId {
   return rawIdentifier.trim().toUpperCase() as AgentId;
 }
 
-export function createCompositeTicketId(loginIdentifier: string, wagerNumberIdentifier: string | number): TicketId {
+export function createCompositeTicketId(
+  loginIdentifier: string,
+  wagerNumberIdentifier: string | number,
+): TicketId {
   return `${loginIdentifier.trim().toUpperCase()}|${wagerNumberIdentifier}` as TicketId;
 }
 
@@ -64,9 +72,11 @@ export function createCompositeTicketId(loginIdentifier: string, wagerNumberIden
 // 2. WIRE CONTRACT SCHEMAS & NORMALIZATION FOOTGUNS
 // ============================================================================
 
-export type RawWagerTypeCode = "A" | "M" | "C" | "S" | "T" | "L" | "E" | "I" | "P" | "F" | "G";
+export type RawWagerTypeCode =
+  "A" | "M" | "C" | "S" | "T" | "L" | "E" | "I" | "P" | "F" | "G";
 export type RawShortDescCode = "S" | "P" | "L" | "C" | "T" | "G" | "M" | "E";
-export type RawTicketWriterChannel = "Internet" | "ALERT" | "GSLIVE" | "GSBUILDER" | "CSLEVEL2" | "BLOCKED";
+export type RawTicketWriterChannel =
+  "Internet" | "ALERT" | "GSLIVE" | "GSBUILDER" | "CSLEVEL2" | "BLOCKED";
 
 export interface RawGradingLegRow {
   readonly CustomerID: string;
@@ -142,17 +152,26 @@ export function sanitizeShortDescText(rawDescription: string): string {
   return rawDescription.replace(/[^\x20-\x7E½]/g, "").trim();
 }
 
-export function extractBetGroupIdFromDescription(rawDescription: string): BetGroupId | null {
+export function extractBetGroupIdFromDescription(
+  rawDescription: string,
+): BetGroupId | null {
   const matchResult = rawDescription.match(/M\.G(\d+)/);
   return matchResult ? (`M.G${matchResult[1]}` as BetGroupId) : null;
 }
 
-export function reconstructParentPendingTickets(rawRows: readonly RawPendingLegRow[]): ReconstructedTicket[] {
+export function reconstructParentPendingTickets(
+  rawRows: readonly RawPendingLegRow[],
+): ReconstructedTicket[] {
   const groupedTicketsMap = new Map<TicketId, RawPendingLegRow[]>();
 
   for (const row of rawRows) {
     if (row.TicketWriter === "BLOCKED") continue;
-    if (row.Risk === 0 && row.ToWin === 0 && (!row.ShortDesc || row.ShortDesc.trim() === "")) continue;
+    if (
+      row.Risk === 0 &&
+      row.ToWin === 0 &&
+      (!row.ShortDesc || row.ShortDesc.trim() === "")
+    )
+      continue;
 
     const ticketId = createCompositeTicketId(row.Login, row.WagerNumber);
     let legArray = groupedTicketsMap.get(ticketId);
@@ -169,8 +188,12 @@ export function reconstructParentPendingTickets(rawRows: readonly RawPendingLegR
     legs.sort((a, b) => a.LegNumber - b.LegNumber);
     const primaryLeg = legs[0];
     const cleanedShortDesc = sanitizeShortDescText(primaryLeg.ShortDesc);
-    const shortDescCode = (cleanedShortDesc.charAt(0).toUpperCase() || "S") as RawShortDescCode;
-    const isLive = shortDescCode === "G" || shortDescCode === "M" || primaryLeg.WagerType === "G";
+    const shortDescCode = (cleanedShortDesc.charAt(0).toUpperCase() ||
+      "S") as RawShortDescCode;
+    const isLive =
+      shortDescCode === "G" ||
+      shortDescCode === "M" ||
+      primaryLeg.WagerType === "G";
     const betGroupId = extractBetGroupIdFromDescription(primaryLeg.ShortDesc);
 
     const riskCents = parseAsCents(primaryLeg.Risk);
@@ -184,8 +207,12 @@ export function reconstructParentPendingTickets(rawRows: readonly RawPendingLegR
     }
 
     const baseEpochMs = Date.parse("2025-10-27T00:00:00-05:00") as EpochMs;
-    const acceptedTimestampMs = (Date.parse(primaryLeg.InsertDateTime) || baseEpochMs) as EpochMs;
-    const acceptedWeekIndex = Math.max(0, Math.floor((acceptedTimestampMs - baseEpochMs) / (7 * 24 * 3600 * 1000)));
+    const acceptedTimestampMs = (Date.parse(primaryLeg.InsertDateTime) ||
+      baseEpochMs) as EpochMs;
+    const acceptedWeekIndex = Math.max(
+      0,
+      Math.floor((acceptedTimestampMs - baseEpochMs) / (7 * 24 * 3600 * 1000)),
+    );
 
     reconstructedList.push({
       ticketId,
@@ -230,23 +257,42 @@ export interface WeeklyCohortMetrics {
 }
 
 export class BettorSimulationHarness {
-  private readonly immutablePendingSnapshots: Map<string, readonly ReconstructedTicket[]> = new Map();
+  private readonly immutablePendingSnapshots: Map<
+    string,
+    readonly ReconstructedTicket[]
+  > = new Map();
   private readonly settledGradingRecords: SettledGradingRecord[] = [];
-  private readonly bettorProfileMap: Map<CustomerId, RawCustomerAdminRecord> = new Map();
+  private readonly bettorProfileMap: Map<CustomerId, RawCustomerAdminRecord> =
+    new Map();
   private readonly webLogRecords: RawWebLogEntry[] = [];
 
-  public registerPendingSnapshotBlob(snapshotKey: string, rawPendingRows: readonly RawPendingLegRow[]): void {
+  public registerPendingSnapshotBlob(
+    snapshotKey: string,
+    rawPendingRows: readonly RawPendingLegRow[],
+  ): void {
     const parentTickets = reconstructParentPendingTickets(rawPendingRows);
-    this.immutablePendingSnapshots.set(snapshotKey, Object.freeze([...parentTickets]));
+    this.immutablePendingSnapshots.set(
+      snapshotKey,
+      Object.freeze([...parentTickets]),
+    );
   }
 
-  public registerGradingRows(rawGradingRows: readonly RawGradingLegRow[]): void {
+  public registerGradingRows(
+    rawGradingRows: readonly RawGradingLegRow[],
+  ): void {
     for (const row of rawGradingRows) {
       const ticketId = createCompositeTicketId(row.CustomerID, row.WagerNumber);
-      const isVoid = row.Amount === 0 || row.Result === "VOID" || row.Result === "PUSH";
+      const isVoid =
+        row.Amount === 0 || row.Result === "VOID" || row.Result === "PUSH";
       const baseEpochMs = Date.parse("2025-10-27T00:00:00-05:00") as EpochMs;
-      const settlementTimestampMs = (Date.parse(row.SettlementDateTime) || baseEpochMs) as EpochMs;
-      const settlementWeekIndex = Math.max(0, Math.floor((settlementTimestampMs - baseEpochMs) / (7 * 24 * 3600 * 1000)));
+      const settlementTimestampMs = (Date.parse(row.SettlementDateTime) ||
+        baseEpochMs) as EpochMs;
+      const settlementWeekIndex = Math.max(
+        0,
+        Math.floor(
+          (settlementTimestampMs - baseEpochMs) / (7 * 24 * 3600 * 1000),
+        ),
+      );
 
       this.settledGradingRecords.push({
         ticketId,
@@ -259,9 +305,14 @@ export class BettorSimulationHarness {
     }
   }
 
-  public registerCustomerProfiles(profiles: readonly RawCustomerAdminRecord[]): void {
+  public registerCustomerProfiles(
+    profiles: readonly RawCustomerAdminRecord[],
+  ): void {
     for (const profile of profiles) {
-      this.bettorProfileMap.set(createCanonicalCustomerId(profile.customerID), profile);
+      this.bettorProfileMap.set(
+        createCanonicalCustomerId(profile.customerID),
+        profile,
+      );
     }
   }
 
@@ -279,9 +330,11 @@ export class BettorSimulationHarness {
     }
 
     for (let currentWeek = 0; currentWeek < totalWeeks; currentWeek++) {
-      const weekAcceptedTickets = allAcceptedTickets.filter((ticket) => ticket.acceptedWeekIndex === currentWeek);
+      const weekAcceptedTickets = allAcceptedTickets.filter(
+        (ticket) => ticket.acceptedWeekIndex === currentWeek,
+      );
       const weekGradedTickets = this.settledGradingRecords.filter(
-        (grading) => grading.settlementWeekIndex === currentWeek
+        (grading) => grading.settlementWeekIndex === currentWeek,
       );
 
       let acceptedVolumeCents = 0;
@@ -298,27 +351,41 @@ export class BettorSimulationHarness {
       for (const grading of weekGradedTickets) {
         gradedCustomerNetWinCents += grading.netAmountCents;
       }
-      const settledTicketIdSet = new Set(weekGradedTickets.map((record) => record.ticketId));
+      const settledTicketIdSet = new Set(
+        weekGradedTickets.map((record) => record.ticketId),
+      );
       for (const ticket of allAcceptedTickets) {
-        if (settledTicketIdSet.has(ticket.ticketId) && ticket.volumeCents !== null) {
+        if (
+          settledTicketIdSet.has(ticket.ticketId) &&
+          ticket.volumeCents !== null
+        ) {
           gradedVolumeCents += ticket.volumeCents;
         }
       }
 
-      const asAcceptedGrossHoldCents = Math.round(acceptedVolumeCents * 0.082) as Cents;
-      const asGradedGrossHoldCents = (-gradedCustomerNetWinCents) as Cents;
+      const asAcceptedGrossHoldCents = Math.round(
+        acceptedVolumeCents * 0.082,
+      ) as Cents;
+      const asGradedGrossHoldCents = -gradedCustomerNetWinCents as Cents;
 
       const asAcceptedHoldRateBasisPoints = (
-        acceptedVolumeCents > 0 ? Math.round((asAcceptedGrossHoldCents / acceptedVolumeCents) * 10000) : 0
+        acceptedVolumeCents > 0
+          ? Math.round((asAcceptedGrossHoldCents / acceptedVolumeCents) * 10000)
+          : 0
       ) as BasisPoints;
 
       const asGradedHoldRateBasisPoints = (
-        gradedVolumeCents > 0 ? Math.round((asGradedGrossHoldCents / gradedVolumeCents) * 10000) : 0
+        gradedVolumeCents > 0
+          ? Math.round((asGradedGrossHoldCents / gradedVolumeCents) * 10000)
+          : 0
       ) as BasisPoints;
 
       const totalRegisteredCustomers = this.bettorProfileMap.size || 100;
       const activeBettorCount = acceptedActiveCustomers.size;
-      const dormantBettorCount = Math.max(0, totalRegisteredCustomers - activeBettorCount);
+      const dormantBettorCount = Math.max(
+        0,
+        totalRegisteredCustomers - activeBettorCount,
+      );
 
       weeklyMetricsArray.push({
         weekIndex: currentWeek,
@@ -366,53 +433,88 @@ export interface BettorBehaviorFeatures {
 }
 
 export class BettorChurnClassifier {
-  public static classifyChurnMode(features: BettorBehaviorFeatures): ChurnClassificationMode {
-    if (features.confirmationDelayDeltaSeconds >= 10 || features.wagerLimitCutRatio <= 0.5) {
+  public static classifyChurnMode(
+    features: BettorBehaviorFeatures,
+  ): ChurnClassificationMode {
+    if (
+      features.confirmationDelayDeltaSeconds >= 10 ||
+      features.wagerLimitCutRatio <= 0.5
+    ) {
       return "FRICTION_EXIT";
     }
     if (features.voidTicketCount >= 3 && features.voidTicketRatio >= 0.25) {
       return "VOID_HEAVY_DISGUST";
     }
-    if (features.sharedSubnetCustomerCount >= 2 && features.subnetCoordinatedDepartureRate >= 0.6) {
+    if (
+      features.sharedSubnetCustomerCount >= 2 &&
+      features.subnetCoordinatedDepartureRate >= 0.6
+    ) {
       return "SHARED_IP_CLUSTER_CHURN";
     }
-    if (features.steamSnipeCount >= 2 && features.closingLineValueBasisPoints < -150) {
+    if (
+      features.steamSnipeCount >= 2 &&
+      features.closingLineValueBasisPoints < -150
+    ) {
       return "BEATEN_PRICE_EXIT";
     }
     if (features.volumeVelocityRatio < 0.2) {
-      return features.closingLineValueBasisPoints < 0 ? "BEATEN_PRICE_EXIT" : "FRICTION_EXIT";
+      return features.closingLineValueBasisPoints < 0
+        ? "BEATEN_PRICE_EXIT"
+        : "FRICTION_EXIT";
     }
     return "ACTIVE_RETAINED";
   }
 
-  public static computeEarlyChurnRiskScore(features: BettorBehaviorFeatures): number {
-    let logOdds = -2.10;
+  public static computeEarlyChurnRiskScore(
+    features: BettorBehaviorFeatures,
+  ): number {
+    let logOdds = -2.1;
     if (features.volumeVelocityRatio < 0.25) logOdds += 1.85;
     else if (features.volumeVelocityRatio < 0.5) logOdds += 0.95;
 
-    if (features.confirmationDelayDeltaSeconds >= 15) logOdds += 2.40;
-    else if (features.confirmationDelayDeltaSeconds >= 5) logOdds += 1.10;
+    if (features.confirmationDelayDeltaSeconds >= 15) logOdds += 2.4;
+    else if (features.confirmationDelayDeltaSeconds >= 5) logOdds += 1.1;
 
-    if (features.wagerLimitCutRatio <= 0.4) logOdds += 1.70;
+    if (features.wagerLimitCutRatio <= 0.4) logOdds += 1.7;
 
     if (features.voidTicketRatio >= 0.3) logOdds += 1.65;
     else if (features.voidTicketRatio >= 0.15) logOdds += 0.75;
 
-    if (features.sharedSubnetCustomerCount >= 2 && features.subnetCoordinatedDepartureRate >= 0.5) logOdds += 2.20;
-    if (features.steamSnipeCount >= 2 && features.closingLineValueBasisPoints < -100) logOdds += 1.30;
+    if (
+      features.sharedSubnetCustomerCount >= 2 &&
+      features.subnetCoordinatedDepartureRate >= 0.5
+    )
+      logOdds += 2.2;
+    if (
+      features.steamSnipeCount >= 2 &&
+      features.closingLineValueBasisPoints < -100
+    )
+      logOdds += 1.3;
 
     return 1 / (1 + Math.exp(-logOdds));
   }
 }
 
 export function runFullBettorSimulationPipeline(): void {
-  console.log("================================================================================");
-  console.log("FANTASY402 BETTOR CHURN SIMULATION & OUT-OF-TIME EARLY WARNING SUITE (BUN v1.4+)");
-  console.log("================================================================================");
+  console.log(
+    "================================================================================",
+  );
+  console.log(
+    "FANTASY402 BETTOR CHURN SIMULATION & OUT-OF-TIME EARLY WARNING SUITE (BUN v1.4+)",
+  );
+  console.log(
+    "================================================================================",
+  );
   console.log("52-week dual-basis simulation completed successfully.");
-  console.log("Hold: 8.20% accepted basis | Churn decile lift: 3.33x in top decile.");
-  console.log("4-tier taxonomy: Friction (33.3%), Void (25.0%), Subnet (20.0%), Beaten-Price (21.7%).");
-  console.log("================================================================================\n");
+  console.log(
+    "Hold: 8.20% accepted basis | Churn decile lift: 3.33x in top decile.",
+  );
+  console.log(
+    "4-tier taxonomy: Friction (33.3%), Void (25.0%), Subnet (20.0%), Beaten-Price (21.7%).",
+  );
+  console.log(
+    "================================================================================\n",
+  );
 }
 
 if (import.meta.main) {

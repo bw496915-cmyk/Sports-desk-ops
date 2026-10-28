@@ -4,15 +4,15 @@ This guide details the integration of your Cloudflare Account, Scoped API Token,
 
 ## 1. Credentials & Configuration Matrix
 
-| Variable | Configured Value | Operational Purpose |
-| :--- | :--- | :--- |
-| **`CLOUDFLARE_ACCOUNT_ID`** | `7a470541a704caaf91e71efccc78fd36` | Scopes Cloudflare API requests & R2 namespace |
-| **`CLOUDFLARE_API_TOKEN`** | `<CLOUDFLARE_API_TOKEN>` *(configured in `.env`)* | Edge DNS, Tunnel authentication & API verification |
-| **`R2_ACCESS_KEY_ID`** | `<R2_ACCESS_KEY_ID>` *(configured in `.env`)* | S3-compatible client access key |
-| **`R2_SECRET_ACCESS_KEY`** | `<R2_SECRET_ACCESS_KEY>` *(configured in `.env`)* | S3-compatible secret signing key (SigV4) |
-| **`R2_ENDPOINT`** | `https://7a470541a704caaf91e71efccc78fd36.r2.cloudflarestorage.com` | Global S3 REST endpoint |
-| **`R2_BUCKET_NAME`** | `sportsdesk-ops-reports` | Dedicated bucket for report archives and audit bundles |
-| **`R2_PUBLIC_URL`** | `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev` | Public HTTPS gateway for zero-egress report downloads |
+| Variable                    | Configured Value                                                    | Operational Purpose                                    |
+| :-------------------------- | :------------------------------------------------------------------ | :----------------------------------------------------- |
+| **`CLOUDFLARE_ACCOUNT_ID`** | `7a470541a704caaf91e71efccc78fd36`                                  | Scopes Cloudflare API requests & R2 namespace          |
+| **`CLOUDFLARE_API_TOKEN`**  | `<CLOUDFLARE_API_TOKEN>` _(configured in `.env`)_                   | Edge DNS, Tunnel authentication & API verification     |
+| **`R2_ACCESS_KEY_ID`**      | `<R2_ACCESS_KEY_ID>` _(configured in `.env`)_                       | S3-compatible client access key                        |
+| **`R2_SECRET_ACCESS_KEY`**  | `<R2_SECRET_ACCESS_KEY>` _(configured in `.env`)_                   | S3-compatible secret signing key (SigV4)               |
+| **`R2_ENDPOINT`**           | `https://7a470541a704caaf91e71efccc78fd36.r2.cloudflarestorage.com` | Global S3 REST endpoint                                |
+| **`R2_BUCKET_NAME`**        | `sportsdesk-ops-reports`                                            | Dedicated bucket for report archives and audit bundles |
+| **`R2_PUBLIC_URL`**         | `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev`               | Public HTTPS gateway for zero-egress report downloads  |
 
 ## 2. Token Verification & Cloudflare Edge Services
 
@@ -25,9 +25,15 @@ curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/7a470541a704caaf91
   -H "Authorization: Bearer \${CLOUDFLARE_API_TOKEN}"
 ```
 
-*Expected response:*
+_Expected response:_
+
 ```json
-{"result":{"id":"...","status":"active"},"success":true,"errors":[],"messages":[]}
+{
+  "result": { "id": "...", "status": "active" },
+  "success": true,
+  "errors": [],
+  "messages": []
+}
 ```
 
 ## 3. Cloudflare R2 Object Storage Integration
@@ -35,9 +41,11 @@ curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/7a470541a704caaf91
 ### 3.1. Public R2 Direct Access Gateway (`r2.dev`)
 
 Your bucket has public bucket access enabled via the `r2.dev` subdomain:
+
 - **Base Public URL:** `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev`
 
 Any file uploaded to the bucket is instantly accessible via direct HTTPS:
+
 - **Report Bundle Manifest:** `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/reports/<TIMESTAMP>/MANIFEST.md`
 - **Intra-Day Snipers (24h):** `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/reports/<TIMESTAMP>/01_winners_24h.txt`
 - **Monthly Leaderboard:** `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/reports/<TIMESTAMP>/05_monthly_leaderboard.txt`

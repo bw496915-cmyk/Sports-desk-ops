@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
+    "gen:tokens": "bun run scripts/generate_tokens.ts",
     "cli": "bun run sportsdesk_cli.ts",
     "sim": "bun run simulate_bettor_churn_suite.ts",
     "reports": "./run_reports.sh",

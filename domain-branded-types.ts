@@ -51,11 +51,16 @@ export function isCents(value: unknown): value is Cents {
 
 export function assertCents(value: unknown): asserts value is Cents {
   if (!isCents(value)) {
-    throw new TypeError(`Expected integer Cents primitive, received: ${String(value)}`);
+    throw new TypeError(
+      `Expected integer Cents primitive, received: ${String(value)}`,
+    );
   }
 }
 
-export function parseAsCents(dollarsOrCents: number, isAlreadyCents: boolean = true): Cents {
+export function parseAsCents(
+  dollarsOrCents: number,
+  isAlreadyCents: boolean = true,
+): Cents {
   const normalized = isAlreadyCents
     ? Math.round(dollarsOrCents)
     : Math.round(dollarsOrCents * 100);
@@ -69,7 +74,9 @@ export function parseAsCents(dollarsOrCents: number, isAlreadyCents: boolean = t
 export type Dollars = Brand<number, "Dollars">;
 
 export function isDollars(value: unknown): value is Dollars {
-  return typeof value === "number" && !Number.isNaN(value) && Number.isFinite(value);
+  return (
+    typeof value === "number" && !Number.isNaN(value) && Number.isFinite(value)
+  );
 }
 
 export function centsToDollars(centsValue: Cents): Dollars {
@@ -98,14 +105,20 @@ export type CustomerIdentifier = Brand<string, "CustomerIdentifier">;
 // Backward-compatible alias
 export type CustomerId = CustomerIdentifier;
 
-export function isCustomerIdentifier(value: unknown): value is CustomerIdentifier {
-  return typeof value === "string" && /^[A-Z0-9_\-\.]{2,32}$/.test(value.trim());
+export function isCustomerIdentifier(
+  value: unknown,
+): value is CustomerIdentifier {
+  return (
+    typeof value === "string" && /^[A-Z0-9_\-\.]{2,32}$/.test(value.trim())
+  );
 }
 
 export function customerIdentifier(rawIdentifier: string): CustomerIdentifier {
   const trimmed = rawIdentifier.trim().toUpperCase();
   if (trimmed.length < 2) {
-    throw new TypeError(`CustomerIdentifier cannot be shorter than 2 characters: '${rawIdentifier}'`);
+    throw new TypeError(
+      `CustomerIdentifier cannot be shorter than 2 characters: '${rawIdentifier}'`,
+    );
   }
   return trimmed as CustomerIdentifier;
 }
@@ -117,14 +130,18 @@ export function customerIdentifier(rawIdentifier: string): CustomerIdentifier {
 export type PaddedCustomerId = Brand<string, "PaddedCustomerId">;
 
 export function isPaddedCustomerId(value: unknown): value is PaddedCustomerId {
-  return typeof value === "string" && value.length === 11 && value.trim().length > 0;
+  return (
+    typeof value === "string" && value.length === 11 && value.trim().length > 0
+  );
 }
 
-export function padCustomerIdCanonical(rawIdentifier: string): PaddedCustomerId {
+export function padCustomerIdCanonical(
+  rawIdentifier: string,
+): PaddedCustomerId {
   const trimmed = rawIdentifier.trim().toUpperCase();
   if (trimmed.length === 0 || trimmed.length > 11) {
     throw new RangeError(
-      `PaddedCustomerId source length must be between 1 and 11 characters (got ${trimmed.length}): '${rawIdentifier}'`
+      `PaddedCustomerId source length must be between 1 and 11 characters (got ${trimmed.length}): '${rawIdentifier}'`,
     );
   }
   return trimmed.padEnd(11, " ") as PaddedCustomerId;
@@ -139,13 +156,17 @@ export type AgentIdentifier = Brand<string, "AgentIdentifier">;
 export type AgentId = AgentIdentifier;
 
 export function isAgentIdentifier(value: unknown): value is AgentIdentifier {
-  return typeof value === "string" && /^[A-Z0-9_\-\.]{2,32}$/.test(value.trim());
+  return (
+    typeof value === "string" && /^[A-Z0-9_\-\.]{2,32}$/.test(value.trim())
+  );
 }
 
 export function agentIdentifier(rawIdentifier: string): AgentIdentifier {
   const trimmed = rawIdentifier.trim().toUpperCase();
   if (trimmed.length < 2) {
-    throw new TypeError(`AgentIdentifier cannot be shorter than 2 characters: '${rawIdentifier}'`);
+    throw new TypeError(
+      `AgentIdentifier cannot be shorter than 2 characters: '${rawIdentifier}'`,
+    );
   }
   return trimmed as AgentIdentifier;
 }
@@ -164,12 +185,14 @@ export function isTicketIdentifier(value: unknown): value is TicketIdentifier {
 
 export function ticketIdentifier(
   loginIdentifier: string,
-  wagerNumberIdentifier: string | number
+  wagerNumberIdentifier: string | number,
 ): TicketIdentifier {
   const cleanLogin = loginIdentifier.trim().toUpperCase();
   const cleanWagerNumber = String(wagerNumberIdentifier).trim();
   if (!cleanLogin || !cleanWagerNumber) {
-    throw new TypeError(`TicketIdentifier components cannot be empty: login='${cleanLogin}', wagerNumber='${cleanWagerNumber}'`);
+    throw new TypeError(
+      `TicketIdentifier components cannot be empty: login='${cleanLogin}', wagerNumber='${cleanWagerNumber}'`,
+    );
   }
   return `${cleanLogin}|${cleanWagerNumber}` as TicketIdentifier;
 }
@@ -182,19 +205,25 @@ export type BetGroupIdentifier = Brand<string, "BetGroupIdentifier">;
 // Backward-compatible alias
 export type BetGroupId = BetGroupIdentifier;
 
-export function isBetGroupIdentifier(value: unknown): value is BetGroupIdentifier {
+export function isBetGroupIdentifier(
+  value: unknown,
+): value is BetGroupIdentifier {
   return typeof value === "string" && /^M\.G\d+$/.test(value);
 }
 
 export function betGroupIdentifier(raw: string): BetGroupIdentifier {
   const match = raw.match(/M\.G(\d+)/);
   if (!match) {
-    throw new TypeError(`Invalid BetGroupIdentifier format (must contain 'M.G<digits>'): '${raw}'`);
+    throw new TypeError(
+      `Invalid BetGroupIdentifier format (must contain 'M.G<digits>'): '${raw}'`,
+    );
   }
   return `M.G${match[1]}` as BetGroupIdentifier;
 }
 
-export function extractBetGroupIdentifier(rawDescription: string): BetGroupIdentifier | null {
+export function extractBetGroupIdentifier(
+  rawDescription: string,
+): BetGroupIdentifier | null {
   const match = rawDescription.match(/M\.G(\d+)/);
   return match ? (`M.G${match[1]}` as BetGroupIdentifier) : null;
 }
@@ -210,15 +239,24 @@ export function extractBetGroupIdentifier(rawDescription: string): BetGroupIdent
 export type EpochSec = Brand<number, "EpochSec">;
 
 export function isEpochSec(value: unknown): value is EpochSec {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < 4102444800; // < Year 2100
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value < 4102444800
+  ); // < Year 2100
 }
 
 export function parseAsEpochSec(dateOrMs: number | string | Date): EpochSec {
   if (typeof dateOrMs === "number") {
-    const sec = dateOrMs > 10000000000 ? Math.floor(dateOrMs / 1000) : Math.floor(dateOrMs);
+    const sec =
+      dateOrMs > 10000000000
+        ? Math.floor(dateOrMs / 1000)
+        : Math.floor(dateOrMs);
     return sec as EpochSec;
   }
-  const ms = typeof dateOrMs === "string" ? Date.parse(dateOrMs) : dateOrMs.getTime();
+  const ms =
+    typeof dateOrMs === "string" ? Date.parse(dateOrMs) : dateOrMs.getTime();
   return Math.floor(ms / 1000) as EpochSec;
 }
 
@@ -235,7 +273,8 @@ export function parseAsEpochMs(dateOrMs: number | string | Date): EpochMs {
   if (typeof dateOrMs === "number") {
     return Math.floor(dateOrMs) as EpochMs;
   }
-  const ms = typeof dateOrMs === "string" ? Date.parse(dateOrMs) : dateOrMs.getTime();
+  const ms =
+    typeof dateOrMs === "string" ? Date.parse(dateOrMs) : dateOrMs.getTime();
   return Math.floor(ms) as EpochMs;
 }
 
@@ -258,15 +297,22 @@ export function isColorHexInt(value: unknown): value is ColorHexInt {
   );
 }
 
-export function assertColorHexInt(value: unknown): asserts value is ColorHexInt {
+export function assertColorHexInt(
+  value: unknown,
+): asserts value is ColorHexInt {
   if (!isColorHexInt(value)) {
-    throw new RangeError(`ColorHexInt must be a 24-bit integer between 0x000000 and 0xFFFFFF (got: ${String(value)})`);
+    throw new RangeError(
+      `ColorHexInt must be a 24-bit integer between 0x000000 and 0xFFFFFF (got: ${String(value)})`,
+    );
   }
 }
 
 export function parseAsColorHexInt(cssOrNumber: string | number): ColorHexInt {
   if (typeof cssOrNumber === "number") {
-    const masked = cssOrNumber > 0xffffff ? (cssOrNumber >>> 8) & 0xffffff : cssOrNumber & 0xffffff;
+    const masked =
+      cssOrNumber > 0xffffff
+        ? (cssOrNumber >>> 8) & 0xffffff
+        : cssOrNumber & 0xffffff;
     return masked as ColorHexInt;
   }
 
@@ -278,7 +324,8 @@ export function parseAsColorHexInt(cssOrNumber: string | number): ColorHexInt {
       const parsed = (Bun as any).color(clean, "number");
       if (typeof parsed === "number" && !Number.isNaN(parsed)) {
         // Bun returns 32-bit rgba number; mask down to 24-bit RGB packed integer discarding alpha
-        const masked = parsed > 0xffffff ? (parsed >>> 8) & 0xffffff : parsed & 0xffffff;
+        const masked =
+          parsed > 0xffffff ? (parsed >>> 8) & 0xffffff : parsed & 0xffffff;
         return masked as ColorHexInt;
       }
     } catch {
@@ -296,12 +343,16 @@ export function parseAsColorHexInt(cssOrNumber: string | number): ColorHexInt {
       return parseInt(hexDigits.slice(0, 6), 16) as ColorHexInt;
     }
     if (hexDigits.length === 3) {
-      const expanded = hexDigits.split("").map(ch => ch + ch).join("");
+      const expanded = hexDigits
+        .split("")
+        .map((ch) => ch + ch)
+        .join("");
       return parseInt(expanded, 16) as ColorHexInt;
     }
   }
 
-  const fallback = parseInt(clean.replace(/[^0-9a-fA-F]/g, "").slice(0, 6), 16) || 0;
+  const fallback =
+    parseInt(clean.replace(/[^0-9a-fA-F]/g, "").slice(0, 6), 16) || 0;
   return fallback as ColorHexInt;
 }
 
@@ -320,7 +371,11 @@ export function parseAsColorCssString(cssOrNumber: string | number): string {
   return colorHexIntToHexString(hexInt);
 }
 
-export function colorHexIntToRgbChannels(color: ColorHexInt): { readonly red: number; readonly green: number; readonly blue: number } {
+export function colorHexIntToRgbChannels(color: ColorHexInt): {
+  readonly red: number;
+  readonly green: number;
+  readonly blue: number;
+} {
   assertColorHexInt(color);
   return {
     red: (color >> 16) & 0xff,
@@ -352,7 +407,9 @@ export function isParlayLegCount(value: unknown): value is ParlayLegCount {
 export function parlayLegCount(rawCount: number): ParlayLegCount {
   const integerCount = Math.floor(rawCount);
   if (integerCount <= 1) {
-    throw new RangeError(`ParlayLegCount must be strictly greater than 1 (got: ${rawCount})`);
+    throw new RangeError(
+      `ParlayLegCount must be strictly greater than 1 (got: ${rawCount})`,
+    );
   }
   return integerCount as ParlayLegCount;
 }
@@ -360,13 +417,23 @@ export function parlayLegCount(rawCount: number): ParlayLegCount {
 export type RotationNumber = Brand<number, "RotationNumber">;
 
 export function isRotationNumber(value: unknown): value is RotationNumber {
-  return typeof value === "number" && Number.isInteger(value) && value >= 100 && value <= 999999;
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 100 &&
+    value <= 999999
+  );
 }
 
 export function rotationNumber(rawNumber: number | string): RotationNumber {
-  const parsed = typeof rawNumber === "string" ? parseInt(rawNumber, 10) : Math.floor(rawNumber);
+  const parsed =
+    typeof rawNumber === "string"
+      ? parseInt(rawNumber, 10)
+      : Math.floor(rawNumber);
   if (!isRotationNumber(parsed)) {
-    throw new RangeError(`RotationNumber must be an integer between 100 and 999999 (got: ${rawNumber})`);
+    throw new RangeError(
+      `RotationNumber must be an integer between 100 and 999999 (got: ${rawNumber})`,
+    );
   }
   return parsed as RotationNumber;
 }
@@ -391,7 +458,9 @@ export function parseAmericanOdds(rawOdds: number | string): AmericanOdds {
   }
 
   if (val > -100 && val < 100) {
-    throw new RangeError(`AmericanOdds cannot reside in invalid [-99..+99] deadband (got: ${val})`);
+    throw new RangeError(
+      `AmericanOdds cannot reside in invalid [-99..+99] deadband (got: ${val})`,
+    );
   }
   return val as AmericanOdds;
 }
@@ -426,7 +495,10 @@ export function isSharpScore(value: unknown): value is SharpScore {
   return typeof value === "number" && value >= 0 && value <= 100;
 }
 
-export function computeBayesSharp(rawScore: number, ticketCount: number): SharpScore {
+export function computeBayesSharp(
+  rawScore: number,
+  ticketCount: number,
+): SharpScore {
   const n = Math.max(0, ticketCount);
   const weight = n / (n + 25.0);
   const shrunk = weight * rawScore + (1.0 - weight) * 50.0;
@@ -440,8 +512,13 @@ export function isBasisPoints(value: unknown): value is BasisPoints {
   return typeof value === "number" && Number.isInteger(value);
 }
 
-export function parseAsBasisPoints(ratioOrBps: number, isAlreadyBps: boolean = false): BasisPoints {
-  const val = isAlreadyBps ? Math.round(ratioOrBps) : Math.round(ratioOrBps * 10000);
+export function parseAsBasisPoints(
+  ratioOrBps: number,
+  isAlreadyBps: boolean = false,
+): BasisPoints {
+  const val = isAlreadyBps
+    ? Math.round(ratioOrBps)
+    : Math.round(ratioOrBps * 10000);
   return val as BasisPoints;
 }
 
@@ -463,12 +540,7 @@ export type SignalChannelCode =
   | "CSLEVEL2";
 
 export type SignalChannelStatus =
-  | "ACTIVE"
-  | "DROPPED"
-  | "ALERT"
-  | "STEERABLE"
-  | "CRITICAL"
-  | "SUPPRESSED";
+  "ACTIVE" | "DROPPED" | "ALERT" | "STEERABLE" | "CRITICAL" | "SUPPRESSED";
 
 export type DecisionMoveFlag =
   | "STEAM_CONVERGENCE"
@@ -476,9 +548,47 @@ export type DecisionMoveFlag =
   | "LIQUIDITY_HALT"
   | "TERMINAL_ENFORCE";
 
+export type TriggerPredicateKind =
+  | "ADVERSE_SELECTION"
+  | "CLV_MARGIN_DECAY"
+  | "ORDER_BOOK_EXHAUSTION"
+  | "TERMINAL_DEFICIT_ESCALATION";
+
+export type MitigationActionKind =
+  | "DYNAMIC_REPRICE"
+  | "SHRINKAGE_RECALIBRATE"
+  | "CIRCUIT_BREAKER_HALT"
+  | "MANAGER_LIMIT_CLAMP";
+
+/**
+ * Axis 1 Transport SLA Discriminated Union.
+ * Eliminates synthetic "0 ms" latency sentinels: sentinel drops represent an un-executed filtering policy.
+ */
+export type TransportSla =
+  | { readonly kind: "latency"; readonly latencySlaMs: number }
+  | { readonly kind: "sentinel_drop" };
+
+/**
+ * Axis 2 Algorithmic Threshold Discriminated Union.
+ * Completely eliminates polymorphic string typing across consensus lag, shrinkage, depth, and risk gates.
+ */
+export type RouteThreshold =
+  | { readonly kind: "consensus_lag"; readonly maxLagMs: number }
+  | {
+      readonly kind: "bayes_shrinkage";
+      readonly tauStar: number;
+      readonly minTickets: number;
+    }
+  | { readonly kind: "liquidity_depth"; readonly minDepthCents: Cents }
+  | {
+      readonly kind: "composite_risk_gate";
+      readonly minToxicityScore: number;
+      readonly maxHoldRateBasisPoints: BasisPoints;
+      readonly maxDeficitCents: Cents;
+    };
+
 /**
  * Axis 1: Ingestion Signal Channels (Layers 18–24).
- * Strictly typed by physical transport network latency SLA in milliseconds (transportLatencySlaMs: number).
  */
 export interface IngestionChannelDefinition {
   readonly layerId: `L${number}.N${string}`;
@@ -487,7 +597,7 @@ export interface IngestionChannelDefinition {
   readonly channelCode: SignalChannelCode;
   readonly signalTier: string;
   readonly transportUri: string;
-  readonly transportLatencySlaMs: number;
+  readonly sla: TransportSla;
   readonly channelStatus: SignalChannelStatus;
   readonly volumeRule: string;
   readonly operationalRole: string;
@@ -495,7 +605,6 @@ export interface IngestionChannelDefinition {
 
 /**
  * Axis 2: Risk Decision & Route Continuum (Layers 25–28).
- * Strictly typed by algorithmic trigger predicates, move flags, and mitigation enforcement actions.
  */
 export interface RouteCircuitDefinition {
   readonly layerId: `L${number}.N${string}`;
@@ -503,15 +612,14 @@ export interface RouteCircuitDefinition {
   readonly hex: string;
   readonly routeName: string;
   readonly moveFlag: DecisionMoveFlag;
-  readonly triggerPredicate: string;
-  readonly algorithmicThreshold: string;
-  readonly mitigationAction: string;
+  readonly triggerKind: TriggerPredicateKind;
+  readonly threshold: RouteThreshold;
+  readonly mitigationKind: MitigationActionKind;
   readonly operationalRole: string;
 }
 
 /**
  * Axis 3: Telemetry Viewports & Rendering Surfaces.
- * Strictly typed by target viewport dimensions, color depth, and display context.
  */
 export interface SurfaceDefinition {
   readonly layerId: "SURFACE.DOM" | "SURFACE.CLI";
@@ -519,18 +627,17 @@ export interface SurfaceDefinition {
   readonly hex: string;
   readonly surfaceName: string;
   readonly targetViewport: string;
+  readonly protocol: string;
   readonly colorDepth: string;
   readonly operationalRole: string;
 }
 
 export type AnyQwenNeuronDefinition =
-  | IngestionChannelDefinition
-  | RouteCircuitDefinition
-  | SurfaceDefinition;
+  IngestionChannelDefinition | RouteCircuitDefinition | SurfaceDefinition;
 
 /**
  * Ingestion Signal Channels (Layers 18-24).
- * Every channel has a strictly typed integer transportLatencySlaMs (milliseconds).
+ * Generated directly from tokens.toml.
  */
 export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
   {
@@ -540,7 +647,7 @@ export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
     channelCode: "Internet",
     signalTier: "SIGNAL_INTERNET",
     transportUri: "portal://ticker/live-stream",
-    transportLatencySlaMs: 1500,
+    sla: { kind: "latency", latencySlaMs: 1500 },
     channelStatus: "ACTIVE",
     volumeRule: "TARGET_TWIN (gapDurationSeconds = Internet - ALERT)",
     operationalRole: "Retail Pregame Baseline Gate",
@@ -552,7 +659,7 @@ export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
     channelCode: "BLOCKED",
     signalTier: "SIGNAL_SENTINEL_DROP",
     transportUri: "portal://pending/noise-filter",
-    transportLatencySlaMs: 0,
+    sla: { kind: "sentinel_drop" },
     channelStatus: "DROPPED",
     volumeRule: "DROP_BEFORE_GROUPING (unconditionally dropped on getPending)",
     operationalRole: "Blocked Sentinel & Zero-Stake Filter",
@@ -564,7 +671,7 @@ export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
     channelCode: "GATEWAY",
     signalTier: "SIGNAL_EQUILIBRIUM_GATE",
     transportUri: "portal://gateway/equilibrium-gate",
-    transportLatencySlaMs: 1000,
+    sla: { kind: "latency", latencySlaMs: 1000 },
     channelStatus: "ACTIVE",
     volumeRule: "EQUILIBRIUM_SWEEP (+15c/+20c vig persist read-backs)",
     operationalRole: "Equilibrium Confirm & Vig Gate",
@@ -576,7 +683,7 @@ export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
     channelCode: "ALERT",
     signalTier: "SIGNAL_ALERT_TWIN",
     transportUri: "portal://ticker/alert-twins",
-    transportLatencySlaMs: 250,
+    sla: { kind: "latency", latencySlaMs: 250 },
     channelStatus: "ALERT",
     volumeRule: "SOURCE_ALERT (canonicalVolumeCents = 0; skip Bayes scoring)",
     operationalRole: "Syndicate Sub-acct Syntax & Twin Buffer",
@@ -588,9 +695,10 @@ export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
     channelCode: "GSBUILDER",
     signalTier: "SIGNAL_SGP_BUILDER",
     transportUri: "portal://ticker/sgp-builder",
-    transportLatencySlaMs: 1000,
+    sla: { kind: "latency", latencySlaMs: 1000 },
     channelStatus: "STEERABLE",
-    volumeRule: "GS118_JOIN (joined via M.G<betGroupId>; steerable via --steer)",
+    volumeRule:
+      "GS118_JOIN (joined via M.G<betGroupId>; steerable via --steer)",
     operationalRole: "Steam / Line Chase Phrasing & SGP Builder",
   },
   {
@@ -600,9 +708,10 @@ export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
     channelCode: "GSLIVE",
     signalTier: "SIGNAL_GS_INPLAY",
     transportUri: "portal://ticker/gs-partner-118",
-    transportLatencySlaMs: 500,
+    sla: { kind: "latency", latencySlaMs: 500 },
     channelStatus: "CRITICAL",
-    volumeRule: "GS118_JOIN (forces rotationGrade='LIVE'; extracts M.G<id>; +20c tax)",
+    volumeRule:
+      "GS118_JOIN (forces rotationGrade='LIVE'; extracts M.G<id>; +20c tax)",
     operationalRole: "Whale Sizing Anomaly & In-Play Live Move",
   },
   {
@@ -612,16 +721,17 @@ export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
     channelCode: "CSLEVEL2",
     signalTier: "SIGNAL_SYNDICATE_L2",
     transportUri: "portal://ticker/cslevel2-feed",
-    transportLatencySlaMs: 2000,
+    sla: { kind: "latency", latencySlaMs: 2000 },
     channelStatus: "SUPPRESSED",
-    volumeRule: "NONE (secondary syndicate/tennis/prop feed; steerable via --steer)",
+    volumeRule:
+      "NONE (secondary syndicate/tennis/prop feed; steerable via --steer)",
     operationalRole: "Recreational Longshot Bias Ingestion",
   },
 ];
 
 /**
  * Decision & Route Continuum (Layers 25-28).
- * L27.N0912 is assigned dedicated #d97706 (Amber-600) to eliminate collision with L22.N1402 (#f59e0b).
+ * Generated directly from tokens.toml.
  */
 export const ROUTE_CIRCUITS: readonly RouteCircuitDefinition[] = [
   {
@@ -630,9 +740,9 @@ export const ROUTE_CIRCUITS: readonly RouteCircuitDefinition[] = [
     hex: "#06b6d4",
     routeName: "Route 04 Devig Consensus",
     moveFlag: "STEAM_CONVERGENCE",
-    triggerPredicate: "Adverse selection vs PINNACLE_REF",
-    algorithmicThreshold: "Consensus Lag <= 5,000 ms",
-    mitigationAction: "Dynamic Quote Reprice & Spread Realignment",
+    triggerKind: "ADVERSE_SELECTION",
+    threshold: { kind: "consensus_lag", maxLagMs: 5000 },
+    mitigationKind: "DYNAMIC_REPRICE",
     operationalRole: "Steam Convergence & Consensus Price Arbitration",
   },
   {
@@ -641,9 +751,9 @@ export const ROUTE_CIRCUITS: readonly RouteCircuitDefinition[] = [
     hex: "#a855f7",
     routeName: "Route 02 Sharp Shrinkage",
     moveFlag: "SHRINKAGE_SHARP",
-    triggerPredicate: "CLV margin decay across settled wagers",
-    algorithmicThreshold: "tau* = 0.68, N_min >= 8 tickets",
-    mitigationAction: "Empirical Bayes Score Recalibration & Limit Shading",
+    triggerKind: "CLV_MARGIN_DECAY",
+    threshold: { kind: "bayes_shrinkage", tauStar: 0.68, minTickets: 8 },
+    mitigationKind: "SHRINKAGE_RECALIBRATE",
     operationalRole: "Bayesian Sharp Detection & Margin Decay Guard",
   },
   {
@@ -652,9 +762,9 @@ export const ROUTE_CIRCUITS: readonly RouteCircuitDefinition[] = [
     hex: "#d97706",
     routeName: "Route 01 Liquidity Breaker",
     moveFlag: "LIQUIDITY_HALT",
-    triggerPredicate: "Order book depth exhaustion during active steam",
-    algorithmicThreshold: "Market Depth < $1,000 USD",
-    mitigationAction: "Automated Circuit Breaker Trading Halt & Pending Queue Hold",
+    triggerKind: "ORDER_BOOK_EXHAUSTION",
+    threshold: { kind: "liquidity_depth", minDepthCents: parseAsCents(100000) },
+    mitigationKind: "CIRCUIT_BREAKER_HALT",
     operationalRole: "Liquidity Exhaustion Protection & Breaker Trip",
   },
   {
@@ -663,15 +773,21 @@ export const ROUTE_CIRCUITS: readonly RouteCircuitDefinition[] = [
     hex: "#f43f5e",
     routeName: "Route 03 Manager Terminal",
     moveFlag: "TERMINAL_ENFORCE",
-    triggerPredicate: "Terminal downline deficit or toxic syndicate escalation",
-    algorithmicThreshold: "Toxicity >= 80 || Hold <= -50% || Deficit > $100k",
-    mitigationAction: "Manager/updateByColumn Limit Slash to $1k & Upfront Escrow",
+    triggerKind: "TERMINAL_DEFICIT_ESCALATION",
+    threshold: {
+      kind: "composite_risk_gate",
+      minToxicityScore: 80,
+      maxHoldRateBasisPoints: parseAsBasisPoints(-5000, true),
+      maxDeficitCents: parseAsCents(10000000),
+    },
+    mitigationKind: "MANAGER_LIMIT_CLAMP",
     operationalRole: "Terminal Risk Containment & Manager Write-Gate",
   },
 ];
 
 /**
  * Telemetry Viewports & Rendering Surfaces.
+ * Generated directly from tokens.toml.
  */
 export const TELEMETRY_SURFACES: readonly SurfaceDefinition[] = [
   {
@@ -680,6 +796,7 @@ export const TELEMETRY_SURFACES: readonly SurfaceDefinition[] = [
     hex: "#070b14",
     surfaceName: "Dark Obsidian Shell",
     targetViewport: "1440x900 (Desktop) / 375x812 (Mobile)",
+    protocol: "W3C DOM / Canvas WebGL",
     colorDepth: "24-bit TrueColor RGB",
     operationalRole: "Main Dashboard DOM Surface Background",
   },
@@ -688,7 +805,8 @@ export const TELEMETRY_SURFACES: readonly SurfaceDefinition[] = [
     tokenName: "--sd-surface-cli",
     hex: "#04070e",
     surfaceName: "Deterministic Dark ANSI",
-    targetViewport: "Standard VT100 / xterm-256color / ANSI Terminal",
+    targetViewport: "DirectColor VT (Ghostty / xterm-direct)",
+    protocol: "ANSI 24-bit TrueColor (\x1b[38;2;R;G;Bm)",
     colorDepth: "24-bit TrueColor RGB",
     operationalRole: "CLI Terminal Telemetry Surface Background",
   },
@@ -702,37 +820,3 @@ export const ALL_QWEN_TOKENS: readonly AnyQwenNeuronDefinition[] = [
   ...ROUTE_CIRCUITS,
   ...TELEMETRY_SURFACES,
 ];
-
-/**
- * CI Guardrail: Asserts 1-to-1 uniqueness between CSS tokens, layer IDs, and ColorHexInt values.
- * Throws immediately if duplicate hex codes or tokens are detected across distinct operational entities.
- */
-export function assertUniqueTokenColors(
-  tokens: readonly { readonly layerId: string; readonly tokenName: string; readonly hex: string }[]
-): void {
-  const seenHex = new Map<number, string>();
-  const seenTokens = new Set<string>();
-  const seenLayers = new Set<string>();
-
-  for (const t of tokens) {
-    if (seenTokens.has(t.tokenName)) {
-      throw new Error(`Duplicate CSS tokenName detected in registry: '${t.tokenName}' (Layer: ${t.layerId})`);
-    }
-    seenTokens.add(t.tokenName);
-
-    if (seenLayers.has(t.layerId)) {
-      throw new Error(`Duplicate layerId detected in registry: '${t.layerId}' (Token: ${t.tokenName})`);
-    }
-    seenLayers.add(t.layerId);
-
-    const colorInt = parseAsColorHexInt(t.hex);
-    if (seenHex.has(colorInt)) {
-      const prior = seenHex.get(colorInt)!;
-      throw new Error(
-        `Color Hex Collision Detected! Color 0x${colorInt.toString(16).padStart(6, "0")} (${t.hex}) is shared between '${prior}' and '${t.tokenName}' (${t.layerId}). Each entity must have a distinct ColorHexInt.`
-      );
-    }
-    seenHex.set(colorInt, `${t.tokenName} (${t.layerId})`);
-  }
-}
-
