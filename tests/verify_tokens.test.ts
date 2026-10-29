@@ -12,9 +12,6 @@ import {
   ALL_QWEN_TOKENS,
   UI_TOKENS,
   parseAsColorHexInt,
-  type IngestionChannelDefinition,
-  type RouteCircuitDefinition,
-  type SurfaceDefinition,
 } from "../domain-branded-types.ts";
 import {
   assertUniqueTokenColors,
@@ -347,7 +344,9 @@ describe("5. Dead-Token & Bi-Directional Reference Consistency", () => {
     for (const file of DASHBOARD_FILES) {
       const { initialValues, rootValues } =
         await readDashboardCustomProperties(file);
-      expect(initialValues.size).toBeGreaterThanOrEqual(DASHBOARD_TOKENS.length);
+      expect(initialValues.size).toBeGreaterThanOrEqual(
+        DASHBOARD_TOKENS.length,
+      );
 
       const actual = [...initialValues].map(([name, initial]) => ({
         file,

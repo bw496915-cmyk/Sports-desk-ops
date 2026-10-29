@@ -108,9 +108,7 @@ export type CustomerId = CustomerIdentifier;
 export function isCustomerIdentifier(
   value: unknown,
 ): value is CustomerIdentifier {
-  return (
-    typeof value === "string" && /^[A-Z0-9_\-\.]{2,32}$/.test(value.trim())
-  );
+  return typeof value === "string" && /^[A-Z0-9_\-.]{2,32}$/.test(value.trim());
 }
 
 export function customerIdentifier(rawIdentifier: string): CustomerIdentifier {
@@ -156,9 +154,7 @@ export type AgentIdentifier = Brand<string, "AgentIdentifier">;
 export type AgentId = AgentIdentifier;
 
 export function isAgentIdentifier(value: unknown): value is AgentIdentifier {
-  return (
-    typeof value === "string" && /^[A-Z0-9_\-\.]{2,32}$/.test(value.trim())
-  );
+  return typeof value === "string" && /^[A-Z0-9_\-.]{2,32}$/.test(value.trim());
 }
 
 export function agentIdentifier(rawIdentifier: string): AgentIdentifier {
@@ -180,7 +176,7 @@ export type TicketIdentifier = Brand<string, "TicketIdentifier">;
 export type TicketId = TicketIdentifier;
 
 export function isTicketIdentifier(value: unknown): value is TicketIdentifier {
-  return typeof value === "string" && /^[A-Z0-9_\-\.]+\|\d+$/.test(value);
+  return typeof value === "string" && /^[A-Z0-9_\-.]+\|\d+$/.test(value);
 }
 
 export function ticketIdentifier(

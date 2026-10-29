@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Native Bun Lint Rule: no-unsafe-fetch-init
+ * Repository RequestInit source gate, executed by Bun.
  * Enforces RequestInit & fetch invariants across source files:
  * 1. No lowercase HTTP method literals in fetch/Request options (method: "post", etc.)
  * 2. No BufferSource bodies without an explicit Content-Type in request init
@@ -95,7 +95,15 @@ function auditContent(content: string, relPath: string): AuditResult {
     if (BUFFER_BODY_RE.test(line)) {
       const start = Math.max(0, idx - 4);
       const end = Math.min(lines.length, idx + 4);
-      const block = lines.slice(start, end).join("\n").toLowerCase();
+      const block = lines
+        .slice(start, end)
+        .filter(
+          (candidate) =>
+            !candidate.trim().startsWith("//") &&
+            !candidate.trim().startsWith("*"),
+        )
+        .join("\n")
+        .toLowerCase();
       if (!block.includes("content-type")) {
         violations.push(
           `Line ${idx + 1}: BufferSource body without explicit Content-Type in request init.`,
@@ -162,12 +170,12 @@ async function main(): Promise<void> {
     console.log(
       `PASS: ${scannedCount} files scanned across ${ROOT}. Inspected ${totalFetchCalls} fetch() call site(s) across ${filesWithFetch} files. Zero RequestInit violations found.`,
     );
-    process.exit(0);
+    process.exitCode = 0;
   } else {
     console.error(
       `FAILED: ${totalViolations} RequestInit violation(s) across codebase (${totalFetchCalls} fetch calls inspected).`,
     );
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 

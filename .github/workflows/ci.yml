@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         timeout-minutes: 5
         run: bun install --frozen-lockfile
+      - name: Lint
+        timeout-minutes: 3
+        run: bun run lint:check
       - name: Token SSOT Zero-Drift Gate
         timeout-minutes: 3
         run: bun run gen:tokens && git diff --exit-code
@@ -37,7 +40,7 @@ jobs:
         run: bun bin/check-innerhtml.ts --verbose
       - name: Execute Full Verification Test Suite
         timeout-minutes: 5
-        run: bun test tests/ --reporter=junit --output=junit-report.xml
+        run: bun test tests/ --reporter=junit --reporter-outfile=junit-report.xml
       - name: Archive Test Results
         if: always()
         uses: actions/upload-artifact@v4

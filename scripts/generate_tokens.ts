@@ -8,7 +8,7 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { resolve } from "node:path";
 
 const rootDir = resolve(import.meta.dir, "..");
 const tomlPath = resolve(rootDir, "tokens.toml");

@@ -10,7 +10,7 @@
  *  4. Direct mapping to public zero-egress gateway `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev`.
  */
 
-import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
+import { readdirSync, statSync, existsSync } from "node:fs";
 import { resolve, join, basename } from "node:path";
 
 export interface R2Config {

@@ -34,6 +34,27 @@ bun run sportsdesk_cli.ts winners -p 24h --limit 25
 bun run simulate_bettor_churn_suite.ts
 ```
 
+Repository lint uses exact-pinned Oxlint through Bun; stable Bun 1.4.4 does not
+enable native `bun lint`. Run `bun run lint:check` for a read-only gate that
+fails on warnings or errors, or `bun run lint` to apply safe fixes. CI runs lint
+alongside token regeneration, the fetch/innerHTML gates, and the full tests.
+
+## Pinned Bun compatibility tests
+
+Tests distinguish Fetch-spec requirements from behavior observed on Bun 1.4.4.
+The pinned `Request` constructor retains GET/HEAD bodies and accepts spec-forbidden
+methods. It also maps mixed-case `Delete` to `GET` and uppercases custom verbs.
+These are compatibility differences, not application guarantees: use explicit
+uppercase methods. `fetch` rejects nonempty GET/HEAD bodies before transmission.
+
+String request bodies have no inferred Content-Type on this binary, and JSON
+Blobs acquire `charset=utf-8`. Wire tests check explicit Content-Type headers
+separately so application behavior does not depend on those inferences.
+
+Subprocess fixtures await output writes and exit naturally while the parent
+drains stdout and stderr concurrently. They assert complete byte content rather
+than assuming unread pipes always deadlock or enforcing machine-speed thresholds.
+
 ## Runtime Architecture & Server Policies
 
 ### Server Port & Hostname Binding Policy

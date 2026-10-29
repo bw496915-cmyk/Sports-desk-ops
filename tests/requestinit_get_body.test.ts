@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 /**
  * WHATWG Fetch § "Request constructor":
@@ -18,19 +18,37 @@ import { describe, expect, test } from "bun:test";
  * - Number `42` coerces to `"42"`
  */
 
-describe("RequestInit GET/HEAD body constraints and WebIDL coercion", () => {
+// The pinned constructor retains GET/HEAD bodies; fetch rejects nonempty bodies.
+// Exercise both boundaries rather than assuming constructor conformance.
+describe("Bun 1.4.4 GET/HEAD body compatibility and fetch validation", () => {
+  let server: ReturnType<typeof Bun.serve>;
+  let requestsReceived = 0;
+  beforeAll(() => {
+    server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch() {
+        requestsReceived++;
+        return new Response("ok");
+      },
+    });
+  });
+  afterAll(() => server.stop(true));
   const getMethods = ["GET", "get"] as const;
   const headMethods = ["HEAD", "head"] as const;
 
   for (const m of getMethods) {
-    test(`method "${m}" with non-null string body throws TypeError`, () => {
-      expect(() => {
-        new Request("http://127.0.0.1", { method: m, body: "" });
-      }).toThrow(TypeError);
-
-      expect(() => {
-        new Request("http://127.0.0.1", { method: m, body: "data" });
-      }).toThrow(TypeError);
+    test(`pinned constructor retains string bodies on "${m}", while fetch rejects nonempty bodies`, async () => {
+      for (const body of ["", "data"]) {
+        const request = new Request(server.url, { method: m, body });
+        expect(request.body).not.toBeNull();
+        expect(await request.text()).toBe(body);
+      }
+      const before = requestsReceived;
+      await expect(
+        fetch(server.url, { method: m, body: "data", proxy: false }),
+      ).rejects.toThrow("GET/HEAD method cannot have body");
+      expect(requestsReceived).toBe(before);
     });
 
     test(`method "${m}" with body: null succeeds`, () => {
@@ -40,21 +58,27 @@ describe("RequestInit GET/HEAD body constraints and WebIDL coercion", () => {
     });
 
     test(`method "${m}" with body: undefined succeeds`, () => {
-      const req = new Request("http://127.0.0.1", { method: m, body: undefined });
+      const req = new Request("http://127.0.0.1", {
+        method: m,
+        body: undefined,
+      });
       expect(req.method).toBe(m.toUpperCase());
       expect(req.body).toBeNull();
     });
   }
 
   for (const m of headMethods) {
-    test(`method "${m}" with non-null string body throws TypeError`, () => {
-      expect(() => {
-        new Request("http://127.0.0.1", { method: m, body: "" });
-      }).toThrow(TypeError);
-
-      expect(() => {
-        new Request("http://127.0.0.1", { method: m, body: "data" });
-      }).toThrow(TypeError);
+    test(`pinned constructor retains string bodies on "${m}", while fetch rejects nonempty bodies`, async () => {
+      for (const body of ["", "data"]) {
+        const request = new Request(server.url, { method: m, body });
+        expect(request.body).not.toBeNull();
+        expect(await request.text()).toBe(body);
+      }
+      const before = requestsReceived;
+      await expect(
+        fetch(server.url, { method: m, body: "data", proxy: false }),
+      ).rejects.toThrow("GET/HEAD method cannot have body");
+      expect(requestsReceived).toBe(before);
     });
 
     test(`method "${m}" with body: null succeeds`, () => {
@@ -64,7 +88,10 @@ describe("RequestInit GET/HEAD body constraints and WebIDL coercion", () => {
     });
 
     test(`method "${m}" with body: undefined succeeds`, () => {
-      const req = new Request("http://127.0.0.1", { method: m, body: undefined });
+      const req = new Request("http://127.0.0.1", {
+        method: m,
+        body: undefined,
+      });
       expect(req.method).toBe(m.toUpperCase());
       expect(req.body).toBeNull();
     });
@@ -76,7 +103,7 @@ describe("RequestInit GET/HEAD body constraints and WebIDL coercion", () => {
     // Coerced via String() or WebIDL conversion
     const req = new Request("http://127.0.0.1", {
       method: "POST",
-      body: String(obj) as unknown as BodyInit,
+      body: String(obj),
     });
     const text = await req.text();
     expect(text).toBe("[object Object]");
@@ -87,7 +114,7 @@ describe("RequestInit GET/HEAD body constraints and WebIDL coercion", () => {
     const num = 42;
     const req = new Request("http://127.0.0.1", {
       method: "POST",
-      body: String(num) as unknown as BodyInit,
+      body: String(num),
     });
     const text = await req.text();
     expect(text).toBe("42");

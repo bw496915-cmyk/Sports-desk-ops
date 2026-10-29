@@ -5,10 +5,7 @@ import { resolve, join, extname } from "node:path";
 describe("Fetch Security & URL Credentials Audit", () => {
   const repoRoot = resolve(import.meta.dir, "..");
 
-  function getAllSourceFiles(
-    dir: string,
-    fileList: string[] = [],
-  ): string[] {
+  function getAllSourceFiles(dir: string, fileList: string[] = []): string[] {
     const entries = readdirSync(dir);
     for (const entry of entries) {
       if (
@@ -42,7 +39,7 @@ describe("Fetch Security & URL Credentials Audit", () => {
     expect(files.length).toBeGreaterThan(15);
 
     // Regex matching http(s)://user:password@host embedded credentials
-    const credentialUrlRegex = /https?:\/\/[a-zA-Z0-9_\-\.]+:[^@\s/]+@/g;
+    const credentialUrlRegex = /https?:\/\/[a-zA-Z0-9_\-.]+:[^@\s/]+@/g;
     const violations: { file: string; line: number; match: string }[] = [];
 
     for (const file of files) {
@@ -61,10 +58,7 @@ describe("Fetch Security & URL Credentials Audit", () => {
     }
 
     if (violations.length > 0) {
-      console.error(
-        "Detected forbidden embedded URL credentials:",
-        violations,
-      );
+      console.error("Detected forbidden embedded URL credentials:", violations);
     }
     expect(violations.length).toBe(0);
   });

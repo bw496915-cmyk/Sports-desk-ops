@@ -16,7 +16,8 @@ import path from "node:path";
 describe("check-fetch-init gate integrity meta-test", () => {
   test("bin/check-fetch-init.ts detects all four violation classes and exits non-zero", async () => {
     // 1. Plant the violations in a non-test, non-doc path of a throwaway root
-    const credUrl = "https://" + "adminUser:secretPass@" + "api.sportsdesk.internal/status";
+    const credUrl =
+      "https://" + "adminUser:secretPass@" + "api.sportsdesk.internal/status";
     const dirtyContent = `
 export async function violateFetchInvariants() {
   // Violation 1: Lowercase method literal
@@ -48,7 +49,7 @@ export async function violateFetchInvariants() {
     try {
       await Bun.write(path.join(root, "lib/scratch.ts"), dirtyContent);
 
-      // 2. Execute the native Bun linter with explicit env and timeout signal
+      // 2. Execute the repository gate with explicit env and timeout signal
       const proc = Bun.spawn(
         [
           process.execPath,
@@ -66,8 +67,9 @@ export async function violateFetchInvariants() {
         },
       );
 
-      const [stdout, exitCode] = await Promise.all([
+      const [stdout, stderr, exitCode] = await Promise.all([
         proc.stdout.text(),
+        proc.stderr.text(),
         proc.exited,
       ]);
 
@@ -81,7 +83,7 @@ export async function violateFetchInvariants() {
       );
       expect(stdout).toContain("URL-embedded credentials found");
       expect(stdout).toContain("Plain object literal passed to body");
-      expect(stdout).toContain("4 RequestInit violation(s)");
+      expect(stderr).toContain("4 RequestInit violation(s)");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

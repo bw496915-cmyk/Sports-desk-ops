@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
+    "lint": "bun --bun run oxlint --fix",
+    "lint:check": "bun --bun run oxlint --deny-warnings",
     "gen:tokens": "bun run scripts/generate_tokens.ts",
     "check:fetch-init": "bun run bin/check-fetch-init.ts",
     "check:innerhtml": "bun run bin/check-innerhtml.ts",
@@ -35,6 +37,7 @@
   "author": "bw496915-cmyk",
   "license": "MIT",
   "devDependencies": {
-    "@types/bun": "1.4.4"
+    "@types/bun": "1.4.4",
+    "oxlint": "1.90.0"
   }
 }

@@ -12,7 +12,7 @@
  *  4. Full integration with Telegram Bot, Webview Server, Churn Simulator, and OnePass Agent Plugin.
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import {
   REPORT_TYPES,
@@ -53,12 +53,6 @@ import {
   ROUTE_CIRCUITS,
   TELEMETRY_SURFACES,
   ALL_QWEN_TOKENS,
-  type Cents,
-  type CustomerIdentifier,
-  type AgentIdentifier,
-  type IngestionChannelDefinition,
-  type RouteCircuitDefinition,
-  type SurfaceDefinition,
 } from "./domain-branded-types.ts";
 import { assertUniqueTokenColors } from "./validation/token_validator.ts";
 
@@ -578,7 +572,6 @@ export function printNeuronRegistry(): void {
 export function printWinners(args: string[]): void {
   const period = getArgValue(args, ["-p", "--period"], "24h");
   const limit = parseInt(getArgValue(args, ["--limit"], "10"), 10);
-  const byAgent = args.includes("--by-agent");
   const format = getArgValue(args, ["--format"], "table");
 
   const winnersData = [
@@ -855,7 +848,6 @@ export function printLosers(args: string[]): void {
 
 export function printLeaderboard(args: string[]): void {
   const period = getArgValue(args, ["-p", "--period"], "month");
-  const limit = parseInt(getArgValue(args, ["--limit"], "10"), 10);
 
   console.log(
     "================================================================================",
@@ -961,7 +953,7 @@ export async function main(): Promise<void> {
     rawArgs.includes("--onepass") ||
     cmd === "onepass"
   ) {
-    const plugin = new AgentOnePassPlugin(0.5);
+    new AgentOnePassPlugin(0.5);
     console.log("Agent OnePass active with 50% liability model.");
     return;
   }
@@ -973,7 +965,9 @@ export async function main(): Promise<void> {
   ) {
     const type = (rawArgs[1] || "EVENING_SETTLEMENT").toUpperCase();
     if (!isReportType(type)) {
-      console.error(`Unknown report type ${type}. Use: ${REPORT_TYPES.join(", ")}`);
+      console.error(
+        `Unknown report type ${type}. Use: ${REPORT_TYPES.join(", ")}`,
+      );
       process.exitCode = 1;
       return;
     }
