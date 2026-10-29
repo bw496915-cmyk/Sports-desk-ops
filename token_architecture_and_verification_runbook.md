@@ -25,6 +25,49 @@ All design tokens, RGB color channels, and semantic styling originate strictly f
 * **Zero-Drift Invariant:** Every CI verification run executes `bun run gen:tokens && git diff --exit-code`. Any manual edit to generated files or uncompiled token definitions fails CI immediately.
 * **Cross-Axis Semantic Aliasing:** When domain models introduce secondary palettes (such as 8-tier branch risk grades or account behavioral roles), they must be declared as semantic aliases referencing canonical tokens (e.g., `--color-grade-aaa: var(--sd-theme-emerald)`), never as unmanaged raw RGB definitions in siloed stylesheets.
 
+### 1.2 Bun.color, CSS Houdini @property & :root Architecture
+
+Design tokens span three distinct rendering surfaces compiled synchronously by `scripts/generate_tokens.ts`:
+
+1. **Terminal / CLI Surface (24-bit TrueColor ANSI via `Bun.color`)**:
+   * `Bun.color(raw, "[rgba]")` validates and unpacks hex color strings into 24-bit RGB packed integers (`ColorHexInt`, `0xRRGGBB`).
+   * The integer value formats directly into DirectColor ANSI escape sequences:
+     ```typescript
+     export function colorHexIntToAnsiEscape(c: ColorHexInt): string {
+       const r = (c >> 16) & 0xff;
+       const g = (c >> 8) & 0xff;
+       const b = c & 0xff;
+       return `\x1b[38;2;${r};${g};${b}m`;
+     }
+     ```
+   * Guarantees identical photometric rendering between terminal outputs (`bun sportsdesk_cli.ts -N`) and web interfaces.
+
+2. **DOM / Webview Surface (CSS Houdini `@property` Typed Tokens)**:
+   * Every token in `tokens.toml` generates an explicit CSS Houdini `@property` registration in both `customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`:
+     ```css
+     @property --sd-tier-steam {
+       syntax: '<color>';
+       inherits: true;
+       initial-value: #f59e0b;
+     }
+     ```
+   * **Typed Syntax Validation (`syntax: '<color>'`)**: The browser rendering engine validates assigned values as color types. Invalid runtime script assignments fail closed and preserve the fallback `initial-value` rather than corrupting styles.
+   * **Smooth Transition Interpolation**: Standard unregistered CSS variables (`var(--custom)`) are treated as untyped strings by browser compositors, preventing CSS transition interpolation and causing abrupt snapping. Declaring `@property` with `syntax: '<color>'` enables hardware-accelerated GPU color interpolation for theme transitions, risk escalation badges, and alert pulses.
+   * **Inheritance Control**: `inherits: true` guarantees reliable cascading down DOM component hierarchies.
+
+3. **Canonical `:root` Fallback Mapping**:
+   * Accompanying the `@property` block, `scripts/generate_tokens.ts` generates standard `:root` variable definitions:
+     ```css
+     :root {
+       --sd-tier-steam: #f59e0b;
+     }
+     ```
+   * Ensures instant backwards compatibility for headless engines or older webview runtimes lacking full CSS Properties and Values API Level 1 support.
+
+4. **Automated Registration Verification (`tests/verify_tokens.test.ts`)**:
+   * CI tests verify that 100% of tokens defined in `tokens.toml` have matching `@property` registrations in both webviews (`expect(html).toContain(`@property ${token.tokenName}`)`).
+   * Verifies that every token parses cleanly via `Bun.color` into a unique packed integer with $\Delta E_{00} \ge 7.0$ separation floor and WCAG 2.1 contrast compliance.
+
 ---
 
 ## 2. Perceptual Distance & Contrast Gates
