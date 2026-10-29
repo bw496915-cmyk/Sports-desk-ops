@@ -10,6 +10,7 @@ import {
   ROUTE_CIRCUITS,
   TELEMETRY_SURFACES,
   ALL_QWEN_TOKENS,
+  UI_TOKENS,
   parseAsColorHexInt,
   type IngestionChannelDefinition,
   type RouteCircuitDefinition,
@@ -47,6 +48,7 @@ describe("1. Single Source of Truth & Zero-Drift Regeneration", () => {
     expect(surfaces.length + ingestion.length + routes.length).toBe(
       ALL_QWEN_TOKENS.length,
     );
+    expect(Object.values(parsed.ui ?? {}).length).toBe(UI_TOKENS.length);
   });
 
   it("test_assert_zero_drift_between_tokens_toml_and_source_code", async () => {
@@ -285,6 +287,8 @@ const DASHBOARD_FILES = [
   "telegram-miniapp-dashboard.html",
 ] as const;
 
+const DASHBOARD_TOKENS = [...ALL_QWEN_TOKENS, ...UI_TOKENS];
+
 interface DashboardCustomProperties {
   readonly file: string;
   readonly initialValues: ReadonlyMap<string, string>;
@@ -323,13 +327,13 @@ describe("5. Dead-Token & Bi-Directional Reference Consistency", () => {
       const { initialValues, rootValues } =
         await readDashboardCustomProperties(file);
 
-      const actual = ALL_QWEN_TOKENS.map((token) => ({
+      const actual = DASHBOARD_TOKENS.map((token) => ({
         file,
         token: token.tokenName,
         initial: colorNumber(initialValues.get(token.tokenName)),
         root: colorNumber(rootValues.get(token.tokenName)),
       }));
-      const expected = ALL_QWEN_TOKENS.map((token) => {
+      const expected = DASHBOARD_TOKENS.map((token) => {
         const hex = colorNumber(token.hex);
         expect(hex).not.toBeNull();
         return { file, token: token.tokenName, initial: hex, root: hex };
@@ -343,7 +347,7 @@ describe("5. Dead-Token & Bi-Directional Reference Consistency", () => {
     for (const file of DASHBOARD_FILES) {
       const { initialValues, rootValues } =
         await readDashboardCustomProperties(file);
-      expect(initialValues.size).toBeGreaterThanOrEqual(ALL_QWEN_TOKENS.length);
+      expect(initialValues.size).toBeGreaterThanOrEqual(DASHBOARD_TOKENS.length);
 
       const actual = [...initialValues].map(([name, initial]) => ({
         file,
@@ -358,7 +362,7 @@ describe("5. Dead-Token & Bi-Directional Reference Consistency", () => {
   });
 
   it("test_assert_non_token_root_properties_are_aliases_of_tokens", async () => {
-    const tokenNames = new Set(ALL_QWEN_TOKENS.map((t) => t.tokenName));
+    const tokenNames = new Set(DASHBOARD_TOKENS.map((t) => t.tokenName));
     for (const file of DASHBOARD_FILES) {
       const { initialValues, rootValues } =
         await readDashboardCustomProperties(file);
@@ -373,6 +377,54 @@ describe("5. Dead-Token & Bi-Directional Reference Consistency", () => {
         .map(([name, value]) => `${file}: ${name}: ${value}`);
       expect(nonAliases).toEqual([]);
     }
+  });
+
+  it("test_assert_every_referenced_sd_property_is_defined", async () => {
+    for (const file of DASHBOARD_FILES) {
+      const html = await Bun.file(resolve(rootDir, file)).text();
+      const { initialValues, rootValues } =
+        await readDashboardCustomProperties(file);
+      const undefinedRefs = [
+        ...new Set(
+          [...html.matchAll(/var\(\s*(--sd-[\w-]+)/g)].map((m) => m[1]!),
+        ),
+      ].filter((name) => !rootValues.has(name) && !initialValues.has(name));
+      expect({ file, undefinedRefs }).toEqual({ file, undefinedRefs: [] });
+    }
+  });
+
+  it("test_assert_no_raw_color_literals_outside_token_blocks", async () => {
+    for (const file of DASHBOARD_FILES) {
+      const html = await Bun.file(resolve(rootDir, file)).text();
+      const css = [
+        ...[...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((m) => m[1]!),
+        ...[...html.matchAll(/\sstyle="([^"]*)"/g)].map((m) => m[1]!),
+      ]
+        .join("\n")
+        .replace(/@property\s+--sd-[\w-]+\s*\{[^}]*\}/g, "")
+        .replace(/:root\s*\{[^}]*\}/g, "")
+        .replace(/\/\*[\s\S]*?\*\//g, "");
+      const literals = [
+        ...css.matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(\s*\d/g),
+      ].map((m) => m[0]);
+      expect({ file, literals }).toEqual({ file, literals: [] });
+    }
+  });
+
+  it("test_assert_text_tokens_meet_wcag_aa_on_every_surface", () => {
+    const surfaces = [
+      ...TELEMETRY_SURFACES.map((s) => s.hex),
+      ...UI_TOKENS.filter((t) => t.role === "surface").map((t) => t.hex),
+    ];
+    const failures = UI_TOKENS.filter((t) => t.role === "text").flatMap((t) =>
+      surfaces
+        .map((bg) => ({
+          pair: `${t.tokenName} on ${bg}`,
+          ratio: calculateContrastRatio(hexToRgb(t.hex), hexToRgb(bg)),
+        }))
+        .filter((r) => r.ratio < 4.5),
+    );
+    expect(failures).toEqual([]);
   });
 });
 

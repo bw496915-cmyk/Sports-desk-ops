@@ -46,7 +46,34 @@ export class ReportingSchedulerService {
 
   constructor(telegramService?: SportsDeskTelegramService) {
     this.telegramService = telegramService || new SportsDeskTelegramService();
+    this.telegramService.setReportGenerator((type) => this.generateReport(type));
     this.initDefaultSchedules();
+  }
+
+  /** Fires each enabled schedule at its `HH:MM` in America/New_York; returns a stop function. */
+  public start(): () => void {
+    const jobs = this.getSchedules()
+      .filter((s) => s.enabled)
+      .map((s) => {
+        const [hour, minute] = s.scheduleTime.split(":").map(Number);
+        return Bun.cron(
+          `${minute} ${hour} * * *`,
+          async () => {
+            s.lastTriggeredAt = new Date().toISOString();
+            await this.dispatchReportNow(s.reportType, s.targetChatId);
+          },
+          { tz: "America/New_York" },
+        );
+      });
+    console.log(
+      `[Reporting Scheduler] ${jobs.length} schedules active (America/New_York): ${this.getSchedules()
+        .filter((s) => s.enabled)
+        .map((s) => s.scheduleTime)
+        .join(", ")}`,
+    );
+    return () => {
+      for (const job of jobs) job.stop();
+    };
   }
 
   private initDefaultSchedules(): void {
@@ -193,7 +220,30 @@ Master Agent: <code>BILLY666</code> • Generated: <code>${nowStr}</code>
   }
 }
 
+/** Scheduled reports plus inbound commands; polls only when no webhook is registered. */
+export async function startBotDaemon(): Promise<void> {
+  const bot = new SportsDeskTelegramService();
+  const scheduler = new ReportingSchedulerService(bot);
+  const stopSchedules = scheduler.start();
+  const shutdown = () => {
+    stopSchedules();
+    bot.stopPolling();
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+
+  const status = await bot.getStatus();
+  console.log(`[Telegram] ${status.mode}: ${status.modeReason}`);
+  if (status.error) console.error(`[Telegram] ${status.error}`);
+  if (status.webhook?.url) {
+    console.log(
+      `[Telegram] Webhook set to ${status.webhook.url}; updates arrive at the webview server, not here.`,
+    );
+    return;
+  }
+  if (status.tokenConfigured) await bot.startPolling();
+}
+
 if (import.meta.main) {
-  const scheduler = new ReportingSchedulerService();
-  console.log("Reporting Scheduler initialized.");
+  await startBotDaemon();
 }

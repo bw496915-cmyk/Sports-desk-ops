@@ -40,6 +40,8 @@ declare module "bun" {
     readonly TELEGRAM_BOT_TOKEN?: string;
     readonly TELEGRAM_BOT_USERNAME?: string;
     readonly TELEGRAM_CHAT_ID?: string;
+    readonly TELEGRAM_ADMIN_CHAT_IDS?: string;
+    readonly SPORTSDESK_ADMIN_TOKEN?: string;
     readonly TELEGRAM_MINIAPP_URL?: string;
     readonly TELEGRAM_WEBHOOK_URL?: string;
     readonly TELEGRAM_WEBHOOK_SECRET?: string;

@@ -31,6 +31,40 @@ protocol = "ANSI 24-bit TrueColor (\\x1b[38;2;R;G;Bm)"
 color_depth = "24-bit TrueColor RGB"
 
 # ------------------------------------------------------------------------------
+# Dashboard UI Chrome (cards, borders, text)
+# role: surface | border | text. Text tokens must reach WCAG 4.5:1 on every surface.
+# ------------------------------------------------------------------------------
+[ui.surface_card]
+token_name = "--sd-surface-card"
+hex = "#0d1527"
+role = "surface"
+description = "Cards, panels, table bodies"
+
+[ui.surface_hover]
+token_name = "--sd-surface-hover"
+hex = "#131f38"
+role = "surface"
+description = "Hovered cards and table rows"
+
+[ui.surface_border]
+token_name = "--sd-surface-border"
+hex = "#1e293b"
+role = "border"
+description = "Hairlines and dividers"
+
+[ui.text_primary]
+token_name = "--sd-text-primary"
+hex = "#f1f5f9"
+role = "text"
+description = "Body copy and headings"
+
+[ui.text_muted]
+token_name = "--sd-text-muted"
+hex = "#94a3b8"
+role = "text"
+description = "Secondary copy, labels, table headers"
+
+# ------------------------------------------------------------------------------
 # Axis 1: Ingestion Signal Channels (Layers 18-24)
 # SLA is strictly discriminated: latency (ms) vs sentinel_drop policy
 # ------------------------------------------------------------------------------

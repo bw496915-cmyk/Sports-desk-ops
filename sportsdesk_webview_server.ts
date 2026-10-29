@@ -14,8 +14,31 @@
  *  - Robust error boundary handling via Bun.serve `error(err)` returning structured 500 JSON.
  */
 
+import crypto from "node:crypto";
 import { resolve, dirname } from "node:path";
-import { SportsDeskTelegramService } from "./sportsdesk_telegram_bot.ts";
+import { ReportingSchedulerService } from "./reporting_scheduler_service.ts";
+import {
+  REPORT_TYPES,
+  SportsDeskTelegramService,
+  isReportType,
+  type TelegramUpdate,
+} from "./sportsdesk_telegram_bot.ts";
+
+/** `null` when the bearer token matches SPORTSDESK_ADMIN_TOKEN; otherwise the rejection status and reason. */
+function adminRejection(
+  req: Request,
+): { status: 401 | 503; error: string } | null {
+  const expected = Bun.env.SPORTSDESK_ADMIN_TOKEN ?? "";
+  if (!expected) {
+    return { status: 503, error: "SPORTSDESK_ADMIN_TOKEN is not set on the server" };
+  }
+  const given = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+    ? null
+    : { status: 401, error: "Missing or wrong admin token" };
+}
 
 const currentDir =
   typeof import.meta !== "undefined" && import.meta.dir
@@ -31,6 +54,7 @@ export interface ServerOptions {
 
 export function startServer(options?: ServerOptions) {
   const telegramService = new SportsDeskTelegramService();
+  const scheduler = new ReportingSchedulerService(telegramService);
   const customerDashboardPath = resolve(
     currentDir,
     "customer-churn-simulation-dashboard.html",
@@ -111,13 +135,71 @@ export function startServer(options?: ServerOptions) {
       }
 
       // 4. Telegram Mini App (GET /miniapp)
-      if (pathname === "/miniapp") {
+      if (pathname === "/miniapp" || pathname === "/miniapp/") {
         return new Response(miniappDashboardFile, {
           headers: {
             ...corsHeaders,
             "Content-Type": "text/html; charset=utf-8",
           },
         });
+      }
+
+      // Telegram webhook: Telegram echoes the secret registered by setWebhook in this header
+      if (pathname === "/telegram/webhook" && req.method === "POST") {
+        if (
+          !telegramService.isWebhookSecretValid(
+            req.headers.get("x-telegram-bot-api-secret-token"),
+          )
+        ) {
+          return Response.json({ ok: false }, { status: 401 });
+        }
+        const update = (await req.json().catch(() => null)) as TelegramUpdate | null;
+        if (update) {
+          await telegramService.handleUpdate(update).catch((err) =>
+            console.error("[Telegram webhook] update failed:", err),
+          );
+        }
+        return Response.json({ ok: true });
+      }
+
+      if (pathname === "/api/watchlist" || pathname.startsWith("/api/telegram/")) {
+        const rejected = adminRejection(req);
+        if (rejected) {
+          return Response.json(
+            { success: false, error: rejected.error },
+            { status: rejected.status, headers: corsHeaders },
+          );
+        }
+      }
+
+      if (pathname === "/api/telegram/status" && req.method === "GET") {
+        return Response.json(
+          {
+            success: true,
+            status: await telegramService.getStatus(),
+            schedules: scheduler.getSchedules(),
+            reportTypes: REPORT_TYPES,
+          },
+          { headers: corsHeaders },
+        );
+      }
+
+      if (pathname === "/api/telegram/webhook" && req.method === "POST") {
+        const body = (await req.json().catch(() => ({}))) as { action?: string };
+        if (body.action !== "set" && body.action !== "delete") {
+          return Response.json(
+            { success: false, error: 'action must be "set" or "delete"' },
+            { status: 400, headers: corsHeaders },
+          );
+        }
+        const res =
+          body.action === "set"
+            ? await telegramService.setWebhook()
+            : await telegramService.deleteWebhook();
+        return Response.json(
+          { success: res.ok, ok: res.ok, error: res.ok ? undefined : res.description },
+          { status: res.ok ? 200 : 502, headers: corsHeaders },
+        );
       }
 
       // 5. REST API: Monitored Watch List Accounts
@@ -163,9 +245,14 @@ export function startServer(options?: ServerOptions) {
 
       // 7. REST API: Scheduled Executive Report Trigger
       if (pathname === "/api/telegram/report" && req.method === "POST") {
-        const type = (url.searchParams.get("type") ||
-          "EVENING_SETTLEMENT") as any;
-        const sent = await telegramService.dispatchScheduledReport(type);
+        const type = url.searchParams.get("type") || "EVENING_SETTLEMENT";
+        if (!isReportType(type)) {
+          return Response.json(
+            { success: false, error: `type must be one of ${REPORT_TYPES.join(", ")}` },
+            { status: 400, headers: corsHeaders },
+          );
+        }
+        const sent = await scheduler.dispatchReportNow(type);
         return Response.json(
           {
             success: true,

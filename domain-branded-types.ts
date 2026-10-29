@@ -805,6 +805,50 @@ export const TELEMETRY_SURFACES: readonly SurfaceDefinition[] = [
 ];
 
 /**
+ * Dashboard UI chrome tokens (cards, borders, text). Not neurons: excluded from the
+ * pairwise ΔE00 floor, gated by role-specific WCAG contrast instead.
+ */
+export interface UiTokenDefinition {
+  readonly tokenName: string;
+  readonly hex: string;
+  readonly role: "surface" | "border" | "text";
+  readonly description: string;
+}
+
+export const UI_TOKENS: readonly UiTokenDefinition[] = [
+  {
+    tokenName: "--sd-surface-card",
+    hex: "#0d1527",
+    role: "surface",
+    description: "Cards, panels, table bodies",
+  },
+  {
+    tokenName: "--sd-surface-hover",
+    hex: "#131f38",
+    role: "surface",
+    description: "Hovered cards and table rows",
+  },
+  {
+    tokenName: "--sd-surface-border",
+    hex: "#1e293b",
+    role: "border",
+    description: "Hairlines and dividers",
+  },
+  {
+    tokenName: "--sd-text-primary",
+    hex: "#f1f5f9",
+    role: "text",
+    description: "Body copy and headings",
+  },
+  {
+    tokenName: "--sd-text-muted",
+    hex: "#94a3b8",
+    role: "text",
+    description: "Secondary copy, labels, table headers",
+  },
+];
+
+/**
  * Complete 13-entity registry across all 3 decoupled axes.
  */
 export const ALL_QWEN_TOKENS: readonly AnyQwenNeuronDefinition[] = [

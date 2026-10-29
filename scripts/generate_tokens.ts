@@ -24,11 +24,23 @@ const data = Bun.TOML.parse(tomlText) as any;
 const surfaces = Object.values(data.surfaces) as any[];
 const ingestion = Object.values(data.ingestion) as any[];
 const routes = Object.values(data.routes) as any[];
+const ui = Object.values(data.ui ?? {}) as any[];
+
+const UI_ROLES = new Set(["surface", "border", "text"]);
+for (const t of ui) {
+  if (!UI_ROLES.has(t.role) || Bun.color(t.hex, "number") === null) {
+    console.error(
+      `[gen:tokens] Error: ui token ${t.token_name} needs role surface|border|text and a Bun.color-parseable hex (got role=${t.role}, hex=${t.hex})`,
+    );
+    process.exit(1);
+  }
+}
 
 console.log(`[gen:tokens] Loaded tokens.toml (v${data.meta.version}):`);
 console.log(` - Surfaces : ${surfaces.length}`);
 console.log(` - Ingestion: ${ingestion.length}`);
 console.log(` - Routes   : ${routes.length}`);
+console.log(` - UI       : ${ui.length}`);
 
 // ============================================================================
 // 1. GENERATE DOMAIN-BRANDED-TYPES.TS (SECTION 7)
@@ -251,6 +263,32 @@ for (const s of surfaces) {
 generatedSection7 += `];
 
 /**
+ * Dashboard UI chrome tokens (cards, borders, text). Not neurons: excluded from the
+ * pairwise ΔE00 floor, gated by role-specific WCAG contrast instead.
+ */
+export interface UiTokenDefinition {
+  readonly tokenName: string;
+  readonly hex: string;
+  readonly role: "surface" | "border" | "text";
+  readonly description: string;
+}
+
+export const UI_TOKENS: readonly UiTokenDefinition[] = [
+`;
+
+for (const t of ui) {
+  generatedSection7 += `  {
+    tokenName: "${t.token_name}",
+    hex: "${t.hex}",
+    role: "${t.role}",
+    description: "${t.description}",
+  },
+`;
+}
+
+generatedSection7 += `];
+
+/**
  * Complete 13-entity registry across all 3 decoupled axes.
  */
 export const ALL_QWEN_TOKENS: readonly AnyQwenNeuronDefinition[] = [
@@ -267,7 +305,7 @@ console.log(`[gen:tokens] Emitted updated domain-branded-types.ts`);
 // ============================================================================
 // 2. GENERATE CSS DECLARATIONS & SYNCHRONIZE DASHBOARDS
 // ============================================================================
-const allTokens = [...surfaces, ...ingestion, ...routes];
+const allTokens = [...surfaces, ...ui, ...ingestion, ...routes];
 
 function generateHoudiniPropertyCss(): string {
   let css =

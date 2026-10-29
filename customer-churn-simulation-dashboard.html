@@ -26,6 +26,31 @@
         inherits: true;
         initial-value: #04070e;
       }
+      @property --sd-surface-card {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #0d1527;
+      }
+      @property --sd-surface-hover {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #131f38;
+      }
+      @property --sd-surface-border {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #1e293b;
+      }
+      @property --sd-text-primary {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #f1f5f9;
+      }
+      @property --sd-text-muted {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #94a3b8;
+      }
       @property --sd-tier-retail {
         syntax: "<color>";
         inherits: true;
@@ -89,6 +114,11 @@
         /* Generated from tokens.toml (v1.1.0) */
         --sd-surface-bg: #070b14;
         --sd-surface-cli: #04070e;
+        --sd-surface-card: #0d1527;
+        --sd-surface-hover: #131f38;
+        --sd-surface-border: #1e293b;
+        --sd-text-primary: #f1f5f9;
+        --sd-text-muted: #94a3b8;
         --sd-tier-retail: #1d84b5;
         --sd-tier-blocked: #64748b;
         --sd-theme-emerald: #10b981;
@@ -106,6 +136,9 @@
         --sd-danger: var(--sd-tier-alert);
         --sd-warning: var(--sd-tier-steam);
         --sd-purple: var(--sd-route-sharp);
+        --sd-text-dim: var(--sd-tier-blocked);
+        --sd-text-on-fill: var(--sd-surface-bg);
+        color-scheme: dark;
 
         /* Surface and Semantic Variable Mapping */
         --bg: var(--sd-surface-bg);
@@ -306,7 +339,7 @@
       .kpi-val {
         font-size: 24px;
         font-weight: 700;
-        color: #fff;
+        color: var(--sd-text-primary);
         margin: 4px 0 2px 0;
         font-family: var(--mono);
       }
@@ -331,7 +364,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        color: #fff;
+        color: var(--sd-text-primary);
       }
       table {
         width: 100%;
@@ -367,7 +400,7 @@
       }
       .btn {
         background: var(--sd-primary);
-        color: #fff;
+        color: var(--sd-text-on-fill);
         border: none;
         padding: 7px 12px;
         border-radius: 5px;
@@ -387,7 +420,100 @@
       }
       .btn-warning {
         background: var(--sd-warning);
-        color: #000;
+        color: var(--sd-text-on-fill);
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: progress;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--sd-text-primary);
+        border: 1px solid var(--sd-surface-border);
+      }
+
+      /* Telegram Bot Control */
+      .tg-grid {
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+        gap: 18px;
+      }
+      @media (max-width: 760px) {
+        .tg-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .tg-status {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 6px 14px;
+        font-size: 12px;
+      }
+      .tg-status dt {
+        color: var(--sd-text-muted);
+        text-transform: uppercase;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .tg-status dd {
+        font-family: var(--mono);
+        color: var(--sd-text-primary);
+        overflow-wrap: anywhere;
+      }
+      .tg-status dd[data-tone="good"] {
+        color: var(--sd-accent);
+      }
+      .tg-status dd[data-tone="warn"] {
+        color: var(--sd-warning);
+      }
+      .tg-status dd[data-tone="bad"] {
+        color: var(--sd-danger);
+      }
+      .tg-form,
+      .tg-action {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+      .tg-form label,
+      .tg-action label {
+        font-size: 11px;
+        color: var(--sd-text-muted);
+        text-transform: uppercase;
+        font-weight: 600;
+        min-width: 86px;
+      }
+      .tg-form input,
+      .tg-action select {
+        background: var(--sd-surface-bg);
+        color: var(--sd-text-primary);
+        border: 1px solid var(--sd-surface-border);
+        border-radius: 5px;
+        padding: 6px 8px;
+        font-family: var(--mono);
+        font-size: 12px;
+        min-width: 160px;
+      }
+      .tg-form input:focus-visible,
+      .tg-action select:focus-visible,
+      .btn:focus-visible {
+        outline: 2px solid var(--sd-primary);
+        outline-offset: 2px;
+      }
+      .tg-log {
+        margin-top: 8px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--sd-text-muted);
+        min-height: 1.5em;
+      }
+      .tg-log[data-tone="good"] {
+        color: var(--sd-accent);
+      }
+      .tg-log[data-tone="bad"] {
+        color: var(--sd-danger);
       }
     </style>
   </head>
@@ -612,6 +738,85 @@
       </div>
     </div>
 
+    <!-- Telegram Bot Control -->
+    <section
+      class="section-card"
+      id="telegram-control"
+      aria-labelledby="tg-title"
+    >
+      <div class="section-title">
+        <span id="tg-title">Telegram Bot Control</span>
+        <span class="badge badge-warning" id="tg-mode-badge"
+          >NOT CONNECTED</span
+        >
+      </div>
+      <div class="tg-grid">
+        <div>
+          <form class="tg-form" id="tg-token-form">
+            <label for="tg-admin-token">Admin token</label>
+            <input
+              type="password"
+              id="tg-admin-token"
+              autocomplete="off"
+              placeholder="SPORTSDESK_ADMIN_TOKEN"
+            />
+            <button class="btn" type="submit">Connect</button>
+          </form>
+          <dl class="tg-status" id="tg-status">
+            <dt>Bot</dt>
+            <dd data-field="bot">-</dd>
+            <dt>Mode</dt>
+            <dd data-field="mode">-</dd>
+            <dt>Default chat</dt>
+            <dd data-field="chat">-</dd>
+            <dt>Inbound</dt>
+            <dd data-field="inbound">-</dd>
+            <dt>Webhook</dt>
+            <dd data-field="webhook">-</dd>
+            <dt>Pending</dt>
+            <dd data-field="pending">-</dd>
+            <dt>Last error</dt>
+            <dd data-field="error">-</dd>
+            <dt>Schedules</dt>
+            <dd data-field="schedules">-</dd>
+          </dl>
+        </div>
+        <div>
+          <div class="tg-action">
+            <label for="tg-customer">Test alert</label>
+            <select id="tg-customer"></select>
+            <button class="btn" type="button" data-action="alert">
+              Send alert
+            </button>
+          </div>
+          <div class="tg-action">
+            <label for="tg-report">Report</label>
+            <select id="tg-report"></select>
+            <button class="btn" type="button" data-action="report">
+              Send report
+            </button>
+          </div>
+          <div class="tg-action">
+            <label>Webhook</label>
+            <button class="btn" type="button" data-action="webhook-set">
+              Register
+            </button>
+            <button
+              class="btn btn-danger"
+              type="button"
+              data-action="webhook-delete"
+            >
+              Remove
+            </button>
+            <button class="btn btn-ghost" type="button" data-action="refresh">
+              Refresh
+            </button>
+          </div>
+          <p class="tg-log" id="tg-log" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
     <!-- Priority Monitored Accounts Surveillance -->
     <div class="section-card">
       <div class="section-title">
@@ -689,7 +894,10 @@
             <td>
               <button
                 class="btn"
-                style="background: var(--sd-tier-steam); color: #000"
+                style="
+                  background: var(--sd-tier-steam);
+                  color: var(--sd-text-on-fill);
+                "
                 onclick="alert('6s Delay Active')"
               >
                 Apply 6s Delay
@@ -719,5 +927,220 @@
         </tbody>
       </table>
     </div>
+
+    <script type="module">
+      const TOKEN_KEY = "sportsdesk-admin-token";
+      const panel = document.getElementById("telegram-control");
+      const tokenInput = document.getElementById("tg-admin-token");
+      const badge = document.getElementById("tg-mode-badge");
+      const log = document.getElementById("tg-log");
+      const customerSelect = document.getElementById("tg-customer");
+      const reportSelect = document.getElementById("tg-report");
+      const field = (name) => panel.querySelector(`[data-field="${name}"]`);
+
+      tokenInput.value = sessionStorage.getItem(TOKEN_KEY) ?? "";
+
+      function say(text, tone = "") {
+        log.textContent = text;
+        log.dataset.tone = tone;
+      }
+
+      function setField(name, text, tone = "") {
+        const el = field(name);
+        el.textContent = text;
+        el.dataset.tone = tone;
+      }
+
+      function setBadge(text, kind) {
+        badge.textContent = text;
+        badge.className = `badge badge-${kind}`;
+      }
+
+      function fillSelect(select, values, label = (v) => v) {
+        const current = select.value;
+        select.replaceChildren(
+          ...values.map((v) => {
+            const option = document.createElement("option");
+            option.value = v;
+            option.textContent = label(v);
+            return option;
+          }),
+        );
+        if (values.includes(current)) select.value = current;
+      }
+
+      async function api(path, init = {}) {
+        const res = await fetch(path, {
+          ...init,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${tokenInput.value}`,
+            ...init.headers,
+          },
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || body.success === false) {
+          throw new Error(body.error ?? `HTTP ${res.status}`);
+        }
+        return body;
+      }
+
+      async function refresh() {
+        if (!tokenInput.value) {
+          setBadge("NOT CONNECTED", "warning");
+          say("Enter the admin token to load bot status.");
+          return;
+        }
+        try {
+          const [{ status, schedules, reportTypes }, watchlist] =
+            await Promise.all([
+              api("/api/telegram/status"),
+              api("/api/watchlist"),
+            ]);
+          setBadge(
+            status.error ? "BOT ERROR" : status.mode.toUpperCase(),
+            status.error
+              ? "alert"
+              : status.mode === "live"
+                ? "accent"
+                : "warning",
+          );
+          setField(
+            "bot",
+            status.bot
+              ? `@${status.bot.username}`
+              : status.tokenConfigured
+                ? "token rejected"
+                : "no token",
+            status.bot ? "good" : "bad",
+          );
+          setField(
+            "mode",
+            status.modeReason,
+            status.mode === "live" ? "good" : "warn",
+          );
+          setField(
+            "chat",
+            status.defaultChatConfigured
+              ? `configured (${status.authorizedChatCount} authorized)`
+              : "missing: send /chatid to the bot",
+            status.defaultChatConfigured ? "good" : "warn",
+          );
+          setField(
+            "inbound",
+            status.inbound === "none"
+              ? "nothing receiving commands: run `bun run bot` or register the webhook"
+              : status.inbound,
+            status.inbound === "none" ? "warn" : "good",
+          );
+          const hook = status.webhook;
+          setField(
+            "webhook",
+            hook?.url ||
+              (hook?.configuredUrl
+                ? `not registered (${hook.configuredUrl})`
+                : "not configured"),
+            hook?.url ? "good" : "",
+          );
+          setField("pending", String(hook?.pendingUpdates ?? "-"));
+          setField(
+            "error",
+            status.error ??
+              hook?.lastError ??
+              (hook && !hook.secretConfigured
+                ? "TELEGRAM_WEBHOOK_SECRET not set"
+                : "none"),
+            status.error || hook?.lastError ? "bad" : "",
+          );
+          setField(
+            "schedules",
+            schedules
+              .filter((s) => s.enabled)
+              .map(
+                (s) =>
+                  `${s.scheduleTime} ${s.name}${s.lastTriggeredAt ? " (last " + s.lastTriggeredAt + ")" : ""}`,
+              )
+              .join("; ") || "none",
+          );
+          fillSelect(
+            customerSelect,
+            watchlist.data.map((a) => a.customerId),
+            (id) => {
+              const a = watchlist.data.find((x) => x.customerId === id);
+              return `${id} (${a.riskTier})`;
+            },
+          );
+          fillSelect(reportSelect, reportTypes);
+          say(`Status loaded ${new Date().toLocaleTimeString()}`, "good");
+        } catch (err) {
+          setBadge("NOT CONNECTED", "alert");
+          say(err.message, "bad");
+        }
+      }
+
+      const actions = {
+        alert: () =>
+          api("/api/telegram/alert", {
+            method: "POST",
+            body: JSON.stringify({ customerId: customerSelect.value }),
+          }).then(
+            (r) =>
+              `Alert for ${r.customerId}: ${r.ok ? "sent" : "Telegram refused it"}`,
+          ),
+        report: () =>
+          api(
+            `/api/telegram/report?type=${encodeURIComponent(reportSelect.value)}`,
+            {
+              method: "POST",
+            },
+          ).then(
+            (r) => `${r.reportType}: ${r.ok ? "sent" : "Telegram refused it"}`,
+          ),
+        "webhook-set": () =>
+          api("/api/telegram/webhook", {
+            method: "POST",
+            body: JSON.stringify({ action: "set" }),
+          }).then(() => "Webhook registered"),
+        "webhook-delete": () =>
+          api("/api/telegram/webhook", {
+            method: "POST",
+            body: JSON.stringify({ action: "delete" }),
+          }).then(() => "Webhook removed; run `bun run bot` to poll instead"),
+        refresh: () => refresh().then(() => log.textContent),
+      };
+
+      panel.addEventListener("click", async (event) => {
+        const button = event.target.closest("button[data-action]");
+        if (!button) return;
+        const run = actions[button.dataset.action];
+        if (
+          button.dataset.action === "webhook-delete" &&
+          !confirm("Remove the Telegram webhook?")
+        )
+          return;
+        button.disabled = true;
+        try {
+          const message = await run();
+          if (button.dataset.action !== "refresh") {
+            await refresh();
+            say(message, "good");
+          }
+        } catch (err) {
+          say(err.message, "bad");
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      document
+        .getElementById("tg-token-form")
+        .addEventListener("submit", (event) => {
+          event.preventDefault();
+          sessionStorage.setItem(TOKEN_KEY, tokenInput.value);
+          refresh();
+        });
+
+      refresh();
+    </script>
   </body>
 </html>

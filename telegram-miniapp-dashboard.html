@@ -23,6 +23,31 @@
         inherits: true;
         initial-value: #04070e;
       }
+      @property --sd-surface-card {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #0d1527;
+      }
+      @property --sd-surface-hover {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #131f38;
+      }
+      @property --sd-surface-border {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #1e293b;
+      }
+      @property --sd-text-primary {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #f1f5f9;
+      }
+      @property --sd-text-muted {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #94a3b8;
+      }
       @property --sd-tier-retail {
         syntax: "<color>";
         inherits: true;
@@ -86,6 +111,11 @@
         /* Generated from tokens.toml (v1.1.0) */
         --sd-surface-bg: #070b14;
         --sd-surface-cli: #04070e;
+        --sd-surface-card: #0d1527;
+        --sd-surface-hover: #131f38;
+        --sd-surface-border: #1e293b;
+        --sd-text-primary: #f1f5f9;
+        --sd-text-muted: #94a3b8;
         --sd-tier-retail: #1d84b5;
         --sd-tier-blocked: #64748b;
         --sd-theme-emerald: #10b981;
@@ -103,6 +133,7 @@
         --sd-danger: var(--sd-tier-alert);
         --sd-warning: var(--sd-tier-steam);
         --sd-purple: var(--sd-route-sharp);
+        --sd-text-on-fill: var(--sd-surface-bg);
 
         /* Telegram WebApp Theme Integration */
         --bg: var(--tg-theme-bg-color, var(--sd-surface-bg));
@@ -115,7 +146,10 @@
         --text: var(--tg-theme-text-color, var(--sd-text-primary));
         --text-muted: var(--tg-theme-hint-color, var(--sd-text-muted));
         --primary: var(--tg-theme-button-color, var(--sd-primary));
-        --primary-text: var(--tg-theme-button-text-color, #ffffff);
+        --primary-text: var(
+          --tg-theme-button-text-color,
+          var(--sd-text-on-fill)
+        );
         --accent: var(--sd-accent);
         --danger: var(--sd-danger);
         --warning: var(--sd-warning);
@@ -216,11 +250,11 @@
       }
       .btn-danger {
         background: var(--danger);
-        color: #fff;
+        color: var(--sd-text-on-fill);
       }
       .btn-warning {
         background: var(--warning);
-        color: #000;
+        color: var(--sd-text-on-fill);
       }
     </style>
   </head>
@@ -343,7 +377,7 @@
       </div>
       <button
         class="btn"
-        style="background: var(--sd-tier-steam); color: #000"
+        style="background: var(--sd-tier-steam); color: var(--sd-text-on-fill)"
         onclick="alert('6s Delay Applied')"
       >
         Apply 6s Delay Gate

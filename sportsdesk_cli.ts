@@ -14,7 +14,15 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
-import { SportsDeskTelegramService } from "./sportsdesk_telegram_bot.ts";
+import {
+  REPORT_TYPES,
+  SportsDeskTelegramService,
+  isReportType,
+} from "./sportsdesk_telegram_bot.ts";
+import {
+  ReportingSchedulerService,
+  startBotDaemon,
+} from "./reporting_scheduler_service.ts";
 import { runFullBettorSimulationPipeline } from "./simulate_bettor_churn_suite.ts";
 import { AgentOnePassPlugin } from "./agent_onepass_plugin.ts";
 import {
@@ -959,12 +967,27 @@ export async function main(): Promise<void> {
   }
 
   if (
+    rawArgs.includes("-R") ||
+    rawArgs.includes("--telegram-report") ||
+    cmd === "report"
+  ) {
+    const type = (rawArgs[1] || "EVENING_SETTLEMENT").toUpperCase();
+    if (!isReportType(type)) {
+      console.error(`Unknown report type ${type}. Use: ${REPORT_TYPES.join(", ")}`);
+      process.exitCode = 1;
+      return;
+    }
+    const scheduler = new ReportingSchedulerService();
+    process.exitCode = (await scheduler.dispatchReportNow(type)) ? 0 : 1;
+    return;
+  }
+
+  if (
     rawArgs.includes("-t") ||
     rawArgs.includes("--telegram") ||
     cmd === "telegram"
   ) {
-    const bot = new SportsDeskTelegramService();
-    bot.startScheduledReportingService();
+    await startBotDaemon();
     return;
   }
 
