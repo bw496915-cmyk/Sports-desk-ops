@@ -25,14 +25,14 @@ All design tokens, RGB color channels, and semantic styling originate strictly f
 * **Single Source of Truth (`tokens.toml`):** Master configuration file governing all 13 Qwen3.5-4B (Layers 18–28) neuron design tokens and UI themes.
 * **Code Generation (`bun run gen:tokens`):** Compiles `tokens.toml` into downstream TypeScript types (`domain-branded-types.ts`), dashboard CSS variables, and Telegram Mini App properties.
 * **Zero-Drift Invariant:** Every CI verification run executes `bun run gen:tokens && git diff --exit-code`. Any manual edit to generated files or uncompiled token definitions fails CI immediately.
-* **Cross-Axis Semantic Aliasing:** When domain models introduce secondary palettes (such as 8-tier branch risk grades or account behavioral roles), they must be declared as semantic aliases referencing canonical tokens (e.g., `--color-grade-aaa: var(--sd-theme-emerald)`), never as unmanaged raw RGB definitions in siloed stylesheets.
+* **Cross-Axis Semantic Aliasing:** When domain models introduce secondary palettes (such as 8-tier branch risk grades or account behavioral roles), they must be declared as semantic aliases referencing canonical tokens (e.g., `--color-grade-aaa: var(--sd-theme-emerald)`), never as unmanaged raw RGB definitions in siloed stylesheets. The one current exception is the out-of-CI prototype (`docs/prototypes/sportsdesk-surveillance-dashboard.html`), which still uses raw channel triples; it must be normalized to aliases (and its 3 new hexes adjudicated) before promotion — see §1.2.
 
 ### 1.2 Bun.color, CSS Houdini @property & :root Architecture
 
 Design tokens span three distinct rendering surfaces compiled synchronously by `scripts/generate_tokens.ts`:
 
 1. **Terminal / CLI Surface (24-bit TrueColor ANSI via `Bun.color`)**:
-   * `Bun.color(raw, "number")` validates a hex color string and returns the 24-bit packed integer (`ColorHexInt`, `0xRRGGBB`). On the pinned Bun, `Bun.color("#f59e0b", "number")` returns `16096779` (`0xf59e0b`): a non-negative 24-bit integer with alpha dropped (`#f59e0b80` returns the same number). This shape is observed behavior, not documented in Bun's reference.
+   * `Bun.color(raw, "number")` returns a JavaScript `number` (`typeof` is `"number"`; the domain name `ColorHexInt` is a branded alias of `number`, not a distinct runtime shape): the 24-bit packed value `0xRRGGBB`. On the pinned Bun (`bun --revision` → `1.4.4+38afee6c8`), `Bun.color("#f59e0b", "number")` returns `16096779` (`0xf59e0b`): a non-negative 24-bit integer with alpha dropped (`#f59e0b80` returns the same number). This shape is observed behavior, not documented in Bun's reference.
    * `Bun.color(raw, "[rgba]")` returns a channel array (`[245, 158, 11, 255]`), not a packed integer.
    * DirectColor ANSI escape sequences come from `Bun.color` directly:
      ```typescript
@@ -64,9 +64,81 @@ Design tokens span three distinct rendering surfaces compiled synchronously by `
    * `:root` provides the unregistered value; `@property` supplies the typed registration and the invalid-value fallback. Value overrides that need older-browser guards belong in `@supports`. An invalid custom property is not discarded like a normal declaration, so a sibling `:root` block is not a value-level fallback.
 
 4. **Automated Registration Verification (`tests/verify_tokens.test.ts`)**:
-   * For each of the 13 tokens in `tokens.toml`, CI asserts an `@property` registration and a `:root` declaration in the 2 production dashboards, `customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`, and that `initial-value`, the `:root` value and the `tokens.toml` hex resolve to the same `Bun.color(_, "number")`. The registered `@property` set is exactly the `tokens.toml` tokens. Any other `--sd-*` in `:root` (`--sd-primary`, `--sd-accent`, `--sd-danger`, `--sd-warning`, `--sd-purple`) must be a `var(--sd-<token>)` alias of one of them, so it cannot bypass the uniqueness, ΔE00 and contrast gates. `tokens.toml` defines no grade tokens.
+   * For each of the 13 tokens in `tokens.toml`, CI asserts an `@property` registration and a `:root` declaration in the 2 production dashboards, `customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`, and that `initial-value`, the `:root` value and the `tokens.toml` hex resolve to the same `Bun.color(_, "number")`. The registered `@property` set is exactly the `tokens.toml` tokens. Any other `--sd-*` in `:root` (`--sd-primary`, `--sd-accent`, `--sd-danger`, `--sd-warning`, `--sd-purple`) must be a `var(--sd-<token>)` alias of one of them, so it cannot bypass the uniqueness, ΔE00 and contrast gates. `tokens.toml` defines no grade tokens, and neither production dashboard declares a `--color-grade-*` property. The 8-tier branch-risk grades exist only in the out-of-CI prototype `docs/prototypes/sportsdesk-surveillance-dashboard.html` (dotfiles), as raw RGB channel triples (`--color-grade-aaa-rgb: 16 185 129`, …), not as `var(--sd-*)` aliases. Their ΔE00 status splits:
+   * **5 are aliases in effect (vacuous in ΔE00):** `aaa`→`--sd-theme-emerald` (`#10b981`), `a`→`--sd-route-devig` (`#06b6d4`), `bbb`→`--sd-tier-blocked` (`#64748b`), `bb`→`--sd-tier-steam` (`#f59e0b`), `d-toxic`→`--sd-route-manager` (`#f43f5e`). Normalizing them to `var(--sd-*)` before promotion makes ΔE00 evaluate the canonical token only; the grades themselves are vacuous.
+   * **3 are new hexes (unadjudicated):** `aa` `#059669`, `b` `#f97316`, `ccc` `#ea580c` are absent from `tokens.toml`. They must be added there and pass the same ΔE00/contrast gates before any promotion, or be replaced with canonical aliases.
+   Because the prototype is outside `gen:tokens` and CI (`tests/prototype_boundary.test.ts`), the ΔE00 gate currently does not evaluate any of the 8 — that is a boundary exclusion, not a pass.
+   * `test_assert_every_registered_sd_property_initial_value_equals_root_value` asserts `initial-value` ↔ `:root` equality for every registered `--sd-*` in both dashboards, in the same 15-test run — this is tested, not out of scope.
    * The prototype `docs/prototypes/sportsdesk-surveillance-dashboard.html` is excluded by design. It lives in the dotfiles repo, where `tests/prototype_boundary.test.ts` keeps it outside `gen:tokens`.
    * `validation/token_validator.ts` checks that every token has a unique packed integer, a $\Delta E_{00} \ge 7.0$ separation floor and WCAG 2.1 contrast. Its `hexToRgb` parses through `Bun.color(_, "{rgb}")` and throws on unparseable input.
+
+### 1.3 Copies, CI scope & pinned evidence
+
+Exactly one canonical architecture document exists: this file in `sportsdesk-ops`. The dotfiles repo holds two tracked pointers that only name this file (`token_architecture_and_verification_runbook.md` and `docs/token_architecture_and_verification_runbook.md`), plus one untracked vault-style pointer (`docs/bun-color-css-houdini-at-property-architecture.md`) that states it is not tracked in git and not covered by CI. No vault copy participates in CI; none should be edited as if it were canonical.
+
+Pinned on 2026-10-28 on `bun --revision` → `1.4.4+38afee6c8`:
+
+```console
+$ bun -e 'console.log(Bun.color("#f59e0b","number"), Bun.color("#f59e0b","ansi-16m"), Bun.color("#f59e0b","hex"))'
+16096779 \x1b[38;2;245;158;11m #f59e0b
+
+$ bun -e 'console.log(typeof Bun.color("#f59e0b","number"), JSON.stringify(Bun.color("#f59e0b","[rgba]")), Bun.color("#f59e0b80","number"))'
+number [245,158,11,255] 16096779
+
+$ rg -c '@property --sd-' customer-churn-simulation-dashboard.html telegram-miniapp-dashboard.html
+customer-churn-simulation-dashboard.html:13
+telegram-miniapp-dashboard.html:13
+
+$ grep -c 'token_name = ' tokens.toml
+13
+
+$ rg -n -- '--sd-tier-steam' customer-churn-simulation-dashboard.html
+49:      @property --sd-tier-steam {
+96:        --sd-tier-steam: #f59e0b;
+104:        --sd-warning: var(--sd-tier-steam);
+
+$ rg -c 'initial-value' *.html
+customer-churn-simulation-dashboard.html:13
+telegram-miniapp-dashboard.html:13
+
+# spot check: --sd-tier-steam initial-value (#f59e0b, line 52) == :root value (line 96)
+
+$ rg -n -- '--color-grade-' docs/prototypes/sportsdesk-surveillance-dashboard.html ~/dotfiles/docs/prototypes/sportsdesk-surveillance-dashboard.html
+33:        --color-grade-aaa-rgb: 16 185 129;      /* 0x10B981 Prime Reserve [20%+) */
+34:        --color-grade-aa-rgb: 5 150 105;       /* 0x059669 High Quality [12%..20%) */
+35:        --color-grade-a-rgb: 6 182 212;        /* 0x06B6D4 Upper Medium [5%..12%) */
+36:        --color-grade-bbb-rgb: 100 116 139;    /* 0x64748B Baseline Neutral [0%..5%) */
+37:        --color-grade-bb-rgb: 245 158 11;      /* 0xF59E0B Speculative Watch [-5%..0%) */
+38:        --color-grade-b-rgb: 249 115 22;       /* 0xF97316 Highly Speculative [-10%..-5%) */
+39:        --color-grade-ccc-rgb: 234 88 12;      /* 0xEA580C Vulnerable Deficit [-25%..-10%) */
+40:        --color-grade-d-toxic-rgb: 244 63 94;  /* 0xF43F5E Inverted / Toxic Override Rose */
+
+$ # 5 of 8 mirror tokens.toml; 3 have no canonical token
+#059669 -> (none)   #f97316 -> (none)   #ea580c -> (none)
+$ rg -n 'colorHexIntToAnsiEscape|Bun\.color' sportsdesk_cli.ts scripts/generate_tokens.ts
+sportsdesk_cli.ts:483:    const ansi = Bun.color(n.hex, "ansi-16m") ?? "";
+sportsdesk_cli.ts:514:    const ansi = Bun.color(n.hex, "ansi-16m") ?? "";
+sportsdesk_cli.ts:552:    const ansi = Bun.color(n.hex, "ansi-16m") ?? "";
+```
+
+`colorHexIntToAnsiEscape` no longer exists in the repo — the `rg` above returns only `Bun.color(hex, "ansi-16m")` call sites, so no parity test is needed.
+
+`bun test tests/verify_tokens.test.ts` on the same build:
+
+```console
+(pass) 1. Single Source of Truth & Zero-Drift Regeneration > test_assert_zero_drift_between_tokens_toml_and_source_code
+(pass) 2. Color Uniqueness & CIEDE2000 Perceptual Evaluation > test_perceptual_distance_ciede2000_pairwise_evaluation
+(pass) 5. Dead-Token & Bi-Directional Reference Consistency > test_assert_every_qwen_token_is_registered_and_declared_in_root_with_matching_color
+(pass) 5. Dead-Token & Bi-Directional Reference Consistency > test_assert_every_registered_sd_property_initial_value_equals_root_value
+(pass) 5. Dead-Token & Bi-Directional Reference Consistency > test_assert_non_token_root_properties_are_aliases_of_tokens
+
+ 15 pass
+ 0 fail
+ 578 expect() calls
+Ran 15 tests across 1 file. [14.00ms]
+```
+
+That run covers exactly the 13 `tokens.toml` tokens in both production dashboards (`customer-churn-simulation-dashboard.html`, `telegram-miniapp-dashboard.html`). `@supports` remains the place for older-browser value overrides; a `:root` block is not a value-level fallback for an invalid registered property. The interpolation claim is scoped to the style engine, not the compositor (`rg -n 'compositor'` matches only line 53's correction and this sentence).
 
 ---
 
