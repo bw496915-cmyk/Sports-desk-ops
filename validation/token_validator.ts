@@ -22,16 +22,12 @@ export interface ColorLab {
 }
 
 /**
- * Converts a 6-digit hex color string to sRGB channels [0..255].
+ * Converts any CSS color `Bun.color` accepts to sRGB channels [0..255]; throws on unparseable input.
  */
 export function hexToRgb(hex: string): ColorRgb {
-  const clean = hex.trim().replace(/^#/, "");
-  const num = parseInt(clean, 16);
-  return {
-    r: (num >> 16) & 255,
-    g: (num >> 8) & 255,
-    b: num & 255,
-  };
+  const rgb = Bun.color(hex.trim(), "{rgb}");
+  if (rgb === null) throw new Error(`Bun.color cannot parse ${hex}`);
+  return rgb;
 }
 
 /**

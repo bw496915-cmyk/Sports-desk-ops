@@ -326,7 +326,7 @@ let customerHtml = readFileSync(customerDashboardPath, "utf-8");
 
 // Regex update for Houdini property block
 const houdiniRegex =
-  /\/\* ==========================================================================\s+1\. CSS Houdini @property Declarations[\s\S]*?(?=\/\* Core Status and Component Tokens|\/\* ==========================================================================\s+2\. Canonical :root)/;
+  /\/\* ==========================================================================\s+1\. CSS Houdini @property Declarations[\s\S]*?(?=\/\* ==========================================================================\s+2\. Canonical :root)/;
 customerHtml = spliceOrExit(
   customerHtml,
   customerDashboardPath,
@@ -357,7 +357,7 @@ const telegramDashboardPath = resolve(
 let telegramHtml = readFileSync(telegramDashboardPath, "utf-8");
 
 const tmaHoudiniRegex =
-  /\/\* ==========================================================================\s+1\. CSS Houdini @property Declarations[\s\S]*?(?=@property --sd-primary|\/\* ==========================================================================\s+2\. TMA Theme Mapping)/;
+  /\/\* ==========================================================================\s+1\. CSS Houdini @property Declarations[\s\S]*?(?=\/\* ==========================================================================\s+2\. TMA Theme Mapping)/;
 telegramHtml = spliceOrExit(
   telegramHtml,
   telegramDashboardPath,

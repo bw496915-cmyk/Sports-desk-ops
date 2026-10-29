@@ -64,9 +64,9 @@ Design tokens span three distinct rendering surfaces compiled synchronously by `
    * `:root` provides the unregistered value; `@property` supplies the typed registration and the invalid-value fallback. Value overrides that need older-browser guards belong in `@supports`. An invalid custom property is not discarded like a normal declaration, so a sibling `:root` block is not a value-level fallback.
 
 4. **Automated Registration Verification (`tests/verify_tokens.test.ts`)**:
-   * For each of the 13 tokens in `tokens.toml`, CI asserts an `@property` registration and a `:root` declaration in the 2 production dashboards, `customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`, and that `initial-value`, the `:root` value and the `tokens.toml` hex resolve to the same `Bun.color(_, "number")`. Every other registered `--sd-*` property must also have `initial-value` equal to its `:root` value. `tokens.toml` defines no grade tokens.
+   * For each of the 13 tokens in `tokens.toml`, CI asserts an `@property` registration and a `:root` declaration in the 2 production dashboards, `customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`, and that `initial-value`, the `:root` value and the `tokens.toml` hex resolve to the same `Bun.color(_, "number")`. The registered `@property` set is exactly the `tokens.toml` tokens. Any other `--sd-*` in `:root` (`--sd-primary`, `--sd-accent`, `--sd-danger`, `--sd-warning`, `--sd-purple`) must be a `var(--sd-<token>)` alias of one of them, so it cannot bypass the uniqueness, ΔE00 and contrast gates. `tokens.toml` defines no grade tokens.
    * The prototype `docs/prototypes/sportsdesk-surveillance-dashboard.html` is excluded by design. It lives in the dotfiles repo, where `tests/prototype_boundary.test.ts` keeps it outside `gen:tokens`.
-   * `validation/token_validator.ts` checks that every token has a unique packed integer, a $\Delta E_{00} \ge 7.0$ separation floor and WCAG 2.1 contrast. It converts hex through its own `hexToRgb`, not `Bun.color`.
+   * `validation/token_validator.ts` checks that every token has a unique packed integer, a $\Delta E_{00} \ge 7.0$ separation floor and WCAG 2.1 contrast. Its `hexToRgb` parses through `Bun.color(_, "{rgb}")` and throws on unparseable input.
 
 ---
 

@@ -41,10 +41,12 @@ describe("1. Single Source of Truth & Zero-Drift Regeneration", () => {
     const ingestion = Object.values(parsed.ingestion);
     const routes = Object.values(parsed.routes);
 
-    expect(surfaces.length).toBe(2);
-    expect(ingestion.length).toBe(7);
-    expect(routes.length).toBe(4);
-    expect(surfaces.length + ingestion.length + routes.length).toBe(13);
+    expect(surfaces.length).toBe(TELEMETRY_SURFACES.length);
+    expect(ingestion.length).toBe(INGESTION_CHANNELS.length);
+    expect(routes.length).toBe(ROUTE_CIRCUITS.length);
+    expect(surfaces.length + ingestion.length + routes.length).toBe(
+      ALL_QWEN_TOKENS.length,
+    );
   });
 
   it("test_assert_zero_drift_between_tokens_toml_and_source_code", async () => {
@@ -104,13 +106,13 @@ describe("2. Color Uniqueness & CIEDE2000 Perceptual Evaluation", () => {
     hex: t.hex,
   }));
 
-  it("test_assert_zero_color_collisions_across_all_13_tokens", () => {
+  it("test_assert_zero_color_collisions_across_all_tokens", () => {
     expect(() => assertUniqueTokenColors(tokenEntries)).not.toThrow();
 
     const uniqueHexInts = new Set(
       tokenEntries.map((t) => parseAsColorHexInt(t.hex)),
     );
-    expect(uniqueHexInts.size).toBe(13);
+    expect(uniqueHexInts.size).toBe(tokenEntries.length);
   });
 
   it("test_perceptual_distance_ciede2000_pairwise_evaluation", () => {
@@ -352,6 +354,24 @@ describe("5. Dead-Token & Bi-Directional Reference Consistency", () => {
       const unparseable = actual.filter((p) => p.initial === null);
       expect(unparseable).toEqual([]);
       expect(actual).toEqual(actual.map((p) => ({ ...p, root: p.initial })));
+    }
+  });
+
+  it("test_assert_non_token_root_properties_are_aliases_of_tokens", async () => {
+    const tokenNames = new Set(ALL_QWEN_TOKENS.map((t) => t.tokenName));
+    for (const file of DASHBOARD_FILES) {
+      const { initialValues, rootValues } =
+        await readDashboardCustomProperties(file);
+      expect([...initialValues.keys()].sort()).toEqual([...tokenNames].sort());
+
+      const nonAliases = [...rootValues]
+        .filter(([name]) => !tokenNames.has(name))
+        .filter(([, value]) => {
+          const ref = value.match(/^var\((--sd-[\w-]+)\)$/)?.[1];
+          return ref === undefined || !tokenNames.has(ref);
+        })
+        .map(([name, value]) => `${file}: ${name}: ${value}`);
+      expect(nonAliases).toEqual([]);
     }
   });
 });

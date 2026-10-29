@@ -82,33 +82,6 @@
         initial-value: #f43f5e;
       }
 
-      /* Core Status and Component Tokens */
-      @property --sd-primary {
-        syntax: "<color>";
-        inherits: true;
-        initial-value: #38bdf8;
-      }
-      @property --sd-accent {
-        syntax: "<color>";
-        inherits: true;
-        initial-value: #10b981;
-      }
-      @property --sd-danger {
-        syntax: "<color>";
-        inherits: true;
-        initial-value: #ef4444;
-      }
-      @property --sd-warning {
-        syntax: "<color>";
-        inherits: true;
-        initial-value: #f59e0b;
-      }
-      @property --sd-purple {
-        syntax: "<color>";
-        inherits: true;
-        initial-value: #a855f7;
-      }
-
       /* ==========================================================================
        2. Canonical :root Variables and Backward-Compatible Aliases
        ========================================================================== */
@@ -128,11 +101,11 @@
         --sd-route-pending: #d97706;
         --sd-route-manager: #f43f5e;
 
-        --sd-primary: #38bdf8;
-        --sd-accent: #10b981;
-        --sd-danger: #ef4444;
-        --sd-warning: #f59e0b;
-        --sd-purple: #a855f7;
+        --sd-primary: var(--sd-tier-rec-bias);
+        --sd-accent: var(--sd-theme-emerald);
+        --sd-danger: var(--sd-tier-alert);
+        --sd-warning: var(--sd-tier-steam);
+        --sd-purple: var(--sd-route-sharp);
 
         /* Surface and Semantic Variable Mapping */
         --bg: var(--sd-surface-bg);
