@@ -22,7 +22,7 @@ When the sandbox cannot reach the code, the work stops at "proposed," and the ne
 
 All design tokens, RGB color channels, and semantic styling originate strictly from `tokens.toml`:
 
-* **Single Source of Truth (`tokens.toml`):** Master configuration file governing all 13 Qwen3.5-4B (Layers 18–28) neuron design tokens and UI themes.
+* **Single Source of Truth (`tokens.toml`):** Master configuration file governing all 18 Qwen3.5-4B (Layers 18–28) neuron design tokens and UI themes.
 * **Code Generation (`bun run gen:tokens`):** Compiles `tokens.toml` into downstream TypeScript types (`domain-branded-types.ts`), dashboard CSS variables, and Telegram Mini App properties.
 * **Zero-Drift Invariant:** Every CI verification run executes `bun run gen:tokens && git diff --exit-code`. Any manual edit to generated files or uncompiled token definitions fails CI immediately.
 * **Cross-Axis Semantic Aliasing:** When domain models introduce secondary palettes (such as 8-tier branch risk grades or account behavioral roles), they must be declared as semantic aliases referencing canonical tokens (e.g., `--color-grade-aaa: var(--sd-theme-emerald)`), never as unmanaged raw RGB definitions in siloed stylesheets. The one current exception is the out-of-CI prototype (`docs/prototypes/sportsdesk-surveillance-dashboard.html`), which still uses raw channel triples; it must be normalized to aliases (and its 3 new hexes adjudicated) before promotion — see §1.2.
@@ -64,11 +64,11 @@ Design tokens span three distinct rendering surfaces compiled synchronously by `
    * `:root` provides the unregistered value; `@property` supplies the typed registration and the invalid-value fallback. Value overrides that need older-browser guards belong in `@supports`. An invalid custom property is not discarded like a normal declaration, so a sibling `:root` block is not a value-level fallback.
 
 4. **Automated Registration Verification (`tests/verify_tokens.test.ts`)**:
-   * For each of the 13 tokens in `tokens.toml`, CI asserts an `@property` registration and a `:root` declaration in the 2 production dashboards, `customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`, and that `initial-value`, the `:root` value and the `tokens.toml` hex resolve to the same `Bun.color(_, "number")`. The registered `@property` set is exactly the `tokens.toml` tokens, including the `[ui.*]` chrome tokens (`--sd-surface-card`, `--sd-surface-hover`, `--sd-surface-border`, `--sd-text-primary`, `--sd-text-muted`). Any other `--sd-*` in `:root` (`--sd-primary`, `--sd-accent`, `--sd-danger`, `--sd-warning`, `--sd-purple`, `--sd-text-dim`, `--sd-text-on-fill`) must be a `var(--sd-<token>)` alias of one of them, so it cannot bypass the uniqueness, ΔE00 and contrast gates. Every `var(--sd-*)` a dashboard references must be defined, component CSS and `style=""` attributes may not contain raw color literals, and `role = "text"` UI tokens must reach 4.5:1 on every surface. UI tokens are excluded from the pairwise ΔE00 floor, because neighbouring surfaces are meant to be close. `tokens.toml` defines no grade tokens, and neither production dashboard declares a `--color-grade-*` property. The 8-tier branch-risk grades exist only in the out-of-CI prototype `docs/prototypes/sportsdesk-surveillance-dashboard.html` (dotfiles), as raw RGB channel triples (`--color-grade-aaa-rgb: 16 185 129`, …), not as `var(--sd-*)` aliases. Their ΔE00 status splits:
+   * For each of the 18 tokens in `tokens.toml`, CI asserts an `@property` registration and a `:root` declaration in the 2 production dashboards, `customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`, and that `initial-value`, the `:root` value and the `tokens.toml` hex resolve to the same `Bun.color(_, "number")`. The registered `@property` set is exactly the `tokens.toml` tokens, including the `[ui.*]` chrome tokens (`--sd-surface-card`, `--sd-surface-hover`, `--sd-surface-border`, `--sd-text-primary`, `--sd-text-muted`). Any other `--sd-*` in `:root` (`--sd-primary`, `--sd-accent`, `--sd-danger`, `--sd-warning`, `--sd-purple`, `--sd-text-dim`, `--sd-text-on-fill`) must be a `var(--sd-<token>)` alias of one of them, so it cannot bypass the uniqueness, ΔE00 and contrast gates. Every `var(--sd-*)` a dashboard references must be defined, component CSS and `style=""` attributes may not contain raw color literals, and `role = "text"` UI tokens must reach 4.5:1 on every surface. UI tokens are excluded from the pairwise ΔE00 floor, because neighbouring surfaces are meant to be close. `tokens.toml` defines no grade tokens, and neither production dashboard declares a `--color-grade-*` property. The 8-tier branch-risk grades exist only in the out-of-CI prototype `docs/prototypes/sportsdesk-surveillance-dashboard.html` (dotfiles), as raw RGB channel triples (`--color-grade-aaa-rgb: 16 185 129`, …), not as `var(--sd-*)` aliases. Their ΔE00 status splits:
    * **5 are aliases in effect (vacuous in ΔE00):** `aaa`→`--sd-theme-emerald` (`#10b981`), `a`→`--sd-route-devig` (`#06b6d4`), `bbb`→`--sd-tier-blocked` (`#64748b`), `bb`→`--sd-tier-steam` (`#f59e0b`), `d-toxic`→`--sd-route-manager` (`#f43f5e`). Normalizing them to `var(--sd-*)` before promotion makes ΔE00 evaluate the canonical token only; the grades themselves are vacuous.
-   * **3 are new hexes (unadjudicated):** `aa` `#059669`, `b` `#f97316`, `ccc` `#ea580c` are absent from `tokens.toml`. They must be added there and pass the same ΔE00/contrast gates before any promotion, or be replaced with canonical aliases.
+   * **3 are new hexes (unadjudicated):** `aa` `#059669`, `b` `#f97316`, `ccc` `#ea580c` are absent from `tokens.toml`. They must be added there and pass the same ΔE00/contrast gates before any promotion, or be replaced with canonical aliases. Decision (2026-10-29): they stay prototype-only — no `tokens.toml` entries until a promotion is requested, at which point they are adjudicated. `tests/prototype_grade_palette.test.ts` in dotfiles pins the 8-token palette and this 5-alias/3-new split so drift is caught.
    Because the prototype is outside `gen:tokens` and CI (`tests/prototype_boundary.test.ts`), the ΔE00 gate currently does not evaluate any of the 8 — that is a boundary exclusion, not a pass.
-   * `test_assert_every_registered_sd_property_initial_value_equals_root_value` asserts `initial-value` ↔ `:root` equality for every registered `--sd-*` in both dashboards, in the same 15-test run — this is tested, not out of scope.
+   * `test_assert_every_registered_sd_property_initial_value_equals_root_value` asserts `initial-value` ↔ `:root` equality for every registered `--sd-*` in both dashboards, in the same 18-test run — this is tested, not out of scope.
    * The prototype `docs/prototypes/sportsdesk-surveillance-dashboard.html` is excluded by design. It lives in the dotfiles repo, where `tests/prototype_boundary.test.ts` keeps it outside `gen:tokens`.
    * `validation/token_validator.ts` checks that every token has a unique packed integer, a $\Delta E_{00} \ge 7.0$ separation floor and WCAG 2.1 contrast. Its `hexToRgb` parses through `Bun.color(_, "{rgb}")` and throws on unparseable input.
 
@@ -86,22 +86,22 @@ $ bun -e 'console.log(typeof Bun.color("#f59e0b","number"), JSON.stringify(Bun.c
 number [245,158,11,255] 16096779
 
 $ rg -c '@property --sd-' customer-churn-simulation-dashboard.html telegram-miniapp-dashboard.html
-customer-churn-simulation-dashboard.html:13
-telegram-miniapp-dashboard.html:13
+customer-churn-simulation-dashboard.html:18
+telegram-miniapp-dashboard.html:18
 
 $ grep -c 'token_name = ' tokens.toml
-13
+18
 
 $ rg -n -- '--sd-tier-steam' customer-churn-simulation-dashboard.html
-49:      @property --sd-tier-steam {
-96:        --sd-tier-steam: #f59e0b;
-104:        --sd-warning: var(--sd-tier-steam);
+74:      @property --sd-tier-steam {
+126:        --sd-tier-steam: #f59e0b;
+137:        --sd-warning: var(--sd-tier-steam);
 
 $ rg -c 'initial-value' *.html
-customer-churn-simulation-dashboard.html:13
-telegram-miniapp-dashboard.html:13
+customer-churn-simulation-dashboard.html:18
+telegram-miniapp-dashboard.html:18
 
-# spot check: --sd-tier-steam initial-value (#f59e0b, line 52) == :root value (line 96)
+# spot check: --sd-tier-steam initial-value: #f59e0b (line 77) == :root value (line 126)
 
 $ rg -n -- '--color-grade-' docs/prototypes/sportsdesk-surveillance-dashboard.html ~/dotfiles/docs/prototypes/sportsdesk-surveillance-dashboard.html
 33:        --color-grade-aaa-rgb: 16 185 129;      /* 0x10B981 Prime Reserve [20%+) */
@@ -113,7 +113,7 @@ $ rg -n -- '--color-grade-' docs/prototypes/sportsdesk-surveillance-dashboard.ht
 39:        --color-grade-ccc-rgb: 234 88 12;      /* 0xEA580C Vulnerable Deficit [-25%..-10%) */
 40:        --color-grade-d-toxic-rgb: 244 63 94;  /* 0xF43F5E Inverted / Toxic Override Rose */
 
-$ # 5 of 8 mirror tokens.toml; 3 have no canonical token
+$ # tokens.toml now holds 18 tokens (UI chrome added); grade mapping is unchanged: 5 mirror, 3 have no canonical token
 #059669 -> (none)   #f97316 -> (none)   #ea580c -> (none)
 $ rg -n 'colorHexIntToAnsiEscape|Bun\.color' sportsdesk_cli.ts scripts/generate_tokens.ts
 sportsdesk_cli.ts:483:    const ansi = Bun.color(n.hex, "ansi-16m") ?? "";
@@ -131,14 +131,17 @@ sportsdesk_cli.ts:552:    const ansi = Bun.color(n.hex, "ansi-16m") ?? "";
 (pass) 5. Dead-Token & Bi-Directional Reference Consistency > test_assert_every_qwen_token_is_registered_and_declared_in_root_with_matching_color
 (pass) 5. Dead-Token & Bi-Directional Reference Consistency > test_assert_every_registered_sd_property_initial_value_equals_root_value
 (pass) 5. Dead-Token & Bi-Directional Reference Consistency > test_assert_non_token_root_properties_are_aliases_of_tokens
+(pass) 5. Dead-Token & Bi-Directional Reference Consistency > test_assert_every_referenced_sd_property_is_defined
+(pass) 5. Dead-Token & Bi-Directional Reference Consistency > test_assert_no_raw_color_literals_outside_token_blocks
+(pass) 5. Dead-Token & Bi-Directional Reference Consistency > test_assert_text_tokens_meet_wcag_aa_on_every_surface
 
- 15 pass
+ 18 pass
  0 fail
- 578 expect() calls
-Ran 15 tests across 1 file. [14.00ms]
+ 594 expect() calls
+Ran 18 tests across 1 file. [36.00ms]
 ```
 
-That run covers exactly the 13 `tokens.toml` tokens in both production dashboards (`customer-churn-simulation-dashboard.html`, `telegram-miniapp-dashboard.html`). `@supports` remains the place for older-browser value overrides; a `:root` block is not a value-level fallback for an invalid registered property. The interpolation claim is scoped to the style engine, not the compositor (`rg -n 'compositor'` matches only line 53's correction and this sentence).
+That run covers exactly the 18 `tokens.toml` tokens in both production dashboards (`customer-churn-simulation-dashboard.html`, `telegram-miniapp-dashboard.html`). `@supports` remains the place for older-browser value overrides; a `:root` block is not a value-level fallback for an invalid registered property. The interpolation claim is scoped to the style engine, not the compositor (`rg -n 'compositor'` matches only line 53's correction and this sentence).
 
 ---
 
