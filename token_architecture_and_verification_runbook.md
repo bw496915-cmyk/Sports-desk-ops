@@ -74,7 +74,7 @@ Design tokens span three distinct rendering surfaces compiled synchronously by `
 
 ### 1.3 Copies, CI scope & pinned evidence
 
-Exactly one canonical architecture document exists: this file in `sportsdesk-ops`. The dotfiles repo holds two tracked pointers that only name this file (`token_architecture_and_verification_runbook.md` and `docs/token_architecture_and_verification_runbook.md`), plus one untracked vault-style pointer (`docs/bun-color-css-houdini-at-property-architecture.md`) that states it is not tracked in git and not covered by CI. No vault copy participates in CI; none should be edited as if it were canonical.
+Exactly one canonical architecture document exists: this file in `sportsdesk-ops`. The dotfiles repo holds two tracked pointers that only name this file (`token_architecture_and_verification_runbook.md` and `docs/token_architecture_and_verification_runbook.md`), plus one untracked vault-style pointer (`docs/bun-color-css-houdini-at-property-architecture.md`) that states it is not tracked in git and not covered by CI. No vault copy participates in CI; none should be edited as if it were canonical. The prototype boundary and the 8-token grade palette pin are enforced by the dotfiles CI job, which runs `bun test ./tests/` (40 tests across 9 files, including `prototype_boundary.test.ts` and `prototype_grade_palette.test.ts`); this repo's CI cannot see them.
 
 Pinned on 2026-10-28 on `bun --revision` → `1.4.4+38afee6c8`:
 
