@@ -42,5 +42,17 @@
   "devDependencies": {
     "@types/bun": "1.4.4",
     "oxlint": "1.90.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bw496915-cmyk/Sports-desk-ops.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bw496915-cmyk/Sports-desk-ops/issues"
+  },
+  "homepage": "https://github.com/bw496915-cmyk/Sports-desk-ops#readme",
+  "packageManager": "bun@1.4.4",
+  "engines": {
+    "bun": "1.4.4"
   }
 }

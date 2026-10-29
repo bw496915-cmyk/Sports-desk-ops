@@ -1,13 +1,18 @@
 # SportsDesk & Fantasy402 Operations Suite
 
-Production intelligence, downline risk surveillance, Cloudflare R2 backup, Qwen3.5-4B neuron token taxonomy, and automated reporting pipeline built on the **Bun runtime (v1.4+)** for SportsDesk and Fantasy402 books.
+Production intelligence, downline risk surveillance, Cloudflare R2 backup, Qwen3.5-4B neuron token taxonomy, and automated reporting pipeline built on the **Bun runtime (v1.4.4)** for SportsDesk and Fantasy402 books.
 
-Repository: [bw496915-cmyk/Sports-desk-ops](https://github.com/bw496915-cmyk/Sports-desk-ops.git)
+Repository: [bw496915-cmyk/Sports-desk-ops](https://github.com/bw496915-cmyk/Sports-desk-ops)
 
 ## Quick Start
 
 ```bash
-cd /Users/nolarose/dotfiles/sportsdesk-ops
+git clone https://github.com/bw496915-cmyk/Sports-desk-ops.git
+cd Sports-desk-ops
+
+# Verify Bun 1.4.4, then install the locked dependencies
+bun --version
+bun install --frozen-lockfile
 
 # 1. Inspect nominal branded types & domain invariants
 bun run sportsdesk_cli.ts -b
@@ -45,7 +50,11 @@ double-quote style with semicolons. Run `bun run typecheck` for Bun's native
 strict, no-emit checker; `tsconfig.json` makes the previous inferred compiler
 defaults explicit and includes the repository's source, tests, and declarations.
 CI runs formatting and type checking before lint. Bun remains pinned to 1.4.4
-in CI, with matching `@types/bun`; no Prettier or oxfmt package is required.
+in CI and declared in `package.json` (`packageManager` and `engines`), with
+matching `@types/bun`; no Prettier or oxfmt package is required. These manifest
+fields document the required version; CI explicitly selects it. The canonical
+local checkout on this machine is `~/code/sportsdesk-ops`; the dotfiles symlink
+is only a convenience pointer.
 
 ## Pinned Bun compatibility tests
 
