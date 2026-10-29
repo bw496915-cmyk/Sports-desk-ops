@@ -26,6 +26,12 @@ jobs:
       - name: Install dependencies
         timeout-minutes: 5
         run: bun install --frozen-lockfile
+      - name: Check formatting
+        timeout-minutes: 3
+        run: bun run format:check
+      - name: Type check
+        timeout-minutes: 3
+        run: bun run typecheck
       - name: Lint
         timeout-minutes: 3
         run: bun run lint:check

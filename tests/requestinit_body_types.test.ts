@@ -31,6 +31,12 @@ describe("RequestInit body types and emitted Content-Type headers", () => {
   let baseUrl: string;
   let lastCapturedHeaders: Headers | null = null;
 
+  function readCapturedContentType(): string | null {
+    if (lastCapturedHeaders === null)
+      throw new Error("No incoming request headers captured");
+    return lastCapturedHeaders.get("content-type");
+  }
+
   beforeAll(() => {
     server = Bun.serve({
       port: 0,
@@ -112,9 +118,7 @@ describe("RequestInit body types and emitted Content-Type headers", () => {
       body: "payload",
       proxy: false,
     });
-    expect(lastCapturedHeaders?.get("content-type")).toBe(
-      "text/plain;charset=utf-8",
-    );
+    expect(readCapturedContentType()).toBe("text/plain;charset=utf-8");
   });
 
   test("explicit header overrides Bun's inferred JSON Blob charset", async () => {
@@ -125,7 +129,7 @@ describe("RequestInit body types and emitted Content-Type headers", () => {
       body: new Blob(["{}"], { type: "application/json" }),
       proxy: false,
     });
-    expect(lastCapturedHeaders?.get("content-type")).toBe("application/json");
+    expect(readCapturedContentType()).toBe("application/json");
   });
 
   test("5. Blob body with empty type emits NO Content-Type header", async () => {

@@ -1,4 +1,11 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+} from "bun:test";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import {
@@ -49,7 +56,11 @@ function makeBot() {
 function message(chatId: number, text: string): TelegramUpdate {
   return {
     update_id: 1,
-    message: { message_id: 1, chat: { id: chatId, type: chatId < 0 ? "group" : "private" }, text },
+    message: {
+      message_id: 1,
+      chat: { id: chatId, type: chatId < 0 ? "group" : "private" },
+      text,
+    },
   };
 }
 
@@ -71,19 +82,25 @@ describe("Telegram bot commands", () => {
   test("test_assert_authorized_chat_gets_watchlist_and_report", async () => {
     const bot = makeBot();
     await bot.handleUpdate(message(Number(AUTHORIZED), "/watchlist"));
-    await bot.handleUpdate(message(Number(AUTHORIZED), "/report MORNING_BRIEFING"));
+    await bot.handleUpdate(
+      message(Number(AUTHORIZED), "/report MORNING_BRIEFING"),
+    );
     expect(calls.map((c) => c.method)).toEqual(["sendMessage", "sendMessage"]);
     expect(calls[0]!.body.text).toContain("RF2003");
     expect(calls[1]!.body.text).toContain("MORNING RISK BRIEFING");
   });
 
   test("test_assert_bot_suffix_and_unknown_report_handled", async () => {
-    await makeBot().handleUpdate(message(Number(AUTHORIZED), "/report@demodevdeskbot NOPE"));
+    await makeBot().handleUpdate(
+      message(Number(AUTHORIZED), "/report@demodevdeskbot NOPE"),
+    );
     expect(calls[0]!.body.text).toContain("Unknown report");
   });
 
   test("test_assert_check_escapes_user_input", async () => {
-    await makeBot().handleUpdate(message(Number(AUTHORIZED), "/check <b>x</b>"));
+    await makeBot().handleUpdate(
+      message(Number(AUTHORIZED), "/check <b>x</b>"),
+    );
     expect(calls[0]!.body.text).not.toContain("<b>X</b>");
     expect(calls[0]!.body.text).toContain("&lt;B&gt;");
   });
@@ -99,7 +116,9 @@ describe("Telegram mini app buttons", () => {
     });
     await bot.dispatchTestAlert("RF2003", "-100200");
     await bot.dispatchTestAlert("RF2003", "555");
-    const [group, priv] = calls.map((c) => c.body.reply_markup.inline_keyboard[0][0]);
+    const [group, priv] = calls.map(
+      (c) => c.body.reply_markup.inline_keyboard[0][0],
+    );
     expect(group.web_app).toBeUndefined();
     expect(group.url).toBe(
       "https://desk.example/miniapp?tab=forensics&agent=FAKEMONEY&customer=RF2003",
@@ -120,7 +139,10 @@ describe("Telegram callback buttons", () => {
       },
     });
     expect(calls).toEqual([
-      { method: "answerCallbackQuery", body: { callback_query_id: "q1", text: "Not authorized" } },
+      {
+        method: "answerCallbackQuery",
+        body: { callback_query_id: "q1", text: "Not authorized" },
+      },
     ]);
   });
 
@@ -156,7 +178,9 @@ describe("Telegram activity log", () => {
       ["out", "999", "sent"],
       ["in", "999", "unauthorized"],
     ]);
-    expect(entries[0]!.summary).toStartWith("RF2003 (Whale Volatility Concentration)");
+    expect(entries[0]!.summary).toStartWith(
+      "RF2003 (Whale Volatility Concentration)",
+    );
     expect(entries[0]!.summary).not.toContain("<");
     expect(await bot.getActivity(1)).toHaveLength(1);
     await rm(path, { force: true });
@@ -164,7 +188,10 @@ describe("Telegram activity log", () => {
 
   test("test_assert_simulated_send_is_logged_with_reason", async () => {
     const path = `${tmpdir()}/sd-activity-${crypto.randomUUID()}.jsonl`;
-    const bot = new SportsDeskTelegramService({ botToken: "", activityLogPath: path });
+    const bot = new SportsDeskTelegramService({
+      botToken: "",
+      activityLogPath: path,
+    });
     await bot.sendMessage("", "<b>hello</b> &amp; bye");
     const [entry] = await bot.getActivity();
     expect(entry).toMatchObject({
@@ -178,7 +205,9 @@ describe("Telegram activity log", () => {
 });
 
 describe("Webview server Telegram endpoints", () => {
-  let server: ReturnType<typeof import("../sportsdesk_webview_server.ts").startServer>;
+  let server: ReturnType<
+    typeof import("../sportsdesk_webview_server.ts").startServer
+  >;
   let base: string;
   const saved = {
     token: env.TELEGRAM_BOT_TOKEN,
@@ -223,7 +252,9 @@ describe("Webview server Telegram endpoints", () => {
       headers: { Authorization: "Bearer admin-secret" },
     });
     expect(ok.status).toBe(200);
-    const body = (await ok.json()) as { status: { mode: string; tokenConfigured: boolean } };
+    const body = (await ok.json()) as {
+      status: { mode: string; tokenConfigured: boolean };
+    };
     expect(body.status.tokenConfigured).toBe(false);
     expect(body.status.mode).toBe("simulation");
   });
@@ -240,13 +271,19 @@ describe("Webview server Telegram endpoints", () => {
   test("test_assert_webhook_rejects_wrong_secret", async () => {
     const res = await fetch(`${base}/telegram/webhook`, {
       method: "POST",
-      headers: { "X-Telegram-Bot-Api-Secret-Token": "wrong", "Content-Type": "application/json" },
+      headers: {
+        "X-Telegram-Bot-Api-Secret-Token": "wrong",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ update_id: 1 }),
     });
     expect(res.status).toBe(401);
     const ok = await fetch(`${base}/telegram/webhook`, {
       method: "POST",
-      headers: { "X-Telegram-Bot-Api-Secret-Token": "hook-secret", "Content-Type": "application/json" },
+      headers: {
+        "X-Telegram-Bot-Api-Secret-Token": "hook-secret",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ update_id: 1 }),
     });
     expect(ok.status).toBe(200);

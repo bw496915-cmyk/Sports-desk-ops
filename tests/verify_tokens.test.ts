@@ -12,6 +12,8 @@ import {
   ALL_QWEN_TOKENS,
   UI_TOKENS,
   parseAsColorHexInt,
+  parseAsCents,
+  parseAsBasisPoints,
 } from "../domain-branded-types.ts";
 import {
   assertUniqueTokenColors,
@@ -251,7 +253,7 @@ describe("4. Discriminated Union Type Guardrails", () => {
     const r27 = ROUTE_CIRCUITS.find((r) => r.layerId === "L27.N0912")!;
     expect(r27.threshold.kind).toBe("liquidity_depth");
     if (r27.threshold.kind === "liquidity_depth") {
-      expect(r27.threshold.minDepthCents).toBe(100000);
+      expect(r27.threshold.minDepthCents).toBe(parseAsCents(100000));
     }
     expect(r27.triggerKind).toBe("ORDER_BOOK_EXHAUSTION");
     expect(r27.mitigationKind).toBe("CIRCUIT_BREAKER_HALT");
@@ -260,8 +262,10 @@ describe("4. Discriminated Union Type Guardrails", () => {
     expect(r28.threshold.kind).toBe("composite_risk_gate");
     if (r28.threshold.kind === "composite_risk_gate") {
       expect(r28.threshold.minToxicityScore).toBe(80);
-      expect(r28.threshold.maxHoldRateBasisPoints).toBe(-5000);
-      expect(r28.threshold.maxDeficitCents).toBe(10000000);
+      expect(r28.threshold.maxHoldRateBasisPoints).toBe(
+        parseAsBasisPoints(-5000, true),
+      );
+      expect(r28.threshold.maxDeficitCents).toBe(parseAsCents(10000000));
     }
     expect(r28.triggerKind).toBe("TERMINAL_DEFICIT_ESCALATION");
     expect(r28.mitigationKind).toBe("MANAGER_LIMIT_CLAMP");

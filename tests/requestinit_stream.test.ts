@@ -81,7 +81,6 @@ describe("RequestInit ReadableStream body and duplex behavior in Bun", () => {
     const response = await fetch(`${baseUrl}/stream`, {
       method: "POST",
       body: stream,
-      // @ts-expect-error - duplex is WHATWG/Node extension
       duplex: "half",
     });
 
@@ -94,7 +93,6 @@ describe("RequestInit ReadableStream body and duplex behavior in Bun", () => {
     const req = new Request("http://127.0.0.1/test", {
       method: "POST",
       body: stream,
-      // @ts-expect-error - duplex
       duplex: "half",
     });
 
@@ -111,8 +109,14 @@ describe("RequestInit ReadableStream body and duplex behavior in Bun", () => {
     const form = new FormData();
     form.append("key", "value");
 
-    const req1 = new Request("http://127.0.0.1/form", { method: "POST", body: form });
-    const req2 = new Request("http://127.0.0.1/form", { method: "POST", body: form });
+    const req1 = new Request("http://127.0.0.1/form", {
+      method: "POST",
+      body: form,
+    });
+    const req2 = new Request("http://127.0.0.1/form", {
+      method: "POST",
+      body: form,
+    });
 
     const ct1 = req1.headers.get("content-type");
     const ct2 = req2.headers.get("content-type");

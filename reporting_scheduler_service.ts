@@ -46,7 +46,9 @@ export class ReportingSchedulerService {
 
   constructor(telegramService?: SportsDeskTelegramService) {
     this.telegramService = telegramService || new SportsDeskTelegramService();
-    this.telegramService.setReportGenerator((type) => this.generateReport(type));
+    this.telegramService.setReportGenerator((type) =>
+      this.generateReport(type),
+    );
     this.initDefaultSchedules();
   }
 

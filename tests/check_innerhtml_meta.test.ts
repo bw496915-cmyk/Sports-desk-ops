@@ -22,16 +22,19 @@ describe("check-innerhtml 5-case meta-test suite", () => {
       const content = `// Scratch test\nexport function test(container: HTMLElement, untrusted: string, a: string, b: string, x: string) {\n  ${codeLine}\n}\n`;
       await Bun.write(path.join(root, "lib/scratch.ts"), content);
 
-      const proc = Bun.spawnSync([
-        process.execPath,
-        path.join(import.meta.dir, "../bin/check-innerhtml.ts"),
-        root,
-      ], {
-        env: {
-          PATH: process.env.PATH ?? "",
-          HOME: process.env.HOME ?? "",
+      const proc = Bun.spawnSync(
+        [
+          process.execPath,
+          path.join(import.meta.dir, "../bin/check-innerhtml.ts"),
+          root,
+        ],
+        {
+          env: {
+            PATH: process.env.PATH ?? "",
+            HOME: process.env.HOME ?? "",
+          },
         },
-      });
+      );
 
       return {
         exitCode: proc.exitCode,

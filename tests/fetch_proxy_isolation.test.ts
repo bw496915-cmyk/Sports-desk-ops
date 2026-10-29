@@ -1,130 +1,122 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
+/** Proxy environment belongs to each child, keeping the parent environment immutable. */
 describe("Outbound Fetch Proxy Isolation (NO_PROXY Verification)", () => {
   let server: ReturnType<typeof Bun.serve>;
-  const originalHttpProxy = process.env.HTTP_PROXY;
-  const originalHttpsProxy = process.env.HTTPS_PROXY;
-  const originalAllProxy = process.env.ALL_PROXY;
-  const originalNoProxy = process.env.NO_PROXY;
 
   beforeEach(() => {
     server = Bun.serve({
       port: 0,
       hostname: "127.0.0.1",
       fetch(req) {
-        const url = new URL(req.url);
         return Response.json({
           status: "isolated",
-          pathname: url.pathname,
-          clientIP: "127.0.0.1",
+          pathname: new URL(req.url).pathname,
         });
       },
     });
   });
 
-  afterEach(() => {
-    server.stop(true);
-    if (originalHttpProxy !== undefined) {
-      process.env.HTTP_PROXY = originalHttpProxy;
-    } else {
-      delete process.env.HTTP_PROXY;
-    }
-    if (originalHttpsProxy !== undefined) {
-      process.env.HTTPS_PROXY = originalHttpsProxy;
-    } else {
-      delete process.env.HTTPS_PROXY;
-    }
-    if (originalAllProxy !== undefined) {
-      process.env.ALL_PROXY = originalAllProxy;
-    } else {
-      delete process.env.ALL_PROXY;
-    }
-    if (originalNoProxy !== undefined) {
-      process.env.NO_PROXY = originalNoProxy;
-    } else {
-      delete process.env.NO_PROXY;
-    }
-  });
+  afterEach(() => server.stop(true));
+
+  async function fetchWithProxyEnvironment(
+    environment: Record<string, string | undefined>,
+    proxy?: Bun.FetchProxyOption,
+  ) {
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "--no-env-file",
+        "-e",
+        `
+        const proxy = JSON.parse(Bun.argv[2]);
+        try {
+          const response = await fetch(Bun.argv[1], {
+            signal: AbortSignal.timeout(3000),
+            ...(proxy === null ? {} : { proxy }),
+          });
+          console.log(JSON.stringify({ status: response.status, body: await response.json() }));
+        } catch (error) {
+          console.log(JSON.stringify({ trapped: true, code: error.code }));
+        }
+      `,
+        `http://127.0.0.1:${server.port}/health`,
+        JSON.stringify(proxy ?? null),
+      ],
+      {
+        env: {
+          ...process.env,
+          HTTP_PROXY: undefined,
+          HTTPS_PROXY: undefined,
+          ALL_PROXY: undefined,
+          NO_PROXY: undefined,
+          http_proxy: undefined,
+          https_proxy: undefined,
+          all_proxy: undefined,
+          no_proxy: undefined,
+          ...environment,
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 10_000,
+      },
+    );
+    const [stdout, stderr, exitCode] = await Promise.all([
+      child.stdout.text(),
+      child.stderr.text(),
+      child.exited,
+    ]);
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+    const result: unknown = JSON.parse(stdout);
+    return result;
+  }
 
   test("test_loopback_bypasses_proxy_when_no_proxy_configured", async () => {
-    // Point HTTP_PROXY to a non-existent port (59999) that will refuse connections
-    process.env.HTTP_PROXY = "http://127.0.0.1:59999";
-    process.env.NO_PROXY = "127.0.0.1,localhost,::1";
-
-    const response = await fetch(`http://127.0.0.1:${server.port}/health`, {
-      signal: AbortSignal.timeout(3000),
+    const result = await fetchWithProxyEnvironment({
+      HTTP_PROXY: "http://127.0.0.1:59999",
+      NO_PROXY: "127.0.0.1,localhost,::1",
     });
-
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as any;
-    expect(body.status).toBe("isolated");
-    expect(body.pathname).toBe("/health");
+    expect(result).toMatchObject({
+      status: 200,
+      body: { status: "isolated", pathname: "/health" },
+    });
   });
 
   test("test_loopback_is_trapped_when_no_proxy_is_missing", async () => {
-    // When NO_PROXY is missing, Bun routes loopback requests through HTTP_PROXY per request
-    process.env.HTTP_PROXY = "http://127.0.0.1:59999";
-    delete process.env.NO_PROXY;
-
-    let hasTrapped = false;
-    try {
-      await fetch(`http://127.0.0.1:${server.port}/health`, {
-        signal: AbortSignal.timeout(1000),
-      });
-    } catch (caughtError: any) {
-      hasTrapped = true;
-      // Proves the request was redirected to the dead proxy port
-      expect(caughtError).toBeDefined();
-    }
-
-    expect(hasTrapped).toBe(true);
+    const result = await fetchWithProxyEnvironment({
+      HTTP_PROXY: "http://127.0.0.1:59999",
+    });
+    expect(result).toMatchObject({ trapped: true, code: "ECONNREFUSED" });
   });
 
   test("test_explicit_proxy_false_bypasses_environment_proxy", async () => {
-    // With HTTP_PROXY set and NO_PROXY unset, passing { proxy: false } connects directly
-    process.env.HTTP_PROXY = "http://127.0.0.1:59999";
-    delete process.env.NO_PROXY;
-
-    const response = await fetch(`http://127.0.0.1:${server.port}/health`, {
-      proxy: false,
-      signal: AbortSignal.timeout(3000),
+    const result = await fetchWithProxyEnvironment(
+      { HTTP_PROXY: "http://127.0.0.1:59999" },
+      false,
+    );
+    expect(result).toMatchObject({
+      status: 200,
+      body: { status: "isolated", pathname: "/health" },
     });
-
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as any;
-    expect(body.status).toBe("isolated");
-    expect(body.pathname).toBe("/health");
   });
 
   test("test_explicit_proxy_respects_no_proxy_by_default", async () => {
-    // NO_PROXY also applies to an explicit proxy option by default
-    process.env.NO_PROXY = "127.0.0.1,localhost,::1";
-
-    const response = await fetch(`http://127.0.0.1:${server.port}/health`, {
-      proxy: "http://127.0.0.1:59999",
-      signal: AbortSignal.timeout(3000),
-    });
-
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as any;
-    expect(body.status).toBe("isolated");
+    const result = await fetchWithProxyEnvironment(
+      { NO_PROXY: "127.0.0.1,localhost,::1" },
+      "http://127.0.0.1:59999",
+    );
+    expect(result).toMatchObject({ status: 200, body: { status: "isolated" } });
   });
 
   test("test_respect_no_proxy_false_forces_proxy", async () => {
-    // Setting respectNoProxy: false forces request through the proxy despite NO_PROXY
-    process.env.NO_PROXY = "127.0.0.1,localhost,::1";
-
-    let hasTrapped = false;
-    try {
-      await fetch(`http://127.0.0.1:${server.port}/health`, {
-        proxy: { url: "http://127.0.0.1:59999", respectNoProxy: false },
-        signal: AbortSignal.timeout(1000),
-      });
-    } catch (caughtError: any) {
-      hasTrapped = true;
-      expect(caughtError).toBeDefined();
-    }
-
-    expect(hasTrapped).toBe(true);
+    const result = await fetchWithProxyEnvironment(
+      { NO_PROXY: "127.0.0.1,localhost,::1" },
+      {
+        url: "http://127.0.0.1:59999",
+        respectNoProxy: false,
+      },
+    );
+    expect(result).toMatchObject({ trapped: true, code: "ECONNREFUSED" });
   });
 });

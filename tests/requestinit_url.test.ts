@@ -18,6 +18,10 @@ describe("RequestInit URL normalization, credentials and base URL constraints", 
   let baseUrl: string;
   let lastCapturedAuthHeader: string | null = null;
 
+  function readCapturedAuthorization(): string | null {
+    return lastCapturedAuthHeader;
+  }
+
   beforeAll(() => {
     server = Bun.serve({
       port: 0,
@@ -40,8 +44,12 @@ describe("RequestInit URL normalization, credentials and base URL constraints", 
   });
 
   test("path and query casing are strictly preserved", () => {
-    const req = new Request("http://example.com/API/V1/Users?FilterStatus=ACTIVE&UserId=MM800");
-    expect(req.url).toBe("http://example.com/API/V1/Users?FilterStatus=ACTIVE&UserId=MM800");
+    const req = new Request(
+      "http://example.com/API/V1/Users?FilterStatus=ACTIVE&UserId=MM800",
+    );
+    expect(req.url).toBe(
+      "http://example.com/API/V1/Users?FilterStatus=ACTIVE&UserId=MM800",
+    );
   });
 
   test("default ports are stripped from request.url (HTTP 80, HTTPS 443)", () => {
@@ -70,24 +78,28 @@ describe("RequestInit URL normalization, credentials and base URL constraints", 
 
   test("URL credentials convert to Basic Authorization header in Bun", async () => {
     lastCapturedAuthHeader = null;
-    const urlWithCreds = "http://" + "adminUser:secretPass@" + `${baseUrl}/protected`;
+    const urlWithCreds =
+      "http://" + "adminUser:secretPass@" + `${baseUrl}/protected`;
     await fetch(urlWithCreds);
 
     expect(lastCapturedAuthHeader).not.toBeNull();
     // adminUser:secretPass in Base64 is YWRtaW5Vc2VyOnNlY3JldFBhc3M=
-    const expectedBase64 = Buffer.from("adminUser:secretPass").toString("base64");
-    expect(lastCapturedAuthHeader).toBe(`Basic ${expectedBase64}`);
+    const expectedBase64 = Buffer.from("adminUser:secretPass").toString(
+      "base64",
+    );
+    expect(readCapturedAuthorization()).toBe(`Basic ${expectedBase64}`);
   });
 
   test("explicit Authorization header overrides URL credentials", async () => {
     lastCapturedAuthHeader = null;
-    const urlWithCreds = "http://" + "adminUser:secretPass@" + `${baseUrl}/protected`;
+    const urlWithCreds =
+      "http://" + "adminUser:secretPass@" + `${baseUrl}/protected`;
     await fetch(urlWithCreds, {
       headers: {
         Authorization: "Bearer override-token-123",
       },
     });
 
-    expect(lastCapturedAuthHeader).toBe("Bearer override-token-123");
+    expect(readCapturedAuthorization()).toBe("Bearer override-token-123");
   });
 });

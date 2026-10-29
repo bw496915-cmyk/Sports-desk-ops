@@ -30,9 +30,15 @@ function adminRejection(
 ): { status: 401 | 503; error: string } | null {
   const expected = Bun.env.SPORTSDESK_ADMIN_TOKEN ?? "";
   if (!expected) {
-    return { status: 503, error: "SPORTSDESK_ADMIN_TOKEN is not set on the server" };
+    return {
+      status: 503,
+      error: "SPORTSDESK_ADMIN_TOKEN is not set on the server",
+    };
   }
-  const given = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const given = (req.headers.get("authorization") ?? "").replace(
+    /^Bearer\s+/i,
+    "",
+  );
   const a = Buffer.from(given);
   const b = Buffer.from(expected);
   return a.length === b.length && crypto.timingSafeEqual(a, b)
@@ -153,16 +159,23 @@ export function startServer(options?: ServerOptions) {
         ) {
           return Response.json({ ok: false }, { status: 401 });
         }
-        const update = (await req.json().catch(() => null)) as TelegramUpdate | null;
+        const update = (await req
+          .json()
+          .catch(() => null)) as TelegramUpdate | null;
         if (update) {
-          await telegramService.handleUpdate(update).catch((err) =>
-            console.error("[Telegram webhook] update failed:", err),
-          );
+          await telegramService
+            .handleUpdate(update)
+            .catch((err) =>
+              console.error("[Telegram webhook] update failed:", err),
+            );
         }
         return Response.json({ ok: true });
       }
 
-      if (pathname === "/api/watchlist" || pathname.startsWith("/api/telegram/")) {
+      if (
+        pathname === "/api/watchlist" ||
+        pathname.startsWith("/api/telegram/")
+      ) {
         const rejected = adminRejection(req);
         if (rejected) {
           return Response.json(
@@ -185,7 +198,10 @@ export function startServer(options?: ServerOptions) {
       }
 
       if (pathname === "/api/telegram/activity" && req.method === "GET") {
-        const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 50, 1), 200);
+        const limit = Math.min(
+          Math.max(Number(url.searchParams.get("limit")) || 50, 1),
+          200,
+        );
         return Response.json(
           { success: true, entries: await telegramService.getActivity(limit) },
           { headers: corsHeaders },
@@ -193,7 +209,9 @@ export function startServer(options?: ServerOptions) {
       }
 
       if (pathname === "/api/telegram/webhook" && req.method === "POST") {
-        const body = (await req.json().catch(() => ({}))) as { action?: string };
+        const body = (await req.json().catch(() => ({}))) as {
+          action?: string;
+        };
         if (body.action !== "set" && body.action !== "delete") {
           return Response.json(
             { success: false, error: 'action must be "set" or "delete"' },
@@ -205,7 +223,11 @@ export function startServer(options?: ServerOptions) {
             ? await telegramService.setWebhook()
             : await telegramService.deleteWebhook();
         return Response.json(
-          { success: res.ok, ok: res.ok, error: res.ok ? undefined : res.description },
+          {
+            success: res.ok,
+            ok: res.ok,
+            error: res.ok ? undefined : res.description,
+          },
           { status: res.ok ? 200 : 502, headers: corsHeaders },
         );
       }
@@ -256,7 +278,10 @@ export function startServer(options?: ServerOptions) {
         const type = url.searchParams.get("type") || "EVENING_SETTLEMENT";
         if (!isReportType(type)) {
           return Response.json(
-            { success: false, error: `type must be one of ${REPORT_TYPES.join(", ")}` },
+            {
+              success: false,
+              error: `type must be one of ${REPORT_TYPES.join(", ")}`,
+            },
             { status: 400, headers: corsHeaders },
           );
         }
@@ -304,9 +329,7 @@ export function startServer(options?: ServerOptions) {
 
   const unixSocket =
     options?.unix ||
-    (typeof Bun !== "undefined"
-      ? Bun.env.BUN_SOCKET
-      : process.env.BUN_SOCKET);
+    (typeof Bun !== "undefined" ? Bun.env.BUN_SOCKET : process.env.BUN_SOCKET);
 
   if (unixSocket) {
     (serveConfig as any).unix = unixSocket;

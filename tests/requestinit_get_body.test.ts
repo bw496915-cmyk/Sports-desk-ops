@@ -40,7 +40,7 @@ describe("Bun 1.4.4 GET/HEAD body compatibility and fetch validation", () => {
   for (const m of getMethods) {
     test(`pinned constructor retains string bodies on "${m}", while fetch rejects nonempty bodies`, async () => {
       for (const body of ["", "data"]) {
-        const request = new Request(server.url, { method: m, body });
+        const request = new Request(server.url.href, { method: m, body });
         expect(request.body).not.toBeNull();
         expect(await request.text()).toBe(body);
       }
@@ -70,7 +70,7 @@ describe("Bun 1.4.4 GET/HEAD body compatibility and fetch validation", () => {
   for (const m of headMethods) {
     test(`pinned constructor retains string bodies on "${m}", while fetch rejects nonempty bodies`, async () => {
       for (const body of ["", "data"]) {
-        const request = new Request(server.url, { method: m, body });
+        const request = new Request(server.url.href, { method: m, body });
         expect(request.body).not.toBeNull();
         expect(await request.text()).toBe(body);
       }

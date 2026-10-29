@@ -6,6 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
+    "format": "bun fmt",
+    "format:check": "bun fmt --check",
+    "typecheck": "bun --check",
     "lint": "bun --bun run oxlint --fix",
     "lint:check": "bun --bun run oxlint --deny-warnings",
     "gen:tokens": "bun run scripts/generate_tokens.ts",

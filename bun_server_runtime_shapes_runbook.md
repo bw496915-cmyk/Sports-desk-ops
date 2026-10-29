@@ -386,20 +386,20 @@ A critical design decision in SportsDesk is **where** TLS termination occurs:
 
 ## 6. SportsDesk Production Server Alignment Matrix
 
-| Interface / Feature | SportsDesk Implementation Module | Operational Policy & Configuration |
-| :--- | :--- | :--- |
-| **Port Cascade** | `sportsdesk_webview_server.ts` | Resolves via `BUN_PORT` → `PORT` → `NODE_PORT` → `3000`. Production defaults to `PORT=4020` in `.env`. |
-| **Hostname Binding** | `sportsdesk_webview_server.ts` | Default `0.0.0.0` (all interfaces), configurable to `127.0.0.1` for strict loopback. |
-| **Unix Domain Socket** | `sportsdesk_webview_server.ts`, `deploy_to_vps.sh` | Binds to `BUN_SOCKET=/run/sportsdesk/webview.sock` for zero-TCP-port Nginx upstream proxying. |
-| **Error Boundary** | `sportsdesk_webview_server.ts` | Implements `error(err)` hook returning structured 500 JSON, suppressing stack traces when `NODE_ENV=production`. |
-| **Security Headers** | `sportsdesk_webview_server.ts` | Omits deprecated `X-Frame-Options: ALLOWALL`; enforces `Content-Security-Policy: frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:;`. |
-| **In-Memory Testing** | `tests/server_error.test.ts`, `tests/bench_server.test.ts` | Evaluates routes via `server.fetch(req)` to eliminate port contention in sandboxes and CI. |
-| **Loopback Proxy Isolation** | `.env`, `.env.example`, `deploy_to_vps.sh` | Sets `NO_PROXY=127.0.0.1,localhost,::1` to prevent corporate/CI proxy interception of loopback calls. |
-| **Outbound Timeouts** | `sportsdesk_telegram_bot.ts`, `sportsdesk_r2_sync.ts` | Enforces `signal: AbortSignal.timeout(...)` across all outbound calls to prevent hanging event loops. |
-| **FetchSession & Preconnect** | `sportsdesk_telegram_bot.ts` | Uses `Bun.FetchSession` with `rejectUnauthorized: true` and boot-time `fetch.preconnect("https://api.telegram.org")`. |
-| **Connection Pool Bounds** | `.env`, `deploy_to_vps.sh` | Sets `BUN_CONFIG_MAX_HTTP_REQUESTS=256` to size the shared connection pool to SportsDesk throughput. |
-| **WebSocket Ticker (Roadmap)** | `fantasy402-ticker-watch` | Implements `WebSocketHandler<TickerSessionContext>` with `perMessageDeflate: true`, `backpressureLimit: 16MB`, and topic pub/sub (`ticker:steam`, `ticker:whale`). |
-| **TLS Policy** | `deploy_to_vps.sh` | Nginx terminates TLS 1.3 at port 443; Bun listens on Unix socket or plaintext loopback. |
+| Interface / Feature            | SportsDesk Implementation Module                           | Operational Policy & Configuration                                                                                                                                   |
+| :----------------------------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Port Cascade**               | `sportsdesk_webview_server.ts`                             | Resolves via `BUN_PORT` → `PORT` → `NODE_PORT` → `3000`. Production defaults to `PORT=4020` in `.env`.                                                               |
+| **Hostname Binding**           | `sportsdesk_webview_server.ts`                             | Default `0.0.0.0` (all interfaces), configurable to `127.0.0.1` for strict loopback.                                                                                 |
+| **Unix Domain Socket**         | `sportsdesk_webview_server.ts`, `deploy_to_vps.sh`         | Binds to `BUN_SOCKET=/run/sportsdesk/webview.sock` for zero-TCP-port Nginx upstream proxying.                                                                        |
+| **Error Boundary**             | `sportsdesk_webview_server.ts`                             | Implements `error(err)` hook returning structured 500 JSON, suppressing stack traces when `NODE_ENV=production`.                                                     |
+| **Security Headers**           | `sportsdesk_webview_server.ts`                             | Omits deprecated `X-Frame-Options: ALLOWALL`; enforces `Content-Security-Policy: frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:;`. |
+| **In-Memory Testing**          | `tests/server_error.test.ts`, `tests/bench_server.test.ts` | Evaluates routes via `server.fetch(req)` to eliminate port contention in sandboxes and CI.                                                                           |
+| **Loopback Proxy Isolation**   | `.env`, `.env.example`, `deploy_to_vps.sh`                 | Sets `NO_PROXY=127.0.0.1,localhost,::1` to prevent corporate/CI proxy interception of loopback calls.                                                                |
+| **Outbound Timeouts**          | `sportsdesk_telegram_bot.ts`, `sportsdesk_r2_sync.ts`      | Enforces `signal: AbortSignal.timeout(...)` across all outbound calls to prevent hanging event loops.                                                                |
+| **FetchSession & Preconnect**  | `sportsdesk_telegram_bot.ts`                               | Uses `Bun.FetchSession` with `rejectUnauthorized: true` and boot-time `fetch.preconnect("https://api.telegram.org")`.                                                |
+| **Connection Pool Bounds**     | `.env`, `deploy_to_vps.sh`                                 | Sets `BUN_CONFIG_MAX_HTTP_REQUESTS=256` to size the shared connection pool to SportsDesk throughput.                                                                 |
+| **WebSocket Ticker (Roadmap)** | `fantasy402-ticker-watch`                                  | Implements `WebSocketHandler<TickerSessionContext>` with `perMessageDeflate: true`, `backpressureLimit: 16MB`, and topic pub/sub (`ticker:steam`, `ticker:whale`).   |
+| **TLS Policy**                 | `deploy_to_vps.sh`                                         | Nginx terminates TLS 1.3 at port 443; Bun listens on Unix socket or plaintext loopback.                                                                              |
 
 ---
 
@@ -446,7 +446,10 @@ this.fetchSession = new Bun.FetchSession({
 });
 
 // Boot-time pre-warming
-if (typeof fetch !== "undefined" && typeof (fetch as any).preconnect === "function") {
+if (
+  typeof fetch !== "undefined" &&
+  typeof (fetch as any).preconnect === "function"
+) {
   (fetch as any).preconnect("https://api.telegram.org");
 }
 ```
@@ -465,7 +468,8 @@ Pre-warming establishes the TCP connection and TLS 1.3 handshake at service star
 For high-throughput downline ticker streams, sub-millisecond line surveillance, and local process inter-communication (MCP stdio / Unix domain sockets), SportsDesk standardizes on Bun's low-level C++ socket interfaces rather than Node's `net`/`dgram` abstractions. Verified against **Bun v1.4.4 (revision `1.4.4+38afee6c8`)**.
 
 ### 8.1 TCP & Unix Domain Socket Listener (`Bun.listen`)
-*Official Documentation: [https://bun.com/docs/api/tcp](https://bun.com/docs/api/tcp)*
+
+_Official Documentation: [https://bun.com/docs/api/tcp](https://bun.com/docs/api/tcp)_
 
 The `Bun.listen()` factory provisions raw TCP and Unix domain socket servers:
 
@@ -485,11 +489,12 @@ export interface SocketListenerOptions<T = undefined> {
 }
 ```
 
-* **Backpressure Mechanics**: `socket.write(data)` returns the number of bytes written synchronously. When this is less than the input size (or when the OS kernel write buffer is saturated), callers must pause and wait for the `drain(socket)` callback before sending additional chunks. It returns `-1` if the socket is closed or shutting down.
-* **Unix Domain Socket IPC (No TCP Port Bound)**: Binds directly to `/run/sportsdesk/webview.sock` or `/tmp/*.sock`, eliminating TCP port exposure, loopback port contention, and corporate proxy interference.
+- **Backpressure Mechanics**: `socket.write(data)` returns the number of bytes written synchronously. When this is less than the input size (or when the OS kernel write buffer is saturated), callers must pause and wait for the `drain(socket)` callback before sending additional chunks. It returns `-1` if the socket is closed or shutting down.
+- **Unix Domain Socket IPC (No TCP Port Bound)**: Binds directly to `/run/sportsdesk/webview.sock` or `/tmp/*.sock`, eliminating TCP port exposure, loopback port contention, and corporate proxy interference.
 
 ### 8.2 Client Socket Connections (`Bun.connect`)
-*Official Documentation: [https://bun.com/docs/api/tcp#bun-connect](https://bun.com/docs/api/tcp#bun-connect)*
+
+_Official Documentation: [https://bun.com/docs/api/tcp#bun-connect](https://bun.com/docs/api/tcp#bun-connect)_
 
 `Bun.connect()` establishes outbound TCP, TLS, and Unix domain socket client streams:
 
@@ -511,7 +516,8 @@ const socket = await Bun.connect({
 ```
 
 ### 8.3 High-Frequency Datagram Telemetry (`Bun.udpSocket`)
-*Official Documentation: [https://bun.com/docs/api/udp](https://bun.com/docs/api/udp)*
+
+_Official Documentation: [https://bun.com/docs/api/udp](https://bun.com/docs/api/udp)_
 
 For loss-tolerant, low-latency odds tick streaming and syndicate volume pings:
 
@@ -535,19 +541,21 @@ if (!sent) {
 }
 ```
 
-* **Backpressure Contract**: `socket.send()` returns `false` when the datagram cannot fit in the OS socket buffer. `socket.sendMany()` returns a count smaller than the input packet array when saturated. In both conditions, `drain(socket)` fires when the kernel buffer is ready for more packets.
+- **Backpressure Contract**: `socket.send()` returns `false` when the datagram cannot fit in the OS socket buffer. `socket.sendMany()` returns a count smaller than the input packet array when saturated. In both conditions, `drain(socket)` fires when the kernel buffer is ready for more packets.
 
 ### 8.4 Zero-Copy ASCII JSONL Stream Parsing (`Bun.JSONL`)
-*Official Documentation: [https://bun.com/docs/runtime/jsonl](https://bun.com/docs/runtime/jsonl)*
+
+_Official Documentation: [https://bun.com/docs/runtime/jsonl](https://bun.com/docs/runtime/jsonl)_
 
 For stdio and socket-based JSON-RPC transports (such as Model Context Protocol bridges in `opencode/mcp/stdio.ts`):
 
-* **Native Streaming (`parseChunk`)**: Bun's C++ JSC parser decodes newline-delimited JSON chunks incrementally from `Uint8Array` binary streams without intermediate `TextDecoder` allocations or manual regex scanning. ASCII content is parsed directly without copying.
-* **Zero-Copy Byte Slices**: `result.read` provides the exact byte offset consumed, enabling zero-copy buffer slicing via `buf.subarray(result.read)`.
-* **FIFO Dispatch Ordering**: Writes to stdout/socket maintain strict dispatch sequence via queued slot promises, preventing race conditions between asynchronous handlers and immediate JSON-RPC 2.0 `-32700` parse error frames.
+- **Native Streaming (`parseChunk`)**: Bun's C++ JSC parser decodes newline-delimited JSON chunks incrementally from `Uint8Array` binary streams without intermediate `TextDecoder` allocations or manual regex scanning. ASCII content is parsed directly without copying.
+- **Zero-Copy Byte Slices**: `result.read` provides the exact byte offset consumed, enabling zero-copy buffer slicing via `buf.subarray(result.read)`.
+- **FIFO Dispatch Ordering**: Writes to stdout/socket maintain strict dispatch sequence via queued slot promises, preventing race conditions between asynchronous handlers and immediate JSON-RPC 2.0 `-32700` parse error frames.
 
 ### 8.5 Unix Domain Socket Dual-Endpoint Pattern
-*Official Documentation: [https://bun.com/docs/api/http#unix-domain-sockets](https://bun.com/docs/api/http#unix-domain-sockets)*
+
+_Official Documentation: [https://bun.com/docs/api/http#unix-domain-sockets](https://bun.com/docs/api/http#unix-domain-sockets)_
 
 SportsDesk standardizes on matching Unix domain socket paths between server listeners and client fetch dispatchers:
 

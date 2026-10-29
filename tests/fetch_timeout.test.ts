@@ -60,13 +60,9 @@ describe("Outbound Fetch Timeout Hardening (AbortSignal.timeout)", () => {
 
   test("test_telegram_service_sendMessage_handles_offline_and_timeout_parameters", async () => {
     const service = new SportsDeskTelegramService({ botToken: "" });
-    const result = await service.sendMessage(
-      "TEST_CHAT",
-      "<b>Test alert</b>",
-      {
-        timeoutMs: 2000,
-      },
-    );
+    const result = await service.sendMessage("TEST_CHAT", "<b>Test alert</b>", {
+      timeoutMs: 2000,
+    });
 
     expect(result.ok).toBe(true);
     expect(result.message_id).toBeDefined();

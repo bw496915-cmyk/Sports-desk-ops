@@ -39,6 +39,14 @@ enable native `bun lint`. Run `bun run lint:check` for a read-only gate that
 fails on warnings or errors, or `bun run lint` to apply safe fixes. CI runs lint
 alongside token regeneration, the fetch/innerHTML gates, and the full tests.
 
+Run `bun run format` to format the repository or `bun run format:check` for a
+read-only check. `bunfig.toml` preserves the existing 80-column, two-space,
+double-quote style with semicolons. Run `bun run typecheck` for Bun's native
+strict, no-emit checker; `tsconfig.json` makes the previous inferred compiler
+defaults explicit and includes the repository's source, tests, and declarations.
+CI runs formatting and type checking before lint. Bun remains pinned to 1.4.4
+in CI, with matching `@types/bun`; no Prettier or oxfmt package is required.
+
 ## Pinned Bun compatibility tests
 
 Tests distinguish Fetch-spec requirements from behavior observed on Bun 1.4.4.
@@ -112,16 +120,16 @@ To ensure seamless embedding inside Telegram Web (`https://web.telegram.org`), T
 
 Empirical measurements recorded via `tests/bench_server.test.ts` and `tests/sendfile_threshold.test.ts` on Bun v1.4.4 (macOS arm64):
 
-| Surface / Operation | Manual Baseline Path | Native Bun Path | Measured Latency | Throughput / Speedup |
-| :--- | :--- | :--- | :--- | :--- |
-| **JSON Serialization** (25 accounts) | `JSON.stringify` + headers | `Response.json(data)` | 0.99 µs vs 0.82 µs | 1.21x faster |
+| Surface / Operation                                | Manual Baseline Path             | Native Bun Path            | Measured Latency    | Throughput / Speedup                |
+| :------------------------------------------------- | :------------------------------- | :------------------------- | :------------------ | :---------------------------------- |
+| **JSON Serialization** (25 accounts)               | `JSON.stringify` + headers       | `Response.json(data)`      | 0.99 µs vs 0.82 µs  | 1.21x faster                        |
 | **Response Handle Construction** (21.5 KB payload) | `readFileSync` buffer allocation | `new Response(Bun.file())` | 45.91 µs vs 0.38 µs | 119.88x faster lazy handle creation |
-| **Handle Construction Latency** (16 KB) | Buffer allocation | `new Response(Bun.file())` | 0.49 µs/op | Sub-microsecond lazy handle |
-| **Handle Construction Latency** (64 KB) | Buffer allocation | `new Response(Bun.file())` | 0.47 µs/op | Sub-microsecond lazy handle |
-| **Handle Construction Latency** (1 MB) | Buffer allocation | `new Response(Bun.file())` | 0.21 µs/op | Sub-microsecond lazy handle |
-| **End-to-End Socket Transfer** (16 KB payload) | `fetch` socket transfer | `new Response(Bun.file())` | 0.149 ms/req | Direct loopback socket transfer |
-| **End-to-End Socket Transfer** (64 KB payload) | `fetch` socket transfer | `new Response(Bun.file())` | 0.191 ms/req | Direct loopback socket transfer |
-| **End-to-End Socket Transfer** (1 MB payload) | `fetch` socket transfer | `new Response(Bun.file())` | 0.489 ms/req | Direct loopback socket transfer |
+| **Handle Construction Latency** (16 KB)            | Buffer allocation                | `new Response(Bun.file())` | 0.49 µs/op          | Sub-microsecond lazy handle         |
+| **Handle Construction Latency** (64 KB)            | Buffer allocation                | `new Response(Bun.file())` | 0.47 µs/op          | Sub-microsecond lazy handle         |
+| **Handle Construction Latency** (1 MB)             | Buffer allocation                | `new Response(Bun.file())` | 0.21 µs/op          | Sub-microsecond lazy handle         |
+| **End-to-End Socket Transfer** (16 KB payload)     | `fetch` socket transfer          | `new Response(Bun.file())` | 0.149 ms/req        | Direct loopback socket transfer     |
+| **End-to-End Socket Transfer** (64 KB payload)     | `fetch` socket transfer          | `new Response(Bun.file())` | 0.191 ms/req        | Direct loopback socket transfer     |
+| **End-to-End Socket Transfer** (1 MB payload)      | `fetch` socket transfer          | `new Response(Bun.file())` | 0.489 ms/req        | Direct loopback socket transfer     |
 
 ## Qwen3.5-4B (Layers 18–28) Token Architecture & Single Source of Truth
 
