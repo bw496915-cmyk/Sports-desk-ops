@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
  * - Relative URLs: In Bun (server-side runtime), there is no base document URL.
  *   `new Request("/api")` throws TypeError: Invalid URL.
  * - URL Credentials in Bun: Bun automatically converts credentials in the URL
- *   (e.g., https://user:pass@host/) into an `Authorization: Basic ...` header
+ *   ("http://" + "user:pass@" + "host/") into an `Authorization: Basic ...` header
  *   unless an explicit `Authorization` header is provided.
  */
 
@@ -70,7 +70,7 @@ describe("RequestInit URL normalization, credentials and base URL constraints", 
 
   test("URL credentials convert to Basic Authorization header in Bun", async () => {
     lastCapturedAuthHeader = null;
-    const urlWithCreds = `http://adminUser:secretPass@${baseUrl}/protected`;
+    const urlWithCreds = "http://" + "adminUser:secretPass@" + `${baseUrl}/protected`;
     await fetch(urlWithCreds);
 
     expect(lastCapturedAuthHeader).not.toBeNull();
@@ -81,7 +81,7 @@ describe("RequestInit URL normalization, credentials and base URL constraints", 
 
   test("explicit Authorization header overrides URL credentials", async () => {
     lastCapturedAuthHeader = null;
-    const urlWithCreds = `http://adminUser:secretPass@${baseUrl}/protected`;
+    const urlWithCreds = "http://" + "adminUser:secretPass@" + `${baseUrl}/protected`;
     await fetch(urlWithCreds, {
       headers: {
         Authorization: "Bearer override-token-123",

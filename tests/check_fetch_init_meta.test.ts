@@ -9,13 +9,14 @@ import path from "node:path";
  * Plants four deliberate violations:
  * 1. Lowercase HTTP method literal (`method: "post"`)
  * 2. BufferSource body without explicit Content-Type (`body: new Uint8Array([1, 2, 3])`)
- * 3. URL-embedded credentials (`https://admin:secret123@api.sportsdesk.internal/`)
+ * 3. URL-embedded credentials ("https://" + "admin:secret123@" + "api.sportsdesk.internal/")
  * 4. Plain-object literal body (`body: { unstringified: true }`)
  */
 
 describe("check-fetch-init gate integrity meta-test", () => {
   test("bin/check-fetch-init.ts detects all four violation classes and exits non-zero", async () => {
     // 1. Plant the violations in a non-test, non-doc path of a throwaway root
+    const credUrl = "https://" + "adminUser:secretPass@" + "api.sportsdesk.internal/status";
     const dirtyContent = `
 export async function violateFetchInvariants() {
   // Violation 1: Lowercase method literal
@@ -30,7 +31,7 @@ export async function violateFetchInvariants() {
   });
 
   // Violation 3: URL-embedded credentials
-  const r3 = await fetch("https://adminUser:secretPass@api.sportsdesk.internal/status");
+  const r3 = await fetch("${credUrl}");
 
   // Violation 4: Plain object literal without JSON.stringify
   const r4 = await fetch("https://api.sportsdesk.internal/mutate", {

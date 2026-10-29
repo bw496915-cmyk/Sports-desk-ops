@@ -6,3 +6,7 @@ reports/
 .DS_Store
 *.bundle
 *.tar.gz
+
+# Customer and downline datasets stay local (public repo)
+enriched_customers_full.json
+sportsdesk_downline_data.json

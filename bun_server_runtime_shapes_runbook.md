@@ -457,3 +457,111 @@ Pre-warming establishes the TCP connection and TLS 1.3 handshake at service star
 
 - **No Embedded Credentials in URLs**: URLs of the form `http(s)://user:password@hostname` are forbidden across the codebase to prevent credential exposure in access logs and error traces.
 - **No `rejectUnauthorized: false`**: Disabling TLS verification creates CVE-vulnerable transport channels. SportsDesk enforces strict certificate validation across all runtime services. Verified continuously via `tests/fetch_url_credentials.test.ts`.
+
+---
+
+## 8. Low-Level Socket Networking & IPC Specification (`Bun.listen`, `Bun.connect`, `Bun.udpSocket`, `Bun.JSONL`)
+
+For high-throughput downline ticker streams, sub-millisecond line surveillance, and local process inter-communication (MCP stdio / Unix domain sockets), SportsDesk standardizes on Bun's low-level C++ socket interfaces rather than Node's `net`/`dgram` abstractions. Verified against **Bun v1.4.4 (revision `1.4.4+38afee6c8`)**.
+
+### 8.1 TCP & Unix Domain Socket Listener (`Bun.listen`)
+*Official Documentation: [https://bun.com/docs/api/tcp](https://bun.com/docs/api/tcp)*
+
+The `Bun.listen()` factory provisions raw TCP and Unix domain socket servers:
+
+```typescript
+export interface SocketListenerOptions<T = undefined> {
+  hostname?: string;
+  port?: number;
+  unix?: string; // Path to Unix domain socket
+  tls?: TLSOptions;
+  socket: {
+    open?(socket: Socket<T>): void | Promise<void>;
+    data(socket: Socket<T>, data: Buffer): void | Promise<void>;
+    drain?(socket: Socket<T>): void | Promise<void>;
+    close?(socket: Socket<T>): void | Promise<void>;
+    error?(socket: Socket<T>, error: Error): void | Promise<void>;
+  };
+}
+```
+
+* **Backpressure Mechanics**: `socket.write(data)` returns the number of bytes written synchronously. When this is less than the input size (or when the OS kernel write buffer is saturated), callers must pause and wait for the `drain(socket)` callback before sending additional chunks. It returns `-1` if the socket is closed or shutting down.
+* **Unix Domain Socket IPC (No TCP Port Bound)**: Binds directly to `/run/sportsdesk/webview.sock` or `/tmp/*.sock`, eliminating TCP port exposure, loopback port contention, and corporate proxy interference.
+
+### 8.2 Client Socket Connections (`Bun.connect`)
+*Official Documentation: [https://bun.com/docs/api/tcp#bun-connect](https://bun.com/docs/api/tcp#bun-connect)*
+
+`Bun.connect()` establishes outbound TCP, TLS, and Unix domain socket client streams:
+
+```typescript
+const socket = await Bun.connect({
+  hostname: "127.0.0.1",
+  port: 4020,
+  socket: {
+    data(socket, buffer) {
+      // Direct binary frame processing
+    },
+    open(socket) {
+      socket.write("PING\n");
+    },
+    close(socket) {},
+    error(socket, err) {},
+  },
+});
+```
+
+### 8.3 High-Frequency Datagram Telemetry (`Bun.udpSocket`)
+*Official Documentation: [https://bun.com/docs/api/udp](https://bun.com/docs/api/udp)*
+
+For loss-tolerant, low-latency odds tick streaming and syndicate volume pings:
+
+```typescript
+const socket = await Bun.udpSocket({
+  port: 9876,
+  socket: {
+    data(socket, buf, port, addr) {
+      // Buffer passed to callback without intermediate copy
+    },
+    error(socket, err) {},
+    drain(socket) {
+      // Resume sending when buffer empties
+    },
+  },
+});
+// Dispatch datagram: returns false if packet does not fit OS buffer
+const sent = socket.send("TICK:L23.N0412:RF2003:+$20000", 9876, "127.0.0.1");
+if (!sent) {
+  // Wait for drain(socket) before re-trying
+}
+```
+
+* **Backpressure Contract**: `socket.send()` returns `false` when the datagram cannot fit in the OS socket buffer. `socket.sendMany()` returns a count smaller than the input packet array when saturated. In both conditions, `drain(socket)` fires when the kernel buffer is ready for more packets.
+
+### 8.4 Zero-Copy ASCII JSONL Stream Parsing (`Bun.JSONL`)
+*Official Documentation: [https://bun.com/docs/runtime/jsonl](https://bun.com/docs/runtime/jsonl)*
+
+For stdio and socket-based JSON-RPC transports (such as Model Context Protocol bridges in `opencode/mcp/stdio.ts`):
+
+* **Native Streaming (`parseChunk`)**: Bun's C++ JSC parser decodes newline-delimited JSON chunks incrementally from `Uint8Array` binary streams without intermediate `TextDecoder` allocations or manual regex scanning. ASCII content is parsed directly without copying.
+* **Zero-Copy Byte Slices**: `result.read` provides the exact byte offset consumed, enabling zero-copy buffer slicing via `buf.subarray(result.read)`.
+* **FIFO Dispatch Ordering**: Writes to stdout/socket maintain strict dispatch sequence via queued slot promises, preventing race conditions between asynchronous handlers and immediate JSON-RPC 2.0 `-32700` parse error frames.
+
+### 8.5 Unix Domain Socket Dual-Endpoint Pattern
+*Official Documentation: [https://bun.com/docs/api/http#unix-domain-sockets](https://bun.com/docs/api/http#unix-domain-sockets)*
+
+SportsDesk standardizes on matching Unix domain socket paths between server listeners and client fetch dispatchers:
+
+```typescript
+// 1. Server Listener (Zero TCP Port Exposure)
+const server = Bun.serve({
+  unix: "/run/sportsdesk/webview.sock",
+  fetch(req) {
+    return new Response("ok");
+  },
+});
+
+// 2. Client Outbound Request (Bypasses all proxy environments)
+const res = await fetch("http://localhost/health", {
+  unix: "/run/sportsdesk/webview.sock",
+});
+```
