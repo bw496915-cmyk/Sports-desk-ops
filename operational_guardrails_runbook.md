@@ -126,6 +126,8 @@ In the Fantasy402 Manager portal under **Reporting** (`data-action="get-ip-track
 
 #### 5.1.1 Wire format (`getWebLog`)
 
+> The BookDeskOps Desk owns the live contract: `src/risk/weblog.ts` (request builders for all four modes, including per-mode date formatting) and `docs/weblog-runbook.md` (retained index, per-customer security panel). Where this section and Desk disagree, Desk wins. Mode `C` sends both dates as `YYYY-MM-DD`; the other modes use `MM/DD/YYYY`. Desk sends `ip` as the customer ID for every mode except `I`, while the captured mode `B` request below sent it empty.
+
 All four modes are one endpoint; the selector value is the `type` field. Observed in a Manager HAR capture (2026-10-28, portal `v1.0.279`) for mode `B`; the other modes are inferred from the form and still need a capture.
 
 ```http
