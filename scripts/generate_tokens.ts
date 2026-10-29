@@ -299,6 +299,21 @@ function generateRootVariablesCss(): string {
   return css;
 }
 
+function spliceOrExit(
+  html: string,
+  filePath: string,
+  marker: RegExp,
+  replacement: string,
+): string {
+  if (!marker.test(html)) {
+    console.error(
+      `[gen:tokens] Error: splice marker not found in ${filePath}: ${marker.source}`,
+    );
+    process.exit(1);
+  }
+  return html.replace(marker, replacement);
+}
+
 const houdiniCss = generateHoudiniPropertyCss();
 const rootVarsCss = generateRootVariablesCss();
 
@@ -312,16 +327,22 @@ let customerHtml = readFileSync(customerDashboardPath, "utf-8");
 // Regex update for Houdini property block
 const houdiniRegex =
   /\/\* ==========================================================================\s+1\. CSS Houdini @property Declarations[\s\S]*?(?=\/\* Core Status and Component Tokens|\/\* ==========================================================================\s+2\. Canonical :root)/;
-if (houdiniRegex.test(customerHtml)) {
-  customerHtml = customerHtml.replace(houdiniRegex, houdiniCss.trim() + "\n\n");
-}
+customerHtml = spliceOrExit(
+  customerHtml,
+  customerDashboardPath,
+  houdiniRegex,
+  houdiniCss.trim() + "\n\n",
+);
 
 // Regex update for :root variables
 const rootVarsRegex =
-  /:root\s*\{\s*\/\* Canonical SportsDesk Semantic Tokens[\s\S]*?(?=--sd-primary:)/;
-if (rootVarsRegex.test(customerHtml)) {
-  customerHtml = customerHtml.replace(rootVarsRegex, rootVarsCss + "\n      ");
-}
+  /:root\s*\{\s*\/\* Generated from tokens\.toml \(v[^)]*\) \*\/[\s\S]*?(?=--sd-primary:)/;
+customerHtml = spliceOrExit(
+  customerHtml,
+  customerDashboardPath,
+  rootVarsRegex,
+  rootVarsCss + "\n      ",
+);
 
 writeFileSync(customerDashboardPath, customerHtml, "utf-8");
 console.log(
@@ -337,21 +358,19 @@ let telegramHtml = readFileSync(telegramDashboardPath, "utf-8");
 
 const tmaHoudiniRegex =
   /\/\* ==========================================================================\s+1\. CSS Houdini @property Declarations[\s\S]*?(?=@property --sd-primary|\/\* ==========================================================================\s+2\. TMA Theme Mapping)/;
-if (tmaHoudiniRegex.test(telegramHtml)) {
-  telegramHtml = telegramHtml.replace(
-    tmaHoudiniRegex,
-    houdiniCss.trim() + "\n\n    ",
-  );
-}
+telegramHtml = spliceOrExit(
+  telegramHtml,
+  telegramDashboardPath,
+  tmaHoudiniRegex,
+  houdiniCss.trim() + "\n\n    ",
+);
 
-const tmaRootVarsRegex =
-  /:root\s*\{\s*\/\* Canonical SportsDesk Tokens[\s\S]*?(?=--sd-primary:)/;
-if (tmaRootVarsRegex.test(telegramHtml)) {
-  telegramHtml = telegramHtml.replace(
-    tmaRootVarsRegex,
-    rootVarsCss + "\n      ",
-  );
-}
+telegramHtml = spliceOrExit(
+  telegramHtml,
+  telegramDashboardPath,
+  rootVarsRegex,
+  rootVarsCss + "\n      ",
+);
 
 writeFileSync(telegramDashboardPath, telegramHtml, "utf-8");
 console.log(`[gen:tokens] Emitted updated telegram-miniapp-dashboard.html`);

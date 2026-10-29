@@ -319,14 +319,11 @@ export function parseAsColorHexInt(cssOrNumber: string | number): ColorHexInt {
   const clean = cssOrNumber.trim();
 
   // 1. Primary: Native Bun.color parser (Bun v1.4+)
-  if (typeof Bun !== "undefined" && typeof (Bun as any).color === "function") {
+  if (typeof Bun !== "undefined") {
     try {
-      const parsed = (Bun as any).color(clean, "number");
-      if (typeof parsed === "number" && !Number.isNaN(parsed)) {
-        // Bun returns 32-bit rgba number; mask down to 24-bit RGB packed integer discarding alpha
-        const masked =
-          parsed > 0xffffff ? (parsed >>> 8) & 0xffffff : parsed & 0xffffff;
-        return masked as ColorHexInt;
+      const parsed = Bun.color(clean, "number");
+      if (parsed !== null) {
+        return parsed as ColorHexInt;
       }
     } catch {
       // Fall through to manual parsing
@@ -357,9 +354,9 @@ export function parseAsColorHexInt(cssOrNumber: string | number): ColorHexInt {
 }
 
 export function parseAsColorCssString(cssOrNumber: string | number): string {
-  if (typeof Bun !== "undefined" && typeof (Bun as any).color === "function") {
+  if (typeof Bun !== "undefined") {
     try {
-      const css = (Bun as any).color(cssOrNumber, "css");
+      const css = Bun.color(cssOrNumber, "css");
       if (typeof css === "string" && css.length > 0) {
         return css;
       }
@@ -387,11 +384,6 @@ export function colorHexIntToRgbChannels(color: ColorHexInt): {
 export function colorHexIntToHexString(color: ColorHexInt): string {
   assertColorHexInt(color);
   return `#${color.toString(16).padStart(6, "0")}`;
-}
-
-export function colorHexIntToAnsiEscape(color: ColorHexInt): string {
-  const { red, green, blue } = colorHexIntToRgbChannels(color);
-  return `\x1b[38;2;${red};${green};${blue}m`;
 }
 
 // ============================================================================

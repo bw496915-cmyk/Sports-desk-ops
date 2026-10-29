@@ -4,7 +4,6 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   INGESTION_CHANNELS,
@@ -279,25 +278,80 @@ describe("4. Discriminated Union Type Guardrails", () => {
   });
 });
 
+const DASHBOARD_FILES = [
+  "customer-churn-simulation-dashboard.html",
+  "telegram-miniapp-dashboard.html",
+] as const;
+
+interface DashboardCustomProperties {
+  readonly file: string;
+  readonly initialValues: ReadonlyMap<string, string>;
+  readonly rootValues: ReadonlyMap<string, string>;
+}
+
+async function readDashboardCustomProperties(
+  file: string,
+): Promise<DashboardCustomProperties> {
+  const html = await Bun.file(resolve(rootDir, file)).text();
+
+  const initialValues = new Map<string, string>();
+  for (const m of html.matchAll(
+    /@property\s+(--sd-[\w-]+)\s*\{[^}]*?initial-value:\s*([^;]+);[^}]*\}/g,
+  )) {
+    initialValues.set(m[1]!, m[2]!.trim());
+  }
+
+  const rootValues = new Map<string, string>();
+  for (const block of html.matchAll(/:root\s*\{([^}]*)\}/g)) {
+    for (const m of block[1]!.matchAll(/(--sd-[\w-]+)\s*:\s*([^;]+);/g)) {
+      rootValues.set(m[1]!, m[2]!.trim());
+    }
+  }
+
+  return { file, initialValues, rootValues };
+}
+
+function colorNumber(value: string | undefined): number | null {
+  return value === undefined ? null : Bun.color(value, "number");
+}
+
 describe("5. Dead-Token & Bi-Directional Reference Consistency", () => {
-  it("test_assert_every_declared_token_is_present_in_dashboard_html_files", () => {
-    const customerHtml = readFileSync(
-      resolve(rootDir, "customer-churn-simulation-dashboard.html"),
-      "utf-8",
-    );
-    const telegramHtml = readFileSync(
-      resolve(rootDir, "telegram-miniapp-dashboard.html"),
-      "utf-8",
-    );
+  it("test_assert_every_qwen_token_is_registered_and_declared_in_root_with_matching_color", async () => {
+    for (const file of DASHBOARD_FILES) {
+      const { initialValues, rootValues } =
+        await readDashboardCustomProperties(file);
 
-    for (const token of ALL_QWEN_TOKENS) {
-      // Must be registered in @property
-      expect(customerHtml).toContain(`@property ${token.tokenName}`);
-      expect(telegramHtml).toContain(`@property ${token.tokenName}`);
+      const actual = ALL_QWEN_TOKENS.map((token) => ({
+        file,
+        token: token.tokenName,
+        initial: colorNumber(initialValues.get(token.tokenName)),
+        root: colorNumber(rootValues.get(token.tokenName)),
+      }));
+      const expected = ALL_QWEN_TOKENS.map((token) => {
+        const hex = colorNumber(token.hex);
+        expect(hex).not.toBeNull();
+        return { file, token: token.tokenName, initial: hex, root: hex };
+      });
 
-      // Must be set in :root
-      expect(customerHtml).toContain(`${token.tokenName}: ${token.hex};`);
-      expect(telegramHtml).toContain(`${token.tokenName}: ${token.hex};`);
+      expect(actual).toEqual(expected);
+    }
+  });
+
+  it("test_assert_every_registered_sd_property_initial_value_equals_root_value", async () => {
+    for (const file of DASHBOARD_FILES) {
+      const { initialValues, rootValues } =
+        await readDashboardCustomProperties(file);
+      expect(initialValues.size).toBeGreaterThanOrEqual(ALL_QWEN_TOKENS.length);
+
+      const actual = [...initialValues].map(([name, initial]) => ({
+        file,
+        name,
+        initial: colorNumber(initial),
+        root: colorNumber(rootValues.get(name)),
+      }));
+      const unparseable = actual.filter((p) => p.initial === null);
+      expect(unparseable).toEqual([]);
+      expect(actual).toEqual(actual.map((p) => ({ ...p, root: p.initial })));
     }
   });
 });

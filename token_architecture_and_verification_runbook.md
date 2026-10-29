@@ -2,6 +2,8 @@
 
 Operational and governance standard for token compilation, design systems, verification gates, agent sandbox boundaries, and subprocess execution.
 
+Pinned runtime: Bun 1.4.4+38afee6c8. Observed `Bun.color` output shapes below were checked on this build.
+
 ---
 
 ## Sandbox / Repository Firewall
@@ -30,20 +32,16 @@ All design tokens, RGB color channels, and semantic styling originate strictly f
 Design tokens span three distinct rendering surfaces compiled synchronously by `scripts/generate_tokens.ts`:
 
 1. **Terminal / CLI Surface (24-bit TrueColor ANSI via `Bun.color`)**:
-   * `Bun.color(raw, "[rgba]")` validates and unpacks hex color strings into 24-bit RGB packed integers (`ColorHexInt`, `0xRRGGBB`).
-   * The integer value formats directly into DirectColor ANSI escape sequences:
+   * `Bun.color(raw, "number")` validates a hex color string and returns the 24-bit packed integer (`ColorHexInt`, `0xRRGGBB`). On the pinned Bun, `Bun.color("#f59e0b", "number")` returns `16096779` (`0xf59e0b`): a non-negative 24-bit integer with alpha dropped (`#f59e0b80` returns the same number). This shape is observed behavior, not documented in Bun's reference.
+   * `Bun.color(raw, "[rgba]")` returns a channel array (`[245, 158, 11, 255]`), not a packed integer.
+   * DirectColor ANSI escape sequences come from `Bun.color` directly:
      ```typescript
-     export function colorHexIntToAnsiEscape(c: ColorHexInt): string {
-       const r = (c >> 16) & 0xff;
-       const g = (c >> 8) & 0xff;
-       const b = c & 0xff;
-       return `\x1b[38;2;${r};${g};${b}m`;
-     }
+     const escape = Bun.color(hex, "ansi-16m"); // "\x1b[38;2;245;158;11m" for #f59e0b
      ```
    * Guarantees identical photometric rendering between terminal outputs (`bun sportsdesk_cli.ts -N`) and web interfaces.
 
 2. **DOM / Webview Surface (CSS Houdini `@property` Typed Tokens)**:
-   * Every token in `tokens.toml` generates an explicit CSS Houdini `@property` registration in both `customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`:
+   * Every token in `tokens.toml` generates an explicit CSS Houdini `@property` registration in both production dashboards, `customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`:
      ```css
      @property --sd-tier-steam {
        syntax: '<color>';
@@ -51,22 +49,24 @@ Design tokens span three distinct rendering surfaces compiled synchronously by `
        initial-value: #f59e0b;
      }
      ```
-   * **Typed Syntax Validation (`syntax: '<color>'`)**: The browser rendering engine validates assigned values as color types. Invalid runtime script assignments fail closed and preserve the fallback `initial-value` rather than corrupting styles.
-   * **Smooth Transition Interpolation**: Standard unregistered CSS variables (`var(--custom)`) are treated as untyped strings by browser compositors, preventing CSS transition interpolation and causing abrupt snapping. Declaring `@property` with `syntax: '<color>'` enables hardware-accelerated GPU color interpolation for theme transitions, risk escalation badges, and alert pulses.
+   * **Typed Syntax Validation (`syntax: '<color>'`)**: The style engine checks assigned values against `<color>`. Invalid runtime script assignments fail safe to `initial-value`: the engine substitutes the registered initial value instead of rejecting the assignment or corrupting styles.
+   * **Smooth Transition Interpolation**: Unregistered two-dash custom properties (`var(--custom)`) behave like string substitution, so transitions on them snap. Registered `<color>` properties let the style engine interpolate the typed color instead of snapping the string ([MDN `@property`](https://developer.mozilla.org/en-US/docs/Web/CSS/@property)). This covers theme transitions, risk escalation badges, and alert pulses. The interpolation happens in the style engine, not the compositor, which only handles `transform`, `opacity`, and `filter`.
    * **Inheritance Control**: `inherits: true` guarantees reliable cascading down DOM component hierarchies.
 
-3. **Canonical `:root` Fallback Mapping**:
+3. **Canonical `:root` Value Mapping**:
    * Accompanying the `@property` block, `scripts/generate_tokens.ts` generates standard `:root` variable definitions:
      ```css
      :root {
        --sd-tier-steam: #f59e0b;
      }
      ```
-   * Ensures instant backwards compatibility for headless engines or older webview runtimes lacking full CSS Properties and Values API Level 1 support.
+   * `@property` is Baseline (all modern browsers since July 2024). The floor is engines that predate it, such as iOS Safari < 16.4 and old Android WebView builds; there the `:root` value still applies, untyped and without interpolation.
+   * `:root` provides the unregistered value; `@property` supplies the typed registration and the invalid-value fallback. Value overrides that need older-browser guards belong in `@supports`. An invalid custom property is not discarded like a normal declaration, so a sibling `:root` block is not a value-level fallback.
 
 4. **Automated Registration Verification (`tests/verify_tokens.test.ts`)**:
-   * CI tests verify that 100% of tokens defined in `tokens.toml` have matching `@property` registrations in both webviews (`expect(html).toContain(`@property ${token.tokenName}`)`).
-   * Verifies that every token parses cleanly via `Bun.color` into a unique packed integer with $\Delta E_{00} \ge 7.0$ separation floor and WCAG 2.1 contrast compliance.
+   * For each of the 13 tokens in `tokens.toml`, CI asserts an `@property` registration and a `:root` declaration in the 2 production dashboards, `customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`, and that `initial-value`, the `:root` value and the `tokens.toml` hex resolve to the same `Bun.color(_, "number")`. Every other registered `--sd-*` property must also have `initial-value` equal to its `:root` value. `tokens.toml` defines no grade tokens.
+   * The prototype `docs/prototypes/sportsdesk-surveillance-dashboard.html` is excluded by design. It lives in the dotfiles repo, where `tests/prototype_boundary.test.ts` keeps it outside `gen:tokens`.
+   * `validation/token_validator.ts` checks that every token has a unique packed integer, a $\Delta E_{00} \ge 7.0$ separation floor and WCAG 2.1 contrast. It converts hex through its own `hexToRgb`, not `Bun.color`.
 
 ---
 
@@ -102,7 +102,7 @@ Every static gate and linter must adhere to strict reporting and testing standar
 
 ## 5. Prototype Governance & Promotion Boundary
 
-* **Prototype Isolation:** Experimental or unmanaged interface artifacts reside strictly under `docs/prototypes/` and carry the mandatory file header:
+* **Prototype Isolation:** Experimental or unmanaged interface artifacts reside strictly under `docs/prototypes/` in the dotfiles repo (not this repo), where `tests/prototype_boundary.test.ts` enforces the boundary, and carry the mandatory file header:
   ```html
   <!-- PROTOTYPE — not in gen:tokens. Maintained as prototype reference under docs/prototypes/ -->
   ```
@@ -144,5 +144,5 @@ Subprocess execution via `Bun.spawn` and Bun Shell (`$`) must adhere to strict c
     await writer.write(new TextEncoder().encode(payloadString));
     await writer.close();
     ```
-    Never pass arbitrary strings as shell file paths (`< ${fileList}`).
+    Bun Shell redirection also accepts `ReadableStream`, `Blob`, and `Response` objects as expressions (`$`cat < ${blob}``). Never pass arbitrary strings as shell file paths (`< ${fileList}`).
   * **Exit Code Handling:** In test suites, use `.nothrow()` and assert `result.exitCode`. In operational hooks, omit `.nothrow()` (or use `.throws(true)`) to fail immediately on non-zero exits.

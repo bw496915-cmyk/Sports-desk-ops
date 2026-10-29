@@ -34,7 +34,6 @@ import {
   parseAsEpochMs,
   parseAsColorHexInt,
   colorHexIntToHexString,
-  colorHexIntToAnsiEscape,
   betGroupIdentifier,
   parlayLegCount,
   rotationNumber,
@@ -481,8 +480,7 @@ export function printNeuronRegistry(): void {
   );
   INGESTION_CHANNELS.forEach((n, idx) => {
     const num = String(idx + 1).padStart(2);
-    const colorInt = parseAsColorHexInt(n.hex);
-    const ansi = colorHexIntToAnsiEscape(colorInt);
+    const ansi = Bun.color(n.hex, "ansi-16m") ?? "";
     const preview = `${ansi}████████${reset}`;
     const slaStr =
       n.sla.kind === "latency"
@@ -513,8 +511,7 @@ export function printNeuronRegistry(): void {
   );
   ROUTE_CIRCUITS.forEach((n, idx) => {
     const num = String(idx + 8).padStart(2);
-    const colorInt = parseAsColorHexInt(n.hex);
-    const ansi = colorHexIntToAnsiEscape(colorInt);
+    const ansi = Bun.color(n.hex, "ansi-16m") ?? "";
     const preview = `${ansi}████████${reset}`;
 
     let threshStr = "";
@@ -552,8 +549,7 @@ export function printNeuronRegistry(): void {
   );
   TELEMETRY_SURFACES.forEach((n, idx) => {
     const num = String(idx + 12).padStart(2);
-    const colorInt = parseAsColorHexInt(n.hex);
-    const ansi = colorHexIntToAnsiEscape(colorInt);
+    const ansi = Bun.color(n.hex, "ansi-16m") ?? "";
     const preview = `${ansi}████████${reset}`;
     console.log(
       `${num} | ` +
