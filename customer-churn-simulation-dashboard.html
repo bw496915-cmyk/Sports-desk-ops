@@ -486,7 +486,9 @@
         min-width: 86px;
       }
       .tg-form input,
-      .tg-action select {
+      .tg-action select,
+      .wl-toolbar input,
+      .wl-toolbar select {
         background: var(--sd-surface-bg);
         color: var(--sd-text-primary);
         border: 1px solid var(--sd-surface-border);
@@ -498,6 +500,9 @@
       }
       .tg-form input:focus-visible,
       .tg-action select:focus-visible,
+      .wl-toolbar input:focus-visible,
+      .wl-toolbar select:focus-visible,
+      .th-sort:focus-visible,
       .btn:focus-visible {
         outline: 2px solid var(--sd-primary);
         outline-offset: 2px;
@@ -513,6 +518,130 @@
         color: var(--sd-accent);
       }
       .tg-log[data-tone="bad"] {
+        color: var(--sd-danger);
+      }
+
+      /* Watch List */
+      .wl-toolbar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+      .wl-toolbar input {
+        flex: 1 1 220px;
+      }
+      .table-scroll {
+        overflow-x: auto;
+      }
+      .th-sort {
+        all: unset;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      th[aria-sort="ascending"] .th-sort::after {
+        content: " ▲";
+      }
+      th[aria-sort="descending"] .th-sort::after {
+        content: " ▼";
+      }
+      th[aria-sort="ascending"],
+      th[aria-sort="descending"] {
+        color: var(--sd-text-primary);
+      }
+      .num {
+        text-align: right;
+        white-space: nowrap;
+      }
+      .pnl-bad {
+        color: var(--sd-danger);
+      }
+      .pnl-good {
+        color: var(--sd-accent);
+      }
+      .playbook {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .playbook span {
+        color: var(--sd-text-muted);
+        font-size: 11px;
+        max-width: 280px;
+      }
+      .playbook .btn {
+        white-space: nowrap;
+      }
+      .empty-row {
+        color: var(--sd-text-muted);
+        text-align: center;
+        padding: 18px;
+      }
+      .wl-note {
+        font-size: 11px;
+        color: var(--sd-text-muted);
+        margin-top: 8px;
+      }
+
+      /* Bot Activity */
+      .act-list {
+        list-style: none;
+        max-height: 340px;
+        overflow-y: auto;
+        font-size: 12px;
+      }
+      .act-list li {
+        display: grid;
+        grid-template-columns:
+          92px 44px minmax(90px, max-content)
+          1fr max-content;
+        gap: 10px;
+        align-items: baseline;
+        padding: 6px 4px;
+        border-bottom: 1px solid
+          color-mix(in srgb, var(--sd-surface-border) 60%, transparent);
+      }
+      .act-list li.empty-row {
+        display: block;
+      }
+      td .badge,
+      .act-time {
+        white-space: nowrap;
+      }
+      .act-time,
+      .act-chat {
+        font-family: var(--mono);
+        color: var(--sd-text-muted);
+      }
+      .act-dir {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--sd-primary);
+      }
+      .act-dir[data-dir="in"] {
+        color: var(--sd-purple);
+      }
+      .act-summary {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .act-outcome {
+        font-family: var(--mono);
+        font-size: 11px;
+        text-transform: uppercase;
+      }
+      .act-outcome[data-outcome="sent"],
+      .act-outcome[data-outcome="received"] {
+        color: var(--sd-accent);
+      }
+      .act-outcome[data-outcome="simulated"] {
+        color: var(--sd-warning);
+      }
+      .act-outcome[data-outcome="failed"],
+      .act-outcome[data-outcome="unauthorized"] {
         color: var(--sd-danger);
       }
     </style>
@@ -783,13 +912,6 @@
         </div>
         <div>
           <div class="tg-action">
-            <label for="tg-customer">Test alert</label>
-            <select id="tg-customer"></select>
-            <button class="btn" type="button" data-action="alert">
-              Send alert
-            </button>
-          </div>
-          <div class="tg-action">
             <label for="tg-report">Report</label>
             <select id="tg-report"></select>
             <button class="btn" type="button" data-action="report">
@@ -817,128 +939,149 @@
       </div>
     </section>
 
-    <!-- Priority Monitored Accounts Surveillance -->
-    <div class="section-card">
+    <!-- Telegram Bot Activity (sent and received, across the bot daemon and this server) -->
+    <section class="section-card" id="bot-activity" aria-labelledby="act-title">
       <div class="section-title">
-        <span>High-Exposure Accounts &amp; Forensic Watch List</span>
-        <span class="badge badge-warning">SURVEILLANCE ACTIVE</span>
+        <span id="act-title">Bot Activity</span>
+        <span class="badge badge-primary" id="act-count">LOCKED</span>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Bettor ID</th>
-            <th>Owning Agent</th>
-            <th>Archetype</th>
-            <th>Neuron Channel</th>
-            <th>Handle ($)</th>
-            <th>Recent P&amp;L ($)</th>
-            <th>Lifetime P&amp;L ($)</th>
-            <th>Action Playbook</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="mono-cell">RF2003</td>
-            <td class="mono-cell">FAKEMONEY</td>
-            <td>Whale Volatility Concentration</td>
-            <td><span class="badge badge-whale">L23.N0412 Whale</span></td>
-            <td class="mono-cell">$940,000.00</td>
-            <td class="mono-cell" style="color: var(--sd-tier-whale)">
-              +$25,000.00
-            </td>
-            <td class="mono-cell" style="color: var(--sd-danger)">
-              -$1,006,530.00
-            </td>
-            <td>
-              <button
-                class="btn btn-warning"
-                onclick="alert('Cap $5,000 sent')"
-              >
-                Cap $5,000
-              </button>
-            </td>
-          </tr>
-          <tr>
-            <td class="mono-cell">BGD101</td>
-            <td class="mono-cell">BIGDAD</td>
-            <td>Execution Sniper (100% Win Rate)</td>
-            <td><span class="badge badge-alert">L21.N0884 Alert</span></td>
-            <td class="mono-cell">$40,000.00</td>
-            <td class="mono-cell" style="color: var(--sd-danger)">
-              +$40,000.00
-            </td>
-            <td class="mono-cell" style="color: var(--sd-danger)">
-              -$177,400.00
-            </td>
-            <td>
-              <button
-                class="btn btn-danger"
-                onclick="alert('Slash to $1k sent')"
-              >
-                Slash to $1k
-              </button>
-            </td>
-          </tr>
-          <tr>
-            <td class="mono-cell">GP300</td>
-            <td class="mono-cell">GPRO50RSK</td>
-            <td>High-Frequency Steam / Line Chaser</td>
-            <td><span class="badge badge-steam">L22.N1402 Steam</span></td>
-            <td class="mono-cell">$46,140.00</td>
-            <td class="mono-cell" style="color: var(--sd-tier-steam)">
-              +$33,858.00
-            </td>
-            <td class="mono-cell" style="color: var(--sd-danger)">
-              -$1,519.00
-            </td>
-            <td>
-              <button
-                class="btn"
-                style="
-                  background: var(--sd-tier-steam);
-                  color: var(--sd-text-on-fill);
-                "
-                onclick="alert('6s Delay Active')"
-              >
-                Apply 6s Delay
-              </button>
-            </td>
-          </tr>
-          <tr>
-            <td class="mono-cell">ABC700</td>
-            <td class="mono-cell">JUICEPLUS</td>
-            <td>Chronic Lifetime Extractor Sharp</td>
-            <td><span class="badge badge-purple">L26.N3104 Sharp</span></td>
-            <td class="mono-cell">$42,000.00</td>
-            <td class="mono-cell">-$4,000.00</td>
-            <td class="mono-cell" style="color: var(--sd-accent)">
-              +$200,050.00
-            </td>
-            <td>
-              <button
-                class="btn"
-                style="background: var(--sd-purple)"
-                onclick="alert('+20c Vig Enforced')"
-              >
-                +20c Vig Model
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <ol class="act-list" id="act-list" aria-live="polite">
+        <li class="empty-row">
+          Connect with the admin token to load activity.
+        </li>
+      </ol>
+    </section>
+
+    <!-- Priority Monitored Accounts Surveillance -->
+    <section class="section-card" id="watchlist" aria-labelledby="wl-title">
+      <div class="section-title">
+        <span id="wl-title"
+          >High-Exposure Accounts &amp; Forensic Watch List</span
+        >
+        <span class="badge badge-warning" id="wl-count">LOCKED</span>
+      </div>
+      <div class="wl-toolbar">
+        <input
+          type="search"
+          id="wl-search"
+          placeholder="Search bettor, agent or archetype"
+          aria-label="Search the watch list"
+        />
+        <select id="wl-tier" aria-label="Filter by risk tier">
+          <option value="">All tiers</option>
+        </select>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead id="wl-head">
+            <tr>
+              <th aria-sort="none">
+                <button type="button" class="th-sort" data-sort="customerId">
+                  Bettor ID
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button type="button" class="th-sort" data-sort="agentId">
+                  Owning Agent
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button type="button" class="th-sort" data-sort="archetype">
+                  Archetype
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button type="button" class="th-sort" data-sort="riskTier">
+                  Neuron Channel
+                </button>
+              </th>
+              <th class="num" aria-sort="none">
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="sportsHandleUSD"
+                >
+                  Handle
+                </button>
+              </th>
+              <th class="num" aria-sort="none">
+                <button type="button" class="th-sort" data-sort="ticketsCount">
+                  Tickets
+                </button>
+              </th>
+              <th class="num" aria-sort="none">
+                <button type="button" class="th-sort" data-sort="recentNetUSD">
+                  Recent P&amp;L
+                </button>
+              </th>
+              <th class="num" aria-sort="none">
+                <button
+                  type="button"
+                  class="th-sort"
+                  data-sort="lifetimeNetUSD"
+                >
+                  Lifetime P&amp;L
+                </button>
+              </th>
+              <th>Action Playbook</th>
+            </tr>
+          </thead>
+          <tbody id="wl-body">
+            <tr>
+              <td class="empty-row" colspan="9">
+                Connect with the admin token to load the watch list.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="wl-note">
+        P&amp;L is the bettor's net: red means the bettor is up and the book is
+        losing. "Alert to Telegram" sends the account's alert to the default
+        chat; apply limits in Fantasy402.
+      </p>
+    </section>
 
     <script type="module">
       const TOKEN_KEY = "sportsdesk-admin-token";
+      const ACTIVITY_POLL_MS = 15_000;
+      const TIERS = {
+        CRITICAL_WHALE: ["whale", "L23.N0412 Whale"],
+        EXECUTION_SNIPER: ["alert", "L21.N0884 Alert"],
+        STEAM_CHASER: ["steam", "L22.N1402 Steam"],
+        CHRONIC_SHARP: ["purple", "L26.N3104 Sharp"],
+        HIT_AND_RUN_DORMANT: ["retail", "L18.N0204 Dormant"],
+      };
       const panel = document.getElementById("telegram-control");
       const tokenInput = document.getElementById("tg-admin-token");
       const badge = document.getElementById("tg-mode-badge");
       const log = document.getElementById("tg-log");
-      const customerSelect = document.getElementById("tg-customer");
       const reportSelect = document.getElementById("tg-report");
+      const actList = document.getElementById("act-list");
+      const actCount = document.getElementById("act-count");
+      const wlHead = document.getElementById("wl-head");
+      const wlBody = document.getElementById("wl-body");
+      const wlCount = document.getElementById("wl-count");
+      const wlSearch = document.getElementById("wl-search");
+      const wlTier = document.getElementById("wl-tier");
       const field = (name) => panel.querySelector(`[data-field="${name}"]`);
+      const money = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      });
+
+      let connected = false;
+      let accounts = [];
+      let sort = { key: "sportsHandleUSD", dir: -1 };
 
       tokenInput.value = sessionStorage.getItem(TOKEN_KEY) ?? "";
+
+      function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
 
       function say(text, tone = "") {
         log.textContent = text;
@@ -946,9 +1089,9 @@
       }
 
       function setField(name, text, tone = "") {
-        const el = field(name);
-        el.textContent = text;
-        el.dataset.tone = tone;
+        const node = field(name);
+        node.textContent = text;
+        node.dataset.tone = tone;
       }
 
       function setBadge(text, kind) {
@@ -956,13 +1099,13 @@
         badge.className = `badge badge-${kind}`;
       }
 
-      function fillSelect(select, values, label = (v) => v) {
+      function fillSelect(select, values, label = (v) => v, keep = []) {
         const current = select.value;
         select.replaceChildren(
+          ...keep,
           ...values.map((v) => {
-            const option = document.createElement("option");
+            const option = el("option", "", label(v));
             option.value = v;
-            option.textContent = label(v);
             return option;
           }),
         );
@@ -985,104 +1128,260 @@
         return body;
       }
 
+      function lockedRow(message) {
+        const td = el("td", "empty-row", message);
+        td.colSpan = 9;
+        const tr = el("tr");
+        tr.append(td);
+        return tr;
+      }
+
+      function showLocked(message) {
+        connected = false;
+        accounts = [];
+        wlCount.textContent = "LOCKED";
+        actCount.textContent = "LOCKED";
+        wlBody.replaceChildren(lockedRow(message));
+        actList.replaceChildren(el("li", "empty-row", message));
+      }
+
+      const signed = (n) => (n > 0 ? "+" : "") + money.format(n);
+      const pnlClass = (n) => (n > 0 ? "pnl-bad" : n < 0 ? "pnl-good" : "");
+
+      function accountRow(a) {
+        const [kind, label] = TIERS[a.riskTier] ?? ["primary", a.riskTier];
+        const tier = el("td");
+        tier.append(el("span", `badge badge-${kind}`, label));
+        const alertButton = el("button", "btn", "Alert to Telegram");
+        alertButton.type = "button";
+        alertButton.dataset.action = "alert";
+        alertButton.dataset.customer = a.customerId;
+        alertButton.setAttribute(
+          "aria-label",
+          `Send the ${a.customerId} alert to Telegram`,
+        );
+        const playbook = el("div", "playbook");
+        playbook.append(el("span", "", a.recommendedAction), alertButton);
+        const action = el("td");
+        action.append(playbook);
+        const tr = el("tr");
+        tr.append(
+          el("td", "mono-cell", a.customerId),
+          el("td", "mono-cell", a.agentId),
+          el("td", "", a.archetype),
+          tier,
+          el("td", "mono-cell num", money.format(a.sportsHandleUSD)),
+          el("td", "mono-cell num", String(a.ticketsCount)),
+          el(
+            "td",
+            `mono-cell num ${pnlClass(a.recentNetUSD)}`,
+            signed(a.recentNetUSD),
+          ),
+          el(
+            "td",
+            `mono-cell num ${pnlClass(a.lifetimeNetUSD)}`,
+            signed(a.lifetimeNetUSD),
+          ),
+          action,
+        );
+        return tr;
+      }
+
+      function renderWatchlist() {
+        if (!connected) return;
+        const query = wlSearch.value.trim().toLowerCase();
+        const tier = wlTier.value;
+        const rows = accounts
+          .filter(
+            (a) =>
+              (!tier || a.riskTier === tier) &&
+              (!query ||
+                [a.customerId, a.agentId, a.archetype].some((v) =>
+                  v.toLowerCase().includes(query),
+                )),
+          )
+          .sort((a, b) => {
+            const x = a[sort.key];
+            const y = b[sort.key];
+            const order =
+              typeof x === "number"
+                ? x - y
+                : String(x).localeCompare(String(y));
+            return order * sort.dir;
+          });
+        for (const th of wlHead.querySelectorAll("th[aria-sort]")) {
+          const key = th.querySelector("[data-sort]").dataset.sort;
+          th.setAttribute(
+            "aria-sort",
+            key !== sort.key
+              ? "none"
+              : sort.dir === 1
+                ? "ascending"
+                : "descending",
+          );
+        }
+        wlCount.textContent = `${rows.length} / ${accounts.length} ACCOUNTS`;
+        wlBody.replaceChildren(
+          ...(rows.length
+            ? rows.map(accountRow)
+            : [lockedRow("No accounts match the filter.")]),
+        );
+      }
+
+      function activityItem(entry) {
+        const at = new Date(entry.at);
+        const time = el(
+          "time",
+          "act-time",
+          at.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
+        );
+        time.dateTime = entry.at;
+        time.title = at.toLocaleString();
+        const dir = el(
+          "span",
+          "act-dir",
+          entry.direction === "in" ? "↓ IN" : "↑ OUT",
+        );
+        dir.dataset.dir = entry.direction;
+        const summary = el("span", "act-summary", entry.summary);
+        summary.title = entry.summary;
+        const outcome = el("span", "act-outcome", entry.outcome);
+        outcome.dataset.outcome = entry.outcome;
+        if (entry.detail) outcome.title = entry.detail;
+        const li = el("li");
+        li.append(
+          time,
+          dir,
+          el("code", "act-chat", entry.chatId),
+          summary,
+          outcome,
+        );
+        return li;
+      }
+
+      async function loadActivity() {
+        const { entries } = await api("/api/telegram/activity?limit=50");
+        actCount.textContent = `${entries.length} RECENT`;
+        actList.replaceChildren(
+          ...(entries.length
+            ? entries.map(activityItem)
+            : [
+                el(
+                  "li",
+                  "empty-row",
+                  "No messages yet. Send /help to the bot or use the actions above.",
+                ),
+              ]),
+        );
+      }
+
+      function renderStatus({ status, schedules, reportTypes }) {
+        setBadge(
+          status.error ? "BOT ERROR" : status.mode.toUpperCase(),
+          status.error
+            ? "alert"
+            : status.mode === "live"
+              ? "accent"
+              : "warning",
+        );
+        setField(
+          "bot",
+          status.bot
+            ? `@${status.bot.username}`
+            : status.tokenConfigured
+              ? "token rejected"
+              : "no token",
+          status.bot ? "good" : "bad",
+        );
+        setField(
+          "mode",
+          status.modeReason,
+          status.mode === "live" ? "good" : "warn",
+        );
+        setField(
+          "chat",
+          status.defaultChatConfigured
+            ? `configured (${status.authorizedChatCount} authorized)`
+            : "missing: send /chatid to the bot",
+          status.defaultChatConfigured ? "good" : "warn",
+        );
+        setField(
+          "inbound",
+          status.inbound === "none"
+            ? "nothing receiving commands: run `bun run bot` or register the webhook"
+            : status.inbound,
+          status.inbound === "none" ? "warn" : "good",
+        );
+        const hook = status.webhook;
+        setField(
+          "webhook",
+          hook?.url ||
+            (hook?.configuredUrl
+              ? `not registered (${hook.configuredUrl})`
+              : "not configured"),
+          hook?.url ? "good" : "",
+        );
+        setField("pending", String(hook?.pendingUpdates ?? "-"));
+        setField(
+          "error",
+          status.error ??
+            hook?.lastError ??
+            (hook && !hook.secretConfigured
+              ? "TELEGRAM_WEBHOOK_SECRET not set"
+              : "none"),
+          status.error || hook?.lastError ? "bad" : "",
+        );
+        setField(
+          "schedules",
+          schedules
+            .filter((s) => s.enabled)
+            .map(
+              (s) =>
+                `${s.scheduleTime} ${s.name}${s.lastTriggeredAt ? " (last " + s.lastTriggeredAt + ")" : ""}`,
+            )
+            .join("; ") || "none",
+        );
+        fillSelect(reportSelect, reportTypes);
+      }
+
       async function refresh() {
         if (!tokenInput.value) {
           setBadge("NOT CONNECTED", "warning");
           say("Enter the admin token to load bot status.");
+          showLocked("Connect with the admin token to load this.");
           return;
         }
         try {
-          const [{ status, schedules, reportTypes }, watchlist] =
-            await Promise.all([
-              api("/api/telegram/status"),
-              api("/api/watchlist"),
-            ]);
-          setBadge(
-            status.error ? "BOT ERROR" : status.mode.toUpperCase(),
-            status.error
-              ? "alert"
-              : status.mode === "live"
-                ? "accent"
-                : "warning",
-          );
-          setField(
-            "bot",
-            status.bot
-              ? `@${status.bot.username}`
-              : status.tokenConfigured
-                ? "token rejected"
-                : "no token",
-            status.bot ? "good" : "bad",
-          );
-          setField(
-            "mode",
-            status.modeReason,
-            status.mode === "live" ? "good" : "warn",
-          );
-          setField(
-            "chat",
-            status.defaultChatConfigured
-              ? `configured (${status.authorizedChatCount} authorized)`
-              : "missing: send /chatid to the bot",
-            status.defaultChatConfigured ? "good" : "warn",
-          );
-          setField(
-            "inbound",
-            status.inbound === "none"
-              ? "nothing receiving commands: run `bun run bot` or register the webhook"
-              : status.inbound,
-            status.inbound === "none" ? "warn" : "good",
-          );
-          const hook = status.webhook;
-          setField(
-            "webhook",
-            hook?.url ||
-              (hook?.configuredUrl
-                ? `not registered (${hook.configuredUrl})`
-                : "not configured"),
-            hook?.url ? "good" : "",
-          );
-          setField("pending", String(hook?.pendingUpdates ?? "-"));
-          setField(
-            "error",
-            status.error ??
-              hook?.lastError ??
-              (hook && !hook.secretConfigured
-                ? "TELEGRAM_WEBHOOK_SECRET not set"
-                : "none"),
-            status.error || hook?.lastError ? "bad" : "",
-          );
-          setField(
-            "schedules",
-            schedules
-              .filter((s) => s.enabled)
-              .map(
-                (s) =>
-                  `${s.scheduleTime} ${s.name}${s.lastTriggeredAt ? " (last " + s.lastTriggeredAt + ")" : ""}`,
-              )
-              .join("; ") || "none",
-          );
-          fillSelect(
-            customerSelect,
-            watchlist.data.map((a) => a.customerId),
-            (id) => {
-              const a = watchlist.data.find((x) => x.customerId === id);
-              return `${id} (${a.riskTier})`;
-            },
-          );
-          fillSelect(reportSelect, reportTypes);
+          const [status, watchlist] = await Promise.all([
+            api("/api/telegram/status"),
+            api("/api/watchlist"),
+          ]);
+          renderStatus(status);
+          connected = true;
+          accounts = watchlist.data;
+          const tiers = [...new Set(accounts.map((a) => a.riskTier))];
+          const allTiers = el("option", "", "All tiers");
+          allTiers.value = "";
+          fillSelect(wlTier, tiers, (t) => TIERS[t]?.[1] ?? t, [allTiers]);
+          renderWatchlist();
+          await loadActivity();
           say(`Status loaded ${new Date().toLocaleTimeString()}`, "good");
         } catch (err) {
           setBadge("NOT CONNECTED", "alert");
           say(err.message, "bad");
+          showLocked(`Not connected: ${err.message}`);
         }
       }
 
       const actions = {
-        alert: () =>
+        alert: (button) =>
           api("/api/telegram/alert", {
             method: "POST",
-            body: JSON.stringify({ customerId: customerSelect.value }),
+            body: JSON.stringify({ customerId: button.dataset.customer }),
           }).then(
             (r) =>
               `Alert for ${r.customerId}: ${r.ok ? "sent" : "Telegram refused it"}`,
@@ -1090,9 +1389,7 @@
         report: () =>
           api(
             `/api/telegram/report?type=${encodeURIComponent(reportSelect.value)}`,
-            {
-              method: "POST",
-            },
+            { method: "POST" },
           ).then(
             (r) => `${r.reportType}: ${r.ok ? "sent" : "Telegram refused it"}`,
           ),
@@ -1106,31 +1403,44 @@
             method: "POST",
             body: JSON.stringify({ action: "delete" }),
           }).then(() => "Webhook removed; run `bun run bot` to poll instead"),
-        refresh: () => refresh().then(() => log.textContent),
       };
 
-      panel.addEventListener("click", async (event) => {
+      document.addEventListener("click", async (event) => {
         const button = event.target.closest("button[data-action]");
         if (!button) return;
-        const run = actions[button.dataset.action];
+        const name = button.dataset.action;
+        if (name === "refresh") {
+          refresh();
+          return;
+        }
         if (
-          button.dataset.action === "webhook-delete" &&
+          name === "webhook-delete" &&
           !confirm("Remove the Telegram webhook?")
         )
           return;
         button.disabled = true;
         try {
-          const message = await run();
-          if (button.dataset.action !== "refresh") {
-            await refresh();
-            say(message, "good");
-          }
+          const message = await actions[name](button);
+          await refresh();
+          say(message, "good");
         } catch (err) {
           say(err.message, "bad");
         } finally {
           button.disabled = false;
         }
       });
+
+      wlHead.addEventListener("click", (event) => {
+        const key = event.target.closest("[data-sort]")?.dataset.sort;
+        if (!key) return;
+        sort =
+          key === sort.key
+            ? { key, dir: -sort.dir }
+            : { key, dir: typeof accounts[0]?.[key] === "number" ? -1 : 1 };
+        renderWatchlist();
+      });
+      wlSearch.addEventListener("input", renderWatchlist);
+      wlTier.addEventListener("change", renderWatchlist);
 
       document
         .getElementById("tg-token-form")
@@ -1139,6 +1449,12 @@
           sessionStorage.setItem(TOKEN_KEY, tokenInput.value);
           refresh();
         });
+
+      setInterval(() => {
+        if (connected && !document.hidden) {
+          loadActivity().catch((err) => say(err.message, "bad"));
+        }
+      }, ACTIVITY_POLL_MS);
 
       refresh();
     </script>

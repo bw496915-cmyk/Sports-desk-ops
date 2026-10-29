@@ -15,6 +15,8 @@
  */
 
 import crypto from "node:crypto";
+import { appendFile, mkdir } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
 export interface WatchListAccount {
   readonly customerId: string;
@@ -78,9 +80,9 @@ export const REPORT_TYPES = [
   "EVENING_SETTLEMENT",
 ] as const satisfies readonly ScheduledReportTask["reportType"][];
 
-export type ReportGenerator = (
-  type: ScheduledReportTask["reportType"],
-) => { readonly contentHtml: string };
+export type ReportGenerator = (type: ScheduledReportTask["reportType"]) => {
+  readonly contentHtml: string;
+};
 
 interface TelegramApiResult<T> {
   readonly ok: boolean;
@@ -127,6 +129,33 @@ export interface TelegramBotStatus {
   readonly error: string | null;
 }
 
+export interface TelegramActivityEntry {
+  readonly at: string;
+  readonly direction: "in" | "out";
+  readonly chatId: string;
+  readonly summary: string;
+  readonly outcome:
+    "sent" | "simulated" | "failed" | "received" | "unauthorized";
+  readonly detail?: string;
+}
+
+const ACTIVITY_MAX_BYTES = 512 * 1024;
+const ACTIVITY_KEEP_LINES = 1_000;
+
+function plainPreview(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/━+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+}
+
 export class SportsDeskTelegramService {
   private readonly botToken: string;
   private readonly defaultChatId: string;
@@ -141,13 +170,26 @@ export class SportsDeskTelegramService {
   private readonly fetchSession: Bun.FetchSession;
   private reportGenerator: ReportGenerator | null = null;
   private pollingAbort: AbortController | null = null;
+  private readonly activityLogPath: string | null;
 
+  /**
+   * `activityLogPath` is shared by the polling daemon and the web server (separate processes),
+   * so the dashboard feed shows both; `null` disables it (the default under `bun test`).
+   */
   constructor(options?: {
     botToken?: string;
     chatId?: string;
     miniappUrl?: string;
     apiBaseUrl?: string;
+    activityLogPath?: string | null;
   }) {
+    this.activityLogPath =
+      options?.activityLogPath !== undefined
+        ? options.activityLogPath
+        : process.env.TELEGRAM_ACTIVITY_LOG ||
+          (process.env.NODE_ENV === "test"
+            ? null
+            : resolve(import.meta.dir, "reports/telegram-activity.jsonl"));
     this.apiBaseUrl = options?.apiBaseUrl ?? "https://api.telegram.org";
     this.botToken = options?.botToken ?? process.env.TELEGRAM_BOT_TOKEN ?? "";
     this.defaultChatId = options?.chatId ?? process.env.TELEGRAM_CHAT_ID ?? "";
@@ -162,7 +204,10 @@ export class SportsDeskTelegramService {
       this.defaultChatId.trim().length > 0,
     );
     this.authorizedChatIds = new Set(
-      [this.defaultChatId, ...(process.env.TELEGRAM_ADMIN_CHAT_IDS ?? "").split(",")]
+      [
+        this.defaultChatId,
+        ...(process.env.TELEGRAM_ADMIN_CHAT_IDS ?? "").split(","),
+      ]
         .map((id) => id.trim())
         .filter((id) => id.length > 0),
     );
@@ -467,6 +512,15 @@ export class SportsDeskTelegramService {
         "================================================================================",
       );
       console.log(htmlText.replace(/<[^>]*>/g, ""));
+      await this.record({
+        direction: "out",
+        chatId: targetChat,
+        summary: plainPreview(htmlText),
+        outcome: "simulated",
+        detail: this.botToken.trim()
+          ? "TELEGRAM_CHAT_ID is not set"
+          : "TELEGRAM_BOT_TOKEN is not set",
+      });
       return { ok: true, message_id: Math.floor(Math.random() * 100000) };
     }
 
@@ -484,11 +538,61 @@ export class SportsDeskTelegramService {
     if (!res.ok) {
       console.error("[Telegram API Error] sendMessage:", res.description);
     }
+    await this.record({
+      direction: "out",
+      chatId: targetChat,
+      summary: plainPreview(htmlText),
+      outcome: res.ok ? "sent" : "failed",
+      ...(res.ok ? {} : { detail: res.description ?? "sendMessage failed" }),
+    });
     return {
       ok: res.ok,
       message_id: res.result?.message_id,
       description: res.description,
     };
+  }
+
+  /** Newest first. */
+  public async getActivity(limit = 50): Promise<TelegramActivityEntry[]> {
+    if (!this.activityLogPath) return [];
+    const file = Bun.file(this.activityLogPath);
+    if (!(await file.exists())) return [];
+    return (await file.text())
+      .trimEnd()
+      .split("\n")
+      .slice(-limit)
+      .reverse()
+      .flatMap((line): TelegramActivityEntry[] => {
+        try {
+          return [JSON.parse(line) as TelegramActivityEntry];
+        } catch {
+          return [];
+        }
+      });
+  }
+
+  /** Best effort: a log failure must never block a send or a command. */
+  private async record(
+    entry: Omit<TelegramActivityEntry, "at">,
+  ): Promise<void> {
+    const path = this.activityLogPath;
+    if (!path) return;
+    try {
+      await mkdir(dirname(path), { recursive: true });
+      await appendFile(
+        path,
+        `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`,
+      );
+      if (Bun.file(path).size > ACTIVITY_MAX_BYTES) {
+        const lines = (await Bun.file(path).text()).trimEnd().split("\n");
+        await Bun.write(
+          path,
+          `${lines.slice(-ACTIVITY_KEEP_LINES).join("\n")}\n`,
+        );
+      }
+    } catch (err) {
+      console.error("[Telegram] activity log write failed:", err);
+    }
   }
 
   /** POST a Bot API method; never throws, transport failures come back as `ok: false`. */
@@ -553,7 +657,13 @@ export class SportsDeskTelegramService {
       authorizedChatCount: this.authorizedChatIds.size,
     } as const;
     if (!tokenConfigured) {
-      return { ...base, bot: null, inbound: "none", webhook: null, error: null };
+      return {
+        ...base,
+        bot: null,
+        inbound: "none",
+        webhook: null,
+        error: null,
+      };
     }
 
     const [me, hook] = await Promise.all([
@@ -568,11 +678,7 @@ export class SportsDeskTelegramService {
     return {
       ...base,
       bot: me.result ? { username: me.result.username } : null,
-      inbound: webhookUrl
-        ? "webhook"
-        : this.pollingAbort
-          ? "polling"
-          : "none",
+      inbound: webhookUrl ? "webhook" : this.pollingAbort ? "polling" : "none",
       webhook: hook.ok
         ? {
             url: webhookUrl,
@@ -654,6 +760,15 @@ export class SportsDeskTelegramService {
     const chatId = String(message.chat.id);
     const [rawCommand = "", ...args] = message.text.trim().split(/\s+/);
     const command = rawCommand.split("@")[0]!.toLowerCase();
+    await this.record({
+      direction: "in",
+      chatId,
+      summary: message.text.trim().slice(0, 160),
+      outcome:
+        command === "/chatid" || this.isAuthorizedChat(chatId)
+          ? "received"
+          : "unauthorized",
+    });
 
     if (command === "/chatid") {
       await this.sendMessage(
@@ -763,7 +878,14 @@ export class SportsDeskTelegramService {
     query: NonNullable<TelegramUpdate["callback_query"]>,
   ): Promise<void> {
     const chatId = query.message?.chat.id;
-    if (chatId === undefined || !this.isAuthorizedChat(chatId)) {
+    const authorized = chatId !== undefined && this.isAuthorizedChat(chatId);
+    await this.record({
+      direction: "in",
+      chatId: String(chatId ?? query.from.id),
+      summary: `button ${query.data ?? ""} from ${query.from.username ?? query.from.id}`,
+      outcome: authorized ? "received" : "unauthorized",
+    });
+    if (!authorized) {
       await this.api("answerCallbackQuery", {
         callback_query_id: query.id,
         text: "Not authorized",
@@ -891,7 +1013,6 @@ ${action}
 
     return this.dispatchWatchListAlert(testPayload, targetChatId);
   }
-
 }
 
 export function isReportType(

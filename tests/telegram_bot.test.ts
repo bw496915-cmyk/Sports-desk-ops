@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import {
   SportsDeskTelegramService,
   type TelegramUpdate,
@@ -136,6 +138,45 @@ describe("Telegram callback buttons", () => {
   });
 });
 
+describe("Telegram activity log", () => {
+  test("test_assert_sends_and_commands_are_logged_newest_first", async () => {
+    const path = `${tmpdir()}/sd-activity-${crypto.randomUUID()}.jsonl`;
+    const bot = new SportsDeskTelegramService({
+      botToken: "test-token",
+      chatId: AUTHORIZED,
+      apiBaseUrl: `http://127.0.0.1:${stub.port}`,
+      activityLogPath: path,
+    });
+    await bot.handleUpdate(message(999, "/watchlist"));
+    await bot.handleUpdate(message(Number(AUTHORIZED), "/check RF2003"));
+    const entries = await bot.getActivity();
+    expect(entries.map((e) => [e.direction, e.chatId, e.outcome])).toEqual([
+      ["out", AUTHORIZED, "sent"],
+      ["in", AUTHORIZED, "received"],
+      ["out", "999", "sent"],
+      ["in", "999", "unauthorized"],
+    ]);
+    expect(entries[0]!.summary).toStartWith("RF2003 (Whale Volatility Concentration)");
+    expect(entries[0]!.summary).not.toContain("<");
+    expect(await bot.getActivity(1)).toHaveLength(1);
+    await rm(path, { force: true });
+  });
+
+  test("test_assert_simulated_send_is_logged_with_reason", async () => {
+    const path = `${tmpdir()}/sd-activity-${crypto.randomUUID()}.jsonl`;
+    const bot = new SportsDeskTelegramService({ botToken: "", activityLogPath: path });
+    await bot.sendMessage("", "<b>hello</b> &amp; bye");
+    const [entry] = await bot.getActivity();
+    expect(entry).toMatchObject({
+      direction: "out",
+      outcome: "simulated",
+      summary: "hello & bye",
+      detail: "TELEGRAM_BOT_TOKEN is not set",
+    });
+    await rm(path, { force: true });
+  });
+});
+
 describe("Webview server Telegram endpoints", () => {
   let server: ReturnType<typeof import("../sportsdesk_webview_server.ts").startServer>;
   let base: string;
@@ -209,6 +250,16 @@ describe("Webview server Telegram endpoints", () => {
       body: JSON.stringify({ update_id: 1 }),
     });
     expect(ok.status).toBe(200);
+  });
+
+  test("test_assert_activity_endpoint_is_admin_guarded", async () => {
+    env.SPORTSDESK_ADMIN_TOKEN = "admin-secret";
+    expect((await fetch(`${base}/api/telegram/activity`)).status).toBe(401);
+    const res = await fetch(`${base}/api/telegram/activity?limit=5`, {
+      headers: { Authorization: "Bearer admin-secret" },
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { entries: unknown[] }).entries).toBeArray();
   });
 
   test("test_assert_miniapp_trailing_slash_is_served", async () => {

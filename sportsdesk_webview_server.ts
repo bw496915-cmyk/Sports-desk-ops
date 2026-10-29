@@ -184,6 +184,14 @@ export function startServer(options?: ServerOptions) {
         );
       }
 
+      if (pathname === "/api/telegram/activity" && req.method === "GET") {
+        const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 50, 1), 200);
+        return Response.json(
+          { success: true, entries: await telegramService.getActivity(limit) },
+          { headers: corsHeaders },
+        );
+      }
+
       if (pathname === "/api/telegram/webhook" && req.method === "POST") {
         const body = (await req.json().catch(() => ({}))) as { action?: string };
         if (body.action !== "set" && body.action !== "delete") {
