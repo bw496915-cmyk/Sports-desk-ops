@@ -1,0 +1,48 @@
+{
+  "fixtureVersion": 1,
+  "operation": {
+    "path": "/cloud/api/Manager/getWebLog",
+    "method": "POST",
+    "operationId": "postCloudApiManagerGetWebLog"
+  },
+  "capturedAt": "2026-10-30T12:00:00.000Z",
+  "request": {
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "headers": {
+      "accept": "application/json",
+      "x-requested-with": "XMLHttpRequest",
+      "authorization": "Bearer fixture-not-a-real-token",
+      "cookie": "session=fixture-cookie-not-real"
+    },
+    "form": {
+      "agentID": "DEMO-AGENT",
+      "customerID": "0",
+      "start": "10/28/2026",
+      "end": "10/28/2026",
+      "type": "B",
+      "actions": "ALL",
+      "ip": "",
+      "operation": "getWebLog",
+      "RRO": "1",
+      "agentOwner": "DEMO-AGENT"
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json; charset=utf-8",
+    "body": [
+      {
+        "customerID": "4821",
+        "ipAddress": "203.0.113.9",
+        "timestamp": "2026-10-28T12:04:11Z",
+        "agentOwner": "DEMO-AGENT"
+      },
+      {
+        "customerID": "7730",
+        "ipAddress": "198.51.100.7",
+        "timestamp": "2026-10-28T12:05:02Z",
+        "agentOwner": "DEMO-AGENT"
+      }
+    ]
+  }
+}

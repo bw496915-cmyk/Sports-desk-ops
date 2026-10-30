@@ -1,0 +1,24 @@
+{
+  "fixtureVersion": 1,
+  "operation": {
+    "path": "/cloud/api/Manager/getCustomerNotes",
+    "method": "POST",
+    "operationId": "postCloudApiManagerGetCustomerNotes"
+  },
+  "capturedAt": "2026-10-30T12:07:00.000Z",
+  "request": {
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "headers": {
+      "accept": "application/json",
+      "x-requested-with": "XMLHttpRequest"
+    },
+    "form": {
+      "agentID": "DEMO-AGENT",
+      "operation": "getCustomerNotes",
+      "customerID": "4821",
+      "RRO": "1",
+      "agentOwner": "DEMO-AGENT"
+    }
+  },
+  "response": null
+}

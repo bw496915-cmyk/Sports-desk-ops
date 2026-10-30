@@ -1,0 +1,51 @@
+{
+  "fixtureVersion": 1,
+  "operation": {
+    "path": "/cloud/api/Manager/getPending",
+    "method": "POST",
+    "operationId": "postCloudApiManagerGetPending"
+  },
+  "capturedAt": "2026-10-30T12:04:00.000Z",
+  "request": {
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "headers": {
+      "accept": "application/json",
+      "x-requested-with": "XMLHttpRequest"
+    },
+    "form": {
+      "agentID": "DEMO-AGENT",
+      "agentOwner": "DEMO-AGENT",
+      "customerID": "0",
+      "operation": "getPending",
+      "RRO": "1"
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json; charset=utf-8",
+    "body": [
+      {
+        "Login": "DEMO101",
+        "WagerNumber": 900001,
+        "LegNumber": 1,
+        "Risk": 11000,
+        "ToWin": 10000,
+        "WagerType": "G",
+        "ShortDesc": "NFL",
+        "TicketWriter": "WEB",
+        "InsertDateTime": "2026-10-28T12:06:00Z"
+      },
+      {
+        "Login": "L19.N0518",
+        "WagerNumber": 900003,
+        "LegNumber": 1,
+        "Risk": 0,
+        "ToWin": 0,
+        "WagerType": "G",
+        "ShortDesc": "DEMO",
+        "TicketWriter": "WEB",
+        "InsertDateTime": "2026-10-28T12:07:00Z"
+      }
+    ]
+  }
+}

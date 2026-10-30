@@ -1,0 +1,67 @@
+{
+  "fixtureVersion": 1,
+  "description": "Deterministic mock capture fixtures for the read-only allowlist. Synthetic values only; capture records persist skeletons + hashes, never these values. mock-flow records can never upgrade an evidence tier.",
+  "generatedAt": "2026-10-30T12:00:00.000Z",
+  "policyVersion": 1,
+  "fixtures": [
+    {
+      "op": "getWebLog",
+      "file": "getWebLog.mock.json",
+      "hasResponse": true,
+      "capturedAt": "2026-10-30T12:00:00.000Z"
+    },
+    {
+      "op": "getInfoPlayer",
+      "file": "getInfoPlayer.mock.json",
+      "hasResponse": true,
+      "capturedAt": "2026-10-30T12:01:00.000Z"
+    },
+    {
+      "op": "getBetTicker",
+      "file": "getBetTicker.mock.json",
+      "hasResponse": true,
+      "capturedAt": "2026-10-30T12:02:00.000Z"
+    },
+    {
+      "op": "getBetTickerConfig",
+      "file": "getBetTickerConfig.mock.json",
+      "hasResponse": true,
+      "capturedAt": "2026-10-30T12:03:00.000Z"
+    },
+    {
+      "op": "getPending",
+      "file": "getPending.mock.json",
+      "hasResponse": true,
+      "capturedAt": "2026-10-30T12:04:00.000Z"
+    },
+    {
+      "op": "getSportsVigSetup",
+      "file": "getSportsVigSetup.mock.json",
+      "hasResponse": true,
+      "capturedAt": "2026-10-30T12:05:00.000Z"
+    },
+    {
+      "op": "getInfoManager",
+      "file": "getInfoManager.mock.json",
+      "hasResponse": true,
+      "capturedAt": "2026-10-30T12:06:00.000Z"
+    },
+    {
+      "op": "getCustomerNotes",
+      "file": "getCustomerNotes.mock.json",
+      "hasResponse": false,
+      "capturedAt": "2026-10-30T12:07:00.000Z"
+    }
+  ],
+  "expectedCounts": {
+    "total": 8,
+    "withResponse": 7,
+    "withoutResponse": 1,
+    "mode": "mock"
+  },
+  "notes": [
+    "getCustomerNotes.mock.json intentionally has response=null: it exercises the missing-response path (record persists with response:null, never upgradeable).",
+    "getWebLog.mock.json mirrors the observed 2026-10-28 mode-B request field order; response rows are invented.",
+    "Authorization/Cookie headers are present only to prove redaction; values are fake."
+  ]
+}

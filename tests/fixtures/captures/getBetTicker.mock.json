@@ -1,0 +1,52 @@
+{
+  "fixtureVersion": 1,
+  "operation": {
+    "path": "/cloud/api/Manager/getBetTicker",
+    "method": "POST",
+    "operationId": "postCloudApiManagerGetBetTicker"
+  },
+  "capturedAt": "2026-10-30T12:02:00.000Z",
+  "request": {
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "headers": {
+      "accept": "application/json",
+      "x-requested-with": "XMLHttpRequest"
+    },
+    "form": {
+      "agentID": "DEMO-AGENT",
+      "agentOwner": "DEMO-AGENT",
+      "wagerNumber": "0",
+      "operation": "getBetTicker",
+      "RRO": "1"
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json; charset=utf-8",
+    "body": {
+      "INFO": true,
+      "LIST": [
+        {
+          "wagerNumber": 900001,
+          "Login": "DEMO101",
+          "TicketWriter": "WEB",
+          "Risk": 11000,
+          "ToWin": 10000,
+          "Description": "DEMO TEAM -110",
+          "InsertDateTime": "2026-10-28T12:06:00Z",
+          "ShortDesc": "NFL"
+        },
+        {
+          "wagerNumber": 900002,
+          "Login": "DEMO102",
+          "TicketWriter": "PHONE",
+          "Risk": 5500,
+          "ToWin": 5000,
+          "Description": "DEMO TEAM +105",
+          "InsertDateTime": "2026-10-28T12:06:30Z",
+          "ShortDesc": "NBA"
+        }
+      ]
+    }
+  }
+}

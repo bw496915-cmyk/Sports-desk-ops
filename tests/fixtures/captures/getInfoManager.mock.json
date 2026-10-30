@@ -1,0 +1,33 @@
+{
+  "fixtureVersion": 1,
+  "operation": {
+    "path": "/cloud/api/Manager/getInfoManager",
+    "method": "POST",
+    "operationId": "postCloudApiManagerGetInfoManager"
+  },
+  "capturedAt": "2026-10-30T12:06:00.000Z",
+  "request": {
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "headers": {
+      "accept": "application/json",
+      "x-requested-with": "XMLHttpRequest"
+    },
+    "form": {
+      "agentID": "DEMO-AGENT",
+      "operation": "getInfoManager",
+      "RRO": "1",
+      "agentOwner": "DEMO-AGENT"
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json; charset=utf-8",
+    "body": {
+      "agentID": "DEMO-AGENT",
+      "grand-total-weekly": 123456,
+      "agent-count": 12,
+      "active-players": 340,
+      "currency": "USD"
+    }
+  }
+}
