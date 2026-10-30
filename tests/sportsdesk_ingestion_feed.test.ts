@@ -7,7 +7,6 @@ import {
 import {
   ingestionFeedPullExitCode,
   pullIngestionFeedWithProvenance,
-  sha256HexOfBytes,
 } from "../sportsdesk_ingestion_feed_provenance.ts";
 
 describe("sportsdesk_ingestion_feed", () => {

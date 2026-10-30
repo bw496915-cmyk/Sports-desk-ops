@@ -3,7 +3,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { resolve } from "node:path";
 import {
   probeHistoricalJsonlBytes,
   type HistoricalLogReplayResult,
@@ -100,11 +100,14 @@ export async function pullIngestionFeedWithProvenance(
   const priorSha256Hex = await sha256HexOfFile(path);
   const headMeta = await fetchIngestionFeedHttpMeta(source, options?.timeoutMs);
 
-  const { bytes, contentType, status } = await pullRawIngestionFeed(source, {
-    ...(options?.timeoutMs !== undefined
+  const pullOpts =
+    options?.timeoutMs !== undefined
       ? { timeoutMs: options.timeoutMs }
-      : {}),
-  });
+      : undefined;
+  const { bytes, contentType, status } = await pullRawIngestionFeed(
+    source,
+    pullOpts,
+  );
   const sha256Hex = sha256HexOfBytes(bytes);
   const jsonl = await probeHistoricalJsonlBytes(bytes);
 

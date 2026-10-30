@@ -216,7 +216,6 @@ export function parseSportsdeskIngestionLogRow(
   if (typeof value !== "object" || value === null) return null;
   const row = value as Record<string, unknown>;
   const id = row.id;
-  const v_t = row.v_t;
   const xml = row.xml;
   const vf = row.v_t ?? row.valid_from ?? row.vf;
   if (typeof id !== "number" || typeof vf !== "number") return null;

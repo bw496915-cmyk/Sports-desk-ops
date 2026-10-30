@@ -41,7 +41,7 @@ function prodDumpFromManifest(
   const dir = mkdtempSync(join(tmpdir(), "schema-parity-"));
   const dbPath = join(dir, "t.sqlite");
   const db = new Database(dbPath);
-  for (const [table, sql] of Object.entries(tableSql)) {
+  for (const [, sql] of Object.entries(tableSql)) {
     db.exec(sql);
   }
   db.close();

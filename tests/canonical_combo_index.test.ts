@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  canonicalComboFromWire,
-  deriveCanonicalComboId,
-} from "../lib/canonical_combo_index.ts";
+import { canonicalComboFromWire } from "../lib/canonical_combo_index.ts";
 import { createComboVenueStore } from "../lib/combo_venue_store.ts";
 import {
   classifyLeadLagDelta,
