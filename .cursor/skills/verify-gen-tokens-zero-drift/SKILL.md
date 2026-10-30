@@ -18,18 +18,18 @@ Charts are rendered with [Pele](https://pele.run) (blueprint theme) into `verifi
 
 ## Coverage record
 
-| TLA+ action | Code |
-| ----------- | ---- |
-| `RunGateDirty` | `scripts/gen_tokens_gate.ts`: dirty check on `GEN_TOKEN_EMISSION_PATHS` |
-| `RunGateCleanCheckout` | `lib/gen_tokens/emission_targets.ts` targets with `reset: git-checkout-head` |
-| `RunGateCleanRm` | targets with `reset: rm-before-gen` (`domain-branded-types.ts` full-from-toml) |
-| `GenCrash` | non-zero `bun run gen:tokens` |
-| `GenSkipStrict` | `assertStrictGateEmission` under `GEN_TOKENS_GATE=1` (partial emit → gen exit 1) |
-| `GenSkipAfterCheckout` | skip write with weak gate (`~strictGate`); manifest miss at gate |
-| `GenSkipAfterRm` | missing file after `rm` reset (weak gate path) |
-| `ManifestForged` | `verifyManifestAgainstDisk` rejects stale or incomplete manifest |
-| `GenOk` | manifest lists all targets + matching sha256/run id + `git diff --quiet` |
-| `GenDrift` | diff non-quiet |
+| TLA+ action            | Code                                                                             |
+| ---------------------- | -------------------------------------------------------------------------------- |
+| `RunGateDirty`         | `scripts/gen_tokens_gate.ts`: dirty check on `GEN_TOKEN_EMISSION_PATHS`          |
+| `RunGateCleanCheckout` | `lib/gen_tokens/emission_targets.ts` targets with `reset: git-checkout-head`     |
+| `RunGateCleanRm`       | targets with `reset: rm-before-gen` (`domain-branded-types.ts` full-from-toml)   |
+| `GenCrash`             | non-zero `bun run gen:tokens`                                                    |
+| `GenSkipStrict`        | `assertStrictGateEmission` under `GEN_TOKENS_GATE=1` (partial emit → gen exit 1) |
+| `GenSkipAfterCheckout` | skip write with weak gate (`~strictGate`); manifest miss at gate                 |
+| `GenSkipAfterRm`       | missing file after `rm` reset (weak gate path)                                   |
+| `ManifestForged`       | `verifyManifestAgainstDisk` rejects stale or incomplete manifest                 |
+| `GenOk`                | manifest lists all targets + matching sha256/run id + `git diff --quiet`         |
+| `GenDrift`             | diff non-quiet                                                                   |
 
 Files: `scripts/gen_tokens_gate.ts`, `lib/gen_tokens/emission_targets.ts`, `lib/gen_tokens/emission_manifest.ts`, `scripts/generate_tokens.ts`, `package.json` scripts `gen:tokens`, `gen:tokens:gate`, `verify:gen-tokens-gate`.
 

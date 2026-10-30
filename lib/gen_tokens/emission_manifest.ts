@@ -26,7 +26,9 @@ export function buildManifestFromDisk(
   return runId ? { gateRunId: runId, emitted } : { emitted };
 }
 
-export function assertStrictGateEmission(emittedPaths: readonly string[]): void {
+export function assertStrictGateEmission(
+  emittedPaths: readonly string[],
+): void {
   if (process.env[GEN_TOKENS_GATE_ENV] !== "1") return;
 
   const expected = new Set(GEN_TOKEN_EMISSION_PATHS);

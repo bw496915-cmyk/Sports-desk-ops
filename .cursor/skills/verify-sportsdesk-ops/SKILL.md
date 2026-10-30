@@ -37,12 +37,12 @@ Run before the first drive and after any failed drive. Requires Bun **1.4.4**, `
 
 Follow one feature file under `features/`. Capture stdout/stderr to `$SPORTSDESK_VERIFY_EVIDENCE/<feature-id>/`.
 
-| Feature | Command |
-| -------- | -------- |
-| gen-tokens-zero-drift-gate | `bun run gen:tokens:gate` |
-| gen-tokens-mutant-harness | `bash verification/gen-tokens-zero-drift-gate/replay-mutant.sh` |
-| formal-gen-tokens-model | `bun run verify:gen-tokens-gate --no-render` |
-| token-design-assertions | `bun test tests/verify_tokens.test.ts` |
+| Feature                    | Command                                                         |
+| -------------------------- | --------------------------------------------------------------- |
+| gen-tokens-zero-drift-gate | `bun run gen:tokens:gate`                                       |
+| gen-tokens-mutant-harness  | `bash verification/gen-tokens-zero-drift-gate/replay-mutant.sh` |
+| formal-gen-tokens-model    | `bun run verify:gen-tokens-gate --no-render`                    |
+| token-design-assertions    | `bun test tests/verify_tokens.test.ts`                          |
 
 Formal properties: use project skill **verify-gen-tokens-zero-drift** and pstack **/statechart**.
 

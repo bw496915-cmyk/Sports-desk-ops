@@ -46,7 +46,9 @@ function findStatechart(): string {
   }
   const versions = fs
     .readdirSync(root)
-    .map((name) => path.join(root, name, "skills/statechart/scripts/statechart"))
+    .map((name) =>
+      path.join(root, name, "skills/statechart/scripts/statechart"),
+    )
     .filter((p) => fs.existsSync(p));
   if (versions.length === 0) {
     throw new Error(

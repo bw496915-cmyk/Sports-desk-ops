@@ -59,7 +59,11 @@ function writeEmissionManifest(): void {
   const manifest = buildManifestFromDisk(rootDir, emittedThisRun, runId);
   const manifestPath = resolve(rootDir, GEN_TOKEN_EMISSION_MANIFEST);
   mkdirSync(resolve(manifestPath, ".."), { recursive: true });
-  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
+  writeFileSync(
+    manifestPath,
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf-8",
+  );
 }
 
 if (!Bun.file(tomlPath).size) {

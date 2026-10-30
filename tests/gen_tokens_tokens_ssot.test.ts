@@ -33,7 +33,11 @@ describe("parseTokensToml", () => {
       expect(r25.max_lag_ms).toBe(5000);
     }
 
-    expect(ssot.ui.every((t) => t.role === "surface" || t.role === "border" || t.role === "text")).toBe(true);
+    expect(
+      ssot.ui.every(
+        (t) => t.role === "surface" || t.role === "border" || t.role === "text",
+      ),
+    ).toBe(true);
   });
 
   it("rejects unknown sla_kind", () => {

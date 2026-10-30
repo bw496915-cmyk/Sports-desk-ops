@@ -28,8 +28,7 @@ export type SurfaceToml = {
 };
 
 export type IngestionSlaToml =
-  | { sla_kind: "latency"; sla_ms: number }
-  | { sla_kind: "sentinel_drop" };
+  { sla_kind: "latency"; sla_ms: number } | { sla_kind: "sentinel_drop" };
 
 export type IngestionChannelToml = {
   layer_id: string;
@@ -94,7 +93,11 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function reqString(obj: Record<string, unknown>, key: string, ctx: string): string {
+function reqString(
+  obj: Record<string, unknown>,
+  key: string,
+  ctx: string,
+): string {
   const v = obj[key];
   if (typeof v !== "string" || v.length === 0) {
     throw new Error(`[tokens_ssot] ${ctx}: missing or invalid string ${key}`);
@@ -102,7 +105,11 @@ function reqString(obj: Record<string, unknown>, key: string, ctx: string): stri
   return v;
 }
 
-function reqNumber(obj: Record<string, unknown>, key: string, ctx: string): number {
+function reqNumber(
+  obj: Record<string, unknown>,
+  key: string,
+  ctx: string,
+): number {
   const v = obj[key];
   if (typeof v !== "number" || !Number.isFinite(v)) {
     throw new Error(`[tokens_ssot] ${ctx}: missing or invalid number ${key}`);
@@ -122,10 +129,13 @@ function parseMeta(raw: unknown): TokensMeta {
 }
 
 function parseSurface(key: string, raw: unknown): SurfaceToml {
-  if (!isRecord(raw)) throw new Error(`[tokens_ssot] surfaces.${key}: expected table`);
+  if (!isRecord(raw))
+    throw new Error(`[tokens_ssot] surfaces.${key}: expected table`);
   const layer_id = reqString(raw, "layer_id", `surfaces.${key}`);
   if (layer_id !== "SURFACE.DOM" && layer_id !== "SURFACE.CLI") {
-    throw new Error(`[tokens_ssot] surfaces.${key}: unknown layer_id ${layer_id}`);
+    throw new Error(
+      `[tokens_ssot] surfaces.${key}: unknown layer_id ${layer_id}`,
+    );
   }
   return {
     layer_id,
@@ -145,7 +155,10 @@ function parseIngestionSla(
 ): IngestionSlaToml {
   const sla_kind = reqString(raw, "sla_kind", `ingestion.${key}`);
   if (sla_kind === "latency") {
-    return { sla_kind: "latency", sla_ms: reqNumber(raw, "sla_ms", `ingestion.${key}`) };
+    return {
+      sla_kind: "latency",
+      sla_ms: reqNumber(raw, "sla_ms", `ingestion.${key}`),
+    };
   }
   if (sla_kind === "sentinel_drop") {
     return { sla_kind: "sentinel_drop" };
@@ -156,7 +169,8 @@ function parseIngestionSla(
 }
 
 function parseIngestion(key: string, raw: unknown): IngestionChannelToml {
-  if (!isRecord(raw)) throw new Error(`[tokens_ssot] ingestion.${key}: expected table`);
+  if (!isRecord(raw))
+    throw new Error(`[tokens_ssot] ingestion.${key}: expected table`);
   const sla = parseIngestionSla(key, raw);
   const base = {
     layer_id: reqString(raw, "layer_id", `ingestion.${key}`),
@@ -202,7 +216,11 @@ function parseRouteThreshold(
     case "composite_risk_gate":
       return {
         threshold_kind: kind,
-        min_toxicity_score: reqNumber(raw, "min_toxicity_score", `routes.${key}`),
+        min_toxicity_score: reqNumber(
+          raw,
+          "min_toxicity_score",
+          `routes.${key}`,
+        ),
         max_hold_rate_basis_points: reqNumber(
           raw,
           "max_hold_rate_basis_points",
@@ -223,7 +241,8 @@ function isRouteThresholdKind(k: string): k is RouteThresholdKind {
 }
 
 function parseRoute(key: string, raw: unknown): RouteToml {
-  if (!isRecord(raw)) throw new Error(`[tokens_ssot] routes.${key}: expected table`);
+  if (!isRecord(raw))
+    throw new Error(`[tokens_ssot] routes.${key}: expected table`);
   const threshold = parseRouteThreshold(key, raw);
   const base = {
     layer_id: reqString(raw, "layer_id", `routes.${key}`),
@@ -239,7 +258,8 @@ function parseRoute(key: string, raw: unknown): RouteToml {
 }
 
 function parseUi(key: string, raw: unknown): UiTokenToml {
-  if (!isRecord(raw)) throw new Error(`[tokens_ssot] ui.${key}: expected table`);
+  if (!isRecord(raw))
+    throw new Error(`[tokens_ssot] ui.${key}: expected table`);
   const roleRaw = reqString(raw, "role", `ui.${key}`);
   if (!UI_ROLES.includes(roleRaw as UiRole)) {
     throw new Error(
@@ -254,10 +274,7 @@ function parseUi(key: string, raw: unknown): UiTokenToml {
   };
 }
 
-function tableValues(
-  section: string,
-  raw: unknown,
-): [string, unknown][] {
+function tableValues(section: string, raw: unknown): [string, unknown][] {
   if (!isRecord(raw)) {
     throw new Error(`[tokens_ssot] ${section} must be a table`);
   }

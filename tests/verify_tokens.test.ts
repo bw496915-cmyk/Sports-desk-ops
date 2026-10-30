@@ -32,7 +32,8 @@ describe("1. Single Source of Truth & Zero-Drift Regeneration", () => {
   it("test_assert_tokens_toml_is_valid_and_complete", async () => {
     const tomlPath = resolve(rootDir, "tokens.toml");
     const tomlText = await Bun.file(tomlPath).text();
-    const { parseTokensToml } = await import("../lib/gen_tokens/tokens_ssot.ts");
+    const { parseTokensToml } =
+      await import("../lib/gen_tokens/tokens_ssot.ts");
     const ssot = parseTokensToml(tomlText);
 
     expect(ssot.meta.version).toBe("1.1.0");
@@ -53,7 +54,8 @@ describe("1. Single Source of Truth & Zero-Drift Regeneration", () => {
   it("test_assert_zero_drift_between_tokens_toml_and_source_code", async () => {
     const tomlPath = resolve(rootDir, "tokens.toml");
     const tomlText = await Bun.file(tomlPath).text();
-    const { parseTokensToml } = await import("../lib/gen_tokens/tokens_ssot.ts");
+    const { parseTokensToml } =
+      await import("../lib/gen_tokens/tokens_ssot.ts");
     const ssot = parseTokensToml(tomlText);
 
     const ingestionList = ssot.ingestion;
