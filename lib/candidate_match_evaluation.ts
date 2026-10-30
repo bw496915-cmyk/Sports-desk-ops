@@ -1,5 +1,6 @@
 /**
- * Candidate-evidence overlay evaluation — golden AST + replayable match_evaluations.
+ * Candidate-evidence overlay evaluation — golden evaluation JSON (canonical bytes) + replayable match_evaluations.
+ * For Bun.XML ingest drift pins see lib/bun_xml_golden_ast.ts (JSON5 AST fingerprints).
  *
  * Universe: pending-wager observations at poll time (Manager/getPending slice), not
  * full wager lifecycle. Policy replay proves matcher behavior on stored replay_input_json;

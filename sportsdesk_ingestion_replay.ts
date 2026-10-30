@@ -25,6 +25,7 @@ import {
   replayHistoricalJsonlFile,
   type HistoricalLogReplayResult,
 } from "./lib/jsonl_stream_replay.ts";
+import { xmlGoldenAstSha256ForIngest } from "./lib/bun_xml_golden_ast.ts";
 
 const INGESTION_CHANNEL_BY_CODE = new Map(
   INGESTION_CHANNELS.map((c) => [c.channelCode, c] as const),
@@ -232,6 +233,11 @@ export function parseSportsdeskIngestionLogRow(
     }
   }
   return out;
+}
+
+/** SHA256 of JSON5 AST — append at Plane 1 ingest for replay drift checks. */
+export function goldenAstSha256ForSportsdeskXml(xml: string): string {
+  return xmlGoldenAstSha256ForIngest(xml);
 }
 
 /** `{ compact: false }` XML board price — text at children[0].children[0]. */
