@@ -1,24 +1,141 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SportsDesk & Fantasy402 Production API Reference</title>
-  <meta name="description" content="Official API reference for SportsDesk and Fantasy402 Manager, Bet Ticker, Customer Mutations, and Forensic Surveillance." />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background: #070b14;
-    }
-  </style>
-</head>
-<body>
-  <script
-    id="api-reference"
-    data-url="./openapi.json"
-    data-configuration='{"theme":"moon","darkMode":true,"showSidebar":true,"searchHotKey":"k"}'
-    src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      SportsDesk &amp; Fantasy402 Wire API Reference — evidence-labelled
+    </title>
+    <meta
+      name="description"
+      content="Evidence-labelled OpenAPI 3.1 reference for SportsDesk and Fantasy402. Every operation states its evidence tier: captured request, implementation-verified route, or inferred proposal. No response body has been captured in this release."
+    />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#070b14" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --sd-page: #070b14;
+        --sd-bar: #0b1220;
+        --sd-border: #1e293b;
+        --sd-text: #e2e8f0;
+        --sd-muted: #94a3b8;
+        --sd-accent: #38bdf8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        background: var(--sd-page);
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--sd-page);
+        color: var(--sd-text);
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+      }
+      .evidence-badge {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.25rem;
+        padding: 0.4rem 1rem;
+        border-bottom: 1px solid var(--sd-border);
+        background: var(--sd-bar);
+        font-size: 0.78rem;
+        line-height: 1.3;
+        color: var(--sd-muted);
+      }
+      .evidence-badge strong {
+        color: var(--sd-text);
+        font-weight: 600;
+      }
+      .evidence-badge .dot {
+        color: var(--sd-border);
+      }
+      .evidence-badge a {
+        color: var(--sd-accent);
+        text-decoration: none;
+        border-bottom: 1px dotted currentColor;
+      }
+      .evidence-badge a:hover {
+        color: #7dd3fc;
+      }
+      .evidence-badge .spacer {
+        flex: 1 1 auto;
+      }
+      .evidence-badge code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.72rem;
+        color: var(--sd-text);
+      }
+      noscript {
+        display: block;
+        padding: 1rem;
+        border-bottom: 1px solid var(--sd-border);
+        color: var(--sd-muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header
+      class="evidence-badge"
+      aria-label="Specification version and evidence status"
+    >
+      <strong>Evidence-labelled spec</strong>
+      <span class="dot" aria-hidden="true">•</span>
+      <span>v2026.10.31</span>
+      <span class="dot" aria-hidden="true">•</span>
+      <span
+        >No response body was captured in this release — tier A is empty by
+        construction.</span
+      >
+      <span class="spacer"></span>
+      <a
+        href="./openapi.json"
+        download="openapi.json"
+        title="Download the machine-readable OpenAPI 3.1 specification"
+        >Download openapi.json</a
+      >
+      <span class="dot" aria-hidden="true">•</span>
+      <span
+        >tiers: <code>B</code> observed request/route · <code>C</code> inferred
+        · <code>D</code> missing surface · <code>E</code> unimplemented</span
+      >
+    </header>
+    <noscript>
+      This reference renders with the pinned Scalar bundle. Without JavaScript,
+      download
+      <a href="./openapi.json">openapi.json</a> and open it in any OpenAPI 3.1
+      viewer.
+    </noscript>
+    <!--
+    Pinned CDN dependency: @scalar/api-reference 1.76.4, SRI sha384 computed from the
+    exact standalone.js bytes served by jsDelivr for that immutable version.
+    Do not loosen the pin or drop the integrity/crossorigin attributes.
+  -->
+    <script
+      id="api-reference"
+      data-url="./openapi.json"
+      data-configuration='{"theme":"moon","darkMode":true,"showSidebar":true,"searchHotKey":"k","hideDownloadButton":false}'
+      src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.4/dist/browser/standalone.js"
+      integrity="sha384-hwB9WroDTpZaI38gr+u9CXA6ksz5gUYgD2GxXazKl/agT1L2GWUiRFWGJYNiFu4Q"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+  </body>
 </html>
