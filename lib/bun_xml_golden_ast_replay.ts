@@ -37,7 +37,13 @@ export type IngestionXmlGoldenVerifyOptions = {
 };
 
 export type IngestionXmlGoldenFailure =
-  | { ok: false; reason: "drift"; expectedSha256: string; actualSha256: string; rowId?: number }
+  | {
+      ok: false;
+      reason: "drift";
+      expectedSha256: string;
+      actualSha256: string;
+      rowId?: number;
+    }
   | { ok: false; reason: "missingPin"; rowId?: number }
   | { ok: false; reason: "missingXml"; rowId?: number }
   | {
