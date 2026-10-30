@@ -1730,9 +1730,9 @@ const SCRIPT_REQUIREMENTS: readonly ScriptRequirement[] = [
   },
   {
     script: "docs:deploy",
-    mustInclude: ["test:docs", "verify:docs", "fantasy402-docs-4ay"],
+    mustInclude: ["test:docs", "verify:docs", "fantasy402-docs"],
     message:
-      "must gate deployment (test:docs && verify:docs) and target the real Pages project fantasy402-docs-4ay",
+      "must gate deployment (test:docs && verify:docs) and target the real Pages project fantasy402-docs",
   },
   {
     script: "docs:verify:live",
