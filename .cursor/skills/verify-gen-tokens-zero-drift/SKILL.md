@@ -18,34 +18,30 @@ Charts are rendered with [Pele](https://pele.run) (blueprint theme) into `verifi
 
 ## Coverage record
 
-| TLA+ action | Code (`scripts/gen_tokens_zero_drift_gate.sh`) |
-| ----------- | ---------------------------------------------- |
-| `RunGateDirty` | L11–14: `git diff --quiet` on generated paths → exit 1 |
-| `RunGateCleanCheckout` | L17–19: `git checkout HEAD --` (as-built reset) |
-| `RunGateCleanRm` | **Not in as-built script** — models alternative `rm -f` reset |
-| `GenCrash` | L21–24: `bun run gen:tokens` non-zero → exit 1 |
-| `GenSkipAfterCheckout` | L27–38: file still at HEAD, `-f` + `git diff --quiet` pass → exit 0 (**false pass**) |
-| `GenSkipAfterRm` | Would be L28–30 if reset were `rm -f` |
-| `GenOk` | Regen matches HEAD → exit 0 |
-| `GenDrift` | L33–37: `git diff` non-quiet → exit 1 |
+| TLA+ action | Code |
+| ----------- | ---- |
+| `RunGateDirty` | `scripts/gen_tokens_gate.ts`: dirty check on `GEN_TOKEN_EMISSION_PATHS` |
+| `RunGateCleanCheckout` | `lib/gen_tokens/emission_targets.ts` targets with `reset: git-checkout-head` |
+| `RunGateCleanRm` | targets with `reset: rm-before-gen` (none yet; models future full-file outputs) |
+| `GenCrash` | non-zero `bun run gen:tokens` |
+| `GenSkipAfterCheckout` | skip write → manifest miss → gate exit non-zero |
+| `GenSkipAfterRm` | missing file after `rm` reset |
+| `GenOk` | manifest lists all targets + `git diff --quiet` |
+| `GenDrift` | diff non-quiet |
 
-Files: `scripts/gen_tokens_zero_drift_gate.sh`, `scripts/generate_tokens.ts` (generator behavior abstracted as `genBehavior`), `package.json` scripts `gen:tokens`, `gen:tokens:gate`, `verify:gen-tokens-gate`.
+Files: `scripts/gen_tokens_gate.ts`, `lib/gen_tokens/emission_targets.ts`, `scripts/generate_tokens.ts`, `package.json` scripts `gen:tokens`, `gen:tokens:gate`, `verify:gen-tokens-gate`.
 
 **Sync commit:** `4aa21db` — verification bundle and model confirmed against product gate at `81fefeb`. Update only after you diff covered files from `81fefeb` and reconcile the TLA+ model.
 
 **Last maintain (2026-10-30):** Outcome **bug** (not drift). Product gate unchanged since `81fefeb`; model matches `gen_tokens_zero_drift_gate.sh`. TLC exit **1** (`NoSilentPassWhenGenSkips`); `replay-mutant.sh` exit **0** on real gate (false pass). Bug path since checkout reset (`35a2927`); dirty guard and `-f` check (`bf23486`) did not close skip-after-checkout.
 
-## Expected result (as-built)
+## Expected result
 
-**Exit 1** from `bun run verify:gen-tokens-gate` is the **documented finding**, not a broken harness. Invariant **`NoSilentPassWhenGenSkips`** breaks:
+**Exit 0** from `bun run verify:gen-tokens-gate` when the TLA+ model matches the manifest-based gate (`GenSkipAfterCheckout` → `Gate failed`, not pass).
 
-1. Waiting to run  
-2. Reset files at HEAD (`git checkout`)  
-3. Gate passed (gen skipped write)
+**Exit 1** means a modeled invariant breaks — treat as regression or intentional promise change; do not weaken rules to greenwash.
 
-Do not weaken this invariant to obtain exit 0 while the gate still uses checkout reset without proving regen ran.
-
-**Exit 0** means every configured invariant holds (expected after a gate fix that closes the skip hole, e.g. `rm -f` pre-gen once the generator no longer needs splice anchors).
+Confirm skip is caught on real code: `bash verification/gen-tokens-zero-drift-gate/replay-mutant.sh` must exit **0** (gate failed on skip).
 
 ## Assumptions
 
@@ -73,13 +69,11 @@ TLC counterexample above is necessary; confirm on the shell gate with:
 bash verification/gen-tokens-zero-drift-gate/replay-mutant.sh
 ```
 
-That script temporarily skips writing `domain-branded-types.ts`, runs `gen:tokens:gate`, expects exit **0** (false pass), then restores `generate_tokens.ts`.
-
-To prove the harness catches a fixed gate: after an intentional fix, rerun TLC (expect 0) and ensure `replay-mutant.sh` would exit non-zero (gate fails on skip).
+That script temporarily skips writing `domain-branded-types.ts`, runs `gen:tokens:gate`, expects gate **non-zero** (manifest miss), then restores `generate_tokens.ts`.
 
 ## Read a result
 
-- **Exit 1 + `NoSilentPassWhenGenSkips`:** code bug or accepted tradeoff; replay with `replay-mutant.sh`. Do not weaken the model without a product change.
+- **Exit 1 on TLC:** replay counterexample; if real code cannot reach it, fix the model.
 - **Exit 2:** Java/TLC/statechart missing — see `verification/gen-tokens-zero-drift-gate/README.md`.
 - **Exit 0:** property holds in the model; re-read covered shell script and move sync commit forward.
 

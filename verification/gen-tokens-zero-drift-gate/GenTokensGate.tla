@@ -88,7 +88,7 @@ GenSkipAfterRm ==
 GenSkipAfterCheckout ==
   /\ phase = "Reset files at HEAD"
   /\ genBehavior = "gen skips file"
-  /\ phase' = "Gate passed"
+  /\ phase' = "Gate failed"
   /\ onDisk' = "at HEAD"
   /\ matchesHead' = TRUE
   /\ UNCHANGED <<workDirty, strategy, genBehavior>>

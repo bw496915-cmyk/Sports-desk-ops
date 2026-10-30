@@ -32,8 +32,11 @@ export const step = (action, _from, to) => {
   if (action === "GenCrash") {
     return "gen:tokens exits with an error";
   }
-  if (action === "GenSkipAfterCheckout" || action === "GenSkipAfterRm") {
+  if (action === "GenSkipAfterRm") {
     return "gen:tokens finishes without writing a file";
+  }
+  if (action === "GenSkipAfterCheckout") {
+    return "gen:tokens skips a file; manifest check fails";
   }
   if (action === "GenDrift") {
     return "gen:tokens writes bytes that differ from HEAD";

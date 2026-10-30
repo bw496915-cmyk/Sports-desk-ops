@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prove the silent-skip hole on real code (mutates generate_tokens.ts, then restores).
+# Prove the gate catches a partial gen (mutates generate_tokens.ts, then restores).
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -14,15 +14,27 @@ import sys
 path = sys.argv[1]
 lines = open(path, encoding="utf-8").read().splitlines()
 out: list[str] = []
-for line in lines:
-    if line.startswith("writeFileSync(domainBrandedTypesPath"):
-        out.append(
-            'console.log("[gen:tokens] VERIFY MUTANT skip domain-branded-types.ts");'
-        )
-        continue
-    if "Emitted updated domain-branded-types.ts" in line:
+i = 0
+while i < len(lines):
+    line = lines[i]
+    if line.strip().startswith("emitRepoFile("):
+        block = [line]
+        i += 1
+        while i < len(lines) and lines[i].strip() != ");":
+            block.append(lines[i])
+            i += 1
+        if i < len(lines):
+            block.append(lines[i])
+            i += 1
+        if any("domain-branded-types.ts" in b for b in block):
+            out.append(
+                'console.log("[gen:tokens] VERIFY MUTANT skip domain-branded-types.ts");'
+            )
+        else:
+            out.extend(block)
         continue
     out.append(line)
+    i += 1
 open(path, "w", encoding="utf-8").write("\n".join(out) + "\n")
 PY
 
@@ -32,9 +44,9 @@ bun run gen:tokens:gate
 gate_exit=$?
 set -e
 
-if [[ "$gate_exit" -ne 0 ]]; then
-  echo "replay-mutant: expected gen:tokens:gate exit 0 (false pass), got $gate_exit" >&2
+if [[ "$gate_exit" -eq 0 ]]; then
+  echo "replay-mutant: expected gen:tokens:gate exit non-zero (manifest miss on skip), got 0" >&2
   exit 1
 fi
 
-echo "replay-mutant: confirmed false pass when gen skips domain-branded-types.ts write"
+echo "replay-mutant: gate correctly failed when gen skips domain-branded-types.ts write"

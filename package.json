@@ -17,7 +17,7 @@
     "lint": "bun --bun run oxlint --fix",
     "lint:check": "bun --bun run oxlint --deny-warnings",
     "gen:tokens": "bun run scripts/generate_tokens.ts",
-    "gen:tokens:gate": "bash scripts/gen_tokens_zero_drift_gate.sh",
+    "gen:tokens:gate": "bun run scripts/gen_tokens_gate.ts",
     "verify:gen-tokens-gate": "bun run verification/gen-tokens-zero-drift-gate/run.ts",
     "check:fetch-init": "bun run bin/check-fetch-init.ts",
     "check:innerhtml": "bun run bin/check-innerhtml.ts",

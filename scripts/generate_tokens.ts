@@ -7,11 +7,49 @@
  * Usage: bun run scripts/generate_tokens.ts (or bun run gen:tokens)
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  DASHBOARD_TEMPLATES,
+  spliceDashboardHtml,
+} from "../lib/gen_tokens/dashboard_templates.ts";
+import {
+  GEN_TOKEN_EMISSION_MANIFEST,
+  GEN_TOKEN_EMISSION_PATHS,
+} from "../lib/gen_tokens/emission_targets.ts";
+import { formatRouteThreshold } from "../lib/gen_tokens/route_threshold.ts";
 
 const rootDir = resolve(import.meta.dir, "..");
 const tomlPath = resolve(rootDir, "tokens.toml");
+const emittedThisRun: string[] = [];
+
+function recordEmission(repoRelativePath: string): void {
+  if (!GEN_TOKEN_EMISSION_PATHS.includes(repoRelativePath)) {
+    throw new Error(
+      `[gen:tokens] internal: unregistered emission path ${repoRelativePath}`,
+    );
+  }
+  emittedThisRun.push(repoRelativePath);
+}
+
+function emitRepoFile(
+  repoRelativePath: string,
+  absolutePath: string,
+  content: string,
+): void {
+  writeFileSync(absolutePath, content, "utf-8");
+  recordEmission(repoRelativePath);
+}
+
+function writeEmissionManifest(): void {
+  const manifestPath = resolve(rootDir, GEN_TOKEN_EMISSION_MANIFEST);
+  mkdirSync(resolve(manifestPath, ".."), { recursive: true });
+  writeFileSync(
+    manifestPath,
+    `${JSON.stringify({ emitted: [...emittedThisRun] }, null, 2)}\n`,
+    "utf-8",
+  );
+}
 
 if (!Bun.file(tomlPath).size) {
   console.error(`Error: tokens.toml not found at ${tomlPath}`);
@@ -222,16 +260,7 @@ export const ROUTE_CIRCUITS: readonly RouteCircuitDefinition[] = [
 `;
 
 for (const r of routes) {
-  let threshCode = "";
-  if (r.threshold_kind === "consensus_lag") {
-    threshCode = `{ kind: "consensus_lag", maxLagMs: ${r.max_lag_ms} }`;
-  } else if (r.threshold_kind === "bayes_shrinkage") {
-    threshCode = `{ kind: "bayes_shrinkage", tauStar: ${r.tau_star}, minTickets: ${r.min_tickets} }`;
-  } else if (r.threshold_kind === "liquidity_depth") {
-    threshCode = `{ kind: "liquidity_depth", minDepthCents: parseAsCents(${r.min_depth_cents}) }`;
-  } else if (r.threshold_kind === "composite_risk_gate") {
-    threshCode = `{ kind: "composite_risk_gate", minToxicityScore: ${r.min_toxicity_score}, maxHoldRateBasisPoints: parseAsBasisPoints(${r.max_hold_rate_basis_points}, true), maxDeficitCents: parseAsCents(${r.max_deficit_cents}) }`;
-  }
+  const threshCode = formatRouteThreshold(r);
 
   generatedSection7 += `  {
     layerId: "${r.layer_id}",
@@ -309,7 +338,11 @@ export const ALL_QWEN_TOKENS: readonly AnyQwenNeuronDefinition[] = [
 `;
 
 const newDomainBrandedText = `${domainBrandedBase}\n\n${generatedSection7}`;
-writeFileSync(domainBrandedTypesPath, newDomainBrandedText, "utf-8");
+emitRepoFile(
+  "domain-branded-types.ts",
+  domainBrandedTypesPath,
+  newDomainBrandedText,
+);
 console.log(`[gen:tokens] Emitted updated domain-branded-types.ts`);
 
 // ============================================================================
@@ -365,80 +398,29 @@ function spliceOrExit(
 const houdiniCss = generateHoudiniPropertyCss();
 const rootVarsCss = generateRootVariablesCss();
 
-// Update customer-churn-simulation-dashboard.html
-const customerDashboardPath = resolve(
-  rootDir,
-  "customer-churn-simulation-dashboard.html",
-);
-let customerHtml = readFileSync(customerDashboardPath, "utf-8");
+for (const template of DASHBOARD_TEMPLATES) {
+  const dashboardPath = resolve(rootDir, template.repoPath);
+  let html = readFileSync(dashboardPath, "utf-8");
+  html = spliceDashboardHtml(
+    html,
+    dashboardPath,
+    template,
+    houdiniCss,
+    rootVarsCss,
+    spliceOrExit,
+  );
+  emitRepoFile(template.repoPath, dashboardPath, html);
+  console.log(`[gen:tokens] Emitted updated ${template.repoPath}`);
+}
 
-// Regex update for Houdini property block
-const houdiniRegex =
-  /\/\* ==========================================================================\s+1\. CSS Houdini @property Declarations[\s\S]*?(?=\/\* ==========================================================================\s+2\. Canonical :root)/;
-customerHtml = spliceOrExit(
-  customerHtml,
-  customerDashboardPath,
-  houdiniRegex,
-  houdiniCss.trim() + "\n\n",
-);
-
-// Regex update for :root variables
-const rootVarsRegex =
-  /:root\s*\{\s*\/\* Generated from tokens\.toml \(v[^)]*\) \*\/[\s\S]*?(?=--sd-primary:)/;
-customerHtml = spliceOrExit(
-  customerHtml,
-  customerDashboardPath,
-  rootVarsRegex,
-  rootVarsCss + "\n      ",
-);
-
-writeFileSync(customerDashboardPath, customerHtml, "utf-8");
-console.log(
-  `[gen:tokens] Emitted updated customer-churn-simulation-dashboard.html`,
-);
-
-// Update telegram-miniapp-dashboard.html
-const telegramDashboardPath = resolve(
-  rootDir,
-  "telegram-miniapp-dashboard.html",
-);
-let telegramHtml = readFileSync(telegramDashboardPath, "utf-8");
-
-const tmaHoudiniRegex =
-  /\/\* ==========================================================================\s+1\. CSS Houdini @property Declarations[\s\S]*?(?=\/\* ==========================================================================\s+2\. TMA Theme Mapping)/;
-telegramHtml = spliceOrExit(
-  telegramHtml,
-  telegramDashboardPath,
-  tmaHoudiniRegex,
-  houdiniCss.trim() + "\n\n    ",
-);
-
-telegramHtml = spliceOrExit(
-  telegramHtml,
-  telegramDashboardPath,
-  rootVarsRegex,
-  rootVarsCss + "\n      ",
-);
-
-writeFileSync(telegramDashboardPath, telegramHtml, "utf-8");
-console.log(`[gen:tokens] Emitted updated telegram-miniapp-dashboard.html`);
-
-// Automatically run bun fmt on touched files
 const bunBin = process.execPath || "bun";
-Bun.spawnSync(
-  [
-    bunBin,
-    "fmt",
-    domainBrandedTypesPath,
-    customerDashboardPath,
-    telegramDashboardPath,
-  ],
-  {
-    cwd: rootDir,
-  },
-);
+const fmtPaths = emittedThisRun.map((p) => resolve(rootDir, p));
+Bun.spawnSync([bunBin, "fmt", ...fmtPaths], {
+  cwd: rootDir,
+});
 console.log(
   `[gen:tokens] Deterministically formatted generated files via bun fmt`,
 );
 
+writeEmissionManifest();
 console.log("[gen:tokens] Generation completed successfully.");

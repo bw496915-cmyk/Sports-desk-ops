@@ -16,9 +16,9 @@ bun run verify:gen-tokens-gate
 
 Options: `--no-render` (skip Pele SVG).
 
-**Expected exit code today:** `1` — invariant `NoSilentPassWhenGenSkips` breaks on the as-built gate (`git checkout HEAD` then regen). See `report.md` and `chart.svg` after a run.
+**Expected exit code:** `0` when the TLA+ model matches the manifest-based gate in `scripts/gen_tokens_gate.ts`.
 
-Exit `0` means the model’s rules all hold (e.g. after a gate fix such as `rm -f` pre-gen with a full-file generator).
+Exit `1` means a modeled invariant broke — treat as regression.
 
 ## Bootstrap
 
@@ -34,4 +34,4 @@ Models `scripts/gen_tokens_zero_drift_gate.sh` as one abstract output file and t
 bash verification/gen-tokens-zero-drift-gate/replay-mutant.sh
 ```
 
-Temporarily skips writing `domain-branded-types.ts`, runs `gen:tokens:gate`, expects exit **0** (false pass), then restores the generator.
+Temporarily skips the `domain-branded-types.ts` `emitRepoFile` call, runs `gen:tokens:gate`, expects **non-zero** (manifest miss), then restores the generator.
