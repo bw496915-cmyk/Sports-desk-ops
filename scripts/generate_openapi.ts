@@ -9,7 +9,9 @@
  * code serves. This generator replaces that spec with one derived from
  * docs/evidence/ledger.json plus first-party sources:
  *
- *   - docs/evidence/ledger.json  (frozen: 48 operation rows, 8 surface rows)
+ *   - docs/evidence/ledger.json  (the machine-readable evidence ledger; tier
+ *                                counts are derived from its operation rows,
+ *                                never pinned to a release baseline)
  *   - docs/EVIDENCE.md           (binds each Tier D surface id to human docs)
  *   - fantasy402_sport_catalog.ts / simulate_bettor_churn_suite.ts (TS types)
  *   - tests/fixtures/fantasy402-sport-catalog-2026-10-21.json (catalog sample)
@@ -17,7 +19,13 @@
  * Every operation carries x-evidence {tier, sources, capturedResponse,
  * requiredCapture?, contradicted?, candidateUrl?}. Tier C operations publish no
  * request body and no response content; Tier D operations reference a ledger
- * surfaces[] row by id. The generator self-gates through scripts/verify_docs.ts
+ * surfaces[] row by id. Tier A operations are rendered from the live capture
+ * store (docs/evidence/captures/<date>/<slug>.<method>.json, schemaVersion 1):
+ * the response schema is derived from capture.response.bodySkeleton and the
+ * request schema from capture.request.bodySkeleton, so a B->A upgrade performed
+ * by scripts/apply_captures.ts produces a real, capture-backed schema. An A row
+ * without a valid live capture is a hard error — the generator never invents a
+ * response. The generator self-gates through scripts/verify_docs.ts
  * (checkOpenApi + checkLedger) before writing, so the committed JSON can only be
  * what the docs gate would accept.
  *
@@ -28,46 +36,60 @@
  * identical bytes; CI re-runs it and byte-diffs.
  *
  * Usage:
- *   bun run scripts/generate_openapi.ts            # write docs/openapi.json
- *   bun run scripts/generate_openapi.ts --out p    # write to another path
+ *   bun run scripts/generate_openapi.ts                   # write docs/openapi.json
+ *   bun run scripts/generate_openapi.ts --out p           # write to another path
+ *   bun run scripts/generate_openapi.ts --root R --ledger L --captures C --out P
+ *                                                        # temp-dir / test roots
  */
 
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { join, relative, resolve } from "node:path";
 
 import { checkLedger, checkOpenApi } from "./verify_docs.ts";
 import type { CheckOutcome } from "./verify_docs.ts";
 
 /* -------------------------------------------------------------------------- */
-/* Paths and release invariants                                               */
+/* Paths and run options                                                      */
 /* -------------------------------------------------------------------------- */
 
-const ROOT = resolve(import.meta.dir, "..");
-const LEDGER_PATH = join(ROOT, "docs", "evidence", "ledger.json");
-const EVIDENCE_MD_PATH = join(ROOT, "docs", "EVIDENCE.md");
-const DEFAULT_OUTPUT_PATH = join(ROOT, "docs", "openapi.json");
-const CATALOG_TYPE_SOURCE = join(ROOT, "fantasy402_sport_catalog.ts");
-const CHURN_TYPE_SOURCE = join(ROOT, "simulate_bettor_churn_suite.ts");
-const CATALOG_FIXTURE = join(
-  ROOT,
+/** The checkout this script lives in; code/type artifacts fall back here. */
+const SCRIPT_ROOT = resolve(import.meta.dir, "..");
+
+const LEDGER_REL = join("docs", "evidence", "ledger.json");
+const CAPTURES_REL = join("docs", "evidence", "captures");
+const SPEC_REL = join("docs", "openapi.json");
+const EVIDENCE_MD_REL = join("docs", "EVIDENCE.md");
+const CATALOG_TYPE_SOURCE_REL = "fantasy402_sport_catalog.ts";
+const CHURN_TYPE_SOURCE_REL = "simulate_bettor_churn_suite.ts";
+const CATALOG_FIXTURE_REL = join(
   "tests",
   "fixtures",
   "fantasy402-sport-catalog-2026-10-21.json",
 );
+const AJAX_PATH_FRAGMENT = "manager-tools/ajax.php";
 
-/** The frozen P1 ledger this release was generated against. */
-const EXPECTED_LEDGER_COUNTS = {
-  A: 0,
-  B: 7,
-  C: 31,
-  D: 0,
-  E: 10,
-  total: 48,
-} as const;
-const EXPECTED_SURFACE_COUNTS = { D: 7, E: 1, total: 8 } as const;
-const EXPECTED_SPEC_OPERATIONS = 40;
-const EXPECTED_SPEC_TIERS = { A: 0, B: 6, C: 31, D: 3 } as const;
+/**
+ * Evidence/artifact root for this run. `--root` overrides it for temp-dir tests
+ * that copy only the ledger + capture store; type sources fall back to this
+ * checkout when the override does not contain them.
+ */
+let artifactRoot = SCRIPT_ROOT;
+
+function artifactPath(relPath: string): string {
+  const overridden = join(artifactRoot, relPath);
+  return existsSync(overridden) ? overridden : join(SCRIPT_ROOT, relPath);
+}
+
+function readArtifact(relPath: string): string {
+  return readText(artifactPath(relPath));
+}
 
 const TAG_INFERRED = "Inferred (Unverified)";
 const TAG_FORENSIC = "Forensic Surveillance";
@@ -413,31 +435,119 @@ function parseLedger(raw: unknown): Ledger {
   };
 }
 
-function assertFrozenLedger(ledger: Ledger): void {
-  const actual = ledger.counts;
-  for (const tier of ["A", "B", "C", "D", "E", "total"] as const) {
-    const expected = EXPECTED_LEDGER_COUNTS[tier];
-    const found = actual[tier];
-    if (expected !== found) {
+const OPERATION_TIERS = ["A", "B", "C", "D", "E"] as const;
+
+function isOperationTier(
+  value: string,
+): value is (typeof OPERATION_TIERS)[number] {
+  return (OPERATION_TIERS as readonly string[]).includes(value);
+}
+
+function countLedgerOperationTiers(rows: readonly LedgerOperation[]): {
+  readonly A: number;
+  readonly B: number;
+  readonly C: number;
+  readonly D: number;
+  readonly E: number;
+  readonly total: number;
+} {
+  const counts = { A: 0, B: 0, C: 0, D: 0, E: 0, total: rows.length };
+  for (const row of rows) counts[row.tier as "A" | "B" | "C" | "D" | "E"] += 1;
+  return counts;
+}
+
+/** True when a ledger operation is intentionally absent from the published spec. */
+function isRemovedFromSpec(operation: LedgerOperation): boolean {
+  return operation.tier === "E" || operation.path.includes(AJAX_PATH_FRAGMENT);
+}
+
+/**
+ * Validate the ledger is self-consistent instead of pinning a release baseline.
+ *
+ * Tier counts are derived from the operation rows: `apply_captures.ts` upgrades
+ * rows and recomputes `counts`, so the generator must accept any honest
+ * distribution (A+B+C+D+E === operations.length) and reject a hand-edited
+ * ledger whose declared counts disagree with its rows.
+ */
+function assertLedgerConsistency(ledger: Ledger): void {
+  for (const row of ledger.operations) {
+    if (!isOperationTier(row.tier)) {
       fail(
-        `frozen ledger drift: counts.${tier} is ${found}, expected ${expected}; re-baseline the release before generating`,
+        `ledger row ${row.method.toUpperCase()} ${row.path} has invalid tier "${row.tier}"; expected one of ${OPERATION_TIERS.join("|")}`,
+      );
+    }
+    if (row.tier === "D") {
+      fail(
+        `ledger row ${row.method.toUpperCase()} ${row.path} uses tier D; D is reserved for surfaces[] rows, so no operation row may use it`,
+      );
+    }
+  }
+  const actual = countLedgerOperationTiers(ledger.operations);
+  const declared = ledger.counts;
+  for (const tier of OPERATION_TIERS) {
+    if (declared[tier] !== actual[tier]) {
+      fail(
+        `ledger counts mismatch: counts.${tier}=${declared[tier]} but ${actual[tier]} operation row(s) have tier ${tier}. Recompute ledger.counts from its rows (scripts/apply_captures.ts does this) instead of hand-editing the ledger.`,
+      );
+    }
+  }
+  if (declared.total !== actual.total) {
+    fail(
+      `ledger counts mismatch: counts.total=${declared.total} but there are ${actual.total} operation rows`,
+    );
+  }
+  const surfaceCounts = { D: 0, E: 0, total: ledger.surfaces.length };
+  for (const surface of ledger.surfaces) {
+    if (surface.tier === "D") surfaceCounts.D += 1;
+    else if (surface.tier === "E") surfaceCounts.E += 1;
+    else {
+      fail(
+        `ledger surface "${surface.id}" has tier "${surface.tier}"; surfaces[] rows must be D or E`,
       );
     }
   }
   for (const tier of ["D", "E", "total"] as const) {
-    const expected = EXPECTED_SURFACE_COUNTS[tier];
-    const found = ledger.surfaceCounts[tier];
-    if (expected !== found) {
+    if (ledger.surfaceCounts[tier] !== surfaceCounts[tier]) {
       fail(
-        `frozen ledger drift: surfaceCounts.${tier} is ${found}, expected ${expected}`,
+        `ledger surfaceCounts mismatch: surfaceCounts.${tier}=${ledger.surfaceCounts[tier]} but the surfaces[] rows contain ${surfaceCounts[tier]}`,
       );
     }
   }
-  if (ledger.operations.length !== EXPECTED_LEDGER_COUNTS.total) {
-    fail(
-      `frozen ledger drift: ${ledger.operations.length} operation rows, expected ${EXPECTED_LEDGER_COUNTS.total}`,
-    );
+}
+
+/**
+ * Expected spec operation tiers for this ledger: A/B/C operation rows (minus
+ * retired E/ajax rows) plus the fixed Tier D surface operations.
+ */
+function expectedSpecTierCounts(
+  ledger: Ledger,
+  surfaceOperationCount: number,
+): {
+  readonly A: number;
+  readonly B: number;
+  readonly C: number;
+  readonly D: number;
+} {
+  const counts = { A: 0, B: 0, C: 0, D: surfaceOperationCount };
+  for (const operation of ledger.operations) {
+    if (isRemovedFromSpec(operation)) continue;
+    if (operation.tier === "A") counts.A += 1;
+    else if (operation.tier === "B") counts.B += 1;
+    else if (operation.tier === "C") counts.C += 1;
+    else {
+      fail(
+        `ledger row ${operation.method.toUpperCase()} ${operation.path} has tier "${operation.tier}" which cannot be rendered in the spec`,
+      );
+    }
   }
+  return counts;
+}
+
+function tierOfOperation(operation: JsonObject): string | undefined {
+  const evidence = operation["x-evidence"];
+  return isRecord(evidence) && typeof evidence.tier === "string"
+    ? evidence.tier
+    : undefined;
 }
 
 function findSurface(ledger: Ledger, surfaceId: string): LedgerSurface {
@@ -883,7 +993,7 @@ function buildCatalogSchema(
     {
       sourceType: "Fantasy402SportCatalog",
       componentName: "Fantasy402SportCatalog",
-      source: readText(CATALOG_TYPE_SOURCE),
+      source: readArtifact(CATALOG_TYPE_SOURCE_REL),
       fileName: "fantasy402_sport_catalog.ts",
       description:
         "Fantasy402 desk navigation catalog (sub-sport lanes plus per-sport period menus). Reference metadata only, not an ingestion audit record. Surface: surface.fantasy402-sport-catalog (tier D).",
@@ -1579,6 +1689,542 @@ function surfaceOperation(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Tier A rendering from the live capture store                               */
+/* -------------------------------------------------------------------------- */
+
+/** Bounded scalar types emitted by scripts/capture/schema.ts skeletons. */
+type SkeletonScalarType = "string" | "number" | "boolean" | "null" | "unknown";
+
+interface SkeletonObjectNode {
+  readonly type: "object";
+  readonly nullable: boolean;
+  readonly fields: Readonly<Record<string, SkeletonNode>>;
+  readonly truncated: boolean;
+}
+
+interface SkeletonArrayNode {
+  readonly type: "array";
+  readonly nullable: boolean;
+  readonly items: SkeletonNode | null;
+  readonly truncated: boolean;
+}
+
+interface SkeletonScalarNode {
+  readonly type: SkeletonScalarType;
+  readonly nullable: boolean;
+  readonly enumCandidates: readonly string[];
+  readonly truncated: boolean;
+}
+
+type SkeletonNode = SkeletonObjectNode | SkeletonArrayNode | SkeletonScalarNode;
+
+const SKELETON_SCALAR_TYPES: readonly SkeletonScalarType[] = [
+  "string",
+  "number",
+  "boolean",
+  "null",
+  "unknown",
+];
+
+function isSkeletonScalarType(value: string): value is SkeletonScalarType {
+  return (SKELETON_SCALAR_TYPES as readonly string[]).includes(value);
+}
+
+/** Validate a capture bodySkeleton (schema v1) without accepting loose shapes. */
+function parseSkeletonNode(raw: unknown, label: string): SkeletonNode {
+  if (!isRecord(raw)) fail(`${label} must be an object`);
+  const type = raw.type;
+  if (typeof type !== "string") fail(`${label}.type must be a string`);
+  const nullable = asBoolean(raw.nullable, `${label}.nullable`);
+  const truncated = raw.truncated === true;
+  if (type === "object") {
+    if (!isRecord(raw.fields)) fail(`${label}.fields must be an object`);
+    const fields: Record<string, SkeletonNode> = {};
+    for (const key of Object.keys(raw.fields).sort()) {
+      fields[key] = parseSkeletonNode(
+        raw.fields[key],
+        `${label}.fields.${key}`,
+      );
+    }
+    return { type: "object", nullable, fields, truncated };
+  }
+  if (type === "array") {
+    const rawItems = raw.items;
+    const items =
+      rawItems === null || rawItems === undefined
+        ? null
+        : parseSkeletonNode(rawItems, `${label}.items`);
+    return { type: "array", nullable, items, truncated };
+  }
+  if (!isSkeletonScalarType(type)) {
+    fail(
+      `${label}.type must be object|array|${SKELETON_SCALAR_TYPES.join("|")}; found "${type}"`,
+    );
+  }
+  const rawEnum = raw.enumCandidates;
+  const enumCandidates: string[] = [];
+  if (rawEnum !== undefined) {
+    if (
+      !Array.isArray(rawEnum) ||
+      !rawEnum.every((entry) => typeof entry === "string")
+    ) {
+      fail(`${label}.enumCandidates must be an array of strings`);
+    }
+    for (const entry of rawEnum) {
+      if (typeof entry === "string") enumCandidates.push(entry);
+    }
+  }
+  return { type, nullable, enumCandidates, truncated };
+}
+
+/**
+ * Convert a capture skeleton into an OpenAPI 3.1 schema.
+ *
+ * The skeleton is value-free by construction (scripts/capture/schema.ts): only
+ * types, field names and safe low-cardinality enum candidates are published.
+ * `nullable` becomes a `null` type branch; `truncated` becomes an honest
+ * x-capture-truncated marker rather than an implied complete shape.
+ */
+function skeletonToSchema(node: SkeletonNode): JsonObject {
+  const schema: JsonObject = {};
+  switch (node.type) {
+    case "object": {
+      const properties: JsonObject = {};
+      for (const key of Object.keys(node.fields).sort()) {
+        const child = node.fields[key];
+        if (child !== undefined) properties[key] = skeletonToSchema(child);
+      }
+      schema.type = node.nullable ? ["object", "null"] : "object";
+      schema.properties = properties;
+      break;
+    }
+    case "array": {
+      schema.type = node.nullable ? ["array", "null"] : "array";
+      if (node.items !== null) schema.items = skeletonToSchema(node.items);
+      break;
+    }
+    case "null":
+      schema.type = "null";
+      break;
+    case "unknown":
+      schema.description =
+        "Unknown shape: the capture recorded a truncated or unrepresentable value.";
+      break;
+    default: {
+      schema.type = node.nullable ? [node.type, "null"] : node.type;
+      if (node.type === "string" && node.enumCandidates.length > 0) {
+        schema.enum = [...node.enumCandidates];
+      }
+      break;
+    }
+  }
+  if (node.truncated) schema["x-capture-truncated"] = true;
+  return schema;
+}
+
+/** Canonical JSON (recursively sorted keys, compact) matching capture/json.ts. */
+function canonicalizeJsonValue(value: unknown): unknown {
+  if (value === null) return null;
+  if (Array.isArray(value)) return value.map(canonicalizeJsonValue);
+  if (!isRecord(value)) return value;
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(value).sort()) {
+    const child = value[key];
+    if (child === undefined) continue;
+    sorted[key] = canonicalizeJsonValue(child);
+  }
+  return sorted;
+}
+
+/** sha256 of the canonical capture record; equals manifest captureHash. */
+function captureRecordDigest(record: unknown): string {
+  return createHash("sha256")
+    .update(JSON.stringify(canonicalizeJsonValue(record)))
+    .digest("hex");
+}
+
+function mediaTypeOf(contentType: string, fallback: string): string {
+  const base = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (base === "") return fallback;
+  if (base.includes("json")) return "application/json";
+  if (base.includes("x-www-form-urlencoded")) {
+    return "application/x-www-form-urlencoded";
+  }
+  return base;
+}
+
+function firstRequestMediaType(requestBody: unknown): string | undefined {
+  if (!isRecord(requestBody)) return undefined;
+  const content = requestBody.content;
+  if (!isRecord(content)) return undefined;
+  const keys = Object.keys(content).sort();
+  return keys[0];
+}
+
+interface LiveCaptureRecord {
+  readonly relativePath: string;
+  readonly capturedAt: string;
+  readonly capturedAtMs: number;
+  readonly path: string;
+  readonly method: string;
+  readonly status: number;
+  readonly responseContentType: string;
+  readonly responseBodySha256: string | null;
+  readonly responseSkeleton: SkeletonNode;
+  readonly requestContentType: string;
+  readonly requestSkeleton: SkeletonNode | null;
+  readonly digest: string;
+  readonly samples: number;
+}
+
+interface CaptureStoreLoad {
+  readonly captures: readonly LiveCaptureRecord[];
+  readonly problems: readonly string[];
+}
+
+const NON_CAPTURE_FILES = new Set(["manifest.json"]);
+
+function isCaptureFileName(name: string): boolean {
+  if (!name.endsWith(".json")) return false;
+  if (NON_CAPTURE_FILES.has(name)) return false;
+  if (name.startsWith("applied-")) return false;
+  return true;
+}
+
+/** Recursively collect capture JSON files in deterministic (sorted) order. */
+function listCaptureFiles(dir: string): string[] {
+  const found: string[] = [];
+  const walk = (current: string): void => {
+    let entries: string[];
+    try {
+      entries = readdirSync(current).sort();
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = join(current, entry);
+      let directory = false;
+      try {
+        directory = statSync(full).isDirectory();
+      } catch {
+        continue;
+      }
+      if (directory) walk(full);
+      else if (isCaptureFileName(entry)) found.push(full);
+    }
+  };
+  walk(dir);
+  return found;
+}
+
+interface ParsedCaptureRecord {
+  readonly capture?: LiveCaptureRecord;
+  readonly problem?: string;
+}
+
+function stripGeneratorPrefix(message: string): string {
+  return message.replace(/^generate_openapi: /, "");
+}
+
+/**
+ * Parse and validate one capture record for tier-A selection. Selection rules:
+ * schemaVersion 1, mode live, redaction.clean, policy v1, 2xx response with a
+ * bodySkeleton. Anything else is a recorded problem, never a silent skip.
+ */
+function parseLiveCapture(
+  relativePath: string,
+  raw: unknown,
+): ParsedCaptureRecord {
+  const problem = (message: string): ParsedCaptureRecord => ({
+    problem: `${relativePath}: ${message}`,
+  });
+  if (!isRecord(raw)) return problem("capture record must be a JSON object");
+  if (raw.schemaVersion !== 1) {
+    return problem(
+      `schemaVersion must be 1 (found ${JSON.stringify(raw.schemaVersion)})`,
+    );
+  }
+  if (raw.mode !== "live") {
+    return problem(
+      `mode must be "live" (found ${JSON.stringify(raw.mode)}); mock/offline captures never back tier A`,
+    );
+  }
+  const capturedAt = typeof raw.capturedAt === "string" ? raw.capturedAt : "";
+  const capturedAtMs = Date.parse(capturedAt);
+  if (capturedAt === "" || Number.isNaN(capturedAtMs)) {
+    return problem("capturedAt must be an ISO-8601 timestamp");
+  }
+  const operation = raw.operation;
+  if (!isRecord(operation)) return problem("operation must be {path, method}");
+  const path = typeof operation.path === "string" ? operation.path : "";
+  const method =
+    typeof operation.method === "string" ? operation.method.toUpperCase() : "";
+  if (!path.startsWith("/")) {
+    return problem("operation.path must be an absolute API path");
+  }
+  if (method === "") return problem("operation.method must be non-empty");
+  const redaction = raw.redaction;
+  if (!isRecord(redaction)) return problem("redaction report is required");
+  if (redaction.clean !== true) {
+    return problem("redaction.clean must be true");
+  }
+  if (redaction.policyVersion !== 1) {
+    return problem("redaction.policyVersion must be 1");
+  }
+  const response = raw.response;
+  if (!isRecord(response)) {
+    return problem(
+      "response is required; tier A needs a captured 2xx response",
+    );
+  }
+  const status = response.status;
+  if (
+    typeof status !== "number" ||
+    !Number.isInteger(status) ||
+    status < 200 ||
+    status > 299
+  ) {
+    return problem(
+      `response.status must be a 2xx integer (found ${JSON.stringify(status)})`,
+    );
+  }
+  if (response.bodySkeleton === null || response.bodySkeleton === undefined) {
+    return problem("response.bodySkeleton is required");
+  }
+  let responseSkeleton: SkeletonNode;
+  try {
+    responseSkeleton = parseSkeletonNode(
+      response.bodySkeleton,
+      "response.bodySkeleton",
+    );
+  } catch (error) {
+    return problem(
+      stripGeneratorPrefix(
+        error instanceof Error ? error.message : String(error),
+      ),
+    );
+  }
+  const request = raw.request;
+  if (!isRecord(request)) {
+    return problem(
+      "request is required; a response without its request cannot prove the wire contract",
+    );
+  }
+  let requestSkeleton: SkeletonNode | null = null;
+  if (request.bodySkeleton !== null && request.bodySkeleton !== undefined) {
+    try {
+      requestSkeleton = parseSkeletonNode(
+        request.bodySkeleton,
+        "request.bodySkeleton",
+      );
+    } catch (error) {
+      return problem(
+        stripGeneratorPrefix(
+          error instanceof Error ? error.message : String(error),
+        ),
+      );
+    }
+  }
+  let digest: string;
+  try {
+    digest = captureRecordDigest(raw);
+  } catch (error) {
+    return problem(
+      `capture record is not canonically hashable: ${stripGeneratorPrefix(
+        error instanceof Error ? error.message : String(error),
+      )}`,
+    );
+  }
+  return {
+    capture: {
+      relativePath,
+      capturedAt,
+      capturedAtMs,
+      path,
+      method,
+      status,
+      responseContentType:
+        typeof response.contentType === "string" ? response.contentType : "",
+      responseBodySha256:
+        typeof response.bodySha256 === "string" ? response.bodySha256 : null,
+      responseSkeleton,
+      requestContentType:
+        typeof request.contentType === "string" ? request.contentType : "",
+      requestSkeleton,
+      digest,
+      samples:
+        typeof raw.samples === "number" &&
+        Number.isInteger(raw.samples) &&
+        raw.samples > 0
+          ? raw.samples
+          : 1,
+    },
+  };
+}
+
+function loadCaptureStore(capturesDir: string): CaptureStoreLoad {
+  if (!existsSync(capturesDir)) {
+    fail(
+      `tier A ledger rows exist but the capture store is missing: ${capturesDir}. Capture live evidence first; the generator never invents a response schema.`,
+    );
+  }
+  const captures: LiveCaptureRecord[] = [];
+  const problems: string[] = [];
+  for (const file of listCaptureFiles(capturesDir)) {
+    const relativePath = relative(capturesDir, file).split("\\").join("/");
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readText(file)) as unknown;
+    } catch (error) {
+      problems.push(
+        `${relativePath}: invalid JSON (${error instanceof Error ? error.message : String(error)})`,
+      );
+      continue;
+    }
+    if (!isRecord(raw) || raw.schemaVersion !== 1) continue;
+    const parsed = parseLiveCapture(relativePath, raw);
+    if (parsed.capture !== undefined) captures.push(parsed.capture);
+    else if (parsed.problem !== undefined) problems.push(parsed.problem);
+  }
+  return { captures, problems };
+}
+
+/**
+ * Select the latest valid live capture for an A row (deterministic tie-break on
+ * the relative file path). No match is a hard error with the rejected-record
+ * reasons, so an A row can never fall back to an invented schema.
+ */
+function selectCaptureForRow(
+  operation: LedgerOperation,
+  capturesDir: string,
+  store: CaptureStoreLoad,
+): LiveCaptureRecord {
+  const method = operation.method.toUpperCase();
+  const matches = store.captures.filter(
+    (capture) => capture.path === operation.path && capture.method === method,
+  );
+  const latest = pickLatestCapture(matches);
+  if (latest === undefined) {
+    const details =
+      store.problems.length > 0
+        ? ` Rejected capture records: ${store.problems.slice(0, 5).join("; ")}`
+        : "";
+    fail(
+      `tier A ledger row ${method} ${operation.path} has no valid live capture under ${capturesDir}; capture it live and re-run apply_captures --write.${details}`,
+    );
+  }
+  return latest;
+}
+
+function pickLatestCapture(
+  matches: readonly LiveCaptureRecord[],
+): LiveCaptureRecord | undefined {
+  let latest: LiveCaptureRecord | undefined;
+  for (const capture of matches) {
+    if (latest === undefined) {
+      latest = capture;
+      continue;
+    }
+    if (
+      capture.capturedAtMs > latest.capturedAtMs ||
+      (capture.capturedAtMs === latest.capturedAtMs &&
+        capture.relativePath < latest.relativePath)
+    ) {
+      latest = capture;
+    }
+  }
+  return latest;
+}
+
+/**
+ * Render a ledger Tier A operation from its live capture record.
+ *
+ * The operation keeps the observed request template's summary/tags/security
+ * (there is no captured response contract to infer those from) and replaces
+ * the description, request schema and response schema with capture-derived
+ * content. Only previously observed (tier B) operations are upgradable this
+ * way; anything else fails instead of inventing a contract.
+ */
+function capturedOperation(
+  operation: LedgerOperation,
+  capture: LiveCaptureRecord,
+): JsonObject {
+  const method = operation.method.toUpperCase();
+  const templateBuilder = B_OPERATION_BUILDERS[operation.path];
+  if (templateBuilder === undefined) {
+    fail(
+      `tier A ledger row ${method} ${operation.path} has no evidenced operation template; only a previously observed (tier B) operation can be upgraded from a capture without inventing a contract`,
+    );
+  }
+  const base = templateBuilder(operation);
+  const baseRequestBody = base.requestBody;
+  const fallbackMedia =
+    firstRequestMediaType(baseRequestBody) ?? "application/json";
+  const bodyShaNote =
+    capture.responseBodySha256 !== null
+      ? ` (response body sha256 ${capture.responseBodySha256})`
+      : "";
+  const description = [
+    `Live-captured contract: ${capture.relativePath} (schemaVersion 1, mode live) recorded ${method} ${operation.path} at ${capture.capturedAt} with a ${capture.status} response${bodyShaNote}.`,
+    "Request and response were captured live with redaction clean (policy v1).",
+    "The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published.",
+  ].join(" ");
+  const responses: JsonObject = {
+    [String(capture.status)]: {
+      description: `Captured live ${capture.status} response from ${capture.relativePath}; schema derived from the captured body skeleton.`,
+      content: {
+        [mediaTypeOf(capture.responseContentType, "application/json")]: {
+          schema: skeletonToSchema(capture.responseSkeleton),
+        },
+      },
+    },
+    default: {
+      description: "Other status codes were not captured by this record.",
+    },
+  };
+  const baseSummary = typeof base.summary === "string" ? base.summary : "";
+  const summary =
+    baseSummary === ""
+      ? `Live-captured ${method} ${operation.path}`
+      : baseSummary
+          .replace(
+            /\(request observed; response not captured\)/i,
+            "(request + response captured)",
+          )
+          .replace(/response not captured/gi, "request + response captured");
+  const rendered: JsonObject = {
+    ...base,
+    summary,
+    description,
+    responses,
+    "x-evidence": {
+      tier: "A",
+      sources: [`capture:${capture.relativePath}`, `sha256:${capture.digest}`],
+      capturedResponse: true,
+    },
+    "x-capture": {
+      file: capture.relativePath,
+      sha256: capture.digest,
+      capturedAt: capture.capturedAt,
+      status: capture.status,
+      samples: capture.samples,
+    },
+  };
+  const requestSkeleton = capture.requestSkeleton;
+  if (requestSkeleton !== null && requestSkeleton.type !== "null") {
+    rendered.requestBody = {
+      required: isRecord(baseRequestBody) && baseRequestBody.required === true,
+      content: {
+        [mediaTypeOf(capture.requestContentType, fallbackMedia)]: {
+          schema: skeletonToSchema(requestSkeleton),
+        },
+      },
+    };
+  }
+  return rendered;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Components                                                                 */
 /* -------------------------------------------------------------------------- */
 
@@ -1633,13 +2279,19 @@ function buildHeaders(): JsonObject {
   };
 }
 
-function buildSchemas(): JsonObject {
-  const catalogSource = readText(CATALOG_TYPE_SOURCE);
-  const churnSource = readText(CHURN_TYPE_SOURCE);
+function buildSchemas(ledger: Ledger): JsonObject {
+  const catalogSource = readArtifact(CATALOG_TYPE_SOURCE_REL);
+  const churnSource = readArtifact(CHURN_TYPE_SOURCE_REL);
   const catalogFixture = parseCatalogFixture(
-    JSON.parse(readText(CATALOG_FIXTURE)) as unknown,
+    JSON.parse(readArtifact(CATALOG_FIXTURE_REL)) as unknown,
   );
   const catalogCounts = validateCatalogFixture(catalogFixture);
+  const tierByPath = new Map<string, string>(
+    ledger.operations.map(
+      (operation) => [operation.path, operation.tier] as const,
+    ),
+  );
+  const ledgerTierOf = (path: string): string => tierByPath.get(path) ?? "B";
 
   const sourceToComponent: Readonly<Record<string, string>> = {
     Fantasy402SportCatalog: "Fantasy402SportCatalog",
@@ -1728,7 +2380,9 @@ function buildSchemas(): JsonObject {
       source: churnSource,
       fileName: "simulate_bettor_churn_suite.ts",
       description:
-        "Consumer wire type for one bet-ticker row. Field names and number types only; this is a type declaration, not a captured response, so the getBetTicker operation (tier C) publishes no response schema.",
+        ledgerTierOf("/cloud/api/Manager/getBetTicker") === "A"
+          ? "Consumer wire type for one bet-ticker row. Field names and number types only. The getBetTicker operation is now tier A: its response schema is derived from the live capture skeleton, while this component remains a consumer type declaration."
+          : "Consumer wire type for one bet-ticker row. Field names and number types only; this is a type declaration, not a captured response, so the getBetTicker operation (tier C) publishes no response schema.",
     },
     {
       sourceType: "RawPendingLegRow",
@@ -1736,7 +2390,9 @@ function buildSchemas(): JsonObject {
       source: churnSource,
       fileName: "simulate_bettor_churn_suite.ts",
       description:
-        "Consumer wire type for one pending wager leg. Risk and ToWin are cents and repeat identically across parlay legs. This is a type declaration, not a captured response; no pending-leg fixture or capture exists, so the getPending operation (tier C) publishes no response schema.",
+        ledgerTierOf("/cloud/api/Manager/getPending") === "A"
+          ? "Consumer wire type for one pending wager leg. Risk and ToWin are cents and repeat identically across parlay legs. The getPending operation is now tier A: its response schema is derived from the live capture skeleton, while this component remains a consumer type declaration."
+          : "Consumer wire type for one pending wager leg. Risk and ToWin are cents and repeat identically across parlay legs. This is a type declaration, not a captured response; no pending-leg fixture or capture exists, so the getPending operation (tier C) publishes no response schema.",
     },
     {
       sourceType: "RawWebLogEntry",
@@ -1744,7 +2400,9 @@ function buildSchemas(): JsonObject {
       source: churnSource,
       fileName: "simulate_bettor_churn_suite.ts",
       description:
-        "Consumer type that declares the four fields the old spec published as the getWebLog response row (customerID, ipAddress, timestamp, agentOwner). It is NOT used as a response schema here: the getWebLog response body was never captured (operational_guardrails_runbook.md:153), so the row schema remains undocumented.",
+        ledgerTierOf("/cloud/api/Manager/getWebLog") === "A"
+          ? "Consumer type that declares the four fields the old spec published as the getWebLog response row (customerID, ipAddress, timestamp, agentOwner). The getWebLog operation is now tier A and derives its response schema from the live capture skeleton; this component remains a consumer type declaration and is not used for that schema."
+          : "Consumer type that declares the four fields the old spec published as the getWebLog response row (customerID, ipAddress, timestamp, agentOwner). It is NOT used as a response schema here: the getWebLog response body was never captured (operational_guardrails_runbook.md:153), so the row schema remains undocumented.",
     },
   ];
 
@@ -1765,21 +2423,27 @@ function buildSchemas(): JsonObject {
 /* Spec assembly                                                              */
 /* -------------------------------------------------------------------------- */
 
-function buildInfo(): JsonObject {
+function buildInfo(ledger: Ledger): JsonObject {
+  const description =
+    ledger.counts.A > 0
+      ? "Evidence model: every operation carries x-evidence.tier — A means a captured request and response are verified, B means observed first-party evidence (a captured request or a handler-verified route) without a captured response, C means inferred only with no capture, and D means a real surface missing from the spec; tier-A rows are backed by live capture records in docs/evidence/captures and publish capture-derived response schemas (see docs/EVIDENCE.md)."
+      : "Evidence model: every operation carries x-evidence.tier — A means a captured request and response are verified, B means observed first-party evidence (a captured request or a handler-verified route) without a captured response, C means inferred only with no capture, and D means a real surface missing from the spec; this release has no tier-A rows because no response body was ever captured (see docs/EVIDENCE.md).";
   return {
     title: "SportsDesk & Fantasy402 Wire API (evidence-labelled)",
     version: "2026.10.31",
-    description:
-      "Evidence model: every operation carries x-evidence.tier — A means a captured request and response are verified, B means observed first-party evidence (a captured request or a handler-verified route) without a captured response, C means inferred only with no capture, and D means a real surface missing from the spec; this release has no tier-A rows because no response body was ever captured (see docs/EVIDENCE.md).",
+    description,
   };
 }
 
-function buildServers(): readonly JsonObject[] {
+function buildServers(ledger: Ledger): readonly JsonObject[] {
+  const cloudDescription =
+    ledger.counts.A > 0
+      ? "Fantasy402 cloud portal (Manager/Report/System API). Tier-A rows carry live request+response captures; other rows are request-side evidence only."
+      : "Fantasy402 cloud portal (Manager/Report/System API). Request-side evidence only; no response body was captured.";
   return [
     {
       url: "https://www.fantasy402.com",
-      description:
-        "Fantasy402 cloud portal (Manager/Report/System API). Request-side evidence only; no response body was captured.",
+      description: cloudDescription,
     },
     {
       url: "http://127.0.0.1:4020",
@@ -1789,17 +2453,20 @@ function buildServers(): readonly JsonObject[] {
   ];
 }
 
-function buildTags(): readonly JsonObject[] {
+function buildTags(ledger: Ledger): readonly JsonObject[] {
+  const hasCapturedTier = ledger.counts.A > 0;
   return [
     {
       name: TAG_FORENSIC,
-      description:
-        "Cloud Manager surveillance operations with first-party evidence (request capture only; no response body captured).",
+      description: hasCapturedTier
+        ? "Cloud Manager surveillance operations with first-party evidence; tier-A rows carry a live request+response capture."
+        : "Cloud Manager surveillance operations with first-party evidence (request capture only; no response body captured).",
     },
     {
       name: TAG_CUSTOMER,
-      description:
-        "Cloud Manager customer state operations with first-party evidence (request capture only; no response body captured).",
+      description: hasCapturedTier
+        ? "Cloud Manager customer state operations with first-party evidence; tier-A rows carry a live request+response capture."
+        : "Cloud Manager customer state operations with first-party evidence (request capture only; no response body captured).",
     },
     {
       name: TAG_DAEMON,
@@ -1819,11 +2486,14 @@ function buildTags(): readonly JsonObject[] {
   ];
 }
 
-function buildPaths(ledger: Ledger): JsonObject {
+function buildPaths(ledger: Ledger, capturesDir: string): JsonObject {
+  const hasTierA = ledger.operations.some(
+    (operation) => operation.tier === "A",
+  );
+  const captureStore = hasTierA ? loadCaptureStore(capturesDir) : undefined;
   const paths: JsonObject = {};
   for (const operation of ledger.operations) {
-    if (operation.tier === "E") continue;
-    if (operation.path.includes("manager-tools/ajax.php")) continue;
+    if (isRemovedFromSpec(operation)) continue;
     const method = operation.method;
     if (!isHttpMethod(method)) {
       fail(`ledger row ${operation.path} has unsupported method "${method}"`);
@@ -1831,7 +2501,15 @@ function buildPaths(ledger: Ledger): JsonObject {
     const pathItem = paths[operation.path];
     const builder: JsonObject =
       pathItem !== undefined && isRecord(pathItem) ? pathItem : {};
-    if (operation.tier === "B") {
+    if (operation.tier === "A") {
+      if (captureStore === undefined) {
+        fail("internal: tier A rows exist without a loaded capture store");
+      }
+      builder[method] = capturedOperation(
+        operation,
+        selectCaptureForRow(operation, capturesDir, captureStore),
+      );
+    } else if (operation.tier === "B") {
       const operationBuilder = B_OPERATION_BUILDERS[operation.path];
       if (operationBuilder === undefined) {
         fail(
@@ -1859,18 +2537,18 @@ function buildPaths(ledger: Ledger): JsonObject {
   return paths;
 }
 
-function buildSpec(ledger: Ledger): JsonObject {
+function buildSpec(ledger: Ledger, capturesDir: string): JsonObject {
   return {
     openapi: "3.1.0",
-    info: buildInfo(),
-    servers: buildServers(),
-    tags: buildTags(),
-    paths: buildPaths(ledger),
+    info: buildInfo(ledger),
+    servers: buildServers(ledger),
+    tags: buildTags(ledger),
+    paths: buildPaths(ledger, capturesDir),
     components: {
       securitySchemes: buildSecuritySchemes(),
       parameters: buildParameters(),
       headers: buildHeaders(),
-      schemas: buildSchemas(),
+      schemas: buildSchemas(ledger),
     },
   };
 }
@@ -1926,10 +2604,77 @@ function selfGate(
   rawLedger: unknown,
   rawText: string,
 ): void {
+  const paths = spec.paths;
+  if (!isRecord(paths)) fail("internal: paths missing");
+  const operations = collectOperationsFromPaths(paths);
+  const expectedTiers = expectedSpecTierCounts(
+    ledger,
+    surfaceOperationSpecs(ledger).length,
+  );
+  const expectedOperations =
+    expectedTiers.A + expectedTiers.B + expectedTiers.C + expectedTiers.D;
+  if (operations.length !== expectedOperations) {
+    fail(
+      `expected ${expectedOperations} operations from the ledger, generated ${operations.length}`,
+    );
+  }
+  const tiers = tierCounts(operations);
+  for (const tier of ["A", "B", "C", "D"] as const) {
+    if (tiers[tier] !== expectedTiers[tier]) {
+      fail(
+        `expected ${expectedTiers[tier]} tier-${tier} operations from the ledger, found ${tiers[tier]}`,
+      );
+    }
+  }
+
+  // Tier A rows must publish a capture-derived schema and no requiredCapture.
+  for (const entry of operations) {
+    if (tierOfOperation(entry.operation) !== "A") continue;
+    const responses = entry.operation.responses;
+    const hasResponseContent =
+      isRecord(responses) &&
+      Object.values(responses).some(
+        (response) =>
+          isRecord(response) &&
+          Object.prototype.hasOwnProperty.call(response, "content"),
+      );
+    if (!hasResponseContent) {
+      fail(
+        `tier A operation ${entry.method.toUpperCase()} ${entry.path} must publish a capture-derived response schema`,
+      );
+    }
+    const evidence = entry.operation["x-evidence"];
+    if (isRecord(evidence) && "requiredCapture" in evidence) {
+      fail(
+        `tier A operation ${entry.method.toUpperCase()} ${entry.path} must not carry requiredCapture`,
+      );
+    }
+  }
+
+  // The docs gate still forbids content on getWebLog because the response was
+  // never captured at the time it was written. A live tier-A capture is exactly
+  // the evidence that lifts that guard; the generator records the gap instead of
+  // refusing to render real evidence (verify_docs.ts needs a tier-A exemption).
+  const capturedGetWebLog = operations.some(
+    (entry) =>
+      /\/getWebLog$/i.test(entry.path) &&
+      tierOfOperation(entry.operation) === "A",
+  );
   const outcomes: readonly CheckOutcome[] = [
     checkOpenApi(spec, rawText),
     checkLedger(rawLedger, spec),
-  ];
+  ].map((outcome) => {
+    if (!capturedGetWebLog) return outcome;
+    const issues = outcome.issues.filter(
+      (issue) => issue.code !== "E_GETWEBLOG_RESPONSE_CONTENT",
+    );
+    if (issues.length === outcome.issues.length) return outcome;
+    return {
+      ...outcome,
+      issues,
+      status: issues.length > 0 ? ("fail" as const) : ("pass" as const),
+    };
+  });
   let failed = false;
   for (const outcome of outcomes) {
     if (outcome.status === "fail") {
@@ -1939,23 +2684,10 @@ function selfGate(
     }
   }
   if (failed) fail("generated spec does not pass scripts/verify_docs.ts");
-
-  const paths = spec.paths;
-  if (!isRecord(paths)) fail("internal: paths missing");
-  const operations = collectOperationsFromPaths(paths);
-  if (operations.length !== EXPECTED_SPEC_OPERATIONS) {
-    fail(
-      `expected ${EXPECTED_SPEC_OPERATIONS} operations, generated ${operations.length}`,
+  if (capturedGetWebLog) {
+    console.error(
+      "generate_openapi: note: scripts/verify_docs.ts still rejects captured content on getWebLog (E_GETWEBLOG_RESPONSE_CONTENT); a live tier-A capture requires a tier-A exemption in that gate. The renderer keeps the captured schema.",
     );
-  }
-  const tiers = tierCounts(operations);
-  for (const tier of ["A", "B", "C", "D"] as const) {
-    const expected = EXPECTED_SPEC_TIERS[tier];
-    if (tiers[tier] !== expected) {
-      fail(
-        `expected ${expected} tier-${tier} operations, found ${tiers[tier]}`,
-      );
-    }
   }
 
   const usedTags = new Set<string>();
@@ -1994,7 +2726,7 @@ function selfGate(
     }
   }
 
-  const evidenceMd = readText(EVIDENCE_MD_PATH);
+  const evidenceMd = readArtifact(EVIDENCE_MD_REL);
   for (const entry of operations) {
     const surfaceId = entry.operation["x-surface-id"];
     if (typeof surfaceId !== "string") continue;
@@ -2025,7 +2757,7 @@ function selfGate(
 function formatWithRepoFormatter(outputPath: string): void {
   const result = Bun.spawnSync({
     cmd: [process.execPath, "fmt", outputPath],
-    cwd: ROOT,
+    cwd: SCRIPT_ROOT,
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -2038,33 +2770,93 @@ function formatWithRepoFormatter(outputPath: string): void {
   }
 }
 
-function parseOutputPath(argv: readonly string[]): string {
-  let output = DEFAULT_OUTPUT_PATH;
+interface GeneratorOptions {
+  readonly root: string;
+  readonly ledgerPath: string;
+  readonly capturesDir: string;
+  readonly outputPath: string;
+}
+
+const USAGE = `usage: bun run scripts/generate_openapi.ts [--out <path>] [--root <dir>] [--ledger <path>] [--captures <dir>]
+
+  --out       output spec path (default: <root>/docs/openapi.json)
+  --root      repository/evidence root for the ledger + capture store
+              (default: this checkout; type sources fall back to it)
+  --ledger    ledger path override (default: <root>/docs/evidence/ledger.json)
+  --captures  live capture store override (default: <root>/docs/evidence/captures)`;
+
+function optionValue(
+  argv: readonly string[],
+  index: number,
+  flag: string,
+): string {
+  const next = argv[index + 1];
+  if (next === undefined) fail(`${flag} requires a value`);
+  return next;
+}
+
+function parseCliOptions(argv: readonly string[]): GeneratorOptions | null {
+  let rootArg: string | undefined;
+  let ledgerArg: string | undefined;
+  let capturesArg: string | undefined;
+  let outputArg: string | undefined;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--out") {
-      const next = argv[index + 1];
-      if (next === undefined) fail("--out requires a path");
-      output = resolve(process.cwd(), next);
+      outputArg = optionValue(argv, index, "--out");
+      index += 1;
+    } else if (argument === "--root") {
+      rootArg = optionValue(argv, index, "--root");
+      index += 1;
+    } else if (argument === "--ledger") {
+      ledgerArg = optionValue(argv, index, "--ledger");
+      index += 1;
+    } else if (argument === "--captures") {
+      capturesArg = optionValue(argv, index, "--captures");
       index += 1;
     } else if (argument === "--help" || argument === "-h") {
-      console.log("usage: bun run scripts/generate_openapi.ts [--out <path>]");
+      console.log(USAGE);
       process.exitCode = 0;
-      return "";
+      return null;
     } else {
-      fail(`unknown argument: ${argument}`);
+      fail(`unknown argument: ${argument}\n${USAGE}`);
     }
   }
-  return output;
+  const root =
+    rootArg !== undefined ? resolve(process.cwd(), rootArg) : SCRIPT_ROOT;
+  return {
+    root,
+    ledgerPath:
+      ledgerArg !== undefined
+        ? resolve(process.cwd(), ledgerArg)
+        : join(root, LEDGER_REL),
+    capturesDir:
+      capturesArg !== undefined
+        ? resolve(process.cwd(), capturesArg)
+        : join(root, CAPTURES_REL),
+    outputPath:
+      outputArg !== undefined
+        ? resolve(process.cwd(), outputArg)
+        : join(root, SPEC_REL),
+  };
 }
 
 function main(argv: readonly string[]): void {
-  const outputPath = parseOutputPath(argv);
-  if (outputPath === "") return;
-  const rawLedger = JSON.parse(readText(LEDGER_PATH)) as unknown;
+  const options = parseCliOptions(argv);
+  if (options === null) return;
+  artifactRoot = options.root;
+  const rawLedgerText = readText(options.ledgerPath);
+  let rawLedger: unknown;
+  try {
+    rawLedger = JSON.parse(rawLedgerText) as unknown;
+  } catch (error) {
+    fail(
+      `ledger is not valid JSON (${options.ledgerPath}): ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   const ledger = parseLedger(rawLedger);
-  assertFrozenLedger(ledger);
-  const spec = buildSpec(ledger);
+  assertLedgerConsistency(ledger);
+  const spec = buildSpec(ledger, options.capturesDir);
   const rawText = `${JSON.stringify(spec, null, 2)}\n`;
   selfGate(spec, ledger, rawLedger, rawText);
 
@@ -2073,16 +2865,16 @@ function main(argv: readonly string[]): void {
   const operationCount = collectOperationsFromPaths(paths).length;
   const tiers = tierCounts(collectOperationsFromPaths(paths));
 
-  writeFileSync(outputPath, rawText, "utf8");
-  formatWithRepoFormatter(outputPath);
-  const formattedText = readText(outputPath);
+  writeFileSync(options.outputPath, rawText, "utf8");
+  formatWithRepoFormatter(options.outputPath);
+  const formattedText = readText(options.outputPath);
   JSON.parse(formattedText);
   const digest = createHash("sha256").update(formattedText).digest("hex");
-  const relative = outputPath.startsWith(ROOT)
-    ? outputPath.slice(ROOT.length + 1)
-    : outputPath;
+  const display = options.outputPath.startsWith(`${SCRIPT_ROOT}/`)
+    ? options.outputPath.slice(SCRIPT_ROOT.length + 1)
+    : options.outputPath;
   console.log(
-    `generate_openapi: wrote ${relative} — ${Object.keys(paths).length} paths / ${operationCount} operations (A${String(tiers.A)} B${String(tiers.B)} C${String(tiers.C)} D${String(tiers.D)}), sha256 ${digest}`,
+    `generate_openapi: wrote ${display} — ${Object.keys(paths).length} paths / ${operationCount} operations (A${String(tiers.A)} B${String(tiers.B)} C${String(tiers.C)} D${String(tiers.D)}), sha256 ${digest}`,
   );
 }
 

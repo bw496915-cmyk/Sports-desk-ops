@@ -426,3 +426,106 @@ describe("negative coverage — the gate bites", () => {
     );
   });
 });
+
+/* ------------------------------------------------------------------------- */
+/* getWebLog tier-A capture gate (P-E)                                        */
+/* ------------------------------------------------------------------------- */
+
+const VALID_TIER_A_CAPTURE = {
+  file: "2026-10-31/getWebLog.post.json",
+  sha256: "216affe5fe89706085b42b4093db302bdb0a6f7a218ffb8ab8d4dfc83b309202",
+  capturedAt: "2026-10-31T12:34:56.000Z",
+  status: 200,
+  samples: 1,
+} as const;
+
+/** Upgrade getWebLog to a valid tier-A capture (x-evidence + x-capture + 200 schema). */
+function makeTierAGetWebLog(): Record<string, unknown> {
+  const mutated = structuredClone(loadSpec());
+  const operation = requireOperation(mutated, /\/getWebLog$/i);
+  operation.operation["x-evidence"] = {
+    tier: "A",
+    sources: [
+      "capture:2026-10-31/getWebLog.post.json",
+      `sha256:${VALID_TIER_A_CAPTURE.sha256}`,
+    ],
+    capturedResponse: true,
+  };
+  operation.operation["x-capture"] = { ...VALID_TIER_A_CAPTURE };
+  const responses = operation.operation.responses;
+  if (!isRecord(responses)) throw new Error("getWebLog has no responses");
+  responses["200"] = {
+    description:
+      "Captured live 200 response; schema derived from the captured body skeleton.",
+    content: {
+      "application/json": {
+        schema: { type: "array", items: { type: "object" } },
+      },
+    },
+  };
+  return mutated;
+}
+
+describe("getWebLog tier-A capture gate", () => {
+  test("(a) tier B with 200 content still fails E_GETWEBLOG_RESPONSE_CONTENT", () => {
+    const mutated = structuredClone(loadSpec());
+    const operation = requireOperation(mutated, /\/getWebLog$/i);
+    const responses = operation.operation.responses;
+    if (!isRecord(responses)) throw new Error("getWebLog has no responses");
+    responses["200"] = {
+      description: "invented",
+      content: { "application/json": { schema: { type: "object" } } },
+    };
+
+    const outcome = checkOpenApi(mutated);
+    const codes = outcome.issues.map((issue) => issue.code);
+    expect(outcome.status).toBe("fail");
+    expect(codes).toContain(CODES.GETWEBLOG_RESPONSE_CONTENT);
+    // A claimed response below tier A is still fabrication, not a provenance bug.
+    expect(codes).not.toContain(CODES.GETWEBLOG_TIER_A_CAPTURE_INVALID);
+  });
+
+  test("(b) tier A + valid x-capture with 200 content passes the gate", () => {
+    const outcome = checkOpenApi(makeTierAGetWebLog());
+    expect(outcome.issues).toEqual([]);
+    expect(outcome.status).toBe("pass");
+  });
+
+  test("(c) tier A without x-capture fails E_GETWEBLOG_TIER_A_CAPTURE_INVALID", () => {
+    const mutated = makeTierAGetWebLog();
+    const operation = requireOperation(mutated, /\/getWebLog$/i);
+    delete operation.operation["x-capture"];
+
+    const outcome = checkOpenApi(mutated);
+    const codes = outcome.issues.map((issue) => issue.code);
+    expect(outcome.status).toBe("fail");
+    expect(codes).toContain(CODES.GETWEBLOG_TIER_A_CAPTURE_INVALID);
+    expect(codes).not.toContain(CODES.GETWEBLOG_RESPONSE_CONTENT);
+  });
+
+  test("(d) tier A with a non-hex sha256 fails E_GETWEBLOG_TIER_A_CAPTURE_INVALID", () => {
+    const mutated = makeTierAGetWebLog();
+    const operation = requireOperation(mutated, /\/getWebLog$/i);
+    const capture = operation.operation["x-capture"];
+    if (!isRecord(capture)) throw new Error("x-capture missing");
+    capture.sha256 = "not-a-64-char-hex-digest";
+
+    const outcome = checkOpenApi(mutated);
+    const codes = outcome.issues.map((issue) => issue.code);
+    expect(outcome.status).toBe("fail");
+    expect(codes).toContain(CODES.GETWEBLOG_TIER_A_CAPTURE_INVALID);
+    expect(codes).not.toContain(CODES.GETWEBLOG_RESPONSE_CONTENT);
+  });
+
+  test("(e) tier A content without capturedResponse=true still fails as non-A", () => {
+    const mutated = makeTierAGetWebLog();
+    const operation = requireOperation(mutated, /\/getWebLog$/i);
+    const evidence = operation.operation["x-evidence"];
+    if (!isRecord(evidence)) throw new Error("x-evidence missing");
+    evidence.capturedResponse = false;
+
+    const outcome = checkOpenApi(mutated);
+    const codes = outcome.issues.map((issue) => issue.code);
+    expect(codes).toContain(CODES.GETWEBLOG_RESPONSE_CONTENT);
+  });
+});

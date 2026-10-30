@@ -83,6 +83,7 @@ export const CODES = {
   RESPONSES_MISSING: "E_RESPONSES_MISSING",
   GETWEBLOG_RESPONSE_MISSING: "E_GETWEBLOG_RESPONSE_MISSING",
   GETWEBLOG_RESPONSE_CONTENT: "E_GETWEBLOG_RESPONSE_CONTENT",
+  GETWEBLOG_TIER_A_CAPTURE_INVALID: "E_GETWEBLOG_TIER_A_CAPTURE_INVALID",
   TIER_C_RESPONSE_CONTENT: "E_TIER_C_RESPONSE_CONTENT",
   OPID_DUPLICATE: "E_OPID_DUPLICATE",
   SECURITY_SCHEMES_MISSING: "E_SECURITY_SCHEMES_MISSING",
@@ -384,6 +385,65 @@ function validateSecurityScheme(
   }
 }
 
+const CAPTURE_STORE_PREFIX = "docs/evidence/captures/";
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/i;
+
+/**
+ * A tier-A operation that publishes response content must name the live
+ * capture record its schema was derived from (`x-capture`). This is what keeps
+ * the getWebLog 200-content allowance honest: content is only legal when a real
+ * captured response exists, not when a tier-B row is hand-edited to claim one.
+ */
+function validateTierACaptureProvenance(
+  value: unknown,
+  label: string,
+): string | undefined {
+  if (!isRecord(value)) {
+    return `${label}: x-evidence.tier="A" with capturedResponse=true and a 200 content schema, but no x-capture object names the live capture record`;
+  }
+  const file = value.file;
+  if (typeof file !== "string" || file.trim() === "") {
+    return `${label}: x-capture.file must be a non-empty path to the live capture record`;
+  }
+  const normalizedFile = file.replace(/^\.\//, "").replace(/\\/g, "/");
+  const underCaptureStore =
+    normalizedFile.includes(CAPTURE_STORE_PREFIX) ||
+    (!normalizedFile.startsWith("/") &&
+      !normalizedFile.split("/").includes(".."));
+  if (!underCaptureStore || !normalizedFile.endsWith(".json")) {
+    return `${label}: x-capture.file ${JSON.stringify(file)} must be a .json record under docs/evidence/captures/ (paths relative to the capture store are allowed)`;
+  }
+  const sha256Value = value.sha256;
+  if (
+    typeof sha256Value !== "string" ||
+    !SHA256_HEX_PATTERN.test(sha256Value)
+  ) {
+    return `${label}: x-capture.sha256 must be a 64-character hex sha256; found ${show(sha256Value)}`;
+  }
+  const capturedAt = value.capturedAt;
+  if (typeof capturedAt !== "string" || Number.isNaN(Date.parse(capturedAt))) {
+    return `${label}: x-capture.capturedAt must be an ISO-8601 timestamp; found ${show(capturedAt)}`;
+  }
+  const status = value.status;
+  if (
+    typeof status !== "number" ||
+    !Number.isInteger(status) ||
+    status < 200 ||
+    status > 299
+  ) {
+    return `${label}: x-capture.status must be a 2xx integer HTTP status; found ${show(status)}`;
+  }
+  const samples = value.samples;
+  if (
+    typeof samples !== "number" ||
+    !Number.isInteger(samples) ||
+    samples < 1
+  ) {
+    return `${label}: x-capture.samples must be an integer >= 1; found ${show(samples)}`;
+  }
+  return undefined;
+}
+
 /**
  * Validate spec structure, evidence completeness, tag consistency, security
  * references and the fabricated-contract regression guards.
@@ -584,6 +644,8 @@ export function checkOpenApi(spec: unknown, rawText?: string): CheckOutcome {
 
     // x-evidence
     const evidence = operation.operation["x-evidence"];
+    let operationTier: string | undefined;
+    let operationCapturedResponse: boolean | undefined;
     if (!isRecord(evidence)) {
       issues.push(
         problem(
@@ -593,6 +655,7 @@ export function checkOpenApi(spec: unknown, rawText?: string): CheckOutcome {
       );
     } else {
       const tier = evidence.tier;
+      operationTier = typeof tier === "string" ? tier : undefined;
       if (typeof tier !== "string" || !isSpecTier(tier)) {
         issues.push(
           problem(
@@ -618,6 +681,8 @@ export function checkOpenApi(spec: unknown, rawText?: string): CheckOutcome {
           );
         }
         const capturedResponse = evidence.capturedResponse;
+        operationCapturedResponse =
+          typeof capturedResponse === "boolean" ? capturedResponse : undefined;
         if (typeof capturedResponse !== "boolean") {
           issues.push(
             problem(
@@ -685,14 +750,29 @@ export function checkOpenApi(spec: unknown, rawText?: string): CheckOutcome {
           response,
           "content",
         );
-        if (isWebLogOperation && code === "200") {
-          if (hasContent) {
+        // Tier B content is intentionally left untouched here (the reviewed
+        // failure was the getWebLog schema invented below tier A, not every B
+        // schema). Tier C content is still rejected by the general guard below.
+        if (isWebLogOperation && code === "200" && hasContent) {
+          const tierAWithCapturedResponse =
+            operationTier === "A" && operationCapturedResponse === true;
+          if (!tierAWithCapturedResponse) {
             issues.push(
               problem(
                 CODES.GETWEBLOG_RESPONSE_CONTENT,
-                `${label}: getWebLog 200 response declares "content"; the response body was never captured (operational_guardrails_runbook.md:153) so no schema may be invented. Keep only a description.`,
+                `${label}: getWebLog 200 response declares "content" while x-evidence.tier=${show(operationTier)} / capturedResponse=${show(operationCapturedResponse)}; published content is only legal for a tier-A operation with a real captured response. Keep only a description below tier A.`,
               ),
             );
+          } else {
+            const captureProblem = validateTierACaptureProvenance(
+              operation.operation["x-capture"],
+              label,
+            );
+            if (captureProblem !== undefined) {
+              issues.push(
+                problem(CODES.GETWEBLOG_TIER_A_CAPTURE_INVALID, captureProblem),
+              );
+            }
           }
         }
         if (hasContent) {
