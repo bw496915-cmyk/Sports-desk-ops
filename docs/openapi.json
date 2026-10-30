@@ -24,24 +24,58 @@
     }
   ],
   "tags": [
-    { "name": "Upstream Authentication", "description": "Bearer JWT lifecycle and session issuance" },
-    { "name": "Trading Desk Feeds", "description": "Real-time ticker delta watermark and open exposure streams" },
-    { "name": "Customer State Mutations", "description": "PaddedCustomerId mutations, delay gates, and vig shading" },
-    { "name": "Forensic Surveillance", "description": "Web access logs, IP collision detectors, and reverse lookup" },
-    { "name": "Downline Accounting", "description": "Weekly figures, BranchGrade health, settled collections, and delete audit" },
-    { "name": "Local Desk & Telegram Gateway", "description": "In-process Bun.serve gateway, Mini App, and Telegram alert webhooks" },
-    { "name": "Desk HITL Security", "description": "Operator CookieMap session management and HMAC limit approvals" },
-    { "name": "Cross-Book Steam", "description": "GS Partner 118 steam-lag joins" }
+    {
+      "name": "Upstream Authentication",
+      "description": "Bearer JWT lifecycle and session issuance"
+    },
+    {
+      "name": "Trading Desk Feeds",
+      "description": "Real-time ticker delta watermark and open exposure streams"
+    },
+    {
+      "name": "Customer State Mutations",
+      "description": "PaddedCustomerId mutations, delay gates, and vig shading"
+    },
+    {
+      "name": "Forensic Surveillance",
+      "description": "Web access logs, IP collision detectors, and reverse lookup"
+    },
+    {
+      "name": "Downline Accounting",
+      "description": "Weekly figures, BranchGrade health, settled collections, and delete audit"
+    },
+    {
+      "name": "Local Desk & Telegram Gateway",
+      "description": "In-process Bun.serve gateway, Mini App, and Telegram alert webhooks"
+    },
+    {
+      "name": "Desk HITL Security",
+      "description": "Operator CookieMap session management and HMAC limit approvals"
+    },
+    {
+      "name": "Cross-Book Steam",
+      "description": "GS Partner 118 steam-lag joins"
+    },
+    {
+      "name": "Tracked Operational Domains",
+      "description": "Launcher tiles currently under automated crawler surveillance and wire discovery (Bun.WebView + Bun.FetchSession)."
+    }
   ],
   "paths": {
     "/cloud/api/System/authenticateCustomer": {
       "post": {
-        "tags": ["Upstream Authentication"],
+        "tags": [
+          "Upstream Authentication"
+        ],
         "summary": "Authenticate Agent / Customer Session",
         "description": "Exchanges master or downline agent credentials for a scoped Bearer JWT token (~20–25 minute lifetime). Re-mint immediately if response contains HTML challenge.",
         "parameters": [
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -49,10 +83,19 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["customerID", "password"],
+                "required": [
+                  "customerID",
+                  "password"
+                ],
                 "properties": {
-                  "customerID": { "type": "string", "example": "BILLY666" },
-                  "password": { "type": "string", "format": "password" }
+                  "customerID": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password"
+                  }
                 }
               }
             }
@@ -62,36 +105,59 @@
           "200": {
             "description": "Authentication successful",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" },
-              "Referrer-Policy": { "$ref": "#/components/headers/ReferrerPolicyHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "code": { "type": "string", "description": "Bearer JWT token string" },
-                    "accountInfo": { "type": "object" }
+                    "code": {
+                      "type": "string",
+                      "description": "Bearer JWT token string"
+                    },
+                    "accountInfo": {
+                      "type": "object"
+                    }
                   }
                 }
               }
             }
           },
-          "401": { "description": "Invalid credentials or Cloudflare challenge" }
+          "401": {
+            "description": "Invalid credentials or Cloudflare challenge"
+          }
         }
       }
     },
     "/cloud/api/Manager/getBetTicker": {
       "post": {
-        "tags": ["Trading Desk Feeds"],
+        "tags": [
+          "Trading Desk Feeds"
+        ],
         "summary": "Live Bet Ticker Feed (Delta Watermark Stream)",
         "description": "Ticket-per-row continuous surveillance stream. Supports delta polling using monotonic wagerNumber watermark. Ingests all 5 active WagerSource channels: Internet (L18.N0204), ALERT (L21.N0884), GSBUILDER (L22.N1402), GSLIVE (L23.N0412), CSLEVEL2 (L24.N2019).",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" },
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          },
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -99,13 +165,39 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["agentID", "agentOwner", "wagerNumber", "operation", "RRO"],
+                "required": [
+                  "agentID",
+                  "agentOwner",
+                  "wagerNumber",
+                  "operation",
+                  "RRO"
+                ],
                 "properties": {
-                  "agentID": { "type": "string", "example": "BILLY666" },
-                  "agentOwner": { "type": "string", "example": "BILLY666" },
-                  "wagerNumber": { "type": "string", "description": "Monotonic watermark integer ('0' for full initial batch)", "example": "894100" },
-                  "operation": { "type": "string", "enum": ["getBetTicker"] },
-                  "RRO": { "type": "string", "enum": ["1"] }
+                  "agentID": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  },
+                  "agentOwner": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  },
+                  "wagerNumber": {
+                    "type": "string",
+                    "description": "Monotonic watermark integer ('0' for full initial batch)",
+                    "example": "894100"
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "getBetTicker"
+                    ]
+                  },
+                  "RRO": {
+                    "type": "string",
+                    "enum": [
+                      "1"
+                    ]
+                  }
                 }
               }
             }
@@ -115,18 +207,27 @@
           "200": {
             "description": "Ticker response envelope",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "INFO": { "type": "boolean", "example": true },
+                    "INFO": {
+                      "type": "boolean",
+                      "example": true
+                    },
                     "LIST": {
                       "type": "array",
-                      "items": { "$ref": "#/components/schemas/TickerRowRecord" }
+                      "items": {
+                        "$ref": "#/components/schemas/TickerRowRecord"
+                      }
                     }
                   }
                 }
@@ -138,12 +239,18 @@
     },
     "/cloud/api/Manager/getBetTickerConfig": {
       "post": {
-        "tags": ["Trading Desk Feeds"],
+        "tags": [
+          "Trading Desk Feeds"
+        ],
         "summary": "Bet Ticker Panel Configuration Probe",
         "description": "Probes if the live bet ticker is configured for the authenticated agent scope. Returns { 'INFO': false } when inactive or misconfigured.",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -151,11 +258,26 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["agentID", "agentOwner", "operation"],
+                "required": [
+                  "agentID",
+                  "agentOwner",
+                  "operation"
+                ],
                 "properties": {
-                  "agentID": { "type": "string", "example": "BILLY666" },
-                  "agentOwner": { "type": "string", "example": "BILLY666" },
-                  "operation": { "type": "string", "enum": ["getBetTickerConfig"] }
+                  "agentID": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  },
+                  "agentOwner": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "getBetTickerConfig"
+                    ]
+                  }
                 }
               }
             }
@@ -169,8 +291,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "INFO": { "type": "boolean", "example": true },
-                    "Config": { "type": "object" }
+                    "INFO": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "Config": {
+                      "type": "object"
+                    }
                   }
                 }
               }
@@ -181,14 +308,24 @@
     },
     "/cloud/api/Manager/getPending": {
       "post": {
-        "tags": ["Trading Desk Feeds"],
+        "tags": [
+          "Trading Desk Feeds"
+        ],
         "summary": "Open Book Exposure Feed (Leg-per-Row Stream)",
         "description": "Returns raw flat array of ~6,000+ open legs. Requires client-side parent ticket reconstruction keyed by Login|WagerNumber. Drops BLOCKED sentinel noise (L19.N0518) and zero-stake rows prior to parent grouping.",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" },
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          },
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -197,8 +334,16 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "customerID": { "type": "string", "description": "Optional customer filter (empty for all)", "example": "" },
-                  "date": { "type": "string", "description": "Window start date offset", "example": "2026-10-24" }
+                  "customerID": {
+                    "type": "string",
+                    "description": "Optional customer filter (empty for all)",
+                    "example": ""
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Window start date offset",
+                    "example": "2026-10-24"
+                  }
                 }
               }
             }
@@ -208,14 +353,20 @@
           "200": {
             "description": "Flat array of pending wager legs",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/PendingLegRowRecord" }
+                  "items": {
+                    "$ref": "#/components/schemas/PendingLegRowRecord"
+                  }
                 }
               }
             }
@@ -225,14 +376,24 @@
     },
     "/cloud/api/Manager/getWebLog": {
       "post": {
-        "tags": ["Forensic Surveillance"],
+        "tags": [
+          "Forensic Surveillance"
+        ],
         "summary": "Forensic Web Access Log & IP Tracker (Observed HAR Capture v1.0.279)",
         "description": "The authoritative forensic IP investigation endpoint documented in operational_guardrails_runbook.md § 5.1.1. Governed by the selector type field: A (Web Access Log velocity), B (Global IP Matcher across BILLY666 downline), C (Acct IP Match for sibling accounts), I (Users by IP reverse lookup).",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" },
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          },
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -240,22 +401,77 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["agentID", "customerID", "start", "end", "type", "actions", "operation", "RRO", "agentOwner"],
+                "required": [
+                  "agentID",
+                  "customerID",
+                  "start",
+                  "end",
+                  "type",
+                  "actions",
+                  "operation",
+                  "RRO",
+                  "agentOwner"
+                ],
                 "properties": {
-                  "agentID": { "type": "string", "description": "Session master agent", "example": "BILLY666" },
-                  "agentOwner": { "type": "string", "description": "Session master agent", "example": "BILLY666" },
-                  "customerID": { "type": "string", "description": "0 for whole book; target bettor ID for Mode C", "example": "0" },
-                  "start": { "type": "string", "description": "Start date (MM/DD/YYYY, or YYYY-MM-DD for Mode C)", "example": "10/28/2026" },
-                  "end": { "type": "string", "description": "End date (MM/DD/YYYY, or YYYY-MM-DD for Mode C)", "example": "10/28/2026" },
+                  "agentID": {
+                    "type": "string",
+                    "description": "Session master agent",
+                    "example": "BILLY666"
+                  },
+                  "agentOwner": {
+                    "type": "string",
+                    "description": "Session master agent",
+                    "example": "BILLY666"
+                  },
+                  "customerID": {
+                    "type": "string",
+                    "description": "0 for whole book; target bettor ID for Mode C",
+                    "example": "0"
+                  },
+                  "start": {
+                    "type": "string",
+                    "description": "Start date (MM/DD/YYYY, or YYYY-MM-DD for Mode C)",
+                    "example": "10/28/2026"
+                  },
+                  "end": {
+                    "type": "string",
+                    "description": "End date (MM/DD/YYYY, or YYYY-MM-DD for Mode C)",
+                    "example": "10/28/2026"
+                  },
                   "type": {
                     "type": "string",
-                    "enum": ["A", "B", "C", "I"],
+                    "enum": [
+                      "A",
+                      "B",
+                      "C",
+                      "I"
+                    ],
                     "description": "A: Web Access Log; B: Global IP Matcher; C: Acct IP Match; I: Users by IP"
                   },
-                  "actions": { "type": "string", "enum": ["ALL"], "example": "ALL" },
-                  "ip": { "type": "string", "description": "Target IP address or /24 prefix for Mode I", "example": "" },
-                  "operation": { "type": "string", "enum": ["getWebLog"] },
-                  "RRO": { "type": "string", "enum": ["1"] }
+                  "actions": {
+                    "type": "string",
+                    "enum": [
+                      "ALL"
+                    ],
+                    "example": "ALL"
+                  },
+                  "ip": {
+                    "type": "string",
+                    "description": "Target IP address or /24 prefix for Mode I",
+                    "example": ""
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "getWebLog"
+                    ]
+                  },
+                  "RRO": {
+                    "type": "string",
+                    "enum": [
+                      "1"
+                    ]
+                  }
                 }
               }
             }
@@ -265,8 +481,12 @@
           "200": {
             "description": "Forensic log entries",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
@@ -275,10 +495,22 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "customerID": { "type": "string", "example": "CB112_1" },
-                      "ipAddress": { "type": "string", "example": "198.51.100.42" },
-                      "timestamp": { "type": "string", "example": "2026-10-28 13:19:20" },
-                      "agentOwner": { "type": "string", "example": "CUB22HR" }
+                      "customerID": {
+                        "type": "string",
+                        "example": "CB112_1"
+                      },
+                      "ipAddress": {
+                        "type": "string",
+                        "example": "198.51.100.42"
+                      },
+                      "timestamp": {
+                        "type": "string",
+                        "example": "2026-10-28 13:19:20"
+                      },
+                      "agentOwner": {
+                        "type": "string",
+                        "example": "CUB22HR"
+                      }
                     }
                   }
                 }
@@ -290,12 +522,18 @@
     },
     "/cloud/api/Manager/search": {
       "post": {
-        "tags": ["Forensic Surveillance"],
+        "tags": [
+          "Forensic Surveillance"
+        ],
         "summary": "Global Omnisearch Component (search-component)",
         "description": "Searches both downline agent tree nodes and bettor customer accounts. Employs autocomplete='new-password' to defeat password manager autofill.",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -303,11 +541,27 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["term", "type", "agentID"],
+                "required": [
+                  "term",
+                  "type",
+                  "agentID"
+                ],
                 "properties": {
-                  "term": { "type": "string", "example": "CB112" },
-                  "type": { "type": "string", "enum": ["all"], "example": "all" },
-                  "agentID": { "type": "string", "example": "BILLY666" }
+                  "term": {
+                    "type": "string",
+                    "example": "CB112"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "all"
+                    ],
+                    "example": "all"
+                  },
+                  "agentID": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  }
                 }
               }
             }
@@ -323,10 +577,26 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": { "type": "string", "example": "CB112_1" },
-                      "type": { "type": "string", "enum": ["player", "agent"], "example": "player" },
-                      "agentOwner": { "type": "string", "example": "CUB22HR" },
-                      "status": { "type": "string", "example": "Active" }
+                      "id": {
+                        "type": "string",
+                        "example": "CB112_1"
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "player",
+                          "agent"
+                        ],
+                        "example": "player"
+                      },
+                      "agentOwner": {
+                        "type": "string",
+                        "example": "CUB22HR"
+                      },
+                      "status": {
+                        "type": "string",
+                        "example": "Active"
+                      }
                     }
                   }
                 }
@@ -338,14 +608,24 @@
     },
     "/cloud/api/Manager/updateByColumn": {
       "post": {
-        "tags": ["Customer State Mutations"],
+        "tags": [
+          "Customer State Mutations"
+        ],
         "summary": "Customer State Mutation (Confirmation Delays & Limit Clamps)",
         "description": "Mutates single column on customer record. Invariants: customerID must be strictly 11-character space-padded PaddedCustomerId. agentID/agentOwner must match direct owning sub-agent (never master BILLY666). Passing path poisons updateByColumn (HTTP 500 empty body).",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" },
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          },
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -353,23 +633,77 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["operation", "customerID", "agentID", "agentOwner", "columnName", "type", "value", "title", "RRO"],
+                "required": [
+                  "operation",
+                  "customerID",
+                  "agentID",
+                  "agentOwner",
+                  "columnName",
+                  "type",
+                  "value",
+                  "title",
+                  "RRO"
+                ],
                 "properties": {
-                  "operation": { "type": "string", "enum": ["updateByColumn"] },
-                  "customerID": { "type": "string", "description": "Strict 11-char space-padded PaddedCustomerId", "example": "CB112_1    " },
-                  "agentID": { "type": "string", "description": "Direct owning sub-agent (e.g. CUB22HR)", "example": "CUB22HR" },
-                  "agentOwner": { "type": "string", "description": "Direct owning sub-agent (e.g. CUB22HR)", "example": "CUB22HR" },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "updateByColumn"
+                    ]
+                  },
+                  "customerID": {
+                    "type": "string",
+                    "description": "Strict 11-char space-padded PaddedCustomerId",
+                    "example": "CB112_1    "
+                  },
+                  "agentID": {
+                    "type": "string",
+                    "description": "Direct owning sub-agent (e.g. CUB22HR)",
+                    "example": "CUB22HR"
+                  },
+                  "agentOwner": {
+                    "type": "string",
+                    "description": "Direct owning sub-agent (e.g. CUB22HR)",
+                    "example": "CUB22HR"
+                  },
                   "columnName": {
                     "type": "string",
-                    "enum": ["confirmationDelaySeconds", "wagerLimitRiskCents", "parlayMaxBetRiskCents"],
+                    "enum": [
+                      "confirmationDelaySeconds",
+                      "wagerLimitRiskCents",
+                      "parlayMaxBetRiskCents"
+                    ],
                     "example": "confirmationDelaySeconds"
                   },
-                  "type": { "type": "string", "enum": ["0"] },
-                  "value": { "type": "string", "description": "Target value", "example": "6" },
-                  "title": { "type": "string", "example": "confirmationDelaySeconds" },
-                  "information": { "type": "string", "example": "" },
-                  "special": { "type": "string", "example": "" },
-                  "RRO": { "type": "string", "enum": ["1"] }
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "0"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Target value",
+                    "example": "6"
+                  },
+                  "title": {
+                    "type": "string",
+                    "example": "confirmationDelaySeconds"
+                  },
+                  "information": {
+                    "type": "string",
+                    "example": ""
+                  },
+                  "special": {
+                    "type": "string",
+                    "example": ""
+                  },
+                  "RRO": {
+                    "type": "string",
+                    "enum": [
+                      "1"
+                    ]
+                  }
                 }
               }
             }
@@ -379,8 +713,12 @@
           "200": {
             "description": "Mutation execution outcome",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
@@ -392,7 +730,11 @@
                       "properties": {
                         "Result": {
                           "type": "integer",
-                          "enum": [1, 0, -1],
+                          "enum": [
+                            1,
+                            0,
+                            -1
+                          ],
                           "description": "1 = SUCCESS (Committed); 0 = FAILURE (Unpadded bare ID / silent drop); -1 = REJECTED_SCOPE (Master BILLY666 passed)"
                         }
                       }
@@ -402,21 +744,35 @@
               }
             }
           },
-          "400": { "description": "Model error (Called Customer/updateByColumn instead of Manager/)" },
-          "500": { "description": "Poisoned path parameter detected (empty body) or Gateway fault" }
+          "400": {
+            "description": "Model error (Called Customer/updateByColumn instead of Manager/)"
+          },
+          "500": {
+            "description": "Poisoned path parameter detected (empty body) or Gateway fault"
+          }
         }
       }
     },
     "/cloud/api/Manager/getInfoPlayer": {
       "post": {
-        "tags": ["Customer State Mutations"],
+        "tags": [
+          "Customer State Mutations"
+        ],
         "summary": "Customer Account Inspection & Read-Back Verification",
         "description": "Reads live customer record to verify persistence following updateByColumn mutations via normalized Bun.deepEquals().",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" },
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          },
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -424,10 +780,19 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["customerID", "agentID"],
+                "required": [
+                  "customerID",
+                  "agentID"
+                ],
                 "properties": {
-                  "customerID": { "type": "string", "example": "CB112_1    " },
-                  "agentID": { "type": "string", "example": "CUB22HR" }
+                  "customerID": {
+                    "type": "string",
+                    "example": "CB112_1    "
+                  },
+                  "agentID": {
+                    "type": "string",
+                    "example": "CUB22HR"
+                  }
                 }
               }
             }
@@ -437,8 +802,12 @@
           "200": {
             "description": "Live player account attributes",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
@@ -448,11 +817,22 @@
                     "Result": {
                       "type": "object",
                       "properties": {
-                        "CurrentBalance": { "type": "string" },
-                        "PendingAmount": { "type": "string" },
-                        "CreditLimit": { "type": "string" },
-                        "confirmationDelaySeconds": { "type": "string", "example": "6" },
-                        "wagerLimitRiskCents": { "type": "string" }
+                        "CurrentBalance": {
+                          "type": "string"
+                        },
+                        "PendingAmount": {
+                          "type": "string"
+                        },
+                        "CreditLimit": {
+                          "type": "string"
+                        },
+                        "confirmationDelaySeconds": {
+                          "type": "string",
+                          "example": "6"
+                        },
+                        "wagerLimitRiskCents": {
+                          "type": "string"
+                        }
                       }
                     }
                   }
@@ -465,14 +845,24 @@
     },
     "/cloud/api/Manager/vigSetupInsert": {
       "post": {
-        "tags": ["Customer State Mutations"],
+        "tags": [
+          "Customer State Mutations"
+        ],
         "summary": "Player Odds Shading & Vig Override Mutation (+15c / +20c)",
         "description": "Applies custom vigorish adjustments to sharp accounts (+15c main spreads/totals, +20c derivatives). Requires Content-Type: application/json, 20-character space-padded sportType, and 11-character space-padded player ID.",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" },
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          },
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -480,20 +870,88 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["operation", "sportType", "allPlayers", "agentProfile", "player", "flagVig", "VigSpread", "VigTotal", "VigDerivative", "RRO"],
+                "required": [
+                  "operation",
+                  "sportType",
+                  "allPlayers",
+                  "agentProfile",
+                  "player",
+                  "flagVig",
+                  "VigSpread",
+                  "VigTotal",
+                  "VigDerivative",
+                  "RRO"
+                ],
                 "properties": {
-                  "operation": { "type": "string", "enum": ["vigSetupInsert"] },
-                  "sportType": { "type": "string", "description": "20-char space-padded sport sequence", "example": "Football            " },
-                  "allPlayers": { "type": "string", "enum": ["off", "on"], "example": "off" },
-                  "agentProfile": { "type": "integer", "example": 0 },
-                  "player": { "type": "string", "description": "11-char space-padded PaddedCustomerId", "example": "CB112_1    " },
-                  "flagVig": { "type": "string", "enum": ["Y", "N"], "example": "Y" },
-                  "flagDiscount": { "type": "string", "enum": ["Y", "N"], "example": "N" },
-                  "VigSpread": { "type": "string", "description": "Main spread tax in cents (+15c)", "example": "15" },
-                  "VigTotal": { "type": "string", "description": "Main total tax in cents (+15c)", "example": "15" },
-                  "VigDerivative": { "type": "string", "description": "1H / derivative tax in cents (+20c)", "example": "20" },
-                  "VigDiscountPercent": { "type": "string", "example": "0" },
-                  "RRO": { "type": "string", "enum": ["1"] }
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "vigSetupInsert"
+                    ]
+                  },
+                  "sportType": {
+                    "type": "string",
+                    "description": "20-char space-padded sport sequence",
+                    "example": "Football            "
+                  },
+                  "allPlayers": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "on"
+                    ],
+                    "example": "off"
+                  },
+                  "agentProfile": {
+                    "type": "integer",
+                    "example": 0
+                  },
+                  "player": {
+                    "type": "string",
+                    "description": "11-char space-padded PaddedCustomerId",
+                    "example": "CB112_1    "
+                  },
+                  "flagVig": {
+                    "type": "string",
+                    "enum": [
+                      "Y",
+                      "N"
+                    ],
+                    "example": "Y"
+                  },
+                  "flagDiscount": {
+                    "type": "string",
+                    "enum": [
+                      "Y",
+                      "N"
+                    ],
+                    "example": "N"
+                  },
+                  "VigSpread": {
+                    "type": "string",
+                    "description": "Main spread tax in cents (+15c)",
+                    "example": "15"
+                  },
+                  "VigTotal": {
+                    "type": "string",
+                    "description": "Main total tax in cents (+15c)",
+                    "example": "15"
+                  },
+                  "VigDerivative": {
+                    "type": "string",
+                    "description": "1H / derivative tax in cents (+20c)",
+                    "example": "20"
+                  },
+                  "VigDiscountPercent": {
+                    "type": "string",
+                    "example": "0"
+                  },
+                  "RRO": {
+                    "type": "string",
+                    "enum": [
+                      "1"
+                    ]
+                  }
                 }
               }
             }
@@ -503,8 +961,12 @@
           "200": {
             "description": "Vig setup insertion confirmation",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
@@ -514,8 +976,14 @@
                     "Result": {
                       "type": "object",
                       "properties": {
-                        "Result": { "type": "integer", "example": 1 },
-                        "Message": { "type": "string", "example": "Vig setup successfully saved" }
+                        "Result": {
+                          "type": "integer",
+                          "example": 1
+                        },
+                        "Message": {
+                          "type": "string",
+                          "example": "Vig setup successfully saved"
+                        }
                       }
                     }
                   }
@@ -528,14 +996,24 @@
     },
     "/cloud/api/Manager/getSportsVigSetup": {
       "post": {
-        "tags": ["Customer State Mutations"],
+        "tags": [
+          "Customer State Mutations"
+        ],
         "summary": "Read-Back Verification for Player Vig Overrides",
         "description": "Queries live vigorish configuration to verify persistence following vigSetupInsert mutations.",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" },
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          },
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -543,12 +1021,33 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["operation", "sportType", "player", "RRO"],
+                "required": [
+                  "operation",
+                  "sportType",
+                  "player",
+                  "RRO"
+                ],
                 "properties": {
-                  "operation": { "type": "string", "enum": ["getSportsVigSetup"] },
-                  "sportType": { "type": "string", "example": "Football            " },
-                  "player": { "type": "string", "example": "CB112_1    " },
-                  "RRO": { "type": "string", "enum": ["1"] }
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "getSportsVigSetup"
+                    ]
+                  },
+                  "sportType": {
+                    "type": "string",
+                    "example": "Football            "
+                  },
+                  "player": {
+                    "type": "string",
+                    "example": "CB112_1    "
+                  },
+                  "RRO": {
+                    "type": "string",
+                    "enum": [
+                      "1"
+                    ]
+                  }
                 }
               }
             }
@@ -558,8 +1057,12 @@
           "200": {
             "description": "Configured sport vigorish profile",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
@@ -569,12 +1072,34 @@
                     "Result": {
                       "type": "object",
                       "properties": {
-                        "Customer": { "type": "string", "example": "CB112_1    " },
-                        "Sport": { "type": "string", "example": "Football            " },
-                        "flagVig": { "type": "string", "enum": ["Y", "N"], "example": "Y" },
-                        "VigSpread": { "type": "string", "example": "15" },
-                        "VigTotal": { "type": "string", "example": "15" },
-                        "VigDerivative": { "type": "string", "example": "20" }
+                        "Customer": {
+                          "type": "string",
+                          "example": "CB112_1    "
+                        },
+                        "Sport": {
+                          "type": "string",
+                          "example": "Football            "
+                        },
+                        "flagVig": {
+                          "type": "string",
+                          "enum": [
+                            "Y",
+                            "N"
+                          ],
+                          "example": "Y"
+                        },
+                        "VigSpread": {
+                          "type": "string",
+                          "example": "15"
+                        },
+                        "VigTotal": {
+                          "type": "string",
+                          "example": "15"
+                        },
+                        "VigDerivative": {
+                          "type": "string",
+                          "example": "20"
+                        }
                       }
                     }
                   }
@@ -587,14 +1112,24 @@
     },
     "/cloud/api/Manager/getInfoManager": {
       "post": {
-        "tags": ["Downline Accounting"],
+        "tags": [
+          "Downline Accounting"
+        ],
         "summary": "Master Header KPIs & Summary Balances",
         "description": "Feeds mobile and desktop header summary tiles: My Balance, Weekly figure, Today net, Active accounts, and Makeup carryover deficit.",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" },
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          },
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -602,10 +1137,19 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["agentID", "agentOwner"],
+                "required": [
+                  "agentID",
+                  "agentOwner"
+                ],
                 "properties": {
-                  "agentID": { "type": "string", "example": "BILLY666" },
-                  "agentOwner": { "type": "string", "example": "BILLY666" }
+                  "agentID": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  },
+                  "agentOwner": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  }
                 }
               }
             }
@@ -615,19 +1159,38 @@
           "200": {
             "description": "Summary balance metrics",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "balance": { "type": "string", "description": "Agent ledger balance with house" },
-                    "grand-total-weekly": { "type": "string", "description": "Current settlement week net figure" },
-                    "grand-total-day": { "type": "string", "description": "Intraday net figure" },
-                    "grand-total-player": { "type": "string", "description": "Active downline accounts count" },
-                    "distribution": { "type": "string", "description": "Cumulative negative carryover makeup" }
+                    "balance": {
+                      "type": "string",
+                      "description": "Agent ledger balance with house"
+                    },
+                    "grand-total-weekly": {
+                      "type": "string",
+                      "description": "Current settlement week net figure"
+                    },
+                    "grand-total-day": {
+                      "type": "string",
+                      "description": "Intraday net figure"
+                    },
+                    "grand-total-player": {
+                      "type": "string",
+                      "description": "Active downline accounts count"
+                    },
+                    "distribution": {
+                      "type": "string",
+                      "description": "Cumulative negative carryover makeup"
+                    }
                   }
                 }
               }
@@ -638,14 +1201,24 @@
     },
     "/cloud/api/Report/getWeeklyFigure": {
       "post": {
-        "tags": ["Downline Accounting"],
+        "tags": [
+          "Downline Accounting"
+        ],
         "summary": "Weekly Downline Settlement Roll-Up",
         "description": "Triggered by data-action='get-weekly-figure'. Returns Monday-to-Sunday weekly volume, gross net won/lost, and active account totals across all sub-agents under BILLY666.",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" },
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          },
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -653,10 +1226,19 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["agentID", "date"],
+                "required": [
+                  "agentID",
+                  "date"
+                ],
                 "properties": {
-                  "agentID": { "type": "string", "example": "BILLY666" },
-                  "date": { "type": "string", "example": "2026-10-26" }
+                  "agentID": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  },
+                  "date": {
+                    "type": "string",
+                    "example": "2026-10-26"
+                  }
                 }
               }
             }
@@ -666,19 +1248,33 @@
           "200": {
             "description": "Weekly settlement figures across downline branches",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "TotalVolume": { "type": "string" },
-                    "TotalWin": { "type": "string" },
-                    "TotalLoss": { "type": "string" },
-                    "TotalNet": { "type": "string" },
-                    "TotalPlayers": { "type": "string" }
+                    "TotalVolume": {
+                      "type": "string"
+                    },
+                    "TotalWin": {
+                      "type": "string"
+                    },
+                    "TotalLoss": {
+                      "type": "string"
+                    },
+                    "TotalNet": {
+                      "type": "string"
+                    },
+                    "TotalPlayers": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -689,14 +1285,24 @@
     },
     "/cloud/api/Report/getAgentPerformance": {
       "post": {
-        "tags": ["Downline Accounting"],
+        "tags": [
+          "Downline Accounting"
+        ],
         "summary": "Branch Performance & Hold Rate Surveillance",
         "description": "Triggered by data-action='get-agent-performance' (data-type='C'). Downline volume, net won, and hold percentage evaluated against the 8-tier BranchGrade hierarchy (AAA down to D_TOXIC).",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" },
-          { "$ref": "#/components/parameters/AcceptJson" },
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          },
+          {
+            "$ref": "#/components/parameters/AcceptJson"
+          },
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -704,11 +1310,26 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["agentID", "dataType"],
+                "required": [
+                  "agentID",
+                  "dataType"
+                ],
                 "properties": {
-                  "agentID": { "type": "string", "example": "BILLY666" },
-                  "dataType": { "type": "string", "enum": ["C"], "example": "C" },
-                  "period": { "type": "string", "example": "7d" }
+                  "agentID": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  },
+                  "dataType": {
+                    "type": "string",
+                    "enum": [
+                      "C"
+                    ],
+                    "example": "C"
+                  },
+                  "period": {
+                    "type": "string",
+                    "example": "7d"
+                  }
                 }
               }
             }
@@ -718,8 +1339,12 @@
           "200": {
             "description": "Per-agent downline performance records",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
@@ -728,10 +1353,18 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "agentID": { "type": "string" },
-                      "volume": { "type": "number" },
-                      "netWon": { "type": "number" },
-                      "holdPct": { "type": "number" }
+                      "agentID": {
+                        "type": "string"
+                      },
+                      "volume": {
+                        "type": "number"
+                      },
+                      "netWon": {
+                        "type": "number"
+                      },
+                      "holdPct": {
+                        "type": "number"
+                      }
                     }
                   }
                 }
@@ -743,12 +1376,18 @@
     },
     "/cloud/api/Report/getSettledFigure": {
       "post": {
-        "tags": ["Downline Accounting"],
+        "tags": [
+          "Downline Accounting"
+        ],
         "summary": "Collections & 50% Settlement Liability Accounting",
         "description": "Triggered by data-action='get-settled-figure' (Collections). Audits weekly settled figures, agent 50% split accounting, and carryover makeup obligations.",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -756,10 +1395,19 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["agentID", "weekDate"],
+                "required": [
+                  "agentID",
+                  "weekDate"
+                ],
                 "properties": {
-                  "agentID": { "type": "string", "example": "BILLY666" },
-                  "weekDate": { "type": "string", "example": "2026-10-26" }
+                  "agentID": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  },
+                  "weekDate": {
+                    "type": "string",
+                    "example": "2026-10-26"
+                  }
                 }
               }
             }
@@ -773,11 +1421,21 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "WeekEnding": { "type": "string" },
-                    "TotalHandle": { "type": "string" },
-                    "GrossNet": { "type": "string" },
-                    "AgentSplit50Pct": { "type": "string" },
-                    "MakeupBalance": { "type": "string" }
+                    "WeekEnding": {
+                      "type": "string"
+                    },
+                    "TotalHandle": {
+                      "type": "string"
+                    },
+                    "GrossNet": {
+                      "type": "string"
+                    },
+                    "AgentSplit50Pct": {
+                      "type": "string"
+                    },
+                    "MakeupBalance": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -788,12 +1446,18 @@
     },
     "/cloud/api/Report/delete-wager": {
       "post": {
-        "tags": ["Downline Accounting"],
+        "tags": [
+          "Downline Accounting"
+        ],
         "summary": "Deleted & Voided Wagers Audit Trail",
         "description": "Triggered by data-action='delete-wager'. Audits all voided, cancelled, and deleted tickets to investigate line-chase cancels or VOID_HEAVY_DISGUST churn.",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" },
-          { "$ref": "#/components/parameters/XRequestedWith" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestedWith"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -801,11 +1465,24 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["agentID", "startDate", "endDate"],
+                "required": [
+                  "agentID",
+                  "startDate",
+                  "endDate"
+                ],
                 "properties": {
-                  "agentID": { "type": "string", "example": "BILLY666" },
-                  "startDate": { "type": "string", "example": "2026-10-20" },
-                  "endDate": { "type": "string", "example": "2026-10-28" }
+                  "agentID": {
+                    "type": "string",
+                    "example": "BILLY666"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "example": "2026-10-20"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "example": "2026-10-28"
+                  }
                 }
               }
             }
@@ -821,12 +1498,24 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "WagerNumber": { "type": "string" },
-                      "Login": { "type": "string" },
-                      "DeletedBy": { "type": "string" },
-                      "DeletedTimestamp": { "type": "string" },
-                      "OriginalRisk": { "type": "string" },
-                      "Reason": { "type": "string" }
+                      "WagerNumber": {
+                        "type": "string"
+                      },
+                      "Login": {
+                        "type": "string"
+                      },
+                      "DeletedBy": {
+                        "type": "string"
+                      },
+                      "DeletedTimestamp": {
+                        "type": "string"
+                      },
+                      "OriginalRisk": {
+                        "type": "string"
+                      },
+                      "Reason": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -838,27 +1527,51 @@
     },
     "/health": {
       "get": {
-        "tags": ["Local Desk & Telegram Gateway"],
+        "tags": [
+          "Local Desk & Telegram Gateway"
+        ],
         "summary": "SportsDesk Daemon Health & Telemetry Probe",
         "description": "Local in-process probe verifying Bun HTTP server uptime, active port, and runtime environment.",
         "responses": {
           "200": {
             "description": "Healthy daemon status",
             "headers": {
-              "Content-Security-Policy": { "$ref": "#/components/headers/CSPHeader" },
-              "X-Content-Type-Options": { "$ref": "#/components/headers/XContentTypeOptionsHeader" }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "example": "healthy" },
-                    "port": { "type": "integer", "example": 4020 },
-                    "hostname": { "type": "string", "example": "0.0.0.0" },
-                    "uptimeSeconds": { "type": "integer", "example": 1240 },
-                    "runtime": { "type": "string", "example": "Bun v1.4.4" },
-                    "nodeEnv": { "type": "string", "example": "production" }
+                    "status": {
+                      "type": "string",
+                      "example": "healthy"
+                    },
+                    "port": {
+                      "type": "integer",
+                      "example": 4020
+                    },
+                    "hostname": {
+                      "type": "string",
+                      "example": "0.0.0.0"
+                    },
+                    "uptimeSeconds": {
+                      "type": "integer",
+                      "example": 1240
+                    },
+                    "runtime": {
+                      "type": "string",
+                      "example": "Bun v1.4.4"
+                    },
+                    "nodeEnv": {
+                      "type": "string",
+                      "example": "production"
+                    }
                   }
                 }
               }
@@ -869,11 +1582,15 @@
     },
     "/api/watchlist": {
       "get": {
-        "tags": ["Local Desk & Telegram Gateway"],
+        "tags": [
+          "Local Desk & Telegram Gateway"
+        ],
         "summary": "Active Monitored Sharp / Whale Accounts",
         "description": "Returns list of tracked accounts under active surveillance. Requires SPORTSDESK_ADMIN_TOKEN bearer authorization.",
         "parameters": [
-          { "$ref": "#/components/parameters/AuthBearer" }
+          {
+            "$ref": "#/components/parameters/AuthBearer"
+          }
         ],
         "responses": {
           "200": {
@@ -883,17 +1600,35 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "count": { "type": "integer", "example": 3 },
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "count": {
+                      "type": "integer",
+                      "example": 3
+                    },
                     "data": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "customerId": { "type": "string", "example": "RF2003" },
-                          "agentId": { "type": "string", "example": "FAKEMONEY" },
-                          "riskTier": { "type": "string", "example": "WHALE_VOLATILITY" },
-                          "sharpScore": { "type": "number", "example": 86.2 }
+                          "customerId": {
+                            "type": "string",
+                            "example": "RF2003"
+                          },
+                          "agentId": {
+                            "type": "string",
+                            "example": "FAKEMONEY"
+                          },
+                          "riskTier": {
+                            "type": "string",
+                            "example": "WHALE_VOLATILITY"
+                          },
+                          "sharpScore": {
+                            "type": "number",
+                            "example": 86.2
+                          }
                         }
                       }
                     }
@@ -907,7 +1642,9 @@
     },
     "/api/telegram/alert": {
       "post": {
-        "tags": ["Local Desk & Telegram Gateway"],
+        "tags": [
+          "Local Desk & Telegram Gateway"
+        ],
         "summary": "Instant Telegram Alert Dispatch",
         "description": "Dispatches an urgent formatted rich alert message directly to the desk Telegram channel via @demodevdeskbot.",
         "requestBody": {
@@ -917,7 +1654,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "customerId": { "type": "string", "example": "RF2003" }
+                  "customerId": {
+                    "type": "string",
+                    "example": "RF2003"
+                  }
                 }
               }
             }
@@ -931,9 +1671,18 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "ok": { "type": "boolean", "example": true },
-                    "customerId": { "type": "string", "example": "RF2003" }
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "customerId": {
+                      "type": "string",
+                      "example": "RF2003"
+                    }
                   }
                 }
               }
@@ -944,7 +1693,9 @@
     },
     "/api/telegram/report": {
       "post": {
-        "tags": ["Local Desk & Telegram Gateway"],
+        "tags": [
+          "Local Desk & Telegram Gateway"
+        ],
         "summary": "Executive Scheduled Report Trigger",
         "description": "Immediately triggers and broadcasts one of the three scheduled reports: MORNING_BRIEFING (08:00 EDT), MIDDAY_STEAM (13:00 EDT), or EVENING_SETTLEMENT (23:00 EDT).",
         "parameters": [
@@ -954,7 +1705,11 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["MORNING_BRIEFING", "MIDDAY_STEAM", "EVENING_SETTLEMENT"],
+              "enum": [
+                "MORNING_BRIEFING",
+                "MIDDAY_STEAM",
+                "EVENING_SETTLEMENT"
+              ],
               "example": "EVENING_SETTLEMENT"
             }
           }
@@ -967,8 +1722,14 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "reportType": { "type": "string", "example": "EVENING_SETTLEMENT" }
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "reportType": {
+                      "type": "string",
+                      "example": "EVENING_SETTLEMENT"
+                    }
                   }
                 }
               }
@@ -979,7 +1740,9 @@
     },
     "/api/desk/auth/session": {
       "post": {
-        "tags": ["Desk HITL Security"],
+        "tags": [
+          "Desk HITL Security"
+        ],
         "summary": "Operator Desk Session Minting (CookieMap & UUIDv7)",
         "description": "Provisions authenticated desk operator session. Sets RFC 6265 HTTP-only cookie desk_session_id using sequential UUIDv7 timestamps.",
         "responses": {
@@ -988,7 +1751,9 @@
             "headers": {
               "Set-Cookie": {
                 "description": "desk_session_id cookie with 8-hour operator shift lifetime and sameSite=strict",
-                "schema": { "type": "string" }
+                "schema": {
+                  "type": "string"
+                }
               }
             },
             "content": {
@@ -996,8 +1761,14 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "authenticated": { "type": "boolean", "example": true },
-                    "sessionId": { "type": "string", "example": "0192e315-9c88-7521-821b-29a8f4c2191b" }
+                    "authenticated": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "example": "0192e315-9c88-7521-821b-29a8f4c2191b"
+                    }
                   }
                 }
               }
@@ -1006,7 +1777,9 @@
         }
       },
       "delete": {
-        "tags": ["Desk HITL Security"],
+        "tags": [
+          "Desk HITL Security"
+        ],
         "summary": "Revoke Operator Desk Session",
         "description": "Clears desk_session_id cookie and invalidates session token.",
         "responses": {
@@ -1017,8 +1790,14 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "authenticated": { "type": "boolean", "example": false },
-                    "message": { "type": "string", "example": "Session revoked" }
+                    "authenticated": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Session revoked"
+                    }
                   }
                 }
               }
@@ -1029,11 +1808,15 @@
     },
     "/api/desk/hitl/approve": {
       "post": {
-        "tags": ["Desk HITL Security"],
+        "tags": [
+          "Desk HITL Security"
+        ],
         "summary": "Human-in-the-Loop Tier 2 Limit Approval (HMAC-SHA256 DESK-*)",
         "description": "Executes Tier 2 limit raises or sharp overrides requiring cryptographic operator authorization. Validates DESK-* HMAC token using constant-time crypto.timingSafeEqual before dispatching Manager/updateByColumn.",
         "parameters": [
-          { "$ref": "#/components/parameters/ReferrerPolicyNoReferrer" }
+          {
+            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
+          }
         ],
         "requestBody": {
           "required": true,
@@ -1041,11 +1824,24 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["approvalToken", "customerIdentifier", "proposedLimitAmountCents"],
+                "required": [
+                  "approvalToken",
+                  "customerIdentifier",
+                  "proposedLimitAmountCents"
+                ],
                 "properties": {
-                  "approvalToken": { "type": "string", "example": "DESK-a1b2c3d4e5f6..." },
-                  "customerIdentifier": { "type": "string", "example": "RF2003" },
-                  "proposedLimitAmountCents": { "type": "integer", "example": 500000 }
+                  "approvalToken": {
+                    "type": "string",
+                    "example": "DESK-a1b2c3d4e5f6..."
+                  },
+                  "customerIdentifier": {
+                    "type": "string",
+                    "example": "RF2003"
+                  },
+                  "proposedLimitAmountCents": {
+                    "type": "integer",
+                    "example": 500000
+                  }
                 }
               }
             }
@@ -1059,21 +1855,34 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "approved": { "type": "boolean", "example": true },
-                    "rawResultCode": { "type": "integer", "example": 1 },
-                    "classification": { "type": "string", "example": "COMMITTED" }
+                    "approved": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "rawResultCode": {
+                      "type": "integer",
+                      "example": 1
+                    },
+                    "classification": {
+                      "type": "string",
+                      "example": "COMMITTED"
+                    }
                   }
                 }
               }
             }
           },
-          "403": { "description": "Invalid token or unsafe referrer policy detected" }
+          "403": {
+            "description": "Invalid token or unsafe referrer policy detected"
+          }
         }
       }
     },
     "/manager-tools/ajax.php": {
       "post": {
-        "tags": ["Cross-Book Steam"],
+        "tags": [
+          "Cross-Book Steam"
+        ],
         "summary": "GS Buckeye 2 Partner 118 Steam Reference Ingestion",
         "description": "Asynchronously queries Partner 118 getBetReport to resolve cross-book steam moves joined via M.G<betGroupId>. Mandates referrerPolicy: 'strict-origin'.",
         "requestBody": {
@@ -1082,10 +1891,22 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": ["operation", "betGroupId"],
+                "required": [
+                  "operation",
+                  "betGroupId"
+                ],
                 "properties": {
-                  "operation": { "type": "string", "enum": ["getBetReport"], "example": "getBetReport" },
-                  "betGroupId": { "type": "string", "example": "908412" }
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "getBetReport"
+                    ],
+                    "example": "getBetReport"
+                  },
+                  "betGroupId": {
+                    "type": "string",
+                    "example": "908412"
+                  }
                 }
               }
             }
@@ -1099,14 +1920,1167 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "betGroupId": { "type": "string" },
-                    "market": { "type": "string" },
-                    "steamLagMs": { "type": "integer", "example": 3200 },
-                    "pinnacleReferencePrice": { "type": "string", "example": "-115" }
+                    "betGroupId": {
+                      "type": "string"
+                    },
+                    "market": {
+                      "type": "string"
+                    },
+                    "steamLagMs": {
+                      "type": "integer",
+                      "example": 3200
+                    },
+                    "pinnacleReferencePrice": {
+                      "type": "string",
+                      "example": "-115"
+                    }
                   }
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/cloud/api/System/verifySession": {
+      "post": {
+        "tags": [
+          "System & Authentication"
+        ],
+        "summary": "Verify Active JWT Session",
+        "description": "Validates active token integrity. On HTTP 401, triggers 1x re-mint cycle before failing closed.",
+        "operationId": "verifySession",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-retryable": true,
+        "responses": {
+          "200": {
+            "description": "Session valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "expiresAt": {
+                      "type": "integer",
+                      "example": 1793042000
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session expired (re-mint triggered)"
+          }
+        }
+      }
+    },
+    "/api/desk/auth/me": {
+      "get": {
+        "tags": [
+          "System & Authentication"
+        ],
+        "summary": "Inspect Current Operator Session",
+        "description": "Retrieves active operator session ID from HTTP-only cookies.",
+        "operationId": "getOperatorSession",
+        "responses": {
+          "200": {
+            "description": "Active session confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authenticated": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated"
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/getCustomerNotes": {
+      "post": {
+        "tags": [
+          "Manager & Player Admin"
+        ],
+        "summary": "Get Customer Risk Notes & Surveillance Annotations",
+        "description": "Fetches operator notes, sharp tags, and historical risk flags for a player.",
+        "operationId": "getCustomerNotes",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "customerID"
+                ],
+                "properties": {
+                  "customerID": {
+                    "type": "string",
+                    "example": "CB112_1    "
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notes retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "author": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/updateCustomerNotes": {
+      "post": {
+        "tags": [
+          "Manager & Player Admin"
+        ],
+        "summary": "Append Customer Risk Annotation",
+        "description": "Appends an immutable audit annotation to the customer profile.",
+        "operationId": "updateCustomerNotes",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "customerID",
+                  "noteText"
+                ],
+                "properties": {
+                  "customerID": {
+                    "type": "string",
+                    "example": "CB112_1    "
+                  },
+                  "noteText": {
+                    "type": "string",
+                    "example": "AUTO-CUT-TIER1 applied limit freeze."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Note appended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "SUCCESS"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/deleteSportsVigSetup": {
+      "post": {
+        "tags": [
+          "Vig & Juice Setup"
+        ],
+        "summary": "Remove Custom Juice Shading Rules",
+        "description": "Restores baseline odds pricing for the player by deleting active vig overrides.",
+        "operationId": "deleteSportsVigSetup",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "operation",
+                  "sportType",
+                  "player"
+                ],
+                "properties": {
+                  "operation": {
+                    "type": "string",
+                    "default": "deleteSportsVigSetup"
+                  },
+                  "sportType": {
+                    "type": "string",
+                    "example": "Football            "
+                  },
+                  "player": {
+                    "type": "string",
+                    "example": "CB112_1    "
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vig setup deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "Result": {
+                      "type": "object",
+                      "properties": {
+                        "Result": {
+                          "type": "integer",
+                          "example": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/deleteWager": {
+      "post": {
+        "tags": [
+          "Wagers & Live Surveillance"
+        ],
+        "summary": "Void / Cancel Wager Ticket",
+        "description": "Cancels an open or contested wager ticket with reason code audit logging.",
+        "operationId": "deleteWager",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "wagerNumber",
+                  "reason"
+                ],
+                "properties": {
+                  "wagerNumber": {
+                    "type": "string",
+                    "example": "894112"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "example": "Past-post stale line exploit"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Wager canceled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "wagerNumber": {
+                      "type": "string",
+                      "example": "894112"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cloud/api/Report/getDeletedWagerReport": {
+      "post": {
+        "tags": [
+          "Reporting & Forensics"
+        ],
+        "summary": "Deleted & Voided Wagers Audit Log",
+        "description": "Audit log of all voided, deleted, and canceled tickets across the downline with operator timestamps.",
+        "operationId": "getDeletedWagerReport",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted wagers log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "wagerNumber": {
+                        "type": "string"
+                      },
+                      "login": {
+                        "type": "string"
+                      },
+                      "deletedAt": {
+                        "type": "string"
+                      },
+                      "deletedBy": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cloud/api/Report/getDailyFigure": {
+      "post": {
+        "tags": [
+          "Reporting & Forensics"
+        ],
+        "summary": "Daily Gross Volume & House Hold Breakdown",
+        "description": "Pulls daily volume, payouts, and hold deficit/profit across billing period.",
+        "operationId": "getDailyFigure",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily breakdown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "volume": {
+                        "type": "number"
+                      },
+                      "netHold": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desk/hitl/queue": {
+      "get": {
+        "tags": [
+          "Desk & HITL Operations"
+        ],
+        "summary": "Query Pending Tier 2 Limit Adjustments",
+        "description": "Lists all queued limit modifications awaiting operator sign-off.",
+        "operationId": "getHitlQueue",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queued approvals list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "approvalId": {
+                        "type": "string"
+                      },
+                      "customerID": {
+                        "type": "string"
+                      },
+                      "currentLimitCents": {
+                        "type": "integer"
+                      },
+                      "proposedLimitCents": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desk/hitl/reject": {
+      "post": {
+        "tags": [
+          "Desk & HITL Operations"
+        ],
+        "summary": "Reject Queued Limit Raise",
+        "description": "Rejects and purges a queued limit raise with rejection audit notes.",
+        "operationId": "rejectHitlLimit",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "approvalId",
+                  "reason"
+                ],
+                "properties": {
+                  "approvalId": {
+                    "type": "string",
+                    "example": "APP-20261030-9411"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "example": "High sharp score."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queued approval rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "REJECTED"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desk/forensics/audit": {
+      "post": {
+        "tags": [
+          "Desk & HITL Operations"
+        ],
+        "summary": "Dispatch Multi-Factor Forensic Audit",
+        "description": "Runs Mode A / Mode B / Mode C / Mode I scans and computes Multi-Factor Corroboration Score (MFCS 0-100).",
+        "operationId": "dispatchForensicAudit",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "period": {
+                    "type": "string",
+                    "example": "24h"
+                  },
+                  "maxVelocitySeconds": {
+                    "type": "integer",
+                    "default": 15
+                  },
+                  "applyLimits": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Forensic audit scorecard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "auditedTickets": {
+                      "type": "integer"
+                    },
+                    "flaggedSnipers": {
+                      "type": "integer"
+                    },
+                    "ipCollisions": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desk/forensics/scores": {
+      "get": {
+        "tags": [
+          "Desk & HITL Operations"
+        ],
+        "summary": "Query Empirical Bayes Sharp Scores",
+        "description": "Queries online Empirical Bayes sharp scores (tau*=0.68, N_min=8) and CLV basis points.",
+        "operationId": "getSharpScores",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sharp scores registry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "customerID": {
+                        "type": "string"
+                      },
+                      "sharpScore": {
+                        "type": "number"
+                      },
+                      "clvBasisPoints": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desk/rfq/quote": {
+      "post": {
+        "tags": [
+          "Prediction Market RFQ"
+        ],
+        "summary": "Request Prediction Market RFQ Joint Probability Quote",
+        "description": "Translates SportsDesk sharp tickets into Polymarket / Kalshi multi-leg event contracts and queries RFQAPI for dynamic probability quotes.",
+        "operationId": "requestRfqQuote",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ticketIdentifier",
+                  "legs"
+                ],
+                "properties": {
+                  "ticketIdentifier": {
+                    "type": "string",
+                    "example": "MM800|894112"
+                  },
+                  "legs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Joint RFQ quote received",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "quoteId": {
+                      "type": "string"
+                    },
+                    "jointProbability": {
+                      "type": "number"
+                    },
+                    "hedgePriceCents": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desk/rfq/hedge": {
+      "post": {
+        "tags": [
+          "Prediction Market RFQ"
+        ],
+        "summary": "Execute Layoff Hedge Order",
+        "description": "Dispatches hedging orders to Polymarket Combos / Kalshi to neutralize tail payout exposure.",
+        "operationId": "executeLayoffHedge",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "quoteId",
+                  "hedgeAmountCents"
+                ],
+                "properties": {
+                  "quoteId": {
+                    "type": "string",
+                    "example": "RFQ-908412-PM"
+                  },
+                  "hedgeAmountCents": {
+                    "type": "integer",
+                    "example": 500000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Layoff hedge executed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "executionId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "FILLED"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/gameAdmin": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "Game Admin: Circling & Line Lock Operations",
+        "description": "Automated surveillance target for locking games, setting emergency circle limits, and managing board availability on breaking news.",
+        "operationId": "gameAdmin",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "Game Admin",
+        "x-dom-selector": "div.tile:has-text('Game Admin')",
+        "x-extracted-inputs": [
+          "rotationNumber",
+          "sportType",
+          "circleLimit",
+          "isLocked"
+        ],
+        "x-data-language-keys": [
+          "L-1034",
+          "L-1052"
+        ],
+        "responses": {
+          "200": {
+            "description": "Game administration state committed"
+          },
+          "401": {
+            "description": "Session expired"
+          },
+          "502": {
+            "description": "Gateway timeout"
+          }
+        }
+      }
+    },
+    "/cloud/api/System/getMessages": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "Messaging: Downline Broadcasts & Operator Inbox",
+        "description": "Downline agent communication hub, system broadcast notices, and sharp alert dispatch log.",
+        "operationId": "getMessages",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "Messaging",
+        "x-dom-selector": "div.tile:has-text('Messaging')",
+        "x-extracted-inputs": [
+          "recipientScope",
+          "subject",
+          "messageBody",
+          "priority"
+        ],
+        "x-data-language-keys": [
+          "L-1055",
+          "L-1056"
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages list retrieved"
+          },
+          "401": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/adjustBalance": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "Cashier: Manual Balance & Credit Ledger Adjustments",
+        "description": "Manual ledger adjustment mutations for deposits, withdrawals, cash settlements, and promotional credit.",
+        "operationId": "adjustBalance",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "Cashier",
+        "x-dom-selector": "div.tile:has-text('Cashier')",
+        "x-extracted-inputs": [
+          "customerID",
+          "amountCents",
+          "transactionType",
+          "notes"
+        ],
+        "x-data-language-keys": [
+          "L-1031",
+          "L-1045",
+          "L-1058"
+        ],
+        "responses": {
+          "200": {
+            "description": "Balance adjustment committed to player ledger"
+          },
+          "401": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/createPlayer": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "Add Customer: Player Account Provisioning",
+        "description": "Provisions new bettor accounts under direct sub-agent hierarchy, binding initial credit lines and delay gates.",
+        "operationId": "createPlayer",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "Add Customer",
+        "x-dom-selector": "div.tile:has-text('Add Customer')",
+        "x-extracted-inputs": [
+          "customerID",
+          "agentID",
+          "password",
+          "creditLimit",
+          "delaySeconds"
+        ],
+        "x-data-language-keys": [
+          "L-1031",
+          "L-1032",
+          "L-1040"
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer account created"
+          },
+          "401": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/get3rdPartyLimits": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "3rd Party Limits: External Feed Collars",
+        "description": "Controls table limit ceilings and risk collars across third-party oddsmaker providers (Don Best, Betradar).",
+        "operationId": "get3rdPartyLimits",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "3rd Party Limits",
+        "x-dom-selector": "div.tile:has-text('3rd Party Limits')",
+        "x-extracted-inputs": [
+          "providerID",
+          "sportCategory",
+          "maxLimitCents"
+        ],
+        "x-data-language-keys": [
+          "L-1060",
+          "L-1061"
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider limits configured"
+          },
+          "401": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/cloud/api/Report/getAnalysis": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "Analysis: Market Concentration & Sport Sizing",
+        "description": "Stage 6 surveillance sizing: breaks down downline turnover by sport, league, and wager type.",
+        "operationId": "getAnalysis",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "Analysis",
+        "x-dom-selector": "div.tile:has-text('Analysis')",
+        "x-extracted-inputs": [
+          "period",
+          "sport",
+          "marketCategory",
+          "agentID"
+        ],
+        "x-data-language-keys": [
+          "L-1034",
+          "L-1064"
+        ],
+        "responses": {
+          "200": {
+            "description": "Market concentration analysis returned"
+          },
+          "401": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/getScores": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "Scores: Live In-Play Grading & Overrides",
+        "description": "Verifies live game scores, period results, and manual settlement grading overrides.",
+        "operationId": "getScores",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "Scores",
+        "x-dom-selector": "div.tile:has-text('Scores')",
+        "x-extracted-inputs": [
+          "gameID",
+          "periodIndex",
+          "homeScore",
+          "awayScore",
+          "isFinal"
+        ],
+        "x-data-language-keys": [
+          "L-1034",
+          "L-1068"
+        ],
+        "responses": {
+          "200": {
+            "description": "Scores and grading status"
+          },
+          "401": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/getAgentTree": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "Agent Admin: Hierarchy Walk & Commission Governance",
+        "description": "Sub-agent tree walk across 668 agents, managing 50% revenue-share splits and credit ceilings.",
+        "operationId": "getAgentTree",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "Agent Admin",
+        "x-dom-selector": "div.tile:has-text('Agent Admin')",
+        "x-extracted-inputs": [
+          "masterAgent",
+          "commissionSplitPercent",
+          "creditCeiling"
+        ],
+        "x-data-language-keys": [
+          "L-1032",
+          "L-1070"
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent tree structure"
+          },
+          "401": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/getBilling": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "Billing: PPH Software Per-Head Accounting",
+        "description": "Calculates weekly software billing across active accounts (accounts with >= 1 graded wager in period).",
+        "operationId": "getBilling",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "Billing",
+        "x-dom-selector": "div.tile:has-text('Billing')",
+        "x-extracted-inputs": [
+          "billingWeek",
+          "ratePerActiveHead",
+          "activeAccountCount"
+        ],
+        "x-data-language-keys": [
+          "L-1050",
+          "L-1072"
+        ],
+        "responses": {
+          "200": {
+            "description": "Billing statement"
+          },
+          "401": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/cloud/api/Manager/getRules": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "Rules & Settings: Book Wagering Parameters",
+        "description": "House wagering rules, teaser tie tables, maximum parlay payout collars, and default delays.",
+        "operationId": "getRules",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "Rules",
+        "x-dom-selector": "div.tile:has-text('Rules')",
+        "x-extracted-inputs": [
+          "parlayMaxPayout",
+          "teaserTieRule",
+          "defaultDelaySeconds"
+        ],
+        "x-data-language-keys": [
+          "L-1040",
+          "L-1075"
+        ],
+        "responses": {
+          "200": {
+            "description": "House rules configuration"
+          },
+          "401": {
+            "description": "Session expired"
+          }
+        }
+      }
+    },
+    "/cloud/api/Report/getFinancialReport": {
+      "post": {
+        "tags": [
+          "Tracked Operational Domains"
+        ],
+        "summary": "Transactions History: Financial Ledger Audits",
+        "description": "Financial transaction ledger audit across players and agent nodes.",
+        "operationId": "getFinancialReport",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-discovery-status": "UNDER_SURVEILLANCE",
+        "x-dom-tile": "Transactions History",
+        "x-dom-selector": "div.tile:has-text('Transactions History')",
+        "x-extracted-inputs": [
+          "customerID",
+          "startDate",
+          "endDate",
+          "transactionFilter"
+        ],
+        "x-data-language-keys": [
+          "L-1031",
+          "L-1033",
+          "L-1058"
+        ],
+        "responses": {
+          "200": {
+            "description": "Financial ledger report"
+          },
+          "401": {
+            "description": "Session expired"
           }
         }
       }
@@ -1119,28 +3093,49 @@
         "in": "header",
         "required": true,
         "description": "Scoped Bearer JWT token minted from authenticateCustomer. Format: Bearer <JWT>",
-        "schema": { "type": "string", "example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
+        "schema": {
+          "type": "string",
+          "example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        }
       },
       "XRequestedWith": {
         "name": "X-Requested-With",
         "in": "header",
         "required": true,
         "description": "AJAX caller identification header required by OpenResty / Cloudflare gateway",
-        "schema": { "type": "string", "enum": ["XMLHttpRequest"], "example": "XMLHttpRequest" }
+        "schema": {
+          "type": "string",
+          "enum": [
+            "XMLHttpRequest"
+          ],
+          "example": "XMLHttpRequest"
+        }
       },
       "AcceptJson": {
         "name": "Accept",
         "in": "header",
         "required": true,
         "description": "Explicit content negotiation header mandating JSON response envelopes",
-        "schema": { "type": "string", "enum": ["application/json"], "example": "application/json" }
+        "schema": {
+          "type": "string",
+          "enum": [
+            "application/json"
+          ],
+          "example": "application/json"
+        }
       },
       "ReferrerPolicyNoReferrer": {
         "name": "Referrer-Policy",
         "in": "header",
         "required": false,
         "description": "Caller transport policy preventing internal portal URLs and DESK-* tokens from leaking across hops",
-        "schema": { "type": "string", "enum": ["no-referrer"], "example": "no-referrer" }
+        "schema": {
+          "type": "string",
+          "enum": [
+            "no-referrer"
+          ],
+          "example": "no-referrer"
+        }
       }
     },
     "headers": {
@@ -1153,23 +3148,46 @@
       },
       "XContentTypeOptionsHeader": {
         "description": "MIME type sniffing prevention header",
-        "schema": { "type": "string", "example": "nosniff" }
+        "schema": {
+          "type": "string",
+          "example": "nosniff"
+        }
       },
       "ReferrerPolicyHeader": {
         "description": "Inbound server referrer policy",
-        "schema": { "type": "string", "example": "strict-origin-when-cross-origin" }
+        "schema": {
+          "type": "string",
+          "example": "strict-origin-when-cross-origin"
+        }
       }
     },
     "schemas": {
       "TickerRowRecord": {
         "type": "object",
         "properties": {
-          "WagerNumber": { "type": "string", "example": "894112" },
-          "Login": { "type": "string", "description": "CustomerIdentifier", "example": "CB112_1" },
-          "Agent": { "type": "string", "description": "Direct AgentIdentifier", "example": "CUB22HR" },
+          "WagerNumber": {
+            "type": "string",
+            "example": "894112"
+          },
+          "Login": {
+            "type": "string",
+            "description": "CustomerIdentifier",
+            "example": "CB112_1"
+          },
+          "Agent": {
+            "type": "string",
+            "description": "Direct AgentIdentifier",
+            "example": "CUB22HR"
+          },
           "TicketWriter": {
             "type": "string",
-            "enum": ["Internet", "ALERT", "GSLIVE", "GSBUILDER", "CSLEVEL2"],
+            "enum": [
+              "Internet",
+              "ALERT",
+              "GSLIVE",
+              "GSBUILDER",
+              "CSLEVEL2"
+            ],
             "description": "Signal channel source string",
             "example": "ALERT"
           },
@@ -1178,25 +3196,457 @@
             "description": "Wager description string. ShortDesc[0] maps primary wager type (S, P, L, C, T, G, M, E)",
             "example": "S - 451 KANSAS CITY CHIEFS -3½ (-110)"
           },
-          "Risk": { "type": "string", "example": "1100.00" },
-          "Win": { "type": "string", "example": "1000.00" },
-          "data-risk": { "type": "string", "description": "Raw unformatted risk amount in dollars", "example": "1100.00" },
-          "data-win": { "type": "string", "description": "Raw unformatted to-win amount in dollars", "example": "1000.00" },
-          "Sport": { "type": "string", "example": "Football" },
-          "Placed": { "type": "string", "example": "2026-10-30 13:19:28" },
-          "PlacedTimestamp": { "type": "integer", "description": "Unix millisecond timestamp", "example": 1793042368000 }
+          "Risk": {
+            "type": "string",
+            "example": "1100.00"
+          },
+          "Win": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "data-risk": {
+            "type": "string",
+            "description": "Raw unformatted risk amount in dollars",
+            "example": "1100.00"
+          },
+          "data-win": {
+            "type": "string",
+            "description": "Raw unformatted to-win amount in dollars",
+            "example": "1000.00"
+          },
+          "Sport": {
+            "type": "string",
+            "example": "Football"
+          },
+          "Placed": {
+            "type": "string",
+            "example": "2026-10-30 13:19:28"
+          },
+          "PlacedTimestamp": {
+            "type": "integer",
+            "description": "Unix millisecond timestamp",
+            "example": 1793042368000
+          }
         }
       },
       "PendingLegRowRecord": {
         "type": "object",
         "properties": {
-          "WagerNumber": { "type": "string", "example": "894115" },
-          "Login": { "type": "string", "description": "CustomerIdentifier", "example": "CB112_1" },
-          "TicketWriter": { "type": "string", "example": "Internet" },
-          "ShortDesc": { "type": "string", "example": "S - 451 CHIEFS -3½" },
-          "Risk": { "type": "number", "description": "Parent ticket risk repeated on every leg row", "example": 1100 },
-          "ToWin": { "type": "number", "example": 1000 },
-          "VIP": { "type": "string", "description": "Space-padded login for VIP verified; '0         ' for retail non-VIP", "example": "0         " }
+          "WagerNumber": {
+            "type": "string",
+            "example": "894115"
+          },
+          "Login": {
+            "type": "string",
+            "description": "CustomerIdentifier",
+            "example": "CB112_1"
+          },
+          "TicketWriter": {
+            "type": "string",
+            "example": "Internet"
+          },
+          "ShortDesc": {
+            "type": "string",
+            "example": "S - 451 CHIEFS -3½"
+          },
+          "Risk": {
+            "type": "number",
+            "description": "Parent ticket risk repeated on every leg row",
+            "example": 1100
+          },
+          "ToWin": {
+            "type": "number",
+            "example": 1000
+          },
+          "VIP": {
+            "type": "string",
+            "description": "Space-padded login for VIP verified; '0         ' for retail non-VIP",
+            "example": "0         "
+          }
+        }
+      },
+      "SysexitCode": {
+        "type": "integer",
+        "description": "Standard BSD/Linux sysexits.h fail-closed process exit codes",
+        "enum": [
+          0,
+          64,
+          72,
+          75,
+          77
+        ],
+        "x-enum-varnames": [
+          "EX_OK",
+          "EX_USAGE",
+          "EX_DATAERR",
+          "EX_TEMPFAIL",
+          "EX_NOPERM"
+        ],
+        "example": 0
+      },
+      "MutationClassification": {
+        "type": "string",
+        "description": "Specification-grade mutation classification outcome",
+        "enum": [
+          "COMMITTED",
+          "UNVERIFIED_COMMIT",
+          "SILENT_NO_OP",
+          "REJECTED",
+          "MODEL_ERROR",
+          "QUBIC_UI_ONLY_404",
+          "POISONED_PATH_500",
+          "GATEWAY_FAULT_500",
+          "UPSTREAM_UNAVAILABLE",
+          "SHAPE_DRIFT"
+        ],
+        "example": "COMMITTED"
+      },
+      "WirePayloadErrorClassification": {
+        "type": "string",
+        "description": "Transport and payload wire error classification",
+        "enum": [
+          "AUTHENTICATION_SESSION_EXPIRED",
+          "WIRE_PAYLOAD_TRUNCATED",
+          "WIRE_PAYLOAD_SHAPE_DRIFT",
+          "CSRF_PAIRING_MISMATCH",
+          "TRANSPORT_TIMEOUT",
+          "CALLER_ABORTED",
+          "POISONED_PATH_DETECTED",
+          "INVALID_IDENTIFIER_LENGTH"
+        ],
+        "example": "AUTHENTICATION_SESSION_EXPIRED"
+      },
+      "StandardWireError": {
+        "type": "object",
+        "required": [
+          "error",
+          "code",
+          "sysexitCode",
+          "retryable"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Session expired or invalid bearer token"
+          },
+          "code": {
+            "$ref": "#/components/schemas/WirePayloadErrorClassification"
+          },
+          "sysexitCode": {
+            "$ref": "#/components/schemas/SysexitCode"
+          },
+          "retryable": {
+            "type": "boolean",
+            "example": true
+          },
+          "retryAfterMs": {
+            "type": "integer",
+            "example": 250
+          }
+        }
+      },
+      "NeuronLayerToken": {
+        "type": "object",
+        "required": [
+          "neuronId",
+          "label",
+          "layer",
+          "hexColor",
+          "channelCode",
+          "operationalRole"
+        ],
+        "properties": {
+          "neuronId": {
+            "type": "string",
+            "example": "L18.N0204"
+          },
+          "label": {
+            "type": "string",
+            "example": "Retail Pregame Baseline Gate"
+          },
+          "layer": {
+            "type": "integer",
+            "example": 18
+          },
+          "hexColor": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "example": "#1d84b5"
+          },
+          "channelCode": {
+            "type": "string",
+            "example": "Internet"
+          },
+          "operationalRole": {
+            "type": "string",
+            "example": "Retail pregame baseline flow monitoring and twin matching target."
+          }
+        }
+      },
+      "ManagerDomLocalizationKey": {
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "domSelector",
+          "wireMapping",
+          "operationalRole"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "L-1029"
+          },
+          "label": {
+            "type": "string",
+            "example": "Source"
+          },
+          "domSelector": {
+            "type": "string",
+            "example": "th[data-language=\"L-1029\"]"
+          },
+          "wireMapping": {
+            "type": "string",
+            "example": "TicketWriter"
+          },
+          "operationalRole": {
+            "type": "string",
+            "example": "Ingestion channel discriminator (Internet, ALERT, GSLIVE, GSBUILDER, CSLEVEL2)."
+          }
+        }
+      },
+      "BitemporalIngestionRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "v_t",
+          "valid_to",
+          "tx_from",
+          "tx_to",
+          "price",
+          "channel_id",
+          "pattern"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 451
+          },
+          "v_t": {
+            "type": "integer",
+            "description": "Valid-time start (milliseconds)",
+            "example": 1793042000000
+          },
+          "valid_to": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Valid-time end; null if open",
+            "example": null
+          },
+          "tx_from": {
+            "type": "integer",
+            "description": "Transaction-time commit timestamp",
+            "example": 1793042000150
+          },
+          "tx_to": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Transaction-time superseded timestamp; null if active",
+            "example": null
+          },
+          "price": {
+            "type": "integer",
+            "description": "Parsed board price from XML AST",
+            "example": -115
+          },
+          "channel_id": {
+            "type": "string",
+            "enum": [
+              "Internet",
+              "ALERT",
+              "GSLIVE",
+              "GSBUILDER",
+              "CSLEVEL2",
+              "BLOCKED",
+              "GATEWAY"
+            ],
+            "example": "Internet"
+          },
+          "pattern": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "UP",
+              "DOWN",
+              "SPIKE_UP",
+              "SPIKE_DOWN"
+            ],
+            "example": "NORMAL"
+          },
+          "xml_golden_ast_sha256": {
+            "type": "string",
+            "example": "3b918478f334ed6540f79a026a27f15850094e84070b140b1329a855f728a745"
+          }
+        }
+      },
+      "EmpiricalBayesSharpProfile": {
+        "type": "object",
+        "required": [
+          "customerID",
+          "archetype",
+          "rawCLVBasisPoints",
+          "shrunkSharpScore",
+          "ticketCount",
+          "isGated"
+        ],
+        "properties": {
+          "customerID": {
+            "type": "string",
+            "example": "BGD101"
+          },
+          "archetype": {
+            "type": "string",
+            "enum": [
+              "EXECUTION_SNIPER",
+              "STEAM_CHASER",
+              "PARLAY_EXTRACTOR",
+              "WHALE_VOLATILITY",
+              "RECREATIONAL_CASUAL"
+            ],
+            "example": "EXECUTION_SNIPER"
+          },
+          "rawCLVBasisPoints": {
+            "type": "integer",
+            "example": 240
+          },
+          "shrunkSharpScore": {
+            "type": "number",
+            "example": 86.2
+          },
+          "ticketCount": {
+            "type": "integer",
+            "example": 14
+          },
+          "isGated": {
+            "type": "boolean",
+            "description": "True if N >= 8 sample floor is met",
+            "example": true
+          },
+          "recommendedDelaySeconds": {
+            "type": "integer",
+            "example": 15
+          }
+        }
+      },
+      "MultiFactorCorroborationScore": {
+        "type": "object",
+        "required": [
+          "clusterId",
+          "mfcsScore",
+          "classification",
+          "isBreached"
+        ],
+        "properties": {
+          "clusterId": {
+            "type": "string",
+            "example": "CLUST-198.51.100.0/24"
+          },
+          "mfcsScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "example": 86.4
+          },
+          "breakdown": {
+            "type": "object",
+            "properties": {
+              "subnetScore": {
+                "type": "number",
+                "example": 30
+              },
+              "timeScore": {
+                "type": "number",
+                "example": 30
+              },
+              "stakeScore": {
+                "type": "number",
+                "example": 20
+              },
+              "deviceScore": {
+                "type": "number",
+                "example": 25
+              },
+              "marketScore": {
+                "type": "number",
+                "example": 30
+              }
+            }
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "CLEARED_RECREATIONAL",
+              "ELEVATED_RISK",
+              "BOT_SNIPER_FLAGGED",
+              "GHOST_INJECTION_CLAMPED"
+            ],
+            "example": "BOT_SNIPER_FLAGGED"
+          },
+          "isBreached": {
+            "type": "boolean",
+            "description": "True if MFCS >= 80",
+            "example": true
+          }
+        }
+      },
+      "BranchGradeEscrowPolicy": {
+        "type": "object",
+        "required": [
+          "agentID",
+          "branchGrade",
+          "netHoldPercentage",
+          "toxicityScore",
+          "escrowHoldbackRate"
+        ],
+        "properties": {
+          "agentID": {
+            "type": "string",
+            "example": "ATEAM"
+          },
+          "branchGrade": {
+            "type": "string",
+            "enum": [
+              "AAA",
+              "AA",
+              "A",
+              "BBB",
+              "BB",
+              "B",
+              "CCC",
+              "D_TOXIC"
+            ],
+            "example": "CCC"
+          },
+          "netHoldPercentage": {
+            "type": "number",
+            "example": -14.2
+          },
+          "toxicityScore": {
+            "type": "number",
+            "example": 76
+          },
+          "sharpsCount": {
+            "type": "integer",
+            "example": 5
+          },
+          "escrowHoldbackRate": {
+            "type": "number",
+            "example": 0.5
+          },
+          "actionPlaybook": {
+            "type": "string",
+            "example": "Escrow freeze; mandate +15c juice model (-115/-115)."
+          }
         }
       }
     }

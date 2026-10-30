@@ -73,7 +73,8 @@
     "deploy": "./deploy_to_vps.sh",
     "docs:stage": "mkdir -p dist && cp docs/index.html dist/index.html && cp docs/openapi.json dist/openapi.json",
     "docs:deploy": "bun run docs:stage && ./wrangler pages deploy dist --project-name=fantasy402-docs --branch=main",
-    "test:docs": "bun test tests/api_reference.test.ts"
+    "test:docs": "bun test tests/api_reference.test.ts",
+    "deploy:docs": "./deploy_docs.sh"
   },
   "keywords": [
     "sportsdesk",
