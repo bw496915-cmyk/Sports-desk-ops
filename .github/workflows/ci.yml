@@ -3,8 +3,24 @@ name: sportsdesk-ops-ci
 on:
   push:
     branches: [main]
+    paths:
+      - "**.ts"
+      - "**.tsx"
+      - "**.json"
+      - "**.jsonl"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/**"
   pull_request:
     branches: [main]
+    paths:
+      - "**.ts"
+      - "**.tsx"
+      - "**.json"
+      - "**.jsonl"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
