@@ -64,6 +64,9 @@ Options:
   --fail-on-divergence   Exit 1 if sha256 differs from previous file at destination
   --json            Machine-readable summary on stdout
   --bitemporal      Require v_to on each non-DROPPED row (CHECK always enforces v_to > v_t)
+  --no-verify-xml-golden   Skip xml_golden_ast_sha256 checks on JSONL rows
+  --strict-xml-golden      Require pin on every row that includes xml
+  --expected-bun <ver>     Fail replay when logged bun_version differs (with pins)
   -h, --help        This help
 
 Transaction axis: business key is (channel_id, id) — ids are per-lane, not global.
@@ -72,8 +75,8 @@ Transaction axis: business key is (channel_id, id) — ids are per-lane, not glo
   single writer; concurrent live corrections need re-read-and-retry (not modeled here).
   Without duplicate keys, replay is valid-time + current tx snapshot only.
 
-Exit codes: 1 = corrupt JSONL, 2 = tx-axis / lost correction, 3 = SLA seen, 0 = ok.
-Precedence: corrupt > tx-axis > SLA.
+Exit codes: 1 = corrupt JSONL, 2 = tx-axis, 3 = SLA, 4 = XML golden AST drift, 0 = ok.
+Precedence: corrupt > tx-axis > SLA > xml golden.
 `);
 }
 
@@ -95,6 +98,9 @@ async function main(): Promise<number> {
   let channelCode: SignalChannelCode | undefined;
   let requireCleanFeed = false;
   let failOnDivergence = false;
+  let verifyXmlGolden = true;
+  let strictXmlGolden = false;
+  let expectedBun: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -121,6 +127,11 @@ async function main(): Promise<number> {
     else if (a === "--markdown") markdown = true;
     else if (a === "--json") json = true;
     else if (a === "--bitemporal") bitemporal = true;
+    else if (a === "--no-verify-xml-golden") verifyXmlGolden = false;
+    else if (a === "--strict-xml-golden") strictXmlGolden = true;
+    else if (a === "--expected-bun" && args[i + 1]) {
+      expectedBun = args[++i]!;
+    }
   }
 
   let feedProvenance:
@@ -179,6 +190,16 @@ async function main(): Promise<number> {
   const result = await replaySportsdeskIngestionLog({
     path,
     bitemporal,
+    verifyXmlGoldenAst: verifyXmlGolden,
+    strictXmlGoldenPins: strictXmlGolden,
+    ...(expectedBun !== undefined ? { expectedBunVersion: expectedBun } : {}),
+    onXmlGoldenAstDrift({ id, expectedSha256, actualSha256 }) {
+      if (!json) {
+        console.warn(
+          `\x1b[31m[XML-GOLDEN]\x1b[0m id ${id ?? "?"} pin drift expected=${expectedSha256?.slice(0, 12)}… actual=${actualSha256?.slice(0, 12)}…`,
+        );
+      }
+    },
     onCorruptedLine(byteOffset, message) {
       if (!json) {
         console.warn(
@@ -215,6 +236,7 @@ async function main(): Promise<number> {
           latencyViolationsAccepted: result.latencyViolationsAccepted,
           transactionSupersedes: result.transactionSupersedes,
           txAxisViolations: result.txAxisViolations,
+          xmlGoldenAst: result.xmlGoldenAst,
           physicalRowCount: result.physicalRowCount,
           currentRowCount: result.currentRowCount,
           feedProvenance: feedProvenance ?? null,

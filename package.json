@@ -21,6 +21,7 @@
     "check:innerhtml": "bun run bin/check-innerhtml.ts",
     "cli": "bun run sportsdesk_cli.ts",
     "replay": "bun run sportsdesk_replay_cli.ts",
+    "ingestion:enrich-xml-golden": "bun run scripts/enrich_ingestion_jsonl_xml_golden.ts",
     "catalog": "bun run sportsdesk_catalog_cli.ts",
     "candidate": "bun run sportsdesk_candidate_cli.ts",
     "settlement": "bun run sportsdesk_settlement_cli.ts",

@@ -25,7 +25,16 @@ import {
   replayHistoricalJsonlFile,
   type HistoricalLogReplayResult,
 } from "./lib/jsonl_stream_replay.ts";
-import { xmlGoldenAstSha256ForIngest } from "./lib/bun_xml_golden_ast.ts";
+import {
+  goldenAstFingerprintFromXml,
+  xmlGoldenAstSha256ForIngest,
+} from "./lib/bun_xml_golden_ast.ts";
+import {
+  accumulateIngestionJsonlXmlGoldenAst,
+  emptyIngestionXmlGoldenAstReplayStats,
+  exitCodeFromIngestionXmlGoldenAstStats,
+  type IngestionXmlGoldenAstReplayStats,
+} from "./lib/bun_xml_golden_ast_replay.ts";
 
 const INGESTION_CHANNEL_BY_CODE = new Map(
   INGESTION_CHANNELS.map((c) => [c.channelCode, c] as const),
@@ -124,6 +133,9 @@ export type SportsdeskIngestionLogRow = {
   tx_from?: number;
   tf?: number;
   color_int?: ColorHexInt;
+  /** Plane 1 golden AST pin (JSON5.stringify(Bun.XML.parse xml, { compact: false })). */
+  xml_golden_ast_sha256?: string;
+  bun_version?: string;
 };
 
 export type ResolvedIngestionChannel = {
@@ -179,9 +191,10 @@ export type SportsdeskIngestionReplayResult = HistoricalLogReplayResult & {
   txAxisViolations: number;
   physicalRowCount: number;
   currentRowCount: number;
+  xmlGoldenAst: IngestionXmlGoldenAstReplayStats;
 };
 
-/** Exit: corrupt (1) > lost correction / tx-axis (2) > SLA (3) > ok (0). */
+/** Exit: corrupt (1) > tx-axis (2) > SLA (3) > XML golden drift (4) > ok (0). */
 export function replayIngestionExitCode(
   result: Pick<
     SportsdeskIngestionReplayResult,
@@ -190,11 +203,15 @@ export function replayIngestionExitCode(
     | "latencyViolationsSeen"
     | "recordCount"
     | "trades"
+    | "xmlGoldenAst"
   >,
 ): number {
   if (result.corruptedLineSkips > 0) return 1;
   if (result.txAxisViolations > 0) return 2;
   if (result.latencyViolationsSeen > 0) return 3;
+  if (exitCodeFromIngestionXmlGoldenAstStats(result.xmlGoldenAst) === 4) {
+    return 4;
+  }
   return result.trades.length > 0 || result.recordCount > 0 ? 0 : 1;
 }
 
@@ -231,6 +248,14 @@ export function parseSportsdeskIngestionLogRow(
     } catch {
       /* optional field */
     }
+  }
+  const pin = row.xml_golden_ast_sha256;
+  if (typeof pin === "string" && pin.length > 0) {
+    out.xml_golden_ast_sha256 = pin;
+  }
+  const bunVer = row.bun_version;
+  if (typeof bunVer === "string" && bunVer.length > 0) {
+    out.bun_version = bunVer;
   }
   return out;
 }
@@ -475,6 +500,16 @@ export type ReplaySportsdeskIngestionOptions = {
     txTo: number;
     message: string;
   }) => void;
+  /** Default true — verify `xml_golden_ast_sha256` when present on JSONL rows. */
+  verifyXmlGoldenAst?: boolean;
+  /** Fail rows that include `xml` without a golden pin. */
+  strictXmlGoldenPins?: boolean;
+  expectedBunVersion?: string;
+  onXmlGoldenAstDrift?: (info: {
+    id?: number;
+    expectedSha256?: string;
+    actualSha256?: string;
+  }) => void;
 };
 
 async function runIngestionReplayOnDatabase(
@@ -482,6 +517,14 @@ async function runIngestionReplayOnDatabase(
   options: ReplaySportsdeskIngestionOptions,
 ): Promise<Omit<SportsdeskIngestionReplayResult, "trades"> & { db: Database }> {
   const strictIntervalContract = options.bitemporal === true;
+  const verifyXmlGolden = options.verifyXmlGoldenAst !== false;
+  const xmlGoldenAst = emptyIngestionXmlGoldenAstReplayStats();
+  const goldenOpts = {
+    strictPins: options.strictXmlGoldenPins === true,
+    ...(options.expectedBunVersion !== undefined
+      ? { expectedBunVersion: options.expectedBunVersion }
+      : {}),
+  };
 
   const insertTrade = db.prepare(
     `INSERT INTO ingestion_trades (
@@ -500,6 +543,25 @@ async function runIngestionReplayOnDatabase(
 
   const base = await replayHistoricalJsonlFile(options.path, {
     onRecord(value) {
+      if (verifyXmlGolden) {
+        accumulateIngestionJsonlXmlGoldenAst(value, xmlGoldenAst, goldenOpts);
+        if (typeof value === "object" && value !== null) {
+          const raw = value as Record<string, unknown>;
+          const pin = raw.xml_golden_ast_sha256;
+          const xml = raw.xml;
+          if (typeof pin === "string" && typeof xml === "string") {
+            const actualSha256 = goldenAstFingerprintFromXml(xml).sha256;
+            if (actualSha256 !== pin) {
+              options.onXmlGoldenAstDrift?.({
+                id: typeof raw.id === "number" ? raw.id : undefined,
+                expectedSha256: pin,
+                actualSha256,
+              });
+            }
+          }
+        }
+      }
+
       const row = parseSportsdeskIngestionLogRow(value);
       if (!row) return;
 
@@ -648,6 +710,7 @@ async function runIngestionReplayOnDatabase(
     txAxisViolations,
     physicalRowCount,
     currentRowCount,
+    xmlGoldenAst,
     db,
   };
 }

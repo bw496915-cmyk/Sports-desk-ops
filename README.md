@@ -158,7 +158,9 @@ bun run replay -- --path /tmp/e.jsonl --markdown
 bun sportsdesk_cli.ts replay --path reports/ingestion-audit.jsonl --json
 ```
 
-Implementation: `sportsdesk_ingestion_replay.ts`, drain mirror `lib/jsonl_stream_replay.ts`, runbook §8.4 in `bun_server_runtime_shapes_runbook.md`.
+**Bun.XML golden AST (Plane 1 pin / Plane 3 verify):** each row with `xml` may carry `xml_golden_ast_sha256` and `bun_version` (`sha256` of `Bun.JSON5.stringify(Bun.XML.parse(xml.trim(), { compact: false }))`). Replay verifies pins unless `--no-verify-xml-golden`; `--strict-xml-golden` requires a pin on every `xml` row. Exit precedence: corrupt **1** → tx **2** → SLA **3** → golden drift **4**. Backfill pins: `bun run ingestion:enrich-xml-golden -- in.jsonl [out.jsonl]`.
+
+Implementation: `sportsdesk_ingestion_replay.ts`, `lib/bun_xml_golden_ast_replay.ts`, drain mirror `lib/jsonl_stream_replay.ts`, runbook §8.4 in `bun_server_runtime_shapes_runbook.md`.
 
 ## Qwen3.5-4B (Layers 18–28) Token Architecture & Single Source of Truth
 
