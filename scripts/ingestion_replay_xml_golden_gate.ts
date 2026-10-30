@@ -64,7 +64,8 @@ async function main(): Promise<number> {
     path: tmp,
     verifyXmlGoldenAst: true,
     strictXmlGoldenPins: true,
-    expectedBunVersion: manifest.bun_version || Bun.version,
+    // Match pins enriched on this runner (CI pins Bun via setup-bun; do not hardcode manifest.bun_version).
+    expectedBunVersion: Bun.version,
   });
 
   const xmlRows = lines.filter((l) => {
