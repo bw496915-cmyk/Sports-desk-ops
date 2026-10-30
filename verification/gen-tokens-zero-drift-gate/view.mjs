@@ -1,4 +1,4 @@
-/** @typedef {{ phase: string; workDirty: boolean; strategy: string; genBehavior: string; onDisk: string; matchesHead: boolean }} V */
+/** @typedef {{ phase: string; workDirty: boolean; strategy: string; genBehavior: string; onDisk: string; matchesHead: boolean; manifestOk: boolean; strictGate: boolean }} V */
 
 export const title = "gen:tokens:gate (zero-drift CI check)";
 
@@ -35,8 +35,14 @@ export const step = (action, _from, to) => {
   if (action === "GenSkipAfterRm") {
     return "gen:tokens finishes without writing a file";
   }
+  if (action === "GenSkipStrict") {
+    return "gen:tokens aborts under GEN_TOKENS_GATE (partial emit)";
+  }
   if (action === "GenSkipAfterCheckout") {
-    return "gen:tokens skips a file; manifest check fails";
+    return "gen:tokens skips a file; manifest check fails (legacy weak gate)";
+  }
+  if (action === "ManifestForged") {
+    return "manifest missing path or stale sha256 vs disk";
   }
   if (action === "GenDrift") {
     return "gen:tokens writes bytes that differ from HEAD";

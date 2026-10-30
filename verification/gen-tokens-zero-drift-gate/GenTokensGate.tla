@@ -1,11 +1,11 @@
 ---- MODULE GenTokensGate ----
-\* Abstract model of scripts/gen_tokens_zero_drift_gate.sh (Sports-desk-ops).
+\* Abstract model of scripts/gen_tokens_gate.ts + strict GEN_TOKENS_GATE manifest.
 
 EXTENDS FiniteSets
 
-VARIABLES phase, workDirty, strategy, genBehavior, onDisk, matchesHead
+VARIABLES phase, workDirty, strategy, genBehavior, onDisk, matchesHead, manifestOk, strictGate
 
-vars == <<phase, workDirty, strategy, genBehavior, onDisk, matchesHead>>
+vars == <<phase, workDirty, strategy, genBehavior, onDisk, matchesHead, manifestOk, strictGate>>
 
 Phases == {
   "Waiting to run",
@@ -13,6 +13,7 @@ Phases == {
   "Reset files at HEAD",
   "Reset files removed",
   "Generator failed",
+  "Manifest invalid",
   "Missing output file",
   "Output drift",
   "Gate passed",
@@ -30,6 +31,8 @@ TypeOK ==
   /\ genBehavior \in GenBehaviors
   /\ onDisk \in DiskStates
   /\ matchesHead \in BOOLEAN
+  /\ manifestOk \in BOOLEAN
+  /\ strictGate \in BOOLEAN
 
 Init ==
   /\ phase = "Waiting to run"
@@ -38,11 +41,14 @@ Init ==
   /\ genBehavior \in GenBehaviors
   /\ onDisk = "at HEAD"
   /\ matchesHead = TRUE
+  /\ manifestOk = FALSE
+  /\ strictGate = TRUE
 
 Terminal ==
   phase \in {
     "Stopped dirty outputs",
     "Generator failed",
+    "Manifest invalid",
     "Missing output file",
     "Output drift",
     "Gate passed",
@@ -53,7 +59,7 @@ RunGateDirty ==
   /\ phase = "Waiting to run"
   /\ workDirty
   /\ phase' = "Stopped dirty outputs"
-  /\ UNCHANGED <<workDirty, strategy, genBehavior, onDisk, matchesHead>>
+  /\ UNCHANGED <<workDirty, strategy, genBehavior, onDisk, matchesHead, manifestOk, strictGate>>
 
 RunGateCleanCheckout ==
   /\ phase = "Waiting to run"
@@ -62,7 +68,8 @@ RunGateCleanCheckout ==
   /\ phase' = "Reset files at HEAD"
   /\ onDisk' = "at HEAD"
   /\ matchesHead' = TRUE
-  /\ UNCHANGED <<workDirty, strategy, genBehavior>>
+  /\ manifestOk' = FALSE
+  /\ UNCHANGED <<workDirty, strategy, genBehavior, strictGate>>
 
 RunGateCleanRm ==
   /\ phase = "Waiting to run"
@@ -71,27 +78,38 @@ RunGateCleanRm ==
   /\ phase' = "Reset files removed"
   /\ onDisk' = "missing"
   /\ matchesHead' = FALSE
-  /\ UNCHANGED <<workDirty, strategy, genBehavior>>
+  /\ manifestOk' = FALSE
+  /\ UNCHANGED <<workDirty, strategy, genBehavior, strictGate>>
 
 GenCrash ==
   /\ phase \in {"Reset files at HEAD", "Reset files removed"}
   /\ genBehavior = "gen crash"
   /\ phase' = "Generator failed"
-  /\ UNCHANGED <<workDirty, strategy, genBehavior, onDisk, matchesHead>>
+  /\ UNCHANGED <<workDirty, strategy, genBehavior, onDisk, matchesHead, manifestOk, strictGate>>
+
+GenSkipStrict ==
+  /\ phase \in {"Reset files at HEAD", "Reset files removed"}
+  /\ genBehavior = "gen skips file"
+  /\ strictGate
+  /\ phase' = "Generator failed"
+  /\ UNCHANGED <<workDirty, strategy, genBehavior, onDisk, matchesHead, manifestOk, strictGate>>
 
 GenSkipAfterRm ==
   /\ phase = "Reset files removed"
   /\ genBehavior = "gen skips file"
+  /\ ~strictGate
   /\ phase' = "Missing output file"
-  /\ UNCHANGED <<workDirty, strategy, genBehavior, onDisk, matchesHead>>
+  /\ UNCHANGED <<workDirty, strategy, genBehavior, onDisk, matchesHead, manifestOk, strictGate>>
 
 GenSkipAfterCheckout ==
   /\ phase = "Reset files at HEAD"
   /\ genBehavior = "gen skips file"
+  /\ ~strictGate
   /\ phase' = "Gate failed"
   /\ onDisk' = "at HEAD"
   /\ matchesHead' = TRUE
-  /\ UNCHANGED <<workDirty, strategy, genBehavior>>
+  /\ manifestOk' = FALSE
+  /\ UNCHANGED <<workDirty, strategy, genBehavior, strictGate>>
 
 GenOk ==
   /\ phase \in {"Reset files at HEAD", "Reset files removed"}
@@ -99,7 +117,8 @@ GenOk ==
   /\ phase' = "Gate passed"
   /\ onDisk' = "regenerated"
   /\ matchesHead' = TRUE
-  /\ UNCHANGED <<workDirty, strategy, genBehavior>>
+  /\ manifestOk' = TRUE
+  /\ UNCHANGED <<workDirty, strategy, genBehavior, strictGate>>
 
 GenDrift ==
   /\ phase \in {"Reset files at HEAD", "Reset files removed"}
@@ -107,7 +126,18 @@ GenDrift ==
   /\ phase' = "Output drift"
   /\ onDisk' = "regenerated"
   /\ matchesHead' = FALSE
-  /\ UNCHANGED <<workDirty, strategy, genBehavior>>
+  /\ manifestOk' = TRUE
+  /\ UNCHANGED <<workDirty, strategy, genBehavior, strictGate>>
+
+ManifestForged ==
+  /\ phase \in {"Reset files at HEAD", "Reset files removed"}
+  /\ genBehavior = "regen ok"
+  /\ strictGate
+  /\ phase' = "Manifest invalid"
+  /\ onDisk' = "at HEAD"
+  /\ matchesHead' = TRUE
+  /\ manifestOk' = FALSE
+  /\ UNCHANGED <<workDirty, strategy, genBehavior, strictGate>>
 
 Done == Terminal /\ UNCHANGED vars
 
@@ -116,10 +146,12 @@ Next ==
   \/ RunGateCleanCheckout
   \/ RunGateCleanRm
   \/ GenCrash
+  \/ GenSkipStrict
   \/ GenSkipAfterRm
   \/ GenSkipAfterCheckout
   \/ GenOk
   \/ GenDrift
+  \/ ManifestForged
   \/ Done
 
 Spec == Init /\ [][Next]_vars
@@ -133,6 +165,11 @@ NoPassWhenFileMissing == ~(phase = "Gate passed" /\ onDisk = "missing")
 
 PassImpliesMatchesHead == (phase = "Gate passed") => matchesHead
 
-NoSilentPassWhenGenSkips == ~(phase = "Gate passed" /\ genBehavior = "gen skips file")
+NoSilentPassWhenGenSkips ==
+  ~(phase = "Gate passed" /\ genBehavior = "gen skips file")
+
+PassImpliesManifestOk == (phase = "Gate passed") => manifestOk
+
+NoPassOnManifestInvalid == phase # "Gate passed" \/ manifestOk
 
 ====

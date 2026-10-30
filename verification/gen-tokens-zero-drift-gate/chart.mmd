@@ -15,22 +15,21 @@ stateDiagram-v2
   s2: Stopped dirty outputs
   s3: Reset files removed
   s4: Generator failed
-  s5: Gate failed
-  s6: Missing output file
-  s7: Output drift
-  s8: Gate passed
+  s5: Manifest invalid
+  s6: Output drift
+  s7: Gate passed
   [*] --> s0
   s0 --> s1: gate restores committed files (git checkout)
   s0 --> s3: gate deletes generated files (rm -f)
   s0 --> s2: gate sees dirty generated files [local WIP]
-  s1 --> s4: gen:tokens exits with an error
-  s1 --> s5: gen:tokens skips a file#59; manifest check fails
-  s1 --> s7: gen:tokens writes bytes that differ from HEAD
-  s1 --> s8: gen:tokens reproduces committed output
-  s3 --> s4: gen:tokens exits with an error
-  s3 --> s6: gen:tokens finishes without writing a file
-  s3 --> s7: gen:tokens writes bytes that differ from HEAD
-  s3 --> s8: gen:tokens reproduces committed output
+  s1 --> s4: gen:tokens exits with an error or gen:tokens aborts under GEN_TOKENS_GATE (partial emit)
+  s1 --> s6: gen:tokens writes bytes that differ from HEAD
+  s1 --> s5: manifest missing path or stale sha256 vs disk
+  s1 --> s7: gen:tokens reproduces committed output
+  s3 --> s4: gen:tokens exits with an error or gen:tokens aborts under GEN_TOKENS_GATE (partial emit)
+  s3 --> s6: gen:tokens writes bytes that differ from HEAD
+  s3 --> s5: manifest missing path or stale sha256 vs disk
+  s3 --> s7: gen:tokens reproduces committed output
   class s0 blue
   class s1 yellow
   class s2 teal
@@ -39,4 +38,3 @@ stateDiagram-v2
   class s5 teal
   class s6 teal
   class s7 teal
-  class s8 teal

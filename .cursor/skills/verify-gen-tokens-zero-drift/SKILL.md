@@ -22,35 +22,37 @@ Charts are rendered with [Pele](https://pele.run) (blueprint theme) into `verifi
 | ----------- | ---- |
 | `RunGateDirty` | `scripts/gen_tokens_gate.ts`: dirty check on `GEN_TOKEN_EMISSION_PATHS` |
 | `RunGateCleanCheckout` | `lib/gen_tokens/emission_targets.ts` targets with `reset: git-checkout-head` |
-| `RunGateCleanRm` | targets with `reset: rm-before-gen` (none yet; models future full-file outputs) |
+| `RunGateCleanRm` | targets with `reset: rm-before-gen` (`domain-branded-types.ts` full-from-toml) |
 | `GenCrash` | non-zero `bun run gen:tokens` |
-| `GenSkipAfterCheckout` | skip write → manifest miss → gate exit non-zero |
-| `GenSkipAfterRm` | missing file after `rm` reset |
-| `GenOk` | manifest lists all targets + `git diff --quiet` |
+| `GenSkipStrict` | `assertStrictGateEmission` under `GEN_TOKENS_GATE=1` (partial emit → gen exit 1) |
+| `GenSkipAfterCheckout` | skip write with weak gate (`~strictGate`); manifest miss at gate |
+| `GenSkipAfterRm` | missing file after `rm` reset (weak gate path) |
+| `ManifestForged` | `verifyManifestAgainstDisk` rejects stale or incomplete manifest |
+| `GenOk` | manifest lists all targets + matching sha256/run id + `git diff --quiet` |
 | `GenDrift` | diff non-quiet |
 
-Files: `scripts/gen_tokens_gate.ts`, `lib/gen_tokens/emission_targets.ts`, `scripts/generate_tokens.ts`, `package.json` scripts `gen:tokens`, `gen:tokens:gate`, `verify:gen-tokens-gate`.
+Files: `scripts/gen_tokens_gate.ts`, `lib/gen_tokens/emission_targets.ts`, `lib/gen_tokens/emission_manifest.ts`, `scripts/generate_tokens.ts`, `package.json` scripts `gen:tokens`, `gen:tokens:gate`, `verify:gen-tokens-gate`.
 
-**Sync commit:** `b802a0b` — update after changes to `lib/gen_tokens/*`, `scripts/gen_tokens_gate.ts`, or manifest schema. Update only after you diff covered files from `81fefeb` and reconcile the TLA+ model.
+**Sync commit:** update after reconciling TLA+ with this table (typed SSOT parser + section 7 full-from-toml + manifest invariants).
 
-**Last maintain (2026-10-30):** Outcome **updated** — emission registry + manifest gate; TLC exit **0**; `replay-mutant.sh` confirms skip fails closed.
+**Last maintain (2026-10-30):** Strict gate + manifest variables in TLC; `domain-branded-types.ts` uses `rm-before-gen`.
 
 ## Expected result
 
-**Exit 0** from `bun run verify:gen-tokens-gate` when the TLA+ model matches the manifest-based gate (`GenSkipAfterCheckout` → `Gate failed`, not pass).
+**Exit 0** from `bun run verify:gen-tokens-gate` when the TLA+ model matches the manifest-based gate (`GenSkipStrict` → `Generator failed`, not pass).
 
 **Exit 1** means a modeled invariant breaks — treat as regression or intentional promise change; do not weaken rules to greenwash.
 
-Confirm skip is caught on real code: `bash verification/gen-tokens-zero-drift-gate/replay-mutant.sh` must exit **0** (gate failed on skip).
+Confirm skip is caught on real code: `bash verification/gen-tokens-zero-drift-gate/replay-mutant.sh` must exit **0** (gate failed on skip via strict gen abort).
 
 ## Assumptions
 
-- Three generated paths are one abstract output (same skip/diff semantics).
+- Three generated paths are one abstract output for skip/diff semantics (per-path sha256 is abstracted as `manifestOk`).
 - `gen:tokens` is one step; crash vs skip vs ok vs drift is chosen nondeterministically in the model.
-- `strategy = "checkout"` in Init matches production; `rm` branch models the discussed fix only.
-- Gate mode sets `GEN_TOKENS_GATE=1` and a run id; manifest records post-`bun fmt` sha256 per path (TLC abstracts this as skip → `Gate failed`).
+- Production sets `strictGate = TRUE` ( `GEN_TOKENS_GATE=1` ).
+- Gate mode sets a run id; manifest records post-`bun fmt` sha256 per path.
 
-Not modelled: per-file sha256, gate run id binding, `tokens.toml` validation, concurrent editors. A forged manifest with HEAD hashes without regen is out of scope (requires `rm-before-gen` / full-file mode).
+Not modelled: per-file sha256 enumeration, concurrent editors, `tokens.toml` field validation.
 
 ## Run
 
@@ -70,7 +72,7 @@ TLC counterexample above is necessary; confirm on the shell gate with:
 bash verification/gen-tokens-zero-drift-gate/replay-mutant.sh
 ```
 
-That script temporarily skips writing `domain-branded-types.ts`, runs `gen:tokens:gate`, expects gate **non-zero** (manifest miss), then restores `generate_tokens.ts`.
+That script temporarily skips writing `domain-branded-types.ts`, runs `gen:tokens:gate`, expects gate **non-zero** (strict gen abort), then restores `generate_tokens.ts`.
 
 ## Read a result
 
