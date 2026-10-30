@@ -729,16 +729,6 @@ export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
   },
 ];
 
-/** Plane 2 latency SLA (ms) per lane — derived from `INGESTION_CHANNELS` / tokens.toml SSOT. */
-export const SIGNAL_SLA_MS: Readonly<
-  Record<SignalChannelCode, number | undefined>
-> = Object.fromEntries(
-  INGESTION_CHANNELS.map((c) => [
-    c.channelCode,
-    c.sla.kind === "latency" ? c.sla.latencySlaMs : undefined,
-  ]),
-) as Record<SignalChannelCode, number | undefined>;
-
 /**
  * Decision & Route Continuum (Layers 25-28).
  * Generated directly from tokens.toml.
