@@ -24,9 +24,12 @@ it.** Everything else is labelled as observed, inferred or unimplemented — in 
 `/api/desk/auth/session` carries both `POST` and `DELETE`). A 0 + B 7 + C 31 + D 0 + E 10 = 48.
 **Surfaces:** 8 rows (D 7, E 1). Surface counts are kept separate from operation counts.
 
-**Tier A is empty by construction, not by omission.** A requires a captured response body. No response
-body exists anywhere in the repository or the GS extract, so the strongest row (the 2026-10-28 Manager HAR
-`getWebLog` mode-B request) is tier B even though its request side is fully captured.
+**Tier A is empty because live capture has not run yet.** A requires a captured response body. The capture
+tooling now exists ([evidence/capture-tooling.md](./evidence/capture-tooling.md)) and the pipeline is
+capture-ready: `apply:captures --write` upgrades a B row to A from a valid live capture, regenerates the
+spec and markdown, and the docs gate accepts the capture-backed response (`x-capture`). Tier A is 0 only
+because no live capture has been taken for this release, so the strongest row (the 2026-10-28 Manager HAR
+`getWebLog` mode-B request) remains tier B even though its request side is fully captured.
 
 **B-vs-C rule for the 11 "Tracked Operational Domains" candidates.** A launcher tile is not enough for B.
 B requires a URL+method observed on the wire (or a handler that serves it). The 11 candidates take their
@@ -64,6 +67,21 @@ capture needed): `GET /health`, `GET /api/watchlist`, `POST /api/telegram/alert`
 **Inferred — everything else:** all other request bodies, all response schemas, all status codes, all
 auth mechanisms except "the one observed Manager session is cookie-based", and the entire `/api/desk/*`
 surface (which has no implementation at all).
+
+---
+
+## Capture tooling (available, not yet run)
+
+Live capture is implemented and gated behind `F402_LIVE_CAPTURE=1` plus credentials in `.env` (never argv).
+It records an authenticated request and the live response as a value-free capture record — sha256 plus a
+schema skeleton, a redaction report and provenance — under the live-only store
+`docs/evidence/captures/` (mock fixtures stay in `tests/fixtures/captures/`), so tier A stays 0 until a
+live capture actually lands. `scripts/apply_captures.ts` is the only sanctioned upgrade path: dry-run by
+default, B→A only, and it refuses mock, redaction-dirty, response-less and mutation captures. Contradicted
+rows are left untouched, the same capture hash is an idempotent no-op, and `--write` regenerates the spec
+and markdown, runs the docs gate, and restores ledger/spec/markdown byte-for-byte on any failure. The
+architecture, commands, read-only allowlist, redaction policy, tier-upgrade rules, release-baseline
+blocker and limitations are in [evidence/capture-tooling.md](./evidence/capture-tooling.md).
 
 ---
 
