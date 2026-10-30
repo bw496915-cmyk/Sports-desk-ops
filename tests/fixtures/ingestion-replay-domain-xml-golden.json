@@ -1,0 +1,42 @@
+{
+  "bun_version": "1.4.4",
+  "captured_at": "2026-10-30T16:05:34.021Z",
+  "entries": [
+    {
+      "xml": "<t><p>100</p></t>",
+      "sha256": "504af5927ba1f04c77d69f7c461e3365950933316b823180d2ffe7653955d8a9"
+    },
+    {
+      "xml": "<t><p>250</p></t>",
+      "sha256": "04826b2f104beba96b306d0c73db01c742b400afc52805acb48b4cfc4db540dd"
+    },
+    {
+      "xml": "<t><p>0</p></t>",
+      "sha256": "e6080d0538e3a7ee33fbdc12e130d7f8d15f19d501b91bd331fc44a55736733d"
+    },
+    {
+      "xml": "<t><p>260</p></t>",
+      "sha256": "0489ca76d309c24d0fb5f12642d92ea1ae1269331004115d2616a3b353549b16"
+    },
+    {
+      "xml": "<t><p>110</p></t>",
+      "sha256": "93bdc1ef699926eb5e7c260ab31e382c9fb9b4175e5a60a18257ce8af09c2f7f"
+    },
+    {
+      "xml": "<t><p>115</p></t>",
+      "sha256": "ec5f9d4115f8fa2ac655c3a043aca60e149d3770d5790cc238dd0320d57e5017"
+    },
+    {
+      "xml": "<t><p>99</p></t>",
+      "sha256": "4cce45381e809848b1a1f591684d16fdf5863c278a190f4a1993606c59ae2ecd"
+    },
+    {
+      "xml": "<t><p>88</p></t>",
+      "sha256": "45b0f1c6ddbf514b543568f9d1d11ae4554556b49a9b3793f3d483c786195bdf"
+    },
+    {
+      "xml": "<t><p>77</p></t>",
+      "sha256": "0aa5d10f0fa28e5f1f47dc972c12f3ff9039d1545a34c7512b6e3dae46c9c83c"
+    }
+  ]
+}
