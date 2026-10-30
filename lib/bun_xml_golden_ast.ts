@@ -88,7 +88,11 @@ export function goldenAstTextFromXml(xml: string, compact = false): string {
   const doc = compact
     ? parseXmlDocumentForGoldenAst(xml, true)
     : parseXmlDocumentForGoldenAst(xml);
-  return Bun.JSON5.stringify(doc);
+  const text = Bun.JSON5.stringify(doc);
+  if (typeof text !== "string" || text.length === 0) {
+    throw new Error("bun-xml-golden-ast: JSON5.stringify returned empty AST");
+  }
+  return text;
 }
 
 export function goldenAstFingerprintFromExample(

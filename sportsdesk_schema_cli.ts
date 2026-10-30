@@ -60,7 +60,7 @@ import {
 import { SPORTSDESK_SQLITE_TABLES } from "./lib/sqlite_schema_registry.ts";
 import { schemaDatabaseUrlFromEnv } from "./lib/env.ts";
 import { parseTableParamFromUrl } from "./lib/urls-query.ts";
-import { asDatabaseURL, type FileURL } from "./lib/urls.ts";
+import { asDatabaseURL } from "./lib/urls.ts";
 import {
   formatSchemaError,
   maybeOpenSchemaError,

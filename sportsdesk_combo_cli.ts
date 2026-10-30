@@ -3,7 +3,6 @@
  * Universal combo index + venue lead-lag (not actor copy-trading).
  */
 
-import type { Database } from "bun:sqlite";
 import { openSportsdeskSqlite } from "./lib/sportsdesk_sqlite.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

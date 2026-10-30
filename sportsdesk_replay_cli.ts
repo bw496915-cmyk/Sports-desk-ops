@@ -75,7 +75,13 @@ Transaction axis: business key is (channel_id, id) — ids are per-lane, not glo
   single writer; concurrent live corrections need re-read-and-retry (not modeled here).
   Without duplicate keys, replay is valid-time + current tx snapshot only.
 
-Exit codes: 1 = corrupt JSONL, 2 = tx-axis, 3 = SLA, 4 = XML golden AST drift, 0 = ok.
+Exit codes:
+  0  success
+  1  replay input corrupt
+  2  transaction failure
+  3  SLA violation
+  4  XML golden issue — AST drift, version pin mismatch, or missing pin
+     (see [XML-GOLDEN] output for which)
 Precedence: corrupt > tx-axis > SLA > xml golden.
 `);
 }
@@ -195,11 +201,9 @@ async function main(): Promise<number> {
     verifyXmlGoldenAst: verifyXmlGolden,
     strictXmlGoldenPins: strictXmlGolden,
     ...(expectedBun !== undefined ? { expectedBunVersion: expectedBun } : {}),
-    onXmlGoldenAstDrift({ id, expectedSha256, actualSha256 }) {
+    onXmlGoldenAstFailure(message) {
       if (!json) {
-        console.warn(
-          `\x1b[31m[XML-GOLDEN]\x1b[0m id ${id ?? "?"} pin drift expected=${expectedSha256?.slice(0, 12)}… actual=${actualSha256?.slice(0, 12)}…`,
-        );
+        console.warn(`\x1b[31m${message}\x1b[0m`);
       }
     },
     onCorruptedLine(byteOffset, message) {

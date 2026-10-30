@@ -3,8 +3,28 @@ name: sportsdesk-ops-ci
 on:
   push:
     branches: [main]
+    paths:
+      - "**.ts"
+      - "**.tsx"
+      - "**.json"
+      - "**.jsonl"
+      - "**.html"
+      - "tokens.toml"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/**"
   pull_request:
     branches: [main]
+    paths:
+      - "**.ts"
+      - "**.tsx"
+      - "**.json"
+      - "**.jsonl"
+      - "**.html"
+      - "tokens.toml"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
@@ -37,7 +57,7 @@ jobs:
         run: bun run lint:check
       - name: Token SSOT Zero-Drift Gate
         timeout-minutes: 3
-        run: bun run gen:tokens && git diff --exit-code
+        run: bun run gen:tokens:gate
       - name: RequestInit Wire Linter Gate
         timeout-minutes: 3
         run: bun bin/check-fetch-init.ts --verbose

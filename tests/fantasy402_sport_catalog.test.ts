@@ -18,17 +18,6 @@ const FIXTURE = join(
   "fixtures/fantasy402-sport-catalog-2026-10-21.json",
 );
 
-const PINNED = {
-  subSportTreeSha256Hex:
-    "d92e9cd0be23a4c6792d70de8d4f9969eb6aa7f8a4b8b2ad2a66ac428ee74187",
-  periodMenusSha256Hex:
-    "4f9bc3bd2c55b8c73be54bcc99026dcb8ac12e6c26ccf1590d5aedf7f1edbcff",
-  collisionRegistrySha256Hex:
-    "b3239f90f8b6eb400146c2fc934af1e43c07be55a3f44951080568e3ad0111e1",
-  observedCollisionSetSha256Hex:
-    "b3239f90f8b6eb400146c2fc934af1e43c07be55a3f44951080568e3ad0111e1",
-};
-
 describe("fantasy402_sport_catalog", () => {
   test("expected empty count is derived from config arrays + tree (not literal 6)", async () => {
     const catalog = await loadFantasy402SportCatalogFromFile(FIXTURE);

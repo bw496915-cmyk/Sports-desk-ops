@@ -17,6 +17,8 @@
     "lint": "bun --bun run oxlint --fix",
     "lint:check": "bun --bun run oxlint --deny-warnings",
     "gen:tokens": "bun run scripts/generate_tokens.ts",
+    "gen:tokens:gate": "bun run scripts/gen_tokens_gate.ts",
+    "verify:gen-tokens-gate": "bun run verification/gen-tokens-zero-drift-gate/run.ts",
     "check:fetch-init": "bun run bin/check-fetch-init.ts",
     "check:innerhtml": "bun run bin/check-innerhtml.ts",
     "cli": "bun run sportsdesk_cli.ts",
@@ -51,7 +53,8 @@
     "schema:check-fixture-drift": "bun run scripts/schema_check_fixture_drift.ts",
     "schema:parity-gauntlet": "bun run scripts/schema_parity_gauntlet.ts",
     "eod:smoke": "bun run scripts/eod_archive_smoke.ts",
-    "schema:gate": "bun run preschema && CI=true bun run schema:snapshot && bun run schema:check-fixture-drift && bun run schema:parity-gauntlet && bun run eod:smoke",
+    "ingestion:replay-xml-golden-gate": "bun run scripts/ingestion_replay_xml_golden_gate.ts",
+    "schema:gate": "bun run preschema && CI=true bun run schema:snapshot && bun run schema:check-fixture-drift && bun run schema:parity-gauntlet && bun run eod:smoke && bun run ingestion:replay-xml-golden-gate",
     "schema:snapshot:shell": "bun --shell=bun run schema:snapshot",
     "schema:match_evaluations": "bun --title=schema:match_evaluations run schema --table match_evaluations",
     "preschema": "bun run --silent schema:typecheck",
@@ -82,7 +85,8 @@
   "license": "MIT",
   "devDependencies": {
     "@types/bun": "1.4.4",
-    "oxlint": "1.90.0"
+    "oxlint": "1.90.0",
+    "pele": "1.9.0"
   },
   "repository": {
     "type": "git",

@@ -3,7 +3,6 @@
  * Candidate overlay evaluation — golden pin check + policy replay (append-only audit).
  */
 
-import type { Database } from "bun:sqlite";
 import { openSportsdeskSqlite } from "./lib/sportsdesk_sqlite.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

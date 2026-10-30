@@ -54,7 +54,9 @@ async function main(): Promise<number> {
   if (fromRegistry) {
     dump = buildRegistryBaselineProdDump();
     if (existing) {
-      dump.allowlist = existing.allowlist ?? dump.allowlist;
+      if (existing.allowlist !== undefined) {
+        dump.allowlist = existing.allowlist;
+      }
       dump.captured_at = existing.captured_at;
     }
   } else {
@@ -64,9 +66,13 @@ async function main(): Promise<number> {
       );
       return 1;
     }
-    dump = captureProdSchemaFromDb(resolve(dbPath), "prod-readonly", {
-      allowlist: existing?.allowlist,
-    });
+    dump = captureProdSchemaFromDb(
+      resolve(dbPath),
+      "prod-readonly",
+      existing?.allowlist !== undefined
+        ? { allowlist: existing.allowlist }
+        : undefined,
+    );
   }
 
   if (dump.format_version !== PROD_SCHEMA_DUMP_FORMAT_VERSION) {

@@ -11,7 +11,6 @@ import {
   SCHEMA_DUMP_PARITY_POLICY_EXIT,
   SCHEMA_DUMP_PARITY_STRUCTURAL_EXIT,
   collectManifestDumpParityDiagnostics,
-  exitCodeFromParityDiagnostics,
   runManifestDumpParity,
 } from "./schema_manifest_db_parity.ts";
 import {

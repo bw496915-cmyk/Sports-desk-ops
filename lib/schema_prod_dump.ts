@@ -182,7 +182,7 @@ export function staleAllowlistWarnings(
 export function captureProdSchemaFromDb(
   dbPath: string,
   sourceLabel: string,
-  preserve?: Pick<ProdSchemaDump, "allowlist" | "captured_at">,
+  preserve?: Partial<Pick<ProdSchemaDump, "allowlist" | "captured_at">>,
 ): ProdSchemaDump {
   const db = openSportsdeskSqliteReadonly(dbPath);
   try {

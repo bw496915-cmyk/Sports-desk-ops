@@ -3,7 +3,6 @@
  * Fantasy402 settlement/history poll — append-only wager lifecycle ingest (Option A).
  */
 
-import type { Database } from "bun:sqlite";
 import { openSportsdeskSqlite } from "./lib/sportsdesk_sqlite.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

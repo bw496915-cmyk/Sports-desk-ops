@@ -24,7 +24,7 @@ All design tokens, RGB color channels, and semantic styling originate strictly f
 
 - **Single Source of Truth (`tokens.toml`):** Master configuration file governing all 18 Qwen3.5-4B (Layers 18–28) neuron design tokens and UI themes.
 - **Code Generation (`bun run gen:tokens`):** Compiles `tokens.toml` into downstream TypeScript types (`domain-branded-types.ts`), dashboard CSS variables, and Telegram Mini App properties.
-- **Zero-Drift Invariant:** Every CI verification run executes `bun run gen:tokens && git diff --exit-code`. Any manual edit to generated files or uncompiled token definitions fails CI immediately.
+- **Zero-Drift Invariant:** CI runs `bun run gen:tokens:gate` (dirty guard, regen, emission manifest, then diff on generated paths). Manual edits to generated files or drift from `tokens.toml` fail that step immediately.
 - **Cross-Axis Semantic Aliasing:** When domain models introduce secondary palettes (such as 8-tier branch risk grades or account behavioral roles), they must be declared as semantic aliases referencing canonical tokens (e.g., `--color-grade-aaa: var(--sd-theme-emerald)`), never as unmanaged raw RGB definitions in siloed stylesheets. The one current exception is the out-of-CI prototype (`docs/prototypes/sportsdesk-surveillance-dashboard.html`), which still uses raw channel triples; it must be normalized to aliases (and its 3 new hexes adjudicated) before promotion — see §1.2.
 
 ### 1.2 Bun.color, CSS Houdini @property & :root Architecture
