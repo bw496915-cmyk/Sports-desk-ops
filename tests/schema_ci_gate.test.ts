@@ -19,7 +19,7 @@ describe("schema CI gate", () => {
     }
   });
 
-  test("schema:gate snapshot exits 0 under CI=true", async () => {
+  test("schema:snapshot exits 0 under CI=true (parity slice of schema:gate)", async () => {
     const proc = Bun.spawn(
       ["bun", "run", snapshotScript],
       {

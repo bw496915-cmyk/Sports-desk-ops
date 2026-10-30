@@ -6,11 +6,8 @@
  */
 
 import { resolve } from "node:path";
-import { canonicalJsonString } from "../lib/canonical_json.ts";
-import {
-  buildRegistryBaselineProdDump,
-  parseProdSchemaDump,
-} from "../lib/schema_prod_dump.ts";
+import { compareFixtureTablesToRegistry } from "../lib/schema_fixture_drift.ts";
+import { parseProdSchemaDump } from "../lib/schema_prod_dump.ts";
 
 const defaultFixture = resolve(
   import.meta.dir,
@@ -24,14 +21,9 @@ async function main(): Promise<number> {
   const existing = parseProdSchemaDump(
     JSON.parse(await Bun.file(fixturePath).text()),
   );
-  const synced = buildRegistryBaselineProdDump();
-  synced.allowlist = existing.allowlist ?? synced.allowlist;
-  synced.captured_at = existing.captured_at;
+  const drift = compareFixtureTablesToRegistry(existing);
 
-  const committedTables = canonicalJsonString(existing.tables);
-  const registryTables = canonicalJsonString(synced.tables);
-
-  if (committedTables === registryTables) {
+  if (drift.equal) {
     console.log(`schema:check-fixture-drift: ok ${fixturePath}`);
     return 0;
   }

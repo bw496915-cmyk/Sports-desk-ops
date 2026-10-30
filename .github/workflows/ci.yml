@@ -44,7 +44,7 @@ jobs:
       - name: Safe innerHTML Linter Gate
         timeout-minutes: 3
         run: bun bin/check-innerhtml.ts --verbose
-      - name: Schema registry gate (typecheck + manifest ↔ prod dump)
+      - name: Schema gate (snapshot parity, fixture drift, gauntlet, EOD smoke)
         timeout-minutes: 5
         env:
           CI: "true"

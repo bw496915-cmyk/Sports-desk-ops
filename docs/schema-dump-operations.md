@@ -56,7 +56,28 @@ Set `SPORTSDESK_SCHEMA_PARITY_LIVE=1` **and** `SPORTSDESK_SCHEMA_DB` to a SQLite
 | Dump matches live prod | Only after explicit prod capture (`schema:dump-prod`) or a live parity run with current DB |
 | Registry matches prod | Registry is source of truth for manifest; dump is evidence—reconcile via dump-prod + commit |
 
+## Contributor workflow (registry edits)
+
+When you change **`lib/sqlite_schema_registry.ts`** (or generated SSOT columns) without re-reading prod SQLite:
+
+1. **`bun run schema:sync-prod-dump`** — refresh `tests/fixtures/prod-schema.json` `tables` from the registry; **preserves** `allowlist` and `captured_at`.
+2. **`git add tests/fixtures/prod-schema.json`** and commit with the registry change.
+3. **`bun run schema:gate`** locally (or rely on CI) — snapshot parity, fixture drift, parity gauntlet, EOD smoke.
+
+When prod SQLite has diverged and ops needs a fresh observation:
+
+1. **`bun run schema:dump-prod`** (path or `SPORTSDESK_SCHEMA_DB`) — live `table_xinfo` capture; **refreshes** `captured_at`; preserves allowlist when outfile exists.
+2. Commit the fixture; note **`dump_lag`** at merge time if lag matters for reviewers.
+
+**`schema:check-fixture-drift`** fails (exit **1**) when step 1 was skipped after a registry edit — fix with sync-prod-dump, not dump-prod, unless you intentionally re-captured prod.
+
 ## CI and metrics
 
-- **`bun run schema:gate`:** `preschema` (`schema:typecheck`) then `schema:snapshot` with `CI=true` (forbids `SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS`). Runs on GitHub Actions after linters.
+- **`bun run schema:gate`** (GitHub Actions after linters), in order:
+  1. **`preschema`** — `schema:typecheck` slice over schema libs and gate scripts
+  2. **`schema:snapshot`** with **`CI=true`** — manifest + fixture parity (forbids `SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS`)
+  3. **`schema:check-fixture-drift`** — registry `tables` vs committed fixture
+  4. **`schema:parity-gauntlet`** — synthetic exit **2** / **3** drill (non-flaky; no live prod)
+  5. **`eod:smoke`** — fixture JSONL + temp SQLite tar.gz member hashes (nested `audit/` paths)
 - **`bun run schema:dump-lag`:** JSON report: `captured_at`, last git commit time on the fixture file, and `dump_lag_days` (commit − observation). Large lag ⇒ fixture may be stale vs live prod even when parity passes.
+- **Drills (local):** `schema:parity-gauntlet` · `schema:check-fixture-drift` · `eod:smoke` · architecture diagram [docs/assets/ARCH-Guide.png](./assets/ARCH-Guide.png)

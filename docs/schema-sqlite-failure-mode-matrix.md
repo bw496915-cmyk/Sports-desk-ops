@@ -14,7 +14,11 @@ Reference for manifest ↔ prod-dump parity, schema snapshot, EOD archiving, and
 | **`SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS=1` locally** | Prod-only detection skipped; stderr bypass notice; exit 0 if no other drift. | **0** | `[BYPASS] prod-only table detection disabled (SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS=1)` |
 | **`schema_snapshot` dump parity failure** | `runManifestDumpParityFile` returns parity exit; `main()` propagates it. | **2** or **3** | Same as parity rows above |
 | **`SPORTSDESK_SCHEMA_SKIP_DUMP_PARITY=1`** | Fixture parity skipped when dump path exists; snapshot still writes JSON/manifest. | **0** | — |
-| **`bun run schema:gate` (CI)** | `preschema` + `schema:snapshot` with `CI=true`; same parity rules as postschema. | **0** / **2** / **3** | (parity rows above) |
+| **`bun run schema:gate` (CI)** | `preschema` → `schema:snapshot` (`CI=true`) → `schema:check-fixture-drift` → `schema:parity-gauntlet` → `eod:smoke`; snapshot step uses same parity rules as postschema. | **0** / **1** / **2** / **3** | (parity rows above) or `schema:check-fixture-drift: registry tables differ…` |
+| **Fixture drift (registry vs committed dump)** | `compareFixtureTablesToRegistry` after sync semantics; registry changed without `schema:sync-prod-dump`. | **1** | `schema:check-fixture-drift: registry tables differ from committed prod-schema.json` |
+| **`schema:parity-gauntlet` failure** | Synthetic scenarios must exit **2** (structural only) and **3** (stale allowlist + structural). | **1** | `schema:parity-gauntlet: one or more scenarios failed` |
+| **`eod:smoke` failure** | Missing fixture JSONL, missing tar members, or WAL sidecars bundled. | **1** | `eod:smoke: missing jsonl member in archive` / `WAL sidecars must not be bundled` |
+| **EOD member hash glob `*` vs `**`** | Bun `Archive.files("*")` omits nested paths; default verify glob is **`**`**. | **1** if smoke uses `*` only | `eod:smoke: missing jsonl member in archive` (member under `audit/…`) |
 | **Prod schema dump format v99 (newer than supported)** | `parseProdSchemaDump` rejects at load time (`SUPPORTED_PROD_SCHEMA_DUMP_VERSION` is **1**). | **Uncaught throw** (typically **1**) | `prod schema dump format v99 unsupported; upgrade parity code (supported v1)` |
 | **Prod schema dump format v0 (obsolete)** | Reject; re-capture required. | **Uncaught throw** (typically **1**) | `prod schema dump format v0 obsolete; re-run schema:dump-prod` |
 | **Missing / invalid dump fields** | Parse errors on load (`format_version`, `captured_at`, `source`, `tables`, allowlist shape). | **Uncaught throw** (typically **1**) | `prod schema dump: missing format_version` |
@@ -51,5 +55,7 @@ Reference for manifest ↔ prod-dump parity, schema snapshot, EOD archiving, and
 | Dump parse / allowlist | `lib/schema_prod_dump.ts` |
 | Snapshot orchestration | `scripts/schema_snapshot.ts` |
 | SQLite open / WAL | `lib/sportsdesk_sqlite.ts` |
-| EOD bundle | `lib/eod_archive.ts`, `scripts/eod_archive.ts` |
+| EOD bundle | `lib/eod_archive.ts`, `scripts/eod_archive.ts`, `scripts/eod_archive_smoke.ts` |
+| Fixture drift | `lib/schema_fixture_drift.ts`, `scripts/schema_check_fixture_drift.ts` |
+| Parity gauntlet | `lib/schema_parity_gauntlet.ts`, `scripts/schema_parity_gauntlet.ts` |
 | Ingestion replay / sentinel | `sportsdesk_ingestion_replay.ts` |

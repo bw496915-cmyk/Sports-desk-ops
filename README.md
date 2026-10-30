@@ -10,7 +10,8 @@ Repository: [bw496915-cmyk/Sports-desk-ops](https://github.com/bw496915-cmyk/Spo
 - Failure modes: [docs/schema-sqlite-failure-mode-matrix.md](docs/schema-sqlite-failure-mode-matrix.md) (parity exit **2** / **3**, `bun:sqlite` strict + safe integers)
 - CLI: `bun run sportsdesk_schema_cli.ts --help`
 - CI gate: `bun run schema:gate` · lag metric: `bun run schema:dump-lag`
-- Index: [docs/README.md](docs/README.md)
+- After registry edits: `bun run schema:sync-prod-dump` then commit `tests/fixtures/prod-schema.json` (see [schema-dump-operations.md](docs/schema-dump-operations.md))
+- Index: [docs/README.md](docs/README.md) · diagram: [docs/assets/ARCH-Guide.png](docs/assets/ARCH-Guide.png)
 
 ## Quick Start
 
