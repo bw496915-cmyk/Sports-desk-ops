@@ -1,398 +1,139 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "SportsDesk & Fantasy402 Complete Wire API & Runtime Shapes Specification",
-    "version": "2026.10.30",
-    "description": "Comprehensive specification covering the entire ecosystem across all 4 operational domains: (1) Fantasy402 Upstream Cloud Management & Surveillance, (2) SportsDesk Local Daemon & Telegram Gateway, (3) Desk HITL HMAC Security Routes, and (4) Cross-Book Steam Joins (GS Partner 118).",
-    "contact": {
-      "name": "SportsDesk Architecture & Quant Risk Team",
-      "url": "https://desk.bookdeskops.com"
-    }
+    "title": "SportsDesk & Fantasy402 Wire API (evidence-labelled)",
+    "version": "2026.10.31",
+    "description": "Evidence model: every operation carries x-evidence.tier — A means a captured request and response are verified, B means observed first-party evidence (a captured request or a handler-verified route) without a captured response, C means inferred only with no capture, and D means a real surface missing from the spec; this release has no tier-A rows because no response body was ever captured (see docs/EVIDENCE.md)."
   },
   "servers": [
     {
       "url": "https://www.fantasy402.com",
-      "description": "Production Cloud Gateway (Direct HTTP/2 Wire Target)"
+      "description": "Fantasy402 cloud portal (Manager/Report/System API). Request-side evidence only; no response body was captured."
     },
     {
       "url": "http://127.0.0.1:4020",
-      "description": "Local SportsDesk Operations Daemon & Telegram Mini App Gateway"
-    },
-    {
-      "url": "https://plive.sportswidgets.pro",
-      "description": "GS Buckeye 2 Partner 118 Steam Reference Gateway"
+      "description": "SportsDesk local daemon (Bun.serve; binds 0.0.0.0 by default, PORT=4020)."
     }
   ],
   "tags": [
     {
-      "name": "Upstream Authentication",
-      "description": "Bearer JWT lifecycle and session issuance"
-    },
-    {
-      "name": "Trading Desk Feeds",
-      "description": "Real-time ticker delta watermark and open exposure streams"
+      "name": "Forensic Surveillance",
+      "description": "Cloud Manager surveillance operations with first-party evidence (request capture only; no response body captured)."
     },
     {
       "name": "Customer State Mutations",
-      "description": "PaddedCustomerId mutations, delay gates, and vig shading"
-    },
-    {
-      "name": "Forensic Surveillance",
-      "description": "Web access logs, IP collision detectors, and reverse lookup"
-    },
-    {
-      "name": "Downline Accounting",
-      "description": "Weekly figures, BranchGrade health, settled collections, and delete audit"
+      "description": "Cloud Manager customer state operations with first-party evidence (request capture only; no response body captured)."
     },
     {
       "name": "Local Desk & Telegram Gateway",
-      "description": "In-process Bun.serve gateway, Mini App, and Telegram alert webhooks"
+      "description": "Routes served by sportsdesk_webview_server.ts, verified against the handler source rather than an HTTP capture."
     },
     {
-      "name": "Desk HITL Security",
-      "description": "Operator CookieMap session management and HMAC limit approvals"
+      "name": "Settlement History",
+      "description": "Upstream settlement-history poll wired in code; the request contract and response rows are uncaptured."
     },
     {
-      "name": "Cross-Book Steam",
-      "description": "GS Partner 118 steam-lag joins"
-    },
-    {
-      "name": "Tracked Operational Domains",
-      "description": "Launcher tiles currently under automated crawler surveillance and wire discovery (Bun.WebView + Bun.FetchSession)."
+      "name": "Inferred (Unverified)",
+      "description": "Tier C operations: inferred or authored only. No request or response was ever observed; path and method are candidates, not contracts."
     }
   ],
   "paths": {
     "/cloud/api/System/authenticateCustomer": {
       "post": {
-        "tags": [
-          "Upstream Authentication"
-        ],
-        "summary": "Authenticate Agent / Customer Session",
-        "description": "Exchanges master or downline agent credentials for a scoped Bearer JWT token (~20–25 minute lifetime). Re-mint immediately if response contains HTML challenge.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "customerID",
-                  "password"
-                ],
-                "properties": {
-                  "customerID": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  },
-                  "password": {
-                    "type": "string",
-                    "format": "password"
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Authenticate agent/customer session",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiSystemAuthenticateCustomer",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Authentication successful",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              },
-              "Referrer-Policy": {
-                "$ref": "#/components/headers/ReferrerPolicyHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "description": "Bearer JWT token string"
-                    },
-                    "accountInfo": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid credentials or Cloudflare challenge"
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "none",
+            "operational_guardrails_runbook.md:153",
+            "docs/openapi.json:65-139"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one authenticateCustomer POST (redacted credentials): status, Set-Cookie vs body token, response envelope/code field, lifetime, and whether Manager calls then send Authorization or the cookie. Upgrades C->A and validates the whole auth model."
         }
       }
     },
     "/cloud/api/Manager/getBetTicker": {
       "post": {
-        "tags": [
-          "Trading Desk Feeds"
-        ],
-        "summary": "Live Bet Ticker Feed (Delta Watermark Stream)",
-        "description": "Ticket-per-row continuous surveillance stream. Supports delta polling using monotonic wagerNumber watermark. Ingests all 5 active WagerSource channels: Internet (L18.N0204), ALERT (L21.N0884), GSBUILDER (L22.N1402), GSLIVE (L23.N0412), CSLEVEL2 (L24.N2019).",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          },
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "agentID",
-                  "agentOwner",
-                  "wagerNumber",
-                  "operation",
-                  "RRO"
-                ],
-                "properties": {
-                  "agentID": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  },
-                  "agentOwner": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  },
-                  "wagerNumber": {
-                    "type": "string",
-                    "description": "Monotonic watermark integer ('0' for full initial batch)",
-                    "example": "894100"
-                  },
-                  "operation": {
-                    "type": "string",
-                    "enum": [
-                      "getBetTicker"
-                    ]
-                  },
-                  "RRO": {
-                    "type": "string",
-                    "enum": [
-                      "1"
-                    ]
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Bet ticker delta feed",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: simulate_bettor_churn_suite.ts:106-115 (a consumer type declaration, not a capture). See the RawBetTickerTick component; it records the field names only and is not used as a response schema here. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGetBetTicker",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Ticker response envelope",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "INFO": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "LIST": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/TickerRowRecord"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "simulate_bettor_churn_suite.ts:106-115",
+            "docs/openapi.json:141-238"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Capture an initial (wagerNumber=0) and a delta poll: exact body, INFO/LIST envelope, row key set/types, watermark semantics. Upgrades C->A; without it the delta-watermark contract is a guess."
         }
       }
     },
     "/cloud/api/Manager/getBetTickerConfig": {
       "post": {
-        "tags": [
-          "Trading Desk Feeds"
-        ],
-        "summary": "Bet Ticker Panel Configuration Probe",
-        "description": "Probes if the live bet ticker is configured for the authenticated agent scope. Returns { 'INFO': false } when inactive or misconfigured.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "agentID",
-                  "agentOwner",
-                  "operation"
-                ],
-                "properties": {
-                  "agentID": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  },
-                  "agentOwner": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  },
-                  "operation": {
-                    "type": "string",
-                    "enum": [
-                      "getBetTickerConfig"
-                    ]
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Ticker configuration",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGetBetTickerConfig",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Configuration probe result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "INFO": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "Config": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["none"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one request/response (spec expects {INFO:true, Config:{}}); verify whether INFO:false is the misconfigured shape. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Manager/getPending": {
       "post": {
-        "tags": [
-          "Trading Desk Feeds"
-        ],
-        "summary": "Open Book Exposure Feed (Leg-per-Row Stream)",
-        "description": "Returns raw flat array of ~6,000+ open legs. Requires client-side parent ticket reconstruction keyed by Login|WagerNumber. Drops BLOCKED sentinel noise (L19.N0518) and zero-stake rows prior to parent grouping.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          },
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "customerID": {
-                    "type": "string",
-                    "description": "Optional customer filter (empty for all)",
-                    "example": ""
-                  },
-                  "date": {
-                    "type": "string",
-                    "description": "Window start date offset",
-                    "example": "2026-10-24"
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Pending wager legs snapshot",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: simulate_bettor_churn_suite.ts:91-104 (a consumer type declaration, not a capture). See the RawPendingLeg component; it records the field names only and is not used as a response schema here. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGetPending",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Flat array of pending wager legs",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PendingLegRowRecord"
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "simulate_bettor_churn_suite.ts:91-104",
+            "lib/fantasy402_wager_universe_scope.ts:13-21",
+            "docs/openapi.json:309-375"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Capture the request (form vs JSON content type is disputed by the spec's own application/json choice) and a non-empty response; verify BLOCKED sentinel rows (L19.N0518) and zero-stake rows actually appear. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Manager/getWebLog": {
       "post": {
-        "tags": [
-          "Forensic Surveillance"
-        ],
-        "summary": "Forensic Web Access Log & IP Tracker (Observed HAR Capture v1.0.279)",
-        "description": "The authoritative forensic IP investigation endpoint documented in operational_guardrails_runbook.md § 5.1.1. Governed by the selector type field: A (Web Access Log velocity), B (Global IP Matcher across BILLY666 downline), C (Acct IP Match for sibling accounts), I (Users by IP reverse lookup).",
+        "tags": ["Forensic Surveillance"],
+        "summary": "Manager getWebLog (mode B request observed; response not captured)",
+        "description": "The forensic IP-investigation endpoint (operational_guardrails_runbook.md §5.1.1). Request side: a 2026-10-28 Manager HAR (portal v1.0.279) captured one mode-B POST with a form-urlencoded body and no Authorization header, so the session is cookie-based. Only mode B was captured; modes A, C and I are inferred from the portal form and still need a capture. Response side: no response body was captured, so the row schema is undocumented and none is published here. The WeblogEntry component (simulate_bettor_churn_suite.ts:117-123) records the four fields the old spec published, but a consumer type is not a capture, so it is not used as a response schema.",
+        "operationId": "postCloudApiManagerGetWebLog",
         "parameters": [
           {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
             "$ref": "#/components/parameters/XRequestedWith"
-          },
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
           }
         ],
         "requestBody": {
@@ -408,6 +149,7 @@
                   "end",
                   "type",
                   "actions",
+                  "ip",
                   "operation",
                   "RRO",
                   "agentOwner"
@@ -415,1123 +157,326 @@
                 "properties": {
                   "agentID": {
                     "type": "string",
-                    "description": "Session master agent",
-                    "example": "BILLY666"
-                  },
-                  "agentOwner": {
-                    "type": "string",
-                    "description": "Session master agent",
-                    "example": "BILLY666"
+                    "description": "Session master agent; the captured value is redacted here.",
+                    "example": "<redacted>"
                   },
                   "customerID": {
                     "type": "string",
-                    "description": "0 for whole book; target bettor ID for Mode C",
+                    "description": "0 = whole book. Mode C should carry the target account (unverified).",
                     "example": "0"
                   },
                   "start": {
                     "type": "string",
-                    "description": "Start date (MM/DD/YYYY, or YYYY-MM-DD for Mode C)",
+                    "description": "Inclusive start date. Observed as MM/DD/YYYY in mode B; mode C reportedly sends YYYY-MM-DD (unverified).",
                     "example": "10/28/2026"
                   },
                   "end": {
                     "type": "string",
-                    "description": "End date (MM/DD/YYYY, or YYYY-MM-DD for Mode C)",
+                    "description": "Inclusive end date. Observed as MM/DD/YYYY in mode B; mode C reportedly sends YYYY-MM-DD (unverified).",
                     "example": "10/28/2026"
                   },
                   "type": {
                     "type": "string",
-                    "enum": [
-                      "A",
-                      "B",
-                      "C",
-                      "I"
-                    ],
-                    "description": "A: Web Access Log; B: Global IP Matcher; C: Acct IP Match; I: Users by IP"
+                    "enum": ["A", "B", "C", "I"],
+                    "description": "A: web access log; B: global IP matcher; C: account IP match; I: users by IP. Only B was captured; A, C and I are inferred."
                   },
                   "actions": {
                     "type": "string",
-                    "enum": [
-                      "ALL"
-                    ],
+                    "enum": ["ALL"],
+                    "description": "Action filter. ALL was observed; other values are unobserved.",
                     "example": "ALL"
                   },
                   "ip": {
                     "type": "string",
-                    "description": "Target IP address or /24 prefix for Mode I",
+                    "description": "Empty in the observed mode-B request; mode I should carry the IP or /24 prefix (unverified).",
                     "example": ""
                   },
                   "operation": {
                     "type": "string",
-                    "enum": [
-                      "getWebLog"
-                    ]
+                    "enum": ["getWebLog"],
+                    "description": "Echo of the method name."
                   },
                   "RRO": {
                     "type": "string",
-                    "enum": [
-                      "1"
-                    ]
+                    "enum": ["1"],
+                    "description": "Observed as 1; the meaning is unknown."
+                  },
+                  "agentOwner": {
+                    "type": "string",
+                    "description": "Session master agent; the captured value is redacted here.",
+                    "example": "<redacted>"
                   }
                 }
               }
             }
           }
         },
+        "security": [
+          {
+            "fantasy402Cookie": []
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Forensic log entries",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "customerID": {
-                        "type": "string",
-                        "example": "CB112_1"
-                      },
-                      "ipAddress": {
-                        "type": "string",
-                        "example": "198.51.100.42"
-                      },
-                      "timestamp": {
-                        "type": "string",
-                        "example": "2026-10-28 13:19:20"
-                      },
-                      "agentOwner": {
-                        "type": "string",
-                        "example": "CUB22HR"
-                      }
-                    }
-                  }
-                }
-              }
-            }
+            "description": "Response body was not captured; row schema undocumented"
           }
+        },
+        "x-evidence": {
+          "tier": "B",
+          "sources": [
+            "operational_guardrails_runbook.md:129-140",
+            "operational_guardrails_runbook.md:131",
+            "operational_guardrails_runbook.md:153",
+            "simulate_bettor_churn_suite.ts:117-123",
+            "docs/openapi.json:377-399"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Capture modes A, C and I requests (exact per-mode date format, ip value, target customerID) plus a full 200 response body for at least one mode, and record the auth actually accepted (session cookie vs Authorization header). Upgrades modes A/C/I from C and closes the response/auth contradiction.",
+          "contradicted": true
         }
       }
     },
     "/cloud/api/Manager/search": {
       "post": {
-        "tags": [
-          "Forensic Surveillance"
-        ],
-        "summary": "Global Omnisearch Component (search-component)",
-        "description": "Searches both downline agent tree nodes and bettor customer accounts. Employs autocomplete='new-password' to defeat password manager autofill.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "term",
-                  "type",
-                  "agentID"
-                ],
-                "properties": {
-                  "term": {
-                    "type": "string",
-                    "example": "CB112"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "all"
-                    ],
-                    "example": "all"
-                  },
-                  "agentID": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Global account omnisearch",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerSearch",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Search matching entities",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "example": "CB112_1"
-                      },
-                      "type": {
-                        "type": "string",
-                        "enum": [
-                          "player",
-                          "agent"
-                        ],
-                        "example": "player"
-                      },
-                      "agentOwner": {
-                        "type": "string",
-                        "example": "CUB22HR"
-                      },
-                      "status": {
-                        "type": "string",
-                        "example": "Active"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "operational_guardrails_runbook.md:205-209",
+            "operational_guardrails_runbook.md:214",
+            "docs/openapi.json:523-607"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one omnisearch request triggered from search-component (URL, method, content type, term/type/agentID fields) and its result rows. Upgrades C->A and confirms candidate_url.",
+          "candidateUrl": true
         }
       }
     },
     "/cloud/api/Manager/updateByColumn": {
       "post": {
-        "tags": [
-          "Customer State Mutations"
-        ],
-        "summary": "Customer State Mutation (Confirmation Delays & Limit Clamps)",
-        "description": "Mutates single column on customer record. Invariants: customerID must be strictly 11-character space-padded PaddedCustomerId. agentID/agentOwner must match direct owning sub-agent (never master BILLY666). Passing path poisons updateByColumn (HTTP 500 empty body).",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          },
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "operation",
-                  "customerID",
-                  "agentID",
-                  "agentOwner",
-                  "columnName",
-                  "type",
-                  "value",
-                  "title",
-                  "RRO"
-                ],
-                "properties": {
-                  "operation": {
-                    "type": "string",
-                    "enum": [
-                      "updateByColumn"
-                    ]
-                  },
-                  "customerID": {
-                    "type": "string",
-                    "description": "Strict 11-char space-padded PaddedCustomerId",
-                    "example": "CB112_1    "
-                  },
-                  "agentID": {
-                    "type": "string",
-                    "description": "Direct owning sub-agent (e.g. CUB22HR)",
-                    "example": "CUB22HR"
-                  },
-                  "agentOwner": {
-                    "type": "string",
-                    "description": "Direct owning sub-agent (e.g. CUB22HR)",
-                    "example": "CUB22HR"
-                  },
-                  "columnName": {
-                    "type": "string",
-                    "enum": [
-                      "confirmationDelaySeconds",
-                      "wagerLimitRiskCents",
-                      "parlayMaxBetRiskCents"
-                    ],
-                    "example": "confirmationDelaySeconds"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "0"
-                    ]
-                  },
-                  "value": {
-                    "type": "string",
-                    "description": "Target value",
-                    "example": "6"
-                  },
-                  "title": {
-                    "type": "string",
-                    "example": "confirmationDelaySeconds"
-                  },
-                  "information": {
-                    "type": "string",
-                    "example": ""
-                  },
-                  "special": {
-                    "type": "string",
-                    "example": ""
-                  },
-                  "RRO": {
-                    "type": "string",
-                    "enum": [
-                      "1"
-                    ]
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Padded-field customer mutation",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: domain-branded-types.ts:9,140-158 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerUpdateByColumn",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Mutation execution outcome",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "Result": {
-                      "type": "object",
-                      "properties": {
-                        "Result": {
-                          "type": "integer",
-                          "enum": [
-                            1,
-                            0,
-                            -1
-                          ],
-                          "description": "1 = SUCCESS (Committed); 0 = FAILURE (Unpadded bare ID / silent drop); -1 = REJECTED_SCOPE (Master BILLY666 passed)"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Model error (Called Customer/updateByColumn instead of Manager/)"
-          },
-          "500": {
-            "description": "Poisoned path parameter detected (empty body) or Gateway fault"
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "operational_guardrails_runbook.md:215",
+            "domain-branded-types.ts:9,140-158",
+            "docs/openapi.json:609-754"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Highest-value mutation capture: one updateByColumn with a safe column (confirmationDelaySeconds) plus the getInfoPlayer read-back. Record exact form fields, content type, padding width actually required (11 vs the observed 10), sub-agent vs master scope, and the Result envelope. Upgrades C->A and is the only way to validate the SILENT_NO_OP / REJECTED_SCOPE claims."
         }
       }
     },
     "/cloud/api/Manager/getInfoPlayer": {
       "post": {
-        "tags": [
-          "Customer State Mutations"
-        ],
-        "summary": "Customer Account Inspection & Read-Back Verification",
-        "description": "Reads live customer record to verify persistence following updateByColumn mutations via normalized Bun.deepEquals().",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          },
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
+        "tags": ["Customer State Mutations"],
+        "summary": "Manager getInfoPlayer (request observed; response not captured)",
+        "description": "Read observed in the 2026-10-28 Manager HAR: opening a player sent a form POST with a 7-character trimmed customerID (e.g. CB112_1, not the padded 11-character form the old spec showed), and agentID/agentOwner were the logged-in master on all 19 Manager calls (operational_guardrails_runbook.md:213-214). The response was not captured, so no response schema is published. Ledger contradicted: the prior spec's padded example is refuted by the capture.",
+        "operationId": "postCloudApiManagerGetInfoPlayer",
         "requestBody": {
           "required": true,
           "content": {
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "customerID",
-                  "agentID"
-                ],
-                "properties": {
-                  "customerID": {
-                    "type": "string",
-                    "example": "CB112_1    "
-                  },
-                  "agentID": {
-                    "type": "string",
-                    "example": "CUB22HR"
-                  }
-                }
+                "additionalProperties": true,
+                "description": "Opaque: a form POST was observed, but only the trimmed customerID and master agentID/agentOwner values are recorded for this call, so the full field list is not published."
               }
             }
           }
         },
-        "responses": {
-          "200": {
-            "description": "Live player account attributes",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "Result": {
-                      "type": "object",
-                      "properties": {
-                        "CurrentBalance": {
-                          "type": "string"
-                        },
-                        "PendingAmount": {
-                          "type": "string"
-                        },
-                        "CreditLimit": {
-                          "type": "string"
-                        },
-                        "confirmationDelaySeconds": {
-                          "type": "string",
-                          "example": "6"
-                        },
-                        "wagerLimitRiskCents": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
+        "security": [
+          {
+            "fantasy402Cookie": []
           }
+        ],
+        "responses": {
+          "default": {
+            "description": "Unknown — the response body was not captured; no status code or body schema is documented."
+          }
+        },
+        "x-evidence": {
+          "tier": "B",
+          "sources": [
+            "operational_guardrails_runbook.md:213",
+            "operational_guardrails_runbook.md:214",
+            "operational_guardrails_runbook.md:214",
+            "docs/openapi.json:756-844"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Capture a getInfoPlayer request+response for a known player: padded vs trimmed customerID on the wire, response key set and value types, and one updateByColumn read-back pair. Upgrades B->A and settles both the padding example and the read-back contract.",
+          "contradicted": true
         }
       }
     },
     "/cloud/api/Manager/vigSetupInsert": {
       "post": {
-        "tags": [
-          "Customer State Mutations"
-        ],
-        "summary": "Player Odds Shading & Vig Override Mutation (+15c / +20c)",
-        "description": "Applies custom vigorish adjustments to sharp accounts (+15c main spreads/totals, +20c derivatives). Requires Content-Type: application/json, 20-character space-padded sportType, and 11-character space-padded player ID.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          },
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "operation",
-                  "sportType",
-                  "allPlayers",
-                  "agentProfile",
-                  "player",
-                  "flagVig",
-                  "VigSpread",
-                  "VigTotal",
-                  "VigDerivative",
-                  "RRO"
-                ],
-                "properties": {
-                  "operation": {
-                    "type": "string",
-                    "enum": [
-                      "vigSetupInsert"
-                    ]
-                  },
-                  "sportType": {
-                    "type": "string",
-                    "description": "20-char space-padded sport sequence",
-                    "example": "Football            "
-                  },
-                  "allPlayers": {
-                    "type": "string",
-                    "enum": [
-                      "off",
-                      "on"
-                    ],
-                    "example": "off"
-                  },
-                  "agentProfile": {
-                    "type": "integer",
-                    "example": 0
-                  },
-                  "player": {
-                    "type": "string",
-                    "description": "11-char space-padded PaddedCustomerId",
-                    "example": "CB112_1    "
-                  },
-                  "flagVig": {
-                    "type": "string",
-                    "enum": [
-                      "Y",
-                      "N"
-                    ],
-                    "example": "Y"
-                  },
-                  "flagDiscount": {
-                    "type": "string",
-                    "enum": [
-                      "Y",
-                      "N"
-                    ],
-                    "example": "N"
-                  },
-                  "VigSpread": {
-                    "type": "string",
-                    "description": "Main spread tax in cents (+15c)",
-                    "example": "15"
-                  },
-                  "VigTotal": {
-                    "type": "string",
-                    "description": "Main total tax in cents (+15c)",
-                    "example": "15"
-                  },
-                  "VigDerivative": {
-                    "type": "string",
-                    "description": "1H / derivative tax in cents (+20c)",
-                    "example": "20"
-                  },
-                  "VigDiscountPercent": {
-                    "type": "string",
-                    "example": "0"
-                  },
-                  "RRO": {
-                    "type": "string",
-                    "enum": [
-                      "1"
-                    ]
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Insert sport vig setup",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerVigSetupInsert",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Vig setup insertion confirmation",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "Result": {
-                      "type": "object",
-                      "properties": {
-                        "Result": {
-                          "type": "integer",
-                          "example": 1
-                        },
-                        "Message": {
-                          "type": "string",
-                          "example": "Vig setup successfully saved"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["none", "docs/openapi.json"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one vigSetupInsert (application/json claimed, 20-char padded sportType) plus getSportsVigSetup read-back; verify content type, padding widths and Result envelope. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Manager/getSportsVigSetup": {
       "post": {
-        "tags": [
-          "Customer State Mutations"
-        ],
-        "summary": "Read-Back Verification for Player Vig Overrides",
-        "description": "Queries live vigorish configuration to verify persistence following vigSetupInsert mutations.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          },
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "operation",
-                  "sportType",
-                  "player",
-                  "RRO"
-                ],
-                "properties": {
-                  "operation": {
-                    "type": "string",
-                    "enum": [
-                      "getSportsVigSetup"
-                    ]
-                  },
-                  "sportType": {
-                    "type": "string",
-                    "example": "Football            "
-                  },
-                  "player": {
-                    "type": "string",
-                    "example": "CB112_1    "
-                  },
-                  "RRO": {
-                    "type": "string",
-                    "enum": [
-                      "1"
-                    ]
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Read sport vig setup",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGetSportsVigSetup",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Configured sport vigorish profile",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "Result": {
-                      "type": "object",
-                      "properties": {
-                        "Customer": {
-                          "type": "string",
-                          "example": "CB112_1    "
-                        },
-                        "Sport": {
-                          "type": "string",
-                          "example": "Football            "
-                        },
-                        "flagVig": {
-                          "type": "string",
-                          "enum": [
-                            "Y",
-                            "N"
-                          ],
-                          "example": "Y"
-                        },
-                        "VigSpread": {
-                          "type": "string",
-                          "example": "15"
-                        },
-                        "VigTotal": {
-                          "type": "string",
-                          "example": "15"
-                        },
-                        "VigDerivative": {
-                          "type": "string",
-                          "example": "20"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["none", "docs/openapi.json"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture the read-back request/response paired with a vigSetupInsert; confirm form-urlencoded vs JSON and the Result field set. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Manager/getInfoManager": {
       "post": {
-        "tags": [
-          "Downline Accounting"
-        ],
-        "summary": "Master Header KPIs & Summary Balances",
-        "description": "Feeds mobile and desktop header summary tiles: My Balance, Weekly figure, Today net, Active accounts, and Makeup carryover deficit.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          },
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "agentID",
-                  "agentOwner"
-                ],
-                "properties": {
-                  "agentID": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  },
-                  "agentOwner": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Manager dashboard header",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGetInfoManager",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Summary balance metrics",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "balance": {
-                      "type": "string",
-                      "description": "Agent ledger balance with house"
-                    },
-                    "grand-total-weekly": {
-                      "type": "string",
-                      "description": "Current settlement week net figure"
-                    },
-                    "grand-total-day": {
-                      "type": "string",
-                      "description": "Intraday net figure"
-                    },
-                    "grand-total-player": {
-                      "type": "string",
-                      "description": "Active downline accounts count"
-                    },
-                    "distribution": {
-                      "type": "string",
-                      "description": "Cumulative negative carryover makeup"
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["none", "docs/openapi.json"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture the dashboard header request/response; confirm the exact JSON keys (the spec uses hyphenated names like 'grand-total-weekly', which is unusual enough to need proof). Upgrades C->A."
         }
       }
     },
     "/cloud/api/Report/getWeeklyFigure": {
       "post": {
-        "tags": [
-          "Downline Accounting"
-        ],
-        "summary": "Weekly Downline Settlement Roll-Up",
-        "description": "Triggered by data-action='get-weekly-figure'. Returns Monday-to-Sunday weekly volume, gross net won/lost, and active account totals across all sub-agents under BILLY666.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          },
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "agentID",
-                  "date"
-                ],
-                "properties": {
-                  "agentID": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  },
-                  "date": {
-                    "type": "string",
-                    "example": "2026-10-26"
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Weekly figure report",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetWeeklyFigure",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Weekly settlement figures across downline branches",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "TotalVolume": {
-                      "type": "string"
-                    },
-                    "TotalWin": {
-                      "type": "string"
-                    },
-                    "TotalLoss": {
-                      "type": "string"
-                    },
-                    "TotalNet": {
-                      "type": "string"
-                    },
-                    "TotalPlayers": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["none", "docs/openapi.json:1202-1284"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture the Reporting weekly-figure request/response (the data-action is itself unverified). Upgrades C->A."
         }
       }
     },
     "/cloud/api/Report/getAgentPerformance": {
       "post": {
-        "tags": [
-          "Downline Accounting"
-        ],
-        "summary": "Branch Performance & Hold Rate Surveillance",
-        "description": "Triggered by data-action='get-agent-performance' (data-type='C'). Downline volume, net won, and hold percentage evaluated against the 8-tier BranchGrade hierarchy (AAA down to D_TOXIC).",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          },
-          {
-            "$ref": "#/components/parameters/AcceptJson"
-          },
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "agentID",
-                  "dataType"
-                ],
-                "properties": {
-                  "agentID": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  },
-                  "dataType": {
-                    "type": "string",
-                    "enum": [
-                      "C"
-                    ],
-                    "example": "C"
-                  },
-                  "period": {
-                    "type": "string",
-                    "example": "7d"
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Agent performance report",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetAgentPerformance",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Per-agent downline performance records",
-            "headers": {
-              "Content-Security-Policy": {
-                "$ref": "#/components/headers/CSPHeader"
-              },
-              "X-Content-Type-Options": {
-                "$ref": "#/components/headers/XContentTypeOptionsHeader"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "agentID": {
-                        "type": "string"
-                      },
-                      "volume": {
-                        "type": "number"
-                      },
-                      "netWon": {
-                        "type": "number"
-                      },
-                      "holdPct": {
-                        "type": "number"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "operational_guardrails_runbook.md:164",
+            "operational_guardrails_runbook.md:214",
+            "docs/openapi.json:1286-1375"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one get-agent-performance call (agentID, data-type C, period) and its rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.",
+          "candidateUrl": true
         }
       }
     },
     "/cloud/api/Report/getSettledFigure": {
       "post": {
-        "tags": [
-          "Downline Accounting"
-        ],
-        "summary": "Collections & 50% Settlement Liability Accounting",
-        "description": "Triggered by data-action='get-settled-figure' (Collections). Audits weekly settled figures, agent 50% split accounting, and carryover makeup obligations.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "agentID",
-                  "weekDate"
-                ],
-                "properties": {
-                  "agentID": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  },
-                  "weekDate": {
-                    "type": "string",
-                    "example": "2026-10-26"
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Settled figure / collections",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetSettledFigure",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Collections settlement breakdown",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "WeekEnding": {
-                      "type": "string"
-                    },
-                    "TotalHandle": {
-                      "type": "string"
-                    },
-                    "GrossNet": {
-                      "type": "string"
-                    },
-                    "AgentSplit50Pct": {
-                      "type": "string"
-                    },
-                    "MakeupBalance": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "operational_guardrails_runbook.md:168",
+            "docs/openapi.json:1377-1445"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one Collections request/response; verify weekDate format and the 50% split fields. Upgrades C->A.",
+          "candidateUrl": true
         }
       }
     },
     "/cloud/api/Report/delete-wager": {
       "post": {
-        "tags": [
-          "Downline Accounting"
-        ],
-        "summary": "Deleted & Voided Wagers Audit Trail",
-        "description": "Triggered by data-action='delete-wager'. Audits all voided, cancelled, and deleted tickets to investigate line-chase cancels or VOID_HEAVY_DISGUST churn.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/AuthBearer"
-          },
-          {
-            "$ref": "#/components/parameters/XRequestedWith"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "agentID",
-                  "startDate",
-                  "endDate"
-                ],
-                "properties": {
-                  "agentID": {
-                    "type": "string",
-                    "example": "BILLY666"
-                  },
-                  "startDate": {
-                    "type": "string",
-                    "example": "2026-10-20"
-                  },
-                  "endDate": {
-                    "type": "string",
-                    "example": "2026-10-28"
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Deleted wagers report",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportDeleteWager",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "List of deleted and voided tickets",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "WagerNumber": {
-                        "type": "string"
-                      },
-                      "Login": {
-                        "type": "string"
-                      },
-                      "DeletedBy": {
-                        "type": "string"
-                      },
-                      "DeletedTimestamp": {
-                        "type": "string"
-                      },
-                      "OriginalRisk": {
-                        "type": "string"
-                      },
-                      "Reason": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "operational_guardrails_runbook.md:165",
+            "docs/openapi.json:1447-1526"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Capture the Reporting Deleted Wagers view request/response; also determine whether delete-wager and getDeletedWagerReport are distinct wire actions. Upgrades C->A.",
+          "candidateUrl": true
         }
       }
     },
     "/health": {
       "get": {
-        "tags": [
-          "Local Desk & Telegram Gateway"
-        ],
-        "summary": "SportsDesk Daemon Health & Telemetry Probe",
-        "description": "Local in-process probe verifying Bun HTTP server uptime, active port, and runtime environment.",
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Daemon health and telemetry probe",
+        "description": "Handler-defined contract: sportsdesk_webview_server.ts:114-131 returns the daemon's status, bound port/hostname, Bun-reported URL, timestamp, uptime, runtime and NODE_ENV. Verified against the handler source, not an HTTP capture. The daemon binds 0.0.0.0 by default (sportsdesk_webview_server.ts:9,345), so the example hostname is 0.0.0.0; the http://127.0.0.1:4020 server target is a loopback client view of that bind.",
+        "operationId": "getHealth",
         "responses": {
           "200": {
             "description": "Healthy daemon status",
@@ -1541,12 +486,25 @@
               },
               "X-Content-Type-Options": {
                 "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
               }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "status",
+                    "port",
+                    "hostname",
+                    "url",
+                    "timestamp",
+                    "uptimeSeconds",
+                    "runtime",
+                    "nodeEnv"
+                  ],
                   "properties": {
                     "status": {
                       "type": "string",
@@ -1554,11 +512,23 @@
                     },
                     "port": {
                       "type": "integer",
+                      "description": "Bound port; PORT defaults to 4020.",
                       "example": 4020
                     },
                     "hostname": {
                       "type": "string",
+                      "description": "Bound hostname. Bun serves on all interfaces by default (0.0.0.0).",
                       "example": "0.0.0.0"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "server.url as reported by Bun; with hostname 0.0.0.0 the daemon is reachable on all interfaces.",
+                      "example": "http://0.0.0.0:4020/"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-10-30T00:00:00.000Z"
                     },
                     "uptimeSeconds": {
                       "type": "integer",
@@ -1577,78 +547,157 @@
               }
             }
           }
+        },
+        "x-evidence": {
+          "tier": "B",
+          "sources": [
+            "sportsdesk_webview_server.ts:114-131",
+            "docs/openapi.json:1528-1581"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Not a capture gap: reconcile the spec to sportsdesk_webview_server.ts:114-131 (add url + timestamp). A curl capture would only confirm the handler."
         }
       }
     },
     "/api/watchlist": {
       "get": {
-        "tags": [
-          "Local Desk & Telegram Gateway"
-        ],
-        "summary": "Active Monitored Sharp / Whale Accounts",
-        "description": "Returns list of tracked accounts under active surveillance. Requires SPORTSDESK_ADMIN_TOKEN bearer authorization.",
-        "parameters": [
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Monitored watch-list accounts",
+        "description": "Returns {success, count, data} from telegramService.getWatchList() (sportsdesk_webview_server.ts:236-246). Requires Authorization: Bearer <SPORTSDESK_ADMIN_TOKEN>; adminRejection returns 503 when the token is unset and 401 otherwise (sportsdesk_webview_server.ts:27-47,175-186).",
+        "operationId": "getApiWatchlist",
+        "security": [
           {
-            "$ref": "#/components/parameters/AuthBearer"
+            "daemonBearer": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Monitored watch list records",
+            "description": "Watch-list snapshot",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": ["success", "count", "data"],
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "example": true
+                      "const": true
                     },
                     "count": {
-                      "type": "integer",
-                      "example": 3
+                      "type": "integer"
                     },
                     "data": {
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "properties": {
-                          "customerId": {
-                            "type": "string",
-                            "example": "RF2003"
-                          },
-                          "agentId": {
-                            "type": "string",
-                            "example": "FAKEMONEY"
-                          },
-                          "riskTier": {
-                            "type": "string",
-                            "example": "WHALE_VOLATILITY"
-                          },
-                          "sharpScore": {
-                            "type": "number",
-                            "example": 86.2
-                          }
-                        }
+                        "additionalProperties": true,
+                        "description": "Opaque watch-list entry owned by sportsdesk_telegram_bot.ts; its shape was not captured."
                       }
                     }
                   }
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing or wrong admin token (sportsdesk_webview_server.ts:38-46).",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "error"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SPORTSDESK_ADMIN_TOKEN is not set on the server (sportsdesk_webview_server.ts:31-37).",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "error"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
+        },
+        "x-evidence": {
+          "tier": "B",
+          "sources": [
+            "sportsdesk_webview_server.ts:236-246",
+            "sportsdesk_webview_server.ts:27-47",
+            "docs/openapi.json:1583-1641"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "No wire capture needed; add the 401/503 responses to the spec from adminRejection (sportsdesk_webview_server.ts:33-46)."
         }
       }
     },
     "/api/telegram/alert": {
       "post": {
-        "tags": [
-          "Local Desk & Telegram Gateway"
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Dispatch an instant Telegram alert",
+        "description": "Request body {customerId?} defaults to RF2003; dispatches through telegramService.dispatchTestAlert and returns {success, ok, customerId} (sportsdesk_webview_server.ts:249-274). Admin-token gated (sportsdesk_webview_server.ts:175-186).",
+        "operationId": "postApiTelegramAlert",
+        "security": [
+          {
+            "daemonBearer": []
+          }
         ],
-        "summary": "Instant Telegram Alert Dispatch",
-        "description": "Dispatches an urgent formatted rich alert message directly to the desk Telegram channel via @demodevdeskbot.",
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {
               "schema": {
@@ -1656,6 +705,7 @@
                 "properties": {
                   "customerId": {
                     "type": "string",
+                    "description": "Customer to alert; defaults to RF2003.",
                     "example": "RF2003"
                   }
                 }
@@ -1665,44 +715,165 @@
         },
         "responses": {
           "200": {
-            "description": "Alert dispatched successfully",
+            "description": "Alert dispatch result",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": ["success", "ok", "customerId"],
                   "properties": {
                     "success": {
-                      "type": "boolean",
-                      "example": true
+                      "type": "boolean"
                     },
                     "ok": {
                       "type": "boolean",
-                      "example": true
+                      "description": "Whether Telegram accepted the alert."
                     },
                     "customerId": {
-                      "type": "string",
-                      "example": "RF2003"
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong admin token (sportsdesk_webview_server.ts:38-46).",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "error"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Dispatch threw (sportsdesk_webview_server.ts:264-273).",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "ok", "error"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "ok": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SPORTSDESK_ADMIN_TOKEN is not set on the server (sportsdesk_webview_server.ts:31-37).",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "error"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "error": {
+                      "type": "string"
                     }
                   }
                 }
               }
             }
           }
+        },
+        "x-evidence": {
+          "tier": "B",
+          "sources": [
+            "sportsdesk_webview_server.ts:249-274",
+            "docs/openapi.json:1643-1692"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "No capture gap; document the Authorization requirement and the 401/503 paths."
         }
       }
     },
     "/api/telegram/report": {
       "post": {
-        "tags": [
-          "Local Desk & Telegram Gateway"
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Trigger a scheduled Telegram report",
+        "description": "Report type is selected by the ?type= query parameter and defaults to EVENING_SETTLEMENT; the handler validates it with isReportType and returns {success, ok, reportType} (sportsdesk_webview_server.ts:277-297). REPORT_TYPES are MORNING_BRIEFING, MIDDAY_STEAM and EVENING_SETTLEMENT (sportsdesk_telegram_bot.ts:77-81). Admin-token gated (sportsdesk_webview_server.ts:175-186).",
+        "operationId": "postApiTelegramReport",
+        "security": [
+          {
+            "daemonBearer": []
+          }
         ],
-        "summary": "Executive Scheduled Report Trigger",
-        "description": "Immediately triggers and broadcasts one of the three scheduled reports: MORNING_BRIEFING (08:00 EDT), MIDDAY_STEAM (13:00 EDT), or EVENING_SETTLEMENT (23:00 EDT).",
         "parameters": [
           {
             "name": "type",
             "in": "query",
-            "required": true,
+            "required": false,
+            "description": "Report type; defaults to EVENING_SETTLEMENT when absent (sportsdesk_webview_server.ts:278).",
             "schema": {
               "type": "string",
               "enum": [
@@ -1710,994 +881,312 @@
                 "MIDDAY_STEAM",
                 "EVENING_SETTLEMENT"
               ],
-              "example": "EVENING_SETTLEMENT"
+              "default": "EVENING_SETTLEMENT"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Report triggered",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "reportType": {
-                      "type": "string",
-                      "example": "EVENING_SETTLEMENT"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/desk/auth/session": {
-      "post": {
-        "tags": [
-          "Desk HITL Security"
-        ],
-        "summary": "Operator Desk Session Minting (CookieMap & UUIDv7)",
-        "description": "Provisions authenticated desk operator session. Sets RFC 6265 HTTP-only cookie desk_session_id using sequential UUIDv7 timestamps.",
-        "responses": {
-          "200": {
-            "description": "Session established",
+            "description": "Report dispatch result",
             "headers": {
-              "Set-Cookie": {
-                "description": "desk_session_id cookie with 8-hour operator shift lifetime and sameSite=strict",
-                "schema": {
-                  "type": "string"
-                }
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
               }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": ["success", "ok", "reportType"],
                   "properties": {
-                    "authenticated": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "ok": {
                       "type": "boolean",
-                      "example": true
+                      "description": "Whether Telegram accepted the report."
                     },
-                    "sessionId": {
+                    "reportType": {
                       "type": "string",
-                      "example": "0192e315-9c88-7521-821b-29a8f4c2191b"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Desk HITL Security"
-        ],
-        "summary": "Revoke Operator Desk Session",
-        "description": "Clears desk_session_id cookie and invalidates session token.",
-        "responses": {
-          "200": {
-            "description": "Session revoked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "authenticated": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Session revoked"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/desk/hitl/approve": {
-      "post": {
-        "tags": [
-          "Desk HITL Security"
-        ],
-        "summary": "Human-in-the-Loop Tier 2 Limit Approval (HMAC-SHA256 DESK-*)",
-        "description": "Executes Tier 2 limit raises or sharp overrides requiring cryptographic operator authorization. Validates DESK-* HMAC token using constant-time crypto.timingSafeEqual before dispatching Manager/updateByColumn.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ReferrerPolicyNoReferrer"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "approvalToken",
-                  "customerIdentifier",
-                  "proposedLimitAmountCents"
-                ],
-                "properties": {
-                  "approvalToken": {
-                    "type": "string",
-                    "example": "DESK-a1b2c3d4e5f6..."
-                  },
-                  "customerIdentifier": {
-                    "type": "string",
-                    "example": "RF2003"
-                  },
-                  "proposedLimitAmountCents": {
-                    "type": "integer",
-                    "example": 500000
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Approval confirmed and mutation committed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "approved": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "rawResultCode": {
-                      "type": "integer",
-                      "example": 1
-                    },
-                    "classification": {
-                      "type": "string",
-                      "example": "COMMITTED"
+                      "enum": [
+                        "MORNING_BRIEFING",
+                        "MIDDAY_STEAM",
+                        "EVENING_SETTLEMENT"
+                      ]
                     }
                   }
                 }
               }
             }
           },
-          "403": {
-            "description": "Invalid token or unsafe referrer policy detected"
-          }
-        }
-      }
-    },
-    "/manager-tools/ajax.php": {
-      "post": {
-        "tags": [
-          "Cross-Book Steam"
-        ],
-        "summary": "GS Buckeye 2 Partner 118 Steam Reference Ingestion",
-        "description": "Asynchronously queries Partner 118 getBetReport to resolve cross-book steam moves joined via M.G<betGroupId>. Mandates referrerPolicy: 'strict-origin'.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "operation",
-                  "betGroupId"
-                ],
-                "properties": {
-                  "operation": {
-                    "type": "string",
-                    "enum": [
-                      "getBetReport"
-                    ],
-                    "example": "getBetReport"
-                  },
-                  "betGroupId": {
-                    "type": "string",
-                    "example": "908412"
-                  }
-                }
+          "400": {
+            "description": "type is not one of REPORT_TYPES (sportsdesk_webview_server.ts:279-287).",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
               }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Partner 118 steam ticket report",
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": ["success", "error"],
                   "properties": {
-                    "betGroupId": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "error": {
                       "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong admin token (sportsdesk_webview_server.ts:38-46).",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "error"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
                     },
-                    "market": {
+                    "error": {
                       "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SPORTSDESK_ADMIN_TOKEN is not set on the server (sportsdesk_webview_server.ts:31-37).",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "error"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": false
                     },
-                    "steamLagMs": {
-                      "type": "integer",
-                      "example": 3200
-                    },
-                    "pinnacleReferencePrice": {
-                      "type": "string",
-                      "example": "-115"
+                    "error": {
+                      "type": "string"
                     }
                   }
                 }
               }
             }
           }
+        },
+        "x-evidence": {
+          "tier": "B",
+          "sources": [
+            "sportsdesk_webview_server.ts:277-297",
+            "sportsdesk_telegram_bot.ts:77-81",
+            "docs/openapi.json:1694-1739"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "No capture gap; add the ?type= query parameter (enum REPORT_TYPES) and 'ok' to the spec."
         }
       }
     },
     "/cloud/api/System/verifySession": {
       "post": {
-        "tags": [
-          "System & Authentication"
-        ],
-        "summary": "Verify Active JWT Session",
-        "description": "Validates active token integrity. On HTTP 401, triggers 1x re-mint cycle before failing closed.",
-        "operationId": "verifySession",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "x-retryable": true,
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Verify an existing session",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiSystemVerifySession",
         "responses": {
-          "200": {
-            "description": "Session valid",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "valid": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "expiresAt": {
-                      "type": "integer",
-                      "example": 1793042000
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Session expired (re-mint triggered)"
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        }
-      }
-    },
-    "/api/desk/auth/me": {
-      "get": {
-        "tags": [
-          "System & Authentication"
-        ],
-        "summary": "Inspect Current Operator Session",
-        "description": "Retrieves active operator session ID from HTTP-only cookies.",
-        "operationId": "getOperatorSession",
-        "responses": {
-          "200": {
-            "description": "Active session confirmed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "authenticated": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "sessionId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthenticated"
-          }
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["scripts/enhance_docs.mjs:98", "docs/openapi.json"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture a verifySession call on a live and an expired token; confirm the response shape and the 401 re-mint behaviour. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Manager/getCustomerNotes": {
       "post": {
-        "tags": [
-          "Manager & Player Admin"
-        ],
-        "summary": "Get Customer Risk Notes & Surveillance Annotations",
-        "description": "Fetches operator notes, sharp tags, and historical risk flags for a player.",
-        "operationId": "getCustomerNotes",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "customerID"
-                ],
-                "properties": {
-                  "customerID": {
-                    "type": "string",
-                    "example": "CB112_1    "
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Read customer notes",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGetCustomerNotes",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Notes retrieved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "notes": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "timestamp": {
-                            "type": "string"
-                          },
-                          "author": {
-                            "type": "string"
-                          },
-                          "text": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["scripts/enhance_docs.mjs:130", "none"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture a customer notes read; confirm the notes row fields and whether notes are operator-annotations or wire-native. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Manager/updateCustomerNotes": {
       "post": {
-        "tags": [
-          "Manager & Player Admin"
-        ],
-        "summary": "Append Customer Risk Annotation",
-        "description": "Appends an immutable audit annotation to the customer profile.",
-        "operationId": "updateCustomerNotes",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "customerID",
-                  "noteText"
-                ],
-                "properties": {
-                  "customerID": {
-                    "type": "string",
-                    "example": "CB112_1    "
-                  },
-                  "noteText": {
-                    "type": "string",
-                    "example": "AUTO-CUT-TIER1 applied limit freeze."
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Update customer notes",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerUpdateCustomerNotes",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Note appended",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "SUCCESS"
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["scripts/enhance_docs.mjs:153", "none"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture an append + read-back; confirm the mutation Result envelope and whether notes are immutable. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Manager/deleteSportsVigSetup": {
       "post": {
-        "tags": [
-          "Vig & Juice Setup"
-        ],
-        "summary": "Remove Custom Juice Shading Rules",
-        "description": "Restores baseline odds pricing for the player by deleting active vig overrides.",
-        "operationId": "deleteSportsVigSetup",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "operation",
-                  "sportType",
-                  "player"
-                ],
-                "properties": {
-                  "operation": {
-                    "type": "string",
-                    "default": "deleteSportsVigSetup"
-                  },
-                  "sportType": {
-                    "type": "string",
-                    "example": "Football            "
-                  },
-                  "player": {
-                    "type": "string",
-                    "example": "CB112_1    "
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Delete sport vig setup",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerDeleteSportsVigSetup",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Vig setup deleted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "Result": {
-                      "type": "object",
-                      "properties": {
-                        "Result": {
-                          "type": "integer",
-                          "example": 1
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["scripts/enhance_docs.mjs:173", "none"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture a delete + getSportsVigSetup read-back; confirm the required fields and Result envelope. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Manager/deleteWager": {
       "post": {
-        "tags": [
-          "Wagers & Live Surveillance"
-        ],
-        "summary": "Void / Cancel Wager Ticket",
-        "description": "Cancels an open or contested wager ticket with reason code audit logging.",
-        "operationId": "deleteWager",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "wagerNumber",
-                  "reason"
-                ],
-                "properties": {
-                  "wagerNumber": {
-                    "type": "string",
-                    "example": "894112"
-                  },
-                  "reason": {
-                    "type": "string",
-                    "example": "Past-post stale line exploit"
-                  }
-                }
-              }
-            }
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Delete a wager",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerDeleteWager",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Wager canceled",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "wagerNumber": {
-                      "type": "string",
-                      "example": "894112"
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["scripts/enhance_docs.mjs:193", "none"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture a void/cancel mutation; confirm the request fields (only wagerNumber/reason are documented) and the result envelope. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Report/getDeletedWagerReport": {
       "post": {
-        "tags": [
-          "Reporting & Forensics"
-        ],
-        "summary": "Deleted & Voided Wagers Audit Log",
-        "description": "Audit log of all voided, deleted, and canceled tickets across the downline with operator timestamps.",
-        "operationId": "getDeletedWagerReport",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Deleted wager report",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetDeletedWagerReport",
         "responses": {
-          "200": {
-            "description": "Deleted wagers log",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "wagerNumber": {
-                        "type": "string"
-                      },
-                      "login": {
-                        "type": "string"
-                      },
-                      "deletedAt": {
-                        "type": "string"
-                      },
-                      "deletedBy": {
-                        "type": "string"
-                      },
-                      "reason": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              }
-            }
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["scripts/enhance_docs.mjs:213", "none"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture the deleted-wager audit read; determine whether it duplicates POST /cloud/api/Report/delete-wager. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Report/getDailyFigure": {
       "post": {
-        "tags": [
-          "Reporting & Forensics"
-        ],
-        "summary": "Daily Gross Volume & House Hold Breakdown",
-        "description": "Pulls daily volume, payouts, and hold deficit/profit across billing period.",
-        "operationId": "getDailyFigure",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Daily figure report",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetDailyFigure",
         "responses": {
-          "200": {
-            "description": "Daily breakdown",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "date": {
-                        "type": "string",
-                        "format": "date"
-                      },
-                      "volume": {
-                        "type": "number"
-                      },
-                      "netHold": {
-                        "type": "number"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/desk/hitl/queue": {
-      "get": {
-        "tags": [
-          "Desk & HITL Operations"
-        ],
-        "summary": "Query Pending Tier 2 Limit Adjustments",
-        "description": "Lists all queued limit modifications awaiting operator sign-off.",
-        "operationId": "getHitlQueue",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Queued approvals list",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "approvalId": {
-                        "type": "string"
-                      },
-                      "customerID": {
-                        "type": "string"
-                      },
-                      "currentLimitCents": {
-                        "type": "integer"
-                      },
-                      "proposedLimitCents": {
-                        "type": "integer"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/desk/hitl/reject": {
-      "post": {
-        "tags": [
-          "Desk & HITL Operations"
-        ],
-        "summary": "Reject Queued Limit Raise",
-        "description": "Rejects and purges a queued limit raise with rejection audit notes.",
-        "operationId": "rejectHitlLimit",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "approvalId",
-                  "reason"
-                ],
-                "properties": {
-                  "approvalId": {
-                    "type": "string",
-                    "example": "APP-20261030-9411"
-                  },
-                  "reason": {
-                    "type": "string",
-                    "example": "High sharp score."
-                  }
-                }
-              }
-            }
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
         },
-        "responses": {
-          "200": {
-            "description": "Queued approval rejected",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "REJECTED"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/desk/forensics/audit": {
-      "post": {
-        "tags": [
-          "Desk & HITL Operations"
-        ],
-        "summary": "Dispatch Multi-Factor Forensic Audit",
-        "description": "Runs Mode A / Mode B / Mode C / Mode I scans and computes Multi-Factor Corroboration Score (MFCS 0-100).",
-        "operationId": "dispatchForensicAudit",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "period": {
-                    "type": "string",
-                    "example": "24h"
-                  },
-                  "maxVelocitySeconds": {
-                    "type": "integer",
-                    "default": 15
-                  },
-                  "applyLimits": {
-                    "type": "boolean",
-                    "default": false
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Forensic audit scorecard",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "auditedTickets": {
-                      "type": "integer"
-                    },
-                    "flaggedSnipers": {
-                      "type": "integer"
-                    },
-                    "ipCollisions": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/desk/forensics/scores": {
-      "get": {
-        "tags": [
-          "Desk & HITL Operations"
-        ],
-        "summary": "Query Empirical Bayes Sharp Scores",
-        "description": "Queries online Empirical Bayes sharp scores (tau*=0.68, N_min=8) and CLV basis points.",
-        "operationId": "getSharpScores",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Sharp scores registry",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "customerID": {
-                        "type": "string"
-                      },
-                      "sharpScore": {
-                        "type": "number"
-                      },
-                      "clvBasisPoints": {
-                        "type": "integer"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/desk/rfq/quote": {
-      "post": {
-        "tags": [
-          "Prediction Market RFQ"
-        ],
-        "summary": "Request Prediction Market RFQ Joint Probability Quote",
-        "description": "Translates SportsDesk sharp tickets into Polymarket / Kalshi multi-leg event contracts and queries RFQAPI for dynamic probability quotes.",
-        "operationId": "requestRfqQuote",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "ticketIdentifier",
-                  "legs"
-                ],
-                "properties": {
-                  "ticketIdentifier": {
-                    "type": "string",
-                    "example": "MM800|894112"
-                  },
-                  "legs": {
-                    "type": "array",
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Joint RFQ quote received",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "quoteId": {
-                      "type": "string"
-                    },
-                    "jointProbability": {
-                      "type": "number"
-                    },
-                    "hedgePriceCents": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/desk/rfq/hedge": {
-      "post": {
-        "tags": [
-          "Prediction Market RFQ"
-        ],
-        "summary": "Execute Layoff Hedge Order",
-        "description": "Dispatches hedging orders to Polymarket Combos / Kalshi to neutralize tail payout exposure.",
-        "operationId": "executeLayoffHedge",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "quoteId",
-                  "hedgeAmountCents"
-                ],
-                "properties": {
-                  "quoteId": {
-                    "type": "string",
-                    "example": "RFQ-908412-PM"
-                  },
-                  "hedgeAmountCents": {
-                    "type": "integer",
-                    "example": 500000
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Layoff hedge executed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "executionId": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "example": "FILLED"
-                    }
-                  }
-                }
-              }
-            }
-          }
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["scripts/enhance_docs.mjs:225", "none"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture a daily figure read; confirm the request (none is documented) and the row fields. Upgrades C->A."
         }
       }
     },
     "/cloud/api/Manager/gameAdmin": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "Game Admin: Circling & Line Lock Operations",
-        "description": "Automated surveillance target for locking games, setting emergency circle limits, and managing board availability on breaking news.",
-        "operationId": "gameAdmin",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: Game Admin",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGameAdmin",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:41",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:2688"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the 'Game Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "Game Admin",
         "x-dom-selector": "div.tile:has-text('Game Admin')",
@@ -2707,36 +1196,32 @@
           "circleLimit",
           "isLocked"
         ],
-        "x-data-language-keys": [
-          "L-1034",
-          "L-1052"
-        ],
-        "responses": {
-          "200": {
-            "description": "Game administration state committed"
-          },
-          "401": {
-            "description": "Session expired"
-          },
-          "502": {
-            "description": "Gateway timeout"
-          }
-        }
+        "x-data-language-keys": ["L-1034", "L-1052"]
       }
     },
     "/cloud/api/System/getMessages": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "Messaging: Downline Broadcasts & Operator Inbox",
-        "description": "Downline agent communication hub, system broadcast notices, and sharp alert dispatch log.",
-        "operationId": "getMessages",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: Messaging",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiSystemGetMessages",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:52",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:2727"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the 'Messaging' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "Messaging",
         "x-dom-selector": "div.tile:has-text('Messaging')",
@@ -2746,33 +1231,32 @@
           "messageBody",
           "priority"
         ],
-        "x-data-language-keys": [
-          "L-1055",
-          "L-1056"
-        ],
-        "responses": {
-          "200": {
-            "description": "Messages list retrieved"
-          },
-          "401": {
-            "description": "Session expired"
-          }
-        }
+        "x-data-language-keys": ["L-1055", "L-1056"]
       }
     },
     "/cloud/api/Manager/adjustBalance": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "Cashier: Manual Balance & Credit Ledger Adjustments",
-        "description": "Manual ledger adjustment mutations for deposits, withdrawals, cash settlements, and promotional credit.",
-        "operationId": "adjustBalance",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: Cashier",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerAdjustBalance",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:63",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:2763"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the 'Cashier' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "Cashier",
         "x-dom-selector": "div.tile:has-text('Cashier')",
@@ -2782,34 +1266,33 @@
           "transactionType",
           "notes"
         ],
-        "x-data-language-keys": [
-          "L-1031",
-          "L-1045",
-          "L-1058"
-        ],
-        "responses": {
-          "200": {
-            "description": "Balance adjustment committed to player ledger"
-          },
-          "401": {
-            "description": "Session expired"
-          }
-        }
+        "x-data-language-keys": ["L-1031", "L-1045", "L-1058"]
       }
     },
     "/cloud/api/Manager/createPlayer": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "Add Customer: Player Account Provisioning",
-        "description": "Provisions new bettor accounts under direct sub-agent hierarchy, binding initial credit lines and delay gates.",
-        "operationId": "createPlayer",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: Add Customer",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerCreatePlayer",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:74",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:2800",
+            "operational_guardrails_runbook.md:213"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the 'Add Customer' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "Add Customer",
         "x-dom-selector": "div.tile:has-text('Add Customer')",
@@ -2820,105 +1303,93 @@
           "creditLimit",
           "delaySeconds"
         ],
-        "x-data-language-keys": [
-          "L-1031",
-          "L-1032",
-          "L-1040"
-        ],
-        "responses": {
-          "200": {
-            "description": "Customer account created"
-          },
-          "401": {
-            "description": "Session expired"
-          }
-        }
+        "x-data-language-keys": ["L-1031", "L-1032", "L-1040"]
       }
     },
     "/cloud/api/Manager/get3rdPartyLimits": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "3rd Party Limits: External Feed Collars",
-        "description": "Controls table limit ceilings and risk collars across third-party oddsmaker providers (Don Best, Betradar).",
-        "operationId": "get3rdPartyLimits",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: 3rd Party Limits",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGet3rdPartyLimits",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:85",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:2838"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the '3rd Party Limits' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "3rd Party Limits",
         "x-dom-selector": "div.tile:has-text('3rd Party Limits')",
-        "x-extracted-inputs": [
-          "providerID",
-          "sportCategory",
-          "maxLimitCents"
-        ],
-        "x-data-language-keys": [
-          "L-1060",
-          "L-1061"
-        ],
-        "responses": {
-          "200": {
-            "description": "Provider limits configured"
-          },
-          "401": {
-            "description": "Session expired"
-          }
-        }
+        "x-extracted-inputs": ["providerID", "sportCategory", "maxLimitCents"],
+        "x-data-language-keys": ["L-1060", "L-1061"]
       }
     },
     "/cloud/api/Report/getAnalysis": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "Analysis: Market Concentration & Sport Sizing",
-        "description": "Stage 6 surveillance sizing: breaks down downline turnover by sport, league, and wager type.",
-        "operationId": "getAnalysis",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: Analysis",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetAnalysis",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:96",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:2873",
+            "operational_guardrails_runbook.md:166"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the 'Analysis' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "Analysis",
         "x-dom-selector": "div.tile:has-text('Analysis')",
-        "x-extracted-inputs": [
-          "period",
-          "sport",
-          "marketCategory",
-          "agentID"
-        ],
-        "x-data-language-keys": [
-          "L-1034",
-          "L-1064"
-        ],
-        "responses": {
-          "200": {
-            "description": "Market concentration analysis returned"
-          },
-          "401": {
-            "description": "Session expired"
-          }
-        }
+        "x-extracted-inputs": ["period", "sport", "marketCategory", "agentID"],
+        "x-data-language-keys": ["L-1034", "L-1064"]
       }
     },
     "/cloud/api/Manager/getScores": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "Scores: Live In-Play Grading & Overrides",
-        "description": "Verifies live game scores, period results, and manual settlement grading overrides.",
-        "operationId": "getScores",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: Scores",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGetScores",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:107",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:2909"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the 'Scores' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "Scores",
         "x-dom-selector": "div.tile:has-text('Scores')",
@@ -2929,33 +1400,32 @@
           "awayScore",
           "isFinal"
         ],
-        "x-data-language-keys": [
-          "L-1034",
-          "L-1068"
-        ],
-        "responses": {
-          "200": {
-            "description": "Scores and grading status"
-          },
-          "401": {
-            "description": "Session expired"
-          }
-        }
+        "x-data-language-keys": ["L-1034", "L-1068"]
       }
     },
     "/cloud/api/Manager/getAgentTree": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "Agent Admin: Hierarchy Walk & Commission Governance",
-        "description": "Sub-agent tree walk across 668 agents, managing 50% revenue-share splits and credit ceilings.",
-        "operationId": "getAgentTree",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: Agent Admin",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGetAgentTree",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:118",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:2946"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the 'Agent Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "Agent Admin",
         "x-dom-selector": "div.tile:has-text('Agent Admin')",
@@ -2964,33 +1434,32 @@
           "commissionSplitPercent",
           "creditCeiling"
         ],
-        "x-data-language-keys": [
-          "L-1032",
-          "L-1070"
-        ],
-        "responses": {
-          "200": {
-            "description": "Agent tree structure"
-          },
-          "401": {
-            "description": "Session expired"
-          }
-        }
+        "x-data-language-keys": ["L-1032", "L-1070"]
       }
     },
     "/cloud/api/Manager/getBilling": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "Billing: PPH Software Per-Head Accounting",
-        "description": "Calculates weekly software billing across active accounts (accounts with >= 1 graded wager in period).",
-        "operationId": "getBilling",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: Billing",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGetBilling",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:129",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:2981"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the 'Billing' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "Billing",
         "x-dom-selector": "div.tile:has-text('Billing')",
@@ -2999,33 +1468,32 @@
           "ratePerActiveHead",
           "activeAccountCount"
         ],
-        "x-data-language-keys": [
-          "L-1050",
-          "L-1072"
-        ],
-        "responses": {
-          "200": {
-            "description": "Billing statement"
-          },
-          "401": {
-            "description": "Session expired"
-          }
-        }
+        "x-data-language-keys": ["L-1050", "L-1072"]
       }
     },
     "/cloud/api/Manager/getRules": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "Rules & Settings: Book Wagering Parameters",
-        "description": "House wagering rules, teaser tie tables, maximum parlay payout collars, and default delays.",
-        "operationId": "getRules",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: Rules",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiManagerGetRules",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:140",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:3016"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the 'Settings & Rules' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "Rules",
         "x-dom-selector": "div.tile:has-text('Rules')",
@@ -3034,33 +1502,33 @@
           "teaserTieRule",
           "defaultDelaySeconds"
         ],
-        "x-data-language-keys": [
-          "L-1040",
-          "L-1075"
-        ],
-        "responses": {
-          "200": {
-            "description": "House rules configuration"
-          },
-          "401": {
-            "description": "Session expired"
-          }
-        }
+        "x-data-language-keys": ["L-1040", "L-1075"]
       }
     },
     "/cloud/api/Report/getFinancialReport": {
       "post": {
-        "tags": [
-          "Tracked Operational Domains"
-        ],
-        "summary": "Transactions History: Financial Ledger Audits",
-        "description": "Financial transaction ledger audit across players and agent nodes.",
-        "operationId": "getFinancialReport",
-        "security": [
-          {
-            "BearerAuth": []
+        "tags": ["Inferred (Unverified)"],
+        "summary": "Launcher tile: Transactions History",
+        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The launcher-tile DOM metadata (x-dom-tile, x-dom-selector, x-extracted-inputs) is UI observation only and must not be read as wire parameters. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetFinancialReport",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
           }
-        ],
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": [
+            "main:scripts/portal_tile_crawler.ts:151",
+            "main:scripts/portal_tile_crawler.ts:164-245",
+            "main:scripts/append_tracked_domains.mjs:22-228",
+            "docs/openapi.json:3051",
+            "operational_guardrails_runbook.md:167"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Open the 'Transactions History' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "candidateUrl": true
+        },
         "x-discovery-status": "UNDER_SURVEILLANCE",
         "x-dom-tile": "Transactions History",
         "x-dom-selector": "div.tile:has-text('Transactions History')",
@@ -3070,584 +1538,491 @@
           "endDate",
           "transactionFilter"
         ],
-        "x-data-language-keys": [
-          "L-1031",
-          "L-1033",
-          "L-1058"
-        ],
+        "x-data-language-keys": ["L-1031", "L-1033", "L-1058"]
+      }
+    },
+    "/cloud/api/Manager/getHistory": {
+      "post": {
+        "tags": ["Settlement History"],
+        "summary": "Manager getHistory (wired settlement-history poll; no response capture)",
+        "description": "The only upstream Fantasy402 route in this repository with a real fetch client: resolveHistoryPollUrl builds `${SPORTSDESK_PORTAL_HTTP_BASE}/cloud/api/Manager/getHistory` and pollManagerGetHistory POSTs with no request body (lib/fantasy402_settlement_ingest.ts:347-368). The response must be a JSON array or {data: []} or the poll throws (lib/fantasy402_settlement_ingest.ts:369-387). The request contract (agent scope, date window, auth) is therefore unknown, and row field shapes are not captured; tests/fixtures/fantasy402-history-poll.json is a placeholder shape sample. Surface: surface.manager-getHistory (tier D).",
+        "operationId": "postCloudApiManagerGetHistory",
         "responses": {
           "200": {
-            "description": "Financial ledger report"
+            "description": "JSON array of raw settlement rows, or an object with a data array. Any other shape throws (lib/fantasy402_settlement_ingest.ts:374-387). Row fields are not captured, so only raw/unknown objects are described.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "Raw settlement row; the poll types rows as Record<string, unknown> and no field shapes were captured."
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": ["data"],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Raw settlement row; field shapes not captured."
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
-          "401": {
-            "description": "Session expired"
+          "default": {
+            "description": "Non-2xx status is not captured; the poll throws on !res.ok (lib/fantasy402_settlement_ingest.ts:369-371)."
           }
-        }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": [
+            "lib/fantasy402_settlement_ingest.ts:347-357",
+            "lib/fantasy402_wager_universe_scope.ts:22-31",
+            "fixture:tests/fixtures/fantasy402-history-poll.json:1-25"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one getHistory request/response (redacted) to record the upstream request contract (body/agent scope/date window/auth) and a real response body; this repo only proves the URL, the bodyless POST and the array-or-{data:[]} acceptance."
+        },
+        "x-surface-id": "surface.manager-getHistory"
+      }
+    },
+    "/miniapp": {
+      "get": {
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Telegram Mini App dashboard (GET /miniapp)",
+        "description": "Serves telegram-miniapp-dashboard.html as text/html (sportsdesk_webview_server.ts:144-151) with Telegram frame-ancestors CSP and no X-Frame-Options (sportsdesk_webview_server.ts:87-90). GET /miniapp/ is an alias. Surface: surface.daemon-miniapp (tier D).",
+        "operationId": "getMiniapp",
+        "responses": {
+          "200": {
+            "description": "Mini App dashboard HTML with the daemon CORS/CSP headers.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string",
+                  "description": "Static HTML document served from disk by the daemon."
+                }
+              }
+            }
+          }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": [
+            "sportsdesk_webview_server.ts:144-151",
+            "sportsdesk_webview_server.ts:87-90"
+          ],
+          "capturedResponse": false,
+          "requiredCapture": "HTTP capture of the served /miniapp HTML (the route is handler-verified only; no HTTP response was captured)."
+        },
+        "x-surface-id": "surface.daemon-miniapp"
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Operator dashboard (GET /dashboard)",
+        "description": "Serves customer-churn-simulation-dashboard.html as text/html (sportsdesk_webview_server.ts:134-141). The same handler also answers GET /; the root path is not modelled as an OpenAPI path because the ledger has no dedicated surface row for it. Surface: surface.daemon-dashboard (tier D).",
+        "operationId": "getDashboard",
+        "responses": {
+          "200": {
+            "description": "Operator dashboard HTML with the daemon CORS/CSP headers.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string",
+                  "description": "Static HTML document served from disk by the daemon."
+                }
+              }
+            }
+          }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": ["sportsdesk_webview_server.ts:134-141"],
+          "capturedResponse": false,
+          "requiredCapture": "HTTP capture of the served /dashboard HTML (the route is handler-verified only; no HTTP response was captured)."
+        },
+        "x-surface-id": "surface.daemon-dashboard"
       }
     }
   },
   "components": {
-    "parameters": {
-      "AuthBearer": {
-        "name": "Authorization",
-        "in": "header",
-        "required": true,
-        "description": "Scoped Bearer JWT token minted from authenticateCustomer. Format: Bearer <JWT>",
-        "schema": {
-          "type": "string",
-          "example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-        }
+    "securitySchemes": {
+      "fantasy402Cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session",
+        "description": "Fantasy402 Manager portal session cookie. The 2026-10-28 capture carried no Authorization header and the session is cookie-based (operational_guardrails_runbook.md:153). The capture did not record the cookie name, so 'session' is a placeholder label, not a verified cookie name."
       },
+      "daemonBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Static daemon admin token: Authorization: Bearer <SPORTSDESK_ADMIN_TOKEN>, compared with crypto.timingSafeEqual (sportsdesk_webview_server.ts:27-47). The daemon answers 503 when SPORTSDESK_ADMIN_TOKEN is unset and 401 otherwise."
+      }
+    },
+    "parameters": {
       "XRequestedWith": {
         "name": "X-Requested-With",
         "in": "header",
         "required": true,
-        "description": "AJAX caller identification header required by OpenResty / Cloudflare gateway",
+        "description": "Observed on the captured 2026-10-28 mode-B Manager request. Whether the portal enforces it is unverified.",
         "schema": {
           "type": "string",
-          "enum": [
-            "XMLHttpRequest"
-          ],
-          "example": "XMLHttpRequest"
-        }
-      },
-      "AcceptJson": {
-        "name": "Accept",
-        "in": "header",
-        "required": true,
-        "description": "Explicit content negotiation header mandating JSON response envelopes",
-        "schema": {
-          "type": "string",
-          "enum": [
-            "application/json"
-          ],
-          "example": "application/json"
-        }
-      },
-      "ReferrerPolicyNoReferrer": {
-        "name": "Referrer-Policy",
-        "in": "header",
-        "required": false,
-        "description": "Caller transport policy preventing internal portal URLs and DESK-* tokens from leaking across hops",
-        "schema": {
-          "type": "string",
-          "enum": [
-            "no-referrer"
-          ],
-          "example": "no-referrer"
+          "enum": ["XMLHttpRequest"]
         }
       }
     },
     "headers": {
       "CSPHeader": {
-        "description": "Standard modern frame-ancestors policy governing Telegram Web / Mini App embedding without X-Frame-Options vulnerabilities",
+        "description": "Content-Security-Policy applied to daemon responses: frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram: (sportsdesk_webview_server.ts:87-90).",
         "schema": {
-          "type": "string",
-          "example": "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:;"
+          "type": "string"
         }
       },
       "XContentTypeOptionsHeader": {
-        "description": "MIME type sniffing prevention header",
+        "description": "X-Content-Type-Options: nosniff (sportsdesk_webview_server.ts:89).",
         "schema": {
           "type": "string",
-          "example": "nosniff"
+          "enum": ["nosniff"]
         }
       },
       "ReferrerPolicyHeader": {
-        "description": "Inbound server referrer policy",
+        "description": "Referrer-Policy: strict-origin-when-cross-origin (sportsdesk_webview_server.ts:90).",
         "schema": {
           "type": "string",
-          "example": "strict-origin-when-cross-origin"
+          "enum": ["strict-origin-when-cross-origin"]
         }
       }
     },
     "schemas": {
-      "TickerRowRecord": {
+      "Fantasy402SportCatalog": {
         "type": "object",
+        "description": "Fantasy402 desk navigation catalog (sub-sport lanes plus per-sport period menus). Reference metadata only, not an ingestion audit record. Surface: surface.fantasy402-sport-catalog (tier D). Parsed from fantasy402_sport_catalog.ts:41-54.",
         "properties": {
-          "WagerNumber": {
-            "type": "string",
-            "example": "894112"
+          "provider": {
+            "type": "string"
           },
-          "Login": {
-            "type": "string",
-            "description": "CustomerIdentifier",
-            "example": "CB112_1"
+          "capturedAt": {
+            "type": "string"
           },
-          "Agent": {
-            "type": "string",
-            "description": "Direct AgentIdentifier",
-            "example": "CUB22HR"
+          "sportCount": {
+            "type": "number"
           },
-          "TicketWriter": {
-            "type": "string",
-            "enum": [
-              "Internet",
-              "ALERT",
-              "GSLIVE",
-              "GSBUILDER",
-              "CSLEVEL2"
-            ],
-            "description": "Signal channel source string",
-            "example": "ALERT"
+          "subSportCount": {
+            "type": "number"
           },
-          "ShortDesc": {
-            "type": "string",
-            "description": "Wager description string. ShortDesc[0] maps primary wager type (S, P, L, C, T, G, M, E)",
-            "example": "S - 451 KANSAS CITY CHIEFS -3½ (-110)"
+          "sports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SportEntry"
+            }
           },
-          "Risk": {
-            "type": "string",
-            "example": "1100.00"
+          "collisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CollisionEntry"
+            },
+            "description": "SSOT for scoped ingestion link_id keys (must match observed cross-sport codes)."
           },
-          "Win": {
-            "type": "string",
-            "example": "1000.00"
+          "expectedEmptySubSportPaths": {
+            "$ref": "#/components/schemas/ExpectedEmptySubSportPaths",
+            "description": "Domain-correct structural empties (sport/code paths), not quality defects."
           },
-          "data-risk": {
-            "type": "string",
-            "description": "Raw unformatted risk amount in dollars",
-            "example": "1100.00"
+          "migrationRisks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogMigrationRisk"
+            }
           },
-          "data-win": {
-            "type": "string",
-            "description": "Raw unformatted to-win amount in dollars",
-            "example": "1000.00"
+          "periodsCapturedAt": {
+            "type": "string"
           },
-          "Sport": {
-            "type": "string",
-            "example": "Football"
-          },
-          "Placed": {
-            "type": "string",
-            "example": "2026-10-30 13:19:28"
-          },
-          "PlacedTimestamp": {
-            "type": "integer",
-            "description": "Unix millisecond timestamp",
-            "example": 1793042368000
+          "sportPeriodCount": {
+            "type": "number"
           }
+        },
+        "required": [
+          "provider",
+          "capturedAt",
+          "sportCount",
+          "subSportCount",
+          "sports",
+          "collisions",
+          "expectedEmptySubSportPaths"
+        ],
+        "x-fixture": {
+          "path": "tests/fixtures/fantasy402-sport-catalog-2026-10-21.json",
+          "provider": "fantasy402",
+          "capturedAt": "2026-10-21T16:38:53.513Z",
+          "periodsCapturedAt": "2026-10-30T04:59:14.572Z",
+          "sportCount": 19,
+          "subSportCount": 230,
+          "sportPeriodCount": 42,
+          "collisionIds": ["Arena", "NCAA Extra"],
+          "caveat": "Committed SSOT sample, not a raw wire capture. capturedAt/periodsCapturedAt are fixture-declared."
         }
       },
-      "PendingLegRowRecord": {
+      "SubSport": {
         "type": "object",
+        "description": "Sub-sport lane inside one sport (code plus display name). Parsed from fantasy402_sport_catalog.ts:8-11.",
         "properties": {
-          "WagerNumber": {
-            "type": "string",
-            "example": "894115"
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["code", "name"]
+      },
+      "Period": {
+        "type": "object",
+        "description": "Period menu entry for one sport; period 0 is named Game. Parsed from fantasy402_sport_catalog.ts:13-16.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "number": {
+            "type": "number"
+          }
+        },
+        "required": ["name", "number"]
+      },
+      "SportEntry": {
+        "type": "object",
+        "description": "Per-sport lane: the sub-sport tree plus the period menu. Parsed from fantasy402_sport_catalog.ts:18-22.",
+        "properties": {
+          "sport": {
+            "type": "string"
+          },
+          "subSports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubSport"
+            }
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Period"
+            }
+          }
+        },
+        "required": ["sport", "subSports", "periods"]
+      },
+      "CollisionEntry": {
+        "type": "object",
+        "description": "Desk-link code shared across sports (Arena, NCAA Extra). makeDeskLinkId rewrites these to <Sport>|<code>; the collision silently breaks scoped ingestion if it is not represented. Parsed from fantasy402_sport_catalog.ts:24-27.",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "sports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["code", "sports"]
+      },
+      "ExpectedEmptySubSportPaths": {
+        "type": "object",
+        "description": "Domain-correct structural empties (sport/code paths) split into stable and volatile LIVE surfaces; not quality defects. Parsed from fantasy402_sport_catalog.ts:29-32.",
+        "properties": {
+          "stable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "volatile": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["stable", "volatile"]
+      },
+      "CatalogMigrationRisk": {
+        "type": "object",
+        "description": "Migration hazard note attached to catalogue entries that need coordinated link_id migration. Parsed from fantasy402_sport_catalog.ts:34-39.",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "affects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": ["kind", "note"]
+      },
+      "RawBetTickerTick": {
+        "type": "object",
+        "description": "Consumer wire type for one bet-ticker row. Field names and number types only; this is a type declaration, not a captured response, so the getBetTicker operation (tier C) publishes no response schema. Parsed from simulate_bettor_churn_suite.ts:106-115.",
+        "properties": {
+          "wagerNumber": {
+            "type": "number"
           },
           "Login": {
-            "type": "string",
-            "description": "CustomerIdentifier",
-            "example": "CB112_1"
+            "type": "string"
           },
           "TicketWriter": {
             "type": "string",
-            "example": "Internet"
-          },
-          "ShortDesc": {
-            "type": "string",
-            "example": "S - 451 CHIEFS -3½"
+            "description": "Wire value or free string. Known values: Internet | ALERT | GSLIVE | GSBUILDER | CSLEVEL2 | BLOCKED"
           },
           "Risk": {
             "type": "number",
-            "description": "Parent ticket risk repeated on every leg row",
-            "example": 1100
+            "description": "In cents"
           },
           "ToWin": {
             "type": "number",
-            "example": 1000
+            "description": "In cents"
+          },
+          "Description": {
+            "type": "string"
+          },
+          "InsertDateTime": {
+            "type": "string",
+            "description": "UTC-5"
+          },
+          "ShortDesc": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "wagerNumber",
+          "Login",
+          "TicketWriter",
+          "Risk",
+          "ToWin",
+          "Description",
+          "InsertDateTime",
+          "ShortDesc"
+        ]
+      },
+      "RawPendingLeg": {
+        "type": "object",
+        "description": "Consumer wire type for one pending wager leg. Risk and ToWin are cents and repeat identically across parlay legs. This is a type declaration, not a captured response; no pending-leg fixture or capture exists, so the getPending operation (tier C) publishes no response schema. Parsed from simulate_bettor_churn_suite.ts:91-104.",
+        "properties": {
+          "Login": {
+            "type": "string"
+          },
+          "WagerNumber": {
+            "type": "number"
+          },
+          "LegNumber": {
+            "type": "number"
+          },
+          "Risk": {
+            "type": "number",
+            "description": "In cents (repeats identically across parlay legs)"
+          },
+          "ToWin": {
+            "type": "number",
+            "description": "In cents (repeats identically across parlay legs)"
+          },
+          "WagerType": {
+            "type": "string",
+            "enum": ["A", "M", "C", "S", "T", "L", "E", "I", "P", "F", "G"],
+            "description": "'G' = live"
+          },
+          "ShortDesc": {
+            "type": "string",
+            "description": "Sanitized first char gives true bet type"
+          },
+          "TicketWriter": {
+            "type": "string",
+            "description": "Wire value or free string. Known values: Internet | ALERT | GSLIVE | GSBUILDER | CSLEVEL2 | BLOCKED"
+          },
+          "InsertDateTime": {
+            "type": "string",
+            "description": "UTC-5 accepted timestamp"
           },
           "VIP": {
-            "type": "string",
-            "description": "Space-padded login for VIP verified; '0         ' for retail non-VIP",
-            "example": "0         "
+            "type": "string"
+          },
+          "Team": {
+            "type": "string"
+          },
+          "Line": {
+            "type": "string"
           }
-        }
-      },
-      "SysexitCode": {
-        "type": "integer",
-        "description": "Standard BSD/Linux sysexits.h fail-closed process exit codes",
-        "enum": [
-          0,
-          64,
-          72,
-          75,
-          77
-        ],
-        "x-enum-varnames": [
-          "EX_OK",
-          "EX_USAGE",
-          "EX_DATAERR",
-          "EX_TEMPFAIL",
-          "EX_NOPERM"
-        ],
-        "example": 0
-      },
-      "MutationClassification": {
-        "type": "string",
-        "description": "Specification-grade mutation classification outcome",
-        "enum": [
-          "COMMITTED",
-          "UNVERIFIED_COMMIT",
-          "SILENT_NO_OP",
-          "REJECTED",
-          "MODEL_ERROR",
-          "QUBIC_UI_ONLY_404",
-          "POISONED_PATH_500",
-          "GATEWAY_FAULT_500",
-          "UPSTREAM_UNAVAILABLE",
-          "SHAPE_DRIFT"
-        ],
-        "example": "COMMITTED"
-      },
-      "WirePayloadErrorClassification": {
-        "type": "string",
-        "description": "Transport and payload wire error classification",
-        "enum": [
-          "AUTHENTICATION_SESSION_EXPIRED",
-          "WIRE_PAYLOAD_TRUNCATED",
-          "WIRE_PAYLOAD_SHAPE_DRIFT",
-          "CSRF_PAIRING_MISMATCH",
-          "TRANSPORT_TIMEOUT",
-          "CALLER_ABORTED",
-          "POISONED_PATH_DETECTED",
-          "INVALID_IDENTIFIER_LENGTH"
-        ],
-        "example": "AUTHENTICATION_SESSION_EXPIRED"
-      },
-      "StandardWireError": {
-        "type": "object",
+        },
         "required": [
-          "error",
-          "code",
-          "sysexitCode",
-          "retryable"
-        ],
-        "properties": {
-          "error": {
-            "type": "string",
-            "example": "Session expired or invalid bearer token"
-          },
-          "code": {
-            "$ref": "#/components/schemas/WirePayloadErrorClassification"
-          },
-          "sysexitCode": {
-            "$ref": "#/components/schemas/SysexitCode"
-          },
-          "retryable": {
-            "type": "boolean",
-            "example": true
-          },
-          "retryAfterMs": {
-            "type": "integer",
-            "example": 250
-          }
-        }
+          "Login",
+          "WagerNumber",
+          "LegNumber",
+          "Risk",
+          "ToWin",
+          "WagerType",
+          "ShortDesc",
+          "TicketWriter",
+          "InsertDateTime"
+        ]
       },
-      "NeuronLayerToken": {
+      "WeblogEntry": {
         "type": "object",
-        "required": [
-          "neuronId",
-          "label",
-          "layer",
-          "hexColor",
-          "channelCode",
-          "operationalRole"
-        ],
-        "properties": {
-          "neuronId": {
-            "type": "string",
-            "example": "L18.N0204"
-          },
-          "label": {
-            "type": "string",
-            "example": "Retail Pregame Baseline Gate"
-          },
-          "layer": {
-            "type": "integer",
-            "example": 18
-          },
-          "hexColor": {
-            "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$",
-            "example": "#1d84b5"
-          },
-          "channelCode": {
-            "type": "string",
-            "example": "Internet"
-          },
-          "operationalRole": {
-            "type": "string",
-            "example": "Retail pregame baseline flow monitoring and twin matching target."
-          }
-        }
-      },
-      "ManagerDomLocalizationKey": {
-        "type": "object",
-        "required": [
-          "key",
-          "label",
-          "domSelector",
-          "wireMapping",
-          "operationalRole"
-        ],
-        "properties": {
-          "key": {
-            "type": "string",
-            "example": "L-1029"
-          },
-          "label": {
-            "type": "string",
-            "example": "Source"
-          },
-          "domSelector": {
-            "type": "string",
-            "example": "th[data-language=\"L-1029\"]"
-          },
-          "wireMapping": {
-            "type": "string",
-            "example": "TicketWriter"
-          },
-          "operationalRole": {
-            "type": "string",
-            "example": "Ingestion channel discriminator (Internet, ALERT, GSLIVE, GSBUILDER, CSLEVEL2)."
-          }
-        }
-      },
-      "BitemporalIngestionRecord": {
-        "type": "object",
-        "required": [
-          "id",
-          "v_t",
-          "valid_to",
-          "tx_from",
-          "tx_to",
-          "price",
-          "channel_id",
-          "pattern"
-        ],
-        "properties": {
-          "id": {
-            "type": "integer",
-            "example": 451
-          },
-          "v_t": {
-            "type": "integer",
-            "description": "Valid-time start (milliseconds)",
-            "example": 1793042000000
-          },
-          "valid_to": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Valid-time end; null if open",
-            "example": null
-          },
-          "tx_from": {
-            "type": "integer",
-            "description": "Transaction-time commit timestamp",
-            "example": 1793042000150
-          },
-          "tx_to": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Transaction-time superseded timestamp; null if active",
-            "example": null
-          },
-          "price": {
-            "type": "integer",
-            "description": "Parsed board price from XML AST",
-            "example": -115
-          },
-          "channel_id": {
-            "type": "string",
-            "enum": [
-              "Internet",
-              "ALERT",
-              "GSLIVE",
-              "GSBUILDER",
-              "CSLEVEL2",
-              "BLOCKED",
-              "GATEWAY"
-            ],
-            "example": "Internet"
-          },
-          "pattern": {
-            "type": "string",
-            "enum": [
-              "NORMAL",
-              "UP",
-              "DOWN",
-              "SPIKE_UP",
-              "SPIKE_DOWN"
-            ],
-            "example": "NORMAL"
-          },
-          "xml_golden_ast_sha256": {
-            "type": "string",
-            "example": "3b918478f334ed6540f79a026a27f15850094e84070b140b1329a855f728a745"
-          }
-        }
-      },
-      "EmpiricalBayesSharpProfile": {
-        "type": "object",
-        "required": [
-          "customerID",
-          "archetype",
-          "rawCLVBasisPoints",
-          "shrunkSharpScore",
-          "ticketCount",
-          "isGated"
-        ],
+        "description": "Consumer type that declares the four fields the old spec published as the getWebLog response row (customerID, ipAddress, timestamp, agentOwner). It is NOT used as a response schema here: the getWebLog response body was never captured (operational_guardrails_runbook.md:153), so the row schema remains undocumented. Parsed from simulate_bettor_churn_suite.ts:117-123.",
         "properties": {
           "customerID": {
-            "type": "string",
-            "example": "BGD101"
+            "type": "string"
           },
-          "archetype": {
-            "type": "string",
-            "enum": [
-              "EXECUTION_SNIPER",
-              "STEAM_CHASER",
-              "PARLAY_EXTRACTOR",
-              "WHALE_VOLATILITY",
-              "RECREATIONAL_CASUAL"
-            ],
-            "example": "EXECUTION_SNIPER"
+          "ipAddress": {
+            "type": "string"
           },
-          "rawCLVBasisPoints": {
-            "type": "integer",
-            "example": 240
+          "timestamp": {
+            "type": "string"
           },
-          "shrunkSharpScore": {
-            "type": "number",
-            "example": 86.2
-          },
-          "ticketCount": {
-            "type": "integer",
-            "example": 14
-          },
-          "isGated": {
-            "type": "boolean",
-            "description": "True if N >= 8 sample floor is met",
-            "example": true
-          },
-          "recommendedDelaySeconds": {
-            "type": "integer",
-            "example": 15
+          "agentOwner": {
+            "type": "string"
           }
-        }
-      },
-      "MultiFactorCorroborationScore": {
-        "type": "object",
-        "required": [
-          "clusterId",
-          "mfcsScore",
-          "classification",
-          "isBreached"
-        ],
-        "properties": {
-          "clusterId": {
-            "type": "string",
-            "example": "CLUST-198.51.100.0/24"
-          },
-          "mfcsScore": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 100,
-            "example": 86.4
-          },
-          "breakdown": {
-            "type": "object",
-            "properties": {
-              "subnetScore": {
-                "type": "number",
-                "example": 30
-              },
-              "timeScore": {
-                "type": "number",
-                "example": 30
-              },
-              "stakeScore": {
-                "type": "number",
-                "example": 20
-              },
-              "deviceScore": {
-                "type": "number",
-                "example": 25
-              },
-              "marketScore": {
-                "type": "number",
-                "example": 30
-              }
-            }
-          },
-          "classification": {
-            "type": "string",
-            "enum": [
-              "CLEARED_RECREATIONAL",
-              "ELEVATED_RISK",
-              "BOT_SNIPER_FLAGGED",
-              "GHOST_INJECTION_CLAMPED"
-            ],
-            "example": "BOT_SNIPER_FLAGGED"
-          },
-          "isBreached": {
-            "type": "boolean",
-            "description": "True if MFCS >= 80",
-            "example": true
-          }
-        }
-      },
-      "BranchGradeEscrowPolicy": {
-        "type": "object",
-        "required": [
-          "agentID",
-          "branchGrade",
-          "netHoldPercentage",
-          "toxicityScore",
-          "escrowHoldbackRate"
-        ],
-        "properties": {
-          "agentID": {
-            "type": "string",
-            "example": "ATEAM"
-          },
-          "branchGrade": {
-            "type": "string",
-            "enum": [
-              "AAA",
-              "AA",
-              "A",
-              "BBB",
-              "BB",
-              "B",
-              "CCC",
-              "D_TOXIC"
-            ],
-            "example": "CCC"
-          },
-          "netHoldPercentage": {
-            "type": "number",
-            "example": -14.2
-          },
-          "toxicityScore": {
-            "type": "number",
-            "example": 76
-          },
-          "sharpsCount": {
-            "type": "integer",
-            "example": 5
-          },
-          "escrowHoldbackRate": {
-            "type": "number",
-            "example": 0.5
-          },
-          "actionPlaybook": {
-            "type": "string",
-            "example": "Escrow freeze; mandate +15c juice model (-115/-115)."
-          }
-        }
+        },
+        "required": ["customerID", "ipAddress", "timestamp", "agentOwner"]
       }
     }
   }
