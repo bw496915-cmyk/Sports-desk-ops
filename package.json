@@ -70,7 +70,10 @@
     "scheduler": "bun run reporting_scheduler_service.ts",
     "onepass": "bun run agent_onepass_plugin.ts",
     "serve": "bun run sportsdesk_webview_server.ts",
-    "deploy": "./deploy_to_vps.sh"
+    "deploy": "./deploy_to_vps.sh",
+    "docs:stage": "mkdir -p dist && cp docs/index.html dist/index.html && cp docs/openapi.json dist/openapi.json",
+    "docs:deploy": "bun run docs:stage && ./wrangler pages deploy dist --project-name=fantasy402-docs --branch=main",
+    "test:docs": "bun test tests/api_reference.test.ts"
   },
   "keywords": [
     "sportsdesk",
