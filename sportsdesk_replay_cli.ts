@@ -166,7 +166,9 @@ async function main(): Promise<number> {
         if (!json) {
           console.log(`Wrote raw ingestion feed: ${path}`);
         } else {
-          console.log(JSON.stringify({ path, provenance: pulled.provenance }, null, 2));
+          console.log(
+            JSON.stringify({ path, provenance: pulled.provenance }, null, 2),
+          );
         }
         if (requireCleanFeed || failOnDivergence) {
           return feedExit;

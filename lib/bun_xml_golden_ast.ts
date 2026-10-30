@@ -10,8 +10,7 @@ export const BUN_XML_GOLDEN_AST_PARSE_OPTIONS = {
 export type BunXmlGoldenAstNode = Bun.XML.Node;
 export type BunXmlGoldenAstDocument = Bun.XML.Document;
 export type BunXmlGoldenAstParseResult =
-  | BunXmlGoldenAstNode
-  | BunXmlGoldenAstDocument;
+  BunXmlGoldenAstNode | BunXmlGoldenAstDocument;
 
 export type BunXmlGoldenAstExampleId =
   | "plane1-link-id-feed"

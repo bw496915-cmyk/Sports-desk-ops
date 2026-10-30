@@ -31,9 +31,7 @@ export type CandidatePending = {
   raw: CandidateTicketRaw;
 };
 
-export type CandidateRejectReason =
-  | "TIME_DIFF_EXCEEDED"
-  | "MATCH_KEY_MISMATCH";
+export type CandidateRejectReason = "TIME_DIFF_EXCEEDED" | "MATCH_KEY_MISMATCH";
 
 export type EnrichedCandidateRow = {
   matchKey: string;

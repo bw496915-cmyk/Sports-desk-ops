@@ -164,7 +164,8 @@ async function cmdPin(args: string[], opts: GlobalOpts): Promise<number> {
     return 2;
   }
 
-  if (opts.json) console.log(JSON.stringify({ ok: true, checked: goldenNames }));
+  if (opts.json)
+    console.log(JSON.stringify({ ok: true, checked: goldenNames }));
   else console.log(`pin ok (${goldenNames.length} golden evaluations)`);
   return 0;
 }
@@ -322,8 +323,7 @@ async function cmdReplay(args: string[], opts: GlobalOpts): Promise<number> {
     console.warn(line);
   }
 
-  const hasFlips =
-    delta.newlyAccepted > 0 || delta.newlyRejected > 0;
+  const hasFlips = delta.newlyAccepted > 0 || delta.newlyRejected > 0;
   let exitCode = 0;
   if (hasFlips) exitCode = 2;
   else if (gatePolicyLatency && delta.latency.driftAny) exitCode = 3;
@@ -384,4 +384,9 @@ if (import.meta.main) {
   process.exit(code);
 }
 
-export { evaluateCandidateOverlay, hashPolicy, DEFAULT_MATCH_POLICY, serializeMatchEvaluationResult };
+export {
+  evaluateCandidateOverlay,
+  hashPolicy,
+  DEFAULT_MATCH_POLICY,
+  serializeMatchEvaluationResult,
+};

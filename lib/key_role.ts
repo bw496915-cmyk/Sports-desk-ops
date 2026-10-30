@@ -8,7 +8,9 @@ export type ParseKeyRole<R extends KeyRole> = R extends "PK"
       ? { readonly type: "unique"; readonly name: N; readonly partial: boolean }
       : never;
 
-export const parseKeyRole = <const R extends KeyRole>(r: R): ParseKeyRole<R> => {
+export const parseKeyRole = <const R extends KeyRole>(
+  r: R,
+): ParseKeyRole<R> => {
   if (r === "PK") {
     return { type: "primary" } as ParseKeyRole<R>;
   }
@@ -25,10 +27,11 @@ export const parseKeyRole = <const R extends KeyRole>(r: R): ParseKeyRole<R> => 
   } as ParseKeyRole<R>;
 };
 
-export type KeyRoleTuple<S extends string> = S extends `${infer H extends KeyRole},${infer R}`
-  ? [H, ...KeyRoleTuple<R>]
-  : S extends KeyRole
-    ? [S]
-    : S extends "—" | ""
-      ? []
-      : [];
+export type KeyRoleTuple<S extends string> =
+  S extends `${infer H extends KeyRole},${infer R}`
+    ? [H, ...KeyRoleTuple<R>]
+    : S extends KeyRole
+      ? [S]
+      : S extends "—" | ""
+        ? []
+        : [];

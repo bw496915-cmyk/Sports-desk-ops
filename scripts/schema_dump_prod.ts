@@ -25,7 +25,9 @@ const defaultOut = resolve(
   "../tests/fixtures/prod-schema.json",
 );
 
-async function readExistingDump(outPath: string): Promise<ProdSchemaDump | null> {
+async function readExistingDump(
+  outPath: string,
+): Promise<ProdSchemaDump | null> {
   if (!(await Bun.file(outPath).exists())) return null;
   try {
     return await loadProdSchemaDump(outPath);
@@ -37,7 +39,9 @@ async function readExistingDump(outPath: string): Promise<ProdSchemaDump | null>
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
   const fromRegistry = args.includes("--from-registry");
-  const outArg = args.find((a) => a.startsWith("--out="))?.slice("--out=".length);
+  const outArg = args
+    .find((a) => a.startsWith("--out="))
+    ?.slice("--out=".length);
   const outPath = outArg?.trim() ? resolve(outArg) : defaultOut;
 
   const dbPath =
@@ -75,7 +79,9 @@ async function main(): Promise<number> {
   }
 
   await Bun.write(outPath, `${JSON.stringify(dump, null, 2)}\n`);
-  console.error(`prod schema dump: ${outPath} (${Object.keys(dump.tables).length} tables)`);
+  console.error(
+    `prod schema dump: ${outPath} (${Object.keys(dump.tables).length} tables)`,
+  );
   return 0;
 }
 

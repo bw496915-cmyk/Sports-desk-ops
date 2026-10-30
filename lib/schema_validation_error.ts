@@ -12,8 +12,7 @@ export class SchemaValidationError extends Error {
 
   /** First key → missing column issue (for editor jump). */
   firstKeyUnknownColumn():
-    | { table: string; column: string; keyName: string }
-    | undefined {
+    { table: string; column: string; keyName: string } | undefined {
     for (const issue of this.issues) {
       if (
         issue.code === "key_unknown_column" &&

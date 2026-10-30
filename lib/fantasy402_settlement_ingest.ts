@@ -4,7 +4,11 @@
 
 import type { Database } from "bun:sqlite";
 import { openSportsdeskSqlite, sqlInt } from "./sportsdesk_sqlite.ts";
-import { auditRunAt, type AuditRunId, type IsoDateTimeUtc } from "./audit_run_id.ts";
+import {
+  auditRunAt,
+  type AuditRunId,
+  type IsoDateTimeUtc,
+} from "./audit_run_id.ts";
 import { canonicalJsonString } from "./match_evaluation_canonical.ts";
 import { sha256HexOfBytes } from "../sportsdesk_ingestion_feed_provenance.ts";
 /** Same semantics as candidate verify/replay store invariant exit (5). */
@@ -52,17 +56,12 @@ export type NormalizedSettlementObservation = {
   payloadSha256: string;
 };
 
-export function fantasy402TicketId(
-  login: string,
-  wagerNumber: number,
-): string {
+export function fantasy402TicketId(login: string, wagerNumber: number): string {
   return `${login.trim().toUpperCase()}|${wagerNumber}`;
 }
 
 function hashRawPayload(raw: Record<string, unknown>): string {
-  return sha256HexOfBytes(
-    new TextEncoder().encode(canonicalJsonString(raw)),
-  );
+  return sha256HexOfBytes(new TextEncoder().encode(canonicalJsonString(raw)));
 }
 
 function parseIsoTime(label: string, value: unknown): string | null {
@@ -304,22 +303,18 @@ export class WagerSettlementStore {
   } {
     const settled = this.countByStatus("S");
     const canceled = this.countByStatus("C");
-    const wins = (
-      this.db
-        .query(
-          `SELECT COUNT(*) AS n FROM wager_settlement_observations
+    const wins = this.db
+      .query(
+        `SELECT COUNT(*) AS n FROM wager_settlement_observations
            WHERE result = 'WIN' OR (wager_status = 'S' AND amount_cents > 0)`,
-        )
-        .get() as { n: number | bigint }
-    );
-    const losses = (
-      this.db
-        .query(
-          `SELECT COUNT(*) AS n FROM wager_settlement_observations
+      )
+      .get() as { n: number | bigint };
+    const losses = this.db
+      .query(
+        `SELECT COUNT(*) AS n FROM wager_settlement_observations
            WHERE result = 'LOSS' OR (wager_status = 'S' AND amount_cents < 0)`,
-        )
-        .get() as { n: number | bigint }
-    );
+      )
+      .get() as { n: number | bigint };
     return {
       settled,
       canceled,
@@ -379,7 +374,11 @@ export async function pollManagerGetHistory(options?: {
   if (Array.isArray(body)) {
     return { polledAt, rows: body as Record<string, unknown>[] };
   }
-  if (body && typeof body === "object" && Array.isArray((body as { data?: unknown }).data)) {
+  if (
+    body &&
+    typeof body === "object" &&
+    Array.isArray((body as { data?: unknown }).data)
+  ) {
     return {
       polledAt,
       rows: (body as { data: Record<string, unknown>[] }).data,

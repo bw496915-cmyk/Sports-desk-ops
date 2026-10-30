@@ -26,11 +26,15 @@ async function main(): Promise<number> {
       continue;
     }
     outLines.push(
-      JSON.stringify(enrichIngestionJsonlRowWithXmlGoldenAst(row as { xml: string })),
+      JSON.stringify(
+        enrichIngestionJsonlRowWithXmlGoldenAst(row as { xml: string }),
+      ),
     );
   }
   await Bun.write(output, `${outLines.join("\n")}\n`);
-  console.log(`enrich_ingestion_jsonl_xml_golden: ${outLines.length} lines → ${output}`);
+  console.log(
+    `enrich_ingestion_jsonl_xml_golden: ${outLines.length} lines → ${output}`,
+  );
   return 0;
 }
 

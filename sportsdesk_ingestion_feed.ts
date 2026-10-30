@@ -11,8 +11,7 @@ import {
 import { getR2Config } from "./sportsdesk_r2_sync.ts";
 
 const INGESTION_AUDIT_OBJECT_KEY =
-  process.env.SPORTSDESK_INGESTION_R2_KEY?.trim() ||
-  "ingestion-audit.jsonl";
+  process.env.SPORTSDESK_INGESTION_R2_KEY?.trim() || "ingestion-audit.jsonl";
 
 export type IngestionFeedSource = {
   url: string;
@@ -41,7 +40,10 @@ export function resolveIngestionFeedSource(options?: {
       (c) => c.channelCode === options.channelCode,
     );
     if (ch) {
-      const portalEnv = process.env.SPORTSDESK_PORTAL_HTTP_BASE?.replace(/\/$/, "");
+      const portalEnv = process.env.SPORTSDESK_PORTAL_HTTP_BASE?.replace(
+        /\/$/,
+        "",
+      );
       if (portalEnv && ch.transportUri.startsWith("portal://")) {
         const path = ch.transportUri.replace(/^portal:\/\//, "");
         return {

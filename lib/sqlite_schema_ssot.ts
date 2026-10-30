@@ -171,7 +171,9 @@ type SsotInvariant<T extends SsotTableName> = TableInvariants<
   SsotPkPolicy<T>
 >;
 
-type InvariantFailed<T extends SsotTableName> = [SsotInvariant<T>] extends [never]
+type InvariantFailed<T extends SsotTableName> = [SsotInvariant<T>] extends [
+  never,
+]
   ? never
   : SsotInvariant<T> extends { readonly __error: infer E extends string }
     ? { readonly table: T; readonly error: E }

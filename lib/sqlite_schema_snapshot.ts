@@ -62,7 +62,10 @@ export function schemaReportJsonDocument(
     manifestUrl: manifestUrl.href,
     generatedAt: report.generatedAt,
   };
-  if (extras?.validationIssues !== undefined && extras.validationIssues.length > 0) {
+  if (
+    extras?.validationIssues !== undefined &&
+    extras.validationIssues.length > 0
+  ) {
     doc.validationIssues = extras.validationIssues;
   }
   if (extras?.db !== undefined) {

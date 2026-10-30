@@ -26,7 +26,9 @@ function parseMemberArg(raw: string): EodArchiveMemberSpec {
 
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
-  const outArg = args.find((a) => a.startsWith("--out="))?.slice("--out=".length);
+  const outArg = args
+    .find((a) => a.startsWith("--out="))
+    ?.slice("--out=".length);
   const outPath = outArg?.trim();
   if (!outPath) {
     console.error("eod:archive: --out=path.tar.gz required");

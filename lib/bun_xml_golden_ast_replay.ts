@@ -125,12 +125,7 @@ export function accumulateIngestionJsonlXmlGoldenAst(
     return;
   }
   if (verdict !== null) {
-    applyIngestionXmlGoldenVerdict(
-      verdict,
-      stats,
-      Boolean(xml),
-      Boolean(pin),
-    );
+    applyIngestionXmlGoldenVerdict(verdict, stats, Boolean(xml), Boolean(pin));
   }
 }
 
@@ -151,7 +146,10 @@ export function exitCodeFromIngestionXmlGoldenAstStats(
 /** Plane 1 writer helper — attach pins before append. */
 export function enrichIngestionJsonlRowWithXmlGoldenAst<
   T extends { xml: string },
->(row: T, bunVersion = Bun.version): T & {
+>(
+  row: T,
+  bunVersion = Bun.version,
+): T & {
   xml_golden_ast_sha256: string;
   bun_version: string;
 } {

@@ -264,8 +264,7 @@ async function main(): Promise<number> {
     ? sqliteDatabaseFileUrl(resolve(manifestPathEarly))
     : defaultManifestUrl;
 
-  const shouldWriteManifest =
-    Boolean(values["write-manifest"]) || values.json;
+  const shouldWriteManifest = Boolean(values["write-manifest"]) || values.json;
 
   if (shouldWriteManifest) {
     await emitSnapshot(report, manifestOutUrl);

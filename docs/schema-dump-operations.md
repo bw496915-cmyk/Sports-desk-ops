@@ -8,10 +8,10 @@ Versioned JSON (`format_version` **1**): `PRAGMA table_xinfo` column shape per u
 
 ## `schema:dump-prod` vs `schema:sync-prod-dump`
 
-| Command | Input | Updates `tables` from | `allowlist` | `captured_at` |
-|---------|--------|------------------------|-------------|---------------|
-| `schema:dump-prod` | Prod SQLite path or `SPORTSDESK_SCHEMA_DB` | Live file (`captureProdSchemaFromDb`, `source` e.g. `prod-readonly`) | Preserved from existing outfile if present | **Refreshed** to capture time |
-| `schema:sync-prod-dump` (`--from-registry`) | TypeScript registry only (`buildRegistryBaselineProdDump`) | Registry report | Preserved from existing outfile | **Preserved** from existing outfile |
+| Command                                     | Input                                                      | Updates `tables` from                                                | `allowlist`                                | `captured_at`                       |
+| ------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------- |
+| `schema:dump-prod`                          | Prod SQLite path or `SPORTSDESK_SCHEMA_DB`                 | Live file (`captureProdSchemaFromDb`, `source` e.g. `prod-readonly`) | Preserved from existing outfile if present | **Refreshed** to capture time       |
+| `schema:sync-prod-dump` (`--from-registry`) | TypeScript registry only (`buildRegistryBaselineProdDump`) | Registry report                                                      | Preserved from existing outfile            | **Preserved** from existing outfile |
 
 Use **dump-prod** after reading prod to refresh the fixture. Use **sync-prod-dump** when registry changed but you are not re-reading prod (CI-safe baseline); it must not pretend to be a prod capture.
 
@@ -50,11 +50,11 @@ Set `SPORTSDESK_SCHEMA_PARITY_LIVE=1` **and** `SPORTSDESK_SCHEMA_DB` to a SQLite
 
 ## Honest scope summary
 
-| Claim | Holds when |
-|-------|------------|
-| Manifest matches committed prod dump | Default snapshot parity (fixture present, not skipped) |
-| Dump matches live prod | Only after explicit prod capture (`schema:dump-prod`) or a live parity run with current DB |
-| Registry matches prod | Registry is source of truth for manifest; dump is evidence—reconcile via dump-prod + commit |
+| Claim                                | Holds when                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Manifest matches committed prod dump | Default snapshot parity (fixture present, not skipped)                                      |
+| Dump matches live prod               | Only after explicit prod capture (`schema:dump-prod`) or a live parity run with current DB  |
+| Registry matches prod                | Registry is source of truth for manifest; dump is evidence—reconcile via dump-prod + commit |
 
 ## Contributor workflow (registry edits)
 

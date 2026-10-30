@@ -65,9 +65,7 @@ async function main(): Promise<number> {
     defaultSchemaReportProvenance({
       sourceUrl: schemaRegistrySourceUrl(),
       manifestUrl: outBin,
-      ...(dbEnv
-        ? { databaseUrl: sqliteDatabaseFileUrl(resolve(dbEnv)) }
-        : {}),
+      ...(dbEnv ? { databaseUrl: sqliteDatabaseFileUrl(resolve(dbEnv)) } : {}),
     }),
   );
   const issues = validateSchemaReport(report);
@@ -102,8 +100,7 @@ async function main(): Promise<number> {
     if (parityExit !== 0) return parityExit;
   }
 
-  const liveParity =
-    process.env.SPORTSDESK_SCHEMA_PARITY_LIVE === "1" && dbEnv;
+  const liveParity = process.env.SPORTSDESK_SCHEMA_PARITY_LIVE === "1" && dbEnv;
   if (liveParity) {
     const dbPath = resolve(dbEnv);
     if (await Bun.file(dbPath).exists()) {
@@ -113,7 +110,9 @@ async function main(): Promise<number> {
 
   if (process.env.SPORTSDESK_SCHEMA_SNAPSHOT_QUIET !== "1") {
     console.log(`schema snapshot: ${outJson}`);
-    console.log(`schema manifest: ${outBin} (${encodeManifest(report).byteLength} bytes)`);
+    console.log(
+      `schema manifest: ${outBin} (${encodeManifest(report).byteLength} bytes)`,
+    );
   }
   return 0;
 }

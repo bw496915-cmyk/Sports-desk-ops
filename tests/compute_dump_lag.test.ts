@@ -8,7 +8,11 @@ import { PROD_SCHEMA_DUMP_FORMAT_VERSION } from "../lib/schema_prod_dump.ts";
 describe("compute_dump_lag", () => {
   test("script exits 0 on fixture with git history", async () => {
     const proc = Bun.spawn(
-      ["bun", "run", resolve(import.meta.dir, "../scripts/compute_dump_lag.ts")],
+      [
+        "bun",
+        "run",
+        resolve(import.meta.dir, "../scripts/compute_dump_lag.ts"),
+      ],
       {
         cwd: resolve(import.meta.dir, ".."),
         stdout: "pipe",
@@ -17,7 +21,10 @@ describe("compute_dump_lag", () => {
     );
     expect(await proc.exited).toBe(0);
     const out = await new Response(proc.stdout).text();
-    const doc = JSON.parse(out) as { dump_lag_days: number; captured_at: string };
+    const doc = JSON.parse(out) as {
+      dump_lag_days: number;
+      captured_at: string;
+    };
     expect(doc.captured_at).toBeTruthy();
     expect(typeof doc.dump_lag_days).toBe("number");
   });
@@ -36,7 +43,12 @@ describe("compute_dump_lag", () => {
       }),
     );
     const proc = Bun.spawn(
-      ["bun", "run", resolve(import.meta.dir, "../scripts/compute_dump_lag.ts"), path],
+      [
+        "bun",
+        "run",
+        resolve(import.meta.dir, "../scripts/compute_dump_lag.ts"),
+        path,
+      ],
       {
         cwd: resolve(import.meta.dir, ".."),
         stdout: "pipe",

@@ -15,8 +15,9 @@ const defaultFixture = resolve(
 );
 
 async function main(): Promise<number> {
-  const fixturePath =
-    process.argv[2]?.trim() ? resolve(process.argv[2]!) : defaultFixture;
+  const fixturePath = process.argv[2]?.trim()
+    ? resolve(process.argv[2]!)
+    : defaultFixture;
 
   const existing = parseProdSchemaDump(
     JSON.parse(await Bun.file(fixturePath).text()),

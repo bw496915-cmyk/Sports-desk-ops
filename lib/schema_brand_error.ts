@@ -2,12 +2,7 @@ import { absurd } from "./exhaustive.ts";
 
 /** Typed brand-constructor failures (schema CLI jump-to-error). */
 export type SchemaBrandKind =
-  | "column"
-  | "table"
-  | "index"
-  | "domain"
-  | "sha256"
-  | "iso";
+  "column" | "table" | "index" | "domain" | "sha256" | "iso";
 
 export class SchemaBrandError extends TypeError {
   override readonly name = "SchemaBrandError";

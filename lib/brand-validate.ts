@@ -1,16 +1,17 @@
 /** Template-literal validators for brand factories (compile-time + runtime). */
 
-export type SnakeCase<S extends string> = S extends Lowercase<S>
-  ? S extends `${number}${string}`
-    ? never
-    : S extends `${string} ${string}`
+export type SnakeCase<S extends string> =
+  S extends Lowercase<S>
+    ? S extends `${number}${string}`
       ? never
-      : S extends `${string}-${string}`
+      : S extends `${string} ${string}`
         ? never
-        : S extends `${string}__${string}`
+        : S extends `${string}-${string}`
           ? never
-          : S
-  : never;
+          : S extends `${string}__${string}`
+            ? never
+            : S
+    : never;
 
 type HexChar =
   | "0"
@@ -32,19 +33,17 @@ type HexChar =
 
 type LowerHexChar = HexChar | Uppercase<HexChar>;
 
-type IsHexString<S extends string> = S extends Lowercase<S>
-  ? S extends `${LowerHexChar}${infer R}`
-    ? IsHexString<R>
-    : S extends ""
-      ? true
-      : false
-  : false;
+type IsHexString<S extends string> =
+  S extends Lowercase<S>
+    ? S extends `${LowerHexChar}${infer R}`
+      ? IsHexString<R>
+      : S extends ""
+        ? true
+        : false
+    : false;
 
-export type HexSha256<S extends string> = IsHexString<S> extends true
-  ? S["length"] extends 64
-    ? S
-    : never
-  : never;
+export type HexSha256<S extends string> =
+  IsHexString<S> extends true ? (S["length"] extends 64 ? S : never) : never;
 
 type Month =
   | "01"
@@ -94,8 +93,9 @@ type Day =
   | "31";
 
 /** UTC Zulu instant (subset aligned with `Date#toISOString()`). */
-export type Iso8601<S extends string> = S extends `${number}-${Month}-${Day}T${number}:${number}:${number}.${number}Z`
-  ? S
-  : S extends `${number}-${Month}-${Day}T${number}:${number}:${number}Z`
+export type Iso8601<S extends string> =
+  S extends `${number}-${Month}-${Day}T${number}:${number}:${number}.${number}Z`
     ? S
-    : never;
+    : S extends `${number}-${Month}-${Day}T${number}:${number}:${number}Z`
+      ? S
+      : never;

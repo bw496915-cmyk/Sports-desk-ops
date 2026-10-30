@@ -220,9 +220,11 @@ describe("candidate_match_evaluation", () => {
     expect(delta.newlyAccepted).toBe(1);
     expect(delta.newlyRejected).toBe(0);
     expect(delta.unchanged).toBe(1);
-    expect(evaluationStateFromResult(
-      evaluateCandidateOverlay(tickerFile2(pending), pending, v3),
-    )).toBe("candidate");
+    expect(
+      evaluationStateFromResult(
+        evaluateCandidateOverlay(tickerFile2(pending), pending, v3),
+      ),
+    ).toBe("candidate");
   });
 
   test("findSerializerDrift flags duplicate evaluation_json_sha256 for same triple", () => {

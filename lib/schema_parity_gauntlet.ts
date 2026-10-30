@@ -118,6 +118,8 @@ export function runSchemaParityGauntlet(): GauntletScenarioResult[] {
   return [scenarioStructuralExit2(), scenarioCombinedExit3()];
 }
 
-export function schemaParityGauntletOk(results: GauntletScenarioResult[]): boolean {
+export function schemaParityGauntletOk(
+  results: GauntletScenarioResult[],
+): boolean {
   return results.every((r) => r.ok);
 }

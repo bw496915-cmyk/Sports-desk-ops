@@ -98,10 +98,7 @@ export async function pullIngestionFeedWithProvenance(
 
   const path = resolve(outPath);
   const priorSha256Hex = await sha256HexOfFile(path);
-  const headMeta = await fetchIngestionFeedHttpMeta(
-    source,
-    options?.timeoutMs,
-  );
+  const headMeta = await fetchIngestionFeedHttpMeta(source, options?.timeoutMs);
 
   const { bytes, contentType, status } = await pullRawIngestionFeed(source, {
     ...(options?.timeoutMs !== undefined
@@ -128,8 +125,7 @@ export async function pullIngestionFeedWithProvenance(
     },
     jsonl,
     priorSha256Hex,
-    divergedFromPrior:
-      priorSha256Hex !== null && priorSha256Hex !== sha256Hex,
+    divergedFromPrior: priorSha256Hex !== null && priorSha256Hex !== sha256Hex,
     sidecarPath,
   };
 
@@ -140,10 +136,7 @@ export async function pullIngestionFeedWithProvenance(
 
 /** Pull integrity: incomplete JSONL or poison lines → non-zero (use before trusting replay). */
 export function ingestionFeedPullExitCode(
-  provenance: Pick<
-    IngestionFeedPullProvenance,
-    "jsonl" | "divergedFromPrior"
-  >,
+  provenance: Pick<IngestionFeedPullProvenance, "jsonl" | "divergedFromPrior">,
   options?: { failOnDivergence?: boolean },
 ): number {
   if (provenance.jsonl.corruptedLineSkips > 0) return 1;

@@ -50,9 +50,7 @@ export class ComboVenueStore {
   constructor(private readonly db: Database) {}
 
   insertObservation(row: ComboVenueObservationInsert): void {
-    const wireJson = row.wireJson
-      ? canonicalJsonString(row.wireJson)
-      : null;
+    const wireJson = row.wireJson ? canonicalJsonString(row.wireJson) : null;
     row.legs.forEach((leg, legIndex) => {
       this.db
         .query(
@@ -104,7 +102,5 @@ export type ComboFirstSeenRow = {
 };
 
 export function hashComboWire(raw: Record<string, unknown>): string {
-  return sha256HexOfBytes(
-    new TextEncoder().encode(canonicalJsonString(raw)),
-  );
+  return sha256HexOfBytes(new TextEncoder().encode(canonicalJsonString(raw)));
 }

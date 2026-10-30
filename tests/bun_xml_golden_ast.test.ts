@@ -9,7 +9,10 @@ import {
 } from "../lib/bun_xml_golden_ast.ts";
 
 const FIXTURE_DIR = join(import.meta.dir, "fixtures/bun-xml-golden-ast");
-const DOMAIN_JSONL = join(import.meta.dir, "fixtures/ingestion-replay-domain.jsonl");
+const DOMAIN_JSONL = join(
+  import.meta.dir,
+  "fixtures/ingestion-replay-domain.jsonl",
+);
 
 describe("bun_xml_golden_ast", () => {
   for (const example of BUN_XML_GOLDEN_AST_EXAMPLES) {

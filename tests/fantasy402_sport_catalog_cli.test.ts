@@ -12,7 +12,9 @@ const FIXTURE = join(
 
 const CLI = join(import.meta.dir, "../sportsdesk_catalog_cli.ts");
 
-async function runCatalog(args: string[]): Promise<{ exit: number; out: string; err: string }> {
+async function runCatalog(
+  args: string[],
+): Promise<{ exit: number; out: string; err: string }> {
   const proc = Bun.spawn(["bun", CLI, ...args], {
     stdout: "pipe",
     stderr: "pipe",
@@ -28,11 +30,7 @@ async function runCatalog(args: string[]): Promise<{ exit: number; out: string; 
 
 describe("fantasy402_sport_catalog_cli", () => {
   test("validate fixture exits 0", async () => {
-    const { exit, out } = await runCatalog([
-      "validate",
-      "--fixture",
-      FIXTURE,
-    ]);
+    const { exit, out } = await runCatalog(["validate", "--fixture", FIXTURE]);
     expect(exit).toBe(0);
     expect(out).toContain("validate: ok");
   });
@@ -143,7 +141,10 @@ describe("fantasy402_sport_catalog_cli", () => {
 
   test("refresh default does not rewrite collisions", async () => {
     const tmpIn = join(import.meta.dir, `.tmp-catalog-in2-${Date.now()}.json`);
-    const tmpOut = join(import.meta.dir, `.tmp-catalog-out2-${Date.now()}.json`);
+    const tmpOut = join(
+      import.meta.dir,
+      `.tmp-catalog-out2-${Date.now()}.json`,
+    );
     const src = await loadFantasy402SportCatalogFromFile(FIXTURE);
     src.collisions = [{ code: "Arena", sports: ["Football", "Horse Racing"] }];
     src.sportCount = 0;

@@ -418,9 +418,7 @@ export function emptyNameQualityRegression(
 export function uniquePeriodTemplateKeys(
   catalog: Fantasy402SportCatalog,
 ): string[] {
-  const keys = new Set(
-    catalog.sports.map((s) => periodTemplateKey(s.periods)),
-  );
+  const keys = new Set(catalog.sports.map((s) => periodTemplateKey(s.periods)));
   return [...keys].sort();
 }
 
@@ -756,7 +754,10 @@ export function parseFantasy402SportCatalog(raw: unknown): CatalogParseResult {
       continue;
     }
     if (typeof s.sport !== "string") {
-      structuralIssues.push({ path: `${base}.sport`, message: "required string" });
+      structuralIssues.push({
+        path: `${base}.sport`,
+        message: "required string",
+      });
     }
     const subSports: Fantasy402SubSport[] = [];
     if (!Array.isArray(s.subSports)) {
@@ -784,7 +785,10 @@ export function parseFantasy402SportCatalog(raw: unknown): CatalogParseResult {
     }
     const periods: Fantasy402Period[] = [];
     if (!Array.isArray(s.periods)) {
-      structuralIssues.push({ path: `${base}.periods`, message: "required array" });
+      structuralIssues.push({
+        path: `${base}.periods`,
+        message: "required array",
+      });
     } else {
       for (let i = 0; i < s.periods.length; i++) {
         const per = s.periods[i];
@@ -867,7 +871,8 @@ export function parseFantasy402SportCatalog(raw: unknown): CatalogParseResult {
   if (Array.isArray(raw.collisions)) {
     for (const item of raw.collisions) {
       if (!isRecord(item)) continue;
-      if (typeof item.code !== "string" || !Array.isArray(item.sports)) continue;
+      if (typeof item.code !== "string" || !Array.isArray(item.sports))
+        continue;
       collisions.push({
         code: item.code,
         sports: item.sports.filter((s): s is string => typeof s === "string"),

@@ -550,7 +550,9 @@ export class SportsDeskTelegramService {
       ...(res.result?.message_id !== undefined
         ? { message_id: res.result.message_id }
         : {}),
-      ...(res.description !== undefined ? { description: res.description } : {}),
+      ...(res.description !== undefined
+        ? { description: res.description }
+        : {}),
     };
   }
 
@@ -710,7 +712,9 @@ export class SportsDeskTelegramService {
     });
     return {
       ok: res.ok,
-      ...(res.description !== undefined ? { description: res.description } : {}),
+      ...(res.description !== undefined
+        ? { description: res.description }
+        : {}),
     };
   }
 
@@ -718,7 +722,9 @@ export class SportsDeskTelegramService {
     const res = await this.api<boolean>("deleteWebhook");
     return {
       ok: res.ok,
-      ...(res.description !== undefined ? { description: res.description } : {}),
+      ...(res.description !== undefined
+        ? { description: res.description }
+        : {}),
     };
   }
 

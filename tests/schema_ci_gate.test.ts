@@ -20,21 +20,20 @@ describe("schema CI gate", () => {
   });
 
   test("schema:snapshot exits 0 under CI=true (parity slice of schema:gate)", async () => {
-    const proc = Bun.spawn(
-      ["bun", "run", snapshotScript],
-      {
-        cwd: repoRoot,
-        env: {
-          ...process.env,
-          CI: "true",
-          SPORTSDESK_SCHEMA_SNAPSHOT_QUIET: "1",
-          SPORTSDESK_SCHEMA_SNAPSHOT_JSON: "/tmp/sportsdesk-schema-ci.snapshot.json",
-          SPORTSDESK_SCHEMA_SNAPSHOT_BIN: "/tmp/sportsdesk-schema-ci.manifest.bin",
-        },
-        stdout: "pipe",
-        stderr: "pipe",
+    const proc = Bun.spawn(["bun", "run", snapshotScript], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        CI: "true",
+        SPORTSDESK_SCHEMA_SNAPSHOT_QUIET: "1",
+        SPORTSDESK_SCHEMA_SNAPSHOT_JSON:
+          "/tmp/sportsdesk-schema-ci.snapshot.json",
+        SPORTSDESK_SCHEMA_SNAPSHOT_BIN:
+          "/tmp/sportsdesk-schema-ci.manifest.bin",
       },
-    );
+      stdout: "pipe",
+      stderr: "pipe",
+    });
     const code = await proc.exited;
     expect(code).toBe(0);
   });
