@@ -66,6 +66,9 @@ async function main(): Promise<number> {
     strictXmlGoldenPins: true,
     // Match pins enriched on this runner (CI pins Bun via setup-bun; do not hardcode manifest.bun_version).
     expectedBunVersion: Bun.version,
+    onXmlGoldenAstFailure: (message) => {
+      console.error(message);
+    },
   });
 
   const xmlRows = lines.filter((l) => {
