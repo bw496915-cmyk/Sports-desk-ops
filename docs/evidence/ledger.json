@@ -1,0 +1,1842 @@
+{
+  "schemaVersion": 1,
+  "generated": "2026-10-30",
+  "generatedBy": "evidence-keeper (task-4) for the docs/full-coverage-2026-10 release",
+  "schemaDoc": {
+    "file": "docs/evidence/ledger.json",
+    "purpose": "Single source of truth for what is verified, observed or merely inferred across the SportsDesk/Fantasy402 docs release. P2 (spec generator) and P3 (markdown generator) must consume this instead of re-asserting contracts.",
+    "shape": "{\"schemaVersion\":1,\"generated\":\"YYYY-MM-DD\",\"counts\":{\"A\":n,\"B\":n,\"C\":n,\"D\":n,\"E\":n,\"total\":n},\"operations\":[row...],\"surfaces\":[row...]}",
+    "operationFields": {
+      "path": "Exact path string from docs/openapi.json (47 paths, 48 operations).",
+      "method": "Lowercase HTTP method as in the spec.",
+      "operationId": "Spec operationId, or null where the spec omits it.",
+      "tag": "First spec tag.",
+      "tier": "A | B | C | E for operations. D is reserved for surfaces[] rows (real surfaces absent from the spec), so counts.D is 0 by construction.",
+      "capturedResponse": "true only when a real captured response body exists in the repo or GS extract. False for every row in this release.",
+      "evidence[]": "Array of {source, kind, note}. source conventions in sourcePrefixes; source 'none' means no artifact exists.",
+      "requiredCapture": "The exact capture (or implementation) that would upgrade the row.",
+      "contradicted": "true when a spec assertion is refuted by a concrete artifact; contradictedReason carries the quotes.",
+      "candidate_url": "true when the path+method is a candidate inferred from UI/DOM metadata rather than observed on the wire.",
+      "ui_observed": "true when a UI/DOM artifact exists for the operation."
+    },
+    "surfaceFields": {
+      "id": "Stable id; every id appears verbatim in docs/EVIDENCE.md.",
+      "name": "Human label.",
+      "tier": "D = real surface missing from the spec; E = documented operation with no implementation.",
+      "category": "catalog | upstream-route | local-route | blocked-contract | documented-not-implemented.",
+      "missingFromSpec": "true when docs/openapi.json has no row for this surface.",
+      "what / members / evidence / note": "Inventory, member routes, citations, caveats."
+    },
+    "counts": "Operation counts by tier. A+B+C+D+E = total = 48. Surface counts are in surfaceCounts and are not mixed into counts.",
+    "surfaceCounts": "Surface inventory counts by tier.",
+    "countsByTag": "Operation tier counts per spec tag (convenience for P2/P3)."
+  },
+  "sourcePrefixes": {
+    "(no prefix)": "Path relative to the worktree root /Users/nolarose/code/sportsdesk-ops/.worktrees/docs.",
+    "main:": "Read-only main tree /Users/nolarose/code/sportsdesk-ops (never edited by this task).",
+    "zip:": "GS manager-cli extract at <main>/scratch/docs-audit/gs-manager-cli.",
+    "fixture:": "Committed fixture under the worktree; a shape sample, not a wire capture."
+  },
+  "tierRules": {
+    "A": "Captured wire contract: a real request AND a real response capture exist. Nothing in this release qualifies (the only HAR captured requests and request headers, never response bodies).",
+    "B": "Observed first-party evidence. (i) captured wire request: getWebLog mode B and getInfoPlayer (2026-10-28 Manager HAR); (ii) observed request payload: GS getBetReport; or (iii) a route this repository serves, verified against its handler source (GET /health, GET /api/watchlist, POST /api/telegram/alert, POST /api/telegram/report). Response bodies may still be uncaptured.",
+    "C": "Inferred only. Authored in docs/openapi.json or its generator scripts, or a repo TypeScript wire type, or a UI/DOM observation whose URL+method is a candidate. No request or response was observed.",
+    "D": "A real surface missing from the spec. Recorded in surfaces[], never in operations[].",
+    "E": "Documented operation with no implementation in this repository (/api/desk/*).",
+    "crawlerCandidatesRule": "B-vs-C rule for the 11 'Tracked Operational Domains' candidates (gameAdmin, getMessages, adjustBalance, createPlayer, get3rdPartyLimits, getAnalysis, getScores, getAgentTree, getBilling, getRules, getFinancialReport): a launcher tile alone is not enough for B. B requires a URL+method observed on the wire (or a handler that serves it). Those 11 rows take their path+method from hand-authored candidateEndpoint/candidateMethod constants in main:scripts/portal_tile_crawler.ts:40-162, echoed by main:scripts/append_tracked_domains.mjs:22-228. The crawler CLI entry runs the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and its live branch only replaces extracted inputs/L-keys, never the URL/method; no audit JSON or screenshot proof exists in the main tree. They are therefore tier C with candidate_url=true and ui_observed=true, never B. getAnalysis and getFinancialReport also have independent UI action-name evidence (runbook:166-167), which improves the tile evidence but does not observe the URL."
+  },
+  "counts": {
+    "A": 0,
+    "B": 7,
+    "C": 31,
+    "D": 0,
+    "E": 10,
+    "total": 48
+  },
+  "surfaceCounts": {
+    "D": 7,
+    "E": 1,
+    "total": 8
+  },
+  "countsByTag": {
+    "Upstream Authentication": {
+      "A": 0,
+      "B": 0,
+      "C": 1,
+      "D": 0,
+      "E": 0,
+      "total": 1
+    },
+    "Trading Desk Feeds": {
+      "A": 0,
+      "B": 0,
+      "C": 3,
+      "D": 0,
+      "E": 0,
+      "total": 3
+    },
+    "Forensic Surveillance": {
+      "A": 0,
+      "B": 1,
+      "C": 1,
+      "D": 0,
+      "E": 0,
+      "total": 2
+    },
+    "Customer State Mutations": {
+      "A": 0,
+      "B": 1,
+      "C": 3,
+      "D": 0,
+      "E": 0,
+      "total": 4
+    },
+    "Downline Accounting": {
+      "A": 0,
+      "B": 0,
+      "C": 5,
+      "D": 0,
+      "E": 0,
+      "total": 5
+    },
+    "Local Desk & Telegram Gateway": {
+      "A": 0,
+      "B": 4,
+      "C": 0,
+      "D": 0,
+      "E": 0,
+      "total": 4
+    },
+    "Desk HITL Security": {
+      "A": 0,
+      "B": 0,
+      "C": 0,
+      "D": 0,
+      "E": 3,
+      "total": 3
+    },
+    "Cross-Book Steam": {
+      "A": 0,
+      "B": 1,
+      "C": 0,
+      "D": 0,
+      "E": 0,
+      "total": 1
+    },
+    "System & Authentication": {
+      "A": 0,
+      "B": 0,
+      "C": 1,
+      "D": 0,
+      "E": 1,
+      "total": 2
+    },
+    "Manager & Player Admin": {
+      "A": 0,
+      "B": 0,
+      "C": 2,
+      "D": 0,
+      "E": 0,
+      "total": 2
+    },
+    "Vig & Juice Setup": {
+      "A": 0,
+      "B": 0,
+      "C": 1,
+      "D": 0,
+      "E": 0,
+      "total": 1
+    },
+    "Wagers & Live Surveillance": {
+      "A": 0,
+      "B": 0,
+      "C": 1,
+      "D": 0,
+      "E": 0,
+      "total": 1
+    },
+    "Reporting & Forensics": {
+      "A": 0,
+      "B": 0,
+      "C": 2,
+      "D": 0,
+      "E": 0,
+      "total": 2
+    },
+    "Desk & HITL Operations": {
+      "A": 0,
+      "B": 0,
+      "C": 0,
+      "D": 0,
+      "E": 4,
+      "total": 4
+    },
+    "Prediction Market RFQ": {
+      "A": 0,
+      "B": 0,
+      "C": 0,
+      "D": 0,
+      "E": 2,
+      "total": 2
+    },
+    "Tracked Operational Domains": {
+      "A": 0,
+      "B": 0,
+      "C": 11,
+      "D": 0,
+      "E": 0,
+      "total": 11
+    }
+  },
+  "operations": [
+    {
+      "path": "/cloud/api/System/authenticateCustomer",
+      "method": "post",
+      "operationId": null,
+      "tag": "Upstream Authentication",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        },
+        {
+          "source": "operational_guardrails_runbook.md:153",
+          "kind": "context",
+          "note": "The one observed Manager session is cookie-based with no Authorization header, which is the opposite of the 'Bearer JWT minted here' model the spec assumes. No auth exchange was captured."
+        },
+        {
+          "source": "docs/openapi.json:65-139",
+          "kind": "spec-claim",
+          "note": "Spec claims a scoped Bearer JWT (~20-25 min lifetime) and an accountInfo object; neither is captured."
+        }
+      ],
+      "requiredCapture": "Capture one authenticateCustomer POST (redacted credentials): status, Set-Cookie vs body token, response envelope/code field, lifetime, and whether Manager calls then send Authorization or the cookie. Upgrades C->A and validates the whole auth model.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/getBetTicker",
+      "method": "post",
+      "operationId": null,
+      "tag": "Trading Desk Feeds",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "simulate_bettor_churn_suite.ts:106-115",
+          "kind": "repo-type",
+          "note": "RawBetTickerTick declares wagerNumber, Login, TicketWriter, Risk, ToWin, Description, InsertDateTime, ShortDesc. A consumer type declaration, not a capture."
+        },
+        {
+          "source": "docs/openapi.json:141-238",
+          "kind": "spec-claim",
+          "note": "Spec adds the request envelope (agentID, agentOwner, wagerNumber watermark, operation, RRO), the INFO/LIST response envelope and a TickerRowRecord schema; none is captured."
+        }
+      ],
+      "requiredCapture": "Capture an initial (wagerNumber=0) and a delta poll: exact body, INFO/LIST envelope, row key set/types, watermark semantics. Upgrades C->A; without it the delta-watermark contract is a guess.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/getBetTickerConfig",
+      "method": "post",
+      "operationId": null,
+      "tag": "Trading Desk Feeds",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture one request/response (spec expects {INFO:true, Config:{}}); verify whether INFO:false is the misconfigured shape. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/getPending",
+      "method": "post",
+      "operationId": null,
+      "tag": "Trading Desk Feeds",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "simulate_bettor_churn_suite.ts:91-104",
+          "kind": "repo-type",
+          "note": "RawPendingLegRow declares Login, WagerNumber, LegNumber, Risk, ToWin, WagerType, ShortDesc, TicketWriter, InsertDateTime, VIP?, Team?, Line?. A consumer type declaration, not a capture."
+        },
+        {
+          "source": "lib/fantasy402_wager_universe_scope.ts:13-21",
+          "kind": "implementation-context",
+          "note": "getPending is modelled as a pending snapshot (wagerStatusOnWire 'P', no settled/canceled rows); no fetch client is implemented in this repo."
+        },
+        {
+          "source": "docs/openapi.json:309-375",
+          "kind": "spec-claim",
+          "note": "Spec claims a flat ~6,000+ leg array and a JSON request body {customerID, date}; neither is captured."
+        }
+      ],
+      "requiredCapture": "Capture the request (form vs JSON content type is disputed by the spec's own application/json choice) and a non-empty response; verify BLOCKED sentinel rows (L19.N0518) and zero-stake rows actually appear. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/getWebLog",
+      "method": "post",
+      "operationId": null,
+      "tag": "Forensic Surveillance",
+      "tier": "B",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "operational_guardrails_runbook.md:129-140",
+          "kind": "capture-request",
+          "note": "2026-10-28 Manager HAR, portal v1.0.279, mode B only. Exact observed request: POST https://www.fantasy402.com/cloud/api/Manager/getWebLog, Content-Type application/x-www-form-urlencoded; charset=UTF-8, X-Requested-With: XMLHttpRequest, body agentID=<session>&customerID=0&start=10%2F28%2F2026&end=10%2F28%2F2026&type=B&actions=ALL&ip=&operation=getWebLog&RRO=1&agentOwner=<session>. No response body in the capture."
+        },
+        {
+          "source": "operational_guardrails_runbook.md:131",
+          "kind": "capture-scope",
+          "note": "Only mode B was observed; modes A/C/I are 'inferred from the form and still need a capture'."
+        },
+        {
+          "source": "operational_guardrails_runbook.md:153",
+          "kind": "contradiction",
+          "note": "Contradicts the spec's auth and response claims: 'The session is cookie-based (the capture has no Authorization header), and the response body was not captured, so the row schema is still undocumented.'"
+        },
+        {
+          "source": "simulate_bettor_churn_suite.ts:117-123",
+          "kind": "repo-type",
+          "note": "RawWebLogEntry declares exactly the four response fields the spec publishes (customerID, ipAddress, timestamp, agentOwner) and notes 'path' is omitted to avoid POISONED_PATH_500. A repo declaration, not a capture."
+        },
+        {
+          "source": "docs/openapi.json:377-399",
+          "kind": "spec-claim",
+          "note": "Spec requires Authorization (BearerAuth), X-Requested-With, Accept and Referrer-Policy request headers, and publishes a 4-field array response at docs/openapi.json:493-519."
+        }
+      ],
+      "requiredCapture": "Capture modes A, C and I requests (exact per-mode date format, ip value, target customerID) plus a full 200 response body for at least one mode, and record the auth actually accepted (session cookie vs Authorization header). Upgrades modes A/C/I from C and closes the response/auth contradiction.",
+      "contradicted": true,
+      "contradictedReason": "Spec publishes a required Authorization Bearer header (docs/openapi.json:386 -> components/parameters/AuthBearer at docs/openapi.json:3091-3099) and a 4-field row schema (docs/openapi.json:493-519). operational_guardrails_runbook.md:153: 'The session is cookie-based (the capture has no Authorization header), and the response body was not captured, so the row schema is still undocumented.' Only the mode-B request is real."
+    },
+    {
+      "path": "/cloud/api/Manager/search",
+      "method": "post",
+      "operationId": null,
+      "tag": "Forensic Surveillance",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "operational_guardrails_runbook.md:205-209",
+          "kind": "ui-observation",
+          "note": "Search component observed in the Manager UI: .search-component inside .input-group (6 occurrences), placeholder 'Search accounts...', data-search='true', data-type='all' (4 occurrences), autocomplete='new-password' + dummy password input."
+        },
+        {
+          "source": "operational_guardrails_runbook.md:214",
+          "kind": "absence",
+          "note": "No search request body appears in the 2026-10-28 HAR; the request fields (term/type/agentID) are inferred from the component."
+        },
+        {
+          "source": "docs/openapi.json:523-607",
+          "kind": "spec-claim",
+          "note": "Spec path /cloud/api/Manager/search and the result rows are authored; the URL was never observed on the wire."
+        }
+      ],
+      "requiredCapture": "Capture one omnisearch request triggered from search-component (URL, method, content type, term/type/agentID fields) and its result rows. Upgrades C->A and confirms candidate_url.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Manager/updateByColumn",
+      "method": "post",
+      "operationId": null,
+      "tag": "Customer State Mutations",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "operational_guardrails_runbook.md:215",
+          "kind": "absence",
+          "note": "The 2026-10-28 capture does NOT include updateByColumn: 'Padded writes ... which this capture does not include. The only padded ID observed is Log/write's customerID, padded to 10 characters. Confirm the width with an updateByColumn capture before relying on 11.'"
+        },
+        {
+          "source": "domain-branded-types.ts:9,140-158",
+          "kind": "repo-type",
+          "note": "PaddedCustomerId is declared as an 11-char space-padded brand for updateByColumn. Authored type, not an observation."
+        },
+        {
+          "source": "docs/openapi.json:609-754",
+          "kind": "spec-claim",
+          "note": "Spec publishes the full 9-field required form body, the 11-char padding rule, the direct-sub-agent scope rule, Result 1/0/-1 semantics and 400/500 outcomes; none is captured."
+        }
+      ],
+      "requiredCapture": "Highest-value mutation capture: one updateByColumn with a safe column (confirmationDelaySeconds) plus the getInfoPlayer read-back. Record exact form fields, content type, padding width actually required (11 vs the observed 10), sub-agent vs master scope, and the Result envelope. Upgrades C->A and is the only way to validate the SILENT_NO_OP / REJECTED_SCOPE claims.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/getInfoPlayer",
+      "method": "post",
+      "operationId": null,
+      "tag": "Customer State Mutations",
+      "tier": "B",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "operational_guardrails_runbook.md:213",
+          "kind": "capture-request",
+          "note": "Observed read in the 2026-10-28 HAR: 'opening a player sent getInfoPlayer with a 7-character customerID' (trimmed, unpadded) - e.g. CB112_1, not the padded form."
+        },
+        {
+          "source": "operational_guardrails_runbook.md:214",
+          "kind": "capture-request",
+          "note": "agentID/agentOwner were the logged-in master on all 19 Manager calls in that capture, including getInfoPlayer; the bettor's direct parent is not in these request fields."
+        },
+        {
+          "source": "operational_guardrails_runbook.md:214",
+          "kind": "absence",
+          "note": "Response explicitly not captured ('Resolve the direct parent from ... getInfoPlayer's response (not captured yet)')."
+        },
+        {
+          "source": "docs/openapi.json:756-844",
+          "kind": "spec-claim",
+          "note": "Spec example sends the 11-char padded customerID 'CB112_1    ' and publishes a Result{CurrentBalance,PendingAmount,CreditLimit,confirmationDelaySeconds,wagerLimitRiskCents} response."
+        }
+      ],
+      "requiredCapture": "Capture a getInfoPlayer request+response for a known player: padded vs trimmed customerID on the wire, response key set and value types, and one updateByColumn read-back pair. Upgrades B->A and settles both the padding example and the read-back contract.",
+      "contradicted": true,
+      "contradictedReason": "Example-level contradiction: the spec's getInfoPlayer request example is the 11-char padded 'CB112_1    ' (docs/openapi.json:765-772), while the observed request sent a 7-char trimmed customerID (operational_guardrails_runbook.md:213). The response schema is also unpublished by any capture (runbook:214)."
+    },
+    {
+      "path": "/cloud/api/Manager/vigSetupInsert",
+      "method": "post",
+      "operationId": null,
+      "tag": "Customer State Mutations",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        },
+        {
+          "source": "docs/openapi.json",
+          "kind": "spec-claim",
+          "note": "Claim under test lives in docs/openapi.json; it has no supporting artifact."
+        }
+      ],
+      "requiredCapture": "Capture one vigSetupInsert (application/json claimed, 20-char padded sportType) plus getSportsVigSetup read-back; verify content type, padding widths and Result envelope. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/getSportsVigSetup",
+      "method": "post",
+      "operationId": null,
+      "tag": "Customer State Mutations",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        },
+        {
+          "source": "docs/openapi.json",
+          "kind": "spec-claim",
+          "note": "Claim under test lives in docs/openapi.json; it has no supporting artifact."
+        }
+      ],
+      "requiredCapture": "Capture the read-back request/response paired with a vigSetupInsert; confirm form-urlencoded vs JSON and the Result field set. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/getInfoManager",
+      "method": "post",
+      "operationId": null,
+      "tag": "Downline Accounting",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        },
+        {
+          "source": "docs/openapi.json",
+          "kind": "spec-claim",
+          "note": "Claim under test lives in docs/openapi.json; it has no supporting artifact."
+        }
+      ],
+      "requiredCapture": "Capture the dashboard header request/response; confirm the exact JSON keys (the spec uses hyphenated names like 'grand-total-weekly', which is unusual enough to need proof). Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Report/getWeeklyFigure",
+      "method": "post",
+      "operationId": null,
+      "tag": "Downline Accounting",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        },
+        {
+          "source": "docs/openapi.json:1202-1284",
+          "kind": "spec-claim",
+          "note": "Spec claims it is triggered by data-action='get-weekly-figure'; that string appears in no capture, test or code artifact in either tree."
+        }
+      ],
+      "requiredCapture": "Capture the Reporting weekly-figure request/response (the data-action is itself unverified). Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Report/getAgentPerformance",
+      "method": "post",
+      "operationId": null,
+      "tag": "Downline Accounting",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "operational_guardrails_runbook.md:164",
+          "kind": "ui-observation",
+          "note": "Reporting action 'get-agent-performance' with data-type='C' is observed in the surveillance lifecycle table (stage 4, 8-tier BranchGrade)."
+        },
+        {
+          "source": "operational_guardrails_runbook.md:214",
+          "kind": "absence",
+          "note": "No getAgentPerformance request is quoted from the HAR; the URL /cloud/api/Report/getAgentPerformance is inferred from the action name."
+        },
+        {
+          "source": "docs/openapi.json:1286-1375",
+          "kind": "spec-claim",
+          "note": "Spec asserts form-urlencoded {agentID, dataType:'C', period} and an array of {agentID, volume, netWon, holdPct}; holdPct/BranchGrade math is not captured."
+        }
+      ],
+      "requiredCapture": "Capture one get-agent-performance call (agentID, data-type C, period) and its rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Report/getSettledFigure",
+      "method": "post",
+      "operationId": null,
+      "tag": "Downline Accounting",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "operational_guardrails_runbook.md:168",
+          "kind": "ui-observation",
+          "note": "Reporting action 'get-settled-figure' (Collections) is an observed stage 8 action."
+        },
+        {
+          "source": "docs/openapi.json:1377-1445",
+          "kind": "spec-claim",
+          "note": "Request {agentID, weekDate} and the 5-field settlement response are authored; no request or response was captured."
+        }
+      ],
+      "requiredCapture": "Capture one Collections request/response; verify weekDate format and the 50% split fields. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Report/delete-wager",
+      "method": "post",
+      "operationId": null,
+      "tag": "Downline Accounting",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "operational_guardrails_runbook.md:165",
+          "kind": "ui-observation",
+          "note": "Reporting action 'delete-wager' (_Deleted Wagers_) is an observed stage 5 action for VOID_HEAVY_DISGUST and line-chase cancels."
+        },
+        {
+          "source": "docs/openapi.json:1447-1526",
+          "kind": "spec-claim",
+          "note": "Request {agentID, startDate, endDate} and the deleted-ticket rows are authored. Note the spec also publishes POST /cloud/api/Report/getDeletedWagerReport for the same audit log; the relationship between the two is unverified."
+        }
+      ],
+      "requiredCapture": "Capture the Reporting Deleted Wagers view request/response; also determine whether delete-wager and getDeletedWagerReport are distinct wire actions. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/health",
+      "method": "get",
+      "operationId": null,
+      "tag": "Local Desk & Telegram Gateway",
+      "tier": "B",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:114-131",
+          "kind": "implementation",
+          "note": "Handler returns JSON {status, port, hostname, url, timestamp, uptimeSeconds, runtime, nodeEnv}. This repo serves the route, so the handler is the contract; no HTTP capture exists (hence B, not A)."
+        },
+        {
+          "source": "docs/openapi.json:1528-1581",
+          "kind": "spec-claim",
+          "note": "Spec omits the 'url' and 'timestamp' fields the handler returns; response schema is a subset, not a contradiction."
+        }
+      ],
+      "requiredCapture": "Not a capture gap: reconcile the spec to sportsdesk_webview_server.ts:114-131 (add url + timestamp). A curl capture would only confirm the handler.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/watchlist",
+      "method": "get",
+      "operationId": null,
+      "tag": "Local Desk & Telegram Gateway",
+      "tier": "B",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:236-246",
+          "kind": "implementation",
+          "note": "Returns {success, count, data:[...]} from telegramService.getWatchList()."
+        },
+        {
+          "source": "sportsdesk_webview_server.ts:27-47",
+          "kind": "implementation",
+          "note": "adminRejection: requires Authorization: Bearer <SPORTSDESK_ADMIN_TOKEN> compared with crypto.timingSafeEqual; 503 when the env token is unset, 401 otherwise. Applied at sportsdesk_webview_server.ts:175-186."
+        },
+        {
+          "source": "docs/openapi.json:1583-1641",
+          "kind": "spec-claim",
+          "note": "Spec documents the 200 shape and the bearer requirement; no 401/503 responses are documented."
+        }
+      ],
+      "requiredCapture": "No wire capture needed; add the 401/503 responses to the spec from adminRejection (sportsdesk_webview_server.ts:33-46).",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/telegram/alert",
+      "method": "post",
+      "operationId": null,
+      "tag": "Local Desk & Telegram Gateway",
+      "tier": "B",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:249-274",
+          "kind": "implementation",
+          "note": "Body {customerId?}; defaults to RF2003; dispatches via telegramService.dispatchTestAlert and returns {success, ok, customerId}. Admin-token gated (sportsdesk_webview_server.ts:175-186)."
+        },
+        {
+          "source": "docs/openapi.json:1643-1692",
+          "kind": "spec-claim",
+          "note": "Spec request/response match the handler except it does not document the admin-token gate."
+        }
+      ],
+      "requiredCapture": "No capture gap; document the Authorization requirement and the 401/503 paths.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/telegram/report",
+      "method": "post",
+      "operationId": null,
+      "tag": "Local Desk & Telegram Gateway",
+      "tier": "B",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:277-297",
+          "kind": "implementation",
+          "note": "Report type is selected by the '?type=' QUERY PARAMETER (default EVENING_SETTLEMENT, validated by isReportType); returns {success, ok, reportType}. The spec has no parameter for it."
+        },
+        {
+          "source": "sportsdesk_telegram_bot.ts:77-81",
+          "kind": "implementation",
+          "note": "REPORT_TYPES = MORNING_BRIEFING, MIDDAY_STEAM, EVENING_SETTLEMENT."
+        },
+        {
+          "source": "docs/openapi.json:1694-1739",
+          "kind": "spec-claim",
+          "note": "Spec omits the required ?type= query parameter and the 'ok' response field."
+        }
+      ],
+      "requiredCapture": "No capture gap; add the ?type= query parameter (enum REPORT_TYPES) and 'ok' to the spec.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/desk/auth/session",
+      "method": "post",
+      "operationId": null,
+      "tag": "Desk HITL Security",
+      "tier": "E",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56",
+          "kind": "absence",
+          "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
+        },
+        {
+          "source": "docs/openapi.json:1741",
+          "kind": "spec-claim",
+          "note": "Operation is published in the spec only; it predates the generator block and no handler implements it."
+        }
+      ],
+      "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/desk/auth/session",
+      "method": "delete",
+      "operationId": null,
+      "tag": "Desk HITL Security",
+      "tier": "E",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56",
+          "kind": "absence",
+          "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
+        },
+        {
+          "source": "docs/openapi.json:1741",
+          "kind": "spec-claim",
+          "note": "Operation is published in the spec only; it predates the generator block and no handler implements it."
+        }
+      ],
+      "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/desk/hitl/approve",
+      "method": "post",
+      "operationId": null,
+      "tag": "Desk HITL Security",
+      "tier": "E",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56",
+          "kind": "absence",
+          "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
+        },
+        {
+          "source": "docs/openapi.json:1809",
+          "kind": "spec-claim",
+          "note": "Operation is published in the spec only; it predates the generator block and no handler implements it."
+        }
+      ],
+      "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/manager-tools/ajax.php",
+      "method": "post",
+      "operationId": null,
+      "tag": "Cross-Book Steam",
+      "tier": "B",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "zip:contracts/get-bet-report.observed.json:2-21",
+          "kind": "observed-request",
+          "note": "The only observed artifact: a user-supplied Last Bets request body for action getBetReport. Keys are action, partnerUserId, agent, eventId, freeBetId, state, sId, minVolume, maxTimeUntilScore, mId, from, fromTime, to, toTime, betId, betGroupId (empty), group (null), dateFilterBy, partnerIds (empty), period. No URL, method, content type, auth or response."
+        },
+        {
+          "source": "zip:README.md:3",
+          "kind": "contradiction",
+          "note": "'Live acquisition is intentionally blocked: no GS endpoint/authentication/response contract is verified.'"
+        },
+        {
+          "source": "zip:contracts/contract-map.md:14",
+          "kind": "contradiction",
+          "note": "'No endpoint URL, method, auth scheme, Summary action, pagination, or upstream response schema is fabricated here.'"
+        },
+        {
+          "source": "zip:contracts/gs-manager.ts:29-30",
+          "kind": "contradiction",
+          "note": "'No response capture exists: assigning invented response properties is prohibited.' GetBetReportResponse = unknown."
+        },
+        {
+          "source": "zip:templates/endpoint-registry.json:281-288",
+          "kind": "contradiction",
+          "note": "Last Bets upstream block: status blocked_contract, url null, method null, contentType null, action getBetReport, responseSchema null, authentication null."
+        },
+        {
+          "source": "zip:templates/contract-verification.md:3",
+          "kind": "contradiction",
+          "note": "'Only Last Bets has an observed action (getBetReport); no transport URL, method, response shape, or auth mechanism has been established for any report.'"
+        },
+        {
+          "source": "docs/openapi.json:1881-1943",
+          "kind": "spec-claim",
+          "note": "Spec asserts POST /manager-tools/ajax.php with application/x-www-form-urlencoded body requiring 'operation' and 'betGroupId' (example '908412'), and a 4-property response {betGroupId, market, steamLagMs, pinnacleReferencePrice}."
+        }
+      ],
+      "requiredCapture": "A redacted browser network capture of the Last Bets report submit: actual transport URL, HTTP method, content type, exact body (action vs operation, partnerIds tenant 118, calcTime semantics), response envelope/rows, auth/CSRF mechanism, pagination and totals. This is the single biggest upstream gap in the release.",
+      "contradicted": true,
+      "contradictedReason": "Spec asserts POST /manager-tools/ajax.php + form-urlencoded + required 'operation'/'betGroupId' + a concrete 4-property response (docs/openapi.json:1881-1943). GS evidence forbids exactly that: zip:README.md:3 'no GS endpoint/authentication/response contract is verified'; zip:contracts/contract-map.md:14 'No endpoint URL, method, auth scheme, ... or upstream response schema is fabricated here'; zip:contracts/gs-manager.ts:29-30 'No response capture exists: assigning invented response properties is prohibited'; zip:templates/endpoint-registry.json:281-288 url/method/contentType/responseSchema/authentication all null. The observed payload uses key 'action' (not 'operation'), leaves betGroupId empty (not '908412'), and has 20 fields."
+    },
+    {
+      "path": "/cloud/api/System/verifySession",
+      "method": "post",
+      "operationId": "verifySession",
+      "tag": "System & Authentication",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "scripts/enhance_docs.mjs:98",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        },
+        {
+          "source": "docs/openapi.json",
+          "kind": "spec-claim",
+          "note": "Claim under test lives in docs/openapi.json; it has no supporting artifact."
+        }
+      ],
+      "requiredCapture": "Capture a verifySession call on a live and an expired token; confirm the response shape and the 401 re-mint behaviour. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/desk/auth/me",
+      "method": "get",
+      "operationId": "getOperatorSession",
+      "tag": "System & Authentication",
+      "tier": "E",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56",
+          "kind": "absence",
+          "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
+        },
+        {
+          "source": "scripts/enhance_docs.mjs:115",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        }
+      ],
+      "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/getCustomerNotes",
+      "method": "post",
+      "operationId": "getCustomerNotes",
+      "tag": "Manager & Player Admin",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "scripts/enhance_docs.mjs:130",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        },
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture a customer notes read; confirm the notes row fields and whether notes are operator-annotations or wire-native. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/updateCustomerNotes",
+      "method": "post",
+      "operationId": "updateCustomerNotes",
+      "tag": "Manager & Player Admin",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "scripts/enhance_docs.mjs:153",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        },
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture an append + read-back; confirm the mutation Result envelope and whether notes are immutable. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/deleteSportsVigSetup",
+      "method": "post",
+      "operationId": "deleteSportsVigSetup",
+      "tag": "Vig & Juice Setup",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "scripts/enhance_docs.mjs:173",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        },
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture a delete + getSportsVigSetup read-back; confirm the required fields and Result envelope. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/deleteWager",
+      "method": "post",
+      "operationId": "deleteWager",
+      "tag": "Wagers & Live Surveillance",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "scripts/enhance_docs.mjs:193",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        },
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture a void/cancel mutation; confirm the request fields (only wagerNumber/reason are documented) and the result envelope. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Report/getDeletedWagerReport",
+      "method": "post",
+      "operationId": "getDeletedWagerReport",
+      "tag": "Reporting & Forensics",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "scripts/enhance_docs.mjs:213",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        },
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture the deleted-wager audit read; determine whether it duplicates POST /cloud/api/Report/delete-wager. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Report/getDailyFigure",
+      "method": "post",
+      "operationId": "getDailyFigure",
+      "tag": "Reporting & Forensics",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "scripts/enhance_docs.mjs:225",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        },
+        {
+          "source": "none",
+          "kind": "none",
+          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture a daily figure read; confirm the request (none is documented) and the row fields. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/desk/hitl/queue",
+      "method": "get",
+      "operationId": "getHitlQueue",
+      "tag": "Desk & HITL Operations",
+      "tier": "E",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56",
+          "kind": "absence",
+          "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
+        },
+        {
+          "source": "scripts/enhance_docs.mjs:237",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        }
+      ],
+      "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/desk/hitl/reject",
+      "method": "post",
+      "operationId": "rejectHitlLimit",
+      "tag": "Desk & HITL Operations",
+      "tier": "E",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56",
+          "kind": "absence",
+          "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
+        },
+        {
+          "source": "scripts/enhance_docs.mjs:249",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        }
+      ],
+      "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/desk/forensics/audit",
+      "method": "post",
+      "operationId": "dispatchForensicAudit",
+      "tag": "Desk & HITL Operations",
+      "tier": "E",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56",
+          "kind": "absence",
+          "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
+        },
+        {
+          "source": "scripts/enhance_docs.mjs:269",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        }
+      ],
+      "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/desk/forensics/scores",
+      "method": "get",
+      "operationId": "getSharpScores",
+      "tag": "Desk & HITL Operations",
+      "tier": "E",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56",
+          "kind": "absence",
+          "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
+        },
+        {
+          "source": "scripts/enhance_docs.mjs:289",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        }
+      ],
+      "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/desk/rfq/quote",
+      "method": "post",
+      "operationId": "requestRfqQuote",
+      "tag": "Prediction Market RFQ",
+      "tier": "E",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56",
+          "kind": "absence",
+          "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
+        },
+        {
+          "source": "scripts/enhance_docs.mjs:301",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        }
+      ],
+      "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/api/desk/rfq/hedge",
+      "method": "post",
+      "operationId": "executeLayoffHedge",
+      "tag": "Prediction Market RFQ",
+      "tier": "E",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56",
+          "kind": "absence",
+          "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
+        },
+        {
+          "source": "scripts/enhance_docs.mjs:321",
+          "kind": "generator",
+          "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
+        }
+      ],
+      "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Manager/gameAdmin",
+      "method": "post",
+      "operationId": "gameAdmin",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:41",
+          "kind": "ui-declaration",
+          "note": "Tile 'Game Admin' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=rotationNumber/sportType/circleLimit/isLocked, dataLanguageLKeys=L-1034,L-1052). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:2688",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile 'Game Admin', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        }
+      ],
+      "requiredCapture": "Open the 'Game Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/System/getMessages",
+      "method": "post",
+      "operationId": "getMessages",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:52",
+          "kind": "ui-declaration",
+          "note": "Tile 'Messaging' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=recipientScope/subject/messageBody/priority, dataLanguageLKeys=L-1055,L-1056). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:2727",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile 'Messaging', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        }
+      ],
+      "requiredCapture": "Open the 'Messaging' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Manager/adjustBalance",
+      "method": "post",
+      "operationId": "adjustBalance",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:63",
+          "kind": "ui-declaration",
+          "note": "Tile 'Cashier' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=customerID/amountCents/transactionType/notes, dataLanguageLKeys=L-1031,L-1045,L-1058). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:2763",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile 'Cashier', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        }
+      ],
+      "requiredCapture": "Open the 'Cashier' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Manager/createPlayer",
+      "method": "post",
+      "operationId": "createPlayer",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:74",
+          "kind": "ui-declaration",
+          "note": "Tile 'Add Customer' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=customerID/agentID/password/creditLimit/delaySeconds, dataLanguageLKeys=L-1031,L-1032,L-1040). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:2800",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile 'Add Customer', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        },
+        {
+          "source": "operational_guardrails_runbook.md:213",
+          "kind": "context",
+          "note": "Identity contract context: observed IDs on reads are trimmed/unpadded 7-char; createPlayer's 'password' input is the only place the spec exposes a credential field."
+        }
+      ],
+      "requiredCapture": "Open the 'Add Customer' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Manager/get3rdPartyLimits",
+      "method": "post",
+      "operationId": "get3rdPartyLimits",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:85",
+          "kind": "ui-declaration",
+          "note": "Tile '3rd Party Limits' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=providerID/sportCategory/maxLimitCents, dataLanguageLKeys=L-1060,L-1061). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:2838",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile '3rd Party Limits', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        }
+      ],
+      "requiredCapture": "Open the '3rd Party Limits' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Report/getAnalysis",
+      "method": "post",
+      "operationId": "getAnalysis",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:96",
+          "kind": "ui-declaration",
+          "note": "Tile 'Analysis' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=period/sport/marketCategory/agentID, dataLanguageLKeys=L-1034,L-1064). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:2873",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile 'Analysis', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        },
+        {
+          "source": "operational_guardrails_runbook.md:166",
+          "kind": "ui-observation",
+          "note": "Independent UI evidence: 'get-analysis' is an observed Reporting action (stage 6, market/sport concentration). The action name is real; the URL/method are still candidates."
+        }
+      ],
+      "requiredCapture": "Open the 'Analysis' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Manager/getScores",
+      "method": "post",
+      "operationId": "getScores",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:107",
+          "kind": "ui-declaration",
+          "note": "Tile 'Scores' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=gameID/periodIndex/homeScore/awayScore/isFinal, dataLanguageLKeys=L-1034,L-1068). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:2909",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile 'Scores', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        }
+      ],
+      "requiredCapture": "Open the 'Scores' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Manager/getAgentTree",
+      "method": "post",
+      "operationId": "getAgentTree",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:118",
+          "kind": "ui-declaration",
+          "note": "Tile 'Agent Admin' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=masterAgent/commissionSplitPercent/creditCeiling, dataLanguageLKeys=L-1032,L-1070). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:2946",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile 'Agent Admin', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        }
+      ],
+      "requiredCapture": "Open the 'Agent Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Manager/getBilling",
+      "method": "post",
+      "operationId": "getBilling",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:129",
+          "kind": "ui-declaration",
+          "note": "Tile 'Billing' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=billingWeek/ratePerActiveHead/activeAccountCount, dataLanguageLKeys=L-1050,L-1072). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:2981",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile 'Billing', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        }
+      ],
+      "requiredCapture": "Open the 'Billing' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Manager/getRules",
+      "method": "post",
+      "operationId": "getRules",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:140",
+          "kind": "ui-declaration",
+          "note": "Tile 'Settings & Rules' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=parlayMaxPayout/teaserTieRule/defaultDelaySeconds, dataLanguageLKeys=L-1040,L-1075). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:3016",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile 'Settings & Rules', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        }
+      ],
+      "requiredCapture": "Open the 'Settings & Rules' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Report/getFinancialReport",
+      "method": "post",
+      "operationId": "getFinancialReport",
+      "tag": "Tracked Operational Domains",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:151",
+          "kind": "ui-declaration",
+          "note": "Tile 'Transactions History' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=customerID/startDate/endDate/transactionFilter, dataLanguageLKeys=L-1031,L-1033,L-1058). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
+        },
+        {
+          "source": "main:scripts/portal_tile_crawler.ts:164-245",
+          "kind": "crawler-behaviour",
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+        },
+        {
+          "source": "main:scripts/append_tracked_domains.mjs:22-228",
+          "kind": "generator",
+          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
+        },
+        {
+          "source": "docs/openapi.json:3051",
+          "kind": "spec-claim",
+          "note": "Spec row carries x-dom-tile 'Transactions History', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
+        },
+        {
+          "source": "operational_guardrails_runbook.md:167",
+          "kind": "ui-observation",
+          "note": "Independent UI evidence: 'get-transaction-history' is an observed Reporting action (stage 7, follow the money). The action name is real; the URL/method are still candidates."
+        }
+      ],
+      "requiredCapture": "Open the 'Transactions History' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "contradicted": false,
+      "contradictedReason": null,
+      "candidate_url": true,
+      "ui_observed": true
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "surface.fantasy402-sport-catalog",
+      "name": "Fantasy402 sport catalog",
+      "tier": "D",
+      "category": "catalog",
+      "missingFromSpec": true,
+      "what": "Desk navigation reference: 19 sports, 230 sub-sports, 42 period menus, 2 desk-link collision ids (Arena -> Football + Horse Racing; NCAA Extra -> Basketball + Hockey), 4 provenance digests (subSportTree, periodMenus, collisionRegistry, expectedEmptyPaths). capturedAt 2026-10-21T16:38:53.513Z; periodsCapturedAt 2026-10-30T04:59:14.572Z.",
+      "members": [
+        "sports",
+        "subSports",
+        "periods",
+        "collisions",
+        "expectedEmptySubSportPaths",
+        "digests"
+      ],
+      "evidence": [
+        {
+          "source": "fixture:tests/fixtures/fantasy402-sport-catalog-2026-10-21.json:2-8",
+          "kind": "fixture",
+          "note": "Fixture declares provider fantasy402, capturedAt 2026-10-21T16:38:53.513Z, sportCount 19, subSportCount 230, periodsCapturedAt 2026-10-30T04:59:14.572Z, sportPeriodCount 42; computed values match the declared counts."
+        },
+        {
+          "source": "fantasy402_sport_catalog.ts:57-66",
+          "kind": "implementation",
+          "note": "PINNED_EXPECTED_EMPTY_SUBSPORT_PATHS: stable Football/Coll Ext, Hockey/NCAA Extra, Horse Racing/Arena, Soccer/France Ligue; volatile LIVE/MMA Live, LIVE/WNCAA Live."
+        },
+        {
+          "source": "fantasy402_sport_catalog.ts:229-245",
+          "kind": "implementation",
+          "note": "makeDeskLinkId: collision codes become '<Sport>|<code>' keys, closing over the collision registry."
+        },
+        {
+          "source": "fantasy402_sport_catalog.ts:133-158,648-663",
+          "kind": "implementation",
+          "note": "CatalogDigestSet defines the 4 sha256 digests and computeProvenanceDigests hashes the stable-JSON views."
+        },
+        {
+          "source": "fantasy402_sport_catalog.ts:448-530",
+          "kind": "implementation",
+          "note": "validateFantasy402SportCatalog enforces declared counts, per-sport duplicate codes, period numbering (0..n-1 with period 0 named Game), timestamp ordering and expected-empty paths."
+        }
+      ],
+      "note": "The fixture is a committed sample used as SSOT for tests, not a raw wire capture. Its capturedAt values are fixture-declared; no HAR or export artifact backs them. The catalog is absent from docs/openapi.json."
+    },
+    {
+      "id": "surface.manager-getHistory",
+      "name": "Manager/getHistory (wired settlement-history poll)",
+      "tier": "D",
+      "category": "upstream-route",
+      "missingFromSpec": true,
+      "what": "POST {SPORTSDESK_PORTAL_HTTP_BASE}/cloud/api/Manager/getHistory - append-only settlement-history poll; response is an array or {data: []}.",
+      "members": ["POST /cloud/api/Manager/getHistory"],
+      "evidence": [
+        {
+          "source": "lib/fantasy402_settlement_ingest.ts:347-357",
+          "kind": "implementation",
+          "note": "resolveHistoryPollUrl builds `${base}/cloud/api/Manager/getHistory` from SPORTSDESK_PORTAL_HTTP_BASE; pollManagerGetHistory POSTs with no body, 60s timeout, accepts array or {data:[]}."
+        },
+        {
+          "source": "lib/fantasy402_wager_universe_scope.ts:22-31",
+          "kind": "implementation",
+          "note": "getHistory is the 'settlement_history' slice with ingestionStatus 'wired'."
+        },
+        {
+          "source": "fixture:tests/fixtures/fantasy402-history-poll.json:1-25",
+          "kind": "fixture",
+          "note": "Shape sample only: Login/WagerNumber/WagerStatus/AcceptedDateTime/GameDateTime/SettlementDateTime/Amount/Risk/ToWin rows with placeholder CUST001/CUST002. Not a capture."
+        }
+      ],
+      "note": "This is the only route in the repo with an actual fetch client, yet it is missing from docs/openapi.json. The poll sends no request body, so the upstream request contract (agent scope, date window) is entirely unknown."
+    },
+    {
+      "id": "surface.manager-getGrading",
+      "name": "Manager/getGrading (declared settlement feed)",
+      "tier": "D",
+      "category": "upstream-route",
+      "missingFromSpec": true,
+      "what": "Manager/getGrading - graded-outcome feed declared as a settlement_history slice with ingestionStatus 'wired'; no fetch client exists.",
+      "members": ["POST /cloud/api/Manager/getGrading"],
+      "evidence": [
+        {
+          "source": "lib/fantasy402_wager_universe_scope.ts:32-38",
+          "kind": "implementation",
+          "note": "getGrading is declared with slice settlement_history and ingestionStatus 'wired'."
+        },
+        {
+          "source": "simulate_bettor_churn_suite.ts:81-89",
+          "kind": "repo-type",
+          "note": "RawGradingLegRow declares CustomerID, WagerNumber, LegNumber, Amount (cents, customer perspective), SettlementDateTime, Result WIN|LOSS|VOID|PUSH, Description."
+        },
+        {
+          "source": "lib/fantasy402_settlement_ingest.ts:17",
+          "kind": "implementation",
+          "note": "SettlementFeed = 'getHistory' | 'getGrading'; grading rows are ingested into the same append-only path."
+        }
+      ],
+      "note": "Called 'wired' in code comments/config but repo-wide there is no getGrading fetch: pollManagerGetHistory targets getHistory only. Treat the transport as unimplemented and the route as missing from the spec."
+    },
+    {
+      "id": "surface.daemon-dashboard",
+      "name": "Daemon dashboard routes (GET / and GET /dashboard)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": true,
+      "what": "GET / and GET /dashboard serve customer-churn-simulation-dashboard.html as text/html from the Bun daemon.",
+      "members": ["GET /", "GET /dashboard"],
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:134-141",
+          "kind": "implementation",
+          "note": "Both paths return the dashboard HTML file with the daemon CORS/CSP headers."
+        }
+      ],
+      "note": "Absent from the 47-path spec."
+    },
+    {
+      "id": "surface.daemon-miniapp",
+      "name": "Daemon Telegram Mini App route (GET /miniapp)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": true,
+      "what": "GET /miniapp (and /miniapp/) serves telegram-miniapp-dashboard.html for Telegram webview embedding.",
+      "members": ["GET /miniapp", "GET /miniapp/"],
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:144-151",
+          "kind": "implementation",
+          "note": "Returns the miniapp HTML with CSP frame-ancestors for Telegram."
+        },
+        {
+          "source": "sportsdesk_webview_server.ts:87-90",
+          "kind": "implementation",
+          "note": "CSP frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:; no X-Frame-Options."
+        }
+      ],
+      "note": "Absent from the 47-path spec."
+    },
+    {
+      "id": "surface.daemon-telegram-admin-routes",
+      "name": "Daemon auxiliary routes (webhook, telegram status/activity, preflight, error trigger)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": true,
+      "what": "Auxiliary daemon routes that exist in code but not in the spec: POST /telegram/webhook (Telegram secret-token verified), GET /api/telegram/status, GET /api/telegram/activity?limit=, POST /api/telegram/webhook {action:set|delete}, OPTIONS preflight 204, GET /api/test/error.",
+      "members": [
+        "POST /telegram/webhook",
+        "GET /api/telegram/status",
+        "GET /api/telegram/activity",
+        "POST /api/telegram/webhook",
+        "OPTIONS *",
+        "GET /api/test/error"
+      ],
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:154-173",
+          "kind": "implementation",
+          "note": "POST /telegram/webhook validates x-telegram-bot-api-secret-token, returns 401 otherwise."
+        },
+        {
+          "source": "sportsdesk_webview_server.ts:188-233",
+          "kind": "implementation",
+          "note": "GET /api/telegram/status and /api/telegram/activity (limit 1..200) and POST /api/telegram/webhook set/delete, all behind the admin-token gate."
+        },
+        {
+          "source": "sportsdesk_webview_server.ts:108-111,100-106",
+          "kind": "implementation",
+          "note": "OPTIONS returns 204 with CORS headers; /api/test/error throws a synthetic error for the error boundary."
+        }
+      ],
+      "note": "Absent from the 47-path spec. They are real, reachable routes and should be either documented or explicitly scoped out."
+    },
+    {
+      "id": "surface.gs-manager-cli",
+      "name": "GS Manager CLI surfaces (6 report kinds + 9 jobs subcommands + orchestration commands)",
+      "tier": "D",
+      "category": "blocked-contract",
+      "missingFromSpec": true,
+      "what": "GS Buckeye 2 manager-tools deliverable: 6 UI report kinds (summary, event, player, open-bet, bettor, last-bets), 9 'jobs' subcommands (add, list, run, logs, enable, disable, remove, tick, unlock) plus capabilities, report, serve, docs, cron print. Every upstream contract is blocked_contract; live acquisition is intentionally disabled.",
+      "members": [
+        "summary",
+        "event",
+        "player",
+        "open-bet",
+        "bettor",
+        "last-bets",
+        "capabilities",
+        "jobs",
+        "serve",
+        "docs",
+        "cron print"
+      ],
+      "evidence": [
+        {
+          "source": "zip:README.md:3",
+          "kind": "implementation",
+          "note": "'Live acquisition is intentionally blocked: no GS endpoint/authentication/response contract is verified. Mock results are explicitly synthetic and contain no customer data.'"
+        },
+        {
+          "source": "zip:contracts/report-surfaces.md:9-16",
+          "kind": "implementation",
+          "note": "Six report kinds mapped to browser routes '/manager-tools/#/...' with contract status: transport unknown (last-bets: action getBetReport observed; HTTP transport and response unknown)."
+        },
+        {
+          "source": "zip:templates/endpoint-registry.json:272-299,301-320",
+          "kind": "implementation",
+          "note": "last-bets upstream: blocked_contract with url/method/contentType/responseSchema/authentication null; localInterfaces lists the CLI commands and marks notUpstreamEndpoints true."
+        },
+        {
+          "source": "zip:src/cli.js:7-19",
+          "kind": "implementation",
+          "note": "Help text enumerates the runnable command surfaces; live report exits 2 with blocked_contract (:37)."
+        },
+        {
+          "source": "zip:contracts/api-security-spec.md:29",
+          "kind": "implementation",
+          "note": "'Keep live acquisition blocked until contract and critical authorization controls are verified.'"
+        }
+      ],
+      "note": "The CLI itself is real and tested (6 Node tests in the extract); the report contracts are not. This mirrors the /manager-tools/ajax.php contradiction: the spec documents a wire contract the GS evidence explicitly says does not exist."
+    },
+    {
+      "id": "surface.desk-api-unimplemented",
+      "name": "/api/desk/* routes documented with no implementation",
+      "tier": "E",
+      "category": "documented-not-implemented",
+      "missingFromSpec": false,
+      "what": "9 spec paths / 10 operations under /api/desk/* (auth session POST+DELETE, auth/me, hitl approve/queue/reject, forensics audit/scores, rfq quote/hedge) have no handler, no HMAC verifier, no CookieMap session code and no queue store anywhere in the repo.",
+      "members": [
+        "POST /api/desk/auth/session",
+        "DELETE /api/desk/auth/session",
+        "GET /api/desk/auth/me",
+        "POST /api/desk/hitl/approve",
+        "GET /api/desk/hitl/queue",
+        "POST /api/desk/hitl/reject",
+        "POST /api/desk/forensics/audit",
+        "GET /api/desk/forensics/scores",
+        "POST /api/desk/rfq/quote",
+        "POST /api/desk/rfq/hedge"
+      ],
+      "evidence": [
+        {
+          "source": "sportsdesk_webview_server.ts:96-307",
+          "kind": "absence",
+          "note": "Handler dispatches the known local routes and falls through to 404 (sportsdesk_webview_server.ts:299-307); no /api/desk prefix is matched."
+        },
+        {
+          "source": "main:tests/api_reference.test.ts:55-56,91-100",
+          "kind": "absence",
+          "note": "The only /api/desk references outside the docs are the documentation tests asserting the spec contains them."
+        },
+        {
+          "source": "scripts/enhance_docs.mjs:115,237,249,269,289,301,321",
+          "kind": "generator",
+          "note": "The routes were authored directly into docs/openapi.json by the generator; nothing implements them."
+        }
+      ],
+      "note": "E tier: these are operations in operations[] (tier E) and are also inventoried here so the release has one list. The 9 paths carry 10 operations because /api/desk/auth/session has both POST and DELETE."
+    }
+  ]
+}
