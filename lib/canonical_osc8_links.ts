@@ -40,7 +40,10 @@ export function getCanonicalAgentUrl(agentId: string): string {
 /**
  * Format markdown hyperlink for customer account.
  */
-export function formatCustomerOsc8Markdown(customerId: string, label?: string): string {
+export function formatCustomerOsc8Markdown(
+  customerId: string,
+  label?: string,
+): string {
   const display = label ?? customerId.trim().toUpperCase();
   return `[${display}](${getCanonicalCustomerUrl(customerId)})`;
 }
@@ -48,7 +51,10 @@ export function formatCustomerOsc8Markdown(customerId: string, label?: string): 
 /**
  * Format markdown hyperlink for sub-agent.
  */
-export function formatAgentOsc8Markdown(agentId: string, label?: string): string {
+export function formatAgentOsc8Markdown(
+  agentId: string,
+  label?: string,
+): string {
   const display = label ?? agentId.trim().toUpperCase();
   return `[${display}](${getCanonicalAgentUrl(agentId)})`;
 }
@@ -56,14 +62,18 @@ export function formatAgentOsc8Markdown(agentId: string, label?: string): string
 /**
  * Format markdown hyperlink for API documentation.
  */
-export function formatDocsOsc8Markdown(text: string = "Official API Reference"): string {
+export function formatDocsOsc8Markdown(
+  text: string = "Official API Reference",
+): string {
   return `[${text}](${CANONICAL_DOMAINS.DOCS_PORTAL})`;
 }
 
 /**
  * Format markdown hyperlink for OpenAPI 3.1 specification.
  */
-export function formatOpenApiSpecOsc8Markdown(text: string = "OpenAPI 3.1 Spec"): string {
+export function formatOpenApiSpecOsc8Markdown(
+  text: string = "OpenAPI 3.1 Spec",
+): string {
   return `[${text}](${CANONICAL_DOMAINS.DOCS_PORTAL}/openapi.json)`;
 }
 
@@ -84,17 +94,30 @@ export interface AnsiMarkdownOptions {
  *  - columns: Line width for word-wrapping (0 to disable wrapping)
  *  - kittyGraphics: Inline local images via Kitty Graphics Protocol (Kitty, WezTerm, Ghostty)
  */
-export function renderAnsiMarkdown(markdown: string, options?: AnsiMarkdownOptions): string {
-  const useColors = options?.colors ?? (!process.env.NO_COLOR && process.env.TERM !== "dumb");
+export function renderAnsiMarkdown(
+  markdown: string,
+  options?: AnsiMarkdownOptions,
+): string {
+  const useColors =
+    options?.colors ?? (!process.env.NO_COLOR && process.env.TERM !== "dumb");
   const useHyperlinks = options?.hyperlinks ?? true;
-  const terminalWidth = options?.columns !== undefined ? options.columns : (process.stdout?.columns || 80);
+  const terminalWidth =
+    options?.columns !== undefined
+      ? options.columns
+      : process.stdout?.columns || 80;
 
   // 1. Primary path: Native Bun.markdown.ansi()
-  if (typeof Bun !== "undefined" && typeof (Bun as any).markdown?.ansi === "function") {
+  if (
+    typeof Bun !== "undefined" &&
+    typeof (Bun as any).markdown?.ansi === "function"
+  ) {
     return (Bun as any).markdown.ansi(markdown, {
       colors: useColors,
       hyperlinks: useHyperlinks,
-      columns: options?.columns !== undefined ? options.columns : Math.min(terminalWidth, 130),
+      columns:
+        options?.columns !== undefined
+          ? options.columns
+          : Math.min(terminalWidth, 130),
       light: options?.light,
       kittyGraphics: options?.kittyGraphics ?? false,
     });
@@ -103,7 +126,10 @@ export function renderAnsiMarkdown(markdown: string, options?: AnsiMarkdownOptio
   // 2. Fallback: manual OSC 8 substitution if running in Node or older Bun
   if (useHyperlinks) {
     const osc8Regex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
-    return markdown.replace(osc8Regex, (_, text, url) => `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`);
+    return markdown.replace(
+      osc8Regex,
+      (_, text, url) => `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`,
+    );
   }
 
   return markdown;
@@ -112,7 +138,10 @@ export function renderAnsiMarkdown(markdown: string, options?: AnsiMarkdownOptio
 /**
  * Print ANSI Markdown directly to process.stdout.
  */
-export function printAnsiMarkdown(markdown: string, options?: AnsiMarkdownOptions): void {
+export function printAnsiMarkdown(
+  markdown: string,
+  options?: AnsiMarkdownOptions,
+): void {
   const rendered = renderAnsiMarkdown(markdown, options);
   process.stdout.write(rendered);
 }

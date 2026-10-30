@@ -16,32 +16,104 @@ openapi.components.schemas = openapi.components.schemas || {};
 
 openapi.components.schemas.BitemporalIngestionRecord = {
   type: "object",
-  required: ["id", "v_t", "valid_to", "tx_from", "tx_to", "price", "channel_id", "pattern"],
+  required: [
+    "id",
+    "v_t",
+    "valid_to",
+    "tx_from",
+    "tx_to",
+    "price",
+    "channel_id",
+    "pattern",
+  ],
   properties: {
     id: { type: "integer", example: 451 },
-    v_t: { type: "integer", description: "Valid-time start (milliseconds)", example: 1793042000000 },
-    valid_to: { type: "integer", nullable: true, description: "Valid-time end; null if open", example: null },
-    tx_from: { type: "integer", description: "Transaction-time commit timestamp", example: 1793042000150 },
-    tx_to: { type: "integer", nullable: true, description: "Transaction-time superseded timestamp; null if active", example: null },
-    price: { type: "integer", description: "Parsed board price from XML AST", example: -115 },
-    channel_id: { type: "string", enum: ["Internet", "ALERT", "GSLIVE", "GSBUILDER", "CSLEVEL2", "BLOCKED", "GATEWAY"], example: "Internet" },
-    pattern: { type: "string", enum: ["NORMAL", "UP", "DOWN", "SPIKE_UP", "SPIKE_DOWN"], example: "NORMAL" },
-    xml_golden_ast_sha256: { type: "string", example: "3b918478f334ed6540f79a026a27f15850094e84070b140b1329a855f728a745" }
-  }
+    v_t: {
+      type: "integer",
+      description: "Valid-time start (milliseconds)",
+      example: 1793042000000,
+    },
+    valid_to: {
+      type: "integer",
+      nullable: true,
+      description: "Valid-time end; null if open",
+      example: null,
+    },
+    tx_from: {
+      type: "integer",
+      description: "Transaction-time commit timestamp",
+      example: 1793042000150,
+    },
+    tx_to: {
+      type: "integer",
+      nullable: true,
+      description: "Transaction-time superseded timestamp; null if active",
+      example: null,
+    },
+    price: {
+      type: "integer",
+      description: "Parsed board price from XML AST",
+      example: -115,
+    },
+    channel_id: {
+      type: "string",
+      enum: [
+        "Internet",
+        "ALERT",
+        "GSLIVE",
+        "GSBUILDER",
+        "CSLEVEL2",
+        "BLOCKED",
+        "GATEWAY",
+      ],
+      example: "Internet",
+    },
+    pattern: {
+      type: "string",
+      enum: ["NORMAL", "UP", "DOWN", "SPIKE_UP", "SPIKE_DOWN"],
+      example: "NORMAL",
+    },
+    xml_golden_ast_sha256: {
+      type: "string",
+      example:
+        "3b918478f334ed6540f79a026a27f15850094e84070b140b1329a855f728a745",
+    },
+  },
 };
 
 openapi.components.schemas.EmpiricalBayesSharpProfile = {
   type: "object",
-  required: ["customerID", "archetype", "rawCLVBasisPoints", "shrunkSharpScore", "ticketCount", "isGated"],
+  required: [
+    "customerID",
+    "archetype",
+    "rawCLVBasisPoints",
+    "shrunkSharpScore",
+    "ticketCount",
+    "isGated",
+  ],
   properties: {
     customerID: { type: "string", example: "BGD101" },
-    archetype: { type: "string", enum: ["EXECUTION_SNIPER", "STEAM_CHASER", "PARLAY_EXTRACTOR", "WHALE_VOLATILITY", "RECREATIONAL_CASUAL"], example: "EXECUTION_SNIPER" },
+    archetype: {
+      type: "string",
+      enum: [
+        "EXECUTION_SNIPER",
+        "STEAM_CHASER",
+        "PARLAY_EXTRACTOR",
+        "WHALE_VOLATILITY",
+        "RECREATIONAL_CASUAL",
+      ],
+      example: "EXECUTION_SNIPER",
+    },
     rawCLVBasisPoints: { type: "integer", example: 240 },
-    shrunkSharpScore: { type: "number", example: 86.20 },
+    shrunkSharpScore: { type: "number", example: 86.2 },
     ticketCount: { type: "integer", example: 14 },
-    isGated: { type: "boolean", description: "True if N >= 8 sample floor is met", example: true },
-    recommendedDelaySeconds: { type: "integer", example: 15 }
-  }
+    isGated: {
+      type: "boolean",
+      description: "True if N >= 8 sample floor is met",
+      example: true,
+    },
+    recommendedDelaySeconds: { type: "integer", example: 15 },
+  },
 };
 
 openapi.components.schemas.MultiFactorCorroborationScore = {
@@ -57,26 +129,52 @@ openapi.components.schemas.MultiFactorCorroborationScore = {
         timeScore: { type: "number", example: 30 },
         stakeScore: { type: "number", example: 20 },
         deviceScore: { type: "number", example: 25 },
-        marketScore: { type: "number", example: 30 }
-      }
+        marketScore: { type: "number", example: 30 },
+      },
     },
-    classification: { type: "string", enum: ["CLEARED_RECREATIONAL", "ELEVATED_RISK", "BOT_SNIPER_FLAGGED", "GHOST_INJECTION_CLAMPED"], example: "BOT_SNIPER_FLAGGED" },
-    isBreached: { type: "boolean", description: "True if MFCS >= 80", example: true }
-  }
+    classification: {
+      type: "string",
+      enum: [
+        "CLEARED_RECREATIONAL",
+        "ELEVATED_RISK",
+        "BOT_SNIPER_FLAGGED",
+        "GHOST_INJECTION_CLAMPED",
+      ],
+      example: "BOT_SNIPER_FLAGGED",
+    },
+    isBreached: {
+      type: "boolean",
+      description: "True if MFCS >= 80",
+      example: true,
+    },
+  },
 };
 
 openapi.components.schemas.BranchGradeEscrowPolicy = {
   type: "object",
-  required: ["agentID", "branchGrade", "netHoldPercentage", "toxicityScore", "escrowHoldbackRate"],
+  required: [
+    "agentID",
+    "branchGrade",
+    "netHoldPercentage",
+    "toxicityScore",
+    "escrowHoldbackRate",
+  ],
   properties: {
     agentID: { type: "string", example: "ATEAM" },
-    branchGrade: { type: "string", enum: ["AAA", "AA", "A", "BBB", "BB", "B", "CCC", "D_TOXIC"], example: "CCC" },
+    branchGrade: {
+      type: "string",
+      enum: ["AAA", "AA", "A", "BBB", "BB", "B", "CCC", "D_TOXIC"],
+      example: "CCC",
+    },
     netHoldPercentage: { type: "number", example: -14.2 },
     toxicityScore: { type: "number", example: 76.0 },
     sharpsCount: { type: "integer", example: 5 },
-    escrowHoldbackRate: { type: "number", example: 0.50 },
-    actionPlaybook: { type: "string", example: "Escrow freeze; mandate +15c juice model (-115/-115)." }
-  }
+    escrowHoldbackRate: { type: "number", example: 0.5 },
+    actionPlaybook: {
+      type: "string",
+      example: "Escrow freeze; mandate +15c juice model (-115/-115).",
+    },
+  },
 };
 
 writeFileSync(openapiPath, JSON.stringify(openapi, null, 2), "utf-8");
@@ -182,7 +280,9 @@ The engine classifies branches using half-open intervals $[min, max)$ with an ex
 if (!md.includes("## 8. Plane 3 Bitemporal Log Replay")) {
   md += deepSections;
   writeFileSync(apiRefPath, md, "utf-8");
-  console.log("Appended deep quantitative architecture sections to docs/api-reference.md.");
+  console.log(
+    "Appended deep quantitative architecture sections to docs/api-reference.md.",
+  );
 } else {
   console.log("Deep sections already present in docs/api-reference.md.");
 }

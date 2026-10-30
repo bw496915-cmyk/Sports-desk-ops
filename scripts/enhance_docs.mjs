@@ -18,7 +18,13 @@ openapi.components.schemas.SysexitCode = {
   type: "integer",
   description: "Standard BSD/Linux sysexits.h fail-closed process exit codes",
   enum: [0, 64, 72, 75, 77],
-  "x-enum-varnames": ["EX_OK", "EX_USAGE", "EX_DATAERR", "EX_TEMPFAIL", "EX_NOPERM"],
+  "x-enum-varnames": [
+    "EX_OK",
+    "EX_USAGE",
+    "EX_DATAERR",
+    "EX_TEMPFAIL",
+    "EX_NOPERM",
+  ],
   example: 0,
 };
 
@@ -60,7 +66,10 @@ openapi.components.schemas.StandardWireError = {
   type: "object",
   required: ["error", "code", "sysexitCode", "retryable"],
   properties: {
-    error: { type: "string", example: "Session expired or invalid bearer token" },
+    error: {
+      type: "string",
+      example: "Session expired or invalid bearer token",
+    },
     code: { $ref: "#/components/schemas/WirePayloadErrorClassification" },
     sysexitCode: { $ref: "#/components/schemas/SysexitCode" },
     retryable: { type: "boolean", example: true },
@@ -70,14 +79,29 @@ openapi.components.schemas.StandardWireError = {
 
 openapi.components.schemas.NeuronLayerToken = {
   type: "object",
-  required: ["neuronId", "label", "layer", "hexColor", "channelCode", "operationalRole"],
+  required: [
+    "neuronId",
+    "label",
+    "layer",
+    "hexColor",
+    "channelCode",
+    "operationalRole",
+  ],
   properties: {
     neuronId: { type: "string", example: "L18.N0204" },
     label: { type: "string", example: "Retail Pregame Baseline Gate" },
     layer: { type: "integer", example: 18 },
-    hexColor: { type: "string", pattern: "^#[0-9a-fA-F]{6}$", example: "#1d84b5" },
+    hexColor: {
+      type: "string",
+      pattern: "^#[0-9a-fA-F]{6}$",
+      example: "#1d84b5",
+    },
     channelCode: { type: "string", example: "Internet" },
-    operationalRole: { type: "string", example: "Retail pregame baseline flow monitoring and twin matching target." },
+    operationalRole: {
+      type: "string",
+      example:
+        "Retail pregame baseline flow monitoring and twin matching target.",
+    },
   },
 };
 
@@ -87,9 +111,13 @@ openapi.components.schemas.ManagerDomLocalizationKey = {
   properties: {
     key: { type: "string", example: "L-1029" },
     label: { type: "string", example: "Source" },
-    domSelector: { type: "string", example: "th[data-language=\"L-1029\"]" },
+    domSelector: { type: "string", example: 'th[data-language="L-1029"]' },
     wireMapping: { type: "string", example: "TicketWriter" },
-    operationalRole: { type: "string", example: "Ingestion channel discriminator (Internet, ALERT, GSLIVE, GSBUILDER, CSLEVEL2)." },
+    operationalRole: {
+      type: "string",
+      example:
+        "Ingestion channel discriminator (Internet, ALERT, GSLIVE, GSBUILDER, CSLEVEL2).",
+    },
   },
 };
 
@@ -99,245 +127,520 @@ const pathsToAdd = {
     post: {
       tags: ["System & Authentication"],
       summary: "Verify Active JWT Session",
-      description: "Validates active token integrity. On HTTP 401, triggers 1x re-mint cycle before failing closed.",
+      description:
+        "Validates active token integrity. On HTTP 401, triggers 1x re-mint cycle before failing closed.",
       operationId: "verifySession",
       security: [{ BearerAuth: [] }],
       "x-retryable": true,
       responses: {
-        "200": {
+        200: {
           description: "Session valid",
-          content: { "application/json": { schema: { type: "object", properties: { valid: { type: "boolean", example: true }, expiresAt: { type: "integer", example: 1793042000 } } } } }
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  valid: { type: "boolean", example: true },
+                  expiresAt: { type: "integer", example: 1793042000 },
+                },
+              },
+            },
+          },
         },
-        "401": { description: "Session expired (re-mint triggered)" }
-      }
-    }
+        401: { description: "Session expired (re-mint triggered)" },
+      },
+    },
   },
   "/api/desk/auth/me": {
     get: {
       tags: ["System & Authentication"],
       summary: "Inspect Current Operator Session",
-      description: "Retrieves active operator session ID from HTTP-only cookies.",
+      description:
+        "Retrieves active operator session ID from HTTP-only cookies.",
       operationId: "getOperatorSession",
       responses: {
-        "200": {
+        200: {
           description: "Active session confirmed",
-          content: { "application/json": { schema: { type: "object", properties: { authenticated: { type: "boolean", example: true }, sessionId: { type: "string", format: "uuid" } } } } }
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  authenticated: { type: "boolean", example: true },
+                  sessionId: { type: "string", format: "uuid" },
+                },
+              },
+            },
+          },
         },
-        "401": { description: "Unauthenticated" }
-      }
-    }
+        401: { description: "Unauthenticated" },
+      },
+    },
   },
   "/cloud/api/Manager/getCustomerNotes": {
     post: {
       tags: ["Manager & Player Admin"],
       summary: "Get Customer Risk Notes & Surveillance Annotations",
-      description: "Fetches operator notes, sharp tags, and historical risk flags for a player.",
+      description:
+        "Fetches operator notes, sharp tags, and historical risk flags for a player.",
       operationId: "getCustomerNotes",
       security: [{ BearerAuth: [] }],
       requestBody: {
         required: true,
         content: {
           "application/x-www-form-urlencoded": {
-            schema: { type: "object", required: ["customerID"], properties: { customerID: { type: "string", example: "CB112_1    " } } }
-          }
-        }
+            schema: {
+              type: "object",
+              required: ["customerID"],
+              properties: {
+                customerID: { type: "string", example: "CB112_1    " },
+              },
+            },
+          },
+        },
       },
       responses: {
-        "200": {
+        200: {
           description: "Notes retrieved",
-          content: { "application/json": { schema: { type: "object", properties: { notes: { type: "array", items: { type: "object", properties: { timestamp: { type: "string" }, author: { type: "string" }, text: { type: "string" } } } } } } } }
-        }
-      }
-    }
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  notes: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        timestamp: { type: "string" },
+                        author: { type: "string" },
+                        text: { type: "string" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/cloud/api/Manager/updateCustomerNotes": {
     post: {
       tags: ["Manager & Player Admin"],
       summary: "Append Customer Risk Annotation",
-      description: "Appends an immutable audit annotation to the customer profile.",
+      description:
+        "Appends an immutable audit annotation to the customer profile.",
       operationId: "updateCustomerNotes",
       security: [{ BearerAuth: [] }],
       requestBody: {
         required: true,
         content: {
           "application/x-www-form-urlencoded": {
-            schema: { type: "object", required: ["customerID", "noteText"], properties: { customerID: { type: "string", example: "CB112_1    " }, noteText: { type: "string", example: "AUTO-CUT-TIER1 applied limit freeze." } } }
-          }
-        }
+            schema: {
+              type: "object",
+              required: ["customerID", "noteText"],
+              properties: {
+                customerID: { type: "string", example: "CB112_1    " },
+                noteText: {
+                  type: "string",
+                  example: "AUTO-CUT-TIER1 applied limit freeze.",
+                },
+              },
+            },
+          },
+        },
       },
       responses: {
-        "200": { description: "Note appended", content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", example: "SUCCESS" } } } } } }
-      }
-    }
+        200: {
+          description: "Note appended",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: { status: { type: "string", example: "SUCCESS" } },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/cloud/api/Manager/deleteSportsVigSetup": {
     post: {
       tags: ["Vig & Juice Setup"],
       summary: "Remove Custom Juice Shading Rules",
-      description: "Restores baseline odds pricing for the player by deleting active vig overrides.",
+      description:
+        "Restores baseline odds pricing for the player by deleting active vig overrides.",
       operationId: "deleteSportsVigSetup",
       security: [{ BearerAuth: [] }],
       requestBody: {
         required: true,
         content: {
           "application/x-www-form-urlencoded": {
-            schema: { type: "object", required: ["operation", "sportType", "player"], properties: { operation: { type: "string", default: "deleteSportsVigSetup" }, sportType: { type: "string", example: "Football            " }, player: { type: "string", example: "CB112_1    " } } }
-          }
-        }
+            schema: {
+              type: "object",
+              required: ["operation", "sportType", "player"],
+              properties: {
+                operation: { type: "string", default: "deleteSportsVigSetup" },
+                sportType: { type: "string", example: "Football            " },
+                player: { type: "string", example: "CB112_1    " },
+              },
+            },
+          },
+        },
       },
       responses: {
-        "200": { description: "Vig setup deleted", content: { "application/json": { schema: { type: "object", properties: { Result: { type: "object", properties: { Result: { type: "integer", example: 1 } } } } } } } }
-      }
-    }
+        200: {
+          description: "Vig setup deleted",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  Result: {
+                    type: "object",
+                    properties: { Result: { type: "integer", example: 1 } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/cloud/api/Manager/deleteWager": {
     post: {
       tags: ["Wagers & Live Surveillance"],
       summary: "Void / Cancel Wager Ticket",
-      description: "Cancels an open or contested wager ticket with reason code audit logging.",
+      description:
+        "Cancels an open or contested wager ticket with reason code audit logging.",
       operationId: "deleteWager",
       security: [{ BearerAuth: [] }],
       requestBody: {
         required: true,
         content: {
           "application/x-www-form-urlencoded": {
-            schema: { type: "object", required: ["wagerNumber", "reason"], properties: { wagerNumber: { type: "string", example: "894112" }, reason: { type: "string", example: "Past-post stale line exploit" } } }
-          }
-        }
+            schema: {
+              type: "object",
+              required: ["wagerNumber", "reason"],
+              properties: {
+                wagerNumber: { type: "string", example: "894112" },
+                reason: {
+                  type: "string",
+                  example: "Past-post stale line exploit",
+                },
+              },
+            },
+          },
+        },
       },
       responses: {
-        "200": { description: "Wager canceled", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean", example: true }, wagerNumber: { type: "string", example: "894112" } } } } } }
-      }
-    }
+        200: {
+          description: "Wager canceled",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  success: { type: "boolean", example: true },
+                  wagerNumber: { type: "string", example: "894112" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/cloud/api/Report/getDeletedWagerReport": {
     post: {
       tags: ["Reporting & Forensics"],
       summary: "Deleted & Voided Wagers Audit Log",
-      description: "Audit log of all voided, deleted, and canceled tickets across the downline with operator timestamps.",
+      description:
+        "Audit log of all voided, deleted, and canceled tickets across the downline with operator timestamps.",
       operationId: "getDeletedWagerReport",
       security: [{ BearerAuth: [] }],
       responses: {
-        "200": { description: "Deleted wagers log", content: { "application/json": { schema: { type: "array", items: { type: "object", properties: { wagerNumber: { type: "string" }, login: { type: "string" }, deletedAt: { type: "string" }, deletedBy: { type: "string" }, reason: { type: "string" } } } } } } }
-      }
-    }
+        200: {
+          description: "Deleted wagers log",
+          content: {
+            "application/json": {
+              schema: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    wagerNumber: { type: "string" },
+                    login: { type: "string" },
+                    deletedAt: { type: "string" },
+                    deletedBy: { type: "string" },
+                    reason: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/cloud/api/Report/getDailyFigure": {
     post: {
       tags: ["Reporting & Forensics"],
       summary: "Daily Gross Volume & House Hold Breakdown",
-      description: "Pulls daily volume, payouts, and hold deficit/profit across billing period.",
+      description:
+        "Pulls daily volume, payouts, and hold deficit/profit across billing period.",
       operationId: "getDailyFigure",
       security: [{ BearerAuth: [] }],
       responses: {
-        "200": { description: "Daily breakdown", content: { "application/json": { schema: { type: "array", items: { type: "object", properties: { date: { type: "string", format: "date" }, volume: { type: "number" }, netHold: { type: "number" } } } } } } }
-      }
-    }
+        200: {
+          description: "Daily breakdown",
+          content: {
+            "application/json": {
+              schema: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    date: { type: "string", format: "date" },
+                    volume: { type: "number" },
+                    netHold: { type: "number" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/api/desk/hitl/queue": {
     get: {
       tags: ["Desk & HITL Operations"],
       summary: "Query Pending Tier 2 Limit Adjustments",
-      description: "Lists all queued limit modifications awaiting operator sign-off.",
+      description:
+        "Lists all queued limit modifications awaiting operator sign-off.",
       operationId: "getHitlQueue",
       security: [{ BearerAuth: [] }],
       responses: {
-        "200": { description: "Queued approvals list", content: { "application/json": { schema: { type: "array", items: { type: "object", properties: { approvalId: { type: "string" }, customerID: { type: "string" }, currentLimitCents: { type: "integer" }, proposedLimitCents: { type: "integer" } } } } } } }
-      }
-    }
+        200: {
+          description: "Queued approvals list",
+          content: {
+            "application/json": {
+              schema: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    approvalId: { type: "string" },
+                    customerID: { type: "string" },
+                    currentLimitCents: { type: "integer" },
+                    proposedLimitCents: { type: "integer" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/api/desk/hitl/reject": {
     post: {
       tags: ["Desk & HITL Operations"],
       summary: "Reject Queued Limit Raise",
-      description: "Rejects and purges a queued limit raise with rejection audit notes.",
+      description:
+        "Rejects and purges a queued limit raise with rejection audit notes.",
       operationId: "rejectHitlLimit",
       security: [{ BearerAuth: [] }],
       requestBody: {
         required: true,
         content: {
           "application/json": {
-            schema: { type: "object", required: ["approvalId", "reason"], properties: { approvalId: { type: "string", example: "APP-20261030-9411" }, reason: { type: "string", example: "High sharp score." } } }
-          }
-        }
+            schema: {
+              type: "object",
+              required: ["approvalId", "reason"],
+              properties: {
+                approvalId: { type: "string", example: "APP-20261030-9411" },
+                reason: { type: "string", example: "High sharp score." },
+              },
+            },
+          },
+        },
       },
       responses: {
-        "200": { description: "Queued approval rejected", content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", example: "REJECTED" } } } } } }
-      }
-    }
+        200: {
+          description: "Queued approval rejected",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: { status: { type: "string", example: "REJECTED" } },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/api/desk/forensics/audit": {
     post: {
       tags: ["Desk & HITL Operations"],
       summary: "Dispatch Multi-Factor Forensic Audit",
-      description: "Runs Mode A / Mode B / Mode C / Mode I scans and computes Multi-Factor Corroboration Score (MFCS 0-100).",
+      description:
+        "Runs Mode A / Mode B / Mode C / Mode I scans and computes Multi-Factor Corroboration Score (MFCS 0-100).",
       operationId: "dispatchForensicAudit",
       security: [{ BearerAuth: [] }],
       requestBody: {
         required: true,
         content: {
           "application/json": {
-            schema: { type: "object", properties: { period: { type: "string", example: "24h" }, maxVelocitySeconds: { type: "integer", default: 15 }, applyLimits: { type: "boolean", default: false } } }
-          }
-        }
+            schema: {
+              type: "object",
+              properties: {
+                period: { type: "string", example: "24h" },
+                maxVelocitySeconds: { type: "integer", default: 15 },
+                applyLimits: { type: "boolean", default: false },
+              },
+            },
+          },
+        },
       },
       responses: {
-        "200": { description: "Forensic audit scorecard", content: { "application/json": { schema: { type: "object", properties: { auditedTickets: { type: "integer" }, flaggedSnipers: { type: "integer" }, ipCollisions: { type: "integer" } } } } } }
-      }
-    }
+        200: {
+          description: "Forensic audit scorecard",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  auditedTickets: { type: "integer" },
+                  flaggedSnipers: { type: "integer" },
+                  ipCollisions: { type: "integer" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/api/desk/forensics/scores": {
     get: {
       tags: ["Desk & HITL Operations"],
       summary: "Query Empirical Bayes Sharp Scores",
-      description: "Queries online Empirical Bayes sharp scores (tau*=0.68, N_min=8) and CLV basis points.",
+      description:
+        "Queries online Empirical Bayes sharp scores (tau*=0.68, N_min=8) and CLV basis points.",
       operationId: "getSharpScores",
       security: [{ BearerAuth: [] }],
       responses: {
-        "200": { description: "Sharp scores registry", content: { "application/json": { schema: { type: "array", items: { type: "object", properties: { customerID: { type: "string" }, sharpScore: { type: "number" }, clvBasisPoints: { type: "integer" } } } } } } }
-      }
-    }
+        200: {
+          description: "Sharp scores registry",
+          content: {
+            "application/json": {
+              schema: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    customerID: { type: "string" },
+                    sharpScore: { type: "number" },
+                    clvBasisPoints: { type: "integer" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/api/desk/rfq/quote": {
     post: {
       tags: ["Prediction Market RFQ"],
       summary: "Request Prediction Market RFQ Joint Probability Quote",
-      description: "Translates SportsDesk sharp tickets into Polymarket / Kalshi multi-leg event contracts and queries RFQAPI for dynamic probability quotes.",
+      description:
+        "Translates SportsDesk sharp tickets into Polymarket / Kalshi multi-leg event contracts and queries RFQAPI for dynamic probability quotes.",
       operationId: "requestRfqQuote",
       security: [{ BearerAuth: [] }],
       requestBody: {
         required: true,
         content: {
           "application/json": {
-            schema: { type: "object", required: ["ticketIdentifier", "legs"], properties: { ticketIdentifier: { type: "string", example: "MM800|894112" }, legs: { type: "array", items: { type: "object" } } } }
-          }
-        }
+            schema: {
+              type: "object",
+              required: ["ticketIdentifier", "legs"],
+              properties: {
+                ticketIdentifier: { type: "string", example: "MM800|894112" },
+                legs: { type: "array", items: { type: "object" } },
+              },
+            },
+          },
+        },
       },
       responses: {
-        "200": { description: "Joint RFQ quote received", content: { "application/json": { schema: { type: "object", properties: { quoteId: { type: "string" }, jointProbability: { type: "number" }, hedgePriceCents: { type: "integer" } } } } } }
-      }
-    }
+        200: {
+          description: "Joint RFQ quote received",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  quoteId: { type: "string" },
+                  jointProbability: { type: "number" },
+                  hedgePriceCents: { type: "integer" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   "/api/desk/rfq/hedge": {
     post: {
       tags: ["Prediction Market RFQ"],
       summary: "Execute Layoff Hedge Order",
-      description: "Dispatches hedging orders to Polymarket Combos / Kalshi to neutralize tail payout exposure.",
+      description:
+        "Dispatches hedging orders to Polymarket Combos / Kalshi to neutralize tail payout exposure.",
       operationId: "executeLayoffHedge",
       security: [{ BearerAuth: [] }],
       requestBody: {
         required: true,
         content: {
           "application/json": {
-            schema: { type: "object", required: ["quoteId", "hedgeAmountCents"], properties: { quoteId: { type: "string", example: "RFQ-908412-PM" }, hedgeAmountCents: { type: "integer", example: 500000 } } }
-          }
-        }
+            schema: {
+              type: "object",
+              required: ["quoteId", "hedgeAmountCents"],
+              properties: {
+                quoteId: { type: "string", example: "RFQ-908412-PM" },
+                hedgeAmountCents: { type: "integer", example: 500000 },
+              },
+            },
+          },
+        },
       },
       responses: {
-        "200": { description: "Layoff hedge executed", content: { "application/json": { schema: { type: "object", properties: { executionId: { type: "string" }, status: { type: "string", example: "FILLED" } } } } } }
-      }
-    }
-  }
+        200: {
+          description: "Layoff hedge executed",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  executionId: { type: "string" },
+                  status: { type: "string", example: "FILLED" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
 };
 
 for (const [p, op] of Object.entries(pathsToAdd)) {
@@ -347,7 +650,11 @@ for (const [p, op] of Object.entries(pathsToAdd)) {
 }
 
 writeFileSync(openapiPath, JSON.stringify(openapi, null, 2), "utf-8");
-console.log("Saved openapi.json with", Object.keys(openapi.paths).length, "paths.");
+console.log(
+  "Saved openapi.json with",
+  Object.keys(openapi.paths).length,
+  "paths.",
+);
 
 // 3. Build comprehensive api-reference.md
 const lines = [
@@ -402,14 +709,14 @@ const lines = [
   "5. **CSRF Pairing Atomic Requirement**: Submitting `sessionId` without `clientCsrfToken` (or vice versa) triggers `CSRF_PAIRING_MISMATCH` (HTTP 403, `EX_NOPERM` 77).",
   "6. **Referrer Leakage Gate**: Inbound HITL approval routes reject `req.referrerPolicy === 'unsafe-url'` with HTTP 403 to protect `DESK-*` tokens.",
   "7. **CookieMap Session Binding**: Operator sessions use native Bun `CookieMap` with time-ordered `Bun.randomUUIDv7()` and `SameSite=Strict`.",
-  "8. **Zero Embedded URL Credentials**: URLs formatted as `https://user:pass@host` are blocked across the runtime to prevent credentials leaking into error stack traces.",
-  "9. **Space-Padding Contract (`PaddedCustomerId`)**: Writing unpadded logins (`\"CB112\"`) to `updateByColumn` or `vigSetupInsert` yields `Result.Result = 0` (`SILENT_NO_OP`); logins must be padded to strictly 11 characters (`\"CB112_1    \"`).",
-  "10. **Scope Hierarchy Rule**: Supplying master agent `\"BILLY666\"` on mutations yields `Result.Result = -1` (`REJECTED_SCOPE`); writes must name the direct owning sub-agent (`\"CUB22HR\"`).",
+  "8. **Zero Embedded URL Credentials**: URLs formatted with inline `user:password@` authority components are blocked across the runtime to prevent credentials leaking into error stack traces.",
+  '9. **Space-Padding Contract (`PaddedCustomerId`)**: Writing unpadded logins (`"CB112"`) to `updateByColumn` or `vigSetupInsert` yields `Result.Result = 0` (`SILENT_NO_OP`); logins must be padded to strictly 11 characters (`"CB112_1    "`).',
+  '10. **Scope Hierarchy Rule**: Supplying master agent `"BILLY666"` on mutations yields `Result.Result = -1` (`REJECTED_SCOPE`); writes must name the direct owning sub-agent (`"CUB22HR"`).',
   "11. **Poisoned Path Trigger**: Passing a `path` parameter in form bodies poisons `updateByColumn`, causing an empty HTTP 500 response (`POISONED_PATH_500`).",
   "12. **Qubic UI Rewrite Illusion**: Direct HTTP calls to `/qubic/api/...` yield HTTP 404 (`QUBIC_UI_ONLY_404`); requests must target `/cloud/api/...`.",
   "13. **Model Routing Trap**: Calling `/cloud/api/Customer/updateByColumn` returns HTTP 400 `Invalid Method: Model:` (`MODEL_ERROR`); customer mutations must route through `/Manager/updateByColumn`.",
-  "14. **Vig Setup Wire Format**: `vigSetupInsert` requires `application/json` with 20-character space-padded `sportType` (`\"Football            \"`), whereas `getSportsVigSetup` requires `application/x-www-form-urlencoded`.",
-  "15. **Pending Noise Sentinel Drops**: Raw `getPending` streams contain noise rows with `TicketWriter === \"BLOCKED\"` (`L19.N0518`) and zero-stake placeholders; these must be dropped before grouping legs into parent tickets.",
+  '14. **Vig Setup Wire Format**: `vigSetupInsert` requires `application/json` with 20-character space-padded `sportType` (`"Football            "`), whereas `getSportsVigSetup` requires `application/x-www-form-urlencoded`.',
+  '15. **Pending Noise Sentinel Drops**: Raw `getPending` streams contain noise rows with `TicketWriter === "BLOCKED"` (`L19.N0518`) and zero-stake placeholders; these must be dropped before grouping legs into parent tickets.',
   "",
   "## 4. Complete L-Key Dictionary: Layer Tokens & Manager DOM Mapping",
   "",
@@ -418,18 +725,18 @@ const lines = [
   "| Neuron Token | Semantic Label | WagerSource / Route | Hex Color | Color Swatch | DOM CSS Class | Latency / Gate Threshold | Operational Function |",
   "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
   "| **`L18.N0204`** | Retail Pregame Baseline Gate | `Internet` | `#1d84b5` | Sky Blue | `.f402-row-retail` | 1,500 ms SLA | Monitors standard casual pregame bets; serves as the canonical counterpart in digital twin matching. |",
-  "| **`L19.N0518`** | Blocked Sentinel & Noise Filter | `BLOCKED` | `#64748b` | Slate Gray | `.tier-blocked-slate` | `{ kind: \"sentinel_drop\" }` | Drops zero-stake and voided rows before multi-leg grouping to prevent corrupting parent parlay leg arrays. |",
+  '| **`L19.N0518`** | Blocked Sentinel & Noise Filter | `BLOCKED` | `#64748b` | Slate Gray | `.tier-blocked-slate` | `{ kind: "sentinel_drop" }` | Drops zero-stake and voided rows before multi-leg grouping to prevent corrupting parent parlay leg arrays. |',
   "| **`L20.N1105`** | Equilibrium Confirm & Vig Gate | `GATEWAY` | `#10b981` | Emerald Green | `.theme-sd-emerald` | 1,000 ms SLA | Monitors overall book hold equilibrium and verifies +15c/+20c vig persist read-backs via `getSportsVigSetup`. |",
   "| **`L21.N0884`** | Syndicate Sub-Account Alert Twin | `ALERT` | `#ef4444` | Crimson Red | `.f402-row-alert` | 250 ms SLA | Shadow wagers mirroring sharp sub-accounts; enforces `canonicalVolumeCents = 0` to prevent double-counting. |",
   "| **`L22.N1402`** | Steam / Line Chase Phrasing | `GSBUILDER` | `#f59e0b` | Amber-500 | `.tier-amber-steam` | 1,000 ms SLA | Correlated Same-Game Parlay (SGP) proposition builder joined via `M.G<betGroupId>`; steerable via `--steer`. |",
-  "| **`L23.N0412`** | Whale Sizing Anomaly | `GSLIVE` | `#28a745` | Forest Green | `.f402-row-whale` | 500 ms SLA | High-stake in-play live derivatives ($2,000+); forces `rotationGrade = \"LIVE\"`, extracts `M.G<id>`, routes to +20c vig tax. |",
+  '| **`L23.N0412`** | Whale Sizing Anomaly | `GSLIVE` | `#28a745` | Forest Green | `.f402-row-whale` | 500 ms SLA | High-stake in-play live derivatives ($2,000+); forces `rotationGrade = "LIVE"`, extracts `M.G<id>`, routes to +20c vig tax. |',
   "| **`L24.N2019`** | Recreational Longshot Bias | `CSLEVEL2` | `#38bdf8` | Light Sky | `.tier-rec-longshot` | 2,000 ms SLA | Customer service telephone bets and manual desk entries; monitors longshot parlay bias and clerk overrides. |",
   "| **`L25.N1882`** | Adverse Selection & Steam Convergence | `--sd-route-devig` | `#06b6d4` | Cyan-500 | `.route-devig-cyan` | Consensus lag $\\le 5\\text{s}$ | Fast market line move convergence against Pinnacle reference; initiates devig spread recalculation. |",
   "| **`L26.N3104`** | CLV Margin Decay & Shrinkage | `--sd-route-sharp` | `#a855f7` | Purple-500 | `.route-sharp-purple` | $\\tau^* = 0.68, N_{\\min} \\ge 8$ | Online Empirical Bayes sharp detection ($k_{\\text{flow}}=6.0, k_{\\text{clv}}=10.0$); flags systematic Closing Line Value extractors. |",
   "| **`L27.N0912`** | Liquidity Exhaustion Circuit Breaker | `--sd-route-pending` | `#d97706` | Dark Amber | `.route-halt-amber` | Top depth $< \\$1,000$ | Triggers automated exposure circuit breakers when top-of-book market liquidity drops below safety thresholds. |",
   "| **`L28.N2501`** | Terminal Execution Write-Gate | `--sd-route-manager` | `#f43f5e` | Rose-500 | `.route-gate-rose` | MFCS $\\ge 80$ | Execution write-gate triggering dynamic 6s confirmation delay and limit clamp via `Manager/updateByColumn`. |",
   "",
-  "### 4.2 Manager DOM Localization Keys (`data-language=\"L-xxxx\"`)",
+  '### 4.2 Manager DOM Localization Keys (`data-language="L-xxxx"`)',
   "",
   "| DOM Localization Key | Header Label / UI Component | Wire Mapping Property | Purpose & Surveillance Binding |",
   "| :--- | :--- | :--- | :--- |",
@@ -438,7 +745,7 @@ const lines = [
   "| **`L-1031`** | **`Player / Account`** | `Login` / `customerID` | Customer account identifier. Trimmed for queries, right-padded to 11 characters (`PaddedCustomerId`) on mutations. |",
   "| **`L-1032`** | **`Agent`** | `agentOwner` / `agentID` | Direct owning sub-agent hierarchy node (e.g. `CUB22HR`). Validates scope to prevent `REJECTED_SCOPE` (-1). |",
   "| **`L-1033`** | **`Date / Time`** | `PlacedTimestamp` | Placed timestamp (ISO UTC). Evaluates session-to-wager dwell velocity ($\\Delta t_{\\text{velocity}} = t_{\\text{placed}} - t_{\\text{login}}$). |",
-  "| **`L-1034`** | **`Sport`** | `SportType` | Normalized sport category. Padded to strictly 20 characters (`\"Football            \"`) on `vigSetupInsert`. |",
+  '| **`L-1034`** | **`Sport`** | `SportType` | Normalized sport category. Padded to strictly 20 characters (`"Football            "`) on `vigSetupInsert`. |',
   "| **`L-1035`** | **`Description`** | `ShortDesc` | Selection description containing bet type (`ShortDesc[0]`), line, odds, and optional `M.G<betGroupId>` headers. |",
   "| **`L-1036`** | **`Risk`** | `Risk` | Stake amount in dollars. Stored in SQLite strictly as integer `Cents` (`Math.round(risk * 100)`). |",
   "| **`L-1037`** | **`To Win`** | `Win` / `ToWin` | Potential payout amount in dollars. Stored as integer `Cents`. |",
@@ -452,13 +759,13 @@ const lines = [
   "",
   "| `TicketWriter` Value | Layer & Token | Execution Source | Wire ShortDesc Codes | Latency SLA | Volume Rule (`canonicalVolumeCents`) | Primary Forensic Exposure |",
   "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
-  "| **`\"Internet\"`** | `L18.N0204` (`#1d84b5`) | Retail Web Portal | `S, P, T, C, E` | 1,500 ms | $\\min(\\text{Risk}, \\text{Win})$ (`null` on Teasers) | Casual pregame flow; target counterpart in digital twin matching. |",
-  "| **`\"ALERT\"`** | `L21.N0884` (`#ef4444`) | Syndicate Mirror Feed | `S, P, L, G, M` | 250 ms | **Strictly `0`** | Bot sniper sub-account mirror slips; precedes web slips by $\\le 6\\text{s}$. |",
-  "| **`\"GSLIVE\"`** | `L23.N0412` (`#28a745`) | GS Partner 118 In-Play | `M` (ticker), `G` (pending) | 500 ms | $\\min(\\text{Risk}, \\text{Win})$ | Whale sizing anomalies; exposes `M.G<id>` and omits `Team`/`Line`. |",
-  "| **`\"GSBUILDER\"`** | `L22.N1402` (`#f59e0b`) | Same-Game Prop Engine | `C, M, P` | 1,000 ms | $\\min(\\text{Risk}, \\text{Win})$ | Multi-leg correlated prop stacks; carries `<br>` delimited legs. |",
-  "| **`\"CSLEVEL2\"`** | `L24.N2019` (`#38bdf8`) | Clerk / Manual Desk | `L, S, C, E` | 2,000 ms | $\\min(\\text{Risk}, \\text{Win})$ | Telephone desk orders, manual line overrides, and doubles tennis. |",
-  "| **`\"BLOCKED\"`** | `L19.N0518` (`#64748b`) | Noise Filter Sentinel | Empty or any | Sentinel drop | **Dropped** (not evaluated) | Zero-stake placeholders and voided legs; must drop before grouping. |",
-  "| **`\"GATEWAY\"`** | `L20.N1105` (`#10b981`) | Equilibrium Sentinel | Empty | 1,000 ms | Diagnostic check | Margin balance and +15c/+20c vig verification read-backs. |",
+  '| **`"Internet"`** | `L18.N0204` (`#1d84b5`) | Retail Web Portal | `S, P, T, C, E` | 1,500 ms | $\\min(\\text{Risk}, \\text{Win})$ (`null` on Teasers) | Casual pregame flow; target counterpart in digital twin matching. |',
+  '| **`"ALERT"`** | `L21.N0884` (`#ef4444`) | Syndicate Mirror Feed | `S, P, L, G, M` | 250 ms | **Strictly `0`** | Bot sniper sub-account mirror slips; precedes web slips by $\\le 6\\text{s}$. |',
+  '| **`"GSLIVE"`** | `L23.N0412` (`#28a745`) | GS Partner 118 In-Play | `M` (ticker), `G` (pending) | 500 ms | $\\min(\\text{Risk}, \\text{Win})$ | Whale sizing anomalies; exposes `M.G<id>` and omits `Team`/`Line`. |',
+  '| **`"GSBUILDER"`** | `L22.N1402` (`#f59e0b`) | Same-Game Prop Engine | `C, M, P` | 1,000 ms | $\\min(\\text{Risk}, \\text{Win})$ | Multi-leg correlated prop stacks; carries `<br>` delimited legs. |',
+  '| **`"CSLEVEL2"`** | `L24.N2019` (`#38bdf8`) | Clerk / Manual Desk | `L, S, C, E` | 2,000 ms | $\\min(\\text{Risk}, \\text{Win})$ | Telephone desk orders, manual line overrides, and doubles tennis. |',
+  '| **`"BLOCKED"`** | `L19.N0518` (`#64748b`) | Noise Filter Sentinel | Empty or any | Sentinel drop | **Dropped** (not evaluated) | Zero-stake placeholders and voided legs; must drop before grouping. |',
+  '| **`"GATEWAY"`** | `L20.N1105` (`#10b981`) | Equilibrium Sentinel | Empty | 1,000 ms | Diagnostic check | Margin balance and +15c/+20c vig verification read-backs. |',
   "",
   "## 6. Error Taxonomy & Sysexits Matrix",
   "",
@@ -466,8 +773,8 @@ const lines = [
   "| :--- | :--- | :--- | :--- | :--- |",
   "| **`COMMITTED`** | 200 | `EX_OK` (0) | No | Mutation confirmed upstream; read-back succeeded. |",
   "| **`UNVERIFIED_COMMIT`** | 200 | `EX_OK` (0) | **No** | Upstream returned `Result=1`, but read-back timed out. Flagged `isCommitted = true` to strictly prevent duplicate write retries. |",
-  "| **`SILENT_NO_OP`** | 200 | `EX_USAGE` (64) | **No** | Unpadded login passed (`\"CB112\"` instead of `\"CB112_1    \"`). Fix client padding before resubmitting. |",
-  "| **`REJECTED_SCOPE`** | 200 | `EX_USAGE` (64) | **No** | Master agent passed (`\"BILLY666\"`) instead of direct parent sub-agent (`\"CUB22HR\"`). Re-bind to sub-agent. |",
+  '| **`SILENT_NO_OP`** | 200 | `EX_USAGE` (64) | **No** | Unpadded login passed (`"CB112"` instead of `"CB112_1    "`). Fix client padding before resubmitting. |',
+  '| **`REJECTED_SCOPE`** | 200 | `EX_USAGE` (64) | **No** | Master agent passed (`"BILLY666"`) instead of direct parent sub-agent (`"CUB22HR"`). Re-bind to sub-agent. |',
   "| **`MODEL_ERROR`** | 400 | `EX_USAGE` (64) | **No** | Target pointed to `/Customer/updateByColumn` instead of `/Manager/updateByColumn`. Re-route to Manager. |",
   "| **`POISONED_PATH_500`** | 500 | `EX_USAGE` (64) | **No** | Form body contained forbidden `path` property. Strip `path` parameter fail-fast at boundary. |",
   "| **`QUBIC_UI_ONLY_404`** | 404 | `EX_USAGE` (64) | **No** | Direct request sent to `/qubic/api/...` instead of `/cloud/api/...`. Correct URL prefix. |",
@@ -481,30 +788,36 @@ const lines = [
   "| **`UPSTREAM_UNAVAILABLE`** | 502 / 503 | `EX_TEMPFAIL` (75) | **Yes** | Cloudflare reverse proxy or gateway unreachable. Retry with exponential backoff and jitter. |",
   "",
   "## 7. Complete Endpoint Reference",
-  ""
+  "",
 ];
 
 for (const [p, methods] of Object.entries(openapi.paths)) {
   for (const [method, op] of Object.entries(methods)) {
     lines.push(`### \`${method.toUpperCase()} ${p}\``);
-    lines.push(`**${op.summary || p}** (\`operationId: ${op.operationId || p}\`)`);
+    lines.push(
+      `**${op.summary || p}** (\`operationId: ${op.operationId || p}\`)`,
+    );
     lines.push("");
     lines.push(op.description || "Operational endpoint.");
     lines.push("");
 
     const retryable = op["x-retryable"] ?? false;
-    lines.push(`- **Retry Policy**: \`${retryable ? "RETRYABLE" : "NON-RETRYABLE"}\``);
+    lines.push(
+      `- **Retry Policy**: \`${retryable ? "RETRYABLE" : "NON-RETRYABLE"}\``,
+    );
 
     if (op.parameters && op.parameters.length > 0) {
       lines.push("- **Parameters**:");
       for (const param of op.parameters) {
-        lines.push(`  - \`${param.name}\` (${param.in}): \`${param.schema?.default || "string"}\` — ${param.description || ""}`);
+        lines.push(
+          `  - \`${param.name}\` (${param.in}): \`${param.schema?.default || "string"}\` — ${param.description || ""}`,
+        );
       }
     }
 
     if (op.requestBody) {
       lines.push("- **Request Payload**:");
-      for (const [ctype, cval] of Object.entries(op.requestBody.content || {})) {
+      for (const ctype of Object.keys(op.requestBody.content || {})) {
         lines.push(`  - Content-Type: \`${ctype}\``);
       }
     }

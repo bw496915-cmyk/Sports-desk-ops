@@ -8,7 +8,7 @@ set -eo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
-PROJECT_NAME="fantasy402-docs"
+PROJECT_NAME="fantasy402-docs-4ay"
 DRY_RUN=false
 TEST_ONLY=false
 
@@ -33,7 +33,7 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  -t, --test-only        Run test suite only without deploying"
       echo "  -d, --dry-run          Run tests and stage dist/ without publishing"
-      echo "  -p, --project <name>   Target Cloudflare Pages project (default: fantasy402-docs)"
+      echo "  -p, --project <name>   Target Cloudflare Pages project (default: fantasy402-docs-4ay)"
       echo "  -h, --help             Show this help message"
       exit 0
       ;;
@@ -62,6 +62,15 @@ else
 fi
 echo "✓ All schema and documentation assertions passed cleanly."
 
+# Step 1b: Provenance / freshness / portal gates
+if command -v bun >/dev/null 2>&1; then
+  bun run scripts/verify_docs.ts
+  echo "✓ Evidence, freshness and portal gates passed."
+else
+  echo "Error: bun is required to run the docs provenance gates" >&2
+  exit 1
+fi
+
 if [[ "${TEST_ONLY}" == true ]]; then
   echo ""
   echo "Test-only mode enabled. Exiting cleanly without deployment."
@@ -71,11 +80,17 @@ fi
 # Step 2: Stage distribution files
 echo ""
 echo "[2/3] Staging distribution bundle into dist/..."
-mkdir -p dist
-cp docs/index.html dist/index.html
-cp docs/openapi.json dist/openapi.json
+if command -v bun >/dev/null 2>&1; then
+  bun run docs:stage
+else
+  mkdir -p dist
+  cp docs/index.html dist/index.html
+  cp docs/openapi.json dist/openapi.json
+  cp functions/_headers dist/_headers
+fi
 echo "✓ Staged dist/index.html ($(wc -c < dist/index.html | tr -d ' ') bytes)"
 echo "✓ Staged dist/openapi.json ($(wc -c < dist/openapi.json | tr -d ' ') bytes)"
+test -f dist/_headers && echo "✓ Staged dist/_headers ($(wc -c < dist/_headers | tr -d ' ') bytes)"
 
 if [[ "${DRY_RUN}" == true ]]; then
   echo ""
@@ -97,7 +112,10 @@ fi
 echo ""
 echo "================================================================================"
 echo "✨ Deployment successful!"
-echo "Production URL : https://${PROJECT_NAME}-4ay.pages.dev"
-echo "OpenAPI Spec   : https://${PROJECT_NAME}-4ay.pages.dev/openapi.json"
+echo "Verify the live artifact before announcing it:"
+echo "  curl -fsS https://${PROJECT_NAME}.pages.dev/openapi.json | sha256sum"
+echo "  (must equal: $(sha256sum dist/openapi.json | awk '{print $1}'))"
+echo "Production URL : https://${PROJECT_NAME}.pages.dev"
+echo "OpenAPI Spec   : https://${PROJECT_NAME}.pages.dev/openapi.json"
 echo "Custom Domain  : https://docs.bookdeskops.com (once CNAME bound in Cloudflare)"
 echo "================================================================================"
