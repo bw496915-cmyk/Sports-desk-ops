@@ -31,7 +31,7 @@ Charts are rendered with [Pele](https://pele.run) (blueprint theme) into `verifi
 
 Files: `scripts/gen_tokens_zero_drift_gate.sh`, `scripts/generate_tokens.ts` (generator behavior abstracted as `genBehavior`), `package.json` scripts `gen:tokens`, `gen:tokens:gate`, `verify:gen-tokens-gate`.
 
-**Sync commit:** `f567207` — verification bundle and model confirmed against product gate at `81fefeb`. Update only after you diff covered files from `81fefeb` and reconcile the TLA+ model.
+**Sync commit:** `4aa21db` — verification bundle and model confirmed against product gate at `81fefeb`. Update only after you diff covered files from `81fefeb` and reconcile the TLA+ model.
 
 **Last maintain (2026-10-30):** Outcome **bug** (not drift). Product gate unchanged since `81fefeb`; model matches `gen_tokens_zero_drift_gate.sh`. TLC exit **1** (`NoSilentPassWhenGenSkips`); `replay-mutant.sh` exit **0** on real gate (false pass). Bug path since checkout reset (`35a2927`); dirty guard and `-f` check (`bf23486`) did not close skip-after-checkout.
 
