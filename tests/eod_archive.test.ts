@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -41,5 +41,21 @@ describe("eod_archive", () => {
       );
     }
     void shmPath;
+  });
+
+  test("sha256MembersInTarGz default glob includes nested archive paths", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "eod-nested-"));
+    const nestedDir = join(dir, "audit");
+    mkdirSync(nestedDir, { recursive: true });
+    const jsonl = join(nestedDir, "events.jsonl");
+    writeFileSync(jsonl, '{"e":1}\n');
+
+    const out = join(dir, "EOD.tar.gz");
+    await createEodTarGzFromPaths(out, [
+      { archiveName: "audit/events.jsonl", path: jsonl },
+    ]);
+
+    const hashes = await sha256MembersInTarGz(out);
+    expect(hashes.has("audit/events.jsonl")).toBe(true);
   });
 });

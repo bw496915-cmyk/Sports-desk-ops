@@ -84,7 +84,8 @@ export function sha256HexBytes(bytes: Uint8Array): string {
  */
 export async function sha256MembersInTarGz(
   archivePath: string,
-  glob = "*",
+  /** `*` only matches tar root; use `**` for nested paths (e.g. audit/*.jsonl). */
+  glob = "**",
 ): Promise<Map<string, string>> {
   const stat = await Bun.file(archivePath).stat();
   const bytes = await Bun.file(archivePath).bytes();

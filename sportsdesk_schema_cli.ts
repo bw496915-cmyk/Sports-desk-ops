@@ -128,8 +128,11 @@ Dump / snapshot:
   bun run schema:dump-prod -- /path/to/prod.sqlite
   bun run schema:sync-prod-dump
   bun run schema:snapshot
-  bun run schema:gate              CI=true typecheck + snapshot parity
+  bun run schema:gate              CI gate (snapshot + fixture drift + gauntlet + eod smoke)
+  bun run schema:check-fixture-drift   registry tables vs committed prod-schema.json
+  bun run schema:parity-gauntlet   drill exit 2 and combined exit 3
   bun run schema:dump-lag          commit_time − captured_at on fixture
+  bun run eod:smoke                fixture JSONL + temp sqlite tar.gz
   bun run eod:archive -- --out=EOD.tar.gz audit.jsonl=./reports/ingestion-audit.jsonl
 
 Docs index: docs/README.md
