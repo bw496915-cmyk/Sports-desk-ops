@@ -1,0 +1,54 @@
+# Schema / SQLite failure-mode matrix
+
+Reference for manifest ↔ prod-dump parity, schema snapshot, EOD archiving, and ingestion replay SQLite behavior. Exit codes are process exit unless noted as thrown (uncaught → non-zero Bun exit, typically 1).
+
+| Scenario | Expected behavior | Exit code | Example message |
+|----------|-------------------|-----------|-----------------|
+| **Stale allowlist + column drift (same parity run)** | `collectManifestDumpParityDiagnostics` emits both policy and structural findings; stderr logs structural lines at error severity and stale allowlist at error severity; `exitCodeFromParityDiagnostics` returns the **maximum** severity (policy wins over structural). | **3** (`SCHEMA_DUMP_PARITY_POLICY_EXIT`) | `[STALE] allowlist entry "orphan_hotfix" past review_by 2020-01-01; remove from fixture (temporary)` plus `nullability drift ingestion_trades.price: manifest NOT NULL, dump nullable (notnull=0)` |
+| **Stale allowlist only (strict)** | Parity fails with policy exit; `ManifestDumpParityFailedError` carries joined diagnostic messages. | **3** | `[STALE] allowlist entry "orphan_hotfix" past review_by 2020-01-01; remove from fixture (temporary)` |
+| **Column drift only (structural)** | Extra/missing columns, nullability, or affinity mismatch; no stale allowlist. | **2** (`SCHEMA_DUMP_PARITY_STRUCTURAL_EXIT`) | `column ingestion_trades.surprise_column in dump but not in manifest` |
+| **Prod-only table (strict, no allowlist)** | Hotfix table in dump not in manifest and not allowlisted. | **2** | `prod-only table: orphan_hotfix (hotfix table, or missing from registry)` |
+| **Allowlisted prod-only table (valid `review_by`)** | Table permitted; parity passes if manifest columns match. | **0** | — |
+| **Allowlist rot (orphaned / promoted entry)** | Warning only (severity 0); emitted via `console.warn`. | **0** (unless combined with severity ≥2/3) | `allowlist entry "gone_table" is not present in captured tables; orphaned` |
+| **`SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS=1` in CI** | `assertAllowlistBypassNotInCi` throws **before** diagnostics; not a parity exit code. | **Uncaught throw** (non-zero; typically **1**) | `SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS=1 is forbidden in CI` |
+| **`SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS=1` locally** | Prod-only detection skipped; stderr bypass notice; exit 0 if no other drift. | **0** | `[BYPASS] prod-only table detection disabled (SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS=1)` |
+| **`schema_snapshot` dump parity failure** | `runManifestDumpParityFile` returns parity exit; `main()` propagates it. | **2** or **3** | Same as parity rows above |
+| **`SPORTSDESK_SCHEMA_SKIP_DUMP_PARITY=1`** | Fixture parity skipped when dump path exists; snapshot still writes JSON/manifest. | **0** | — |
+| **Prod schema dump format v99 (newer than supported)** | `parseProdSchemaDump` rejects at load time (`SUPPORTED_PROD_SCHEMA_DUMP_VERSION` is **1**). | **Uncaught throw** (typically **1**) | `prod schema dump format v99 unsupported; upgrade parity code (supported v1)` |
+| **Prod schema dump format v0 (obsolete)** | Reject; re-capture required. | **Uncaught throw** (typically **1**) | `prod schema dump format v0 obsolete; re-run schema:dump-prod` |
+| **Missing / invalid dump fields** | Parse errors on load (`format_version`, `captured_at`, `source`, `tables`, allowlist shape). | **Uncaught throw** (typically **1**) | `prod schema dump: missing format_version` |
+| **bun:sqlite strict — missing bind parameter** | `Database` opened with `strict: true`; `prepare().run()` with too few bound values throws synchronously. | **Uncaught throw** (typically **1**) | `Missing parameter` / `expected 2 values` (engine message; matched in tests) |
+| **i64 valid-time open sentinel misuse** | `VALID_TIME_OPEN_SENTINEL` is `9223372036854775807n`; must not bind as JS `number` (unsafe integer). Overlap trigger embeds `VALID_TIME_OPEN_SENTINEL_SQL` as a **literal** only; reads use `sqlInt` on `bigint` from `safeIntegers`. | **N/A** (design guard) | Comment in code: `never bind as a JS number (exceeds MAX_SAFE_INTEGER)` |
+| **EOD archive SQLite member** | Before read, `flushSqliteWalForArchive` → `truncateWalAndDisablePersist` (checkpoint TRUNCATE, disable persistent WAL). Only the main `.sqlite`/`.db` bytes are tar members; sidecars are never added. | **0** on success | — |
+| **EOD archive missing member path** | `collectEodArchiveMembers` throws. | **Uncaught throw** (typically **1**) | `eod archive: missing /path/to/member` |
+| **`eod:archive` CLI missing `--out`** | Usage on stderr. | **1** | `eod:archive: --out=path.tar.gz required` |
+| **Ingestion replay exit priority** | `replayIngestionExitCode`: corrupt JSONL **1** > tx-axis **2** > SLA **3** > ok **0**; empty input with no trades → **1**. | **0–3** | (exit code only; SLA/tx handlers log separately) |
+| **Ingestion `--bitemporal` row without closed valid interval** | Throws during replay (not SQLite exit). | **Uncaught throw** (typically **1**) | `v_to required under --bitemporal (id 42, channel Internet)` |
+
+## Severity reference (manifest ↔ dump parity)
+
+| Severity | Meaning | Typical exit |
+|----------|---------|--------------|
+| 0 | Warning (allowlist rot, non-strict stale allowlist) | 0 alone |
+| 2 | Structural drift | 2 |
+| 3 | Policy (stale allowlist under strict mode) | 3 |
+
+## Environment knobs (parity)
+
+| Variable | Effect |
+|----------|--------|
+| `SPORTSDESK_SCHEMA_DUMP_STRICT_TABLES=0` | Disables strict prod-only tables **and** strict stale allowlist |
+| `SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS=1` | Skips prod-only table checks (forbidden when `CI=true`) |
+| `SPORTSDESK_SCHEMA_SKIP_DUMP_PARITY=1` | Skips fixture parity in `schema_snapshot.ts` |
+| `SPORTSDESK_SCHEMA_DUMP` | Override path to committed prod schema JSON |
+
+## Source map
+
+| Area | Primary modules |
+|------|-----------------|
+| Parity / exit codes | `lib/schema_manifest_db_parity.ts` |
+| Dump parse / allowlist | `lib/schema_prod_dump.ts` |
+| Snapshot orchestration | `scripts/schema_snapshot.ts` |
+| SQLite open / WAL | `lib/sportsdesk_sqlite.ts` |
+| EOD bundle | `lib/eod_archive.ts`, `scripts/eod_archive.ts` |
+| Ingestion replay / sentinel | `sportsdesk_ingestion_replay.ts` |

@@ -1,0 +1,410 @@
+{
+  "provider": "fantasy402",
+  "capturedAt": "2026-10-21T16:38:53.513Z",
+  "sportCount": 19,
+  "subSportCount": 230,
+  "periodsCapturedAt": "2026-10-30T04:59:14.572Z",
+  "sportPeriodCount": 42,
+  "collisions": [
+    { "code": "Arena", "sports": ["Football", "Horse Racing"] },
+    { "code": "NCAA Extra", "sports": ["Basketball", "Hockey"] }
+  ],
+  "expectedEmptySubSportPaths": {
+    "stable": [
+      "Football/Coll Ext",
+      "Hockey/NCAA Extra",
+      "Horse Racing/Arena",
+      "Soccer/France Ligue"
+    ],
+    "volatile": ["LIVE/MMA Live", "LIVE/WNCAA Live"]
+  },
+  "migrationRisks": [
+    {
+      "kind": "pseudo-sport",
+      "code": "LIVE",
+      "affects": ["MMA Live", "WNCAA Live"],
+      "note": "Remove or reorganize LIVE only with coordinated link_id migration"
+    }
+  ],
+  "sports": [
+    {
+      "sport": "Auto Racing",
+      "subSports": [
+        { "code": "F1 MATCHUPS", "name": "F1 Matchups" },
+        { "code": "INDY MATCHUP", "name": "Indianapolis 500 Matchups" },
+        { "code": "NASCAR MAT", "name": "Nascar Matchups" },
+        { "code": "NASCAR TRUCK", "name": "Truck Matchups" },
+        { "code": "NATIONWIDE", "name": "Xfinity Matchups" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Baseball",
+      "subSports": [
+        { "code": "ADJ Series", "name": "MLB Adj Series Prices" },
+        { "code": "BasePlaProp", "name": "MLB Player Props" },
+        { "code": "Grand Salami", "name": "MLB Grand Salami" },
+        { "code": "H-R-E", "name": "MLB Hits + Runs + Errors" },
+        { "code": "Mexican Base", "name": "Latin American Baseball" },
+        { "code": "MLB", "name": "MLB" },
+        { "code": "MLB Alt Line", "name": "MLB Alternate Lines" },
+        { "code": "MLB Preseaso", "name": "Exhibition Baseball" },
+        { "code": "MLB Seas Win", "name": "MLB Reg Season Wins" },
+        { "code": "MLB Series", "name": "MLB Series Prices" },
+        { "code": "NCAABaseball", "name": "Little League World Series" },
+        { "code": "RS Player Pr", "name": "MLB Draft Props" },
+        { "code": "Score in 1st", "name": "MLB Score in 1st Inning" },
+        { "code": "Series Props", "name": "MLB Series Props" },
+        { "code": "TeamScor 1st", "name": "MLB Team to Score First" },
+        { "code": "WBC", "name": "Asian Baseball" }
+      ],
+      "periods": [
+        { "name": "Game", "number": 0 },
+        { "name": "1st 5 Innings", "number": 1 },
+        { "name": "Last 4 Innings", "number": 2 }
+      ]
+    },
+    {
+      "sport": "Basketball",
+      "subSports": [
+        { "code": "BAS NCAA ALT", "name": "NCAAB Alternate Lines" },
+        { "code": "EUROLEAGUE", "name": "Euroleague/ Chams League/ Euro Cup" },
+        { "code": "NBA", "name": "NBA" },
+        { "code": "NBA adj seri", "name": "NBA Adj Series Prices" },
+        { "code": "NBA ALT LINE", "name": "NBA Alternate Lines" },
+        { "code": "NBA GPROPS", "name": "NBA Game Props" },
+        { "code": "NBA Preseaso", "name": "NBA Preseason" },
+        { "code": "NBA Sea Wins", "name": "NBA Regular Season Wins" },
+        { "code": "NBA Ser Sprd", "name": "NBA To Make The Playoffs" },
+        { "code": "NBA Series", "name": "NBA Series Prices" },
+        { "code": "NBAPlayerPro", "name": "NBA Player Props" },
+        { "code": "NCAA", "name": "NCAA Basketball" },
+        { "code": "NCAA Extra", "name": "NCAA Basketball Extra" },
+        { "code": "NCAA Props", "name": "NCAAB Game / Player Props" },
+        { "code": "NCAAB Future", "name": "NCAA Tournament Future Props" },
+        { "code": "OLYMPICS - M", "name": "FIBA Mens Basketball" },
+        { "code": "OLYMPICS - W", "name": "FIBA Women Basketball" },
+        { "code": "Other League", "name": "Other Basketball" },
+        { "code": "Season Props", "name": "NBA Reg Season Player Averages" },
+        { "code": "Spanish Leag", "name": "European Basketball" },
+        { "code": "WNBA", "name": "WNBA" },
+        { "code": "WNBA Series", "name": "WNBA Series Prices" },
+        { "code": "WNBAPresea", "name": "WNBA Player Props" },
+        { "code": "WNBARSW", "name": "WNBA Reg Season Wins" },
+        { "code": "WNCAA", "name": "WNCAA Basketball" }
+      ],
+      "periods": [
+        { "name": "Game", "number": 0 },
+        { "name": "1st Half", "number": 1 },
+        { "name": "2nd Half", "number": 2 },
+        { "name": "1st Quarter", "number": 3 },
+        { "name": "2nd Quarter", "number": 4 },
+        { "name": "3rd Quarter", "number": 5 },
+        { "name": "4th Quarter", "number": 6 }
+      ]
+    },
+    {
+      "sport": "Boxing",
+      "subSports": [
+        { "code": "Box Fights", "name": "O Foster vs E Navarrete Card" },
+        { "code": "BOX Matchu", "name": "A Puello vs D Smith Card" },
+        { "code": "Boxing", "name": "Canelo A vs C Mbilli Card" },
+        { "code": "Boxing Minor", "name": "BKFC 95" },
+        { "code": "Boxing Other", "name": "Boxing @ Chandler, AZ" },
+        { "code": "Matchups", "name": "W Hutchinson vs J Buatsi" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Cricket",
+      "subSports": [
+        { "code": "ICCInterCup", "name": "Indian Premier League" },
+        { "code": "OneDayInter", "name": "One Day International" },
+        { "code": "Twenty20Inte", "name": "Cricket Games" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Entertainment",
+      "subSports": [
+        { "code": "Props", "name": "Nathans Hot Dog Eating Contest" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Esports",
+      "subSports": [
+        { "code": "CSGO", "name": "CS GLOBAL OFFENSIVE" },
+        { "code": "Dota2", "name": "Dota 2" },
+        { "code": "Leagueofleg", "name": "League of Legends" },
+        { "code": "MiscEsports", "name": "E-Sports NBA 2K (League)" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Football",
+      "subSports": [
+        { "code": "Arena", "name": "UFL - AFL" },
+        { "code": "Canadian", "name": "Canadian Football" },
+        { "code": "CFL RSW", "name": "CFL Regular Season Wins" },
+        { "code": "Coll Ext", "name": "" },
+        { "code": "COLLALT", "name": "NCAA  Alternate Lines" },
+        { "code": "College", "name": "NCAA Football" },
+        { "code": "CollExt", "name": "NCAAF Extra and FCS" },
+        { "code": "HighschoolF", "name": "Hypothetical Games" },
+        { "code": "HUSKER GAMES", "name": "Husker Future Games" },
+        { "code": "HUSKER PROPS", "name": "Husker Props" },
+        { "code": "NCAA Sea Win", "name": "NCAAF Regular Season Wins" },
+        { "code": "NCAAF Future", "name": "NCAA Football to Make Playoffs" },
+        { "code": "NCAAGMPROPS", "name": "NCAA Game Props" },
+        { "code": "NCAAPLRPROPS", "name": "NCAAF Player Props" },
+        { "code": "NFL", "name": "NFL" },
+        { "code": "NFL Alt SW", "name": "NFL Alternate Reg Season Wins" },
+        { "code": "NFL PRESEAS", "name": "NFL Preseason" },
+        { "code": "NFL Seas Win", "name": "NFL Regular Season Wins" },
+        { "code": "NFLALTLINE", "name": "NFL Alternate Lines" },
+        { "code": "NFLGAMEPROP", "name": "NFL Game Props" },
+        { "code": "NFLGAMEPROP1", "name": "NFL Game/Player Props" },
+        { "code": "NFLGAMEPROP2", "name": "NFL Game/Player Props" },
+        { "code": "NFLGAMEPROP3", "name": "NFL Game/Player Props" },
+        { "code": "NFLGAMEPROP4", "name": "NFL Game/Player Props" },
+        { "code": "NFLGAMEPROP5", "name": "NFL Season High Totals" },
+        { "code": "NFLPlayoffs", "name": "NFL To Make Playoffs" },
+        { "code": "NFLPLRPROP1", "name": "NFL Reg Season Player Totals" },
+        { "code": "NFLPLRPROPS", "name": "NFL Player Props" }
+      ],
+      "periods": [
+        { "name": "Game", "number": 0 },
+        { "name": "1st Half", "number": 1 },
+        { "name": "2nd Half", "number": 2 },
+        { "name": "1st Quarter", "number": 3 },
+        { "name": "2nd Quarter", "number": 4 },
+        { "name": "3rd Quarter", "number": 5 },
+        { "name": "4th Quarter", "number": 6 }
+      ]
+    },
+    {
+      "sport": "Golf",
+      "subSports": [
+        { "code": "Golf Futures", "name": "Golf Futures" },
+        { "code": "Golf Props", "name": "Golf Props" },
+        { "code": "Ind Rou Mat", "name": "PGA Rnd Matchups" },
+        { "code": "Ind Rou Mat2", "name": "DP World Tour Rnd Matchups" },
+        { "code": "LIV Match", "name": "LIV TNT Matchups" },
+        { "code": "LIV Rd Mat", "name": "LIV Rnd Matchups" },
+        { "code": "LPGA Match", "name": "LPGA Matchups" },
+        { "code": "Top 5", "name": "Masters To Make The Cut" },
+        { "code": "Tour Matchu", "name": "PGA TNT Matchups" },
+        { "code": "Tour Matchu2", "name": "DP World Tour TNT Matchups" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Hockey",
+      "subSports": [
+        { "code": "Candien Hock", "name": "Canadian Hockey" },
+        { "code": "Hockey Alter", "name": "NHL Alternate Lines" },
+        { "code": "Hockey Russi", "name": "European Hockey" },
+        { "code": "IIHF", "name": "World Championship" },
+        { "code": "NCAA Extra", "name": "" },
+        { "code": "NCAA Hockey", "name": "NCAA Hockey" },
+        { "code": "NHL", "name": "NHL" },
+        { "code": "NHL adj seri", "name": "NHL to make the playoffs" },
+        { "code": "NHL Game Pro", "name": "NHL Game Props" },
+        { "code": "NHL Grd Sal", "name": "Grand Salami" },
+        { "code": "NHL Player P", "name": "NHL Reg Season Player Totals" },
+        { "code": "NHL PRE", "name": "NHL PreSeason" },
+        { "code": "NHL Reg Time", "name": "NHL Regulation Time" },
+        { "code": "NHL Sea Wins", "name": "NHL Regular Season Pts" },
+        { "code": "NHL Ser Sprd", "name": "Series Spreads & Totals" },
+        { "code": "NHL Series", "name": "NHL Series Prices" }
+      ],
+      "periods": [
+        { "name": "Game", "number": 0 },
+        { "name": "1st Period", "number": 1 },
+        { "name": "2nd Period", "number": 2 },
+        { "name": "3rd Period", "number": 3 }
+      ]
+    },
+    {
+      "sport": "Horse Racing",
+      "subSports": [
+        { "code": "Arena", "name": "" },
+        { "code": "Bel St MATCH", "name": "Belmont Stakes Matchups / Props" },
+        { "code": "Breder Match", "name": "Breeders Cup Matchups" },
+        { "code": "K DER MATCHU", "name": "Kentucky Derby Matchups/ Props" },
+        { "code": "Prek MATCHU", "name": "Preakness Matchups" },
+        { "code": "Triple Crown", "name": "Triple Crown Props" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "LIVE",
+      "subSports": [
+        { "code": "Boxing Live", "name": "Boxing - Live Betting" },
+        { "code": "LIVE1", "name": "World Cup Live" },
+        { "code": "MLB Live", "name": "MLB - Live Betting" },
+        { "code": "MLB PROPS", "name": "MLB - Live Betting Props" },
+        { "code": "MMA Live", "name": "" },
+        { "code": "NBA Live", "name": "NBA - Live Betting" },
+        { "code": "NCAAB Live", "name": "NCAAB - Live Betting" },
+        { "code": "NCAAF Live", "name": "NCAAF - Live Betting" },
+        { "code": "NFL Live", "name": "NFL - Live Betting" },
+        { "code": "NHL Live", "name": "NHL - Live Betting" },
+        { "code": "WNCAA Live", "name": "" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Martial Arts",
+      "subSports": [
+        { "code": "LFA", "name": "LFA" },
+        { "code": "MMA - DSI1", "name": "UFC Invitational" },
+        { "code": "MMA - DSI2", "name": "Power Slap" },
+        { "code": "MMA - Props", "name": "UFC Props" },
+        { "code": "MMA - Strike", "name": "PFL" },
+        { "code": "MMA - TUF", "name": "Cage Warriors 211" },
+        { "code": "MMA - UFC", "name": "UFC 333" },
+        { "code": "MMA - UFC2", "name": "UFC Fight Night" },
+        { "code": "MMA-Bellator", "name": "MVP MMA 1" },
+        { "code": "P Slap", "name": "Power Slap" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Olympics",
+      "subSports": [
+        { "code": "Olympics Gam", "name": "Winter Olympics Hockey Games" },
+        { "code": "Olympics Pro", "name": "Winter Olympics Props" }
+      ],
+      "periods": [
+        { "name": "Game", "number": 0 },
+        { "name": "1st Half", "number": 1 },
+        { "name": "2nd Half", "number": 2 }
+      ]
+    },
+    {
+      "sport": "Other",
+      "subSports": [
+        { "code": "Cycling", "name": "Lacrosse" },
+        { "code": "Misc", "name": "Lottery Props" },
+        { "code": "Misc 2", "name": "Nathans Hot Dog Eating Contest" },
+        { "code": "PRESIDENTIAL", "name": "WNCAA Volleyball" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Rugby",
+      "subSports": [{ "code": "Rugby G", "name": "Rugby Games" }],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Soccer",
+      "subSports": [
+        { "code": "ARG PRI DIV", "name": "Argentina Soccer Leagues" },
+        { "code": "Aust A Leagu", "name": "Australia A League" },
+        { "code": "AUSTR BUN", "name": "Austria Bundesliga" },
+        { "code": "BEL PR LEA", "name": "Belgium Jupiler League" },
+        { "code": "BRA - SER A", "name": "Brazil Serie A" },
+        { "code": "Brazil Cario", "name": "Brazil Serie B" },
+        { "code": "Carling Cup", "name": "Belarus Vysshaya League" },
+        { "code": "Chi Sup Lea", "name": "China Super League" },
+        { "code": "Chil Pri Div", "name": "Chile Primera Division" },
+        { "code": "CONCACAF CH", "name": "CONCACAF Central American Cup" },
+        { "code": "Copa MX", "name": "Mexico Campeon de Campeones" },
+        { "code": "COPA SUDAMER", "name": "Copa Sudamericana" },
+        { "code": "CR PRI DIV", "name": "Central American Soccer" },
+        { "code": "CROA HNL", "name": "Croatian HNL Liga" },
+        { "code": "CZE REP - GA", "name": "Czech Republic Synot Liga" },
+        { "code": "DAN SUPE SAS", "name": "Denmark Soccer" },
+        { "code": "Ecua Seri A", "name": "Ecuador Serie A" },
+        { "code": "Egypt Premir", "name": "Egypt Premier League" },
+        { "code": "ENG CHAMPI", "name": "England Championship" },
+        { "code": "ENG FA CUP", "name": "FA Cup / EFL Carabao Cup" },
+        { "code": "ENG LEA1", "name": "England League One" },
+        { "code": "ENG PREM", "name": "England Premier League" },
+        { "code": "Estonia", "name": "Estonia Premium Liiga" },
+        { "code": "EURO CUP", "name": "UEFA Nations League" },
+        { "code": "FIFA CONFED", "name": "FiFA confederations Cup" },
+        { "code": "Find Veikkau", "name": "Finland Veikkausliiga" },
+        { "code": "FRANCE CUP", "name": "France Cup" },
+        { "code": "France Lig 2", "name": "France Ligue 2" },
+        { "code": "France Ligue", "name": "" },
+        { "code": "FRE LIGUE1", "name": "France Ligue 1" },
+        { "code": "GER BUNDE", "name": "German Bundesliga" },
+        { "code": "GERMANY CUP", "name": "Germany DFB Pokal" },
+        { "code": "Germy Bund 2", "name": "Germany Bundesliga 2" },
+        { "code": "GOLD CUP", "name": "CONCACAF Gold Cup" },
+        { "code": "Greek Suplig", "name": "Greek Super League" },
+        { "code": "HOLLAND", "name": "Holland Soccer League" },
+        { "code": "Hungria OTP", "name": "Hungary NB1" },
+        { "code": "INTER FRIEND", "name": "International Friendlies" },
+        { "code": "IRE PRE", "name": "Ireland Premier Division" },
+        { "code": "ITA SER A", "name": "Italy Serie A" },
+        { "code": "ITA SER B", "name": "Italy Serie B" },
+        { "code": "ITALY CUP", "name": "Italy Coppa Italia" },
+        { "code": "JAP J LEA", "name": "Asia Soccer Leagues" },
+        { "code": "League2", "name": "Mexico Liga de Ascenso" },
+        { "code": "LIBERTADORES", "name": "Copa Libertadores" },
+        { "code": "MEX - PR DIV", "name": "Mexico 1st Division" },
+        { "code": "Norg OBOS L", "name": "Norway OBOS-ligaen" },
+        { "code": "NORW TIP", "name": "Norway 1st Division" },
+        { "code": "Para Pri Div", "name": "Paraguay Primera Division" },
+        { "code": "Peru Pri", "name": "Peru Primera Division" },
+        { "code": "Polan Ekskla", "name": "Poland Ekstraklasa" },
+        { "code": "PORTU PREMIE", "name": "Portugal Primeira Liga" },
+        { "code": "Pro", "name": "CONCACAF Nations League" },
+        { "code": "Ruman Lig 1", "name": "Romania Liga 1" },
+        { "code": "RUS PR LEA", "name": "Russia Premier League" },
+        { "code": "SCOTT PREMIE", "name": "Scotland Premier League" },
+        { "code": "Socc Adva", "name": "CONCACAF Champs Cup to Advance" },
+        { "code": "Socc Alts", "name": "Champions League Alternate Lines" },
+        { "code": "Soccer Prop8", "name": "England Premier League Season Pts" },
+        { "code": "SOCCER1", "name": "UAE AGL" },
+        { "code": "SPA LA LIGA", "name": "Spain La Liga" },
+        { "code": "SPAIN CUP", "name": "Spain Copa del Rey" },
+        { "code": "SPAN SEGUNDA", "name": "Spain Segunda Division" },
+        { "code": "SWE ALLS", "name": "Sweden Allsvenskan" },
+        { "code": "Swed Suprttn", "name": "Sweden Superettan" },
+        { "code": "Swis Chal Le", "name": "Saudi Arabia SPL" },
+        { "code": "SWISS SUP LE", "name": "Switzerland Super League" },
+        { "code": "TUR SUP LEA", "name": "Turkey Super Lig" },
+        { "code": "Turkis PTT1", "name": "Womens and Other Soccer" },
+        { "code": "UEFA CH LEA", "name": "UEFA Champions League" },
+        { "code": "UEFA EU LEA", "name": "UEFA Europa/Conference League" },
+        { "code": "UKR Pre", "name": "Ukraine Premier League" },
+        { "code": "USA MLS", "name": "USA Soccer" },
+        { "code": "WC Asia Afri", "name": "WC Qualifiers Asia - Africa" },
+        { "code": "WC Comebol", "name": "WC Qualifiers South America" },
+        { "code": "WC Concacaf", "name": "WC Qualifiers Intercontinental" },
+        { "code": "WORLD CUP", "name": "FIFA World Cup" }
+      ],
+      "periods": [
+        { "name": "Game", "number": 0 },
+        { "name": "1st Half", "number": 1 },
+        { "name": "2nd Half", "number": 2 }
+      ]
+    },
+    {
+      "sport": "Tennis",
+      "subSports": [
+        { "code": "ATP Matchu", "name": "ATP  Matchups" },
+        { "code": "OLYMPICS-MEN", "name": "Laver Cup Matchups" },
+        { "code": "OLYMPICS-WOM", "name": "Olympic Women" },
+        { "code": "WTA Matchups", "name": "WTA Matchups" }
+      ],
+      "periods": [{ "name": "Game", "number": 0 }]
+    },
+    {
+      "sport": "Virtual Sports",
+      "subSports": [
+        { "code": "Virtual Nasc", "name": "eNascar Matchups" }
+      ],
+      "periods": [
+        { "name": "Game", "number": 0 },
+        { "name": "1st Half", "number": 1 },
+        { "name": "2nd Half", "number": 2 }
+      ]
+    }
+  ]
+}

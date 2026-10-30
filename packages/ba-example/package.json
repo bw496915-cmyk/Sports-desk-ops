@@ -1,0 +1,13 @@
+{
+  "name": "ba-example",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Doc-style workspace for bun run --filter 'ba*' (see bun.com/docs/runtime#filtering)",
+  "type": "module",
+  "scripts": {
+    "schema": "bun run --cwd ../.. schema"
+  },
+  "engines": {
+    "bun": "1.4.4"
+  }
+}

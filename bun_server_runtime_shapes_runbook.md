@@ -553,6 +553,13 @@ For stdio and socket-based JSON-RPC transports (such as Model Context Protocol b
 - **Zero-Copy Byte Slices**: `result.read` provides the exact byte offset consumed, enabling zero-copy buffer slicing via `buf.subarray(result.read)`.
 - **FIFO Dispatch Ordering**: Writes to stdout/socket maintain strict dispatch sequence via queued slot promises, preventing race conditions between asynchronous handlers and immediate JSON-RPC 2.0 `-32700` parse error frames.
 
+**SportsDesk Plane 3 implementation** (`sportsdesk_ingestion_replay.ts` → dotfiles `lib/cli/plane3-historical-log-replay.ts`):
+
+- Append-only **`reports/ingestion-audit.jsonl`** (and **`reports/telegram-activity.jsonl`** for Telegram) — replay with **`bun run replay -- --path FILE [--markdown] [--bitemporal]`** or **`bun sportsdesk_cli.ts replay`**.
+- ASCII **`channel_id`**, **`link_id`**, **`status`** fields stay on the JSONL fast path; resume with **`buf.subarray(result.read)`** (UTF-8 byte offset, not `String.slice`).
+- Poison lines / crash tails: **`skipPoisonJsonlLine`** + **`corruptedLineSkips`** / **`trailingPartialBytes`** — never abort the full EOD replay for one bad line.
+- Post-replay: **`Bun.XML.parse(xml, { compact: false })`** → board price, optional **`ColorHexInt`** via **`parseAsColorHexInt`**, pattern table (**SPIKE_UP** / **DOWN**) via **`Bun.markdown.render`** + registry hex colors.
+
 ### 8.5 Unix Domain Socket Dual-Endpoint Pattern
 
 _Official Documentation: [https://bun.com/docs/api/http#unix-domain-sockets](https://bun.com/docs/api/http#unix-domain-sockets)_

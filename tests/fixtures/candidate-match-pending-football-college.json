@@ -1,0 +1,12 @@
+{
+  "matchKey": "pending-wager-001",
+  "payload": {
+    "SportType": "Football            ",
+    "SportSubType": "College             ",
+    "PeriodDescription": "Game                ",
+    "ShortName1": "  ALA  ",
+    "ShortName2": "UGA",
+    "TotalPointsOU": null,
+    "ContinueOnPushFlag": null
+  }
+}

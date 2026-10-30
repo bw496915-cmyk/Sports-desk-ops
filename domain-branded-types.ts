@@ -36,6 +36,18 @@ export type Brand<BasePrimitive, BrandToken extends string> = BasePrimitive & {
 };
 
 // ============================================================================
+// 1b. DIGEST & UTC INSTANT BRANDS (audit / provenance) — SSOT in lib/brand.ts
+// ============================================================================
+
+export type { IsoTime as IsoDateTimeUtc, Sha256Hex } from "./lib/brand.ts";
+export {
+  isoTime as isoDateTimeUtc,
+  isIsoTime as isIsoDateTimeUtc,
+  isSha256Hex,
+  sha256FromDigest as sha256HexFromDigest,
+} from "./lib/brand.ts";
+
+// ============================================================================
 // 2. MONETARY & VALUATION BRANDED PRIMITIVES
 // ============================================================================
 
@@ -716,6 +728,16 @@ export const INGESTION_CHANNELS: readonly IngestionChannelDefinition[] = [
     operationalRole: "Recreational Longshot Bias Ingestion",
   },
 ];
+
+/** Plane 2 latency SLA (ms) per lane — derived from `INGESTION_CHANNELS` / tokens.toml SSOT. */
+export const SIGNAL_SLA_MS: Readonly<
+  Record<SignalChannelCode, number | undefined>
+> = Object.fromEntries(
+  INGESTION_CHANNELS.map((c) => [
+    c.channelCode,
+    c.sla.kind === "latency" ? c.sla.latencySlaMs : undefined,
+  ]),
+) as Record<SignalChannelCode, number | undefined>;
 
 /**
  * Decision & Route Continuum (Layers 25-28).

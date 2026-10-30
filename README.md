@@ -4,6 +4,12 @@ Production intelligence, downline risk surveillance, Cloudflare R2 backup, Qwen3
 
 Repository: [bw496915-cmyk/Sports-desk-ops](https://github.com/bw496915-cmyk/Sports-desk-ops)
 
+## Schema registry & prod dump parity
+
+- Operations: [docs/schema-dump-operations.md](docs/schema-dump-operations.md) (`schema:dump-prod`, `schema:sync-prod-dump`, fixture allowlist, `captured_at`)
+- Failure modes: [docs/schema-sqlite-failure-mode-matrix.md](docs/schema-sqlite-failure-mode-matrix.md) (parity exit **2** / **3**, `bun:sqlite` strict + safe integers)
+- CLI: `bun run sportsdesk_schema_cli.ts --help`
+
 ## Quick Start
 
 ```bash
@@ -139,6 +145,17 @@ Empirical measurements recorded via `tests/bench_server.test.ts` and `tests/send
 | **End-to-End Socket Transfer** (16 KB payload)     | `fetch` socket transfer          | `new Response(Bun.file())` | 0.149 ms/req        | Direct loopback socket transfer     |
 | **End-to-End Socket Transfer** (64 KB payload)     | `fetch` socket transfer          | `new Response(Bun.file())` | 0.191 ms/req        | Direct loopback socket transfer     |
 | **End-to-End Socket Transfer** (1 MB payload)      | `fetch` socket transfer          | `new Response(Bun.file())` | 0.489 ms/req        | Direct loopback socket transfer     |
+
+## Plane 3 — append-only ingestion JSONL replay
+
+Self-healing replay for **`reports/ingestion-audit.jsonl`** (and any ASCII-field JSONL feed): `Bun.JSONL.parseChunk` on a streaming `Uint8Array` buffer, `Bun.XML.parse` for board prices, optional bitemporal `v_t` guard, and pattern flags (`SPIKE_UP`, `DOWN`, …) rendered with registry colors.
+
+```bash
+bun run replay -- --path /tmp/e.jsonl --markdown
+bun sportsdesk_cli.ts replay --path reports/ingestion-audit.jsonl --json
+```
+
+Implementation: `sportsdesk_ingestion_replay.ts`, drain mirror `lib/jsonl_stream_replay.ts`, runbook §8.4 in `bun_server_runtime_shapes_runbook.md`.
 
 ## Qwen3.5-4B (Layers 18–28) Token Architecture & Single Source of Truth
 

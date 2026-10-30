@@ -242,6 +242,7 @@ export function evaluatePerceptualDistances(
     for (let j = i + 1; j < tokens.length; j++) {
       const a = tokens[i];
       const b = tokens[j];
+      if (a === undefined || b === undefined) continue;
       const labA = rgbToLab(hexToRgb(a.hex));
       const labB = rgbToLab(hexToRgb(b.hex));
       const deltaE = calculateDeltaE00(labA, labB);
@@ -254,7 +255,7 @@ export function evaluatePerceptualDistances(
         tokenB: b.tokenName,
         deltaE: Number(deltaE.toFixed(2)),
         isDeliberateFamilyPair: isDeliberate,
-        justification,
+        ...(justification !== undefined ? { justification } : {}),
       });
 
       if (!isDeliberate && deltaE < minGenericDeltaE) {

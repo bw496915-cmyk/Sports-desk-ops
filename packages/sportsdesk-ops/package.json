@@ -1,0 +1,17 @@
+{
+  "name": "sportsdesk-ops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SportsDesk ops application (workspace member; sources live at repo root)",
+  "type": "module",
+  "scripts": {
+    "test": "bun run --cwd ../.. test",
+    "typecheck": "bun run --cwd ../.. typecheck",
+    "schema": "bun run --cwd ../.. schema",
+    "schema:list": "bun run --cwd ../.. schema:list",
+    "schema:json": "bun run --cwd ../.. schema:json"
+  },
+  "engines": {
+    "bun": "1.4.4"
+  }
+}

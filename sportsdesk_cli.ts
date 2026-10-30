@@ -272,13 +272,17 @@ Usage: bun sportsdesk_cli.ts [command|option] [parameters...]
   -d, --downline, --agent [AGENT_ID]          Query specific sub-agent volume and 50% hold share
   -s, --summary                               Display executive master overview (668 agents, 9,435 bettors)
 
-4. CLOUDFLARE R2 & BACKUP:
+4. PLANE 3 INGESTION REPLAY:
+  replay [--path FILE] [--pull-raw [URL]] [--pull-raw-only] [--channel CODE] …
+      Self-healing JSONL replay; --pull-raw fetches source bytes before replay
+
+5. CLOUDFLARE R2 & BACKUP:
   r2 --info                                   Display Cloudflare R2 bucket & public gateway config
   r2 --verify                                 Verify Cloudflare API Token status via HTTPS REST API
   r2 --sync [DIR]                             Sync report files to Cloudflare R2 bucket
   r2 --list                                   List remote report objects in R2 bucket
 
-5. DOMAIN SPECIFICATIONS & TELEGRAM:
+6. DOMAIN SPECIFICATIONS & TELEGRAM:
   -b, --brands, --types                       Inspect 16 specification-grade nominal branded types
   -N, --neurons, --layers                     Inspect 13-entity Qwen3.5-4B (Layers 18-28) neuron registry
   -t, --telegram, --bot                       Launch Telegram Bot & Scheduled Reporting Service daemon
@@ -868,8 +872,10 @@ function getArgValue(
   defaultValue: string,
 ): string {
   for (let i = 0; i < args.length; i++) {
-    if (flags.includes(args[i]) && i + 1 < args.length) {
-      return args[i + 1];
+    const flag = args[i];
+    const value = args[i + 1];
+    if (flag !== undefined && flags.includes(flag) && value !== undefined) {
+      return value;
     }
   }
   return defaultValue;
@@ -883,7 +889,12 @@ export async function main(): Promise<void> {
     return;
   }
 
-  const cmd = rawArgs[0].toLowerCase();
+  const cmdArg = rawArgs[0];
+  if (cmdArg === undefined) {
+    printHelp();
+    return;
+  }
+  const cmd = cmdArg.toLowerCase();
 
   if (cmd === "winners" || cmd === "win") {
     printWinners(rawArgs.slice(1));
@@ -897,6 +908,19 @@ export async function main(): Promise<void> {
 
   if (cmd === "leaderboard" || cmd === "board") {
     printLeaderboard(rawArgs.slice(1));
+    return;
+  }
+
+  if (cmd === "replay" || cmd === "ingestion-replay") {
+    const replayArgs = ["bun", "run", "sportsdesk_replay_cli.ts"];
+    for (const a of rawArgs.slice(1)) replayArgs.push(a);
+    const proc = Bun.spawn(replayArgs, {
+      cwd: currentDir,
+      stdout: "inherit",
+      stderr: "inherit",
+      stdin: "inherit",
+    });
+    process.exitCode = await proc.exited;
     return;
   }
 

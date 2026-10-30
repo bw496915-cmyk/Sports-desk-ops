@@ -1,0 +1,17 @@
+{
+  "venueRef": "M.G908412",
+  "validTime": "2026-10-21T01:10:00.000Z",
+  "wire": {
+    "sportType": "Football            ",
+    "sportSubType": "College             ",
+    "periodDescription": "Game                ",
+    "validTimeWindow": "2026-10-21",
+    "legs": [
+      {
+        "ShortName1": "UCF",
+        "Line": "+1",
+        "ShortDesc": "S UCF +1 -110"
+      }
+    ]
+  }
+}

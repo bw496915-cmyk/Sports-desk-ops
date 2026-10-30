@@ -1,0 +1,410 @@
+{
+  "format_version": 1,
+  "captured_at": "2026-10-30T15:01:17.890Z",
+  "source": "registry-baseline",
+  "tables": {
+    "match_evaluations": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "notnull": 0,
+        "pk": 1,
+        "hidden": 0
+      },
+      {
+        "name": "run_id",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "run_at",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "valid_time",
+        "type": "TEXT",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "policy_sha256",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "ticker_sha256",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "pending_sha256",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "state",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "reject_reason",
+        "type": "TEXT",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "review_flag",
+        "type": "TEXT",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "time_diff_ms",
+        "type": "REAL",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "evaluation_json",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "evaluation_json_sha256",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "replay_input_json",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      }
+    ],
+    "wager_settlement_observations": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "notnull": 0,
+        "pk": 1,
+        "hidden": 0
+      },
+      {
+        "name": "run_id",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "run_at",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "valid_time",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "ticket_id",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "wager_status",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "source_feed",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "leg_number",
+        "type": "INTEGER",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "result",
+        "type": "TEXT",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "amount_cents",
+        "type": "INTEGER",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "payload_json",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "payload_sha256",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      }
+    ],
+    "combo_legs": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "notnull": 0,
+        "pk": 1,
+        "hidden": 0
+      },
+      {
+        "name": "run_id",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "run_at",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "canonical_combo_id",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "venue",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "venue_ref",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "valid_time",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "leg_index",
+        "type": "INTEGER",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "leg_json",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "wire_json",
+        "type": "TEXT",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      }
+    ],
+    "candidate_tickets": [
+      {
+        "name": "match_key",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "candidate_status",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "reject_reason",
+        "type": "TEXT",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "time_diff",
+        "type": "REAL",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "policy_sha256",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "participant_1_code",
+        "type": "TEXT",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "participant_2_code",
+        "type": "TEXT",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "raw_json",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      }
+    ],
+    "ingestion_trades": [
+      {
+        "name": "rowid",
+        "type": "INTEGER",
+        "notnull": 0,
+        "pk": 1,
+        "hidden": 0
+      },
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "channel_id",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "channel_status",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "valid_from",
+        "type": "INTEGER",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "valid_to",
+        "type": "INTEGER",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "tx_from",
+        "type": "INTEGER",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "tx_to",
+        "type": "INTEGER",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "price",
+        "type": "INTEGER",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "link_id",
+        "type": "TEXT",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "xml_hash",
+        "type": "TEXT",
+        "notnull": 1,
+        "pk": 0,
+        "hidden": 0
+      },
+      {
+        "name": "latency_ms",
+        "type": "INTEGER",
+        "notnull": 0,
+        "pk": 0,
+        "hidden": 0
+      }
+    ]
+  },
+  "allowlist": {}
+}

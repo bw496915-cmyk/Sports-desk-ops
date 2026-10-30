@@ -1,0 +1,9 @@
+{"id":1,"channel_id":"Internet","channel_status":"ACTIVE","v_t":100,"v_to":200,"latency_ms":1200,"xml":"<t><p>100</p></t>"}
+{"id":2,"channel_id":"GSLIVE","channel_status":"CRITICAL","v_t":100,"v_to":150,"latency_ms":400,"xml":"<t><p>250</p></t>"}
+{"id":3,"channel_id":"BLOCKED","channel_status":"DROPPED","v_t":100,"v_to":200,"latency_ms":10,"xml":"<t><p>0</p></t>"}
+{"id":4,"channel_id":"GSLIVE","channel_status":"CRITICAL","v_t":120,"v_to":180,"latency_ms":600,"xml":"<t><p>260</p></t>"}
+{"id":5,"channel_id":"CSLEVEL2","channel_status":"SUPPRESSED","v_t":300,"v_to":400,"latency_ms":1800,"xml":"<t><p>110</p></t>"}
+{"id":6,"channel_id":"CSLEVEL2","channel_status":"SUPPRESSED","v_t":500,"v_to":600,"latency_ms":2100,"xml":"<t><p>115</p></t>"}
+{"id":7,"channel_id":"ALERT","channel_status":"ALERT","v_t":400,"v_to":500,"latency_ms":260,"xml":"<t><p>99</p></t>"}
+{"id":8,"channel_id":"GATEWAY","channel_status":"ACTIVE","v_t":700,"v_to":800,"latency_ms":900,"xml":"<t><p>88</p></t>"}
+{"id":9,"channel_id":"GSBUILDER","channel_status":"STEERABLE","v_t":800,"v_to":900,"latency_ms":1050,"xml":"<t><p>77</p></t>"}

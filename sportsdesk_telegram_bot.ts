@@ -547,8 +547,10 @@ export class SportsDeskTelegramService {
     });
     return {
       ok: res.ok,
-      message_id: res.result?.message_id,
-      description: res.description,
+      ...(res.result?.message_id !== undefined
+        ? { message_id: res.result.message_id }
+        : {}),
+      ...(res.description !== undefined ? { description: res.description } : {}),
     };
   }
 
@@ -706,12 +708,18 @@ export class SportsDeskTelegramService {
       secret_token: this.webhookSecret,
       allowed_updates: ["message", "callback_query"],
     });
-    return { ok: res.ok, description: res.description };
+    return {
+      ok: res.ok,
+      ...(res.description !== undefined ? { description: res.description } : {}),
+    };
   }
 
   public async deleteWebhook(): Promise<{ ok: boolean; description?: string }> {
     const res = await this.api<boolean>("deleteWebhook");
-    return { ok: res.ok, description: res.description };
+    return {
+      ok: res.ok,
+      ...(res.description !== undefined ? { description: res.description } : {}),
+    };
   }
 
   /** Long-polls getUpdates until {@link stopPolling}; Telegram rejects this while a webhook is set. */
@@ -1008,7 +1016,7 @@ ${action}
       wagerType: "Straight (Point Spread)",
       acceptedAt:
         new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC-5",
-      watchAccount: watch,
+      ...(watch !== undefined ? { watchAccount: watch } : {}),
     };
 
     return this.dispatchWatchListAlert(testPayload, targetChatId);

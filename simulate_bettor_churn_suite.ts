@@ -187,6 +187,7 @@ export function reconstructParentPendingTickets(
   for (const [ticketId, legs] of groupedTicketsMap.entries()) {
     legs.sort((a, b) => a.LegNumber - b.LegNumber);
     const primaryLeg = legs[0];
+    if (primaryLeg === undefined) continue;
     const cleanedShortDesc = sanitizeShortDescText(primaryLeg.ShortDesc);
     const shortDescCode = (cleanedShortDesc.charAt(0).toUpperCase() ||
       "S") as RawShortDescCode;
