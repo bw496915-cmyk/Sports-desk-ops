@@ -207,7 +207,7 @@ export enum MitigationActionKind { ... }
 
 All tokens and contracts are verified continuously through `validation/token_validator.ts` and `tests/`:
 
-1. **Zero Drift**: `bun run gen:tokens && git diff --exit-code` guarantees that `tokens.toml`, `domain-branded-types.ts`, `customer-churn-simulation-dashboard.html`, and `telegram-miniapp-dashboard.html` remain synchronized.
+1. **Zero Drift**: `bun run gen:tokens:gate` (CI step) resets generated outputs, regens from `tokens.toml`, and fails on drift for `domain-branded-types.ts`, `customer-churn-simulation-dashboard.html`, and `telegram-miniapp-dashboard.html`.
 2. **24-bit Exact Uniqueness**: 13 unique `ColorHexInt` values derived from `Bun.color()`.
 3. **CIEDE2000 Perceptual Separation ($\Delta E\_{00} \ge 7.0$)**: Mathematically verified color distance floor across all token pairs, preventing indistinguishable UI swatches.
 4. **WCAG 2.1 Contrast Standards**: $\ge 3.0:1$ for graphical UI badges against dark surfaces (`#070b14` / `#0b1329`) and $\ge 4.5:1$ for typography.
