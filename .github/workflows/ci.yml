@@ -44,6 +44,11 @@ jobs:
       - name: Safe innerHTML Linter Gate
         timeout-minutes: 3
         run: bun bin/check-innerhtml.ts --verbose
+      - name: Schema registry gate (typecheck + manifest ↔ prod dump)
+        timeout-minutes: 5
+        env:
+          CI: "true"
+        run: bun run schema:gate
       - name: Execute Full Verification Test Suite
         timeout-minutes: 5
         run: bun test tests/ --reporter=junit --reporter-outfile=junit-report.xml

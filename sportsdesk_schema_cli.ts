@@ -128,7 +128,11 @@ Dump / snapshot:
   bun run schema:dump-prod -- /path/to/prod.sqlite
   bun run schema:sync-prod-dump
   bun run schema:snapshot
+  bun run schema:gate              CI=true typecheck + snapshot parity
+  bun run schema:dump-lag          commit_time − captured_at on fixture
   bun run eod:archive -- --out=EOD.tar.gz audit.jsonl=./reports/ingestion-audit.jsonl
+
+Docs index: docs/README.md
 
 Recipes:
   bun run schema

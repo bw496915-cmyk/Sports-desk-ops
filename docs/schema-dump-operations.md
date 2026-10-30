@@ -55,3 +55,8 @@ Set `SPORTSDESK_SCHEMA_PARITY_LIVE=1` **and** `SPORTSDESK_SCHEMA_DB` to a SQLite
 | Manifest matches committed prod dump | Default snapshot parity (fixture present, not skipped) |
 | Dump matches live prod | Only after explicit prod capture (`schema:dump-prod`) or a live parity run with current DB |
 | Registry matches prod | Registry is source of truth for manifest; dump is evidence—reconcile via dump-prod + commit |
+
+## CI and metrics
+
+- **`bun run schema:gate`:** `preschema` (`schema:typecheck`) then `schema:snapshot` with `CI=true` (forbids `SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS`). Runs on GitHub Actions after linters.
+- **`bun run schema:dump-lag`:** JSON report: `captured_at`, last git commit time on the fixture file, and `dump_lag_days` (commit − observation). Large lag ⇒ fixture may be stale vs live prod even when parity passes.
