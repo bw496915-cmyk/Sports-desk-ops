@@ -8,7 +8,7 @@ set -eo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
-PROJECT_NAME="fantasy402-docs-4ay"
+PROJECT_NAME="fantasy402-docs"
 DRY_RUN=false
 TEST_ONLY=false
 
@@ -33,7 +33,7 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  -t, --test-only        Run test suite only without deploying"
       echo "  -d, --dry-run          Run tests and stage dist/ without publishing"
-      echo "  -p, --project <name>   Target Cloudflare Pages project (default: fantasy402-docs-4ay)"
+      echo "  -p, --project <name>   Target Cloudflare Pages project (default: fantasy402-docs; portal domain fantasy402-docs-4ay.pages.dev)"
       echo "  -h, --help             Show this help message"
       exit 0
       ;;
@@ -113,9 +113,9 @@ echo ""
 echo "================================================================================"
 echo "✨ Deployment successful!"
 echo "Verify the live artifact before announcing it:"
-echo "  curl -fsS https://${PROJECT_NAME}.pages.dev/openapi.json | sha256sum"
+echo "  curl -fsS https://fantasy402-docs-4ay.pages.dev/openapi.json | sha256sum"
 echo "  (must equal: $(sha256sum dist/openapi.json | awk '{print $1}'))"
-echo "Production URL : https://${PROJECT_NAME}.pages.dev"
-echo "OpenAPI Spec   : https://${PROJECT_NAME}.pages.dev/openapi.json"
+echo "Production URL : https://fantasy402-docs-4ay.pages.dev"
+echo "OpenAPI Spec   : https://fantasy402-docs-4ay.pages.dev/openapi.json"
 echo "Custom Domain  : https://docs.bookdeskops.com (once CNAME bound in Cloudflare)"
 echo "================================================================================"
