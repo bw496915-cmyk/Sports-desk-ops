@@ -19,7 +19,9 @@ export function compareFixtureTablesToRegistry(
   existing: ProdSchemaDump,
 ): FixtureTableDriftResult {
   const synced = buildRegistryBaselineProdDump();
-  synced.allowlist = existing.allowlist ?? synced.allowlist;
+  if (existing.allowlist !== undefined) {
+    synced.allowlist = existing.allowlist;
+  }
   synced.captured_at = existing.captured_at;
 
   const committedTablesCanonical = canonicalJsonString(existing.tables);

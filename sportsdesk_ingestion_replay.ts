@@ -548,7 +548,7 @@ async function runIngestionReplayOnDatabase(
             const actualSha256 = goldenAstFingerprintFromXml(xml).sha256;
             if (actualSha256 !== pin) {
               options.onXmlGoldenAstDrift?.({
-                id: typeof raw.id === "number" ? raw.id : undefined,
+                ...(typeof raw.id === "number" ? { id: raw.id } : {}),
                 expectedSha256: pin,
                 actualSha256,
               });
