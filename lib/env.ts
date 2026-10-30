@@ -1,9 +1,7 @@
 import { asDatabaseURL, type DatabaseURL } from "./urls.ts";
 
 export type EnvName =
-  | "SPORTSDESK_SCHEMA_DB"
-  | "SPORTSDESK_DB"
-  | "SPORTSDESK_STRICT";
+  "SPORTSDESK_SCHEMA_DB" | "SPORTSDESK_DB" | "SPORTSDESK_STRICT";
 
 export interface EnvVar<N extends EnvName> {
   readonly name: N;
@@ -27,7 +25,6 @@ export function envOptional<const N extends EnvName>(
 }
 
 export function schemaDatabaseUrlFromEnv(): DatabaseURL | undefined {
-  const v =
-    envOptional("SPORTSDESK_SCHEMA_DB") ?? envOptional("SPORTSDESK_DB");
+  const v = envOptional("SPORTSDESK_SCHEMA_DB") ?? envOptional("SPORTSDESK_DB");
   return v === undefined ? undefined : asDatabaseURL(v.value);
 }

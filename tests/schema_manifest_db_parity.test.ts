@@ -20,10 +20,7 @@ import {
   filterVisibleXInfoColumns,
   parseProdSchemaDump,
 } from "../lib/schema_prod_dump.ts";
-import {
-  decodeManifest,
-  encodeManifest,
-} from "../lib/schema_binary.ts";
+import { decodeManifest, encodeManifest } from "../lib/schema_binary.ts";
 import { buildSqliteSchemaReport } from "../lib/schema_report.ts";
 
 const fixtureManifest: DecodedManifestTable[] = [
@@ -246,7 +243,9 @@ describe("schema_manifest_db_parity", () => {
         review_by: "2020-01-01",
       },
     };
-    dump.tables.orphan_hotfix = [{ name: "x", type: "TEXT", notnull: 0, pk: 0, hidden: 0 }];
+    dump.tables.orphan_hotfix = [
+      { name: "x", type: "TEXT", notnull: 0, pk: 0, hidden: 0 },
+    ];
 
     const diagnostics = collectManifestDumpParityDiagnostics(dump, manifest, {
       strictProdOnlyTables: true,
@@ -254,7 +253,9 @@ describe("schema_manifest_db_parity", () => {
     });
     const messages = diagnostics.map((d) => d.message).join("\n");
     expect(messages).toMatch(/STALE.*orphan_hotfix/);
-    expect(messages).toMatch(/manifest NOT NULL, dump nullable|ingestion_trades\.price/);
+    expect(messages).toMatch(
+      /manifest NOT NULL, dump nullable|ingestion_trades\.price/,
+    );
     expect(exitCodeFromParityDiagnostics(diagnostics)).toBe(
       SCHEMA_DUMP_PARITY_POLICY_EXIT,
     );
@@ -298,10 +299,7 @@ describe("schema_manifest_db_parity", () => {
     dump.allowlist = {
       gone_table: { reason: "was temporary", review_by: null },
     };
-    const warnings = allowlistRotWarnings(
-      dump,
-      new Set(["ingestion_trades"]),
-    );
+    const warnings = allowlistRotWarnings(dump, new Set(["ingestion_trades"]));
     expect(warnings[0]).toMatch(/gone_table.*orphaned/);
   });
 

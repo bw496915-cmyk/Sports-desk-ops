@@ -115,8 +115,6 @@ export function diffSsotAgainstRegistry(): SsotRegistryDrift[] {
 export function assertSsotRegistryInSync(): void {
   const drifts = diffSsotAgainstRegistry();
   if (drifts.length === 0) return;
-  const msg = drifts
-    .map((d) => `  ${d.table}: ${d.detail}`)
-    .join("\n");
+  const msg = drifts.map((d) => `  ${d.table}: ${d.detail}`).join("\n");
   throw new Error(`SSOT/registry drift:\n${msg}`);
 }

@@ -45,7 +45,8 @@ export function asHttpsURLAt<const H extends string>(
 
 export function asDatabaseURL(input: string | URL): DatabaseURL {
   const u = typeof input === "string" ? new URL(input) : input;
-  if (u.protocol === "file:") return asFileURL(u as URL & { protocol: "file:" });
+  if (u.protocol === "file:")
+    return asFileURL(u as URL & { protocol: "file:" });
   if (u.protocol === "sqlite:") {
     return asSqliteURL(u as URL & { protocol: "sqlite:" });
   }
@@ -54,11 +55,14 @@ export function asDatabaseURL(input: string | URL): DatabaseURL {
 
 export function asManifestURL(input: string | URL): ManifestURL {
   const u = typeof input === "string" ? new URL(input) : input;
-  if (u.protocol === "file:") return asFileURL(u as URL & { protocol: "file:" });
+  if (u.protocol === "file:")
+    return asFileURL(u as URL & { protocol: "file:" });
   if (u.protocol === "https:") {
     return asHttpsURL(u as URL & { protocol: "https:" });
   }
-  throw new TypeError(`expected file: or https: manifest URL, got ${u.protocol}`);
+  throw new TypeError(
+    `expected file: or https: manifest URL, got ${u.protocol}`,
+  );
 }
 
 export function defaultDocsBaseUrl(): HttpsURLAt<"sportsdesk.internal"> {

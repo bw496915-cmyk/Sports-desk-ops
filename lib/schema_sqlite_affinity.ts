@@ -9,11 +9,7 @@
 import type { SqliteStorageKind } from "./sqlite_schema_registry.ts";
 
 export type SqliteTypeAffinity =
-  | "INTEGER"
-  | "TEXT"
-  | "REAL"
-  | "BLOB"
-  | "NUMERIC";
+  "INTEGER" | "TEXT" | "REAL" | "BLOB" | "NUMERIC";
 
 /** Affinity SQLite assigns from a column's declared type name. */
 export function declaredTypeAffinity(declared: string): SqliteTypeAffinity {
@@ -25,19 +21,11 @@ export function declaredTypeAffinity(declared: string): SqliteTypeAffinity {
   if (head.includes("INT") || head === "BOOL" || head === "BOOLEAN") {
     return "INTEGER";
   }
-  if (
-    head.includes("CHAR") ||
-    head.includes("CLOB") ||
-    head.includes("TEXT")
-  ) {
+  if (head.includes("CHAR") || head.includes("CLOB") || head.includes("TEXT")) {
     return "TEXT";
   }
   if (head.includes("BLOB")) return "BLOB";
-  if (
-    head.includes("REAL") ||
-    head.includes("FLOA") ||
-    head.includes("DOUB")
-  ) {
+  if (head.includes("REAL") || head.includes("FLOA") || head.includes("DOUB")) {
     return "REAL";
   }
   if (

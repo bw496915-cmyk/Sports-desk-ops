@@ -87,7 +87,8 @@ async function cmdIngest(args: string[], opts: GlobalOpts): Promise<number> {
       return 0;
     }
     if (a === "--db" && args[i + 1]) dbPath = resolve(args[++i]!);
-    else if (a === "--fixture" && args[i + 1]) fixturePath = resolve(args[++i]!);
+    else if (a === "--fixture" && args[i + 1])
+      fixturePath = resolve(args[++i]!);
     else if (a === "--run-id" && args[i + 1]) runId = auditRunId(args[++i]!);
   }
 
@@ -169,13 +170,16 @@ async function cmdVerify(args: string[], opts: GlobalOpts): Promise<number> {
     if (opts.json) {
       console.log(
         JSON.stringify(
-          { ok: false, payloadDrift: report.payloadDrift, validTimeFork: report.validTimeFork },
+          {
+            ok: false,
+            payloadDrift: report.payloadDrift,
+            validTimeFork: report.validTimeFork,
+          },
           null,
           2,
         ),
       );
-    }
-    else console.error("settlement store invariant failure");
+    } else console.error("settlement store invariant failure");
     return SETTLEMENT_EXIT_STORE_INVARIANT;
   }
 
@@ -187,8 +191,7 @@ async function cmdVerify(args: string[], opts: GlobalOpts): Promise<number> {
         validTimeFork: report.validTimeFork,
       }),
     );
-  }
-  else console.log("verify ok (settlement invariants clean)");
+  } else console.log("verify ok (settlement invariants clean)");
   return 0;
 }
 

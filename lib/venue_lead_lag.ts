@@ -2,7 +2,10 @@
  * Venue lead-lag on shared canonical combos — seconds-scale, not ms.
  */
 
-import type { ComboFirstSeenRow, ComboVenueStore } from "./combo_venue_store.ts";
+import type {
+  ComboFirstSeenRow,
+  ComboVenueStore,
+} from "./combo_venue_store.ts";
 
 /** Below this |delta| both venue clocks are undecidable (internal ~10ms vs Polygon ~2s). */
 export const VENUE_CLOCK_NOISE_MS = 500;
@@ -43,7 +46,9 @@ function median(values: number[]): number | null {
     : (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
-export function classifyLeadLagDelta(deltaMs: number): VenueLeadLagClassification {
+export function classifyLeadLagDelta(
+  deltaMs: number,
+): VenueLeadLagClassification {
   if (Math.abs(deltaMs) <= VENUE_CLOCK_NOISE_MS) {
     return "within_clock_noise";
   }
@@ -54,10 +59,7 @@ export function classifyLeadLagDelta(deltaMs: number): VenueLeadLagClassificatio
 export function buildLeadLagPairs(
   rows: ComboFirstSeenRow[],
 ): VenueLeadLagPair[] {
-  const byCombo = new Map<
-    string,
-    { internal?: string; polymarket?: string }
-  >();
+  const byCombo = new Map<string, { internal?: string; polymarket?: string }>();
   for (const row of rows) {
     let entry = byCombo.get(row.canonical_combo_id);
     if (!entry) {
@@ -172,9 +174,7 @@ export function formatLeadLagReport(summary: VenueLeadLagSummary): string {
 
 /** Actor-level copy-trading — not provable without settlement + wallet join + legal review. */
 export type CrossVenuePatternClass =
-  | "signal_propagation"
-  | "venue_lead_lag"
-  | "actor_copy_trading";
+  "signal_propagation" | "venue_lead_lag" | "actor_copy_trading";
 
 export const CROSS_VENUE_PATTERN_SCOPE: Record<
   CrossVenuePatternClass,

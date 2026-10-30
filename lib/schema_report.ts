@@ -27,10 +27,7 @@ import {
   getTableSchema,
   SPORTSDESK_SQLITE_TABLES,
 } from "./sqlite_schema_registry.ts";
-import {
-  parseSsotTableName,
-  type SsotTableName,
-} from "./ssot_table_name.ts";
+import { parseSsotTableName, type SsotTableName } from "./ssot_table_name.ts";
 import { inspectColumns, inspectKeys, inspectSummary } from "./inspect.ts";
 
 export type TableSummary = SchemaSummaryRow;
@@ -63,21 +60,21 @@ export function schemaReportUrl(value: URL | string): URL {
   }
 }
 
-export function defaultSchemaReportProvenance(
-  overrides?: {
-    databaseUrl?: URL | string;
-    sourceUrl?: URL | string;
-    manifestUrl?: URL | string | null;
-    generatedAt?: string;
-  },
-): SchemaReportProvenance {
+export function defaultSchemaReportProvenance(overrides?: {
+  databaseUrl?: URL | string;
+  sourceUrl?: URL | string;
+  manifestUrl?: URL | string | null;
+  generatedAt?: string;
+}): SchemaReportProvenance {
   const databaseUrl =
     overrides?.databaseUrl !== undefined
       ? asDatabaseURL(overrides.databaseUrl)
       : asDatabaseURL("sqlite:///:memory:");
   const sourceUrl =
     overrides?.sourceUrl !== undefined
-      ? asFileURL(schemaReportUrl(overrides.sourceUrl) as URL & { protocol: "file:" })
+      ? asFileURL(
+          schemaReportUrl(overrides.sourceUrl) as URL & { protocol: "file:" },
+        )
       : schemaRegistrySourceUrl();
 
   const base: SchemaReportProvenance = {

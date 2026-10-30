@@ -35,7 +35,10 @@ describe("candidate_cli", () => {
 
     const pending = JSON.parse(
       await Bun.file(
-        join(import.meta.dir, "fixtures/candidate-match-pending-football-college.json"),
+        join(
+          import.meta.dir,
+          "fixtures/candidate-match-pending-football-college.json",
+        ),
       ).text(),
     );
     const ticker = {
@@ -92,7 +95,10 @@ describe("candidate_cli", () => {
     const dbPath = join(dir, "eval.sqlite");
     const pending = JSON.parse(
       await Bun.file(
-        join(import.meta.dir, "fixtures/candidate-match-pending-football-college.json"),
+        join(
+          import.meta.dir,
+          "fixtures/candidate-match-pending-football-college.json",
+        ),
       ).text(),
     );
     const ticker = {
@@ -119,7 +125,14 @@ describe("candidate_cli", () => {
     db.close();
 
     const proc = Bun.spawn({
-      cmd: ["bun", "run", "sportsdesk_candidate_cli.ts", "verify", "--db", dbPath],
+      cmd: [
+        "bun",
+        "run",
+        "sportsdesk_candidate_cli.ts",
+        "verify",
+        "--db",
+        dbPath,
+      ],
       cwd: import.meta.dir + "/..",
       stdout: "pipe",
       stderr: "pipe",
@@ -132,7 +145,10 @@ describe("candidate_cli", () => {
     const dbPath = join(dir, "eval.sqlite");
     const pending = JSON.parse(
       await Bun.file(
-        join(import.meta.dir, "fixtures/candidate-match-pending-football-college.json"),
+        join(
+          import.meta.dir,
+          "fixtures/candidate-match-pending-football-college.json",
+        ),
       ).text(),
     );
     const ticker = {
@@ -167,7 +183,14 @@ describe("candidate_cli", () => {
     db.close();
 
     const proc = Bun.spawn({
-      cmd: ["bun", "run", "sportsdesk_candidate_cli.ts", "verify", "--db", dbPath],
+      cmd: [
+        "bun",
+        "run",
+        "sportsdesk_candidate_cli.ts",
+        "verify",
+        "--db",
+        dbPath,
+      ],
       cwd: import.meta.dir + "/..",
       stderr: "pipe",
     });
@@ -182,7 +205,10 @@ describe("candidate_cli", () => {
 
     const pending = JSON.parse(
       await Bun.file(
-        join(import.meta.dir, "fixtures/candidate-match-pending-football-college.json"),
+        join(
+          import.meta.dir,
+          "fixtures/candidate-match-pending-football-college.json",
+        ),
       ).text(),
     );
     const ticker = {

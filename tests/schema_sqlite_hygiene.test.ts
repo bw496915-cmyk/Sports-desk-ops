@@ -45,13 +45,13 @@ function findRawDatabaseOpens(relPath: string): number[] {
 
 describe("schema_sqlite_hygiene", () => {
   test("lib/ and sportsdesk_*.ts open SQLite only via sportsdesk_sqlite.ts", () => {
-    const relPaths = [
-      ...listTsFilesUnder("lib"),
-      ...listRootSportsdeskClis(),
-    ];
+    const relPaths = [...listTsFilesUnder("lib"), ...listRootSportsdeskClis()];
     const violations: string[] = [];
     for (const rel of relPaths) {
-      const norm = relative(REPO_ROOT, join(REPO_ROOT, rel)).replace(/\\/g, "/");
+      const norm = relative(REPO_ROOT, join(REPO_ROOT, rel)).replace(
+        /\\/g,
+        "/",
+      );
       for (const line of findRawDatabaseOpens(norm)) {
         violations.push(`${norm}:${line}`);
       }

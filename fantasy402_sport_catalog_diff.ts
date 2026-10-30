@@ -246,9 +246,7 @@ export function buildCatalogDiffReport(
     },
     {
       category: "Periods",
-      before: String(
-        fixtureProvenance.metrics.computedCounts.sportPeriodCount,
-      ),
+      before: String(fixtureProvenance.metrics.computedCounts.sportPeriodCount),
       after: String(probeProvenance.metrics.computedCounts.sportPeriodCount),
       detail: periodDetail,
     },
@@ -327,7 +325,9 @@ export function buildCatalogDiffReport(
     JSON.stringify(
       allExpectedEmptyPaths(fixture.expectedEmptySubSportPaths).sort(),
     ) !==
-    JSON.stringify(allExpectedEmptyPaths(probe.expectedEmptySubSportPaths).sort());
+    JSON.stringify(
+      allExpectedEmptyPaths(probe.expectedEmptySubSportPaths).sort(),
+    );
   if (pathsChanged) {
     rows.push({
       category: "Expected empty paths",

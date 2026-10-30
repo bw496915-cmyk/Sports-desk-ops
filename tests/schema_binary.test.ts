@@ -28,9 +28,9 @@ describe("schema_binary", () => {
     const decoded = decodeManifest(bytes);
     expect(decoded.length).toBe(1);
     expect(decoded[0]?.table).toBe(MATCH_EVALUATIONS_TABLE);
-    expect(decoded[0]?.columns.some((c) => c.column === "evaluation_json")).toBe(
-      true,
-    );
+    expect(
+      decoded[0]?.columns.some((c) => c.column === "evaluation_json"),
+    ).toBe(true);
     expect(
       decoded[0]?.columns.find((c) => c.column === "policy_sha256")?.kind,
     ).toBe("text_sha256");
@@ -95,9 +95,9 @@ describe("schema_binary", () => {
   test("integer and integer_pk use distinct kind codes", () => {
     const pkReport = buildSqliteSchemaReportForTable(MATCH_EVALUATIONS_TABLE)!;
     const pkDecoded = decodeManifest(encodeManifest(pkReport));
-    expect(
-      pkDecoded[0]?.columns.find((c) => c.column === "id")?.kind,
-    ).toBe("integer_pk");
+    expect(pkDecoded[0]?.columns.find((c) => c.column === "id")?.kind).toBe(
+      "integer_pk",
+    );
 
     const intReport = buildSqliteSchemaReportForTable(COMBO_LEGS_TABLE)!;
     const intDecoded = decodeManifest(encodeManifest(intReport));

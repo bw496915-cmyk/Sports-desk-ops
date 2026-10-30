@@ -84,9 +84,9 @@ describe("fantasy402_sport_catalog", () => {
       .subSports.find((s) => s.code === "MMA Live")!.name = "MMA Live Betting";
     expect(liveSportSurfaceChanged(catalog, probe)).toBe(true);
     const report = buildCatalogDiffReport(catalog, probe);
-    expect(report.rows.find((r) => r.category === "Migration risks")?.detail).toContain(
-      "LIVE",
-    );
+    expect(
+      report.rows.find((r) => r.category === "Migration risks")?.detail,
+    ).toContain("LIVE");
   });
 
   test("filling a structural empty is exit 4 (not a cleanup win)", async () => {

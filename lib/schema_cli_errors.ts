@@ -1,7 +1,10 @@
 import { fileURLToPath } from "node:url";
 import type { FileURL } from "./urls.ts";
 import { asFileURL } from "./urls.ts";
-import { SchemaBrandError, type SchemaBrandKind } from "./schema_brand_error.ts";
+import {
+  SchemaBrandError,
+  type SchemaBrandKind,
+} from "./schema_brand_error.ts";
 import { SchemaUnknownTableError } from "./schema_unknown_table_error.ts";
 import { SchemaValidationError } from "./schema_validation_error.ts";
 
@@ -28,9 +31,7 @@ function escapeRegExp(value: string): string {
 /** 1-based line number for editor jump. */
 export function findColumnLine(source: string, columnName: string): number {
   const lines = source.split("\n");
-  const colRe = new RegExp(
-    `^\\s+${escapeRegExp(columnName)}:\\s*\\{`,
-  );
+  const colRe = new RegExp(`^\\s+${escapeRegExp(columnName)}:\\s*\\{`);
   for (let i = 0; i < lines.length; i++) {
     if (colRe.test(lines[i]!)) return i + 1;
   }
@@ -185,11 +186,7 @@ export function formatSchemaError(err: Error): string {
   return [head, body, hint].filter(Boolean).join("\n");
 }
 
-export function openAt(
-  fileUrl: FileURL,
-  line: number,
-  column: number,
-): void {
+export function openAt(fileUrl: FileURL, line: number, column: number): void {
   const resolved =
     Bun.env.VISUAL?.trim() ||
     Bun.env.EDITOR?.trim() ||

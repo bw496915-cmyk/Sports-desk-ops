@@ -2,17 +2,15 @@
  * SSOT for audit SQLite tables — column/key types + Bun.inspect report.
  */
 
-import {
-  sqlCol,
-  sqlDomain,
-  sqlTable,
-  type Brand,
-} from "./brand.ts";
+import { sqlCol, sqlDomain, sqlTable, type Brand } from "./brand.ts";
 import { count, type Count } from "./units.ts";
 import { isSsotTableName } from "./ssot_table_name.ts";
 
 export { sqlCol, sqlTable };
-export type SqlColumnName<T extends string = string> = Brand<T, "SqlColumnName">;
+export type SqlColumnName<T extends string = string> = Brand<
+  T,
+  "SqlColumnName"
+>;
 export type SqlTableName<T extends string = string> = Brand<T, "SqlTableName">;
 
 export type SqliteStorageKind =
@@ -193,9 +191,19 @@ export const WAGER_SETTLEMENT_SCHEMA: SqliteTableDef = {
       kind: "text_enum",
       nullable: false,
     },
-    { name: c("leg_number"), sqlType: "INTEGER", kind: "integer", nullable: true },
+    {
+      name: c("leg_number"),
+      sqlType: "INTEGER",
+      kind: "integer",
+      nullable: true,
+    },
     { name: c("result"), sqlType: "TEXT", kind: "text", nullable: true },
-    { name: c("amount_cents"), sqlType: "INTEGER", kind: "integer", nullable: true },
+    {
+      name: c("amount_cents"),
+      sqlType: "INTEGER",
+      kind: "integer",
+      nullable: true,
+    },
     {
       name: c("payload_json"),
       sqlType: "TEXT",
@@ -255,7 +263,12 @@ export const COMBO_LEGS_SCHEMA: SqliteTableDef = {
       kind: "text_iso_time",
       nullable: false,
     },
-    { name: c("leg_index"), sqlType: "INTEGER", kind: "integer", nullable: false },
+    {
+      name: c("leg_index"),
+      sqlType: "INTEGER",
+      kind: "integer",
+      nullable: false,
+    },
     {
       name: c("leg_json"),
       sqlType: "TEXT",
@@ -353,8 +366,18 @@ export const INGESTION_TRADES_SCHEMA: SqliteTableDef = {
       kind: "integer",
       nullable: false,
     },
-    { name: c("valid_to"), sqlType: "INTEGER", kind: "integer", nullable: true },
-    { name: c("tx_from"), sqlType: "INTEGER", kind: "integer", nullable: false },
+    {
+      name: c("valid_to"),
+      sqlType: "INTEGER",
+      kind: "integer",
+      nullable: true,
+    },
+    {
+      name: c("tx_from"),
+      sqlType: "INTEGER",
+      kind: "integer",
+      nullable: false,
+    },
     { name: c("tx_to"), sqlType: "INTEGER", kind: "integer", nullable: true },
     { name: c("price"), sqlType: "INTEGER", kind: "integer", nullable: false },
     { name: c("link_id"), sqlType: "TEXT", kind: "text", nullable: true },
@@ -364,7 +387,12 @@ export const INGESTION_TRADES_SCHEMA: SqliteTableDef = {
       kind: "text_sha256",
       nullable: false,
     },
-    { name: c("latency_ms"), sqlType: "INTEGER", kind: "integer", nullable: true },
+    {
+      name: c("latency_ms"),
+      sqlType: "INTEGER",
+      kind: "integer",
+      nullable: true,
+    },
   ],
   keys: [
     { kind: "primary", columns: [c("rowid")], autoincrement: true },
@@ -511,4 +539,3 @@ export function getTableSchema(
 ): SqliteTableDef | undefined {
   return SPORTSDESK_SQLITE_TABLES.find((t) => t.name === tableName);
 }
-

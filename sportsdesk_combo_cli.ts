@@ -72,8 +72,7 @@ async function cmdDerive(args: string[], opts: GlobalOpts): Promise<number> {
     return 1;
   }
   const wire = JSON.parse(readFileSync(fixturePath, "utf8")) as
-    | InternalComboWire
-    | PolymarketComboWire;
+    InternalComboWire | PolymarketComboWire;
   const projected = canonicalComboFromWire(side, wire);
   if (!projected) {
     console.error("could not project combo from wire");

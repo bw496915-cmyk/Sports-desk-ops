@@ -41,10 +41,7 @@ export function carryForwardJsonlBuffer(
 
 export function skipPoisonJsonlLine(buffer: JsonlByteBuffer): JsonlByteBuffer {
   let at = 0;
-  while (
-    at < buffer.length &&
-    (buffer[at] === 0x0a || buffer[at] === 0x0d)
-  ) {
+  while (at < buffer.length && (buffer[at] === 0x0a || buffer[at] === 0x0d)) {
     at += 1;
   }
   const nl = buffer.indexOf(0x0a, at);

@@ -15,9 +15,7 @@ type Manifest = {
 
 describe("ingestion_replay_xml_golden_manifest", () => {
   test("committed manifest matches live AST fingerprints", () => {
-    const manifest = JSON.parse(
-      readFileSync(manifestPath, "utf8"),
-    ) as Manifest;
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Manifest;
     expect(manifest.entries.length).toBe(9);
     for (const entry of manifest.entries) {
       expect(goldenAstFingerprintFromXml(entry.xml).sha256).toBe(entry.sha256);

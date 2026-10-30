@@ -9,7 +9,10 @@ type PkColumns<C extends ColumnKindMap> = {
 export type AssertExactlyOnePk<C extends ColumnKindMap> = [
   keyof PkColumns<C>,
 ] extends [never]
-  ? { readonly __error: "table must have exactly one integer_pk column"; got: 0 }
+  ? {
+      readonly __error: "table must have exactly one integer_pk column";
+      got: 0;
+    }
   : [keyof PkColumns<C>] extends [infer _Only extends keyof PkColumns<C>]
     ? [keyof PkColumns<C>] extends [_Only]
       ? unknown
@@ -55,7 +58,10 @@ type JsonSiblingFor<
   ? Base extends keyof C
     ? C[Base] extends { kind: "text_json" }
       ? unknown
-      : { readonly __error: "json sibling has wrong kind"; readonly column: Base }
+      : {
+          readonly __error: "json sibling has wrong kind";
+          readonly column: Base;
+        }
     : unknown
   : unknown;
 
@@ -84,6 +90,8 @@ export type TableInvariants<
   C extends ColumnKindMap,
   I extends Record<string, { readonly columns: readonly string[] }>,
   PkPolicy extends "required" | "optional" = "required",
-> = (PkPolicy extends "required" ? AssertExactlyOnePk<C> : AssertAtMostOnePk<C>) &
+> = (PkPolicy extends "required"
+  ? AssertExactlyOnePk<C>
+  : AssertAtMostOnePk<C>) &
   AssertShaPairs<C> &
   IndexInvariants<C, I>;

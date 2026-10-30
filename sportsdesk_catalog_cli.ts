@@ -194,7 +194,9 @@ async function cmdDiff(args: string[], opts: GlobalOpts): Promise<number> {
   if (tIdx !== -1 && args[tIdx + 1]) {
     timeoutMs = Number.parseInt(args[tIdx + 1]!, 10);
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-      console.error("Error: --timeout must be a positive integer (milliseconds)");
+      console.error(
+        "Error: --timeout must be a positive integer (milliseconds)",
+      );
       return 5;
     }
   }

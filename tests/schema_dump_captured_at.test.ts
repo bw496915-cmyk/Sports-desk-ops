@@ -42,7 +42,9 @@ describe("schema dump captured_at discipline", () => {
     const dbPath = join(dir, "mini.sqlite");
 
     const db = new Database(dbPath);
-    db.exec(`CREATE TABLE ingestion_trades (id INTEGER PRIMARY KEY, qty INTEGER, note TEXT);`);
+    db.exec(
+      `CREATE TABLE ingestion_trades (id INTEGER PRIMARY KEY, qty INTEGER, note TEXT);`,
+    );
     db.close();
 
     const initial = buildRegistryBaselineProdDump();

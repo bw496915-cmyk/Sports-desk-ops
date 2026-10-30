@@ -99,7 +99,9 @@ export function isSqliteFileHeader(bytes: Uint8Array): boolean {
   return true;
 }
 
-export async function readSnapshotArrayBuffer(path: string): Promise<ArrayBuffer> {
+export async function readSnapshotArrayBuffer(
+  path: string,
+): Promise<ArrayBuffer> {
   return Bun.file(path).arrayBuffer();
 }
 
@@ -135,7 +137,10 @@ export function packJsonCanonical(
   return algo === "zstd" ? Bun.zstdCompressSync(raw) : Bun.gzipSync(raw);
 }
 
-export function unpackJson(bytes: Uint8Array, algo: JsonPackAlgo = "gzip"): unknown {
+export function unpackJson(
+  bytes: Uint8Array,
+  algo: JsonPackAlgo = "gzip",
+): unknown {
   const buf = bytes as Uint8Array<ArrayBuffer>;
   const raw: Uint8Array =
     algo === "zstd" ? Bun.zstdDecompressSync(buf) : Bun.gunzipSync(buf);
@@ -217,7 +222,11 @@ export function decodeManifest(bytes: Uint8Array): DecodedManifestTable[] {
   for (let ti = 0; ti < tableCount; ti++) {
     const nameLen = dv.getUint16(o, true);
     o += 2;
-    const nameBytes = new Uint8Array(bytes.buffer, bytes.byteOffset + o, nameLen);
+    const nameBytes = new Uint8Array(
+      bytes.buffer,
+      bytes.byteOffset + o,
+      nameLen,
+    );
     o += nameLen;
     const table = textDecoder.decode(nameBytes);
 
@@ -227,7 +236,11 @@ export function decodeManifest(bytes: Uint8Array): DecodedManifestTable[] {
     for (let ci = 0; ci < colCount; ci++) {
       const colLen = dv.getUint16(o, true);
       o += 2;
-      const colBytes = new Uint8Array(bytes.buffer, bytes.byteOffset + o, colLen);
+      const colBytes = new Uint8Array(
+        bytes.buffer,
+        bytes.byteOffset + o,
+        colLen,
+      );
       o += colLen;
       const column = textDecoder.decode(colBytes);
       const kindCode = dv.getUint8(o++);
@@ -281,7 +294,9 @@ export function mergeManifests(chunks: Uint8Array[]): Uint8Array {
   return new Uint8Array(merged);
 }
 
-export function buildSnapshotStreaming(reports: SqliteSchemaReport[]): Uint8Array {
+export function buildSnapshotStreaming(
+  reports: SqliteSchemaReport[],
+): Uint8Array {
   const sink = new Bun.ArrayBufferSink();
   sink.start({ asUint8Array: true });
   sink.write(new Uint8Array([MANIFEST_VERSION]));

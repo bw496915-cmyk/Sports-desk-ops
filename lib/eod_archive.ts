@@ -106,7 +106,9 @@ export async function sha256MembersInTarGz(
             ? content
             : content instanceof Blob
               ? new Uint8Array(await content.arrayBuffer())
-              : new Uint8Array(await new Blob([content as BlobPart]).arrayBuffer());
+              : new Uint8Array(
+                  await new Blob([content as BlobPart]).arrayBuffer(),
+                );
       out.set(name, sha256HexBytes(buf));
     }
     return out;

@@ -42,7 +42,9 @@ describe("bun_xml_golden_ast_replay", () => {
 
     const result = await replaySportsdeskIngestionLog({ path });
     expect(result.xmlGoldenAst.drift).toBe(1);
-    expect(replayIngestionExitCode(result)).toBe(XML_GOLDEN_AST_REPLAY_DRIFT_EXIT);
+    expect(replayIngestionExitCode(result)).toBe(
+      XML_GOLDEN_AST_REPLAY_DRIFT_EXIT,
+    );
     expect(exitCodeFromIngestionXmlGoldenAstStats(result.xmlGoldenAst)).toBe(4);
   });
 
@@ -51,12 +53,17 @@ describe("bun_xml_golden_ast_replay", () => {
       import.meta.dir,
       "fixtures/ingestion-replay-domain.jsonl",
     );
-    const enrichedPath = join(mkdtempSync(join(tmpdir(), "ing-enrich-")), "e.jsonl");
+    const enrichedPath = join(
+      mkdtempSync(join(tmpdir(), "ing-enrich-")),
+      "e.jsonl",
+    );
     const lines = (await Bun.file(path).text()).trim().split("\n");
     const out = lines
       .map((line) =>
         JSON.stringify(
-          enrichIngestionJsonlRowWithXmlGoldenAst(JSON.parse(line) as { xml: string }),
+          enrichIngestionJsonlRowWithXmlGoldenAst(
+            JSON.parse(line) as { xml: string },
+          ),
         ),
       )
       .join("\n");

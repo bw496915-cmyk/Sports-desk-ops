@@ -6,17 +6,15 @@
  */
 
 import type { Database } from "bun:sqlite";
-import {
-  openSportsdeskSqliteReadonly,
-  sqlInt,
-} from "./sportsdesk_sqlite.ts";
+import { openSportsdeskSqliteReadonly, sqlInt } from "./sportsdesk_sqlite.ts";
 import {
   buildSqliteSchemaReport,
   listRegisteredTableNames,
 } from "./schema_report.ts";
 
 export const PROD_SCHEMA_DUMP_FORMAT_VERSION = 1;
-export const SUPPORTED_PROD_SCHEMA_DUMP_VERSION = PROD_SCHEMA_DUMP_FORMAT_VERSION;
+export const SUPPORTED_PROD_SCHEMA_DUMP_VERSION =
+  PROD_SCHEMA_DUMP_FORMAT_VERSION;
 
 export type ProdSchemaDumpColumn = {
   name: string;
@@ -64,7 +62,9 @@ type XInfoRawRow = Omit<ProdSchemaDumpColumn, "notnull" | "pk" | "hidden"> & {
 };
 
 /** Generated/stored columns (hidden 2/3); exclude rowid aliases (hidden 1). */
-export function filterVisibleXInfoColumns(rows: XInfoRawRow[]): ProdSchemaDumpColumn[] {
+export function filterVisibleXInfoColumns(
+  rows: XInfoRawRow[],
+): ProdSchemaDumpColumn[] {
   return rows
     .filter((c) => {
       const hidden = sqlInt(c.hidden);
@@ -119,7 +119,8 @@ export function parseProdSchemaDumpAllowlist(
     }
     if (
       e.review_by !== null &&
-      (typeof e.review_by !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(e.review_by))
+      (typeof e.review_by !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(e.review_by))
     ) {
       throw new Error(
         `prod schema dump: allowlist.${table}.review_by must be YYYY-MM-DD or null`,
@@ -237,13 +238,17 @@ export function parseProdSchemaDump(json: unknown): ProdSchemaDump {
   };
 }
 
-export async function loadProdSchemaDump(path: string): Promise<ProdSchemaDump> {
+export async function loadProdSchemaDump(
+  path: string,
+): Promise<ProdSchemaDump> {
   const text = await Bun.file(path).text();
   return parseProdSchemaDump(JSON.parse(text));
 }
 
 /** Registry-shaped PRAGMA baseline for CI when prod is unavailable. */
-export function buildRegistryBaselineProdDump(source = "registry-baseline"): ProdSchemaDump {
+export function buildRegistryBaselineProdDump(
+  source = "registry-baseline",
+): ProdSchemaDump {
   const report = buildSqliteSchemaReport();
   const tables: Record<string, ProdSchemaDumpColumn[]> = {};
 

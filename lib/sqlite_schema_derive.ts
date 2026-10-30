@@ -18,7 +18,10 @@ type ColumnDef<
   : never;
 
 type ColValueOf<T extends TableName, C extends ColumnName<T>> =
-  ColumnDef<T, C> extends { kind: infer K extends SqliteStorageKind; nullable: infer N extends Nullable }
+  ColumnDef<T, C> extends {
+    kind: infer K extends SqliteStorageKind;
+    nullable: infer N extends Nullable;
+  }
     ? ColumnValueType<K, N>
     : never;
 
@@ -27,12 +30,11 @@ export type Row<T extends TableName> = {
 };
 
 export type Insert<T extends TableName> = {
-  readonly [C in ColumnName<T> as ColumnDef<
-    T,
-    C
-  > extends { kind: "integer_pk" }
-    ? never
-    : C]: ColumnDef<T, C> extends { nullable: "YES" }
+  readonly [
+    C in ColumnName<T> as ColumnDef<T, C> extends { kind: "integer_pk" }
+      ? never
+      : C
+  ]: ColumnDef<T, C> extends { nullable: "YES" }
     ? ColValueOf<T, C> | undefined
     : ColValueOf<T, C>;
 } & { readonly id?: number; readonly rowid?: number };

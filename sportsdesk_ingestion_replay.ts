@@ -91,10 +91,11 @@ export function validTimeEnd(row: SportsdeskIngestionLogRow): number | null {
 export const VALID_TIME_OPEN_SENTINEL = 9223372036854775807n;
 
 /** SQL integer literal for triggers — not for parameter binding. */
-export const VALID_TIME_OPEN_SENTINEL_SQL =
-  VALID_TIME_OPEN_SENTINEL.toString();
+export const VALID_TIME_OPEN_SENTINEL_SQL = VALID_TIME_OPEN_SENTINEL.toString();
 
-export function hasClosedValidInterval(row: SportsdeskIngestionLogRow): boolean {
+export function hasClosedValidInterval(
+  row: SportsdeskIngestionLogRow,
+): boolean {
   return validTimeEnd(row) !== null;
 }
 
@@ -102,11 +103,7 @@ export const SPORTSDESK_INGESTION_LOG_DEFAULT =
   "reports/ingestion-audit.jsonl" as const;
 
 export type SportsdeskPricePattern =
-  | "NORMAL"
-  | "UP"
-  | "DOWN"
-  | "SPIKE_UP"
-  | "SPIKE_DOWN";
+  "NORMAL" | "UP" | "DOWN" | "SPIKE_UP" | "SPIKE_DOWN";
 
 export type SportsdeskIngestionLogRow = {
   id: number;
@@ -147,12 +144,10 @@ export type ResolvedIngestionChannel = {
 export function resolveIngestionChannel(
   row: SportsdeskIngestionLogRow,
 ): ResolvedIngestionChannel | null {
-  const rawCode =
-    row.channel_id ?? row.channel_code ?? row.ch ?? "Internet";
+  const rawCode = row.channel_id ?? row.channel_code ?? row.ch ?? "Internet";
   if (!isSignalChannelCode(rawCode)) return null;
 
-  const rawStatus =
-    row.channel_status ?? row.st ?? row.status;
+  const rawStatus = row.channel_status ?? row.st ?? row.status;
   if (rawStatus !== undefined) {
     if (!isSignalChannelStatus(rawStatus)) return null;
     return { channelCode: rawCode, channelStatus: rawStatus };
@@ -592,9 +587,7 @@ async function runIngestionReplayOnDatabase(
       const latencyMs = row.latency_ms ?? row.lat ?? null;
       const slaMs = latencySlaMsForChannelCode(channel.channelCode);
       const slaViolation =
-        slaMs !== null &&
-        typeof latencyMs === "number" &&
-        latencyMs > slaMs;
+        slaMs !== null && typeof latencyMs === "number" && latencyMs > slaMs;
       if (slaViolation) {
         latencyViolationsSeen += 1;
         options.onLatencyViolation?.({
@@ -693,7 +686,9 @@ async function runIngestionReplayOnDatabase(
   );
   const currentRowCount = Number(
     (
-      db.query(`SELECT COUNT(*) AS n FROM ingestion_trades WHERE tx_to IS NULL`).get() as {
+      db
+        .query(`SELECT COUNT(*) AS n FROM ingestion_trades WHERE tx_to IS NULL`)
+        .get() as {
         n: number | bigint;
       }
     ).n,
@@ -842,7 +837,9 @@ export function formatSportsdeskReplayTradesTable(
   )}\n`;
 }
 
-export function formatIngestionChannelColorInt(channelCode: string): ColorHexInt | null {
+export function formatIngestionChannelColorInt(
+  channelCode: string,
+): ColorHexInt | null {
   const ch = INGESTION_CHANNELS.find((c) => c.channelCode === channelCode);
   if (!ch) return null;
   return parseAsColorHexInt(ch.hex);

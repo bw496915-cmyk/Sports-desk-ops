@@ -6,9 +6,7 @@
  */
 
 export type WagerObservationSlice =
-  | "pending_at_poll"
-  | "settlement_history"
-  | "pending_diff_inferred";
+  "pending_at_poll" | "settlement_history" | "pending_diff_inferred";
 
 /** Feeds that extend the observable universe when ingested append-only. */
 export const FANTASY402_MANAGER_FEEDS = {
@@ -48,10 +46,7 @@ export type PatternClass =
   | "cancel_rate"
   | "parlay_leg_completion";
 
-export type PatternProvability =
-  | "proven"
-  | "partial"
-  | "blocked";
+export type PatternProvability = "proven" | "partial" | "blocked";
 
 export type PatternScopeRow = {
   pattern: PatternClass;
@@ -72,7 +67,8 @@ export const PATTERN_SCOPE_MATRIX: readonly PatternScopeRow[] = [
     pattern: "cross_source_arb",
     provability: "partial",
     requiredSlices: ["pending_at_poll"],
-    limitation: "Polymarket discovery done; Phase 4 cross-match rows not implemented",
+    limitation:
+      "Polymarket discovery done; Phase 4 cross-match rows not implemented",
   },
   {
     pattern: "customer_stake_timing_cluster",
@@ -97,7 +93,8 @@ export const PATTERN_SCOPE_MATRIX: readonly PatternScopeRow[] = [
     pattern: "parlay_leg_completion",
     provability: "proven",
     requiredSlices: ["settlement_history"],
-    limitation: "getPending shows legs; per-leg settlement status needs history feed",
+    limitation:
+      "getPending shows legs; per-leg settlement status needs history feed",
   },
 ];
 

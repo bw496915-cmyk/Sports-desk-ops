@@ -10,7 +10,10 @@ import {
   affinityMismatchMessage,
   manifestKindAffinityCompatible,
 } from "./schema_sqlite_affinity.ts";
-import type { ProdSchemaDump, ProdSchemaDumpColumn } from "./schema_prod_dump.ts";
+import type {
+  ProdSchemaDump,
+  ProdSchemaDumpColumn,
+} from "./schema_prod_dump.ts";
 import {
   SQLITE_INTERNAL_TABLES,
   allowlistRotWarnings,
@@ -45,7 +48,10 @@ export class ManifestDumpParityFailedError extends Error {
   constructor(diagnostics: readonly ParityDiagnostic[], exitCode: number) {
     super(
       [...diagnostics]
-        .sort((a, b) => b.severity - a.severity || a.message.localeCompare(b.message))
+        .sort(
+          (a, b) =>
+            b.severity - a.severity || a.message.localeCompare(b.message),
+        )
         .map((d) => d.message)
         .join("\n"),
     );
@@ -99,14 +105,18 @@ function nullabilityDriftMessage(
   return `nullability drift ${table}.${column}: manifest nullable, dump NOT NULL (notnull=1)`;
 }
 
-export function logAllowlistBypassIfEnabled(opts: ManifestDumpParityOptions): void {
+export function logAllowlistBypassIfEnabled(
+  opts: ManifestDumpParityOptions,
+): void {
   if (!opts.allowlistBypass) return;
   console.error(
     "[BYPASS] prod-only table detection disabled (SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS=1)",
   );
 }
 
-export function assertAllowlistBypassNotInCi(opts: ManifestDumpParityOptions): void {
+export function assertAllowlistBypassNotInCi(
+  opts: ManifestDumpParityOptions,
+): void {
   if (process.env.CI !== "true") return;
   if (!opts.allowlistBypass) return;
   throw new Error(
@@ -296,7 +306,8 @@ export function prodDumpParityOptionsFromEnv(): ManifestDumpParityOptions {
   return {
     strictProdOnlyTables: strictTables,
     strictStaleAllowlist: strictTables,
-    allowlistBypass: process.env.SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS === "1",
+    allowlistBypass:
+      process.env.SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS === "1",
   };
 }
 

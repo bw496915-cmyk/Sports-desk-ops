@@ -11,12 +11,7 @@ import type { Sha256Hex } from "../domain-branded-types.ts";
 import { sha256HexOfBytes } from "../sportsdesk_ingestion_feed_provenance.ts";
 
 export type ComboMarketKind =
-  | "spread"
-  | "moneyline"
-  | "total_over"
-  | "total_under"
-  | "prop"
-  | "unknown";
+  "spread" | "moneyline" | "total_over" | "total_under" | "prop" | "unknown";
 
 export type ComboLegSemantic = {
   participantCode: string;
@@ -76,10 +71,7 @@ export function formatLegSignature(leg: ComboLegSemantic): string {
 
 /** Sorted leg signatures joined — price-free semantic key. */
 export function deriveCanonicalComboId(input: CanonicalComboInput): string {
-  const legPart = [...input.legs]
-    .map(formatLegSignature)
-    .sort()
-    .join(";");
+  const legPart = [...input.legs].map(formatLegSignature).sort().join(";");
   const base = `${input.competitionFamily}|${input.period}|${legPart}`;
   if (input.validTimeWindow) {
     return `${base}|${input.validTimeWindow}`;
@@ -99,7 +91,9 @@ export type InternalComboWire = {
   legs: Array<Record<string, unknown>>;
 };
 
-export function projectInternalCombo(wire: InternalComboWire): CanonicalComboInput | null {
+export function projectInternalCombo(
+  wire: InternalComboWire,
+): CanonicalComboInput | null {
   const sportType = normalizePaddedField(wire.sportType);
   const sportSubType = normalizePaddedField(wire.sportSubType);
   const { competitionFamily } = competitionFamilyFromDirectory(

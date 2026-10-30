@@ -107,7 +107,9 @@ describe("sportsdesk_ingestion_replay", () => {
     expect(result.skippedInserts).toBe(1);
     expect(result.latencyViolationsSeen).toBe(4);
     expect(result.latencyViolationsAccepted).toBe(3);
-    expect(result.trades.map((t) => t.id).sort()).toEqual([1, 2, 5, 6, 7, 8, 9]);
+    expect(result.trades.map((t) => t.id).sort()).toEqual([
+      1, 2, 5, 6, 7, 8, 9,
+    ]);
     expect(result.trades.find((t) => t.id === 8)!.channel_id).toBe("GATEWAY");
     expect(result.trades.find((t) => t.id === 9)!.channel_id).toBe("GSBUILDER");
     expect(SIGNAL_SLA_MS.GATEWAY).toBe(1000);
@@ -123,7 +125,10 @@ describe("sportsdesk_ingestion_replay", () => {
   });
 
   test("overlap trigger enforced without --bitemporal flag", async () => {
-    const file = join(import.meta.dir, `.tmp-trigger-always-${Date.now()}.jsonl`);
+    const file = join(
+      import.meta.dir,
+      `.tmp-trigger-always-${Date.now()}.jsonl`,
+    );
     await Bun.write(
       file,
       `{"id":1,"channel_id":"GSLIVE","channel_status":"CRITICAL","v_t":100,"v_to":200,"xml":"<t><p>100</p></t>"}\n{"id":2,"channel_id":"GSLIVE","channel_status":"CRITICAL","v_t":150,"v_to":250,"xml":"<t><p>105</p></t>"}\n`,
@@ -179,11 +184,24 @@ describe("sportsdesk_ingestion_replay", () => {
           id, channel_id, channel_status, valid_from, valid_to, tx_from, tx_to,
           price, link_id, xml_hash, latency_ms
         ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
-        [10, "Internet", "ACTIVE", validFrom, validTo, 1000, 50, null, "abc", null],
+        [
+          10,
+          "Internet",
+          "ACTIVE",
+          validFrom,
+          validTo,
+          1000,
+          50,
+          null,
+          "abc",
+          null,
+        ],
       );
     };
     insertOpen(100, 200);
-    expect(() => insertOpen(300, 400)).toThrow(/one_open_tx_per_lane_id|UNIQUE/);
+    expect(() => insertOpen(300, 400)).toThrow(
+      /one_open_tx_per_lane_id|UNIQUE/,
+    );
   });
 
   test("out-of-order tx_from rejected before close", async () => {

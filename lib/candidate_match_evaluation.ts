@@ -23,7 +23,11 @@ import {
   serializeMatchEvaluationResult,
 } from "./match_evaluation_canonical.ts";
 import type { Sha256Hex } from "../domain-branded-types.ts";
-import { auditRunAt, type AuditRunId, type IsoDateTimeUtc } from "./audit_run_id.ts";
+import {
+  auditRunAt,
+  type AuditRunId,
+  type IsoDateTimeUtc,
+} from "./audit_run_id.ts";
 import { percentile } from "./match_evaluation_percentile.ts";
 
 export {
@@ -109,7 +113,9 @@ export function hashCanonicalPayload(
   );
 }
 
-export function serializeReplayInput(input: MatchEvaluationReplayInput): string {
+export function serializeReplayInput(
+  input: MatchEvaluationReplayInput,
+): string {
   return canonicalJsonString(input);
 }
 
@@ -278,8 +284,7 @@ export class MatchEvaluationStore {
     const evaluationJson = serializeMatchEvaluationResult(result);
     const evaluationJsonSha256 = hashEvaluationResult(result);
     const state = evaluationStateFromResult(result);
-    const rejectReason =
-      result.rejectedCandidates[0]?.rejectReason ?? null;
+    const rejectReason = result.rejectedCandidates[0]?.rejectReason ?? null;
     this.db
       .query(
         `INSERT INTO match_evaluations (
@@ -415,13 +420,19 @@ export class MatchEvaluationStore {
        AND m.policy_sha256 = ?1
     `;
     if (since && until) {
-      return this.db.query(sql).all(policySha256, since, until) as MatchEvaluationReplayRow[];
+      return this.db
+        .query(sql)
+        .all(policySha256, since, until) as MatchEvaluationReplayRow[];
     }
     if (since) {
-      return this.db.query(sql).all(policySha256, since) as MatchEvaluationReplayRow[];
+      return this.db
+        .query(sql)
+        .all(policySha256, since) as MatchEvaluationReplayRow[];
     }
     if (until) {
-      return this.db.query(sql).all(policySha256, until) as MatchEvaluationReplayRow[];
+      return this.db
+        .query(sql)
+        .all(policySha256, until) as MatchEvaluationReplayRow[];
     }
     return this.db.query(sql).all(policySha256) as MatchEvaluationReplayRow[];
   }
@@ -565,8 +576,14 @@ export function replayPolicyDelta(
   const timeDiffSignedMs: number[] = [];
 
   for (const row of rows) {
-    const input = JSON.parse(row.replay_input_json) as MatchEvaluationReplayInput;
-    const next = evaluateCandidateOverlay(input.ticker, input.pending, newPolicy);
+    const input = JSON.parse(
+      row.replay_input_json,
+    ) as MatchEvaluationReplayInput;
+    const next = evaluateCandidateOverlay(
+      input.ticker,
+      input.pending,
+      newPolicy,
+    );
     timeDiffSignedMs.push(next.timeDifferenceMs);
     timeDiffAbsMs.push(Math.abs(next.timeDifferenceMs));
     const baselineState = row.state;
