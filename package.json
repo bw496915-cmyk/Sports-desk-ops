@@ -77,6 +77,13 @@
     "docs:verify:live": "bun run scripts/verify_docs.ts --live https://fantasy402-docs-4ay.pages.dev",
     "verify:docs": "bun run scripts/verify_docs.ts",
     "test:docs": "bun test tests/api_reference.test.ts tests/docs_evidence.test.ts",
+    "capture:evidence": "bun run scripts/evidence_capture.ts --mode mock",
+    "capture:evidence:live": "bun run scripts/evidence_capture.ts --mode live",
+    "apply:captures": "bun run scripts/apply_captures.ts",
+    "docs:audit:portal": "bun run scripts/audit_docs_webview_cron.ts --once",
+    "docs:audit:portal:watch": "bun run scripts/audit_docs_webview_cron.ts --watch",
+    "crawl:tiles": "bun run scripts/portal_tile_crawler.ts --offline",
+    "test:capture": "bun test tests/capture_*.test.ts tests/portal_audit.test.ts",
     "deploy:docs": "./deploy_docs.sh"
   },
   "keywords": [
