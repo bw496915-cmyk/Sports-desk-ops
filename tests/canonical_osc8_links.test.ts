@@ -24,29 +24,44 @@ describe("Canonical OSC 8 Links & Terminal Hyperlinks Engine", () => {
 
   it("formats markdown links for customer and agent entities", () => {
     const custMd = formatCustomerOsc8Markdown("bgd101");
-    assert.equal(custMd, "[BGD101](https://fantasy402.com/manager.html?customer=BGD101)");
+    assert.equal(
+      custMd,
+      "[BGD101](https://fantasy402.com/manager.html?customer=BGD101)",
+    );
 
     const agentMd = formatAgentOsc8Markdown("bigdad");
-    assert.equal(agentMd, "[BIGDAD](https://desk.bookdeskops.com/agent/BIGDAD)");
+    assert.equal(
+      agentMd,
+      "[BIGDAD](https://desk.bookdeskops.com/agent/BIGDAD)",
+    );
   });
 
   it("formats canonical docs and OpenAPI specification links", () => {
     const docsMd = formatDocsOsc8Markdown();
-    assert.equal(docsMd, `[Official API Reference](${CANONICAL_DOMAINS.DOCS_PORTAL})`);
+    assert.equal(
+      docsMd,
+      `[Official API Reference](${CANONICAL_DOMAINS.DOCS_PORTAL})`,
+    );
 
     const specMd = formatOpenApiSpecOsc8Markdown();
-    assert.equal(specMd, `[OpenAPI 3.1 Spec](${CANONICAL_DOMAINS.DOCS_PORTAL}/openapi.json)`);
+    assert.equal(
+      specMd,
+      `[OpenAPI 3.1 Spec](${CANONICAL_DOMAINS.DOCS_PORTAL}/openapi.json)`,
+    );
   });
 
   it("renders ANSI markdown with OSC 8 escape sequences enabled", () => {
     const md = `Inspect [RF2003](https://fantasy402.com/manager.html?customer=RF2003) for details.`;
-    const rendered = renderAnsiMarkdown(md, { hyperlinks: true, colors: false });
+    const rendered = renderAnsiMarkdown(md, {
+      hyperlinks: true,
+      colors: false,
+    });
 
     assert.ok(rendered.length > 0);
     // Asserts OSC 8 sequence \x1b]8;; is emitted or URL is embedded
     assert.ok(
       rendered.includes("\x1b]8;;") || rendered.includes("RF2003"),
-      "Rendered ANSI string must contain OSC 8 hyperlinks or target text"
+      "Rendered ANSI string must contain OSC 8 hyperlinks or target text",
     );
   });
 });
