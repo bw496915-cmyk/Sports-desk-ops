@@ -9,6 +9,8 @@ Repository: [bw496915-cmyk/Sports-desk-ops](https://github.com/bw496915-cmyk/Spo
 - Operations: [docs/schema-dump-operations.md](docs/schema-dump-operations.md) (`schema:dump-prod`, `schema:sync-prod-dump`, fixture allowlist, `captured_at`)
 - Failure modes: [docs/schema-sqlite-failure-mode-matrix.md](docs/schema-sqlite-failure-mode-matrix.md) (parity exit **2** / **3**, `bun:sqlite` strict + safe integers)
 - CLI: `bun run sportsdesk_schema_cli.ts --help`
+- CI gate: `bun run schema:gate` · lag metric: `bun run schema:dump-lag`
+- Index: [docs/README.md](docs/README.md)
 
 ## Quick Start
 

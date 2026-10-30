@@ -14,6 +14,7 @@ Reference for manifest ↔ prod-dump parity, schema snapshot, EOD archiving, and
 | **`SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS=1` locally** | Prod-only detection skipped; stderr bypass notice; exit 0 if no other drift. | **0** | `[BYPASS] prod-only table detection disabled (SPORTSDESK_SCHEMA_DUMP_ALLOWLIST_BYPASS=1)` |
 | **`schema_snapshot` dump parity failure** | `runManifestDumpParityFile` returns parity exit; `main()` propagates it. | **2** or **3** | Same as parity rows above |
 | **`SPORTSDESK_SCHEMA_SKIP_DUMP_PARITY=1`** | Fixture parity skipped when dump path exists; snapshot still writes JSON/manifest. | **0** | — |
+| **`bun run schema:gate` (CI)** | `preschema` + `schema:snapshot` with `CI=true`; same parity rules as postschema. | **0** / **2** / **3** | (parity rows above) |
 | **Prod schema dump format v99 (newer than supported)** | `parseProdSchemaDump` rejects at load time (`SUPPORTED_PROD_SCHEMA_DUMP_VERSION` is **1**). | **Uncaught throw** (typically **1**) | `prod schema dump format v99 unsupported; upgrade parity code (supported v1)` |
 | **Prod schema dump format v0 (obsolete)** | Reject; re-capture required. | **Uncaught throw** (typically **1**) | `prod schema dump format v0 obsolete; re-run schema:dump-prod` |
 | **Missing / invalid dump fields** | Parse errors on load (`format_version`, `captured_at`, `source`, `tables`, allowlist shape). | **Uncaught throw** (typically **1**) | `prod schema dump: missing format_version` |
