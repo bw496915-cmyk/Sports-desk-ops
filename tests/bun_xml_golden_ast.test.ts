@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   BUN_XML_GOLDEN_AST_EXAMPLES,
+  goldenAstFingerprintFromExample,
   goldenAstFingerprintFromXml,
   goldenAstTextFromXml,
 } from "../lib/bun_xml_golden_ast.ts";
@@ -23,7 +24,7 @@ describe("bun_xml_golden_ast", () => {
       ).trim();
       const xml = readFileSync(join(FIXTURE_DIR, `${example.id}.xml`), "utf8");
       expect(xml).toBe(example.xml);
-      const live = goldenAstFingerprintFromXml(xml);
+      const live = goldenAstFingerprintFromExample(example);
       expect(live.astText).toBe(ast);
       expect(live.sha256).toBe(sha);
     });
