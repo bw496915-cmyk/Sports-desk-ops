@@ -69,13 +69,8 @@ async function main(): Promise<number> {
     dump = captureProdSchemaFromDb(
       resolve(dbPath),
       "prod-readonly",
-      existing
-        ? {
-            ...(existing.allowlist !== undefined
-              ? { allowlist: existing.allowlist }
-              : {}),
-            captured_at: existing.captured_at,
-          }
+      existing?.allowlist !== undefined
+        ? { allowlist: existing.allowlist }
         : undefined,
     );
   }
