@@ -26,7 +26,10 @@ while i < len(lines):
         if i < len(lines):
             block.append(lines[i])
             i += 1
-        if any("domain-branded-types.ts" in b for b in block):
+        if any(
+            "domain-branded-types.ts" in b or "DOMAIN_BRANDED_TYPES_PATH" in b
+            for b in block
+        ):
             out.append(
                 'console.log("[gen:tokens] VERIFY MUTANT skip domain-branded-types.ts");'
             )
@@ -37,6 +40,11 @@ while i < len(lines):
     i += 1
 open(path, "w", encoding="utf-8").write("\n".join(out) + "\n")
 PY
+
+if ! grep -q "VERIFY MUTANT skip domain-branded-types.ts" "$gen"; then
+  echo "replay-mutant: patch did not apply to $gen" >&2
+  exit 1
+fi
 
 cd "$root"
 set +e

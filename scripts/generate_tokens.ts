@@ -14,9 +14,18 @@ import {
   spliceDashboardHtml,
 } from "../lib/gen_tokens/dashboard_templates.ts";
 import {
+  assertStrictGateEmission,
+  buildManifestFromDisk,
+  GEN_TOKENS_GATE_RUN_ID_ENV,
+} from "../lib/gen_tokens/emission_manifest.ts";
+import {
   GEN_TOKEN_EMISSION_MANIFEST,
   GEN_TOKEN_EMISSION_PATHS,
 } from "../lib/gen_tokens/emission_targets.ts";
+import {
+  DOMAIN_BRANDED_SECTION7_MARKER,
+  DOMAIN_BRANDED_TYPES_PATH,
+} from "../lib/gen_tokens/domain_branded_section.ts";
 import { formatRouteThreshold } from "../lib/gen_tokens/route_threshold.ts";
 
 const rootDir = resolve(import.meta.dir, "..");
@@ -42,13 +51,12 @@ function emitRepoFile(
 }
 
 function writeEmissionManifest(): void {
+  assertStrictGateEmission(emittedThisRun);
+  const runId = process.env[GEN_TOKENS_GATE_RUN_ID_ENV];
+  const manifest = buildManifestFromDisk(rootDir, emittedThisRun, runId);
   const manifestPath = resolve(rootDir, GEN_TOKEN_EMISSION_MANIFEST);
   mkdirSync(resolve(manifestPath, ".."), { recursive: true });
-  writeFileSync(
-    manifestPath,
-    `${JSON.stringify({ emitted: [...emittedThisRun] }, null, 2)}\n`,
-    "utf-8",
-  );
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
 }
 
 if (!Bun.file(tomlPath).size) {
@@ -83,13 +91,12 @@ console.log(` - UI       : ${ui.length}`);
 // ============================================================================
 // 1. GENERATE DOMAIN-BRANDED-TYPES.TS (SECTION 7)
 // ============================================================================
-const domainBrandedTypesPath = resolve(rootDir, "domain-branded-types.ts");
+const domainBrandedTypesPath = resolve(rootDir, DOMAIN_BRANDED_TYPES_PATH);
 const currentDomainBrandedText = readFileSync(domainBrandedTypesPath, "utf-8");
 
-// Locate Section 7 marker
-const section7Marker =
-  "// ============================================================================\n// 7. QWEN3.5-4B NEURON REGISTRY & DECOUPLED THREE-AXIS SCHEMAS (LAYERS 18-28)\n// ============================================================================";
-const section7Idx = currentDomainBrandedText.indexOf(section7Marker);
+const section7Idx = currentDomainBrandedText.indexOf(
+  DOMAIN_BRANDED_SECTION7_MARKER,
+);
 
 if (section7Idx === -1) {
   console.error(
@@ -102,7 +109,7 @@ const domainBrandedBase = currentDomainBrandedText
   .slice(0, section7Idx)
   .trimEnd();
 
-let generatedSection7 = `${section7Marker}
+let generatedSection7 = `${DOMAIN_BRANDED_SECTION7_MARKER}
 
 export type SignalChannelCode =
   | "Internet"
@@ -339,7 +346,7 @@ export const ALL_QWEN_TOKENS: readonly AnyQwenNeuronDefinition[] = [
 
 const newDomainBrandedText = `${domainBrandedBase}\n\n${generatedSection7}`;
 emitRepoFile(
-  "domain-branded-types.ts",
+  DOMAIN_BRANDED_TYPES_PATH,
   domainBrandedTypesPath,
   newDomainBrandedText,
 );

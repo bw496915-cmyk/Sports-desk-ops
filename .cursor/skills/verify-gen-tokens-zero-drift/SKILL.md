@@ -31,7 +31,7 @@ Charts are rendered with [Pele](https://pele.run) (blueprint theme) into `verifi
 
 Files: `scripts/gen_tokens_gate.ts`, `lib/gen_tokens/emission_targets.ts`, `scripts/generate_tokens.ts`, `package.json` scripts `gen:tokens`, `gen:tokens:gate`, `verify:gen-tokens-gate`.
 
-**Sync commit:** `dcc2a35` — manifest-based gate and TLA+ model aligned (product gate logic since `81fefeb`). Update only after you diff covered files from `81fefeb` and reconcile the TLA+ model.
+**Sync commit:** `b802a0b` — update after changes to `lib/gen_tokens/*`, `scripts/gen_tokens_gate.ts`, or manifest schema. Update only after you diff covered files from `81fefeb` and reconcile the TLA+ model.
 
 **Last maintain (2026-10-30):** Outcome **updated** — emission registry + manifest gate; TLC exit **0**; `replay-mutant.sh` confirms skip fails closed.
 
@@ -48,8 +48,9 @@ Confirm skip is caught on real code: `bash verification/gen-tokens-zero-drift-ga
 - Three generated paths are one abstract output (same skip/diff semantics).
 - `gen:tokens` is one step; crash vs skip vs ok vs drift is chosen nondeterministically in the model.
 - `strategy = "checkout"` in Init matches production; `rm` branch models the discussed fix only.
+- Gate mode sets `GEN_TOKENS_GATE=1` and a run id; manifest records post-`bun fmt` sha256 per path (TLC abstracts this as skip → `Gate failed`).
 
-Not modelled: partial multi-file writes, `tokens.toml` validation, HTML splice anchors, concurrent editors.
+Not modelled: per-file sha256, gate run id binding, `tokens.toml` validation, concurrent editors. A forged manifest with HEAD hashes without regen is out of scope (requires `rm-before-gen` / full-file mode).
 
 ## Run
 

@@ -2,9 +2,15 @@
 /**
  * Zero-drift gate driven by GEN_TOKEN_EMISSION_TARGETS (explicit phases).
  */
+import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  GEN_TOKENS_GATE_ENV,
+  GEN_TOKENS_GATE_RUN_ID_ENV,
+  verifyManifestAgainstDisk,
+} from "../lib/gen_tokens/emission_manifest.ts";
 import {
   GEN_TOKEN_EMISSION_MANIFEST,
   GEN_TOKEN_EMISSION_TARGETS,
@@ -78,7 +84,19 @@ function main(): number {
     fs.rmSync(path.join(rootDir, p), { force: true });
   }
 
-  if (run("bun", ["run", "gen:tokens"]) !== 0) {
+  const gateRunId = randomUUID();
+  const genEnv = {
+    ...process.env,
+    [GEN_TOKENS_GATE_ENV]: "1",
+    [GEN_TOKENS_GATE_RUN_ID_ENV]: gateRunId,
+  };
+  const gen = spawnSync("bun", ["run", "gen:tokens"], {
+    cwd: rootDir,
+    stdio: "inherit",
+    encoding: "utf-8",
+    env: genEnv,
+  });
+  if ((gen.status ?? 1) !== 0) {
     console.error(
       "::error::gen:tokens exited non-zero — fix scripts/generate_tokens.ts or tokens.toml (drift check skipped)",
     );
@@ -86,20 +104,24 @@ function main(): number {
   }
 
   const manifest = loadManifest();
-  const emitted = new Set(manifest?.emitted ?? []);
+  if (!manifest) {
+    console.error(
+      "::error::gen:tokens did not write emission manifest (partial run or skip)",
+    );
+    return 1;
+  }
+
+  const manifestErr = verifyManifestAgainstDisk(rootDir, manifest, gateRunId);
+  if (manifestErr) {
+    console.error(`::error::${manifestErr}`);
+    return 1;
+  }
 
   let failed = 0;
   for (const target of GEN_TOKEN_EMISSION_TARGETS) {
     const full = path.join(rootDir, target.repoPath);
     if (!fs.existsSync(full)) {
       console.error(`::error::gen:tokens did not write ${target.repoPath}`);
-      failed = 1;
-      continue;
-    }
-    if (!emitted.has(target.repoPath)) {
-      console.error(
-        `::error::gen:tokens did not record emission for ${target.repoPath} (manifest miss — partial run or skip)`,
-      );
       failed = 1;
       continue;
     }

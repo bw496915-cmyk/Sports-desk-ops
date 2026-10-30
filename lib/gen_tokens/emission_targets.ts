@@ -38,6 +38,13 @@ export const GEN_TOKEN_EMISSION_PATHS: readonly string[] =
 /** Written by generate_tokens.ts; gate requires every target path listed. */
 export const GEN_TOKEN_EMISSION_MANIFEST = "scratch/gen-tokens-emitted.json";
 
+export type GenTokenEmissionRecord = {
+  repoPath: string;
+  sha256: string;
+};
+
 export type GenTokenEmissionManifest = {
-  emitted: string[];
+  /** Set when `gen:tokens` runs under `gen:tokens:gate`. */
+  gateRunId?: string;
+  emitted: GenTokenEmissionRecord[];
 };
