@@ -32,14 +32,14 @@ describe("1. Single Source of Truth & Zero-Drift Regeneration", () => {
   it("test_assert_tokens_toml_is_valid_and_complete", async () => {
     const tomlPath = resolve(rootDir, "tokens.toml");
     const tomlText = await Bun.file(tomlPath).text();
-    const parsed = Bun.TOML.parse(tomlText) as any;
+    const { parseTokensToml } = await import("../lib/gen_tokens/tokens_ssot.ts");
+    const ssot = parseTokensToml(tomlText);
 
-    expect(parsed.meta).toBeDefined();
-    expect(parsed.meta.version).toBe("1.1.0");
+    expect(ssot.meta.version).toBe("1.1.0");
 
-    const surfaces = Object.values(parsed.surfaces);
-    const ingestion = Object.values(parsed.ingestion);
-    const routes = Object.values(parsed.routes);
+    const surfaces = ssot.surfaces;
+    const ingestion = ssot.ingestion;
+    const routes = ssot.routes;
 
     expect(surfaces.length).toBe(TELEMETRY_SURFACES.length);
     expect(ingestion.length).toBe(INGESTION_CHANNELS.length);
@@ -47,17 +47,18 @@ describe("1. Single Source of Truth & Zero-Drift Regeneration", () => {
     expect(surfaces.length + ingestion.length + routes.length).toBe(
       ALL_QWEN_TOKENS.length,
     );
-    expect(Object.values(parsed.ui ?? {}).length).toBe(UI_TOKENS.length);
+    expect(ssot.ui.length).toBe(UI_TOKENS.length);
   });
 
   it("test_assert_zero_drift_between_tokens_toml_and_source_code", async () => {
     const tomlPath = resolve(rootDir, "tokens.toml");
     const tomlText = await Bun.file(tomlPath).text();
-    const parsed = Bun.TOML.parse(tomlText) as any;
+    const { parseTokensToml } = await import("../lib/gen_tokens/tokens_ssot.ts");
+    const ssot = parseTokensToml(tomlText);
 
-    const ingestionList = Object.values(parsed.ingestion) as any[];
-    const routeList = Object.values(parsed.routes) as any[];
-    const surfaceList = Object.values(parsed.surfaces) as any[];
+    const ingestionList = ssot.ingestion;
+    const routeList = ssot.routes;
+    const surfaceList = ssot.surfaces;
 
     // Verify all 7 ingestion channels match tokens.toml byte-for-byte
     for (const item of ingestionList) {
@@ -65,10 +66,10 @@ describe("1. Single Source of Truth & Zero-Drift Regeneration", () => {
       expect(match).toBeDefined();
       expect(match!.hex).toBe(item.hex);
       expect(match!.tokenName).toBe(item.token_name);
-      expect(match!.channelCode).toBe(item.channel_code);
+      expect(String(match!.channelCode)).toBe(item.channel_code);
       if (item.sla_kind === "latency") {
         expect(match!.sla.kind).toBe("latency");
-        if (match!.sla.kind === "latency") {
+        if (match!.sla.kind === "latency" && item.sla_kind === "latency") {
           expect(match!.sla.latencySlaMs).toBe(item.sla_ms);
         }
       } else {
@@ -82,10 +83,10 @@ describe("1. Single Source of Truth & Zero-Drift Regeneration", () => {
       expect(match).toBeDefined();
       expect(match!.hex).toBe(item.hex);
       expect(match!.tokenName).toBe(item.token_name);
-      expect(match!.moveFlag).toBe(item.move_flag);
-      expect(match!.triggerKind).toBe(item.trigger_kind);
-      expect(match!.threshold.kind).toBe(item.threshold_kind);
-      expect(match!.mitigationKind).toBe(item.mitigation_kind);
+      expect(String(match!.moveFlag)).toBe(item.move_flag);
+      expect(String(match!.triggerKind)).toBe(item.trigger_kind);
+      expect(String(match!.threshold.kind)).toBe(item.threshold_kind);
+      expect(String(match!.mitigationKind)).toBe(item.mitigation_kind);
     }
 
     // Verify all 2 surfaces match tokens.toml

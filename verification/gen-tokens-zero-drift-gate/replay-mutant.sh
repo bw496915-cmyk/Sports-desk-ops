@@ -7,7 +7,12 @@ gen="$root/scripts/generate_tokens.ts"
 bak="$(mktemp)"
 
 cp "$gen" "$bak"
-trap 'cp "$bak" "$gen"; rm -f "$bak"' EXIT
+restore() {
+  cp "$bak" "$gen"
+  rm -f "$bak"
+  git -C "$root" checkout HEAD -- domain-branded-types.ts 2>/dev/null || true
+}
+trap restore EXIT
 
 python3 - "$gen" <<'PY'
 import sys

@@ -1,24 +1,11 @@
 /** Route threshold rows from tokens.toml → TS literal for ROUTE_CIRCUITS. */
 
-export type RouteThresholdRow = {
-  threshold_kind: string;
-  max_lag_ms?: number;
-  tau_star?: number;
-  min_tickets?: number;
-  min_depth_cents?: number;
-  min_toxicity_score?: number;
-  max_hold_rate_basis_points?: number;
-  max_deficit_cents?: number;
-};
-
-const ROUTE_THRESHOLD_KINDS = [
-  "consensus_lag",
-  "bayes_shrinkage",
-  "liquidity_depth",
-  "composite_risk_gate",
-] as const;
-
-export type RouteThresholdKind = (typeof ROUTE_THRESHOLD_KINDS)[number];
+export type { RouteThresholdKind, RouteThresholdRow } from "./tokens_ssot.ts";
+import {
+  ROUTE_THRESHOLD_KINDS,
+  type RouteThresholdKind,
+  type RouteThresholdRow,
+} from "./tokens_ssot.ts";
 
 function isRouteThresholdKind(k: string): k is RouteThresholdKind {
   return (ROUTE_THRESHOLD_KINDS as readonly string[]).includes(k);

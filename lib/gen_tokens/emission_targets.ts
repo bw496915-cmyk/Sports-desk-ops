@@ -17,8 +17,8 @@ export type GenTokenEmissionTarget = {
 export const GEN_TOKEN_EMISSION_TARGETS: readonly GenTokenEmissionTarget[] = [
   {
     repoPath: "domain-branded-types.ts",
-    mode: "splice-from-committed",
-    reset: "git-checkout-head",
+    mode: "full-from-toml",
+    reset: "rm-before-gen",
   },
   {
     repoPath: "customer-churn-simulation-dashboard.html",
