@@ -1,136 +1,428 @@
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+/**
+ * docs/api-reference invariants — replaces the old fabricated endpoint list.
+ *
+ * The previous test hard-coded the invented inventory (including
+ * /manager-tools/ajax.php), so it could never fail. These tests instead assert
+ * the invariants that made the docs untrustworthy: honest evidence tiers,
+ * consistent tags, no fabricated wire contracts, no invented getWebLog
+ * response schema, resolvable auth, and the shipped portal/header gates.
+ * Negative tests prove the exported validator actually rejects regressions.
+ */
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const rootDir = resolve(__dirname, "..");
-const openApiPath = resolve(rootDir, "docs/openapi.json");
-const htmlPath = resolve(rootDir, "docs/index.html");
-const mdPath = resolve(rootDir, "docs/api-reference.md");
+import { describe, expect, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  checkHeaders,
+  checkIndexHtml,
+  checkMarkdownText,
+  checkOpenApi,
+  CODES,
+  collectOperations,
+  collectSecurityRefs,
+  isRecord,
+  TIERS,
+  type CheckOutcome,
+  type Operation,
+} from "../scripts/verify_docs.ts";
 
-describe("SportsDesk & Fantasy402 API Documentation Suite", () => {
-  it("ensures docs/openapi.json exists and is valid OpenAPI 3.1.0", () => {
-    assert.equal(existsSync(openApiPath), true, "openapi.json must exist");
-    const raw = readFileSync(openApiPath, "utf-8");
-    const spec = JSON.parse(raw);
+const ROOT = join(import.meta.dir, "..");
+const SPEC_PATH = join(ROOT, "docs", "openapi.json");
+const MARKDOWN_PATH = join(ROOT, "docs", "api-reference.md");
+const INDEX_PATH = join(ROOT, "docs", "index.html");
+const HEADERS_PATH = join(ROOT, "functions", "_headers");
+const EVIDENCE_MD_PATH = join(ROOT, "docs", "EVIDENCE.md");
 
-    assert.equal(spec.openapi, "3.1.0");
-    assert.ok(spec.info.title.includes("SportsDesk & Fantasy402"));
-    assert.ok(spec.servers.length >= 3, "Must declare Cloud, Local Daemon, and Partner 118 servers");
-    assert.ok(spec.paths);
-  });
+function readText(path: string): string {
+  return readFileSync(path, "utf8");
+}
 
-  it("verifies all remaining endpoints across all 4 operational domains are present", () => {
-    const spec = JSON.parse(readFileSync(openApiPath, "utf-8"));
-    const paths = Object.keys(spec.paths);
+function loadSpec(): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(readText(SPEC_PATH));
+  if (!isRecord(parsed)) {
+    throw new Error("docs/openapi.json must be a JSON object");
+  }
+  return parsed;
+}
 
-    const requiredEndpoints = [
-      // 1. Upstream Cloud Core
-      "/cloud/api/System/authenticateCustomer",
-      "/cloud/api/Manager/getBetTicker",
-      "/cloud/api/Manager/getBetTickerConfig",
-      "/cloud/api/Manager/getPending",
-      "/cloud/api/Manager/getWebLog",
-      "/cloud/api/Manager/search",
-      "/cloud/api/Manager/updateByColumn",
-      "/cloud/api/Manager/getInfoPlayer",
-      "/cloud/api/Manager/vigSetupInsert",
-      "/cloud/api/Manager/getSportsVigSetup",
-      "/cloud/api/Manager/getInfoManager",
-      "/cloud/api/Report/getWeeklyFigure",
-      "/cloud/api/Report/getAgentPerformance",
-      "/cloud/api/Report/getSettledFigure",
-      "/cloud/api/Report/delete-wager",
+function specPaths(spec: Record<string, unknown>): Record<string, unknown> {
+  const paths = spec.paths;
+  if (!isRecord(paths)) throw new Error("spec.paths must be an object");
+  return paths;
+}
 
-      // 2. Local Desk Daemon & Telegram Gateway
-      "/health",
-      "/api/watchlist",
-      "/api/telegram/alert",
-      "/api/telegram/report",
+function operationsOf(spec: Record<string, unknown>): Operation[] {
+  return collectOperations(spec);
+}
 
-      // 3. Desk HITL Security
-      "/api/desk/auth/session",
-      "/api/desk/hitl/approve",
+function tierOf(operation: Operation): unknown {
+  const evidence = operation.operation["x-evidence"];
+  return isRecord(evidence) ? evidence.tier : undefined;
+}
 
-      // 4. Cross-Book Steam Join
-      "/manager-tools/ajax.php",
-    ];
+function findOperation(
+  spec: Record<string, unknown>,
+  pathPattern: RegExp,
+): Operation | undefined {
+  return operationsOf(spec).find((operation) =>
+    pathPattern.test(operation.path),
+  );
+}
 
-    for (const ep of requiredEndpoints) {
-      assert.ok(paths.includes(ep), `Missing required endpoint: ${ep}`);
+function requireOperation(
+  spec: Record<string, unknown>,
+  pathPattern: RegExp,
+): Operation {
+  const operation = findOperation(spec, pathPattern);
+  if (operation === undefined) {
+    throw new Error(`no operation path matches ${pathPattern}`);
+  }
+  return operation;
+}
+
+function expectNoIssues(outcome: CheckOutcome): void {
+  if (outcome.issues.length > 0 || outcome.status === "fail") {
+    const rendered = outcome.issues
+      .map((issue) => `  [${issue.code}] ${issue.message}`)
+      .join("\n");
+    throw new Error(`${outcome.name} failed:\n${rendered}`);
+  }
+  expect(outcome.status).toBe("pass");
+}
+
+function hasContent(response: unknown): boolean {
+  return (
+    isRecord(response) &&
+    Object.prototype.hasOwnProperty.call(response, "content")
+  );
+}
+
+describe("openapi.json honesty invariants", () => {
+  test("is OpenAPI 3.1.0 and keeps the real cloud + local daemon servers", () => {
+    const spec = loadSpec();
+    expect(spec.openapi).toBe("3.1.0");
+
+    const urls: string[] = [];
+    const servers = spec.servers;
+    if (Array.isArray(servers)) {
+      for (const server of servers) {
+        if (isRecord(server) && typeof server.url === "string") {
+          urls.push(server.url);
+        }
+      }
     }
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.some((url) => url.includes("fantasy402.com"))).toBe(true);
+    expect(urls.some((url) => url.includes("127.0.0.1:4020"))).toBe(true);
+    expect(urls.some((url) => url.includes("sportswidgets.pro"))).toBe(false);
   });
 
-  it("verifies getWebLog contract matches operational_guardrails_runbook.md § 5.1.1", () => {
-    const spec = JSON.parse(readFileSync(openApiPath, "utf-8"));
-    const webLogOp = spec.paths["/cloud/api/Manager/getWebLog"]?.post;
-
-    assert.ok(webLogOp, "getWebLog POST operation must exist");
-    const schema = webLogOp.requestBody.content["application/x-www-form-urlencoded"].schema;
-    assert.ok(schema.required.includes("type"));
-    assert.ok(schema.required.includes("operation"));
-    assert.ok(schema.required.includes("agentID"));
-    assert.deepEqual(schema.properties.type.enum, ["A", "B", "C", "I"]);
+  test("passes the structural gate with zero issues", () => {
+    expectNoIssues(checkOpenApi(loadSpec(), readText(SPEC_PATH)));
   });
 
-  it("verifies updateByColumn requires 11-char padded ID and direct sub-agent", () => {
-    const spec = JSON.parse(readFileSync(openApiPath, "utf-8"));
-    const updateOp = spec.paths["/cloud/api/Manager/updateByColumn"]?.post;
-
-    assert.ok(updateOp, "updateByColumn POST operation must exist");
-    const schema = updateOp.requestBody.content["application/x-www-form-urlencoded"].schema;
-    assert.ok(schema.required.includes("customerID"));
-    assert.ok(schema.required.includes("agentID"));
-    assert.ok(schema.required.includes("agentOwner"));
-    assert.equal(schema.properties.customerID.example, "CB112_1    ");
+  test("every operation declares an evidence tier A|B|C|D", () => {
+    const operations = operationsOf(loadSpec());
+    expect(operations.length).toBeGreaterThan(0);
+    const offenders = operations.filter((operation) => {
+      const tier = tierOf(operation);
+      return (
+        typeof tier !== "string" || !(TIERS as readonly string[]).includes(tier)
+      );
+    });
+    expect(
+      offenders.map((operation) => `${operation.method} ${operation.path}`),
+    ).toEqual([]);
   });
 
-  it("verifies HITL HMAC approval route schema and constant-time token requirement", () => {
-    const spec = JSON.parse(readFileSync(openApiPath, "utf-8"));
-    const hitlOp = spec.paths["/api/desk/hitl/approve"]?.post;
-
-    assert.ok(hitlOp, "HITL approval POST operation must exist");
-    const schema = hitlOp.requestBody.content["application/json"].schema;
-    assert.ok(schema.required.includes("approvalToken"));
-    assert.ok(schema.required.includes("customerIdentifier"));
-    assert.ok(schema.required.includes("proposedLimitAmountCents"));
+  test("declared tags equal the tags operations actually use", () => {
+    const spec = loadSpec();
+    const declared: string[] = [];
+    const specTags = spec.tags;
+    if (Array.isArray(specTags)) {
+      for (const tag of specTags) {
+        if (isRecord(tag) && typeof tag.name === "string") {
+          declared.push(tag.name);
+        }
+      }
+    }
+    const used = new Set<string>();
+    for (const operation of operationsOf(spec)) {
+      const tags = operation.operation.tags;
+      if (!Array.isArray(tags)) continue;
+      for (const tag of tags) if (typeof tag === "string") used.add(tag);
+    }
+    expect([...used].sort()).toEqual([...new Set(declared)].sort());
   });
 
-  it("verifies request parameters and security response headers are declared", () => {
-    const spec = JSON.parse(readFileSync(openApiPath, "utf-8"));
-
-    // Check request parameter headers
-    const params = spec.components.parameters;
-    assert.ok(params.AuthBearer, "Must declare AuthBearer component");
-    assert.ok(params.XRequestedWith, "Must declare XRequestedWith component");
-    assert.ok(params.AcceptJson, "Must declare AcceptJson component");
-    assert.ok(params.ReferrerPolicyNoReferrer, "Must declare ReferrerPolicyNoReferrer component");
-
-    // Check response security headers
-    const headers = spec.components.headers;
-    assert.ok(headers.CSPHeader, "Must declare CSPHeader component");
-    assert.ok(headers.XContentTypeOptionsHeader, "Must declare XContentTypeOptionsHeader component");
-    assert.ok(headers.ReferrerPolicyHeader, "Must declare ReferrerPolicyHeader component");
+  test("contains no fabricated GS wire contract", () => {
+    const spec = loadSpec();
+    const raw = readText(SPEC_PATH);
+    expect(Object.keys(specPaths(spec))).not.toContain(
+      "/manager-tools/ajax.php",
+    );
+    expect(raw).not.toContain("manager-tools/ajax.php");
+    expect(JSON.stringify(spec)).not.toContain("sportswidgets.pro");
   });
 
-  it("ensures docs/index.html loads openapi.json cleanly via modern viewer", () => {
-    assert.equal(existsSync(htmlPath), true, "docs/index.html must exist");
-    const html = readFileSync(htmlPath, "utf-8");
-    assert.ok(html.includes("openapi.json"));
-    assert.ok(!html.includes("redoc.standalone.js"), "Must not use legacy redoc with import.meta error");
+  test("getWebLog response body stays unknown (no invented 200 schema)", () => {
+    const spec = loadSpec();
+    const operation = requireOperation(spec, /\/getWebLog$/i);
+    const tier = tierOf(operation);
+    expect(tier === "A" || tier === "B").toBe(true);
+
+    const evidence = operation.operation["x-evidence"];
+    if (!isRecord(evidence)) throw new Error("getWebLog is missing x-evidence");
+    expect(evidence.capturedResponse).toBe(false);
+
+    const responses = operation.operation.responses;
+    if (!isRecord(responses)) throw new Error("getWebLog has no responses");
+    const response200 = responses["200"];
+    if (!isRecord(response200))
+      throw new Error("getWebLog has no 200 response");
+    expect(hasContent(response200)).toBe(false);
+    const description = response200.description;
+    expect(typeof description).toBe("string");
+    expect(String(description)).toMatch(/(not captured|undocumented|unknown)/i);
   });
 
-  it("ensures docs/api-reference.md documents all domains and references openapi.json", () => {
-    assert.equal(existsSync(mdPath), true, "docs/api-reference.md must exist");
-    const md = readFileSync(mdPath, "utf-8");
-    assert.ok(md.length > 2000, "api-reference.md must be populated");
-    assert.ok(md.includes("Authorization"), "Must document Authorization header");
-    assert.ok(md.includes("getWebLog"), "Must document getWebLog endpoint");
-    assert.ok(md.includes("vigSetupInsert"), "Must document vigSetupInsert endpoint");
-    assert.ok(md.includes("hitl/approve"), "Must document hitl/approve route");
-    assert.ok(md.includes("PaddedCustomerId"), "Must document PaddedCustomerId rule");
+  test("tier C (inferred) operations carry no response content schema", () => {
+    const operations = operationsOf(loadSpec());
+    const inferred = operations.filter(
+      (operation) => tierOf(operation) === "C",
+    );
+    expect(inferred.length).toBeGreaterThan(0);
+    const offenders: string[] = [];
+    for (const operation of inferred) {
+      const responses = operation.operation.responses;
+      if (!isRecord(responses)) continue;
+      for (const [code, response] of Object.entries(responses)) {
+        if (hasContent(response)) {
+          offenders.push(`${operation.method} ${operation.path} ${code}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("auth schemes are declared and every security reference resolves", () => {
+    const spec = loadSpec();
+    const components = spec.components;
+    const schemes =
+      isRecord(components) && isRecord(components.securitySchemes)
+        ? components.securitySchemes
+        : undefined;
+    if (schemes === undefined) {
+      throw new Error("components.securitySchemes missing");
+    }
+    expect(Object.keys(schemes)).toContain("fantasy402Cookie");
+    expect(Object.keys(schemes)).toContain("daemonBearer");
+
+    const references = collectSecurityRefs(spec);
+    expect(references.length).toBeGreaterThan(0);
+    const dangling = references.filter(
+      (reference) =>
+        !Object.prototype.hasOwnProperty.call(schemes, reference.scheme),
+    );
+    expect(
+      dangling.map(
+        (reference) => `${reference.location} -> ${reference.scheme}`,
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("required surfaces", () => {
+  test("local daemon routes are documented", () => {
+    const spec = loadSpec();
+    const paths = Object.keys(specPaths(spec));
+    for (const required of ["/health", "/api/watchlist"]) {
+      expect(paths).toContain(required);
+    }
+    const telegramAlerts = findOperation(spec, /^\/api\/telegram\/alert$/);
+    const telegramReports = findOperation(spec, /^\/api\/telegram\/report$/);
+    expect(telegramAlerts?.method).toBe("post");
+    expect(telegramReports?.method).toBe("post");
+  });
+
+  test("daemon UI surface is either documented or explicitly excluded", () => {
+    const spec = loadSpec();
+    const paths = Object.keys(specPaths(spec));
+    const present = paths.includes("/miniapp") || paths.includes("/dashboard");
+    if (present) {
+      expect(present).toBe(true);
+      return;
+    }
+    // Lead-approved fallback: an explicit evidence exclusion is acceptable.
+    expect(existsSync(EVIDENCE_MD_PATH)).toBe(true);
+    const evidence = readText(EVIDENCE_MD_PATH);
+    expect(/miniapp|dashboard/i.test(evidence)).toBe(true);
+  });
+
+  test("Manager/getHistory is documented or explicitly excluded in EVIDENCE.md", () => {
+    const spec = loadSpec();
+    const documented = Object.keys(specPaths(spec)).some((path) =>
+      /getHistory/i.test(path),
+    );
+    if (documented) {
+      expect(documented).toBe(true);
+      return;
+    }
+    expect(existsSync(EVIDENCE_MD_PATH)).toBe(true);
+    const evidence = readText(EVIDENCE_MD_PATH);
+    expect(/getHistory/i.test(evidence)).toBe(true);
+    expect(
+      /(exclud|not (?:in|documented)|missing|absent|out of scope)/i.test(
+        evidence,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("generated markdown + portal artifacts", () => {
+  test("api-reference.md has no undefined renderer output and covers every path", () => {
+    if (!existsSync(MARKDOWN_PATH)) {
+      throw new Error("docs/api-reference.md missing");
+    }
+    const markdown = readText(MARKDOWN_PATH);
+    expectNoIssues(checkMarkdownText(markdown));
+    const paths = Object.keys(specPaths(loadSpec()));
+    const missing = paths.filter((path) => !markdown.includes(path));
+    expect(missing).toEqual([]);
+    expect(markdown).toMatch(/evidence/i);
+    expect(markdown).toMatch(/tier/i);
+  });
+
+  test("index.html pins Scalar to a version with SRI and loads ./openapi.json", () => {
+    if (!existsSync(INDEX_PATH)) throw new Error("docs/index.html missing");
+    const html = readText(INDEX_PATH);
+    expectNoIssues(checkIndexHtml(html));
+    expect(html).toMatch(/@scalar\/api-reference@\d+\.\d+\.\d+/);
+    expect(html).not.toMatch(/@latest/);
+  });
+
+  test("functions/_headers ships the required security headers", () => {
+    if (!existsSync(HEADERS_PATH))
+      throw new Error("functions/_headers missing");
+    expectNoIssues(checkHeaders(readText(HEADERS_PATH)));
+  });
+});
+
+describe("negative coverage — the gate bites", () => {
+  test("rejects an operation with no x-evidence", () => {
+    const mutated = structuredClone(loadSpec());
+    const operations = operationsOf(mutated);
+    const target = operations[0];
+    if (target === undefined) {
+      throw new Error("spec has no operations to mutate");
+    }
+    delete target.operation["x-evidence"];
+
+    const outcome = checkOpenApi(mutated);
+    expect(outcome.status).toBe("fail");
+    expect(outcome.issues.map((issue) => issue.code)).toContain(
+      CODES.EVIDENCE_MISSING,
+    );
+  });
+
+  test("rejects a fabricated /manager-tools/ajax.php path", () => {
+    const mutated = structuredClone(loadSpec());
+    specPaths(mutated)["/manager-tools/ajax.php"] = { post: {} };
+
+    const outcome = checkOpenApi(mutated);
+    expect(outcome.status).toBe("fail");
+    expect(outcome.issues.map((issue) => issue.code)).toContain(
+      CODES.FORBIDDEN_PATH,
+    );
+  });
+
+  test("rejects an invented getWebLog 200 response schema", () => {
+    const mutated = structuredClone(loadSpec());
+    const operation = requireOperation(mutated, /\/getWebLog$/i);
+    const responses = operation.operation.responses;
+    if (!isRecord(responses)) throw new Error("getWebLog has no responses");
+    const response200 = responses["200"];
+    if (!isRecord(response200)) {
+      throw new Error("getWebLog has no 200 response");
+    }
+    response200.content = {
+      "application/json": { schema: { type: "object" } },
+    };
+
+    const outcome = checkOpenApi(mutated);
+    expect(outcome.status).toBe("fail");
+    expect(outcome.issues.map((issue) => issue.code)).toContain(
+      CODES.GETWEBLOG_RESPONSE_CONTENT,
+    );
+  });
+
+  test("rejects invented response schemas on tier C operations", () => {
+    const mutated = structuredClone(loadSpec());
+    const operations = operationsOf(mutated);
+    const target =
+      operations.find((operation) => tierOf(operation) === "C") ??
+      operations[0];
+    if (target === undefined) {
+      throw new Error("could not pick an operation to mutate");
+    }
+    const evidence = target.operation["x-evidence"];
+    if (isRecord(evidence)) {
+      evidence.tier = "C";
+    } else {
+      target.operation["x-evidence"] = {
+        tier: "C",
+        sources: ["none"],
+        capturedResponse: false,
+      };
+    }
+    if (!isRecord(target.operation.responses)) target.operation.responses = {};
+    const responsesNow = target.operation.responses;
+    if (!isRecord(responsesNow)) throw new Error("could not mutate responses");
+    responsesNow["200"] = {
+      description: "invented row object",
+      content: { "application/json": { schema: { type: "object" } } },
+    };
+
+    const outcome = checkOpenApi(mutated);
+    expect(outcome.status).toBe("fail");
+    expect(outcome.issues.map((issue) => issue.code)).toContain(
+      CODES.TIER_C_RESPONSE_CONTENT,
+    );
+  });
+
+  test("rejects an unpinned Scalar CDN script without SRI", () => {
+    const outcome = checkIndexHtml(
+      '<script id="api-reference" data-url="./openapi.json" src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>',
+    );
+    expect(outcome.status).toBe("fail");
+    const codes = outcome.issues.map((issue) => issue.code);
+    expect(codes).toContain(CODES.SCALAR_UNPINNED);
+    expect(codes).toContain(CODES.SCALAR_SRI);
+  });
+
+  test("rejects an index.html that forgets openapi.json", () => {
+    const outcome = checkIndexHtml("<html><body>no spec here</body></html>");
+    expect(outcome.status).toBe("fail");
+    expect(outcome.issues.map((issue) => issue.code)).toContain(
+      CODES.OPENAPI_REF,
+    );
+  });
+
+  test("rejects _headers without the security directives", () => {
+    const outcome = checkHeaders("/*\n  X-Frame-Options: DENY\n");
+    expect(outcome.status).toBe("fail");
+    const codes = outcome.issues.map((issue) => issue.code);
+    expect(codes.filter((code) => code === CODES.HEADER_REQUIRED).length).toBe(
+      4,
+    );
+  });
+
+  test("rejects markdown containing undefined renderer output", () => {
+    const markdown = `# reference\n\n${"x".repeat(2100)}\n\`undefined (undefined)\`\n`;
+    const outcome = checkMarkdownText(markdown);
+    expect(outcome.status).toBe("fail");
+    expect(outcome.issues.map((issue) => issue.code)).toContain(
+      CODES.MD_UNDEFINED,
+    );
   });
 });

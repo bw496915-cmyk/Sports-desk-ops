@@ -9,6 +9,8 @@ on:
       - "**.json"
       - "**.jsonl"
       - "**.html"
+      - "docs/**"
+      - "functions/**"
       - "tokens.toml"
       - "package.json"
       - "bun.lock"
@@ -21,6 +23,8 @@ on:
       - "**.json"
       - "**.jsonl"
       - "**.html"
+      - "docs/**"
+      - "functions/**"
       - "tokens.toml"
       - "package.json"
       - "bun.lock"
@@ -55,6 +59,12 @@ jobs:
       - name: Lint
         timeout-minutes: 3
         run: bun run lint:check
+      - name: Docs invariants (spec honesty, evidence parity, portal, negative coverage)
+        timeout-minutes: 3
+        run: bun run test:docs
+      - name: "Docs gates (verify_docs: fabricated-contract, freshness, headers, dist)"
+        timeout-minutes: 5
+        run: bun run verify:docs
       - name: Token SSOT Zero-Drift Gate
         timeout-minutes: 3
         run: bun run gen:tokens:gate
