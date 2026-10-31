@@ -470,7 +470,7 @@ describe("apply_captures", () => {
     expect(result.rejections[0]?.message).toMatch(/state mutation/i);
   });
 
-  test("skips non-B rows instead of upgrading them", () => {
+  test("upgrades a C row from a valid live capture (full-shape capture)", () => {
     const { root, capturesDir, dateDir } = makeRoot();
     writeCapture(
       dateDir,
@@ -481,14 +481,12 @@ describe("apply_captures", () => {
       { root, capturesDir, write: true, json: false },
       makeDeps().deps,
     );
-    expect(result.upgrades).toHaveLength(0);
-    expect(result.applied).toBe(false);
-    expect(result.skips.map((skip) => skip.operation)).toEqual(["getPending"]);
-    const tierC = result.skips.find((skip) => skip.operation === "getPending");
-    expect(tierC?.reason).toMatch(/only upgrades B→A/i);
+    expect(result.upgrades).toHaveLength(1);
+    expect(result.applied).toBe(true);
+    expect(result.upgrades[0]?.operation).toBe("getPending");
     expect(
       rowByPath(ledgerAt(root), "/cloud/api/Manager/getPending").tier,
-    ).toBe("C");
+    ).toBe("A");
   });
 
   test("upgrades a contradicted B row from a valid live capture and records the resolution", () => {
@@ -621,18 +619,19 @@ describe("apply_captures", () => {
     expect(result.capturesFound).toBe(7);
     expect(result.upgrades.map((upgrade) => upgrade.operation).sort()).toEqual([
       "getBetTicker",
+      "getPending",
       "getWebLog",
     ]);
     expect(
       result.upgrades.find((upgrade) => upgrade.operation === "getWebLog")
         ?.resolvesContradiction,
     ).toBe(true);
-    expect(result.skips).toHaveLength(1);
+    expect(result.skips).toHaveLength(0);
     expect(result.rejections).toHaveLength(4);
     expect(result.countsAfter).toEqual({
-      A: 2,
+      A: 3,
       B: 1,
-      C: 1,
+      C: 0,
       D: 0,
       E: 1,
       total: 5,

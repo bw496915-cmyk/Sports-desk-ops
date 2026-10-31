@@ -92,6 +92,7 @@ function readArtifact(relPath: string): string {
 }
 
 const TAG_INFERRED = "Inferred (Unverified)";
+const TAG_CAPTURED = "Live-captured (request unverified)";
 const TAG_FORENSIC = "Forensic Surveillance";
 const TAG_CUSTOMER = "Customer State Mutations";
 const TAG_DAEMON = "Local Desk & Telegram Gateway";
@@ -103,6 +104,7 @@ const USED_TAGS = [
   TAG_DAEMON,
   TAG_SETTLEMENT,
   TAG_INFERRED,
+  TAG_CAPTURED,
 ] as const;
 
 /** The 11 hand-authored "Tracked Operational Domains" candidates. */
@@ -1909,8 +1911,12 @@ function listCaptureFiles(dir: string): string[] {
       } catch {
         continue;
       }
-      if (directory) walk(full);
-      else if (isCaptureFileName(entry)) found.push(full);
+      if (directory) {
+        // Catalog-probe artifacts are evidence for the desk catalog surface,
+        // not upgradeable ledger operations.
+        if (entry === "catalog") continue;
+        walk(full);
+      } else if (isCaptureFileName(entry)) found.push(full);
     }
   };
   walk(dir);
@@ -2151,15 +2157,23 @@ function capturedOperation(
 ): JsonObject {
   const method = operation.method.toUpperCase();
   const templateBuilder = B_OPERATION_BUILDERS[operation.path];
-  if (templateBuilder === undefined) {
-    fail(
-      `tier A ledger row ${method} ${operation.path} has no evidenced operation template; only a previously observed (tier B) operation can be upgraded from a capture without inventing a contract`,
-    );
-  }
-  const base = templateBuilder(operation);
+  // A previously observed (tier B) operation keeps its hand-observed request
+  // template; an inferred (tier C) operation has no template, so the request
+  // schema is derived from the live capture's own request skeleton instead.
+  const base: JsonObject =
+    templateBuilder === undefined
+      ? {
+          tags: [TAG_CAPTURED],
+          summary: `Live-captured ${operation.path} (request template unverified)`,
+          parameters: [],
+        }
+      : templateBuilder(operation);
   const baseRequestBody = base.requestBody;
   const fallbackMedia =
-    firstRequestMediaType(baseRequestBody) ?? "application/json";
+    firstRequestMediaType(baseRequestBody) ??
+    (capture.requestSkeleton === null
+      ? "application/json"
+      : capture.requestContentType);
   const bodyShaNote =
     capture.responseBodySha256 !== null
       ? ` (response body sha256 ${capture.responseBodySha256})`
@@ -2168,6 +2182,9 @@ function capturedOperation(
     `Live-captured contract: ${capture.relativePath} (schemaVersion 1, mode live) recorded ${method} ${operation.path} at ${capture.capturedAt} with a ${capture.status} response${bodyShaNote}.`,
     "Request and response were captured live with redaction clean (policy v1).",
     "The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published.",
+    templateBuilder === undefined
+      ? "The endpoint path/method were previously inferred (tier C); the live capture now evidences both, while the request field template remains unverified."
+      : "The request template is the previously observed Manager envelope.",
   ].join(" ");
   const responses: JsonObject = {
     [String(capture.status)]: {
@@ -2455,7 +2472,12 @@ function buildServers(ledger: Ledger): readonly JsonObject[] {
 
 function buildTags(ledger: Ledger): readonly JsonObject[] {
   const hasCapturedTier = ledger.counts.A > 0;
-  return [
+  const hasCaptureOnlyTierA = ledger.operations.some(
+    (operation) =>
+      operation.tier === "A" &&
+      B_OPERATION_BUILDERS[operation.path] === undefined,
+  );
+  const tags: JsonObject[] = [
     {
       name: TAG_FORENSIC,
       description: hasCapturedTier
@@ -2484,6 +2506,14 @@ function buildTags(ledger: Ledger): readonly JsonObject[] {
         "Tier C operations: inferred or authored only. No request or response was ever observed; path and method are candidates, not contracts.",
     },
   ];
+  if (hasCaptureOnlyTierA) {
+    tags.push({
+      name: TAG_CAPTURED,
+      description:
+        "Tier-A operations whose path/method were previously inferred (tier C): the response is live-captured, while the request field template is not observed and remains unverified.",
+    });
+  }
+  return tags;
 }
 
 function buildPaths(ledger: Ledger, capturesDir: string): JsonObject {

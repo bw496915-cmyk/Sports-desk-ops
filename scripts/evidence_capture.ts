@@ -264,6 +264,11 @@ export interface LiveAuthSession {
   /** Raw Cookie header value — memory only, never logged or persisted. */
   cookieHeader: string;
   cookieNames: readonly string[];
+  /**
+   * Portal-issued `Authorization: Bearer <jwt>` value (fantasy402 manager API).
+   * Memory only: never logged, persisted, or written to a capture record.
+   */
+  authorizationHeader?: string;
   close(): Promise<void>;
 }
 
@@ -355,18 +360,59 @@ export async function authenticateWithWebView(
     navigateTimeoutMs: config.timeoutMs,
   });
   try {
-    await view.navigate(config.login.loginUrl);
-    await view.fill(config.login.userSelector, agentID);
-    await view.fill(config.login.passSelector, password);
-    const beforeUrl = view.url;
+    // fantasy402 keeps the native view URL at `about:blank` while serving its
+    // SPA; allow that bootstrap state, then wait for the login form to exist
+    // AND its framework to bind (a click before hydration falls through to a
+    // native form submit and discards the typed values).
+    await view.navigate(config.login.loginUrl, { allowOpaqueUrl: true });
+    await view.waitForSelector(config.login.userSelector, {
+      timeoutMs: config.timeoutMs,
+    });
+    // The login form is server-rendered; its submit handler is bound by jQuery
+    // slightly later. Clicking before that falls through to a native form POST
+    // that reloads the page and drops the typed values. Wait, then retry with a
+    // refill if the first attempt landed prematurely.
+    const hydrationMs = Number(config.env["F402_LOGIN_HYDRATION_MS"] ?? "1500");
+    await new Promise((resolve) =>
+      setTimeout(resolve, Number.isFinite(hydrationMs) ? hydrationMs : 1500),
+    );
     const submitExists = await view.evaluate(
       `(() => document.querySelector(${escapeForExpression(config.login.submitSelector)}) !== null)()`,
     );
-    if (submitExists === true) await view.click(config.login.submitSelector);
-    else await view.press("Enter");
-    await view.waitForLoad({ requireUrlChangeFrom: beforeUrl });
 
-    const probe = await view.evaluate(config.login.authenticatedExpression);
+    let probe: unknown = null;
+    const attemptDeadline = Date.now() + config.timeoutMs;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await view.fill(config.login.userSelector, agentID);
+      await view.fill(config.login.passSelector, password);
+      if (submitExists === true) await view.click(config.login.submitSelector);
+      else await view.press("Enter");
+      const attemptEnd = Math.min(Date.now() + 8_000, attemptDeadline);
+      for (;;) {
+        probe = await view.evaluate(config.login.authenticatedExpression);
+        const authed =
+          isPlainObject(probe) &&
+          probe["hasPasswordField"] !== true &&
+          String(probe["url"] ?? "").length > 0;
+        if (authed) break;
+        if (Date.now() >= attemptEnd || Date.now() >= attemptDeadline) break;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      if (
+        isPlainObject(probe) &&
+        probe["hasPasswordField"] !== true &&
+        String(probe["url"] ?? "").length > 0
+      ) {
+        break;
+      }
+      if (Date.now() >= attemptDeadline) break;
+      // The page may have reloaded to the login form; give it a moment to
+      // re-render before the next fill + submit.
+      await view.waitForSelector(config.login.userSelector, {
+        timeoutMs: 10_000,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
     if (isPlainObject(probe) && probe["hasPasswordField"] === true) {
       throw new Error(
         "login did not complete: password field is still present after submit",
@@ -374,9 +420,11 @@ export async function authenticateWithWebView(
     }
     const cookies = await view.getAllCookies();
     const handoff = cookieHandoffForHost(cookies, hostOf(config.baseUrl));
+    const authorizationHeader = await extractPortalAuthorization(view);
     return {
       cookieHeader: handoff.header,
       cookieNames: handoff.summary.names,
+      ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
       close: async () => {
         // The WebView is already closed in the finally block below; cookies were
         // extracted into memory. Nothing to release.
@@ -384,6 +432,69 @@ export async function authenticateWithWebView(
     };
   } finally {
     await view.close();
+  }
+}
+
+/**
+ * fantasy402's manager API authenticates with `Authorization: Bearer <jwt>`,
+ * not with the session cookie (the cookie jar only holds Cloudflare clearance).
+ * The JWT lives in page storage and is attached by the page's XHR layer; read it
+ * into memory only. Never logged or persisted.
+ */
+async function extractPortalAuthorization(
+  view: ManagedWebView,
+): Promise<string | undefined> {
+  try {
+    const fromStorage = await view.evaluate(`(() => {
+      const jwt = /eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+/;
+      for (const store of [sessionStorage, localStorage]) {
+        for (const key of Object.keys(store)) {
+          const value = store.getItem(key) || "";
+          const match = value.match(jwt);
+          if (match) return "Bearer " + match[0];
+        }
+      }
+      return null;
+    })()`);
+    if (typeof fromStorage === "string" && fromStorage.startsWith("Bearer ")) {
+      return fromStorage;
+    }
+  } catch {
+    // Storage access can be denied by the page; fall through to XHR capture.
+  }
+  try {
+    await view.evaluate(`(() => {
+      window.__f402Auth = [];
+      const proto = XMLHttpRequest.prototype;
+      const setHeader = proto.setRequestHeader;
+      proto.setRequestHeader = function (name, value) {
+        if (String(name).toLowerCase() === "authorization") {
+          window.__f402Auth.push(String(value));
+        }
+        return setHeader.apply(this, arguments);
+      };
+      return true;
+    })()`);
+    // A read-only menu click triggers manager XHRs that carry the header.
+    await view.evaluate(`(() => {
+      const target = Array.from(document.querySelectorAll("a,button,li,span,div"))
+        .find((el) => (el.innerText || "").trim() === "Bet Ticker");
+      target?.click();
+      return Boolean(target);
+    })()`);
+    const deadline = Date.now() + 12_000;
+    for (;;) {
+      const captured = await view.evaluate(
+        `(() => (window.__f402Auth || [])[0] ?? null)()`,
+      );
+      if (typeof captured === "string" && captured.startsWith("Bearer ")) {
+        return captured;
+      }
+      if (Date.now() >= deadline) return undefined;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  } catch {
+    return undefined;
   }
 }
 
@@ -821,6 +932,9 @@ async function runLive(
       const headers: Record<string, string> = {
         ...request.headers,
         cookie: auth.cookieHeader,
+        ...(auth.authorizationHeader === undefined
+          ? {}
+          : { authorization: auth.authorizationHeader }),
       };
       let response: RawHttpResponse | null = null;
       try {

@@ -165,25 +165,29 @@ describe("openapi.json honesty invariants", () => {
     expect(JSON.stringify(spec)).not.toContain("sportswidgets.pro");
   });
 
-  test("getWebLog response body stays unknown (no invented 200 schema)", () => {
+  test("getWebLog is tier A with a valid live x-capture response schema", () => {
     const spec = loadSpec();
     const operation = requireOperation(spec, /\/getWebLog$/i);
-    const tier = tierOf(operation);
-    expect(tier === "A" || tier === "B").toBe(true);
+    expect(tierOf(operation)).toBe("A");
 
     const evidence = operation.operation["x-evidence"];
     if (!isRecord(evidence)) throw new Error("getWebLog is missing x-evidence");
-    expect(evidence.capturedResponse).toBe(false);
+    expect(evidence.capturedResponse).toBe(true);
 
     const responses = operation.operation.responses;
     if (!isRecord(responses)) throw new Error("getWebLog has no responses");
     const response200 = responses["200"];
     if (!isRecord(response200))
       throw new Error("getWebLog has no 200 response");
-    expect(hasContent(response200)).toBe(false);
-    const description = response200.description;
-    expect(typeof description).toBe("string");
-    expect(String(description)).toMatch(/(not captured|undocumented|unknown)/i);
+    expect(hasContent(response200)).toBe(true);
+
+    const capture = operation.operation["x-capture"];
+    if (!isRecord(capture)) throw new Error("getWebLog is missing x-capture");
+    expect(String(capture.file)).toMatch(/\.post\.json$/);
+    expect(String(capture.sha256)).toMatch(/^[a-f0-9]{64}$/);
+    expect(Number(capture.status)).toBeGreaterThanOrEqual(200);
+    expect(Number(capture.status)).toBeLessThan(300);
+    expect(Number(capture.samples)).toBeGreaterThanOrEqual(1);
   });
 
   test("tier C (inferred) operations carry no response content schema", () => {
@@ -336,9 +340,14 @@ describe("negative coverage — the gate bites", () => {
     );
   });
 
-  test("rejects an invented getWebLog 200 response schema", () => {
+  test("rejects an invented getWebLog 200 response schema on a non-captured tier", () => {
     const mutated = structuredClone(loadSpec());
     const operation = requireOperation(mutated, /\/getWebLog$/i);
+    const evidence = operation.operation["x-evidence"];
+    if (!isRecord(evidence)) throw new Error("getWebLog is missing x-evidence");
+    evidence.tier = "B";
+    evidence.capturedResponse = false;
+    delete operation.operation["x-capture"];
     const responses = operation.operation.responses;
     if (!isRecord(responses)) throw new Error("getWebLog has no responses");
     const response200 = responses["200"];
@@ -470,6 +479,13 @@ describe("getWebLog tier-A capture gate", () => {
   test("(a) tier B with 200 content still fails E_GETWEBLOG_RESPONSE_CONTENT", () => {
     const mutated = structuredClone(loadSpec());
     const operation = requireOperation(mutated, /\/getWebLog$/i);
+    // Demote the now-captured getWebLog back to tier B (no capture) so the
+    // tier-B fabrication rule is the one under test.
+    const evidence = operation.operation["x-evidence"];
+    if (!isRecord(evidence)) throw new Error("getWebLog is missing x-evidence");
+    evidence.tier = "B";
+    evidence.capturedResponse = false;
+    delete operation.operation["x-capture"];
     const responses = operation.operation.responses;
     if (!isRecord(responses)) throw new Error("getWebLog has no responses");
     responses["200"] = {

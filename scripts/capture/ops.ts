@@ -486,9 +486,9 @@ export interface LoginConfig {
 }
 
 export const LOGIN_SELECTOR_DEFAULTS = {
-  userSelector: 'input[name="username"]',
+  userSelector: 'input[name="customerID"]',
   passSelector: 'input[type="password"]',
-  submitSelector: 'button[type="submit"]',
+  submitSelector: "button.btn.btn-primary",
 } as const;
 
 export function resolveLoginConfig(env: Env, baseUrl: string): LoginConfig {

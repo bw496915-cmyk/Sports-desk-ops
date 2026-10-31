@@ -60,6 +60,19 @@ function baseEnv(overrides: Record<string, string | undefined> = {}): Env {
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && !key.startsWith("F402_")) env[key] = value;
   }
+  // The repo `.env` is auto-loaded by `bun run` and would otherwise fill the
+  // real capture-gate credentials into refusal tests. Pin the gate keys to an
+  // explicit empty value so a child cannot inherit live credentials unless a
+  // test opts in through `overrides`.
+  for (const key of [
+    "F402_LIVE_CAPTURE",
+    "F402_BASE_URL",
+    "F402_AGENT_ID",
+    "F402_PASSWORD",
+    "F402_OFFLINE_ONLY",
+  ]) {
+    env[key] = "";
+  }
   for (const [key, value] of Object.entries(overrides)) {
     if (value !== undefined) env[key] = value;
   }

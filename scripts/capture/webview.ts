@@ -25,6 +25,7 @@ export type WebViewErrorCode =
   | "invalid-selector"
   | "navigate-failed"
   | "load-timeout"
+  | "selector-timeout"
   | "evaluate-failed"
   | "fill-failed"
   | "click-failed"
@@ -91,6 +92,12 @@ export interface LoadWaitOptions {
   requireUrlChangeFrom?: string;
   /** Allow `data:` URLs to count as settled (some portals bootstrap that way). */
   allowDataUrl?: boolean;
+  /**
+   * Allow an opaque bootstrap URL (`about:blank` / empty) to count as settled
+   * once the document has loaded and has a title. Some portals (fantasy402)
+   * serve their SPA while the native view still reports `about:blank`.
+   */
+  allowOpaqueUrl?: boolean;
 }
 
 export const DEFAULT_NAVIGATE_TIMEOUT_MS = 15_000;
@@ -102,9 +109,13 @@ function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isSettledUrl(url: string, allowDataUrl: boolean): boolean {
-  if (url.length === 0) return false;
-  if (url === "about:blank") return false;
+function isSettledUrl(
+  url: string,
+  allowDataUrl: boolean,
+  allowOpaqueUrl: boolean = false,
+): boolean {
+  if (url.length === 0) return allowOpaqueUrl;
+  if (url === "about:blank") return allowOpaqueUrl;
   if (url.startsWith("chrome-error://") || url.startsWith("chrome://")) {
     return false;
   }
@@ -133,7 +144,11 @@ export async function waitForLoadState(
     if (
       !state.loading &&
       changed &&
-      isSettledUrl(state.url, options.allowDataUrl === true)
+      isSettledUrl(
+        state.url,
+        options.allowDataUrl === true,
+        options.allowOpaqueUrl === true && state.title.length > 0,
+      )
     ) {
       return { url: state.url, title: state.title };
     }
@@ -345,9 +360,48 @@ export class ManagedWebView {
         ...(options.allowDataUrl === undefined
           ? {}
           : { allowDataUrl: options.allowDataUrl }),
+        ...(options.allowOpaqueUrl === undefined
+          ? {}
+          : { allowOpaqueUrl: options.allowOpaqueUrl }),
       },
     );
     return this.pageState;
+  }
+
+  /**
+   * Wait until `document.querySelector(selector)` exists and the document has
+   * finished loading. Needed for SPAs whose shell "settles" before their
+   * framework binds handlers (fantasy402): interacting earlier causes a native
+   * form submit that discards the typed values.
+   */
+  async waitForSelector(
+    selector: string,
+    options: { timeoutMs?: number; pollMs?: number } = {},
+  ): Promise<void> {
+    this.assertOpen();
+    const timeoutMs = options.timeoutMs ?? this.navigateTimeoutMs;
+    const pollMs = options.pollMs ?? this.pollMs;
+    const encoded = escapeForExpression(selector);
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      let ready = false;
+      try {
+        ready =
+          (await this.evaluate(
+            `(() => document.readyState === "complete" && document.querySelector(${encoded}) !== null)()`,
+          )) === true;
+      } catch {
+        ready = false;
+      }
+      if (ready) return;
+      if (Date.now() >= deadline) {
+        throw new WebViewError(
+          "selector-timeout",
+          `element not found within ${timeoutMs}ms: ${selector}`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
   }
 
   /** Evaluate one expression or IIFE (multi-statement strings are invalid). */

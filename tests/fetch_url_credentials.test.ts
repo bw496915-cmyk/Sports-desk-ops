@@ -11,7 +11,13 @@ describe("Fetch Security & URL Credentials Audit", () => {
       if (
         entry === ".git" ||
         entry === "node_modules" ||
-        entry === ".DS_Store"
+        entry === ".DS_Store" ||
+        // Local audit artifacts / detached worktrees are gitignored evidence,
+        // not shipped source.
+        entry === "reports" ||
+        entry === "scratch" ||
+        entry === "dist" ||
+        entry === ".worktrees"
       ) {
         continue;
       }

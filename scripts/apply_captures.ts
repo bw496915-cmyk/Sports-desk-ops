@@ -195,6 +195,8 @@ export interface StepResult {
 export interface ApplyDeps {
   readonly regenerateSpec: (root: string) => StepResult;
   readonly regenerateMarkdown: (root: string) => StepResult;
+  /** Optional: refresh dist/ so the docs gate's staging-parity check is current. */
+  readonly stageDist?: (root: string) => StepResult;
   readonly verifyDocs: (root: string) => StepResult;
   readonly formatFile: (path: string, root: string) => StepResult;
   readonly now: () => Date;
@@ -561,8 +563,12 @@ export function loadManifestIndex(capturesDir: string): ManifestIndex {
       } catch {
         continue;
       }
-      if (isDir) walk(full);
-      else if (entry === "manifest.json") manifestFiles.push(full);
+      if (isDir) {
+        // Catalog-probe artifacts are evidence for the desk catalog surface,
+        // not upgradeable ledger operations; keep them out of the manifest walk.
+        if (entry === "catalog") continue;
+        walk(full);
+      } else if (entry === "manifest.json") manifestFiles.push(full);
     }
   };
   walk(capturesDir);
@@ -878,8 +884,10 @@ export function listCaptureFiles(dir: string): string[] {
       } catch {
         continue;
       }
-      if (isDir) walk(full);
-      else if (isCaptureFile(entry)) found.push(full);
+      if (isDir) {
+        if (entry === "catalog") continue;
+        walk(full);
+      } else if (isCaptureFile(entry)) found.push(full);
     }
   };
   walk(dir);
@@ -1034,14 +1042,14 @@ export function buildPlan(input: BuildPlanInput): Plan {
       });
       continue;
     }
-    if (row.tier !== "B") {
+    if (row.tier !== "B" && row.tier !== "C") {
       skips.push({
         file: relativePath,
         operation: operationName,
         path: record.operation.path,
         reason: row.contradicted
           ? `contradicted tier ${row.tier}: only a contradicted B row can be resolved by a live capture`
-          : `tier ${row.tier}: this tool only upgrades B→A (C rows stay inferred until a human re-tiers them)`,
+          : `tier ${row.tier}: this tool upgrades B/C→A; D/E rows are not upgradable`,
       });
       continue;
     }
@@ -1266,6 +1274,8 @@ export function defaultDeps(): ApplyDeps {
         [process.execPath, "run", join(root, "scripts", "generate_docs.ts")],
         root,
       ),
+    stageDist: (root) =>
+      spawnStep([process.execPath, "run", "docs:stage"], root),
     verifyDocs: (root) =>
       spawnStep(
         [process.execPath, "run", join(root, "scripts", "verify_docs.ts")],
@@ -1523,6 +1533,12 @@ export function applyCaptures(
         `docs/api-reference.md regeneration failed (exit ${markdownStep.code}): ${tail(markdownStep.stderr || markdownStep.stdout)}`,
       );
     }
+    const stageStep = deps.stageDist?.(root);
+    if (stageStep !== undefined && !stageStep.ok) {
+      throw new Error(
+        `dist staging failed (exit ${stageStep.code}): ${tail(stageStep.stderr || stageStep.stdout)}`,
+      );
+    }
     const verifyStep = deps.verifyDocs(root);
     if (!verifyStep.ok) {
       throw new Error(
@@ -1558,6 +1574,8 @@ export function applyCaptures(
     });
   } catch (error) {
     restoreBackups(backups);
+    // Keep dist/ consistent with the restored docs (best effort).
+    deps.stageDist?.(root);
     if (auditPath !== null) rmSync(auditPath, { force: true });
     return baseResult(options, {
       failureKind: "write-failed",
@@ -1597,7 +1615,10 @@ Options:
 
 Rules: live read-only captures only (${READ_ONLY_OPERATIONS.join(", ")});
 mock/offline, redaction-dirty, mutation and response-less captures are refused.
-Contradicted rows are left untouched; only tier B rows are upgraded to tier A.
+Tier B and C rows are upgraded to A from a valid live capture; a contradicted B
+row is resolved by such a capture (the previous reason is preserved). --write
+regenerates spec + markdown, re-stages dist/, runs the docs gate, and restores
+ledger/spec/markdown on any failure.
 `;
 
 export interface CliOptions {

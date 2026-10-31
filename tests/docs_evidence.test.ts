@@ -266,7 +266,10 @@ describe("evidence ledger invariants", () => {
 
     const webLog = rows.find((row) => /\/getWebLog$/i.test(String(row.path)));
     if (webLog === undefined) throw new Error("ledger has no getWebLog row");
-    expect(webLog.capturedResponse).toBe(false);
+    // The 2026-10-31 live capture resolved getWebLog's contradiction and made
+    // it tier A with a captured response.
+    expect(webLog.tier).toBe("A");
+    expect(webLog.capturedResponse).toBe(true);
 
     const gsRow = rows.find((row) =>
       String(row.path).includes("/manager-tools/ajax.php"),
