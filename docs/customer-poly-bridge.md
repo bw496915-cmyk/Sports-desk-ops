@@ -205,6 +205,10 @@ Reading it honestly:
 - Attribution is the bottleneck. 19 of 220 sampled customers are linked; 201 book rows have no
   wallet. Better attribution raises coverage more than any model does.
 - The customer book is a 220-row fixture, not the full 9,435-account downline.
+- The book is **internally inconsistent**: 338/1,100 tickets have `result` contradicting the sign of
+  `net_usd`, `hold_pct` matches `net/volume` on 0/220 rows (sentinels like `-100`), and 48 wager
+  numbers repeat across customers. Run `bun run scripts/audit_customer_book.ts` before quoting any
+  channel or hold figure; treat those as fixture properties, not customer behavior.
 - Shared wallets collapse two customers onto one wallet's PnL; resolve before per-customer use.
 - `POLY_ONLY_UP` is observational. Only leg-level matching on the same market, with time
   alignment, can distinguish a hedge from two independent views.

@@ -74,6 +74,7 @@
     "docs:stage": "mkdir -p dist/assets && cp docs/index.html dist/index.html && cp docs/graph.html dist/graph.html && cp docs/graph.js dist/graph.js && cp docs/gslive-links.js dist/gslive-links.js && cp docs/graph-live-feed.json dist/graph-live-feed.json && cp docs/backtest-4wk-cfb-nba.json dist/backtest-4wk-cfb-nba.json && cp docs/combo-uniqueness.json dist/combo-uniqueness.json && cp docs/cross-domain-bridge.json dist/cross-domain-bridge.json && cp docs/openapi.json dist/openapi.json && cp docs/api-reference.md dist/api-reference.md && cp -f docs/assets/* dist/assets/ && cp functions/_headers dist/_headers",
     "docs:openapi": "bun run scripts/generate_openapi.ts",
     "artifacts:value": "bun run scripts/generate_value_artifacts.ts",
+    "audit:customer-book": "bun run scripts/audit_customer_book.ts",
     "docs:deploy": "bun run test:docs && bun run verify:docs && bun run docs:stage && ./wrangler pages deploy dist --project-name=fantasy402-docs --branch=main",
     "docs:verify:live": "bun run scripts/verify_docs.ts --live https://fantasy402-docs-4ay.pages.dev",
     "verify:docs": "bun run scripts/verify_docs.ts",
