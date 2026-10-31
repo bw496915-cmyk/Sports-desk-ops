@@ -14,22 +14,25 @@ it.** Everything else is labelled as observed, inferred or unimplemented — in 
 
 | Tier  | Meaning                                                                                                                                                                            | Count      |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| **A** | Captured wire contract: a real request **and** a real response capture exist.                                                                                                      | 0          |
-| **B** | Observed first-party evidence: captured wire request, observed request payload, or a route this repo serves verified against its handler source. Response may still be uncaptured. | 7          |
-| **C** | Inferred only: authored in the spec/generators, a repo TypeScript wire type, or a UI/DOM observation whose URL+method is a candidate. No request or response observed.             | 31         |
+| **A** | Captured wire contract: a real request **and** a real response capture exist.                                                                                                      | 5          |
+| **B** | Observed first-party evidence: captured wire request, observed request payload, or a route this repo serves verified against its handler source. Response may still be uncaptured. | 5          |
+| **C** | Inferred only: authored in the spec/generators, a repo TypeScript wire type, or a UI/DOM observation whose URL+method is a candidate. No request or response observed.             | 28         |
 | **D** | A real surface missing from the spec. Recorded in `surfaces[]`, never in `operations[]`.                                                                                           | 7 surfaces |
 | **E** | Documented operation with no implementation in this repository.                                                                                                                    | 10         |
 
 **Operations:** 48 rows = 47 paths (the spec has 47 paths / 48 operations because
-`/api/desk/auth/session` carries both `POST` and `DELETE`). A 0 + B 7 + C 31 + D 0 + E 10 = 48.
+`/api/desk/auth/session` carries both `POST` and `DELETE`). A 5 + B 5 + C 28 + D 0 + E 10 = 48.
 **Surfaces:** 8 rows (D 7, E 1). Surface counts are kept separate from operation counts.
 
-**Tier A is empty because live capture has not run yet.** A requires a captured response body. The capture
-tooling now exists ([evidence/capture-tooling.md](./evidence/capture-tooling.md)) and the pipeline is
-capture-ready: `apply:captures --write` upgrades a B row to A from a valid live capture, regenerates the
-spec and markdown, and the docs gate accepts the capture-backed response (`x-capture`). Tier A is 0 only
-because no live capture has been taken for this release, so the strongest row (the 2026-10-28 Manager HAR
-`getWebLog` mode-B request) remains tier B even though its request side is fully captured.
+**Tier A is populated by the 2026-10-31 live capture session.** An authenticated headless run
+(Bun.WebView login → portal JWT handoff → Bun.FetchSession replay) captured five read-only Manager
+responses: `getWebLog`, `getInfoPlayer`, `getBetTicker`, `getBetTickerConfig`, `getSportsVigSetup`.
+Their response schemas in `docs/openapi.json` are derived from the captured skeletons (`x-capture`),
+and the two prior contradictions (getWebLog response/auth, getInfoPlayer padded example) are resolved
+by that evidence. Three further requests (`getPending`, `getInfoManager`, `getCustomerNotes`) returned
+HTTP 500 with the current request template, so they remain uncaptured and tier C. The live pregame
+sports list is separately probed (`getSportsType`, 19/19 sports identical to the fixture) — see
+[evidence/pregame-catalog.md](./evidence/pregame-catalog.md).
 
 **B-vs-C rule for the 11 "Tracked Operational Domains" candidates.** A launcher tile is not enough for B.
 B requires a URL+method observed on the wire (or a handler that serves it). The 11 candidates take their
@@ -87,7 +90,9 @@ blocker and limitations are in [evidence/capture-tooling.md](./evidence/capture-
 
 ## Contradictions (spec claim vs. concrete artifact)
 
-Three operations carry `contradicted: true` in the ledger. The quotes are the evidence, not paraphrase.
+One operation still carries `contradicted: true` in the ledger: the GS `/manager-tools/ajax.php` contract.
+The `getWebLog` response/auth and `getInfoPlayer` padded-example contradictions were resolved by the
+2026-10-31 live capture session; their historical notes are kept below for the audit trail.
 
 ### 1. `POST /cloud/api/Manager/getWebLog` — response schema and auth
 

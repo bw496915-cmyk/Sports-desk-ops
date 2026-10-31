@@ -289,3 +289,13 @@ Also absent from the spec and documented from source only: `GET /`, `GET /dashbo
 
 The `/api/desk/*` routes cannot be captured: no implementation exists anywhere in the repo. They need
 implementation first (`sportsdesk_webview_server.ts` has no `/api/desk` handler and 404s at `:299-307`).
+
+## Status after the 2026-10-31 live run
+
+Captured live (tier A): `getWebLog`, `getInfoPlayer`, `getBetTicker`, `getBetTickerConfig`,
+`getSportsVigSetup` — records in `captures/2026-10-31/`.
+
+Still needed: `getPending` / `getInfoManager` / `getCustomerNotes` request templates (HTTP 500 with the
+current envelope); a live **sub-sport/period** capture from the Ticketwriter/board surface; and the
+remaining cloud operations (authenticateCustomer, updateByColumn, etc.). Live sports parity is checked
+by `catalog:probe` (`getSportsType`, 19/19 identical to the fixture).

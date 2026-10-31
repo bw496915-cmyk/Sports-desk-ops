@@ -41,7 +41,7 @@ Three cooperating paths; each is used for exactly one job.
                                           │
               ┌───────────────────────────▼────────────────────────────────┐
   ledger      │ scripts/apply_captures.ts (dry-run first)                    │
-              │  validate → plan B→A → --write → regenerate → verify → audit │
+              │  validate → plan B/C→A → --write → regenerate → verify → audit │
               └────────────────────────────────────────────────────────────┘
 ```
 
@@ -153,7 +153,7 @@ Package scripts (owned by the capture branch):
 | ----------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `bun run capture:evidence`          | `scripts/evidence_capture.ts --mode mock`                     | Offline/mock capture run; never upgrades evidence. Default, CI-safe.        |
 | `bun run capture:evidence:live`     | `scripts/evidence_capture.ts --mode live`                     | Live gated capture (see below); writes into the capture store.              |
-| `bun run apply:captures`            | `scripts/apply_captures.ts`                                   | Validate the store and print the B→A plan (dry-run default).                |
+| `bun run apply:captures`            | `scripts/apply_captures.ts`                                   | Validate the store and print the B/C→A plan (dry-run default).              |
 | `bun run apply:captures -- --write` | same, `--write`                                               | Apply upgrades, regenerate spec + markdown, run the docs gate, write audit. |
 | `bun run docs:audit:portal`         | `scripts/audit_docs_webview_cron.ts --once`                   | One docs-portal console/DOM audit of the deployed Scalar page.              |
 | `bun run docs:audit:portal:watch`   | `scripts/audit_docs_webview_cron.ts --watch`                  | In-process `Bun.cron` watcher for the docs portal.                          |
@@ -293,6 +293,20 @@ Current state of the apply path:
    above), after which `--write` applies, regenerates and verifies end to end.
 
 Do not run `--write` against the real ledger without Lead approval.
+
+## Live capture session (2026-10-31)
+
+The first authenticated live run captured five read-only Manager responses — `getWebLog`,
+`getInfoPlayer`, `getBetTicker`, `getBetTickerConfig`, `getSportsVigSetup` — and the capture store
+contains their redacted records under `captures/2026-10-31/`. `apply:captures --write` upgraded
+those ledger rows to tier A, regenerated the spec/markdown, and the docs gate passed. Three requests
+(`getPending`, `getInfoManager`, `getCustomerNotes`) returned HTTP 500 with the current request
+template, so they stay tier C and are listed in `capture-requests.md`.
+
+The live **pregame sports list** is probed separately with `bun run catalog:probe` (authenticated
+`getSportsType`); it reports 19/19 sports identical to the committed catalog fixture and writes
+`captures/catalog/<date>/` + `docs/evidence/pregame-catalog.md`. Sub-sport lanes and period menus are
+desk-navigation catalog data; their live capture still requires the Ticketwriter/board surface.
 
 ## Limitations (do not paper over these)
 

@@ -57,7 +57,7 @@ bun run docs:audit:portal                 # one console/DOM audit of the deploye
 bun run crawl:tiles                       # offline launcher-tile discovery (candidates, no wire claims)
 ```
 
-Tier A stays 0 until a live capture actually lands; `apply_captures` refuses mock captures, requires a
+Tier A is populated by the 2026-10-31 live capture session (5 Manager responses); `apply_captures` refuses mock captures, requires a
 clean-redaction live 2xx response with a body skeleton, resolves a contradicted row only through such a
 capture (recording the previous reason), and is idempotent. `--write` is capture-ready: it upgrades B→A
 from live captures, regenerates the spec and markdown, and the docs gate accepts a valid `x-capture` (see

@@ -84,7 +84,9 @@
     "docs:audit:portal:watch": "bun run scripts/audit_docs_webview_cron.ts --watch",
     "crawl:tiles": "bun run scripts/portal_tile_crawler.ts --offline",
     "test:capture": "bun test tests/capture_*.test.ts tests/portal_audit.test.ts",
-    "deploy:docs": "./deploy_docs.sh"
+    "deploy:docs": "./deploy_docs.sh",
+    "catalog:probe": "bun run scripts/catalog_probe.ts",
+    "catalog:probe:dry": "bun run scripts/catalog_probe.ts --dry-run"
   },
   "keywords": [
     "sportsdesk",

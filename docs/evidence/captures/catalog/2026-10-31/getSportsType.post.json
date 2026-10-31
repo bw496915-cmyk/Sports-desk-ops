@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "mode": "live",
+  "capturedAt": "2026-10-31T00:21:29.359Z",
+  "operation": {
+    "path": "/cloud/api/Manager/getSportsType",
+    "method": "POST",
+    "operationId": "catalogProbeGetSportsType"
+  },
+  "request": {
+    "url": "https://fantasy402.com/cloud/api/Manager/getSportsType",
+    "method": "POST",
+    "headers": {
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "accept": "application/json",
+      "x-requested-with": "XMLHttpRequest",
+      "cookie": "<redacted>",
+      "authorization": "<redacted>"
+    },
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "bodySha256": "d646025067ee3cd3ef6ce062541efa5a1493c000a587e3a5d95e4130712b1402",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "RRO": {
+          "type": "string",
+          "nullable": false
+        },
+        "agentID": {
+          "type": "string",
+          "nullable": false
+        },
+        "agentOwner": {
+          "type": "string",
+          "nullable": false
+        },
+        "operation": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json",
+    "bodySha256": "105edc9c5766b3d5f0e896d3267286ce404cf2c6ef755a3ed92bcbba3c5f4221",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "LIST": {
+          "type": "array",
+          "nullable": false,
+          "items": {
+            "type": "object",
+            "nullable": false,
+            "fields": {
+              "0": {
+                "type": "string",
+                "nullable": false
+              },
+              "sportType": {
+                "type": "string",
+                "nullable": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "bytes": 1226
+  },
+  "redaction": {
+    "policyVersion": 1,
+    "clean": true,
+    "fieldsRedacted": [
+      "request.body.agentID",
+      "request.body.agentOwner",
+      "request.headers.authorization",
+      "request.headers.cookie"
+    ],
+    "piiRedacted": [
+      "agent-id"
+    ]
+  },
+  "provenance": {
+    "portalHost": "fantasy402.com",
+    "proxy": "none",
+    "auth": "cookie",
+    "bunVersion": "1.4.4"
+  },
+  "samples": 1
+}

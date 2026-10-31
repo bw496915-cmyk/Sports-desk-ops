@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-31T00:21:29.359Z",
+  "provider": "fantasy402",
+  "captures": [
+    {
+      "file": "2026-10-31/getSportsType.post.json",
+      "captureHash": "436e1cc17b831c747b322ac900146da22fe229dcaec685f3751ab38b7d92396d",
+      "sha256": "575531add55ff0644a004afa1f6ee013d2da7a8bfe493231d47bd9adea33e99b",
+      "endpoint": "/cloud/api/Manager/getSportsType",
+      "capturedAt": "2026-10-31T00:21:29.359Z",
+      "sportCount": 19
+    }
+  ]
+}

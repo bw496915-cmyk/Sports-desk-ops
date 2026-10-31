@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "provider": "fantasy402",
+  "source": "live getSportsType probe",
+  "capturedAt": "2026-10-31T00:21:29.359Z",
+  "endpoint": "/cloud/api/Manager/getSportsType",
+  "sportCount": 19,
+  "sports": [
+    "Auto Racing         ",
+    "Baseball            ",
+    "Basketball          ",
+    "Boxing              ",
+    "Cricket             ",
+    "Entertainment       ",
+    "Esports             ",
+    "Football            ",
+    "Golf                ",
+    "Hockey              ",
+    "Horse Racing        ",
+    "LIVE                ",
+    "Martial Arts        ",
+    "Olympics            ",
+    "Other               ",
+    "Rugby               ",
+    "Soccer              ",
+    "Tennis              ",
+    "Virtual Sports      "
+  ]
+}
