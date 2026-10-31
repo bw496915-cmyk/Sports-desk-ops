@@ -1,19 +1,204 @@
 # SportsDesk & Fantasy402 OS Cron & Native Bun Cron Integration Guide
 
-This guide details the integration of automated scheduled reporting and risk surveillance across **Linux OS Cron (`/etc/cron.d/sportsdesk-ops` / `crontab`)** and the **Native Bun Cron Scheduling Engine (`sportsdesk_cron_service.ts` / `sportsdesk_cli.ts cron`)**.
+This guide details the integration of automated scheduled reporting and risk surveillance across **Linux OS Cron (`/etc/cron.d/sportsdesk-ops` / `crontab`)**, **OS-level Bun Cron (`Bun.cron(path, schedule, title)`)**, and the **In-Process Native Bun Cron Engine (`Bun.cron(schedule, callback)`)**.
+
+---
 
 ## 1. Operational Scheduling Cadences (America/New_York)
 
-| Job ID                          | Cadence                | Cron Syntax  | Output Format | Target Action / Script                                  | Operational Objective                                                                      |
-| :------------------------------ | :--------------------- | :----------- | :------------ | :------------------------------------------------------ | :----------------------------------------------------------------------------------------- |
-| **`hourly_snipers`**            | Hourly (:00)           | `0 * * * *`  | JSON          | `sportsdesk_cli.ts winners -p 24h`                      | Intra-day sniper surveillance; flags sharp accounts hitting max limits on opening numbers. |
-| **`morning_audit_bundle`**      | Daily 08:00 EDT        | `0 8 * * *`  | Table         | `./run_reports.sh --format table`                       | Morning briefing generating the complete 7-report auditable surveillance bundle.           |
-| **`midday_steam_pulse`**        | Daily 13:00 EDT        | `0 13 * * *` | JSON          | `sportsdesk_cli.ts winners -p 7d --league NBA -m total` | Midday pulse detecting line moves, steam originations, and in-play velocity.               |
-| **`evening_settlement_recap`**  | Daily 23:00 EDT        | `0 23 * * *` | Table         | `./run_reports.sh --format table`                       | Daily settlement figures, net house hold deficit/profit, and 50% agent liability balances. |
-| **`weekly_settlement_rollup`**  | Monday 00:05 EDT       | `5 0 * * 1`  | CSV           | `./run_reports.sh --format csv`                         | Weekly 7-day settlement week rollup exported into timestamped CSV sheets.                  |
-| **`monthly_leaderboard_sweep`** | 1st of month 00:10 EDT | `10 0 1 * *` | CSV           | `sportsdesk_cli.ts leaderboard -p month --limit 50`     | 30-day dual-sided leaderboard review and lifetime house hold pillar rankings.              |
+| Job ID                          | Cadence                | Cron Syntax (NYC) | Cron Syntax (UTC) | Output Format | Target Action / Script                                  | Operational Objective                                                                      |
+| :------------------------------ | :--------------------- | :---------------- | :---------------- | :------------ | :------------------------------------------------------ | :----------------------------------------------------------------------------------------- |
+| **`hourly_snipers`**            | Hourly (:00)           | `0 * * * *`       | `0 * * * *`       | JSON          | `sportsdesk_cli.ts winners -p 24h`                      | Intra-day sniper surveillance; flags sharp accounts hitting max limits on opening numbers. |
+| **`morning_audit_bundle`**      | Daily 08:00 EDT        | `0 8 * * *`       | `0 12 * * *`      | Table         | `./run_reports.sh --format table`                       | Morning briefing generating the complete 7-report auditable surveillance bundle.           |
+| **`midday_steam_pulse`**        | Daily 13:00 EDT        | `0 13 * * *`      | `0 17 * * *`      | JSON          | `sportsdesk_cli.ts winners -p 7d --league NBA -m total` | Midday pulse detecting line moves, steam originations, and in-play velocity.               |
+| **`evening_settlement_recap`**  | Daily 23:00 EDT        | `0 23 * * *`      | `0 3 * * *`       | Table         | `./run_reports.sh --format table`                       | Daily settlement figures, net house hold deficit/profit, and 50% agent liability balances. |
+| **`weekly_settlement_rollup`**  | Monday 00:05 EDT       | `5 0 * * 1`       | `5 4 * * 1`       | CSV           | `./run_reports.sh --format csv`                         | Weekly 7-day settlement week rollup exported into timestamped CSV sheets.                  |
+| **`monthly_leaderboard_sweep`** | 1st of month 00:10 EDT | `10 0 1 * *`      | `10 4 1 * *`      | CSV           | `sportsdesk_cli.ts leaderboard -p month --limit 50`     | 30-day dual-sided leaderboard review and lifetime house hold pillar rankings.              |
 
-## 2. Quick Commands
+---
+
+## 2. Scheduling Engine Architectures: Three Operational Tiers
+
+SportsDesk categorizes automated workloads across three distinct scheduling paradigms depending on runtime persistence, resource isolation, and memory state sharing:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ TIER 1: Linux OS Cron (/etc/cron.d/sportsdesk-ops)                                               │
+│ • System-level daemon persistence across machine reboots.                                         │
+│ • Dispatches independent CLI processes (./run_reports.sh, sportsdesk_cli.ts).                    │
+│ • Uses OS local timezone (America/New_York). Maximum isolation, zero memory sharing.             │
+└──────────────────────────────────┬───────────────────────────────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────▼───────────────────────────────────────────────────────────────┐
+│ TIER 2: OS-Level Bun Cron (Bun.cron(path, schedule, title))                                      │
+│ • Registers persistent crontab / launchd / Task Scheduler entries via Bun CLI.                   │
+│ • Invokes standalone script files on disk with dedicated subprocess lifecycles.                  │
+│ • Uses OS local timezone. Lightweight registration, persistent system execution.                 │
+└──────────────────────────────────┬───────────────────────────────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────▼───────────────────────────────────────────────────────────────┐
+│ TIER 3: In-Process Bun Cron (Bun.cron(schedule, async () => { ... }))                            │
+│ • Native in-process scheduler executing directly inside the long-running daemon / server.        │
+│ • Shares in-memory state: SQLite connection pools, active WebSockets, telemetry caches.          │
+│ • LOCAL-TIME SCHEDULED BY DEFAULT (pass { tz } to pin a zone). Strictly zero-overlap.           │
+│ • Disposable via `using job = Bun.cron(...)`. Safe under `--hot` module reloading.               │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 2.1 Architectural Comparison Matrix
+
+| Property | Linux OS Cron (`/etc/cron.d`) | OS-Level `Bun.cron(path, ...)` | In-Process `Bun.cron(schedule, fn)` |
+| :--- | :--- | :--- | :--- |
+| **Execution Context** | Standalone OS Subprocess | Standalone OS Subprocess | In-Process Event Loop Callback |
+| **State Sharing** | None (Disk / SQLite IPC) | None (Disk / SQLite IPC) | **Full In-Memory Object Sharing** |
+| **Timezone Reference** | System Local (`America/New_York`) | System Local (`America/New_York`) | **Local by default; pass `{ tz }` to pin** |
+| **Concurrent Overlap** | Possible (Requires `flock(1)`) | Possible (Requires external locks) | **Guaranteed Zero-Overlap** (waits for Promise) |
+| **Hot Reloading (`--hot`)** | Unaffected | Unaffected | **Hot-Safe** (cleared & re-bound on save) |
+| **Resource Disposal** | `crontab -r` / File deletion | `Bun.cron.remove(title)` | **Explicit Resource Management (`using`)** |
+| **Process Control** | External init (`systemd`) | External init (`launchd`/`cron`) | **`.ref()` and `.unref()` controls** |
+
+---
+
+## 3. In-Process `Bun.cron()` Engine (v1.4+ Callback Overload)
+
+The in-process callback overload of `Bun.cron` provides lightweight, shared-memory job scheduling for long-running surveillance daemons and web servers.
+
+### 3.1 Core Invariants & Runtime Mechanics
+
+1. **Guaranteed Zero-Overlap Execution**:
+   - The next execution timestamp is scheduled **only after** the previous handler (and its returned `Promise`) completely settles.
+   - If an async surveillance sweep encounters slow upstream network responses or heavy database write locks, subsequent runs wait without piling up concurrent executions or exhausting connection pools.
+
+2. **Timezone Semantics (Bun 1.4+)**:
+   - In-process schedules evaluate in the **system local time** by default (Bun 1.3.12 evaluated strictly in UTC).
+   - Pass `{ tz: "America/New_York" }` as the third argument to pin a zone; `reporting_scheduler_service.ts` does this.
+   - For example, with `{ tz: "UTC" }`, `0 12 * * *` fires at 12:00 UTC; without it, the same expression follows the machine's local clock and DST.
+
+3. **Fault-Tolerant Error Handling**:
+   - Error semantics mirror `setTimeout`: synchronous throws emit `uncaughtException`, and rejected promises emit `unhandledRejection`.
+   - Registering a standard error handler ensures the job automatically reschedules itself for its next scheduled window without crashing the parent process:
+   ```typescript
+   process.on("unhandledRejection", (err) => {
+     console.error("[Cron Error] In-process task rejected:", err);
+   });
+   ```
+
+4. **Hot-Reload Safety (`--hot`)**:
+   - All in-process cron jobs registered via `Bun.cron()` are automatically unregistered and cleared before the Bun module graph re-evaluates.
+   - Developers can modify scheduling cadences, update SQL queries, or edit alert thresholds without restarting the daemon or leaking orphaned timer handles.
+
+5. **Deterministic Scope Disposal (`Disposable`)**:
+   - `Bun.cron` implements `[Symbol.dispose]()`. When wrapped with TypeScript / ECMAScript `using`, the job automatically stops when the enclosing block exits:
+   ```typescript
+   {
+     using sweepJob = Bun.cron("*/5 * * * *", async () => {
+       await syncRiskCache();
+     });
+     // sweepJob automatically stopped if the scope exits or unmounts
+   }
+   ```
+
+6. **Event Loop Steering (`.ref()` vs `.unref()`)**:
+   - By default, `.ref()` keeps the Bun event loop active while scheduled jobs exist.
+   - Calling `.unref()` allows short-lived CLI tasks or background daemons to execute scheduled maintenance while exiting cleanly once interactive CLI operations finish.
+
+---
+
+## 4. SportsDesk Production Implementation Patterns
+
+### 4.1 Continuous In-Process Sniper Surveillance Daemon
+
+```typescript
+import { Database } from "bun:sqlite";
+
+// Shared in-memory database and state
+const db = new Database("data/sportsdesk.sqlite");
+const activeAlerts = new Set<string>();
+
+// Handle unhandled rejections to preserve recurring schedules
+process.on("unhandledRejection", (err) => {
+  console.error("[Cron Error] Sniper surveillance sweep failed:", err);
+});
+
+// Hourly sniper surveillance (runs on the hour in UTC: 0 * * * *)
+// Implements Explicit Resource Management via Disposable
+export function startSurveillanceDaemon(): Disposable {
+  const job = Bun.cron("0 * * * *", async () => {
+    console.log(`[Surveillance] Starting intra-day sniper audit at ${new Date().toISOString()}...`);
+    
+    // In-memory query sharing connection pool with web server
+    const query = db.query(`
+      SELECT account_id, agent_id, SUM(risk_amount) as total_volume
+      FROM pending_tickets
+      WHERE created_at >= datetime('now', '-1 hour')
+      GROUP BY account_id
+      HAVING total_volume > 10000
+    `);
+    
+    const snipers = query.all();
+    for (const sniper of snipers) {
+      console.warn(`[High Sizing Anomaly] Account ${sniper.account_id} placed $${sniper.total_volume} in last 60m`);
+    }
+  });
+
+  return job;
+}
+```
+
+### 4.2 Rolling Syndicate Exposure & R2 Cloudflare Sync
+
+```typescript
+// Midday steam pulse (17:00 UTC = 13:00 EDT)
+// Uses .unref() so script can exit if invoked as a batch worker
+const steamJob = Bun.cron("0 17 * * *", async () => {
+  console.log("[Midday Pulse] Calculating steam originations and line moves...");
+  const proc = Bun.spawn(["./run_reports.sh", "--format", "json", "--sync-r2"], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  await proc.exited;
+});
+
+// Set .ref() for dedicated service or .unref() for transient daemons
+steamJob.ref();
+```
+
+### 4.3 Automated Documentation Error Audit Daemon (`Bun.cron` + `Bun.WebView` + `Bun.FetchSession`)
+
+The documentation error finding daemon (`scripts/audit_docs_webview_cron.ts`) combines an in-process `Bun.cron` UTC hourly schedule with native `Bun.WebView` DOM navigation and `Bun.FetchSession` connection pooling to continuously audit the live documentation portal (`https://fantasy402-docs-4ay.pages.dev`):
+
+```typescript
+import { startDocsAuditCronDaemon, runDocumentationWebviewAudit } from "./scripts/audit_docs_webview_cron.ts";
+
+// Launch continuous hourly in-process documentation auditor (0 * * * * UTC)
+// Uses Explicit Resource Management to unregister cleanly on teardown
+{
+  using docsAuditDaemon = Bun.cron("0 * * * *", async () => {
+    console.log(`[Doc Auditor] Starting scheduled audit sweep at ${new Date().toISOString()}...`);
+    const summary = await runDocumentationWebviewAudit();
+    if (summary.status === "FAIL") {
+      console.warn(`[Doc Auditor] Flagged ${summary.issuesFound} documentation issues!`);
+    }
+  });
+
+  docsAuditDaemon.ref();
+}
+```
+
+#### Key Capabilities & Verification Vectors
+
+1. **Client-Side Exception Interception**:
+   - Evaluates client-side console logs and uncaught runtime exceptions directly in WebKit, catching breaking bundle bugs (e.g., Redoc `import.meta` syntax errors) before users hit them.
+2. **Automated Search Crawl**:
+   - Programmatically runs search queries across all 47 endpoints and 12 component schemas (`updateByColumn`, `getWebLog`, `PaddedCustomerId`, `SysexitCode`, `MutationClassification`, `NeuronLayerToken`, etc.).
+3. **Automated Visual Error Proofs**:
+   - Takes hardware-accelerated screenshot captures upon runtime script exceptions, persisting visual evidence to `reports/doc_audit_proofs/doc_error_*.jpg`.
+4. **Structured JSON Diagnostics**:
+   - Emits structured machine-readable error scorecards to `reports/docs_error_audit.json` with timestamped severity levels (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`).
+
+---
+
+## 5. Quick Commands & CLI Operations
 
 ```bash
 # Run all 7 reports immediately with table output
@@ -24,4 +209,15 @@ This guide details the integration of automated scheduled reporting and risk sur
 
 # Run weekly CSV settlement export
 ./run_reports.sh --format csv
+
+# Launch the interactive SportsDesk CLI cron runner
+bun sportsdesk_cli.ts cron --cadence hourly
+
+# Execute single-pass automated docs error finding & schema audit
+bun sportsdesk_cli.ts docs --audit
+# or: bun run docs:audit
+
+# Launch continuous in-process docs error audit surveillance daemon (hourly UTC)
+bun sportsdesk_cli.ts docs --watch
+# or: bun run docs:watch
 ```
