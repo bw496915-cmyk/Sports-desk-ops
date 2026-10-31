@@ -502,31 +502,34 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
             ? "open-only index"
             : "active+closed · whole series",
         );
-        const rows = ["permissive", "all-legs-cfb", "full-game"]
-          .map(function (gate) {
+        const tbody = document.getElementById("combo-gate-rows");
+        if (tbody) {
+          tbody.textContent = "";
+          ["permissive", "all-legs-cfb", "full-game"].forEach(function (gate) {
             const row = gates[gate] || {};
             const ex = row.exclusions || {};
             const cross =
               gate === "full-game" ? (ex.CROSS_GAME ?? "—") : "included";
-            return (
-              "<tr><td><code>" +
-              gate +
-              "</code></td><td>" +
-              (row.kept ?? "—") +
-              "</td><td>" +
-              (ex.UNRESOLVED_LEGS ?? "—") +
-              "</td><td>" +
-              cross +
-              "</td><td>" +
-              (ex.INELIGIBLE_LEG_TYPE ?? "—") +
-              "</td><td>" +
-              (row.includedCrossGame ?? "—") +
-              "</td></tr>"
-            );
-          })
-          .join("");
-        const tbody = document.getElementById("combo-gate-rows");
-        if (tbody) tbody.innerHTML = rows;
+            const tr = document.createElement("tr");
+            const gateCell = document.createElement("td");
+            const code = document.createElement("code");
+            code.textContent = gate;
+            gateCell.appendChild(code);
+            tr.appendChild(gateCell);
+            [
+              row.kept,
+              ex.UNRESOLVED_LEGS,
+              cross,
+              ex.INELIGIBLE_LEG_TYPE,
+              row.includedCrossGame,
+            ].forEach(function (value) {
+              const td = document.createElement("td");
+              td.textContent = String(value ?? "—");
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          });
+        }
       }
       if (bridgeRes.ok) {
         const bridge = await bridgeRes.json();
