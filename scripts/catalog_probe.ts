@@ -235,19 +235,6 @@ export function renderCatalogReport(input: {
   return lines.join("\n");
 }
 
-async function main(argv: readonly string[]): Promise<number> {
-  const deps: CatalogProbeDeps = {
-    env: process.env,
-    now: () => new Date(),
-    stdout: (line) => console.log(line),
-    stderr: (line) => console.error(line),
-    writeFile: async (path, content) => {
-      await Bun.write(path, content);
-    },
-  };
-  return runCatalogProbe(argv, deps);
-}
-
 export async function runCatalogProbe(
   argv: readonly string[],
   deps: CatalogProbeDeps,
