@@ -2190,6 +2190,61 @@
           <div class="kpi-card">
             <div class="label">Total 4-Week Desk Savings</div>
             <div class="value" style="color: var(--accent-amber)">+
+        <section class="section-panel" id="value-bridge-panel" style="margin-top:1.25rem" aria-label="Cross-domain value and CFB combo gates">
+          <div class="section-header">
+            <h2>🔗 Cross-Domain Value &amp; CFB Combo Gates</h2>
+            <span class="pill" id="value-bridge-evidence">combo-uniqueness.json · cross-domain-bridge.json</span>
+          </div>
+          <div class="kpi-strip" style="margin-bottom:1rem">
+            <div class="kpi-card">
+              <div class="label">Customers Linked to a 0x Wallet</div>
+              <div class="value" style="color: var(--accent-cyan)" id="bridge-linked">—</div>
+              <div class="sub" id="bridge-linked-sub">attribution registry</div>
+            </div>
+            <div class="kpi-card">
+              <div class="label">Polymarket Gross P/L (linked wallets)</div>
+              <div class="value" style="color: var(--accent-emerald)" id="bridge-poly-pnl">—</div>
+              <div class="sub" id="bridge-poly-sub">pre-fee · unique wallets</div>
+            </div>
+            <div class="kpi-card">
+              <div class="label">Poly-Only-Up Leads</div>
+              <div class="value" style="color: var(--accent-amber)" id="bridge-poly-only-up">—</div>
+              <div class="sub">customer wins on Polymarket, loses at the desk</div>
+            </div>
+            <div class="kpi-card">
+              <div class="label">CFB Combos (all legs CFB)</div>
+              <div class="value" style="color: #38bdf8" id="combo-all-cfb">—</div>
+              <div class="sub" id="combo-all-cfb-sub">cross-game allowed</div>
+            </div>
+            <div class="kpi-card">
+              <div class="label">Single-Game CFB Combos</div>
+              <div class="value" style="color: #c084fc" id="combo-full-game">—</div>
+              <div class="sub" id="combo-index-sub">whole-series index</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Gate</th>
+                  <th>Kept</th>
+                  <th>Unresolved legs</th>
+                  <th>Cross-game</th>
+                  <th>Ineligible type</th>
+                  <th>Included cross-game</th>
+                </tr>
+              </thead>
+              <tbody id="combo-gate-rows">
+                <tr><td colspan="6">Loading combo-uniqueness.json…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p style="font-size:0.72rem;color:#94a3b8;margin-top:0.6rem">
+            Source: <code>docs/combo-uniqueness.json</code> + <code>docs/cross-domain-bridge.json</code>.
+            Observational: <code>polyAdvantageUsd</code> is a lead, not proof of a hedge. Net PnL is withheld when activity pagination truncates.
+          </p>
+        </section>
+
       <!-- ================================================================== -->
       <!-- TAB 5: CROSS-VENUE WATCHLIST BET-TICKER BY ROT (POLY <-> F402)     -->
       <!-- ================================================================== -->

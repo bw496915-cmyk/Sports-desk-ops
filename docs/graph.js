@@ -446,6 +446,88 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
     lastUpdatedAgeEl.textContent = sec + "s ago";
   }
 
+  async function hydrateValueArtifacts() {
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+    function fmtUsd(value) {
+      if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
+      return (value < 0 ? "-$" : "$") +
+        Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    }
+    try {
+      const [comboRes, bridgeRes] = await Promise.all([
+        fetch("./combo-uniqueness.json", { cache: "no-store" }),
+        fetch("./cross-domain-bridge.json", { cache: "no-store" }),
+      ]);
+      if (comboRes.ok) {
+        const combo = await comboRes.json();
+        const gates = combo.gates || {};
+        const permissive = gates.permissive || {};
+        const allCfb = gates["all-legs-cfb"] || {};
+        const fullGame = gates["full-game"] || {};
+        setText("combo-all-cfb", String(allCfb.kept ?? "—"));
+        setText(
+          "combo-all-cfb-sub",
+          "of " + (permissive.kept ?? "—") + " permissive · " +
+            (combo.index && combo.index.games ? combo.index.games : "—") + " games",
+        );
+        setText("combo-full-game", String(fullGame.kept ?? "—"));
+        setText(
+          "combo-index-sub",
+          combo.index && combo.index.activeOnly
+            ? "open-only index"
+            : "active+closed · whole series",
+        );
+        const rows = ["permissive", "all-legs-cfb", "full-game"]
+          .map(function (gate) {
+            const row = gates[gate] || {};
+            const ex = row.exclusions || {};
+            const cross =
+              gate === "full-game" ? (ex.CROSS_GAME ?? "—") : "included";
+            return (
+              "<tr><td><code>" + gate + "</code></td><td>" + (row.kept ?? "—") +
+              "</td><td>" + (ex.UNRESOLVED_LEGS ?? "—") + "</td><td>" + cross +
+              "</td><td>" + (ex.INELIGIBLE_LEG_TYPE ?? "—") + "</td><td>" +
+              (row.includedCrossGame ?? "—") + "</td></tr>"
+            );
+          })
+          .join("");
+        const tbody = document.getElementById("combo-gate-rows");
+        if (tbody) tbody.innerHTML = rows;
+      }
+      if (bridgeRes.ok) {
+        const bridge = await bridgeRes.json();
+        const value = bridge.value || {};
+        const coverage = bridge.coverage || {};
+        setText(
+          "bridge-linked",
+          (coverage.linkedCustomers ?? "—") + " / " + (coverage.customersInBook ?? "—"),
+        );
+        setText(
+          "bridge-linked-sub",
+          (coverage.wallets ?? "—") + " wallets · " +
+            (coverage.invalidWallets ?? 0) + " quarantined · " + bridge.evidence,
+        );
+        setText("bridge-poly-pnl", fmtUsd(value.polyGrossPnlUsd));
+        setText(
+          "bridge-poly-sub",
+          "net " + fmtUsd(value.polyNetPnlUsd) + " · " +
+            (value.netCoveragePct ?? 0) + "% replayed · " + bridge.evidence,
+        );
+        setText("bridge-poly-only-up", String(value.polyOnlyUp ?? "—"));
+        setText(
+          "value-bridge-evidence",
+          bridge.evidence + " · generated " +
+            String(bridge.generatedAtIso || "").slice(0, 10),
+        );
+      }
+    } catch (_err) {
+      // artifacts are optional; static placeholders stay visible
+    }
+  }
+
   async function pollLiveFeed() {
     try {
       const res = await fetch("./graph-live-feed.json?t=" + Date.now(), {
@@ -494,4 +576,5 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
   setInterval(updateRelativeAge, 1000);
   setInterval(pollLiveFeed, 15000);
   pollLiveFeed();
+  hydrateValueArtifacts();
 })();
