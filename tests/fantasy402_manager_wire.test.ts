@@ -15,6 +15,15 @@ import {
   WirePayloadErrorClassification,
 } from "../lib/fantasy402_manager_wire.ts";
 
+/** Test boundary: Bun's fetch type carries `preconnect`, which a mock must provide. */
+function mockFetch(
+  handler: (url: any, init: any) => Promise<Response>,
+): typeof fetch {
+  return Object.assign(handler, {
+    preconnect: (_url: string) => {},
+  }) as typeof fetch;
+}
+
 describe("Fantasy402 Manager Wire Mutations (updateByColumn)", () => {
   it("rejects poisoned path parameter fail-fast with POISONED_PATH_DETECTED", async () => {
     await assert.rejects(
@@ -29,10 +38,13 @@ describe("Fantasy402 Manager Wire Mutations (updateByColumn)", () => {
       },
       (err: any) => {
         assert(err instanceof WirePayloadError);
-        assert.equal(err.classification, WirePayloadErrorClassification.POISONED_PATH_DETECTED);
+        assert.equal(
+          err.classification,
+          WirePayloadErrorClassification.POISONED_PATH_DETECTED,
+        );
         assert.equal(err.exitCode, 64);
         return true;
-      }
+      },
     );
   });
 
@@ -48,10 +60,13 @@ describe("Fantasy402 Manager Wire Mutations (updateByColumn)", () => {
       },
       (err: any) => {
         assert(err instanceof WirePayloadError);
-        assert.equal(err.classification, WirePayloadErrorClassification.INVALID_IDENTIFIER_LENGTH);
+        assert.equal(
+          err.classification,
+          WirePayloadErrorClassification.INVALID_IDENTIFIER_LENGTH,
+        );
         assert.equal(err.exitCode, 64);
         return true;
-      }
+      },
     );
   });
 
@@ -77,14 +92,14 @@ describe("Fantasy402 Manager Wire Mutations (updateByColumn)", () => {
       let capturedBody: string | null = null;
       let capturedHeaders: Record<string, string> = {};
 
-      globalThis.fetch = async (url: any, init: any) => {
+      globalThis.fetch = mockFetch(async (url: any, init: any) => {
         capturedBody = init.body;
         capturedHeaders = init.headers;
         return new Response(JSON.stringify({ Result: { Result: 1 } }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
-      };
+      });
 
       const result = await executePlayerColumnMutation({
         portalBaseUrl: "https://mock.fantasy402.com",
@@ -108,7 +123,10 @@ describe("Fantasy402 Manager Wire Mutations (updateByColumn)", () => {
       assert.equal(params.get("column"), "confirmationDelaySeconds");
       assert.equal(params.get("value"), "5");
       assert.equal(params.get("RRO"), "0");
-      assert.equal(capturedHeaders["Content-Type"], "application/x-www-form-urlencoded; charset=UTF-8");
+      assert.equal(
+        capturedHeaders["Content-Type"],
+        "application/x-www-form-urlencoded; charset=UTF-8",
+      );
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -117,12 +135,12 @@ describe("Fantasy402 Manager Wire Mutations (updateByColumn)", () => {
   it("discriminates Result: 0 as SILENT_NO_OP", async () => {
     const originalFetch = globalThis.fetch;
     try {
-      globalThis.fetch = async () => {
+      globalThis.fetch = mockFetch(async () => {
         return new Response(JSON.stringify({ Result: { Result: 0 } }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
-      };
+      });
 
       const result = await executePlayerColumnMutation({
         portalBaseUrl: "https://mock.fantasy402.com",
@@ -147,13 +165,13 @@ describe("Fantasy402 Vig Setup (vigSetupInsert)", () => {
     try {
       let capturedPayload: any = null;
 
-      globalThis.fetch = async (url: any, init: any) => {
+      globalThis.fetch = mockFetch(async (url: any, init: any) => {
         capturedPayload = JSON.parse(init.body);
         return new Response(JSON.stringify({ Result: { Result: 1 } }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
-      };
+      });
 
       const result = await executeVigSetupInsert({
         portalBaseUrl: "https://mock.fantasy402.com",
@@ -186,15 +204,18 @@ describe("Fantasy402 IP Tracker (getWebLog)", () => {
   it("formats dates as YYYY-MM-DD for Mode C and MM/DD/YYYY for Mode B", async () => {
     const originalFetch = globalThis.fetch;
     try {
-      let lastParams: URLSearchParams | null = null;
+      const captured: { params: URLSearchParams | null } = { params: null };
 
-      globalThis.fetch = async (url: any, init: any) => {
-        lastParams = new URLSearchParams(init.body);
-        return new Response(JSON.stringify([{ ip: "192.168.1.1", login: "CB112" }]), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      };
+      globalThis.fetch = mockFetch(async (url: any, init: any) => {
+        captured.params = new URLSearchParams(init.body);
+        return new Response(
+          JSON.stringify([{ ip: "192.168.1.1", login: "CB112" }]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      });
 
       // Test Mode C
       await queryIpTrackerWebLog({
@@ -205,10 +226,10 @@ describe("Fantasy402 IP Tracker (getWebLog)", () => {
         endDate: "2026-10-30",
       });
 
-      assert(lastParams !== null);
-      assert.equal(lastParams.get("type"), "C");
-      assert.equal(lastParams.get("start"), "2026-10-30");
-      assert.equal(lastParams.get("customerID"), "CB112");
+      assert(captured.params !== null);
+      assert.equal(captured.params.get("type"), "C");
+      assert.equal(captured.params.get("start"), "2026-10-30");
+      assert.equal(captured.params.get("customerID"), "CB112");
 
       // Test Mode B
       await queryIpTrackerWebLog({
@@ -218,10 +239,10 @@ describe("Fantasy402 IP Tracker (getWebLog)", () => {
         endDate: "10/30/2026",
       });
 
-      assert(lastParams !== null);
-      assert.equal(lastParams.get("type"), "B");
-      assert.equal(lastParams.get("start"), "10/30/2026");
-      assert.equal(lastParams.get("customerID"), "0");
+      assert(captured.params !== null);
+      assert.equal(captured.params.get("type"), "B");
+      assert.equal(captured.params.get("start"), "10/30/2026");
+      assert.equal(captured.params.get("customerID"), "0");
     } finally {
       globalThis.fetch = originalFetch;
     }

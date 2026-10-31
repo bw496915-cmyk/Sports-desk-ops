@@ -344,7 +344,8 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
       if (!cell) return;
 
       const volume = document.createElement("strong");
-      volume.textContent = "$" + Math.round(wallet.volumeUsd).toLocaleString("en-US");
+      volume.textContent =
+        "$" + Math.round(wallet.volumeUsd).toLocaleString("en-US");
 
       const mode = document.createElement("span");
       mode.className =
@@ -376,24 +377,39 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
       const mode = data.dataMode || "FIXTURE";
       dataModeEl.textContent = "data: " + mode;
       dataModeEl.className =
-        "pill " + (mode === "LIVE" ? "pill-emerald" : mode === "PARTIAL" ? "pill-amber" : "pill-rose");
+        "pill " +
+        (mode === "LIVE"
+          ? "pill-emerald"
+          : mode === "PARTIAL"
+            ? "pill-amber"
+            : "pill-rose");
     }
 
     if (kpiActiveWallets) {
-      kpiActiveWallets.textContent = String(data.activeSyndicateWalletsCount ?? 39);
+      kpiActiveWallets.textContent = String(
+        data.activeSyndicateWalletsCount ?? 39,
+      );
     }
     if (kpiWalletProvenance) {
       const pm = data.provenance && data.provenance.polymarket;
       if (pm && pm.source !== "fixture") {
         kpiWalletProvenance.textContent =
-          pm.walletsOk + " live · " + (pm.walletsInvalid ?? 0) + " quarantined · " +
-          (data.configuredWalletsCount ?? 39) + " configured";
+          pm.walletsOk +
+          " live · " +
+          (pm.walletsInvalid ?? 0) +
+          " quarantined · " +
+          (data.configuredWalletsCount ?? 39) +
+          " configured";
       }
     }
-    if (tabPendingLegs) tabPendingLegs.textContent = String(data.totalOpenLegsCount ?? 222);
-    if (topologyLegs) topologyLegs.textContent = String(data.totalOpenLegsCount ?? 222);
+    if (tabPendingLegs)
+      tabPendingLegs.textContent = String(data.totalOpenLegsCount ?? 222);
+    if (topologyLegs)
+      topologyLegs.textContent = String(data.totalOpenLegsCount ?? 222);
     if (topologyExposure) {
-      topologyExposure.textContent = Number(data.totalOpenExposureUsd ?? 0).toLocaleString("en-US");
+      topologyExposure.textContent = Number(
+        data.totalOpenExposureUsd ?? 0,
+      ).toLocaleString("en-US");
     }
   }
 
@@ -452,9 +468,12 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
       if (el) el.textContent = text;
     }
     function fmtUsd(value) {
-      if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
-      return (value < 0 ? "-$" : "$") +
-        Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 0 });
+      if (value === null || value === undefined || Number.isNaN(value))
+        return "n/a";
+      return (
+        (value < 0 ? "-$" : "$") +
+        Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 0 })
+      );
     }
     try {
       const [comboRes, bridgeRes] = await Promise.all([
@@ -470,8 +489,11 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
         setText("combo-all-cfb", String(allCfb.kept ?? "—"));
         setText(
           "combo-all-cfb-sub",
-          "of " + (permissive.kept ?? "—") + " permissive · " +
-            (combo.index && combo.index.games ? combo.index.games : "—") + " games",
+          "of " +
+            (permissive.kept ?? "—") +
+            " permissive · " +
+            (combo.index && combo.index.games ? combo.index.games : "—") +
+            " games",
         );
         setText("combo-full-game", String(fullGame.kept ?? "—"));
         setText(
@@ -487,10 +509,19 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
             const cross =
               gate === "full-game" ? (ex.CROSS_GAME ?? "—") : "included";
             return (
-              "<tr><td><code>" + gate + "</code></td><td>" + (row.kept ?? "—") +
-              "</td><td>" + (ex.UNRESOLVED_LEGS ?? "—") + "</td><td>" + cross +
-              "</td><td>" + (ex.INELIGIBLE_LEG_TYPE ?? "—") + "</td><td>" +
-              (row.includedCrossGame ?? "—") + "</td></tr>"
+              "<tr><td><code>" +
+              gate +
+              "</code></td><td>" +
+              (row.kept ?? "—") +
+              "</td><td>" +
+              (ex.UNRESOLVED_LEGS ?? "—") +
+              "</td><td>" +
+              cross +
+              "</td><td>" +
+              (ex.INELIGIBLE_LEG_TYPE ?? "—") +
+              "</td><td>" +
+              (row.includedCrossGame ?? "—") +
+              "</td></tr>"
             );
           })
           .join("");
@@ -503,27 +534,37 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
         const coverage = bridge.coverage || {};
         setText(
           "bridge-linked",
-          (coverage.linkedCustomers ?? "—") + " / " + (coverage.customersInBook ?? "—"),
+          (coverage.linkedCustomers ?? "—") +
+            " / " +
+            (coverage.customersInBook ?? "—"),
         );
         setText(
           "bridge-linked-sub",
-          (coverage.wallets ?? "—") + " wallets · " +
-            (coverage.invalidWallets ?? 0) + " quarantined · " + bridge.evidence,
+          (coverage.wallets ?? "—") +
+            " wallets · " +
+            (coverage.invalidWallets ?? 0) +
+            " quarantined · " +
+            bridge.evidence,
         );
         setText("bridge-poly-pnl", fmtUsd(value.polyGrossPnlUsd));
         setText(
           "bridge-poly-sub",
-          "net " + fmtUsd(value.polyNetPnlUsd) + " · " +
-            (value.netCoveragePct ?? 0) + "% replayed · " + bridge.evidence,
+          "net " +
+            fmtUsd(value.polyNetPnlUsd) +
+            " · " +
+            (value.netCoveragePct ?? 0) +
+            "% replayed · " +
+            bridge.evidence,
         );
         setText("bridge-poly-only-up", String(value.polyOnlyUp ?? "—"));
         setText(
           "value-bridge-evidence",
-          bridge.evidence + " · generated " +
+          bridge.evidence +
+            " · generated " +
             String(bridge.generatedAtIso || "").slice(0, 10),
         );
       }
-    } catch (_err) {
+    } catch {
       // artifacts are optional; static placeholders stay visible
     }
   }
@@ -556,7 +597,7 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
         hydrateLiveTicks(data);
         updateRelativeAge();
       }
-    } catch (_err) {
+    } catch {
       const now = new Date();
       lastPollEpochMs = now.getTime();
       if (lastUpdatedEl) {

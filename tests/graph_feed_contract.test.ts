@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const FEED_PATH = join(import.meta.dirname, "..", "docs", "graph-live-feed.json");
+const FEED_PATH = join(
+  import.meta.dirname,
+  "..",
+  "docs",
+  "graph-live-feed.json",
+);
 
 interface Feed {
   schemaVersion?: number;
@@ -11,7 +16,10 @@ interface Feed {
   activeSyndicateWalletsCount?: number;
   configuredWalletsCount?: number;
   provenance?: {
-    polymarket?: Record<string, unknown> & { walletsInvalid?: number; walletsStale?: number };
+    polymarket?: Record<string, unknown> & {
+      walletsInvalid?: number;
+      walletsStale?: number;
+    };
     f402?: Record<string, unknown>;
   };
   liveTicks?: unknown[];
@@ -23,7 +31,8 @@ const feed = JSON.parse(readFileSync(FEED_PATH, "utf8")) as Feed;
 describe("graph-live-feed contract (schema 3)", () => {
   test("declares schema 3, a valid dataMode, and honest WSS fields", () => {
     expect(feed.schemaVersion).toBe(3);
-    expect(["LIVE", "PARTIAL", "FIXTURE"]).toContain(feed.dataMode);
+    expect(feed.dataMode).toBeDefined();
+    expect(["LIVE", "PARTIAL", "FIXTURE"]).toContain(feed.dataMode ?? "");
     expect(feed.wssIngestion).toBe("not_ingested");
     expect(typeof feed.activeSyndicateWalletsCount).toBe("number");
     expect(feed.configuredWalletsCount).toBe(39);
@@ -33,7 +42,13 @@ describe("graph-live-feed contract (schema 3)", () => {
     const pm = feed.provenance?.polymarket;
     expect(pm).toBeDefined();
     if (pm !== undefined && pm["source"] !== "fixture") {
-      for (const key of ["walletsRequested", "walletsOk", "walletsFailed", "walletsStale", "walletsInvalid"]) {
+      for (const key of [
+        "walletsRequested",
+        "walletsOk",
+        "walletsFailed",
+        "walletsStale",
+        "walletsInvalid",
+      ]) {
         expect(typeof pm[key]).toBe("number");
       }
     }
@@ -45,7 +60,9 @@ describe("graph-live-feed contract (schema 3)", () => {
     const wallets = feed.walletProfiles ?? [];
     expect(wallets).toHaveLength(39);
     for (const wallet of wallets) {
-      expect(["LIVE", "STALE", "FIXTURE"]).toContain(String(wallet["dataSource"]));
+      expect(["LIVE", "STALE", "FIXTURE"]).toContain(
+        String(wallet["dataSource"]),
+      );
       expect(typeof wallet["walletAddressValid"]).toBe("boolean");
       if (wallet["walletAddressValid"] === false) {
         expect(wallet["openVolumeUsd"]).toBe(0);

@@ -55,34 +55,22 @@ import {
   ALL_QWEN_TOKENS,
 } from "./domain-branded-types.ts";
 import { assertUniqueTokenColors } from "./validation/token_validator.ts";
-import {
-  printAnsiMarkdown,
-  formatCustomerOsc8Markdown,
-  formatAgentOsc8Markdown,
-  formatDocsOsc8Markdown,
-  formatOpenApiSpecOsc8Markdown,
-  CANONICAL_DOMAINS,
-} from "./lib/canonical_osc8_links.ts";
+import { printAnsiMarkdown } from "./lib/canonical_osc8_links.ts";
 import {
   executePlayerColumnMutation,
   executeVigSetupInsert,
   queryIpTrackerWebLog,
   fetchPlayerInfo,
-  PlayerMutationResultCode,
-  MutationClassification,
 } from "./lib/fantasy402_manager_wire.ts";
 import {
   TEN_MODE_CATALOG,
   buildTenModeLiveSnapshot,
 } from "./lib/forensic_diagnostic_modes.ts";
-import {
-  buildGsLiveDualSurfaceDescriptor,
-} from "./lib/gslive_manager_deeplink_sidecar.ts";
+import { buildGsLiveDualSurfaceDescriptor } from "./lib/gslive_manager_deeplink_sidecar.ts";
 import {
   PER_OFFICE_IP_TRACKER_CLUSTERS,
   buildPerOfficeIpMatcherPayload,
 } from "./lib/bet_ticker_ip_tracker_bridge.ts";
-
 
 interface DownlineMetadata {
   readonly master_agent: string;
@@ -690,17 +678,83 @@ export function printLKeyDictionary(): void {
   );
 
   const neuronRows = [
-    { id: "L18.N0204", chan: "Internet", hex: "#1d84b5", gate: "1,500 ms SLA", role: "Retail pregame baseline; target twin counterpart" },
-    { id: "L19.N0518", chan: "BLOCKED", hex: "#64748b", gate: "Sentinel Drop", role: "Noise sentinel; dropped before parent ticket grouping" },
-    { id: "L20.N1105", chan: "GATEWAY", hex: "#10b981", gate: "1,000 ms SLA", role: "Equilibrium sweep; monitors hold & +15c/+20c vig persist" },
-    { id: "L21.N0884", chan: "ALERT", hex: "#ef4444", gate: "250 ms SLA", role: "Syndicate alert twin; canonicalVolumeCents = 0 buffer" },
-    { id: "L22.N1402", chan: "GSBUILDER", hex: "#f59e0b", gate: "1,000 ms SLA", role: "Same-game prop builder; M.G<id> join; steerable" },
-    { id: "L23.N0412", chan: "GSLIVE", hex: "#28a745", gate: "500 ms SLA", role: "In-play whale sizing ($2k+); M.G<id>; +20c vig tax" },
-    { id: "L24.N2019", chan: "CSLEVEL2", hex: "#38bdf8", gate: "2,000 ms SLA", role: "Clerk telephone orders; longshot recreational bias" },
-    { id: "L25.N1882", chan: "--sd-route-devig", hex: "#06b6d4", gate: "Lag <= 5,000 ms", role: "Steam convergence; consensus devig reprice" },
-    { id: "L26.N3104", chan: "--sd-route-sharp", hex: "#a855f7", gate: "tau*=0.68, N>=8", role: "Online Empirical Bayes sharp shrinkage detector" },
-    { id: "L27.N0912", chan: "--sd-route-pending", hex: "#d97706", gate: "Depth < $1,000", role: "Liquidity exhaustion circuit breaker trip" },
-    { id: "L28.N2501", chan: "--sd-route-manager", hex: "#f43f5e", gate: "MFCS >= 80", role: "Terminal execution write-gate; 6s delay & limit clamp" },
+    {
+      id: "L18.N0204",
+      chan: "Internet",
+      hex: "#1d84b5",
+      gate: "1,500 ms SLA",
+      role: "Retail pregame baseline; target twin counterpart",
+    },
+    {
+      id: "L19.N0518",
+      chan: "BLOCKED",
+      hex: "#64748b",
+      gate: "Sentinel Drop",
+      role: "Noise sentinel; dropped before parent ticket grouping",
+    },
+    {
+      id: "L20.N1105",
+      chan: "GATEWAY",
+      hex: "#10b981",
+      gate: "1,000 ms SLA",
+      role: "Equilibrium sweep; monitors hold & +15c/+20c vig persist",
+    },
+    {
+      id: "L21.N0884",
+      chan: "ALERT",
+      hex: "#ef4444",
+      gate: "250 ms SLA",
+      role: "Syndicate alert twin; canonicalVolumeCents = 0 buffer",
+    },
+    {
+      id: "L22.N1402",
+      chan: "GSBUILDER",
+      hex: "#f59e0b",
+      gate: "1,000 ms SLA",
+      role: "Same-game prop builder; M.G<id> join; steerable",
+    },
+    {
+      id: "L23.N0412",
+      chan: "GSLIVE",
+      hex: "#28a745",
+      gate: "500 ms SLA",
+      role: "In-play whale sizing ($2k+); M.G<id>; +20c vig tax",
+    },
+    {
+      id: "L24.N2019",
+      chan: "CSLEVEL2",
+      hex: "#38bdf8",
+      gate: "2,000 ms SLA",
+      role: "Clerk telephone orders; longshot recreational bias",
+    },
+    {
+      id: "L25.N1882",
+      chan: "--sd-route-devig",
+      hex: "#06b6d4",
+      gate: "Lag <= 5,000 ms",
+      role: "Steam convergence; consensus devig reprice",
+    },
+    {
+      id: "L26.N3104",
+      chan: "--sd-route-sharp",
+      hex: "#a855f7",
+      gate: "tau*=0.68, N>=8",
+      role: "Online Empirical Bayes sharp shrinkage detector",
+    },
+    {
+      id: "L27.N0912",
+      chan: "--sd-route-pending",
+      hex: "#d97706",
+      gate: "Depth < $1,000",
+      role: "Liquidity exhaustion circuit breaker trip",
+    },
+    {
+      id: "L28.N2501",
+      chan: "--sd-route-manager",
+      hex: "#f43f5e",
+      gate: "MFCS >= 80",
+      role: "Terminal execution write-gate; 6s delay & limit clamp",
+    },
   ];
 
   neuronRows.forEach((n) => {
@@ -713,16 +767,16 @@ export function printLKeyDictionary(): void {
     const swatch = `${ansi}████████${reset}`;
     console.log(
       `${n.id.padEnd(12)} | ` +
-      `${n.chan.padEnd(20)} | ` +
-      `${n.hex.padEnd(8)} | ` +
-      `${swatch.padEnd(15)} | ` +
-      `${n.gate.padEnd(24)} | ` +
-      `${n.role}`,
+        `${n.chan.padEnd(20)} | ` +
+        `${n.hex.padEnd(8)} | ` +
+        `${swatch.padEnd(15)} | ` +
+        `${n.gate.padEnd(24)} | ` +
+        `${n.role}`,
     );
   });
 
   console.log(
-    "\n--- PART 2: FANTASY402 MANAGER DOM LOCALIZATION KEYS (data-language=\"L-xxxx\") ---",
+    '\n--- PART 2: FANTASY402 MANAGER DOM LOCALIZATION KEYS (data-language="L-xxxx") ---',
   );
   console.log(
     " DOM L-Key  | DOM Header / Element | Wire Mapping Property | Purpose & Telemetry Binding",
@@ -732,28 +786,98 @@ export function printLKeyDictionary(): void {
   );
 
   const domRows = [
-    { key: "L-1029", label: "Source", prop: "TicketWriter", desc: "Channel discriminator (Internet, ALERT, GSLIVE, GSBUILDER, CSLEVEL2)" },
-    { key: "L-1028", label: "Ticket #", prop: "WagerNumber", desc: "Monotonic parent wager ID; half of composite key ${Login}|${WagerNumber}" },
-    { key: "L-1031", label: "Player / Account", prop: "Login / customerID", desc: "Customer login; trimmed for queries, 11-char space-padded on writes" },
-    { key: "L-1032", label: "Agent", prop: "agentOwner / agentID", desc: "Direct owning sub-agent hierarchy; prevents REJECTED_SCOPE (-1)" },
-    { key: "L-1033", label: "Date / Time", prop: "PlacedTimestamp", desc: "Placed timestamp (UTC); calculates post-login dwell velocity (<15s)" },
-    { key: "L-1034", label: "Sport", prop: "SportType", desc: "Sport name; padded to strictly 20 chars on vigSetupInsert" },
-    { key: "L-1035", label: "Description", prop: "ShortDesc", desc: "Market description, ShortDesc[0] code, <br> legs, M.G<id> headers" },
-    { key: "L-1036", label: "Risk", prop: "Risk", desc: "Stake in USD; integer Cents in SQLite; zeroed out on ALERT slips" },
-    { key: "L-1037", label: "To Win", prop: "Win / ToWin", desc: "Potential payout in USD; integer Cents in SQLite" },
-    { key: "L-1038", label: "Result / Status", prop: "Result / Status", desc: "Resolution status (Pending, Won, Lost, Pushed, Canceled)" },
-    { key: "L-1039", label: "IP Address", prop: "ipAddress", desc: "Client auth IP; feeds Mode B global matcher and /24 subnet clustering" },
-    { key: "L-1040", label: "Delay", prop: "Delay", desc: "Dynamic delay gate in seconds; mutated via updateByColumn (0s to 15s)" },
-    { key: "L-1045", label: "Balance", prop: "CurrentBalance", desc: "Player outstanding balance; verified via getInfoPlayer read-back" },
-    { key: "L-1050", label: "Weekly Total", prop: "grandTotalWeekly", desc: "Mobile header KPI; verified against Report/getWeeklyFigure" },
+    {
+      key: "L-1029",
+      label: "Source",
+      prop: "TicketWriter",
+      desc: "Channel discriminator (Internet, ALERT, GSLIVE, GSBUILDER, CSLEVEL2)",
+    },
+    {
+      key: "L-1028",
+      label: "Ticket #",
+      prop: "WagerNumber",
+      desc: "Monotonic parent wager ID; half of composite key ${Login}|${WagerNumber}",
+    },
+    {
+      key: "L-1031",
+      label: "Player / Account",
+      prop: "Login / customerID",
+      desc: "Customer login; trimmed for queries, 11-char space-padded on writes",
+    },
+    {
+      key: "L-1032",
+      label: "Agent",
+      prop: "agentOwner / agentID",
+      desc: "Direct owning sub-agent hierarchy; prevents REJECTED_SCOPE (-1)",
+    },
+    {
+      key: "L-1033",
+      label: "Date / Time",
+      prop: "PlacedTimestamp",
+      desc: "Placed timestamp (UTC); calculates post-login dwell velocity (<15s)",
+    },
+    {
+      key: "L-1034",
+      label: "Sport",
+      prop: "SportType",
+      desc: "Sport name; padded to strictly 20 chars on vigSetupInsert",
+    },
+    {
+      key: "L-1035",
+      label: "Description",
+      prop: "ShortDesc",
+      desc: "Market description, ShortDesc[0] code, <br> legs, M.G<id> headers",
+    },
+    {
+      key: "L-1036",
+      label: "Risk",
+      prop: "Risk",
+      desc: "Stake in USD; integer Cents in SQLite; zeroed out on ALERT slips",
+    },
+    {
+      key: "L-1037",
+      label: "To Win",
+      prop: "Win / ToWin",
+      desc: "Potential payout in USD; integer Cents in SQLite",
+    },
+    {
+      key: "L-1038",
+      label: "Result / Status",
+      prop: "Result / Status",
+      desc: "Resolution status (Pending, Won, Lost, Pushed, Canceled)",
+    },
+    {
+      key: "L-1039",
+      label: "IP Address",
+      prop: "ipAddress",
+      desc: "Client auth IP; feeds Mode B global matcher and /24 subnet clustering",
+    },
+    {
+      key: "L-1040",
+      label: "Delay",
+      prop: "Delay",
+      desc: "Dynamic delay gate in seconds; mutated via updateByColumn (0s to 15s)",
+    },
+    {
+      key: "L-1045",
+      label: "Balance",
+      prop: "CurrentBalance",
+      desc: "Player outstanding balance; verified via getInfoPlayer read-back",
+    },
+    {
+      key: "L-1050",
+      label: "Weekly Total",
+      prop: "grandTotalWeekly",
+      desc: "Mobile header KPI; verified against Report/getWeeklyFigure",
+    },
   ];
 
   domRows.forEach((d) => {
     console.log(
       `${d.key.padEnd(11)} | ` +
-      `${d.label.padEnd(20)} | ` +
-      `${d.prop.padEnd(21)} | ` +
-      `${d.desc}`,
+        `${d.label.padEnd(20)} | ` +
+        `${d.prop.padEnd(21)} | ` +
+        `${d.desc}`,
     );
   });
 
@@ -783,13 +907,69 @@ export function printTicketWriters(): void {
   );
 
   const writerRows = [
-    { name: "Internet", layer: "L18.N0204", hex: "#1d84b5", code: "S,P,T,C,E", sla: "1,500 ms", vol: "min(Risk, Win)", desc: "Retail pregame baseline; target twin counterpart" },
-    { name: "ALERT", layer: "L21.N0884", hex: "#ef4444", code: "S,P,L,G,M", sla: "250 ms", vol: "STRICTLY 0", desc: "Syndicate sub-account mirror; gapDurationSeconds <= 6s" },
-    { name: "GSLIVE", layer: "L23.N0412", hex: "#28a745", code: "M (tick)/G (pend)", sla: "500 ms", vol: "min(Risk, Win)", desc: "In-play whale sizing; M.G<id> header; empty Team/Line; +20c vig" },
-    { name: "GSBUILDER", layer: "L22.N1402", hex: "#f59e0b", code: "C,M,P", sla: "1,000 ms", vol: "min(Risk, Win)", desc: "Same-Game Parlay builder; <br> delimited legs; correlated props" },
-    { name: "CSLEVEL2", layer: "L24.N2019", hex: "#38bdf8", code: "L,S,C,E", sla: "2,000 ms", vol: "min(Risk, Win)", desc: "Clerk telephone desk entries; doubles tennis; longshot bias" },
-    { name: "BLOCKED", layer: "L19.N0518", hex: "#64748b", code: "Empty / any", sla: "DROP", vol: "DROPPED (0)", desc: "Noise filter sentinel; must drop before multi-leg grouping" },
-    { name: "GATEWAY", layer: "L20.N1105", hex: "#10b981", code: "Empty", sla: "1,000 ms", vol: "DIAGNOSTIC", desc: "Equilibrium telemetry; verifies +15c/+20c vig persist read-backs" },
+    {
+      name: "Internet",
+      layer: "L18.N0204",
+      hex: "#1d84b5",
+      code: "S,P,T,C,E",
+      sla: "1,500 ms",
+      vol: "min(Risk, Win)",
+      desc: "Retail pregame baseline; target twin counterpart",
+    },
+    {
+      name: "ALERT",
+      layer: "L21.N0884",
+      hex: "#ef4444",
+      code: "S,P,L,G,M",
+      sla: "250 ms",
+      vol: "STRICTLY 0",
+      desc: "Syndicate sub-account mirror; gapDurationSeconds <= 6s",
+    },
+    {
+      name: "GSLIVE",
+      layer: "L23.N0412",
+      hex: "#28a745",
+      code: "M (tick)/G (pend)",
+      sla: "500 ms",
+      vol: "min(Risk, Win)",
+      desc: "In-play whale sizing; M.G<id> header; empty Team/Line; +20c vig",
+    },
+    {
+      name: "GSBUILDER",
+      layer: "L22.N1402",
+      hex: "#f59e0b",
+      code: "C,M,P",
+      sla: "1,000 ms",
+      vol: "min(Risk, Win)",
+      desc: "Same-Game Parlay builder; <br> delimited legs; correlated props",
+    },
+    {
+      name: "CSLEVEL2",
+      layer: "L24.N2019",
+      hex: "#38bdf8",
+      code: "L,S,C,E",
+      sla: "2,000 ms",
+      vol: "min(Risk, Win)",
+      desc: "Clerk telephone desk entries; doubles tennis; longshot bias",
+    },
+    {
+      name: "BLOCKED",
+      layer: "L19.N0518",
+      hex: "#64748b",
+      code: "Empty / any",
+      sla: "DROP",
+      vol: "DROPPED (0)",
+      desc: "Noise filter sentinel; must drop before multi-leg grouping",
+    },
+    {
+      name: "GATEWAY",
+      layer: "L20.N1105",
+      hex: "#10b981",
+      code: "Empty",
+      sla: "1,000 ms",
+      vol: "DIAGNOSTIC",
+      desc: "Equilibrium telemetry; verifies +15c/+20c vig persist read-backs",
+    },
   ];
 
   writerRows.forEach((w) => {
@@ -802,13 +982,13 @@ export function printTicketWriters(): void {
     const swatch = `${ansi}████████${reset}`;
     console.log(
       `${w.name.padEnd(13)} | ` +
-      `${w.layer.padEnd(12)} | ` +
-      `${w.hex.padEnd(9)} | ` +
-      `${swatch.padEnd(15)} | ` +
-      `${w.code.padEnd(12)} | ` +
-      `${w.sla.padEnd(10)} | ` +
-      `${w.vol.padEnd(19)} | ` +
-      `${w.desc}`,
+        `${w.layer.padEnd(12)} | ` +
+        `${w.hex.padEnd(9)} | ` +
+        `${swatch.padEnd(15)} | ` +
+        `${w.code.padEnd(12)} | ` +
+        `${w.sla.padEnd(10)} | ` +
+        `${w.vol.padEnd(19)} | ` +
+        `${w.desc}`,
     );
   });
 
@@ -1128,13 +1308,27 @@ function getArgValue(
 export async function handleWireCommand(args: string[]): Promise<void> {
   const sub = args[0]?.toLowerCase();
   if (sub === "mutate" || sub === "mutation" || sub === "update") {
-    const custId = getArgValue(args, ["-c", "--customer", "--customer-id"], "CB112_1");
-    const agentId = getArgValue(args, ["-a", "--agent", "--agent-owner"], "CUB22HR");
-    const col = getArgValue(args, ["--col", "--column"], "confirmationDelaySeconds");
+    const custId = getArgValue(
+      args,
+      ["-c", "--customer", "--customer-id"],
+      "CB112_1",
+    );
+    const agentId = getArgValue(
+      args,
+      ["-a", "--agent", "--agent-owner"],
+      "CUB22HR",
+    );
+    const col = getArgValue(
+      args,
+      ["--col", "--column"],
+      "confirmationDelaySeconds",
+    );
     const val = getArgValue(args, ["--val", "--value"], "5");
     const verify = !args.includes("--no-verify");
 
-    console.log(`[Wire Mutation] Executing updateByColumn for ${custId} (Agent: ${agentId}, Col: ${col}, Val: ${val})...`);
+    console.log(
+      `[Wire Mutation] Executing updateByColumn for ${custId} (Agent: ${agentId}, Col: ${col}, Val: ${val})...`,
+    );
     try {
       const res = await executePlayerColumnMutation({
         customerIdentifier: custId,
@@ -1143,7 +1337,9 @@ export async function handleWireCommand(args: string[]): Promise<void> {
         value: val,
         verifyReadBack: verify,
       });
-      console.log(`[Wire Mutation] Classification: ${res.classification} (Committed: ${res.isCommitted}, ReadBack: ${res.readBackVerified})`);
+      console.log(
+        `[Wire Mutation] Classification: ${res.classification} (Committed: ${res.isCommitted}, ReadBack: ${res.readBackVerified})`,
+      );
       console.log(`  Customer (padded) : "${res.customerId}"`);
       console.log(`  Agent Owner       : "${res.agentOwner}"`);
       console.log(`  Column / Value    : ${res.column} = ${res.value}`);
@@ -1155,13 +1351,19 @@ export async function handleWireCommand(args: string[]): Promise<void> {
   }
 
   if (sub === "vig" || sub === "vig-setup" || sub === "vigsetup") {
-    const custId = getArgValue(args, ["-c", "--customer", "--customer-id"], "CB112_1");
+    const custId = getArgValue(
+      args,
+      ["-c", "--customer", "--customer-id"],
+      "CB112_1",
+    );
     const sport = getArgValue(args, ["-s", "--sport"], "Football");
     const spread = getArgValue(args, ["--spread"], "15");
     const deriv = getArgValue(args, ["--derivative"], "20");
     const verify = !args.includes("--no-verify");
 
-    console.log(`[Wire Vig] Executing vigSetupInsert for ${custId} (${sport}, +${spread}c spread, +${deriv}c derivative)...`);
+    console.log(
+      `[Wire Vig] Executing vigSetupInsert for ${custId} (${sport}, +${spread}c spread, +${deriv}c derivative)...`,
+    );
     try {
       const res = await executeVigSetupInsert({
         customerIdentifier: custId,
@@ -1170,10 +1372,14 @@ export async function handleWireCommand(args: string[]): Promise<void> {
         vigDerivative: deriv,
         verifyReadBack: verify,
       });
-      console.log(`[Wire Vig] Success: ${res.success} (ReadBack: ${res.readBackVerified})`);
+      console.log(
+        `[Wire Vig] Success: ${res.success} (ReadBack: ${res.readBackVerified})`,
+      );
       console.log(`  Sport (20-pad)    : "${res.sportType}"`);
       console.log(`  Player (11-pad)   : "${res.player}"`);
-      console.log(`  Vig Spread / Deriv: +${res.vigSpread}c / +${res.vigDerivative}c`);
+      console.log(
+        `  Vig Spread / Deriv: +${res.vigSpread}c / +${res.vigDerivative}c`,
+      );
     } catch (err: any) {
       console.error(`[Wire Vig Error] ${err.message}`);
       process.exitCode = 1;
@@ -1182,17 +1388,22 @@ export async function handleWireCommand(args: string[]): Promise<void> {
   }
 
   if (sub === "weblog" || sub === "ip-tracker" || sub === "iptracker") {
-    const mode = (getArgValue(args, ["-m", "--mode"], "B").toUpperCase()) as "A" | "B" | "C" | "I";
+    const mode = getArgValue(args, ["-m", "--mode"], "B").toUpperCase() as
+      "A" | "B" | "C" | "I";
     const custId = getArgValue(args, ["-c", "--customer"], "0");
     const ip = getArgValue(args, ["--ip"], "");
-    console.log(`[Wire IP Tracker] Querying getWebLog mode ${mode} (Customer: ${custId}, IP: ${ip || "ALL"})...`);
+    console.log(
+      `[Wire IP Tracker] Querying getWebLog mode ${mode} (Customer: ${custId}, IP: ${ip || "ALL"})...`,
+    );
     try {
       const res = await queryIpTrackerWebLog({
         mode,
         customerId: custId,
         ip,
       });
-      console.log(`[Wire IP Tracker] Mode ${res.mode} returned ${res.rowCount} row(s) at ${res.queryTimestamp}`);
+      console.log(
+        `[Wire IP Tracker] Mode ${res.mode} returned ${res.rowCount} row(s) at ${res.queryTimestamp}`,
+      );
     } catch (err: any) {
       console.error(`[Wire IP Tracker Error] ${err.message}`);
       process.exitCode = 1;
@@ -1258,36 +1469,50 @@ export async function main(): Promise<void> {
 
   if (cmd === "modes" || cmd === "mode" || rawArgs.includes("--modes")) {
     const snap = buildTenModeLiveSnapshot();
-    const modeFilterArg = rawArgs[1] && !rawArgs[1].startsWith("-") ? Number(rawArgs[1]) : null;
+    const modeFilterArg =
+      rawArgs[1] && !rawArgs[1].startsWith("-") ? Number(rawArgs[1]) : null;
     if (rawArgs.includes("--json")) {
       console.log(JSON.stringify(snap, null, 2));
       return;
     }
-    console.log("========================================================================================================================");
-    console.log("  🔬 10-MODE FORENSIC, RISK, CROSS-MARKET & DATA INTEGRITY ENGINE (Modes 1..10)");
-    console.log("========================================================================================================================");
+    console.log(
+      "========================================================================================================================",
+    );
+    console.log(
+      "  🔬 10-MODE FORENSIC, RISK, CROSS-MARKET & DATA INTEGRITY ENGINE (Modes 1..10)",
+    );
+    console.log(
+      "========================================================================================================================",
+    );
     for (const spec of TEN_MODE_CATALOG) {
       if (modeFilterArg && spec.modeNumber !== modeFilterArg) continue;
-      console.log(`  [${spec.domain.padEnd(18)}] ${spec.modeLabel.padEnd(25)} | Checks: ${spec.checksSummary.padEnd(55)} | Output: ${spec.outputSummary}`);
+      console.log(
+        `  [${spec.domain.padEnd(18)}] ${spec.modeLabel.padEnd(25)} | Checks: ${spec.checksSummary.padEnd(55)} | Output: ${spec.outputSummary}`,
+      );
     }
-    console.log("========================================================================================================================");
+    console.log(
+      "========================================================================================================================",
+    );
     return;
   }
 
   if (cmd === "combo") {
-    const { runPolymarketCombo } = await import("./scripts/polymarket_combo_cli.ts");
+    const { runPolymarketCombo } =
+      await import("./scripts/polymarket_combo_cli.ts");
     await runPolymarketCombo(rawArgs.slice(1));
     return;
   }
 
   if (cmd === "profile") {
-    const { runPolymarketProfile } = await import("./scripts/polymarket_profile_cli.ts");
+    const { runPolymarketProfile } =
+      await import("./scripts/polymarket_profile_cli.ts");
     await runPolymarketProfile(rawArgs.slice(1));
     return;
   }
 
   if (cmd === "bridge" || cmd === "crossdomain") {
-    const { runCustomerBridge } = await import("./scripts/customer_bridge_cli.ts");
+    const { runCustomerBridge } =
+      await import("./scripts/customer_bridge_cli.ts");
     await runCustomerBridge(rawArgs.slice(1));
     return;
   }
@@ -1298,7 +1523,12 @@ export async function main(): Promise<void> {
     return;
   }
 
-  if (cmd === "gslive" || cmd === "gs-live" || rawArgs.includes("--gslive") || rawArgs.includes("-G")) {
+  if (
+    cmd === "gslive" ||
+    cmd === "gs-live" ||
+    rawArgs.includes("--gslive") ||
+    rawArgs.includes("-G")
+  ) {
     // Flags that consume the next token; skip both so `--date 2026-11-01 MJ102` resolves MJ102.
     const gsliveFlagValues = new Set(["-c", "--customer", "--date"]);
     let positionalLogin: string | undefined;
@@ -1314,7 +1544,8 @@ export async function main(): Promise<void> {
       break;
     }
     const targetLogin =
-      positionalLogin || getArgValue(rawArgs, ["-c", "--customer"], "CHURN_003");
+      positionalLogin ||
+      getArgValue(rawArgs, ["-c", "--customer"], "CHURN_003");
     const dateYmd = getArgValue(rawArgs, ["--date"], "");
     const desc = buildGsLiveDualSurfaceDescriptor(targetLogin, {
       ...(dateYmd ? { dateYmd } : {}),
@@ -1324,38 +1555,85 @@ export async function main(): Promise<void> {
       console.log(JSON.stringify(desc, null, 2));
       return;
     }
-    console.log("========================================================================================================================");
-    console.log(`  🎯 GSLIVE MANAGER (PARTNER 118) DUAL-SURFACE DEEP-LINK & LIVE SIDECAR (${desc.gsLivePlayerId})`);
-    console.log("========================================================================================================================");
-    console.log("  1. CANONICAL 7-PARAMETER #/reports/users DEEP LINKS (bot=true + desk-day ISO window, America/Chicago):");
+    console.log(
+      "========================================================================================================================",
+    );
+    console.log(
+      `  🎯 GSLIVE MANAGER (PARTNER 118) DUAL-SURFACE DEEP-LINK & LIVE SIDECAR (${desc.gsLivePlayerId})`,
+    );
+    console.log(
+      "========================================================================================================================",
+    );
+    console.log(
+      "  1. CANONICAL 7-PARAMETER #/reports/users DEEP LINKS (bot=true + desk-day ISO window, America/Chicago):",
+    );
     console.log(`     • 7-Day Window  : ${desc.usersReportDeepLink7Day}`);
     console.log(`     • 14-Day Window : ${desc.usersReportDeepLink14Day}`);
-    console.log(`     • Churn Window  : ${desc.usersReportChurnWindowDeepLink}`);
-    console.log("  2. LIVE POPULATING #/events/bet-history SIDECAR STREAM (desk-day window, minVolume=0, DST-aware toTime):");
-    console.log(`     • Live calcTime : ${desc.liveBetHistorySidecarCalcTimeUrl}`);
-    console.log(`     • Live betTime  : ${desc.liveBetHistorySidecarBetTimeUrl}`);
+    console.log(
+      `     • Churn Window  : ${desc.usersReportChurnWindowDeepLink}`,
+    );
+    console.log(
+      "  2. LIVE POPULATING #/events/bet-history SIDECAR STREAM (desk-day window, minVolume=0, DST-aware toTime):",
+    );
+    console.log(
+      `     • Live calcTime : ${desc.liveBetHistorySidecarCalcTimeUrl}`,
+    );
+    console.log(
+      `     • Live betTime  : ${desc.liveBetHistorySidecarBetTimeUrl}`,
+    );
     console.log(`     • Player Filter : ${desc.playerBetHistoryDeepLinkUrl}`);
-    console.log("  3. API DOCS: ./bin/dx docs gslive  ·  Scalar: https://fantasy402-docs-4ay.pages.dev/");
-    console.log("========================================================================================================================");
+    console.log(
+      "  3. API DOCS: ./bin/dx docs gslive  ·  Scalar: https://fantasy402-docs-4ay.pages.dev/",
+    );
+    console.log(
+      "========================================================================================================================",
+    );
     return;
   }
 
-  if (cmd === "iptracker" || cmd === "ip-tracker" || rawArgs.includes("--iptracker")) {
-    const officeFilter = getArgValue(rawArgs, ["--office", "-a"], "ALL").toUpperCase();
-    const clusters = PER_OFFICE_IP_TRACKER_CLUSTERS.filter(c => officeFilter === "ALL" || c.officeAgentId === officeFilter);
+  if (
+    cmd === "iptracker" ||
+    cmd === "ip-tracker" ||
+    rawArgs.includes("--iptracker")
+  ) {
+    const officeFilter = getArgValue(
+      rawArgs,
+      ["--office", "-a"],
+      "ALL",
+    ).toUpperCase();
+    const clusters = PER_OFFICE_IP_TRACKER_CLUSTERS.filter(
+      (c) => officeFilter === "ALL" || c.officeAgentId === officeFilter,
+    );
     if (rawArgs.includes("--json")) {
       console.log(JSON.stringify(clusters, null, 2));
       return;
     }
-    console.log("================================================================================================================");
-    console.log("  🌐 BET-TICKER <-> IP-TRACKER (getWebLog Modes A/B/C/I) PER-OFFICE & CROSS-OFFICE MATCH REPORT");
-    console.log("================================================================================================================");
+    console.log(
+      "================================================================================================================",
+    );
+    console.log(
+      "  🌐 BET-TICKER <-> IP-TRACKER (getWebLog Modes A/B/C/I) PER-OFFICE & CROSS-OFFICE MATCH REPORT",
+    );
+    console.log(
+      "================================================================================================================",
+    );
     for (const c of clusters) {
-      const payload = buildPerOfficeIpMatcherPayload({ officeAgentId: c.officeAgentId });
-      const cross = c.crossOfficeLogins.length ? " | Cross-Office: " + c.crossOfficeLogins.map(x => x.officeAgentId + "/" + x.loginId).join(", ") : "";
-      console.log(`  • Office: ${c.officeAgentId.padEnd(10)} [Mode B customerID="${payload.customerID}"] | ${c.matchClassification.padEnd(32)} | IP: ${c.sharedIpOrSubnet.padEnd(28)} | Dwell: ${c.modeASessionDwellSeconds}s | MFCS: ${c.mfcsCompositeScore}/100 | Logins: ${c.matchedLoginsInOffice.join(", ")}${cross}`);
+      const payload = buildPerOfficeIpMatcherPayload({
+        officeAgentId: c.officeAgentId,
+      });
+      const cross = c.crossOfficeLogins.length
+        ? " | Cross-Office: " +
+          c.crossOfficeLogins
+            .map((x) => x.officeAgentId + "/" + x.loginId)
+            .join(", ")
+        : "";
+      console.log(
+        `  • Office: ${c.officeAgentId.padEnd(10)} [Mode B customerID="${payload.customerID}"] | ${c.matchClassification.padEnd(32)} | IP: ${c.sharedIpOrSubnet.padEnd(28)} | Dwell: ${c.modeASessionDwellSeconds}s | MFCS: ${c.mfcsCompositeScore}/100 | Logins: ${c.matchedLoginsInOffice.join(", ")}${cross}`,
+      );
     }
-    console.log("================================================================================================================");
+    console.log(
+      "================================================================================================================",
+    );
     return;
   }
 
@@ -1543,32 +1821,42 @@ export async function main(): Promise<void> {
   if (cmd === "docs" || cmd === "doc" || rawArgs.includes("--docs")) {
     // Automated Documentation Error Finder via Bun.cron & Bun.WebView
     if (rawArgs.includes("--audit")) {
-      const proc = Bun.spawn(["bun", "run", "scripts/audit_docs_webview_cron.ts"], {
-        cwd: currentDir,
-        stdout: "inherit",
-        stderr: "inherit",
-        stdin: "inherit",
-      });
+      const proc = Bun.spawn(
+        ["bun", "run", "scripts/audit_docs_webview_cron.ts"],
+        {
+          cwd: currentDir,
+          stdout: "inherit",
+          stderr: "inherit",
+          stdin: "inherit",
+        },
+      );
       process.exitCode = await proc.exited;
       return;
     }
 
     if (rawArgs.includes("--watch") || rawArgs.includes("-w")) {
-      const proc = Bun.spawn(["bun", "run", "scripts/audit_docs_webview_cron.ts", "--watch"], {
-        cwd: currentDir,
-        stdout: "inherit",
-        stderr: "inherit",
-        stdin: "inherit",
-      });
+      const proc = Bun.spawn(
+        ["bun", "run", "scripts/audit_docs_webview_cron.ts", "--watch"],
+        {
+          cwd: currentDir,
+          stdout: "inherit",
+          stderr: "inherit",
+          stdin: "inherit",
+        },
+      );
       process.exitCode = await proc.exited;
       return;
     }
 
     const scriptArgs = ["./deploy_docs.sh"];
-    if (rawArgs.includes("--test") || rawArgs.includes("-t")) scriptArgs.push("--test-only");
-    if (rawArgs.includes("--dry-run") || rawArgs.includes("-d")) scriptArgs.push("--dry-run");
+    if (rawArgs.includes("--test") || rawArgs.includes("-t"))
+      scriptArgs.push("--test-only");
+    if (rawArgs.includes("--dry-run") || rawArgs.includes("-d"))
+      scriptArgs.push("--dry-run");
     if (rawArgs.includes("--project") || rawArgs.includes("-p")) {
-      const idx = rawArgs.findIndex(function(a) { return a === "--project" || a === "-p"; });
+      const idx = rawArgs.findIndex(function (a) {
+        return a === "--project" || a === "-p";
+      });
       const project = idx === -1 ? undefined : rawArgs[idx + 1];
       if (project !== undefined) {
         scriptArgs.push("--project", project);

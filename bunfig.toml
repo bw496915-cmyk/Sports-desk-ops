@@ -10,4 +10,12 @@ ignorePatterns = [
   "tests/fixtures/**/*.golden.ast.json5",
   "tests/fixtures/**/*.golden.json",
   "tests/fixtures/fantasy402-sport-catalog-*.json",
+  # Generated artifacts: the poller/generators own their shape.
+  "dist/**",
+  "scratch/**",
+  "docs/graph-live-feed.json",
+  "docs/backtest-4wk-cfb-nba.json",
+  "docs/assets/pipeline-artifacts-metadata.json",
+  "docs/combo-uniqueness.json",
+  "docs/cross-domain-bridge.json",
 ]

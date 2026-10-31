@@ -8,9 +8,13 @@
  * Spec: docs/REAL_INGESTION.md
  */
 
-export const POLYMARKET_POSITIONS_URL = "https://data-api.polymarket.com/positions";
+export const POLYMARKET_POSITIONS_URL =
+  "https://data-api.polymarket.com/positions";
 
-export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+export type FetchLike = (
+  input: string,
+  init?: RequestInit,
+) => Promise<Response>;
 
 export interface PolymarketPosition {
   readonly proxyWallet: string;
@@ -102,7 +106,9 @@ function stringOr(value: unknown, fallback = ""): string {
 }
 
 /** Coerces one API row; returns null when the row cannot be attributed to a market. */
-export function parsePolymarketPosition(value: unknown): PolymarketPosition | null {
+export function parsePolymarketPosition(
+  value: unknown,
+): PolymarketPosition | null {
   const row = asRecord(value);
   if (row === null) return null;
   const asset = stringOr(row.asset);
@@ -131,7 +137,9 @@ export function parsePolymarketPosition(value: unknown): PolymarketPosition | nu
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 /** Aggregate math for one wallet. Redeemable (won-but-unclaimed) positions are excluded from open legs. */
-export function aggregatePositions(positions: readonly PolymarketPosition[]): WalletAggregate {
+export function aggregatePositions(
+  positions: readonly PolymarketPosition[],
+): WalletAggregate {
   const open = positions.filter((position) => !position.redeemable);
   const cost = open.reduce((sum, position) => sum + position.initialValue, 0);
   const value = open.reduce((sum, position) => sum + position.currentValue, 0);
@@ -140,7 +148,10 @@ export function aggregatePositions(positions: readonly PolymarketPosition[]): Wa
     .sort((a, b) => b.currentValue - a.currentValue)
     .slice(0, 3)
     .map((position) => {
-      const label = position.title.length > 48 ? `${position.title.slice(0, 45)}...` : position.title;
+      const label =
+        position.title.length > 48
+          ? `${position.title.slice(0, 45)}...`
+          : position.title;
       const outcome = position.outcome === "" ? "" : ` (${position.outcome})`;
       return `${label}${outcome} $${Math.round(position.currentValue).toLocaleString("en-US")}`;
     });
@@ -156,14 +167,17 @@ export function aggregatePositions(positions: readonly PolymarketPosition[]): Wa
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) {
-    if (error.name === "TimeoutError" || error.name === "AbortError") return "timeout";
+    if (error.name === "TimeoutError" || error.name === "AbortError")
+      return "timeout";
     return error.message;
   }
   return String(error);
 }
 
 const sleep = (ms: number): Promise<void> =>
-  ms <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
+  ms <= 0
+    ? Promise.resolve()
+    : new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Fetches and validates one wallet's positions, following pagination up to `maxPages`. */
 export async function fetchWalletPositions(
@@ -172,7 +186,10 @@ export async function fetchWalletPositions(
 ): Promise<WalletFetchResult> {
   const startedAt = Date.now();
   const fetchedAtIso = new Date(startedAt).toISOString();
-  const baseUrl = (options?.baseUrl ?? POLYMARKET_POSITIONS_URL).replace(/\/$/, "");
+  const baseUrl = (options?.baseUrl ?? POLYMARKET_POSITIONS_URL).replace(
+    /\/$/,
+    "",
+  );
   const fetchImpl: FetchLike = options?.fetchImpl ?? fetch;
   const timeoutMs = options?.timeoutMs ?? 10_000;
   const retryDelayMs = options?.retryDelayMs ?? 250;
@@ -219,7 +236,9 @@ export async function fetchWalletPositions(
 
       const body: unknown = await response.json();
       if (!Array.isArray(body)) {
-        return fail(`unexpected body (${response.headers.get("content-type") ?? "unknown"})`);
+        return fail(
+          `unexpected body (${response.headers.get("content-type") ?? "unknown"})`,
+        );
       }
       pages += 1;
       for (const row of body) {
@@ -256,8 +275,18 @@ export async function fetchPolymarketSnapshot(
 ): Promise<PolymarketSnapshot> {
   const startedAt = Date.now();
   const fetchedAtIso = new Date(startedAt).toISOString();
-  const unique = [...new Set(addresses.map((address) => address.trim()).filter((address) => address !== ""))];
-  const concurrency = Math.min(Math.max(options?.concurrency ?? 6, 1), unique.length || 1);
+  const unique = [
+    ...new Set(
+      addresses
+        .map((address) => address.trim())
+        .filter((address) => address !== ""),
+    ),
+  ];
+  const concurrency = Math.min(
+    Math.max(options?.concurrency ?? 6, 1),
+    unique.length || 1,
+  );
+  // eslint-disable-next-line unicorn/no-new-array -- dense preallocation filled by index
   const wallets: WalletFetchResult[] = new Array(unique.length);
   let cursor = 0;
 
@@ -279,7 +308,9 @@ export async function fetchPolymarketSnapshot(
     requested: unique.length,
     ok,
     failed: unique.length - ok,
-    truncatedWallets: wallets.filter((wallet) => wallet.truncated).map((wallet) => wallet.address),
+    truncatedWallets: wallets
+      .filter((wallet) => wallet.truncated)
+      .map((wallet) => wallet.address),
     wallets,
   };
 }
@@ -312,7 +343,10 @@ export function cacheFromSnapshot(snapshot: PolymarketSnapshot): PositionCache {
   const wallets: Record<string, CachedWallet> = {};
   for (const wallet of snapshot.wallets) {
     if (wallet.status === "ok" && wallet.aggregate !== null) {
-      wallets[wallet.address] = { aggregate: wallet.aggregate, fetchedAtIso: wallet.fetchedAtIso };
+      wallets[wallet.address] = {
+        aggregate: wallet.aggregate,
+        fetchedAtIso: wallet.fetchedAtIso,
+      };
     }
   }
   return { schemaVersion: 1, wallets };

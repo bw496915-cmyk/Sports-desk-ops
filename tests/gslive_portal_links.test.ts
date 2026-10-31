@@ -436,8 +436,8 @@ describe("Portal GSLive link hydration", () => {
       dataSource: "LIVE",
       lastError: null,
     });
-    expect(stats.BAD.dataSource).toBe("FIXTURE");
-    expect(stats.BAD.lastError).toBe("invalid address");
+    expect(stats.BAD?.dataSource).toBe("FIXTURE");
+    expect(stats.BAD?.lastError).toBe("invalid address");
     expect(buildWalletStats(null)).toEqual({});
   });
 

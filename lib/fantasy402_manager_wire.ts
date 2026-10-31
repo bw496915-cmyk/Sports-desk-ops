@@ -20,7 +20,6 @@
  */
 
 import {
-  type CustomerIdentifier,
   type PaddedCustomerId,
   type AgentIdentifier,
   padCustomerIdCanonical,
@@ -60,6 +59,7 @@ export const WirePayloadErrorClassification = {
   CALLER_ABORTED: "CALLER_ABORTED",
   POISONED_PATH_DETECTED: "POISONED_PATH_DETECTED",
   INVALID_IDENTIFIER_LENGTH: "INVALID_IDENTIFIER_LENGTH",
+  GATEWAY_FAULT_500: "GATEWAY_FAULT_500",
 } as const;
 export type WirePayloadErrorClassification =
   (typeof WirePayloadErrorClassification)[keyof typeof WirePayloadErrorClassification];
@@ -68,7 +68,11 @@ export class WirePayloadError extends Error {
   public readonly classification: WirePayloadErrorClassification;
   public readonly exitCode: number;
 
-  constructor(classification: WirePayloadErrorClassification, message: string, exitCode = 72) {
+  constructor(
+    classification: WirePayloadErrorClassification,
+    message: string,
+    exitCode = 72,
+  ) {
     super(`[WirePayloadError:${classification}] ${message}`);
     this.name = "WirePayloadError";
     this.classification = classification;
@@ -151,7 +155,10 @@ export interface WebLogQueryResult {
  * Deep equality helper matching Bun.deepEquals semantics across runtimes.
  */
 export function deepEqualsNormalized(a: unknown, b: unknown): boolean {
-  if (typeof Bun !== "undefined" && typeof (Bun as any).deepEquals === "function") {
+  if (
+    typeof Bun !== "undefined" &&
+    typeof (Bun as any).deepEquals === "function"
+  ) {
     return (Bun as any).deepEquals(a, b);
   }
   return JSON.stringify(a) === JSON.stringify(b);
@@ -161,14 +168,14 @@ export function deepEqualsNormalized(a: unknown, b: unknown): boolean {
  * Executes a customer column write mutation against POST /cloud/api/Manager/updateByColumn.
  */
 export async function executePlayerColumnMutation(
-  options: PlayerMutationOptions
+  options: PlayerMutationOptions,
 ): Promise<PlayerMutationExecutionResult> {
   // 1. Poisoned path parameter guard (fail-fast exitCode 64)
-  if ((options as Record<string, unknown>).path !== undefined) {
+  if ("path" in options && options.path !== undefined) {
     throw new WirePayloadError(
       WirePayloadErrorClassification.POISONED_PATH_DETECTED,
       "Options object contains poisoned 'path' parameter, which causes silent upstream HTTP 500",
-      64
+      64,
     );
   }
 
@@ -178,7 +185,7 @@ export async function executePlayerColumnMutation(
     throw new WirePayloadError(
       WirePayloadErrorClassification.INVALID_IDENTIFIER_LENGTH,
       `Customer identifier '${rawId}' exceeds 11 characters (length: ${rawId.length})`,
-      64
+      64,
     );
   }
 
@@ -199,7 +206,11 @@ export async function executePlayerColumnMutation(
     };
   }
 
-  const baseUrl = (options.portalBaseUrl ?? process.env.SPORTSDESK_PORTAL_HTTP_BASE ?? "https://www.fantasy402.com").replace(/\/$/, "");
+  const baseUrl = (
+    options.portalBaseUrl ??
+    process.env.SPORTSDESK_PORTAL_HTTP_BASE ??
+    "https://www.fantasy402.com"
+  ).replace(/\/$/, "");
   const updateUrl = `${baseUrl}/cloud/api/Manager/updateByColumn`;
   const timeoutMs = options.timeoutMilliseconds ?? 8000;
 
@@ -241,10 +252,18 @@ export async function executePlayerColumnMutation(
     });
   } catch (err: any) {
     if (err?.name === "TimeoutError") {
-      throw new WirePayloadError(WirePayloadErrorClassification.TRANSPORT_TIMEOUT, `updateByColumn timed out after ${timeoutMs}ms`, 75);
+      throw new WirePayloadError(
+        WirePayloadErrorClassification.TRANSPORT_TIMEOUT,
+        `updateByColumn timed out after ${timeoutMs}ms`,
+        75,
+      );
     }
     if (err?.name === "AbortError") {
-      throw new WirePayloadError(WirePayloadErrorClassification.CALLER_ABORTED, "updateByColumn request aborted by caller", 72);
+      throw new WirePayloadError(
+        WirePayloadErrorClassification.CALLER_ABORTED,
+        "updateByColumn request aborted by caller",
+        72,
+      );
     }
     throw err;
   }
@@ -253,7 +272,7 @@ export async function executePlayerColumnMutation(
     throw new WirePayloadError(
       WirePayloadErrorClassification.AUTHENTICATION_SESSION_EXPIRED,
       `Session expired: HTTP ${response.status}`,
-      72
+      72,
     );
   }
 
@@ -290,7 +309,7 @@ export async function executePlayerColumnMutation(
     throw new WirePayloadError(
       WirePayloadErrorClassification.WIRE_PAYLOAD_TRUNCATED,
       "Failed to parse upstream response JSON",
-      72
+      72,
     );
   }
 
@@ -307,7 +326,7 @@ export async function executePlayerColumnMutation(
     throw new WirePayloadError(
       WirePayloadErrorClassification.WIRE_PAYLOAD_SHAPE_DRIFT,
       `Unexpected Result code: ${JSON.stringify(rawResult)}`,
-      72
+      72,
     );
   }
 
@@ -345,13 +364,20 @@ export async function executePlayerColumnMutation(
     try {
       const readBackData = await fetchPlayerInfo({
         portalBaseUrl: baseUrl,
-        jwtToken: options.jwtToken,
-        cookieHeader: options.cookieHeader,
+        ...(options.jwtToken === undefined
+          ? {}
+          : { jwtToken: options.jwtToken }),
+        ...(options.cookieHeader === undefined
+          ? {}
+          : { cookieHeader: options.cookieHeader }),
         customerIdentifier: options.customerIdentifier,
         timeoutMilliseconds: 4000,
       });
 
-      if (readBackData && String(readBackData[options.column]) === String(options.value)) {
+      if (
+        readBackData &&
+        String(readBackData[options.column]) === String(options.value)
+      ) {
         readBackVerified = true;
       }
     } catch {
@@ -360,9 +386,10 @@ export async function executePlayerColumnMutation(
   }
 
   return {
-    classification: readBackVerified || !options.verifyReadBack
-      ? MutationClassification.COMMITTED
-      : MutationClassification.UNVERIFIED_COMMIT,
+    classification:
+      readBackVerified || !options.verifyReadBack
+        ? MutationClassification.COMMITTED
+        : MutationClassification.UNVERIFIED_COMMIT,
     rawResultCode: PlayerMutationResultCode.SUCCESS,
     isCommitted: true,
     customerId: paddedCustId,
@@ -384,7 +411,11 @@ export async function fetchPlayerInfo(options: {
   customerIdentifier: string;
   timeoutMilliseconds?: number;
 }): Promise<Record<string, unknown> | null> {
-  const baseUrl = (options.portalBaseUrl ?? process.env.SPORTSDESK_PORTAL_HTTP_BASE ?? "https://www.fantasy402.com").replace(/\/$/, "");
+  const baseUrl = (
+    options.portalBaseUrl ??
+    process.env.SPORTSDESK_PORTAL_HTTP_BASE ??
+    "https://www.fantasy402.com"
+  ).replace(/\/$/, "");
   const readUrl = `${baseUrl}/cloud/api/Manager/getInfoPlayer`;
   const timeoutMs = options.timeoutMilliseconds ?? 5000;
 
@@ -423,9 +454,13 @@ export async function fetchPlayerInfo(options: {
  * Inserts sport vig setup (+15c / +20c juice shading) via POST /cloud/api/Manager/vigSetupInsert.
  */
 export async function executeVigSetupInsert(
-  options: VigSetupOptions
+  options: VigSetupOptions,
 ): Promise<VigSetupExecutionResult> {
-  const baseUrl = (options.portalBaseUrl ?? process.env.SPORTSDESK_PORTAL_HTTP_BASE ?? "https://www.fantasy402.com").replace(/\/$/, "");
+  const baseUrl = (
+    options.portalBaseUrl ??
+    process.env.SPORTSDESK_PORTAL_HTTP_BASE ??
+    "https://www.fantasy402.com"
+  ).replace(/\/$/, "");
   const insertUrl = `${baseUrl}/cloud/api/Manager/vigSetupInsert`;
   const timeoutMs = options.timeoutMilliseconds ?? 8000;
 
@@ -487,22 +522,27 @@ export async function executeVigSetupInsert(
   let readBackVerified = false;
   if (committed && options.verifyReadBack) {
     try {
-      const readRes = await fetch(`${baseUrl}/cloud/api/Manager/getSportsVigSetup`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-Requested-With": "XMLHttpRequest",
-          ...(options.cookieHeader ? { Cookie: options.cookieHeader } : {}),
-          ...(options.jwtToken ? { Authorization: `Bearer ${options.jwtToken}` } : {}),
+      const readRes = await fetch(
+        `${baseUrl}/cloud/api/Manager/getSportsVigSetup`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Requested-With": "XMLHttpRequest",
+            ...(options.cookieHeader ? { Cookie: options.cookieHeader } : {}),
+            ...(options.jwtToken
+              ? { Authorization: `Bearer ${options.jwtToken}` }
+              : {}),
+          },
+          body: new URLSearchParams({
+            operation: "getSportsVigSetup",
+            sportType: paddedSport,
+            player: paddedPlayer,
+            RRO: "1",
+          }).toString(),
+          signal: AbortSignal.timeout(4000),
         },
-        body: new URLSearchParams({
-          operation: "getSportsVigSetup",
-          sportType: paddedSport,
-          player: paddedPlayer,
-          RRO: "1",
-        }).toString(),
-        signal: AbortSignal.timeout(4000),
-      });
+      );
 
       if (readRes.ok) {
         const readJson: any = await readRes.json();
@@ -530,9 +570,13 @@ export async function executeVigSetupInsert(
  * Queries the Fantasy402 IP Tracker via POST /cloud/api/Manager/getWebLog across modes A, B, C, I.
  */
 export async function queryIpTrackerWebLog(
-  options: WebLogQueryOptions
+  options: WebLogQueryOptions,
 ): Promise<WebLogQueryResult> {
-  const baseUrl = (options.portalBaseUrl ?? process.env.SPORTSDESK_PORTAL_HTTP_BASE ?? "https://www.fantasy402.com").replace(/\/$/, "");
+  const baseUrl = (
+    options.portalBaseUrl ??
+    process.env.SPORTSDESK_PORTAL_HTTP_BASE ??
+    "https://www.fantasy402.com"
+  ).replace(/\/$/, "");
   const logUrl = `${baseUrl}/cloud/api/Manager/getWebLog`;
   const timeoutMs = options.timeoutMilliseconds ?? 10000;
 
@@ -541,15 +585,21 @@ export async function queryIpTrackerWebLog(
   const defaultDateMdy = `${String(today.getMonth() + 1).padStart(2, "0")}/${String(today.getDate()).padStart(2, "0")}/${today.getFullYear()}`;
   const defaultDateYmd = today.toISOString().slice(0, 10);
 
-  const startDate = options.startDate ?? (options.mode === "C" ? defaultDateYmd : defaultDateMdy);
-  const endDate = options.endDate ?? (options.mode === "C" ? defaultDateYmd : defaultDateMdy);
+  const startDate =
+    options.startDate ??
+    (options.mode === "C" ? defaultDateYmd : defaultDateMdy);
+  const endDate =
+    options.endDate ?? (options.mode === "C" ? defaultDateYmd : defaultDateMdy);
 
   const bodyParams = new URLSearchParams({
     operation: "getWebLog",
     type: options.mode,
     agentID: options.agentId ?? "BILLY666",
     agentOwner: options.agentId ?? "BILLY666",
-    customerID: options.mode === "B" && options.officeAgentId ? options.officeAgentId.trim().toUpperCase() : (options.customerId ?? "0"),
+    customerID:
+      options.mode === "B" && options.officeAgentId
+        ? options.officeAgentId.trim().toUpperCase()
+        : (options.customerId ?? "0"),
     start: startDate,
     end: endDate,
     actions: "ALL",
@@ -578,12 +628,14 @@ export async function queryIpTrackerWebLog(
     throw new WirePayloadError(
       WirePayloadErrorClassification.GATEWAY_FAULT_500,
       `getWebLog query failed: HTTP ${res.status} ${res.statusText}`,
-      res.status >= 500 ? 75 : 72
+      res.status >= 500 ? 75 : 72,
     );
   }
 
   const json: any = await res.json();
-  const rows = Array.isArray(json) ? json : json?.LIST ?? json?.data ?? json?.rows ?? [];
+  const rows = Array.isArray(json)
+    ? json
+    : (json?.LIST ?? json?.data ?? json?.rows ?? []);
 
   return {
     mode: options.mode,

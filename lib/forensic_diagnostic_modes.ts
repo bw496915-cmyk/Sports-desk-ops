@@ -29,16 +29,10 @@ import {
   formatWebLogDateForMode,
   PER_OFFICE_IP_TRACKER_CLUSTERS,
 } from "./bet_ticker_ip_tracker_bridge.ts";
-import {
-  buildGsLiveUsersReportDeepLink,
-  buildGsLiveBetHistorySidecarUrl,
-} from "./gslive_manager_deeplink_sidecar.ts";
+import { buildGsLiveUsersReportDeepLink } from "./gslive_manager_deeplink_sidecar.ts";
 
 export type DiagnosticDomain =
-  | "Identity & Network"
-  | "Risk & Exposure"
-  | "Cross-Market"
-  | "Data Integrity";
+  "Identity & Network" | "Risk & Exposure" | "Cross-Market" | "Data Integrity";
 
 export type DiagnosticModeNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
@@ -114,7 +108,8 @@ export const TEN_MODE_CATALOG: readonly DiagnosticModeSpec[] = [
     modeLabel: "6 · Activity overlap",
     domain: "Identity & Network",
     checksSummary: "Session intervals or clearly labeled activity windows",
-    outputSummary: "Overlap duration; distinguishes sessions from nearby events",
+    outputSummary:
+      "Overlap duration; distinguishes sessions from nearby events",
     upstreamEndpoints: [
       "Manager/getWebLog (type=A & type=I)",
       "Manager/getBetTicker (InsertDateTime)",
@@ -139,7 +134,8 @@ export const TEN_MODE_CATALOG: readonly DiagnosticModeSpec[] = [
     modeNumber: 8,
     modeLabel: "8 · Settled net",
     domain: "Risk & Exposure",
-    checksSummary: "Settled tickets, adjustments, free-play, payout/sign conventions",
+    checksSummary:
+      "Settled tickets, adjustments, free-play, payout/sign conventions",
     outputSummary: "Customer P/L by period and currency",
     upstreamEndpoints: [
       "api/Report/getGradedWagerByCustomer",
@@ -155,10 +151,7 @@ export const TEN_MODE_CATALOG: readonly DiagnosticModeSpec[] = [
     domain: "Risk & Exposure",
     checksSummary: "Unique tickets, stakes, payout terms, current status",
     outputSummary: "Stake, potential payout and defined liability separately",
-    upstreamEndpoints: [
-      "api/Report/Pending",
-      "api/Report/getPendingByTicket",
-    ],
+    upstreamEndpoints: ["api/Report/Pending", "api/Report/getPendingByTicket"],
     cliFlag: "--mode=9",
   },
   {
@@ -219,7 +212,9 @@ export function evaluateMode1CustomerOverview(input: {
   const cleanCust = normalizeWebLogLoginId(input.customerId);
   const cleanOffice = input.officeAgentId.trim().toUpperCase();
   const nowMs = input.referenceNowMs ?? Date.parse("2026-10-31T17:37:20Z");
-  const lastAccessMs = input.lastAccessUtc ? Date.parse(input.lastAccessUtc) : NaN;
+  const lastAccessMs = input.lastAccessUtc
+    ? Date.parse(input.lastAccessUtc)
+    : NaN;
   const freshnessSec = Number.isFinite(lastAccessMs)
     ? Math.max(0, Math.round((nowMs - lastAccessMs) / 1000))
     : null;
@@ -253,7 +248,9 @@ export function evaluateMode1CustomerOverview(input: {
     isAccessFresh: isFresh,
     drillDownLinks: {
       f402CustomerUrl: `https://fantasy402.com/manager.html?customer=${encodeURIComponent(cleanCust)}&agent=${encodeURIComponent(cleanOffice)}`,
-      gsLiveProfileUrl: buildGsLiveUsersReportDeepLink({ customerLogin: cleanCust }),
+      gsLiveProfileUrl: buildGsLiveUsersReportDeepLink({
+        customerLogin: cleanCust,
+      }),
       polymarketProfileUrl: input.polymarketWallet
         ? `https://polymarket.com/profile/${input.polymarketWallet}`
         : null,
@@ -272,7 +269,8 @@ export function evaluateMode1CustomerOverview(input: {
 // ============================================================================
 // MODE 2 · ACCESS LOGS (Identity & Network)
 // ============================================================================
-export type AccessActorRole = "SELF_PLAYER" | "OFFICE_AGENT" | "MASTER_MANAGER" | "SYSTEM_GATEWAY";
+export type AccessActorRole =
+  "SELF_PLAYER" | "OFFICE_AGENT" | "MASTER_MANAGER" | "SYSTEM_GATEWAY";
 
 export interface Mode2AccessTimelineEvent {
   readonly eventId: string;
@@ -308,13 +306,15 @@ export function evaluateMode2AccessLogs(
     readonly Operation: string;
     readonly Data: string;
     readonly nextWagerDwellSeconds?: number | null;
-  }[]
+  }[],
 ): Mode2AccessLogsOutput {
   const targetCustomer = normalizeWebLogLoginId(customerId);
   const mapped: Mode2AccessTimelineEvent[] = rawEvents
     .map((row, idx) => {
       const targetId = normalizeWebLogLoginId(row.LoginID || targetCustomer);
-      const rawActor = row.ActorID ? normalizeWebLogLoginId(row.ActorID) : targetId;
+      const rawActor = row.ActorID
+        ? normalizeWebLogLoginId(row.ActorID)
+        : targetId;
       let actorRole: AccessActorRole = "SELF_PLAYER";
       if (rawActor === "BILLY666") actorRole = "MASTER_MANAGER";
       else if (rawActor === "GATEWAY") actorRole = "SYSTEM_GATEWAY";
@@ -375,10 +375,16 @@ export interface Mode3SharedIpOverviewOutput {
   readonly groups: readonly Mode3SharedIpAccountGroup[];
 }
 
-export function normalizeIpv4Address(rawIp: string): { normalizedIp: string; subnetCidr: string } {
+export function normalizeIpv4Address(rawIp: string): {
+  normalizedIp: string;
+  subnetCidr: string;
+} {
   const clean = rawIp.trim().split(" ")[0] ?? "";
   const octets = clean.split(".");
-  const subnetCidr = octets.length === 4 ? `${octets[0]}.${octets[1]}.${octets[2]}.0/24` : `${clean}/32`;
+  const subnetCidr =
+    octets.length === 4
+      ? `${octets[0]}.${octets[1]}.${octets[2]}.0/24`
+      : `${clean}/32`;
   return { normalizedIp: clean, subnetCidr };
 }
 
@@ -387,43 +393,57 @@ export function evaluateMode3SharedIpOverview(options?: {
   dateWindowEndMdy?: string;
   officeFilter?: string;
 }): Mode3SharedIpOverviewOutput {
-  const startMdy = formatWebLogDateForMode(options?.dateWindowStartMdy ?? "10/25/2026", "B");
-  const endMdy = formatWebLogDateForMode(options?.dateWindowEndMdy ?? "10/31/2026", "B");
+  const startMdy = formatWebLogDateForMode(
+    options?.dateWindowStartMdy ?? "10/25/2026",
+    "B",
+  );
+  const endMdy = formatWebLogDateForMode(
+    options?.dateWindowEndMdy ?? "10/31/2026",
+    "B",
+  );
   const filterOffice = options?.officeFilter?.trim().toUpperCase();
 
-  const groups: Mode3SharedIpAccountGroup[] = PER_OFFICE_IP_TRACKER_CLUSTERS.filter(
-    (c) => !filterOffice || filterOffice === "ALL" || c.officeAgentId === filterOffice
-  ).map((c, idx) => {
-    const { normalizedIp, subnetCidr } = normalizeIpv4Address(c.sharedIpOrSubnet);
-    const allCustomers = Array.from(
-      new Set([
-        ...c.matchedLoginsInOffice.map(normalizeWebLogLoginId),
-        ...c.crossOfficeLogins.map((x) => normalizeWebLogLoginId(x.loginId)),
-      ])
-    );
-    const isCrossOffice = c.crossOfficeLogins.length > 0;
-    const wireCustomerParam =
-      c.matchClassification === "CROSS_OFFICE_BEARD_BRIDGE" ? "0" : c.officeAgentId;
+  const groups: Mode3SharedIpAccountGroup[] =
+    PER_OFFICE_IP_TRACKER_CLUSTERS.filter(
+      (c) =>
+        !filterOffice ||
+        filterOffice === "ALL" ||
+        c.officeAgentId === filterOffice,
+    ).map((c, idx) => {
+      const { normalizedIp, subnetCidr } = normalizeIpv4Address(
+        c.sharedIpOrSubnet,
+      );
+      const allCustomers = Array.from(
+        new Set([
+          ...c.matchedLoginsInOffice.map(normalizeWebLogLoginId),
+          ...c.crossOfficeLogins.map((x) => normalizeWebLogLoginId(x.loginId)),
+        ]),
+      );
+      const isCrossOffice = c.crossOfficeLogins.length > 0;
+      const wireCustomerParam =
+        c.matchClassification === "CROSS_OFFICE_BEARD_BRIDGE"
+          ? "0"
+          : c.officeAgentId;
 
-    return {
-      groupId: `SHARED-IP-GRP-${String(idx + 1).padStart(2, "0")}`,
-      normalizedIp,
-      subnetCidr,
-      scope: isCrossOffice ? "CROSS_OFFICE_GLOBAL" : "PER_OFFICE",
-      officeAgentId: c.officeAgentId,
-      dateWindowStartMdy: startMdy,
-      dateWindowEndMdy: endMdy,
-      distinctCustomers: allCustomers,
-      distinctCustomerCount: allCustomers.length,
-      supportingObservations: [
-        `Mode A avg login-to-wager dwell: ${c.modeASessionDwellSeconds}s`,
-        `MFCS composite toxicity: ${c.mfcsCompositeScore}/100`,
-        `Synchronized board rotations: ${c.activeRotations.join(", ")}`,
-        `Bridged Polymarket wallets: ${c.bridgedPolymarketWallets.length}`,
-      ],
-      wireQueryParam: `type="B" & customerID="${wireCustomerParam}" & start="${startMdy}" & end="${endMdy}"`,
-    };
-  });
+      return {
+        groupId: `SHARED-IP-GRP-${String(idx + 1).padStart(2, "0")}`,
+        normalizedIp,
+        subnetCidr,
+        scope: isCrossOffice ? "CROSS_OFFICE_GLOBAL" : "PER_OFFICE",
+        officeAgentId: c.officeAgentId,
+        dateWindowStartMdy: startMdy,
+        dateWindowEndMdy: endMdy,
+        distinctCustomers: allCustomers,
+        distinctCustomerCount: allCustomers.length,
+        supportingObservations: [
+          `Mode A avg login-to-wager dwell: ${c.modeASessionDwellSeconds}s`,
+          `MFCS composite toxicity: ${c.mfcsCompositeScore}/100`,
+          `Synchronized board rotations: ${c.activeRotations.join(", ")}`,
+          `Bridged Polymarket wallets: ${c.bridgedPolymarketWallets.length}`,
+        ],
+        wireQueryParam: `type="B" & customerID="${wireCustomerParam}" & start="${startMdy}" & end="${endMdy}"`,
+      };
+    });
 
   return {
     mode: 3,
@@ -478,12 +498,15 @@ export function evaluateMode4CustomerIpHistory(input: {
   collectionGapThresholdHours?: number;
 }): Mode4CustomerIpHistoryOutput {
   const cleanCust = normalizeWebLogLoginId(input.customerId);
-  const startYmd = formatWebLogDateForMode(input.startDateYmd ?? "2026-10-25", "C");
+  const startYmd = formatWebLogDateForMode(
+    input.startDateYmd ?? "2026-10-25",
+    "C",
+  );
   const endYmd = formatWebLogDateForMode(input.endDateYmd ?? "2026-10-31", "C");
   const gapThreshold = input.collectionGapThresholdHours ?? 24;
 
   const sorted = [...input.observations].sort(
-    (a, b) => Date.parse(a.firstSeenUtc) - Date.parse(b.firstSeenUtc)
+    (a, b) => Date.parse(a.firstSeenUtc) - Date.parse(b.firstSeenUtc),
   );
 
   let ipChangeCount = 0;
@@ -492,14 +515,21 @@ export function evaluateMode4CustomerIpHistory(input: {
   const timeline: Mode4CustomerIpSpan[] = sorted.map((obs, idx) => {
     const { normalizedIp, subnetCidr } = normalizeIpv4Address(obs.ipAddress);
     const prev = idx > 0 ? sorted[idx - 1] : undefined;
-    const prevIp = prev ? normalizeIpv4Address(prev.ipAddress).normalizedIp : normalizedIp;
+    const prevIp = prev
+      ? normalizeIpv4Address(prev.ipAddress).normalizedIp
+      : normalizedIp;
     const changed = idx > 0 && prevIp !== normalizedIp;
     if (changed) ipChangeCount++;
 
     const gapHours = prev
       ? Math.max(
           0,
-          Number(((Date.parse(obs.firstSeenUtc) - Date.parse(prev.lastSeenUtc)) / 3_600_000).toFixed(2))
+          Number(
+            (
+              (Date.parse(obs.firstSeenUtc) - Date.parse(prev.lastSeenUtc)) /
+              3_600_000
+            ).toFixed(2),
+          ),
         )
       : 0;
     const hasGap = gapHours > gapThreshold;
@@ -569,7 +599,10 @@ export function evaluateMode5AccountsByIp(input: {
   }[];
 }): Mode5AccountsByIpOutput {
   const { normalizedIp, subnetCidr } = normalizeIpv4Address(input.selectedIp);
-  const startMdy = formatWebLogDateForMode(input.startDateMdy ?? "10/25/2026", "I");
+  const startMdy = formatWebLogDateForMode(
+    input.startDateMdy ?? "10/25/2026",
+    "I",
+  );
   const endMdy = formatWebLogDateForMode(input.endDateMdy ?? "10/31/2026", "I");
 
   const mapped: Mode5ObservedAccountOnIp[] = input.accounts.map((a) => {
@@ -599,7 +632,8 @@ export function evaluateMode5AccountsByIp(input: {
 // ============================================================================
 // MODE 6 · ACTIVITY OVERLAP (Identity & Network)
 // ============================================================================
-export type ActivityWindowKind = "BOUNDED_SESSION_INTERVAL" | "POINT_IN_TIME_EVENT_WINDOW";
+export type ActivityWindowKind =
+  "BOUNDED_SESSION_INTERVAL" | "POINT_IN_TIME_EVENT_WINDOW";
 export type OverlapDistinctionVerdict =
   | "CONFIRMED_CONCURRENT_SESSION_OVERLAP"
   | "NEARBY_POINT_EVENTS_WITHOUT_SESSION_OVERLAP"
@@ -629,7 +663,7 @@ export interface Mode6ActivityOverlapOutput {
 export function evaluateMode6ActivityOverlap(
   primaryWindow: Mode6ActivityWindow,
   secondaryWindow: Mode6ActivityWindow,
-  nearbyThresholdSeconds = 60
+  nearbyThresholdSeconds = 60,
 ): Mode6ActivityOverlapOutput {
   const startA = Date.parse(primaryWindow.startUtc);
   const endA = Math.max(startA, Date.parse(primaryWindow.endUtc));
@@ -640,7 +674,8 @@ export function evaluateMode6ActivityOverlap(
   const intersectionEnd = Math.min(endA, endB);
 
   const rawOverlapMs = intersectionEnd - intersectionStart;
-  const overlapDurationSeconds = rawOverlapMs > 0 ? Math.round(rawOverlapMs / 1000) : 0;
+  const overlapDurationSeconds =
+    rawOverlapMs > 0 ? Math.round(rawOverlapMs / 1000) : 0;
   const gapBetweenWindowsSeconds =
     rawOverlapMs < 0 ? Math.round(Math.abs(rawOverlapMs) / 1000) : 0;
 
@@ -654,7 +689,10 @@ export function evaluateMode6ActivityOverlap(
   if (overlapDurationSeconds > 0 && bothBoundedSessions) {
     distinctionVerdict = "CONFIRMED_CONCURRENT_SESSION_OVERLAP";
     explanation = `Concurrent active session intervals intersect for ${overlapDurationSeconds}s across ${primaryWindow.accountId} (${primaryWindow.officeAgentId}) and ${secondaryWindow.accountId} (${secondaryWindow.officeAgentId}) on IP ${primaryWindow.ipAddress}.`;
-  } else if (overlapDurationSeconds > 0 || gapBetweenWindowsSeconds <= nearbyThresholdSeconds) {
+  } else if (
+    overlapDurationSeconds > 0 ||
+    gapBetweenWindowsSeconds <= nearbyThresholdSeconds
+  ) {
     distinctionVerdict = "NEARBY_POINT_EVENTS_WITHOUT_SESSION_OVERLAP";
     explanation = `Nearby activity events within ${gapBetweenWindowsSeconds}s (overlap=${overlapDurationSeconds}s), distinguished from full session overlap because at least one observation is a point-in-time event window.`;
   } else {
@@ -751,7 +789,7 @@ export function normalizeDgsRotationNumber(rot: number): {
 
 export function evaluateMode7WagerComparison(
   f402Wager: Mode7ComparableWagerInput,
-  polymarketWager: Mode7ComparableWagerInput
+  polymarketWager: Mode7ComparableWagerInput,
 ): Mode7WagerComparisonOutput {
   const normF402 = normalizeDgsRotationNumber(f402Wager.rotationNumber);
   const normPm = normalizeDgsRotationNumber(polymarketWager.rotationNumber);
@@ -761,7 +799,10 @@ export function evaluateMode7WagerComparison(
   const lineDeltaH = pmLineH - f402LineH;
 
   const tsDeltaSec = Math.round(
-    Math.abs(Date.parse(f402Wager.placedAtUtc) - Date.parse(polymarketWager.placedAtUtc)) / 1000
+    Math.abs(
+      Date.parse(f402Wager.placedAtUtc) -
+        Date.parse(polymarketWager.placedAtUtc),
+    ) / 1000,
   );
 
   const matchReasons: string[] = [];
@@ -771,10 +812,14 @@ export function evaluateMode7WagerComparison(
     f402Wager.eventDateYmd === polymarketWager.eventDateYmd &&
     normF402.parentRot === normPm.parentRot;
   if (sameEvent) {
-    matchReasons.push(`EXACT_EVENT_ROT_${normF402.parentRot}_ON_${f402Wager.eventDateYmd}`);
+    matchReasons.push(
+      `EXACT_EVENT_ROT_${normF402.parentRot}_ON_${f402Wager.eventDateYmd}`,
+    );
   }
   if (normF402.wasAltChildRotation) {
-    matchReasons.push(`NORMALIZED_DGS_ALT_ROT_${f402Wager.rotationNumber}_TO_${normF402.parentRot}`);
+    matchReasons.push(
+      `NORMALIZED_DGS_ALT_ROT_${f402Wager.rotationNumber}_TO_${normF402.parentRot}`,
+    );
   }
   if (f402Wager.marketType === polymarketWager.marketType) {
     matchReasons.push(`SAME_MARKET_${f402Wager.marketType}`);
@@ -782,7 +827,9 @@ export function evaluateMode7WagerComparison(
   if (f402Wager.period === polymarketWager.period) {
     matchReasons.push(`SAME_PERIOD_${f402Wager.period}`);
   } else {
-    uncertaintyFlags.push(`PERIOD_MISMATCH_${f402Wager.period}_VS_${polymarketWager.period}`);
+    uncertaintyFlags.push(
+      `PERIOD_MISMATCH_${f402Wager.period}_VS_${polymarketWager.period}`,
+    );
   }
   if (f402Wager.side.toUpperCase() === polymarketWager.side.toUpperCase()) {
     matchReasons.push(`SAME_SIDE_${f402Wager.side.toUpperCase()}`);
@@ -792,7 +839,9 @@ export function evaluateMode7WagerComparison(
     matchReasons.push(`IDENTICAL_EFFECTIVE_LINE_${f402LineH}_HUNDREDTHS`);
   } else if (Math.abs(lineDeltaH) <= 150) {
     matchReasons.push(`NEAR_LINE_WITHIN_${Math.abs(lineDeltaH)}_HUNDREDTHS`);
-    uncertaintyFlags.push(`LINE_BASIS_DELTA_${lineDeltaH > 0 ? "+" : ""}${lineDeltaH}_HUNDREDTHS`);
+    uncertaintyFlags.push(
+      `LINE_BASIS_DELTA_${lineDeltaH > 0 ? "+" : ""}${lineDeltaH}_HUNDREDTHS`,
+    );
   } else {
     uncertaintyFlags.push(`WIDE_ALT_LINE_DELTA_${lineDeltaH}_HUNDREDTHS`);
   }
@@ -894,10 +943,18 @@ export function evaluateMode8SettledNet(input: {
 
   const bucketMap = new Map<
     string,
-    { periodBucket: "24H" | "7D" | "4WK"; currency: "USD" | "USDC"; settledNetCents: number; adjustmentsCents: number }
+    {
+      periodBucket: "24H" | "7D" | "4WK";
+      currency: "USD" | "USDC";
+      settledNetCents: number;
+      adjustmentsCents: number;
+    }
   >();
 
-  const ensureBucket = (periodBucket: "24H" | "7D" | "4WK", currency: "USD" | "USDC") => {
+  const ensureBucket = (
+    periodBucket: "24H" | "7D" | "4WK",
+    currency: "USD" | "USDC",
+  ) => {
     const key = `${periodBucket}:${currency}`;
     let b = bucketMap.get(key);
     if (!b) {
@@ -935,7 +992,8 @@ export function evaluateMode8SettledNet(input: {
   }
 
   const settledSportsNetCents = grossWonCents + grossLostCents;
-  const customerNetProfitLossCents = settledSportsNetCents + adjustmentsNetCents;
+  const customerNetProfitLossCents =
+    settledSportsNetCents + adjustmentsNetCents;
   const bookNetHoldCents = -settledSportsNetCents;
 
   return {
@@ -1009,7 +1067,7 @@ export interface Mode9PendingExposureOutput {
  */
 export function evaluateMode9PendingExposure(
   customerId: string,
-  rawRows: readonly Mode9RawPendingRow[]
+  rawRows: readonly Mode9RawPendingRow[],
 ): Mode9PendingExposureOutput {
   const cleanCust = normalizeWebLogLoginId(customerId);
   const grouped = new Map<
@@ -1059,8 +1117,14 @@ export function evaluateMode9PendingExposure(
 
   const tickets = Array.from(grouped.values());
   const totalStakeCents = tickets.reduce((acc, t) => acc + t.stakeCents, 0);
-  const potentialPayoutCents = tickets.reduce((acc, t) => acc + t.potentialPayoutCents, 0);
-  const definedLiabilityCents = tickets.reduce((acc, t) => acc + t.definedLiabilityCents, 0);
+  const potentialPayoutCents = tickets.reduce(
+    (acc, t) => acc + t.potentialPayoutCents,
+    0,
+  );
+  const definedLiabilityCents = tickets.reduce(
+    (acc, t) => acc + t.definedLiabilityCents,
+    0,
+  );
 
   return {
     mode: 9,
@@ -1102,7 +1166,10 @@ export interface Mode10ReconciliationOutput {
   readonly explainedDifferencesTotalCents: number;
   readonly explainedDifferences: readonly Mode10ExplainedDifference[];
   readonly unresolvedGapCents: number;
-  readonly reconciliationStatus: "RECONCILED_EXACT" | "RECONCILED_WITH_EXPLAINED_DIFFS" | "UNRESOLVED_GAP_ALERT";
+  readonly reconciliationStatus:
+    | "RECONCILED_EXACT"
+    | "RECONCILED_WITH_EXPLAINED_DIFFS"
+    | "UNRESOLVED_GAP_ALERT";
 }
 
 export function evaluateMode10Reconciliation(input: {
@@ -1119,13 +1186,18 @@ export function evaluateMode10Reconciliation(input: {
   const explainedTotal = diffs.reduce((acc, d) => acc + d.amountCents, 0);
 
   // Reconcile Report Daily Figures + Explained Adjustments against Ledger Delta and Settled Tickets
-  const expectedLedgerFromTickets = input.settledTicketsSumCents + explainedTotal;
-  const unresolvedGapCents = input.ledgerTransactionsDeltaCents - expectedLedgerFromTickets;
+  const expectedLedgerFromTickets =
+    input.settledTicketsSumCents + explainedTotal;
+  const unresolvedGapCents =
+    input.ledgerTransactionsDeltaCents - expectedLedgerFromTickets;
 
   let reconciliationStatus: Mode10ReconciliationOutput["reconciliationStatus"];
   if (!input.isIdenticalScopeVerified || unresolvedGapCents !== 0) {
     reconciliationStatus = "UNRESOLVED_GAP_ALERT";
-  } else if (diffs.length === 0 && input.reportDailyFiguresTotalCents === input.settledTicketsSumCents) {
+  } else if (
+    diffs.length === 0 &&
+    input.reportDailyFiguresTotalCents === input.settledTicketsSumCents
+  ) {
     reconciliationStatus = "RECONCILED_EXACT";
   } else {
     reconciliationStatus = "RECONCILED_WITH_EXPLAINED_DIFFS";
@@ -1337,7 +1409,8 @@ export function buildTenModeLiveSnapshot(): TenModeLiveSnapshot {
         startUtc: "2026-10-31T14:40:00Z",
         endUtc: "2026-10-31T14:46:30Z",
         ipAddress: "104.28.34.12",
-        actionSummary: "Session login + NBA 1Q O55.5 ($16.2K) + LAL -3.0 ($26.4K)",
+        actionSummary:
+          "Session login + NBA 1Q O55.5 ($16.2K) + LAL -3.0 ($26.4K)",
       },
       {
         accountId: "MJ103",
@@ -1346,8 +1419,9 @@ export function buildTenModeLiveSnapshot(): TenModeLiveSnapshot {
         startUtc: "2026-10-31T14:41:10Z",
         endUtc: "2026-10-31T14:45:40Z",
         ipAddress: "104.28.34.12",
-        actionSummary: "Concurrent session + identical NBA 1Q O55.5 ($11.5K) @ +2s",
-      }
+        actionSummary:
+          "Concurrent session + identical NBA 1Q O55.5 ($11.5K) @ +2s",
+      },
     ),
     evaluateMode6ActivityOverlap(
       {
@@ -1357,7 +1431,8 @@ export function buildTenModeLiveSnapshot(): TenModeLiveSnapshot {
         startUtc: "2026-10-31T15:22:48Z",
         endUtc: "2026-10-31T15:22:48Z",
         ipAddress: "192.168.9.42",
-        actionSummary: "Single bet-ticker timestamp on GameNum 5501 LAL Alt -10.5",
+        actionSummary:
+          "Single bet-ticker timestamp on GameNum 5501 LAL Alt -10.5",
       },
       {
         accountId: "CHURN_049",
@@ -1366,8 +1441,9 @@ export function buildTenModeLiveSnapshot(): TenModeLiveSnapshot {
         startUtc: "2026-10-31T15:23:12Z",
         endUtc: "2026-10-31T15:23:12Z",
         ipAddress: "192.168.9.42",
-        actionSummary: "Single bet-ticker timestamp on NBA 1H Derivative Spread (+24s)",
-      }
+        actionSummary:
+          "Single bet-ticker timestamp on NBA 1H Derivative Spread (+24s)",
+      },
     ),
   ];
 
@@ -1402,7 +1478,7 @@ export function buildTenModeLiveSnapshot(): TenModeLiveSnapshot {
         oddsAmerican: -108,
         stakeCents: 650000,
         placedAtUtc: "2026-10-31T15:31:08Z",
-      }
+      },
     ),
     evaluateMode7WagerComparison(
       {
@@ -1435,7 +1511,7 @@ export function buildTenModeLiveSnapshot(): TenModeLiveSnapshot {
         oddsAmerican: 172,
         stakeCents: 2400000,
         placedAtUtc: "2026-10-31T15:21:06Z",
-      }
+      },
     ),
   ];
 
@@ -1536,7 +1612,8 @@ export function buildTenModeLiveSnapshot(): TenModeLiveSnapshot {
         FreePlayFlag: "Y",
         WagerStatus: "P",
         TicketWriter: "Internet",
-        Description: "Football #315 Baylor +3.5 (Free Play Stake=$0, Liability=$9,500)",
+        Description:
+          "Football #315 Baylor +3.5 (Free Play Stake=$0, Liability=$9,500)",
       },
     ]),
   ];
@@ -1553,7 +1630,8 @@ export function buildTenModeLiveSnapshot(): TenModeLiveSnapshot {
         {
           category: "MANUAL_LEDGER_ADJUSTMENT",
           amountCents: -150000,
-          explanation: "getTransactions row TXN-ADJ-901 (-$1,500 wire settlement fee) excluded from sports daily figures",
+          explanation:
+            "getTransactions row TXN-ADJ-901 (-$1,500 wire settlement fee) excluded from sports daily figures",
         },
       ],
     }),

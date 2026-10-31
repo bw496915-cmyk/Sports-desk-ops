@@ -68,6 +68,9 @@ function withPlayerText(url, login) {
  * descriptor's canonical template, which keeps untracked accounts (the CHURN cohort, internal
  * logins) on the live day window instead of a frozen fallback.
  */
+/**
+ * @param {{ wallet?: any, descriptor?: any, login?: string, windowKey?: string }} input
+ */
 export function buildReportUrl({ wallet, descriptor, login, windowKey }) {
   const wallet14 = wallet && wallet.gsLivePlayerReportUrl;
   const template14 = descriptor && descriptor.usersReportDeepLink14Day;
