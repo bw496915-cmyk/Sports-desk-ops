@@ -4,21 +4,22 @@ Evidence-labelled reference generated from `docs/openapi.json` (version `2026.10
 
 ## What is verified vs inferred
 
-1. **Verified (tier B, 6 of 40 operations):** a captured request side or an implementation-verified route exists. **No response body was captured**, so no response shape here is a contract.
-2. **Inferred (tier C, 31 operations):** authored in the spec, a repo type or a UI/DOM observation. No request or response was observed; treat these as proposals.
-3. **Captured responses (tier A, 0) and recovered surfaces (tier D, 3):** tier A requires a captured response body and none exists; tier D operations are real surfaces recovered from code or fixtures after being absent from the spec. No tier E operation remains in the spec — documented-but-unimplemented paths were removed.
+1. **Verified (tier B, 4 of 40 operations):** a captured request side or an implementation-verified route exists. **No response body was captured**, so no response shape here is a contract.
+2. **Inferred (tier C, 28 operations):** authored in the spec, a repo type or a UI/DOM observation. No request or response was observed; treat these as proposals.
+3. **Captured responses (tier A, 5) and recovered surfaces (tier D, 3):** tier A requires a captured response body and the count is above; tier D operations are real surfaces recovered from code or fixtures after being absent from the spec. No tier E operation remains in the spec — documented-but-unimplemented paths were removed.
 
-Ledger totals across every recorded row (including rows removed from the final spec): A 0 · B 7 · C 31 · E 10 · surfaces D 7 / E 1. Full model: [docs/EVIDENCE.md](./EVIDENCE.md).
+Ledger totals across every recorded row (including rows removed from the final spec): A 5 · B 5 · C 28 · E 10 · surfaces D 7 / E 1. Full model: [docs/EVIDENCE.md](./EVIDENCE.md).
 
 ## Operational domains
 
-| Domain / tag                      | Operations | Evidence tiers | Purpose                                                                                                                                |
-| --------------------------------- | ---------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Forensic Surveillance             | 1          | B 1            | Cloud Manager surveillance operations with first-party evidence (request capture only; no response body captured).                     |
-| Customer State Mutations          | 1          | B 1            | Cloud Manager customer state operations with first-party evidence (request capture only; no response body captured).                   |
-| Local Desk &amp; Telegram Gateway | 6          | B 4 · D 2      | Routes served by sportsdesk_webview_server.ts, verified against the handler source rather than an HTTP capture.                        |
-| Settlement History                | 1          | D 1            | Upstream settlement-history poll wired in code; the request contract and response rows are uncaptured.                                 |
-| Inferred (Unverified)             | 31         | C 31           | Tier C operations: inferred or authored only. No request or response was ever observed; path and method are candidates, not contracts. |
+| Domain / tag                       | Operations | Evidence tiers | Purpose                                                                                                                                                                        |
+| ---------------------------------- | ---------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Forensic Surveillance              | 1          | A 1            | Cloud Manager surveillance operations with first-party evidence; tier-A rows carry a live request+response capture.                                                            |
+| Customer State Mutations           | 1          | A 1            | Cloud Manager customer state operations with first-party evidence; tier-A rows carry a live request+response capture.                                                          |
+| Local Desk &amp; Telegram Gateway  | 6          | B 4 · D 2      | Routes served by sportsdesk_webview_server.ts, verified against the handler source rather than an HTTP capture.                                                                |
+| Settlement History                 | 1          | D 1            | Upstream settlement-history poll wired in code; the request contract and response rows are uncaptured.                                                                         |
+| Inferred (Unverified)              | 28         | C 28           | Tier C operations: inferred or authored only. No request or response was ever observed; path and method are candidates, not contracts.                                         |
+| Live-captured (request unverified) | 3          | A 3            | Tier-A operations whose path/method were previously inferred (tier C): the response is live-captured, while the request field template is not observed and remains unverified. |
 
 ## Headers matrix
 
@@ -67,15 +68,13 @@ One section per operation present in the final spec. Each section starts with it
 
 ### `POST /cloud/api/Manager/getWebLog`
 
-> **Evidence — tier B** · sources: `operational_guardrails_runbook.md:129-140`, `operational_guardrails_runbook.md:131`, `operational_guardrails_runbook.md:153`, `simulate_bettor_churn_suite.ts:117-123` · response not captured · **contradicted by a concrete artifact**
+> **Evidence — tier A** · sources: `capture:2026-10-31/getWebLog.post.json`, `sha256:cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712` · response captured
 
-**Manager getWebLog (mode B request observed; response not captured)**
+**Manager getWebLog (mode B request observed; request + response captured)**
 
-The forensic IP-investigation endpoint (operational_guardrails_runbook.md §5.1.1). Request side: a 2026-10-28 Manager HAR (portal v1.0.279) captured one mode-B POST with a form-urlencoded body and no Authorization header, so the session is cookie-based. Only mode B was captured; modes A, C and I are inferred from the portal form and still need a capture. Response side: no response body was captured, so the row schema is undocumented and none is published here. The WeblogEntry component (simulate_bettor_churn_suite.ts:117-123) records the four fields the old spec published, but a consumer type is not a capture, so it is not used as a response schema.
+Live-captured contract: 2026-10-31/getWebLog.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getWebLog at 2026-10-31T00:19:51.204Z with a 200 response (response body sha256 979266c4b6abea5fff0de99966ece0363c5354859c92f5260870ea9507d2abaf). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The request template is the previously observed Manager envelope.
 
 - **Tag:** Forensic Surveillance · **operationId:** `postCloudApiManagerGetWebLog`
-- **Required capture:** Capture modes A, C and I requests (exact per-mode date format, ip value, target customerID) plus a full 200 response body for at least one mode, and record the auth actually accepted (session cookie vs Authorization header). Upgrades modes A/C/I from C and closes the response/auth contradiction.
-- **Contradiction:** The earlier spec required an `Authorization: Bearer` header and published a four-field response row schema; the 2026-10-28 HAR shows a cookie-based session with no Authorization header and captured no response body (`operational_guardrails_runbook.md:153`). Only the mode-B request side is real.
 
 **Parameters**
 
@@ -85,42 +84,53 @@ The forensic IP-investigation endpoint (operational_guardrails_runbook.md §5.1.
 
 **Request body — `application/x-www-form-urlencoded`**
 
-| Field        | Type                        | Required | Description                                                                                                                 | Example            |
-| ------------ | --------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| `agentID`    | string                      | yes      | Session master agent; the captured value is redacted here.                                                                  | `&lt;redacted>`    |
-| `customerID` | string                      | yes      | 0 = whole book. Mode C should carry the target account (unverified).                                                        | `0`                |
-| `start`      | string                      | yes      | Inclusive start date. Observed as MM/DD/YYYY in mode B; mode C reportedly sends YYYY-MM-DD (unverified).                    | `10/28/2026`       |
-| `end`        | string                      | yes      | Inclusive end date. Observed as MM/DD/YYYY in mode B; mode C reportedly sends YYYY-MM-DD (unverified).                      | `10/28/2026`       |
-| `type`       | string — one of: A, B, C, I | yes      | A: web access log; B: global IP matcher; C: account IP match; I: users by IP. Only B was captured; A, C and I are inferred. | `A`, `B`, `C`, `I` |
-| `actions`    | string — one of: ALL        | yes      | Action filter. ALL was observed; other values are unobserved.                                                               | `ALL`              |
-| `ip`         | string                      | yes      | Empty in the observed mode-B request; mode I should carry the IP or /24 prefix (unverified).                                | `—`                |
-| `operation`  | string — one of: getWebLog  | yes      | Echo of the method name.                                                                                                    | `getWebLog`        |
-| `RRO`        | string — one of: 1          | yes      | Observed as 1; the meaning is unknown.                                                                                      | `1`                |
-| `agentOwner` | string                      | yes      | Session master agent; the captured value is redacted here.                                                                  | `&lt;redacted>`    |
+| Field        | Type   | Required | Description | Example |
+| ------------ | ------ | -------- | ----------- | ------- |
+| `RRO`        | string | no       | —           | —       |
+| `actions`    | string | no       | —           | —       |
+| `agentID`    | string | no       | —           | —       |
+| `agentOwner` | string | no       | —           | —       |
+| `customerID` | string | no       | —           | —       |
+| `end`        | string | no       | —           | —       |
+| `ip`         | string | no       | —           | —       |
+| `operation`  | string | no       | —           | —       |
+| `start`      | string | no       | —           | —       |
+| `type`       | string | no       | —           | —       |
 
 **Responses**
 
-- **HTTP 200** — Response body was not captured; row schema undocumented.
+- **HTTP 200** — Captured live 200 response from 2026-10-31/getWebLog.post.json; schema derived from the captured body skeleton.
+  - content `application/json`: **authored response schema — no response body was captured**
+    - `INFO` (string) — no description
+    - `LIST` (array) — no description
+- **Default response (status code not captured)** — Other status codes were not captured by this record.
 
 ### `POST /cloud/api/Manager/getInfoPlayer`
 
-> **Evidence — tier B** · sources: `operational_guardrails_runbook.md:213`, `operational_guardrails_runbook.md:214` · response not captured · **contradicted by a concrete artifact**
+> **Evidence — tier A** · sources: `capture:2026-10-31/getInfoPlayer.post.json`, `sha256:431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597` · response captured
 
-**Manager getInfoPlayer (request observed; response not captured)**
+**Manager getInfoPlayer (request + response captured)**
 
-Read observed in the 2026-10-28 Manager HAR: opening a player sent a form POST with a 7-character trimmed customerID (e.g. CB112_1, not the padded 11-character form the old spec showed), and agentID/agentOwner were the logged-in master on all 19 Manager calls (operational_guardrails_runbook.md:213-214). The response was not captured, so no response schema is published. Ledger contradicted: the prior spec's padded example is refuted by the capture.
+Live-captured contract: 2026-10-31/getInfoPlayer.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getInfoPlayer at 2026-10-31T00:19:51.314Z with a 200 response (response body sha256 3eeb9db890d90b53b1c51cf04b7d9c3a47cba5f4c64eac3b541e7f50d39a37e1). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The request template is the previously observed Manager envelope.
 
 - **Tag:** Customer State Mutations · **operationId:** `postCloudApiManagerGetInfoPlayer`
-- **Required capture:** Capture a getInfoPlayer request+response for a known player: padded vs trimmed customerID on the wire, response key set and value types, and one updateByColumn read-back pair. Upgrades B->A and settles both the padding example and the read-back contract.
-- **Contradiction:** The earlier spec's request example was an 11-character padded `customerID`; the observed read sent a 7-character trimmed ID (`operational_guardrails_runbook.md:213`) and the response remains uncaptured.
 
 **Request body — `application/x-www-form-urlencoded`**
 
-No declared fields.
+| Field        | Type   | Required | Description | Example |
+| ------------ | ------ | -------- | ----------- | ------- |
+| `RRO`        | string | no       | —           | —       |
+| `agentID`    | string | no       | —           | —       |
+| `agentOwner` | string | no       | —           | —       |
+| `customerID` | string | no       | —           | —       |
+| `operation`  | string | no       | —           | —       |
 
 **Responses**
 
-- **Default response (status code not captured)** — Unknown — the response body was not captured; no status code or body schema is documented.
+- **HTTP 200** — Captured live 200 response from 2026-10-31/getInfoPlayer.post.json; schema derived from the captured body skeleton.
+  - content `application/json`: **authored response schema — no response body was captured**
+    - `INFO` (null) — no description
+- **Default response (status code not captured)** — Other status codes were not captured by this record.
 
 ### `POST /api/telegram/alert`
 
@@ -464,36 +474,6 @@ UNVERIFIED — no capture exists. The path and method are candidate values infer
 
 - **Default response (status code not captured)** — Unknown — no response was captured, so no status code or body schema is documented.
 
-### `POST /cloud/api/Manager/getBetTicker`
-
-> **Evidence — tier C** · sources: `simulate_bettor_churn_suite.ts:106-115` · response not captured
-
-**Bet ticker delta feed**
-
-UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: simulate_bettor_churn_suite.ts:106-115 (a consumer type declaration, not a capture). See the RawBetTickerTick component; it records the field names only and is not used as a response schema here. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.
-
-- **Tag:** Inferred (Unverified) · **operationId:** `postCloudApiManagerGetBetTicker`
-- **Required capture:** Capture an initial (wagerNumber=0) and a delta poll: exact body, INFO/LIST envelope, row key set/types, watermark semantics. Upgrades C->A; without it the delta-watermark contract is a guess.
-
-**Responses**
-
-- **Default response (status code not captured)** — Unknown — no response was captured, so no status code or body schema is documented.
-
-### `POST /cloud/api/Manager/getBetTickerConfig`
-
-> **Evidence — tier C** · sources: none — authored only · response not captured
-
-**Ticker configuration**
-
-UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.
-
-- **Tag:** Inferred (Unverified) · **operationId:** `postCloudApiManagerGetBetTickerConfig`
-- **Required capture:** Capture one request/response (spec expects {INFO:true, Config:{}}); verify whether INFO:false is the misconfigured shape. Upgrades C->A.
-
-**Responses**
-
-- **Default response (status code not captured)** — Unknown — no response was captured, so no status code or body schema is documented.
-
 ### `POST /cloud/api/Manager/getBilling`
 
 > **Evidence — tier C** · sources: `main:scripts/portal_tile_crawler.ts:129`, `main:scripts/portal_tile_crawler.ts:164-245`, `main:scripts/append_tracked_domains.mjs:22-228` · response not captured · candidate URL+method (not observed on the wire)
@@ -591,21 +571,6 @@ UNVERIFIED — no capture exists. The path and method are candidate values infer
 **Extracted DOM inputs (UI observation — not wire parameters):** `gameID`, `periodIndex`, `homeScore`, `awayScore`, `isFinal`. These are DOM form-field names from a launcher tile, not a request schema.
 
 **Observed DOM localization keys (not wire fields):** `L-1034`, `L-1068`.
-
-**Responses**
-
-- **Default response (status code not captured)** — Unknown — no response was captured, so no status code or body schema is documented.
-
-### `POST /cloud/api/Manager/getSportsVigSetup`
-
-> **Evidence — tier C** · sources: none — authored only · response not captured
-
-**Read sport vig setup**
-
-UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.
-
-- **Tag:** Inferred (Unverified) · **operationId:** `postCloudApiManagerGetSportsVigSetup`
-- **Required capture:** Capture the read-back request/response paired with a vigSetupInsert; confirm form-urlencoded vs JSON and the Result field set. Upgrades C->A.
 
 **Responses**
 
@@ -848,6 +813,86 @@ UNVERIFIED — no capture exists. The path, method and any previously published 
 
 - **Default response (status code not captured)** — Unknown — no response was captured, so no status code or body schema is documented.
 
+### `POST /cloud/api/Manager/getBetTicker`
+
+> **Evidence — tier A** · sources: `capture:2026-10-31/getBetTicker.post.json`, `sha256:c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9` · response captured
+
+**Live-captured /cloud/api/Manager/getBetTicker (request template unverified)**
+
+Live-captured contract: 2026-10-31/getBetTicker.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getBetTicker at 2026-10-31T00:19:51.608Z with a 200 response (response body sha256 6476f3f36fde99907c849cc28e3e8ccd7b1b63de43a3f659636c9664054bff5d). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The endpoint path/method were previously inferred (tier C); the live capture now evidences both, while the request field template remains unverified.
+
+- **Tag:** Live-captured (request unverified)
+
+**Request body — `application/x-www-form-urlencoded`**
+
+| Field         | Type   | Required | Description | Example |
+| ------------- | ------ | -------- | ----------- | ------- |
+| `RRO`         | string | no       | —           | —       |
+| `agentID`     | string | no       | —           | —       |
+| `agentOwner`  | string | no       | —           | —       |
+| `operation`   | string | no       | —           | —       |
+| `wagerNumber` | string | no       | —           | —       |
+
+**Responses**
+
+- **HTTP 200** — Captured live 200 response from 2026-10-31/getBetTicker.post.json; schema derived from the captured body skeleton.
+  - content `application/json`: **authored response schema — no response body was captured**
+    - `LIST` (array of object) — no description
+- **Default response (status code not captured)** — Other status codes were not captured by this record.
+
+### `POST /cloud/api/Manager/getBetTickerConfig`
+
+> **Evidence — tier A** · sources: `capture:2026-10-31/getBetTickerConfig.post.json`, `sha256:a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e` · response captured
+
+**Live-captured /cloud/api/Manager/getBetTickerConfig (request template unverified)**
+
+Live-captured contract: 2026-10-31/getBetTickerConfig.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getBetTickerConfig at 2026-10-31T00:19:51.741Z with a 200 response (response body sha256 8e8fedd17bfabe36c7753dbdf7c5e71f5748adb1fd5b13fe4d8a1993b7ff686e). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The endpoint path/method were previously inferred (tier C); the live capture now evidences both, while the request field template remains unverified.
+
+- **Tag:** Live-captured (request unverified)
+
+**Request body — `application/x-www-form-urlencoded`**
+
+| Field        | Type   | Required | Description | Example |
+| ------------ | ------ | -------- | ----------- | ------- |
+| `RRO`        | string | no       | —           | —       |
+| `agentID`    | string | no       | —           | —       |
+| `agentOwner` | string | no       | —           | —       |
+| `operation`  | string | no       | —           | —       |
+
+**Responses**
+
+- **HTTP 200** — Captured live 200 response from 2026-10-31/getBetTickerConfig.post.json; schema derived from the captured body skeleton.
+  - content `application/json`: **authored response schema — no response body was captured**
+    - `INFO` (object) — no description
+- **Default response (status code not captured)** — Other status codes were not captured by this record.
+
+### `POST /cloud/api/Manager/getSportsVigSetup`
+
+> **Evidence — tier A** · sources: `capture:2026-10-31/getSportsVigSetup.post.json`, `sha256:25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606` · response captured
+
+**Live-captured /cloud/api/Manager/getSportsVigSetup (request template unverified)**
+
+Live-captured contract: 2026-10-31/getSportsVigSetup.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getSportsVigSetup at 2026-10-31T00:19:53.742Z with a 200 response (response body sha256 9e34409b3ae72b41bea2421597ae611453b419fa9ff197ccd09ca6627fb4b677). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The endpoint path/method were previously inferred (tier C); the live capture now evidences both, while the request field template remains unverified.
+
+- **Tag:** Live-captured (request unverified)
+
+**Request body — `application/x-www-form-urlencoded`**
+
+| Field        | Type   | Required | Description | Example |
+| ------------ | ------ | -------- | ----------- | ------- |
+| `RRO`        | string | no       | —           | —       |
+| `agentID`    | string | no       | —           | —       |
+| `agentOwner` | string | no       | —           | —       |
+| `operation`  | string | no       | —           | —       |
+
+**Responses**
+
+- **HTTP 200** — Captured live 200 response from 2026-10-31/getSportsVigSetup.post.json; schema derived from the captured body skeleton.
+  - content `application/json`: **authored response schema — no response body was captured**
+    - `LIST` (array) — no description
+    - `SCHEDULE` (array of object) — no description
+- **Default response (status code not captured)** — Other status codes were not captured by this record.
+
 ## Inferred, unverified operations
 
 These rows are **tier C**. They are authored in the spec/generators, declared from a repo type, or inferred from a UI/DOM observation; none has an observed request or response. They remain in the spec deliberately, labelled — **do not treat any of them as a contract**.
@@ -861,15 +906,12 @@ These rows are **tier C**. They are authored in the spec/generators, declared fr
 | POST   | `/cloud/api/Manager/gameAdmin`            | Inferred only: crawler behaviour, not a wire observation; generator-authored; a hand-authored UI/DOM declaration.                            | Open the 'Game Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                                   |
 | POST   | `/cloud/api/Manager/get3rdPartyLimits`    | Inferred only: crawler behaviour, not a wire observation; generator-authored; a hand-authored UI/DOM declaration.                            | Open the '3rd Party Limits' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                             |
 | POST   | `/cloud/api/Manager/getAgentTree`         | Inferred only: crawler behaviour, not a wire observation; generator-authored; a hand-authored UI/DOM declaration.                            | Open the 'Agent Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                                  |
-| POST   | `/cloud/api/Manager/getBetTicker`         | Inferred only: a repo TypeScript type only.                                                                                                  | Capture an initial (wagerNumber=0) and a delta poll: exact body, INFO/LIST envelope, row key set/types, watermark semantics. Upgrades C->A; without it the delta-watermark contract is a guess.                                                                                                                                                                                 |
-| POST   | `/cloud/api/Manager/getBetTickerConfig`   | No artifact exists; authored in the spec.                                                                                                    | Capture one request/response (spec expects {INFO:true, Config:{}}); verify whether INFO:false is the misconfigured shape. Upgrades C->A.                                                                                                                                                                                                                                        |
 | POST   | `/cloud/api/Manager/getBilling`           | Inferred only: crawler behaviour, not a wire observation; generator-authored; a hand-authored UI/DOM declaration.                            | Open the 'Billing' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                                      |
 | POST   | `/cloud/api/Manager/getCustomerNotes`     | Inferred only: generator-authored; no artifact.                                                                                              | Capture a customer notes read; confirm the notes row fields and whether notes are operator-annotations or wire-native. Upgrades C->A.                                                                                                                                                                                                                                           |
 | POST   | `/cloud/api/Manager/getInfoManager`       | No artifact exists; authored in the spec.                                                                                                    | Capture the dashboard header request/response; confirm the exact JSON keys (the spec uses hyphenated names like 'grand-total-weekly', which is unusual enough to need proof). Upgrades C->A.                                                                                                                                                                                    |
 | POST   | `/cloud/api/Manager/getPending`           | Inferred only: implementation context only; a repo TypeScript type only.                                                                     | Capture the request (form vs JSON content type is disputed by the spec's own application/json choice) and a non-empty response; verify BLOCKED sentinel rows (L19.N0518) and zero-stake rows actually appear. Upgrades C->A.                                                                                                                                                    |
 | POST   | `/cloud/api/Manager/getRules`             | Inferred only: crawler behaviour, not a wire observation; generator-authored; a hand-authored UI/DOM declaration.                            | Open the 'Settings &amp; Rules' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                         |
 | POST   | `/cloud/api/Manager/getScores`            | Inferred only: crawler behaviour, not a wire observation; generator-authored; a hand-authored UI/DOM declaration.                            | Open the 'Scores' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                                       |
-| POST   | `/cloud/api/Manager/getSportsVigSetup`    | No artifact exists; authored in the spec.                                                                                                    | Capture the read-back request/response paired with a vigSetupInsert; confirm form-urlencoded vs JSON and the Result field set. Upgrades C->A.                                                                                                                                                                                                                                   |
 | POST   | `/cloud/api/Manager/search`               | Inferred only: absence; a UI/DOM observation only.                                                                                           | Capture one omnisearch request triggered from search-component (URL, method, content type, term/type/agentID fields) and its result rows. Upgrades C->A and confirms candidate_url.                                                                                                                                                                                             |
 | POST   | `/cloud/api/Manager/updateByColumn`       | Inferred only: absence; a repo TypeScript type only.                                                                                         | Highest-value mutation capture: one updateByColumn with a safe column (confirmationDelaySeconds) plus the getInfoPlayer read-back. Record exact form fields, content type, padding width actually required (11 vs the observed 10), sub-agent vs master scope, and the Result envelope. Upgrades C->A and is the only way to validate the SILENT_NO_OP / REJECTED_SCOPE claims. |
 | POST   | `/cloud/api/Manager/updateCustomerNotes`  | Inferred only: generator-authored; no artifact.                                                                                              | Capture an append + read-back; confirm the mutation Result envelope and whether notes are immutable. Upgrades C->A.                                                                                                                                                                                                                                                             |
@@ -886,7 +928,7 @@ These rows are **tier C**. They are authored in the spec/generators, declared fr
 | POST   | `/cloud/api/System/getMessages`           | Inferred only: crawler behaviour, not a wire observation; generator-authored; a hand-authored UI/DOM declaration.                            | Open the 'Messaging' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                                    |
 | POST   | `/cloud/api/System/verifySession`         | Inferred only: generator-authored.                                                                                                           | Capture a verifySession call on a live and an expired token; confirm the response shape and the 401 re-mint behaviour. Upgrades C->A.                                                                                                                                                                                                                                           |
 
-Appendix rows: **31** (tier C in the ledger). The capture plan that would upgrade them is [docs/evidence/capture-requests.md](./evidence/capture-requests.md).
+Appendix rows: **28** (tier C in the ledger). The capture plan that would upgrade them is [docs/evidence/capture-requests.md](./evidence/capture-requests.md).
 
 ## Missing surfaces
 
@@ -913,9 +955,9 @@ Counts below are ledger totals (all recorded rows, including rows removed from t
 
 | Tier | Meaning                                                                                                                                                                         | Ledger surfaces | Spec operations |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------- |
-| A    | Captured wire contract: a real request AND a real response capture exist. Nothing in this release qualifies.                                                                    |                 | 0               |
-| B    | Observed first-party evidence: captured request side, observed request payload, or a route verified against its handler source. The response may still be uncaptured.           |                 | 6               |
-| C    | Inferred only: authored in the spec/generators, a repo TypeScript type, or a UI/DOM observation. No request or response was observed.                                           |                 | 31              |
+| A    | Captured wire contract: a real request AND a real response capture exist. Nothing in this release qualifies.                                                                    |                 | 5               |
+| B    | Observed first-party evidence: captured request side, observed request payload, or a route verified against its handler source. The response may still be uncaptured.           |                 | 4               |
+| C    | Inferred only: authored in the spec/generators, a repo TypeScript type, or a UI/DOM observation. No request or response was observed.                                           |                 | 28              |
 | D    | Real surface recovered from code or fixtures after being absent from the earlier spec. No captured response; recorded in `surfaces[]` and, for three rows, as a spec operation. | 7               | 3               |
 | E    | Documented operation with no implementation in this repository.                                                                                                                 | 1               | 0               |
 

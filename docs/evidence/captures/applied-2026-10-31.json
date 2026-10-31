@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "appliedAt": "2026-10-31T00:23:01.103Z",
+  "tool": "scripts/apply_captures.ts",
+  "capturesDir": "/Users/nolarose/code/sportsdesk-ops/docs/evidence/captures",
+  "ledgerCountsBefore": {
+    "A": 0,
+    "B": 7,
+    "C": 31,
+    "D": 0,
+    "E": 10,
+    "total": 48
+  },
+  "ledgerCountsAfter": {
+    "A": 5,
+    "B": 5,
+    "C": 28,
+    "D": 0,
+    "E": 10,
+    "total": 48
+  },
+  "upgrades": [
+    {
+      "file": "2026-10-31/getBetTicker.post.json",
+      "operation": "getBetTicker",
+      "path": "/cloud/api/Manager/getBetTicker",
+      "method": "POST",
+      "digest": "c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9",
+      "capturedAt": "2026-10-31T00:19:51.608Z",
+      "evidenceSource": "capture:2026-10-31:c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9",
+      "responseStatus": 200,
+      "responseBodySha256": "6476f3f36fde99907c849cc28e3e8ccd7b1b63de43a3f659636c9664054bff5d",
+      "resolvesContradiction": false,
+      "previousContradictionReason": null
+    },
+    {
+      "file": "2026-10-31/getBetTickerConfig.post.json",
+      "operation": "getBetTickerConfig",
+      "path": "/cloud/api/Manager/getBetTickerConfig",
+      "method": "POST",
+      "digest": "a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e",
+      "capturedAt": "2026-10-31T00:19:51.741Z",
+      "evidenceSource": "capture:2026-10-31:a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e",
+      "responseStatus": 200,
+      "responseBodySha256": "8e8fedd17bfabe36c7753dbdf7c5e71f5748adb1fd5b13fe4d8a1993b7ff686e",
+      "resolvesContradiction": false,
+      "previousContradictionReason": null
+    },
+    {
+      "file": "2026-10-31/getInfoPlayer.post.json",
+      "operation": "getInfoPlayer",
+      "path": "/cloud/api/Manager/getInfoPlayer",
+      "method": "POST",
+      "digest": "431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597",
+      "capturedAt": "2026-10-31T00:19:51.314Z",
+      "evidenceSource": "capture:2026-10-31:431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597",
+      "responseStatus": 200,
+      "responseBodySha256": "3eeb9db890d90b53b1c51cf04b7d9c3a47cba5f4c64eac3b541e7f50d39a37e1",
+      "resolvesContradiction": true,
+      "previousContradictionReason": "Example-level contradiction: the spec's getInfoPlayer request example is the 11-char padded 'CB112_1    ' (docs/openapi.json:765-772), while the observed request sent a 7-char trimmed customerID (operational_guardrails_runbook.md:213). The response schema is also unpublished by any capture (runbook:214)."
+    },
+    {
+      "file": "2026-10-31/getSportsVigSetup.post.json",
+      "operation": "getSportsVigSetup",
+      "path": "/cloud/api/Manager/getSportsVigSetup",
+      "method": "POST",
+      "digest": "25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606",
+      "capturedAt": "2026-10-31T00:19:53.742Z",
+      "evidenceSource": "capture:2026-10-31:25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606",
+      "responseStatus": 200,
+      "responseBodySha256": "9e34409b3ae72b41bea2421597ae611453b419fa9ff197ccd09ca6627fb4b677",
+      "resolvesContradiction": false,
+      "previousContradictionReason": null
+    },
+    {
+      "file": "2026-10-31/getWebLog.post.json",
+      "operation": "getWebLog",
+      "path": "/cloud/api/Manager/getWebLog",
+      "method": "POST",
+      "digest": "cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712",
+      "capturedAt": "2026-10-31T00:19:51.204Z",
+      "evidenceSource": "capture:2026-10-31:cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712",
+      "responseStatus": 200,
+      "responseBodySha256": "979266c4b6abea5fff0de99966ece0363c5354859c92f5260870ea9507d2abaf",
+      "resolvesContradiction": true,
+      "previousContradictionReason": "Spec publishes a required Authorization Bearer header (docs/openapi.json:386 -> components/parameters/AuthBearer at docs/openapi.json:3091-3099) and a 4-field row schema (docs/openapi.json:493-519). operational_guardrails_runbook.md:153: 'The session is cookie-based (the capture has no Authorization header), and the response body was not captured, so the row schema is still undocumented.' Only the mode-B request is real."
+    }
+  ],
+  "skips": [],
+  "rejections": [
+    {
+      "file": "2026-10-31/getCustomerNotes.post.json",
+      "operation": "/cloud/api/Manager/getCustomerNotes",
+      "code": "E_RESPONSE_STATUS",
+      "message": "response.status must be a 2xx integer (found 500)"
+    },
+    {
+      "file": "2026-10-31/getInfoManager.post.json",
+      "operation": "/cloud/api/Manager/getInfoManager",
+      "code": "E_RESPONSE_STATUS",
+      "message": "response.status must be a 2xx integer (found 500)"
+    },
+    {
+      "file": "2026-10-31/getPending.post.json",
+      "operation": "/cloud/api/Manager/getPending",
+      "code": "E_RESPONSE_STATUS",
+      "message": "response.status must be a 2xx integer (found 500)"
+    }
+  ],
+  "verify": {
+    "ok": true,
+    "exitCode": 0
+  }
+}

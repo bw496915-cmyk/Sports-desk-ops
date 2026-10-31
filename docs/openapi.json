@@ -3,12 +3,12 @@
   "info": {
     "title": "SportsDesk & Fantasy402 Wire API (evidence-labelled)",
     "version": "2026.10.31",
-    "description": "Evidence model: every operation carries x-evidence.tier — A means a captured request and response are verified, B means observed first-party evidence (a captured request or a handler-verified route) without a captured response, C means inferred only with no capture, and D means a real surface missing from the spec; this release has no tier-A rows because no response body was ever captured (see docs/EVIDENCE.md)."
+    "description": "Evidence model: every operation carries x-evidence.tier — A means a captured request and response are verified, B means observed first-party evidence (a captured request or a handler-verified route) without a captured response, C means inferred only with no capture, and D means a real surface missing from the spec; tier-A rows are backed by live capture records in docs/evidence/captures and publish capture-derived response schemas (see docs/EVIDENCE.md)."
   },
   "servers": [
     {
       "url": "https://www.fantasy402.com",
-      "description": "Fantasy402 cloud portal (Manager/Report/System API). Request-side evidence only; no response body was captured."
+      "description": "Fantasy402 cloud portal (Manager/Report/System API). Tier-A rows carry live request+response captures; other rows are request-side evidence only."
     },
     {
       "url": "http://127.0.0.1:4020",
@@ -18,11 +18,11 @@
   "tags": [
     {
       "name": "Forensic Surveillance",
-      "description": "Cloud Manager surveillance operations with first-party evidence (request capture only; no response body captured)."
+      "description": "Cloud Manager surveillance operations with first-party evidence; tier-A rows carry a live request+response capture."
     },
     {
       "name": "Customer State Mutations",
-      "description": "Cloud Manager customer state operations with first-party evidence (request capture only; no response body captured)."
+      "description": "Cloud Manager customer state operations with first-party evidence; tier-A rows carry a live request+response capture."
     },
     {
       "name": "Local Desk & Telegram Gateway",
@@ -35,6 +35,10 @@
     {
       "name": "Inferred (Unverified)",
       "description": "Tier C operations: inferred or authored only. No request or response was ever observed; path and method are candidates, not contracts."
+    },
+    {
+      "name": "Live-captured (request unverified)",
+      "description": "Tier-A operations whose path/method were previously inferred (tier C): the response is live-captured, while the request field template is not observed and remains unverified."
     }
   ],
   "paths": {
@@ -63,42 +67,240 @@
     },
     "/cloud/api/Manager/getBetTicker": {
       "post": {
-        "tags": ["Inferred (Unverified)"],
-        "summary": "Bet ticker delta feed",
-        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: simulate_bettor_churn_suite.ts:106-115 (a consumer type declaration, not a capture). See the RawBetTickerTick component; it records the field names only and is not used as a response schema here. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
-        "operationId": "postCloudApiManagerGetBetTicker",
+        "tags": ["Live-captured (request unverified)"],
+        "summary": "Live-captured /cloud/api/Manager/getBetTicker (request template unverified)",
+        "parameters": [],
+        "description": "Live-captured contract: 2026-10-31/getBetTicker.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getBetTicker at 2026-10-31T00:19:51.608Z with a 200 response (response body sha256 6476f3f36fde99907c849cc28e3e8ccd7b1b63de43a3f659636c9664054bff5d). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The endpoint path/method were previously inferred (tier C); the live capture now evidences both, while the request field template remains unverified.",
         "responses": {
+          "200": {
+            "description": "Captured live 200 response from 2026-10-31/getBetTicker.post.json; schema derived from the captured body skeleton.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "LIST": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "AgentID": {
+                            "type": "string"
+                          },
+                          "AgentLogin": {
+                            "type": "string"
+                          },
+                          "AmountWagered": {
+                            "type": "number"
+                          },
+                          "CustomerID": {
+                            "type": "string"
+                          },
+                          "InsertDateTime": {
+                            "type": "string"
+                          },
+                          "Login": {
+                            "type": "string"
+                          },
+                          "ShortDesc": {
+                            "type": "string"
+                          },
+                          "TicketWriter": {
+                            "type": "string"
+                          },
+                          "ToWinAmount": {
+                            "type": "number"
+                          },
+                          "VIP": {
+                            "type": "string"
+                          },
+                          "VolumeAmount": {
+                            "type": "number"
+                          },
+                          "WagerNumber": {
+                            "type": "number"
+                          },
+                          "WagerType": {
+                            "type": "string",
+                            "enum": ["L", "M", "P", "S", "T"]
+                          }
+                        }
+                      },
+                      "x-capture-truncated": true
+                    }
+                  }
+                }
+              }
+            }
+          },
           "default": {
-            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+            "description": "Other status codes were not captured by this record."
           }
         },
         "x-evidence": {
-          "tier": "C",
+          "tier": "A",
           "sources": [
-            "simulate_bettor_churn_suite.ts:106-115",
-            "docs/openapi.json:141-238"
+            "capture:2026-10-31/getBetTicker.post.json",
+            "sha256:c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9"
           ],
-          "capturedResponse": false,
-          "requiredCapture": "Capture an initial (wagerNumber=0) and a delta poll: exact body, INFO/LIST envelope, row key set/types, watermark semantics. Upgrades C->A; without it the delta-watermark contract is a guess."
+          "capturedResponse": true
+        },
+        "x-capture": {
+          "file": "2026-10-31/getBetTicker.post.json",
+          "sha256": "c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9",
+          "capturedAt": "2026-10-31T00:19:51.608Z",
+          "status": 200,
+          "samples": 1
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "RRO": {
+                    "type": "string"
+                  },
+                  "agentID": {
+                    "type": "string"
+                  },
+                  "agentOwner": {
+                    "type": "string"
+                  },
+                  "operation": {
+                    "type": "string"
+                  },
+                  "wagerNumber": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
     "/cloud/api/Manager/getBetTickerConfig": {
       "post": {
-        "tags": ["Inferred (Unverified)"],
-        "summary": "Ticker configuration",
-        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
-        "operationId": "postCloudApiManagerGetBetTickerConfig",
+        "tags": ["Live-captured (request unverified)"],
+        "summary": "Live-captured /cloud/api/Manager/getBetTickerConfig (request template unverified)",
+        "parameters": [],
+        "description": "Live-captured contract: 2026-10-31/getBetTickerConfig.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getBetTickerConfig at 2026-10-31T00:19:51.741Z with a 200 response (response body sha256 8e8fedd17bfabe36c7753dbdf7c5e71f5748adb1fd5b13fe4d8a1993b7ff686e). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The endpoint path/method were previously inferred (tier C); the live capture now evidences both, while the request field template remains unverified.",
         "responses": {
+          "200": {
+            "description": "Captured live 200 response from 2026-10-31/getBetTickerConfig.post.json; schema derived from the captured body skeleton.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "INFO": {
+                      "type": "object",
+                      "properties": {
+                        "AgentID": {
+                          "type": "string"
+                        },
+                        "color1-499": {
+                          "type": "string"
+                        },
+                        "color1000-1999": {
+                          "type": "string"
+                        },
+                        "color10000-100000": {
+                          "type": "string"
+                        },
+                        "color2000-4999": {
+                          "type": "string"
+                        },
+                        "color500-999": {
+                          "type": "string"
+                        },
+                        "color5000-9999": {
+                          "type": "string"
+                        },
+                        "play1-499": {
+                          "type": "string"
+                        },
+                        "play1000-1999": {
+                          "type": "string"
+                        },
+                        "play10000-100000": {
+                          "type": "string"
+                        },
+                        "play2000-4999": {
+                          "type": "string"
+                        },
+                        "play500-999": {
+                          "type": "string"
+                        },
+                        "play5000-9999": {
+                          "type": "string"
+                        },
+                        "showHorses": {
+                          "type": "string"
+                        },
+                        "showIfbets": {
+                          "type": "string"
+                        },
+                        "showParlays": {
+                          "type": "string"
+                        },
+                        "showStraights": {
+                          "type": "string"
+                        },
+                        "showTeasers": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "default": {
-            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+            "description": "Other status codes were not captured by this record."
           }
         },
         "x-evidence": {
-          "tier": "C",
-          "sources": ["none"],
-          "capturedResponse": false,
-          "requiredCapture": "Capture one request/response (spec expects {INFO:true, Config:{}}); verify whether INFO:false is the misconfigured shape. Upgrades C->A."
+          "tier": "A",
+          "sources": [
+            "capture:2026-10-31/getBetTickerConfig.post.json",
+            "sha256:a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e"
+          ],
+          "capturedResponse": true
+        },
+        "x-capture": {
+          "file": "2026-10-31/getBetTickerConfig.post.json",
+          "sha256": "a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e",
+          "capturedAt": "2026-10-31T00:19:51.741Z",
+          "status": 200,
+          "samples": 1
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "RRO": {
+                    "type": "string"
+                  },
+                  "agentID": {
+                    "type": "string"
+                  },
+                  "agentOwner": {
+                    "type": "string"
+                  },
+                  "operation": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -128,8 +330,8 @@
     "/cloud/api/Manager/getWebLog": {
       "post": {
         "tags": ["Forensic Surveillance"],
-        "summary": "Manager getWebLog (mode B request observed; response not captured)",
-        "description": "The forensic IP-investigation endpoint (operational_guardrails_runbook.md §5.1.1). Request side: a 2026-10-28 Manager HAR (portal v1.0.279) captured one mode-B POST with a form-urlencoded body and no Authorization header, so the session is cookie-based. Only mode B was captured; modes A, C and I are inferred from the portal form and still need a capture. Response side: no response body was captured, so the row schema is undocumented and none is published here. The WeblogEntry component (simulate_bettor_churn_suite.ts:117-123) records the four fields the old spec published, but a consumer type is not a capture, so it is not used as a response schema.",
+        "summary": "Manager getWebLog (mode B request observed; request + response captured)",
+        "description": "Live-captured contract: 2026-10-31/getWebLog.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getWebLog at 2026-10-31T00:19:51.204Z with a 200 response (response body sha256 979266c4b6abea5fff0de99966ece0363c5354859c92f5260870ea9507d2abaf). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The request template is the previously observed Manager envelope.",
         "operationId": "postCloudApiManagerGetWebLog",
         "parameters": [
           {
@@ -142,69 +344,36 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "agentID",
-                  "customerID",
-                  "start",
-                  "end",
-                  "type",
-                  "actions",
-                  "ip",
-                  "operation",
-                  "RRO",
-                  "agentOwner"
-                ],
                 "properties": {
-                  "agentID": {
-                    "type": "string",
-                    "description": "Session master agent; the captured value is redacted here.",
-                    "example": "<redacted>"
-                  },
-                  "customerID": {
-                    "type": "string",
-                    "description": "0 = whole book. Mode C should carry the target account (unverified).",
-                    "example": "0"
-                  },
-                  "start": {
-                    "type": "string",
-                    "description": "Inclusive start date. Observed as MM/DD/YYYY in mode B; mode C reportedly sends YYYY-MM-DD (unverified).",
-                    "example": "10/28/2026"
-                  },
-                  "end": {
-                    "type": "string",
-                    "description": "Inclusive end date. Observed as MM/DD/YYYY in mode B; mode C reportedly sends YYYY-MM-DD (unverified).",
-                    "example": "10/28/2026"
-                  },
-                  "type": {
-                    "type": "string",
-                    "enum": ["A", "B", "C", "I"],
-                    "description": "A: web access log; B: global IP matcher; C: account IP match; I: users by IP. Only B was captured; A, C and I are inferred."
+                  "RRO": {
+                    "type": "string"
                   },
                   "actions": {
-                    "type": "string",
-                    "enum": ["ALL"],
-                    "description": "Action filter. ALL was observed; other values are unobserved.",
-                    "example": "ALL"
+                    "type": "string"
                   },
-                  "ip": {
-                    "type": "string",
-                    "description": "Empty in the observed mode-B request; mode I should carry the IP or /24 prefix (unverified).",
-                    "example": ""
-                  },
-                  "operation": {
-                    "type": "string",
-                    "enum": ["getWebLog"],
-                    "description": "Echo of the method name."
-                  },
-                  "RRO": {
-                    "type": "string",
-                    "enum": ["1"],
-                    "description": "Observed as 1; the meaning is unknown."
+                  "agentID": {
+                    "type": "string"
                   },
                   "agentOwner": {
-                    "type": "string",
-                    "description": "Session master agent; the captured value is redacted here.",
-                    "example": "<redacted>"
+                    "type": "string"
+                  },
+                  "customerID": {
+                    "type": "string"
+                  },
+                  "end": {
+                    "type": "string"
+                  },
+                  "ip": {
+                    "type": "string"
+                  },
+                  "operation": {
+                    "type": "string"
+                  },
+                  "start": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
                   }
                 }
               }
@@ -218,21 +387,41 @@
         ],
         "responses": {
           "200": {
-            "description": "Response body was not captured; row schema undocumented"
+            "description": "Captured live 200 response from 2026-10-31/getWebLog.post.json; schema derived from the captured body skeleton.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "INFO": {
+                      "type": "string"
+                    },
+                    "LIST": {
+                      "type": "array"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Other status codes were not captured by this record."
           }
         },
         "x-evidence": {
-          "tier": "B",
+          "tier": "A",
           "sources": [
-            "operational_guardrails_runbook.md:129-140",
-            "operational_guardrails_runbook.md:131",
-            "operational_guardrails_runbook.md:153",
-            "simulate_bettor_churn_suite.ts:117-123",
-            "docs/openapi.json:377-399"
+            "capture:2026-10-31/getWebLog.post.json",
+            "sha256:cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712"
           ],
-          "capturedResponse": false,
-          "requiredCapture": "Capture modes A, C and I requests (exact per-mode date format, ip value, target customerID) plus a full 200 response body for at least one mode, and record the auth actually accepted (session cookie vs Authorization header). Upgrades modes A/C/I from C and closes the response/auth contradiction.",
-          "contradicted": true
+          "capturedResponse": true
+        },
+        "x-capture": {
+          "file": "2026-10-31/getWebLog.post.json",
+          "sha256": "cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712",
+          "capturedAt": "2026-10-31T00:19:51.204Z",
+          "status": 200,
+          "samples": 1
         }
       }
     },
@@ -286,8 +475,8 @@
     "/cloud/api/Manager/getInfoPlayer": {
       "post": {
         "tags": ["Customer State Mutations"],
-        "summary": "Manager getInfoPlayer (request observed; response not captured)",
-        "description": "Read observed in the 2026-10-28 Manager HAR: opening a player sent a form POST with a 7-character trimmed customerID (e.g. CB112_1, not the padded 11-character form the old spec showed), and agentID/agentOwner were the logged-in master on all 19 Manager calls (operational_guardrails_runbook.md:213-214). The response was not captured, so no response schema is published. Ledger contradicted: the prior spec's padded example is refuted by the capture.",
+        "summary": "Manager getInfoPlayer (request + response captured)",
+        "description": "Live-captured contract: 2026-10-31/getInfoPlayer.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getInfoPlayer at 2026-10-31T00:19:51.314Z with a 200 response (response body sha256 3eeb9db890d90b53b1c51cf04b7d9c3a47cba5f4c64eac3b541e7f50d39a37e1). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The request template is the previously observed Manager envelope.",
         "operationId": "postCloudApiManagerGetInfoPlayer",
         "requestBody": {
           "required": true,
@@ -295,8 +484,23 @@
             "application/x-www-form-urlencoded": {
               "schema": {
                 "type": "object",
-                "additionalProperties": true,
-                "description": "Opaque: a form POST was observed, but only the trimmed customerID and master agentID/agentOwner values are recorded for this call, so the full field list is not published."
+                "properties": {
+                  "RRO": {
+                    "type": "string"
+                  },
+                  "agentID": {
+                    "type": "string"
+                  },
+                  "agentOwner": {
+                    "type": "string"
+                  },
+                  "customerID": {
+                    "type": "string"
+                  },
+                  "operation": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }
@@ -307,21 +511,39 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Captured live 200 response from 2026-10-31/getInfoPlayer.post.json; schema derived from the captured body skeleton.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "INFO": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "default": {
-            "description": "Unknown — the response body was not captured; no status code or body schema is documented."
+            "description": "Other status codes were not captured by this record."
           }
         },
         "x-evidence": {
-          "tier": "B",
+          "tier": "A",
           "sources": [
-            "operational_guardrails_runbook.md:213",
-            "operational_guardrails_runbook.md:214",
-            "operational_guardrails_runbook.md:214",
-            "docs/openapi.json:756-844"
+            "capture:2026-10-31/getInfoPlayer.post.json",
+            "sha256:431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597"
           ],
-          "capturedResponse": false,
-          "requiredCapture": "Capture a getInfoPlayer request+response for a known player: padded vs trimmed customerID on the wire, response key set and value types, and one updateByColumn read-back pair. Upgrades B->A and settles both the padding example and the read-back contract.",
-          "contradicted": true
+          "capturedResponse": true
+        },
+        "x-capture": {
+          "file": "2026-10-31/getInfoPlayer.post.json",
+          "sha256": "431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597",
+          "capturedAt": "2026-10-31T00:19:51.314Z",
+          "status": 200,
+          "samples": 1
         }
       }
     },
@@ -346,20 +568,85 @@
     },
     "/cloud/api/Manager/getSportsVigSetup": {
       "post": {
-        "tags": ["Inferred (Unverified)"],
-        "summary": "Read sport vig setup",
-        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
-        "operationId": "postCloudApiManagerGetSportsVigSetup",
+        "tags": ["Live-captured (request unverified)"],
+        "summary": "Live-captured /cloud/api/Manager/getSportsVigSetup (request template unverified)",
+        "parameters": [],
+        "description": "Live-captured contract: 2026-10-31/getSportsVigSetup.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getSportsVigSetup at 2026-10-31T00:19:53.742Z with a 200 response (response body sha256 9e34409b3ae72b41bea2421597ae611453b419fa9ff197ccd09ca6627fb4b677). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The endpoint path/method were previously inferred (tier C); the live capture now evidences both, while the request field template remains unverified.",
         "responses": {
+          "200": {
+            "description": "Captured live 200 response from 2026-10-31/getSportsVigSetup.post.json; schema derived from the captured body skeleton.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "LIST": {
+                      "type": "array"
+                    },
+                    "SCHEDULE": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "DisplayLineType": {
+                            "type": "string"
+                          },
+                          "Order": {
+                            "type": "number"
+                          },
+                          "lineType": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "default": {
-            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+            "description": "Other status codes were not captured by this record."
           }
         },
         "x-evidence": {
-          "tier": "C",
-          "sources": ["none", "docs/openapi.json"],
-          "capturedResponse": false,
-          "requiredCapture": "Capture the read-back request/response paired with a vigSetupInsert; confirm form-urlencoded vs JSON and the Result field set. Upgrades C->A."
+          "tier": "A",
+          "sources": [
+            "capture:2026-10-31/getSportsVigSetup.post.json",
+            "sha256:25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606"
+          ],
+          "capturedResponse": true
+        },
+        "x-capture": {
+          "file": "2026-10-31/getSportsVigSetup.post.json",
+          "sha256": "25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606",
+          "capturedAt": "2026-10-31T00:19:53.742Z",
+          "status": 200,
+          "samples": 1
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "RRO": {
+                    "type": "string"
+                  },
+                  "agentID": {
+                    "type": "string"
+                  },
+                  "agentOwner": {
+                    "type": "string"
+                  },
+                  "operation": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -1903,7 +2190,7 @@
       },
       "RawBetTickerTick": {
         "type": "object",
-        "description": "Consumer wire type for one bet-ticker row. Field names and number types only; this is a type declaration, not a captured response, so the getBetTicker operation (tier C) publishes no response schema. Parsed from simulate_bettor_churn_suite.ts:106-115.",
+        "description": "Consumer wire type for one bet-ticker row. Field names and number types only. The getBetTicker operation is now tier A: its response schema is derived from the live capture skeleton, while this component remains a consumer type declaration. Parsed from simulate_bettor_churn_suite.ts:106-115.",
         "properties": {
           "wagerNumber": {
             "type": "number"
@@ -2007,7 +2294,7 @@
       },
       "WeblogEntry": {
         "type": "object",
-        "description": "Consumer type that declares the four fields the old spec published as the getWebLog response row (customerID, ipAddress, timestamp, agentOwner). It is NOT used as a response schema here: the getWebLog response body was never captured (operational_guardrails_runbook.md:153), so the row schema remains undocumented. Parsed from simulate_bettor_churn_suite.ts:117-123.",
+        "description": "Consumer type that declares the four fields the old spec published as the getWebLog response row (customerID, ipAddress, timestamp, agentOwner). The getWebLog operation is now tier A and derives its response schema from the live capture skeleton; this component remains a consumer type declaration and is not used for that schema. Parsed from simulate_bettor_churn_suite.ts:117-123.",
         "properties": {
           "customerID": {
             "type": "string"

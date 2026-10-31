@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "mode": "live",
+  "capturedAt": "2026-10-31T00:19:51.204Z",
+  "operation": {
+    "path": "/cloud/api/Manager/getWebLog",
+    "method": "POST",
+    "operationId": "postCloudApiManagerGetWebLog"
+  },
+  "request": {
+    "url": "https://fantasy402.com/cloud/api/Manager/getWebLog",
+    "method": "POST",
+    "headers": {
+      "accept": "application/json",
+      "x-requested-with": "XMLHttpRequest",
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "cookie": "<redacted>",
+      "authorization": "<redacted>"
+    },
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "bodySha256": "cd6846cccd4c35ad7efdbb277528703a6688416638d2b4e81b1a3f7ba8429bd6",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "RRO": {
+          "type": "string",
+          "nullable": false
+        },
+        "actions": {
+          "type": "string",
+          "nullable": false
+        },
+        "agentID": {
+          "type": "string",
+          "nullable": false
+        },
+        "agentOwner": {
+          "type": "string",
+          "nullable": false
+        },
+        "customerID": {
+          "type": "string",
+          "nullable": false
+        },
+        "end": {
+          "type": "string",
+          "nullable": false
+        },
+        "ip": {
+          "type": "string",
+          "nullable": false
+        },
+        "operation": {
+          "type": "string",
+          "nullable": false
+        },
+        "start": {
+          "type": "string",
+          "nullable": false
+        },
+        "type": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json",
+    "bodySha256": "979266c4b6abea5fff0de99966ece0363c5354859c92f5260870ea9507d2abaf",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "INFO": {
+          "type": "string",
+          "nullable": false
+        },
+        "LIST": {
+          "type": "array",
+          "nullable": false,
+          "items": null
+        }
+      }
+    },
+    "bytes": 21
+  },
+  "redaction": {
+    "policyVersion": 1,
+    "clean": true,
+    "fieldsRedacted": [
+      "request.body.agentID",
+      "request.body.agentOwner",
+      "request.body.customerID",
+      "request.body.ip",
+      "request.headers.authorization",
+      "request.headers.cookie"
+    ],
+    "piiRedacted": [
+      "agent-id",
+      "customer-id",
+      "ip"
+    ]
+  },
+  "provenance": {
+    "portalHost": "fantasy402.com",
+    "proxy": "none",
+    "auth": "cookie",
+    "bunVersion": "1.4.4"
+  },
+  "samples": 1
+}

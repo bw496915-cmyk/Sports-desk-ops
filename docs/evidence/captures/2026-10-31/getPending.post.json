@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "mode": "live",
+  "capturedAt": "2026-10-31T00:19:53.632Z",
+  "operation": {
+    "path": "/cloud/api/Manager/getPending",
+    "method": "POST",
+    "operationId": "postCloudApiManagerGetPending"
+  },
+  "request": {
+    "url": "https://fantasy402.com/cloud/api/Manager/getPending",
+    "method": "POST",
+    "headers": {
+      "accept": "application/json",
+      "x-requested-with": "XMLHttpRequest",
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "cookie": "<redacted>",
+      "authorization": "<redacted>"
+    },
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "bodySha256": "83a7f447299604af587427d8df4e1d2c5540da8a98b4bd2a9fd50abcd1f810e1",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "RRO": {
+          "type": "string",
+          "nullable": false
+        },
+        "agentID": {
+          "type": "string",
+          "nullable": false
+        },
+        "agentOwner": {
+          "type": "string",
+          "nullable": false
+        },
+        "customerID": {
+          "type": "string",
+          "nullable": false
+        },
+        "operation": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 500,
+    "contentType": "text/html",
+    "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bodySkeleton": {
+      "type": "null",
+      "nullable": true
+    },
+    "bytes": 0
+  },
+  "redaction": {
+    "policyVersion": 1,
+    "clean": true,
+    "fieldsRedacted": [
+      "request.body.agentID",
+      "request.body.agentOwner",
+      "request.body.customerID",
+      "request.headers.authorization",
+      "request.headers.cookie"
+    ],
+    "piiRedacted": [
+      "agent-id",
+      "customer-id"
+    ]
+  },
+  "provenance": {
+    "portalHost": "fantasy402.com",
+    "proxy": "none",
+    "auth": "cookie",
+    "bunVersion": "1.4.4"
+  },
+  "samples": 1
+}

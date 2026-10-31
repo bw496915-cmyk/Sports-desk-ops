@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "mode": "live",
+  "capturedAt": "2026-10-31T00:19:51.314Z",
+  "operation": {
+    "path": "/cloud/api/Manager/getInfoPlayer",
+    "method": "POST",
+    "operationId": "postCloudApiManagerGetInfoPlayer"
+  },
+  "request": {
+    "url": "https://fantasy402.com/cloud/api/Manager/getInfoPlayer",
+    "method": "POST",
+    "headers": {
+      "accept": "application/json",
+      "x-requested-with": "XMLHttpRequest",
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "cookie": "<redacted>",
+      "authorization": "<redacted>"
+    },
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "bodySha256": "3e51819066874957bf6521b3f69deb40cb49894b214740f848e5cabdc47d1b32",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "RRO": {
+          "type": "string",
+          "nullable": false
+        },
+        "agentID": {
+          "type": "string",
+          "nullable": false
+        },
+        "agentOwner": {
+          "type": "string",
+          "nullable": false
+        },
+        "customerID": {
+          "type": "string",
+          "nullable": false
+        },
+        "operation": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json",
+    "bodySha256": "3eeb9db890d90b53b1c51cf04b7d9c3a47cba5f4c64eac3b541e7f50d39a37e1",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "INFO": {
+          "type": "null",
+          "nullable": true
+        }
+      }
+    },
+    "bytes": 13
+  },
+  "redaction": {
+    "policyVersion": 1,
+    "clean": true,
+    "fieldsRedacted": [
+      "request.body.agentID",
+      "request.body.agentOwner",
+      "request.body.customerID",
+      "request.headers.authorization",
+      "request.headers.cookie"
+    ],
+    "piiRedacted": [
+      "agent-id",
+      "customer-id"
+    ]
+  },
+  "provenance": {
+    "portalHost": "fantasy402.com",
+    "proxy": "none",
+    "auth": "cookie",
+    "bunVersion": "1.4.4"
+  },
+  "samples": 1
+}

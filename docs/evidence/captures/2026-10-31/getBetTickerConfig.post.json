@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "mode": "live",
+  "capturedAt": "2026-10-31T00:19:51.741Z",
+  "operation": {
+    "path": "/cloud/api/Manager/getBetTickerConfig",
+    "method": "POST",
+    "operationId": "postCloudApiManagerGetBetTickerConfig"
+  },
+  "request": {
+    "url": "https://fantasy402.com/cloud/api/Manager/getBetTickerConfig",
+    "method": "POST",
+    "headers": {
+      "accept": "application/json",
+      "x-requested-with": "XMLHttpRequest",
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "cookie": "<redacted>",
+      "authorization": "<redacted>"
+    },
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "bodySha256": "f5847aeda6ee571a84bd54a442c10dc023ec4488a894dd85f279662436d7f575",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "RRO": {
+          "type": "string",
+          "nullable": false
+        },
+        "agentID": {
+          "type": "string",
+          "nullable": false
+        },
+        "agentOwner": {
+          "type": "string",
+          "nullable": false
+        },
+        "operation": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json",
+    "bodySha256": "8e8fedd17bfabe36c7753dbdf7c5e71f5748adb1fd5b13fe4d8a1993b7ff686e",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "INFO": {
+          "type": "object",
+          "nullable": false,
+          "fields": {
+            "AgentID": {
+              "type": "string",
+              "nullable": false
+            },
+            "color1-499": {
+              "type": "string",
+              "nullable": false
+            },
+            "color1000-1999": {
+              "type": "string",
+              "nullable": false
+            },
+            "color10000-100000": {
+              "type": "string",
+              "nullable": false
+            },
+            "color2000-4999": {
+              "type": "string",
+              "nullable": false
+            },
+            "color500-999": {
+              "type": "string",
+              "nullable": false
+            },
+            "color5000-9999": {
+              "type": "string",
+              "nullable": false
+            },
+            "play1-499": {
+              "type": "string",
+              "nullable": false
+            },
+            "play1000-1999": {
+              "type": "string",
+              "nullable": false
+            },
+            "play10000-100000": {
+              "type": "string",
+              "nullable": false
+            },
+            "play2000-4999": {
+              "type": "string",
+              "nullable": false
+            },
+            "play500-999": {
+              "type": "string",
+              "nullable": false
+            },
+            "play5000-9999": {
+              "type": "string",
+              "nullable": false
+            },
+            "showHorses": {
+              "type": "string",
+              "nullable": false
+            },
+            "showIfbets": {
+              "type": "string",
+              "nullable": false
+            },
+            "showParlays": {
+              "type": "string",
+              "nullable": false
+            },
+            "showStraights": {
+              "type": "string",
+              "nullable": false
+            },
+            "showTeasers": {
+              "type": "string",
+              "nullable": false
+            }
+          }
+        }
+      }
+    },
+    "bytes": 461
+  },
+  "redaction": {
+    "policyVersion": 1,
+    "clean": true,
+    "fieldsRedacted": [
+      "request.body.agentID",
+      "request.body.agentOwner",
+      "request.headers.authorization",
+      "request.headers.cookie",
+      "response.body.INFO.AgentID"
+    ],
+    "piiRedacted": [
+      "agent-id"
+    ]
+  },
+  "provenance": {
+    "portalHost": "fantasy402.com",
+    "proxy": "none",
+    "auth": "cookie",
+    "bunVersion": "1.4.4"
+  },
+  "samples": 1
+}

@@ -46,9 +46,9 @@
     "crawlerCandidatesRule": "B-vs-C rule for the 11 'Tracked Operational Domains' candidates (gameAdmin, getMessages, adjustBalance, createPlayer, get3rdPartyLimits, getAnalysis, getScores, getAgentTree, getBilling, getRules, getFinancialReport): a launcher tile alone is not enough for B. B requires a URL+method observed on the wire (or a handler that serves it). Those 11 rows take their path+method from hand-authored candidateEndpoint/candidateMethod constants in main:scripts/portal_tile_crawler.ts:40-162, echoed by main:scripts/append_tracked_domains.mjs:22-228. The crawler CLI entry runs the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and its live branch only replaces extracted inputs/L-keys, never the URL/method; no audit JSON or screenshot proof exists in the main tree. They are therefore tier C with candidate_url=true and ui_observed=true, never B. getAnalysis and getFinancialReport also have independent UI action-name evidence (runbook:166-167), which improves the tile evidence but does not observe the URL."
   },
   "counts": {
-    "A": 0,
-    "B": 7,
-    "C": 31,
+    "A": 5,
+    "B": 5,
+    "C": 28,
     "D": 0,
     "E": 10,
     "total": 48
@@ -68,25 +68,25 @@
       "total": 1
     },
     "Trading Desk Feeds": {
-      "A": 0,
+      "A": 2,
       "B": 0,
-      "C": 3,
+      "C": 1,
       "D": 0,
       "E": 0,
       "total": 3
     },
     "Forensic Surveillance": {
-      "A": 0,
-      "B": 1,
+      "A": 1,
+      "B": 0,
       "C": 1,
       "D": 0,
       "E": 0,
       "total": 2
     },
     "Customer State Mutations": {
-      "A": 0,
-      "B": 1,
-      "C": 3,
+      "A": 2,
+      "B": 0,
+      "C": 2,
       "D": 0,
       "E": 0,
       "total": 4
@@ -222,8 +222,8 @@
       "method": "post",
       "operationId": null,
       "tag": "Trading Desk Feeds",
-      "tier": "C",
-      "capturedResponse": false,
+      "tier": "A",
+      "capturedResponse": true,
       "evidence": [
         {
           "source": "simulate_bettor_churn_suite.ts:106-115",
@@ -234,9 +234,14 @@
           "source": "docs/openapi.json:141-238",
           "kind": "spec-claim",
           "note": "Spec adds the request envelope (agentID, agentOwner, wagerNumber watermark, operation, RRO), the INFO/LIST response envelope and a TickerRowRecord schema; none is captured."
+        },
+        {
+          "source": "capture:2026-10-31:c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9",
+          "kind": "capture",
+          "note": "Live capture 2026-10-31T00:19:51.608Z from a 200 response (response bodySha256 6476f3f36fde99907c849cc28e3e8ccd7b1b63de43a3f659636c9664054bff5d); request and response were captured live with redaction clean (policy v1)."
         }
       ],
-      "requiredCapture": "Capture an initial (wagerNumber=0) and a delta poll: exact body, INFO/LIST envelope, row key set/types, watermark semantics. Upgrades C->A; without it the delta-watermark contract is a guess.",
+      "requiredCapture": null,
       "contradicted": false,
       "contradictedReason": null
     },
@@ -245,16 +250,21 @@
       "method": "post",
       "operationId": null,
       "tag": "Trading Desk Feeds",
-      "tier": "C",
-      "capturedResponse": false,
+      "tier": "A",
+      "capturedResponse": true,
       "evidence": [
         {
           "source": "none",
           "kind": "none",
           "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+        },
+        {
+          "source": "capture:2026-10-31:a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e",
+          "kind": "capture",
+          "note": "Live capture 2026-10-31T00:19:51.741Z from a 200 response (response bodySha256 8e8fedd17bfabe36c7753dbdf7c5e71f5748adb1fd5b13fe4d8a1993b7ff686e); request and response were captured live with redaction clean (policy v1)."
         }
       ],
-      "requiredCapture": "Capture one request/response (spec expects {INFO:true, Config:{}}); verify whether INFO:false is the misconfigured shape. Upgrades C->A.",
+      "requiredCapture": null,
       "contradicted": false,
       "contradictedReason": null
     },
@@ -291,8 +301,8 @@
       "method": "post",
       "operationId": null,
       "tag": "Forensic Surveillance",
-      "tier": "B",
-      "capturedResponse": false,
+      "tier": "A",
+      "capturedResponse": true,
       "evidence": [
         {
           "source": "operational_guardrails_runbook.md:129-140",
@@ -318,11 +328,21 @@
           "source": "docs/openapi.json:377-399",
           "kind": "spec-claim",
           "note": "Spec requires Authorization (BearerAuth), X-Requested-With, Accept and Referrer-Policy request headers, and publishes a 4-field array response at docs/openapi.json:493-519."
+        },
+        {
+          "source": "capture:2026-10-31:cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712",
+          "kind": "capture",
+          "note": "Live capture 2026-10-31T00:19:51.204Z from a 200 response (response bodySha256 979266c4b6abea5fff0de99966ece0363c5354859c92f5260870ea9507d2abaf); request and response were captured live with redaction clean (policy v1)."
         }
       ],
-      "requiredCapture": "Capture modes A, C and I requests (exact per-mode date format, ip value, target customerID) plus a full 200 response body for at least one mode, and record the auth actually accepted (session cookie vs Authorization header). Upgrades modes A/C/I from C and closes the response/auth contradiction.",
-      "contradicted": true,
-      "contradictedReason": "Spec publishes a required Authorization Bearer header (docs/openapi.json:386 -> components/parameters/AuthBearer at docs/openapi.json:3091-3099) and a 4-field row schema (docs/openapi.json:493-519). operational_guardrails_runbook.md:153: 'The session is cookie-based (the capture has no Authorization header), and the response body was not captured, so the row schema is still undocumented.' Only the mode-B request is real."
+      "requiredCapture": null,
+      "contradicted": false,
+      "contradictedReason": null,
+      "resolution": {
+        "resolvedBy": "capture:2026-10-31/getWebLog.post.json",
+        "resolvedAt": "2026-10-31T00:23:00.817Z",
+        "previousReason": "Spec publishes a required Authorization Bearer header (docs/openapi.json:386 -> components/parameters/AuthBearer at docs/openapi.json:3091-3099) and a 4-field row schema (docs/openapi.json:493-519). operational_guardrails_runbook.md:153: 'The session is cookie-based (the capture has no Authorization header), and the response body was not captured, so the row schema is still undocumented.' Only the mode-B request is real."
+      }
     },
     {
       "path": "/cloud/api/Manager/search",
@@ -387,8 +407,8 @@
       "method": "post",
       "operationId": null,
       "tag": "Customer State Mutations",
-      "tier": "B",
-      "capturedResponse": false,
+      "tier": "A",
+      "capturedResponse": true,
       "evidence": [
         {
           "source": "operational_guardrails_runbook.md:213",
@@ -409,11 +429,21 @@
           "source": "docs/openapi.json:756-844",
           "kind": "spec-claim",
           "note": "Spec example sends the 11-char padded customerID 'CB112_1    ' and publishes a Result{CurrentBalance,PendingAmount,CreditLimit,confirmationDelaySeconds,wagerLimitRiskCents} response."
+        },
+        {
+          "source": "capture:2026-10-31:431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597",
+          "kind": "capture",
+          "note": "Live capture 2026-10-31T00:19:51.314Z from a 200 response (response bodySha256 3eeb9db890d90b53b1c51cf04b7d9c3a47cba5f4c64eac3b541e7f50d39a37e1); request and response were captured live with redaction clean (policy v1)."
         }
       ],
-      "requiredCapture": "Capture a getInfoPlayer request+response for a known player: padded vs trimmed customerID on the wire, response key set and value types, and one updateByColumn read-back pair. Upgrades B->A and settles both the padding example and the read-back contract.",
-      "contradicted": true,
-      "contradictedReason": "Example-level contradiction: the spec's getInfoPlayer request example is the 11-char padded 'CB112_1    ' (docs/openapi.json:765-772), while the observed request sent a 7-char trimmed customerID (operational_guardrails_runbook.md:213). The response schema is also unpublished by any capture (runbook:214)."
+      "requiredCapture": null,
+      "contradicted": false,
+      "contradictedReason": null,
+      "resolution": {
+        "resolvedBy": "capture:2026-10-31/getInfoPlayer.post.json",
+        "resolvedAt": "2026-10-31T00:23:00.817Z",
+        "previousReason": "Example-level contradiction: the spec's getInfoPlayer request example is the 11-char padded 'CB112_1    ' (docs/openapi.json:765-772), while the observed request sent a 7-char trimmed customerID (operational_guardrails_runbook.md:213). The response schema is also unpublished by any capture (runbook:214)."
+      }
     },
     {
       "path": "/cloud/api/Manager/vigSetupInsert",
@@ -443,8 +473,8 @@
       "method": "post",
       "operationId": null,
       "tag": "Customer State Mutations",
-      "tier": "C",
-      "capturedResponse": false,
+      "tier": "A",
+      "capturedResponse": true,
       "evidence": [
         {
           "source": "none",
@@ -455,9 +485,14 @@
           "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Claim under test lives in docs/openapi.json; it has no supporting artifact."
+        },
+        {
+          "source": "capture:2026-10-31:25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606",
+          "kind": "capture",
+          "note": "Live capture 2026-10-31T00:19:53.742Z from a 200 response (response bodySha256 9e34409b3ae72b41bea2421597ae611453b419fa9ff197ccd09ca6627fb4b677); request and response were captured live with redaction clean (policy v1)."
         }
       ],
-      "requiredCapture": "Capture the read-back request/response paired with a vigSetupInsert; confirm form-urlencoded vs JSON and the Result field set. Upgrades C->A.",
+      "requiredCapture": null,
       "contradicted": false,
       "contradictedReason": null
     },

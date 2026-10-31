@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 1,
+  "store": "evidence-captures",
+  "generatedAt": "2026-10-31T00:19:57.603Z",
+  "policyVersion": 1,
+  "counts": {
+    "total": 8,
+    "live": 8,
+    "mock": 0,
+    "withResponse": 8,
+    "withoutResponse": 0,
+    "clean": 8,
+    "operations": [
+      "/cloud/api/Manager/getBetTicker",
+      "/cloud/api/Manager/getBetTickerConfig",
+      "/cloud/api/Manager/getCustomerNotes",
+      "/cloud/api/Manager/getInfoManager",
+      "/cloud/api/Manager/getInfoPlayer",
+      "/cloud/api/Manager/getPending",
+      "/cloud/api/Manager/getSportsVigSetup",
+      "/cloud/api/Manager/getWebLog"
+    ]
+  },
+  "captures": [
+    {
+      "file": "2026-10-31/getBetTicker.post.json",
+      "mode": "live",
+      "capturedAt": "2026-10-31T00:19:51.608Z",
+      "operation": {
+        "path": "/cloud/api/Manager/getBetTicker",
+        "method": "POST",
+        "operationId": "postCloudApiManagerGetBetTicker"
+      },
+      "captureHash": "c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9",
+      "requestBodySha256": "e82ab1293b5134178a5c2644cbf55125669e2f2968ec650d837f13ae0128e94e",
+      "responseStatus": 200,
+      "responseBodySha256": "6476f3f36fde99907c849cc28e3e8ccd7b1b63de43a3f659636c9664054bff5d",
+      "responseBytes": 276105,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 1897,
+        "piiRedacted": 3
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4"
+      },
+      "samples": 1
+    },
+    {
+      "file": "2026-10-31/getBetTickerConfig.post.json",
+      "mode": "live",
+      "capturedAt": "2026-10-31T00:19:51.741Z",
+      "operation": {
+        "path": "/cloud/api/Manager/getBetTickerConfig",
+        "method": "POST",
+        "operationId": "postCloudApiManagerGetBetTickerConfig"
+      },
+      "captureHash": "a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e",
+      "requestBodySha256": "f5847aeda6ee571a84bd54a442c10dc023ec4488a894dd85f279662436d7f575",
+      "responseStatus": 200,
+      "responseBodySha256": "8e8fedd17bfabe36c7753dbdf7c5e71f5748adb1fd5b13fe4d8a1993b7ff686e",
+      "responseBytes": 461,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 5,
+        "piiRedacted": 1
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4"
+      },
+      "samples": 1
+    },
+    {
+      "file": "2026-10-31/getCustomerNotes.post.json",
+      "mode": "live",
+      "capturedAt": "2026-10-31T00:19:57.603Z",
+      "operation": {
+        "path": "/cloud/api/Manager/getCustomerNotes",
+        "method": "POST",
+        "operationId": "postCloudApiManagerGetCustomerNotes"
+      },
+      "captureHash": "297d776148e6e3f8e76eec8cd21f2658fe00d31d270727709fd8a94f50768bed",
+      "requestBodySha256": "2c2b65f7f40122799aa97e2a01def8a46a12b42b0d88837fb0a4dcb9f72cdd89",
+      "responseStatus": 500,
+      "responseBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "responseBytes": 0,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 5,
+        "piiRedacted": 2
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4"
+      },
+      "samples": 1
+    },
+    {
+      "file": "2026-10-31/getInfoManager.post.json",
+      "mode": "live",
+      "capturedAt": "2026-10-31T00:19:55.752Z",
+      "operation": {
+        "path": "/cloud/api/Manager/getInfoManager",
+        "method": "POST",
+        "operationId": "postCloudApiManagerGetInfoManager"
+      },
+      "captureHash": "999d43e882a56179f88293ccfed4c02fff9a34ffc0523bb8c8265f9cd35c843a",
+      "requestBodySha256": "69f8ac9ca1d6f9d8b12297de2809d2d4fc96c2291eeee35c350136447204f63b",
+      "responseStatus": 500,
+      "responseBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "responseBytes": 0,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 4,
+        "piiRedacted": 1
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4"
+      },
+      "samples": 1
+    },
+    {
+      "file": "2026-10-31/getInfoPlayer.post.json",
+      "mode": "live",
+      "capturedAt": "2026-10-31T00:19:51.314Z",
+      "operation": {
+        "path": "/cloud/api/Manager/getInfoPlayer",
+        "method": "POST",
+        "operationId": "postCloudApiManagerGetInfoPlayer"
+      },
+      "captureHash": "431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597",
+      "requestBodySha256": "3e51819066874957bf6521b3f69deb40cb49894b214740f848e5cabdc47d1b32",
+      "responseStatus": 200,
+      "responseBodySha256": "3eeb9db890d90b53b1c51cf04b7d9c3a47cba5f4c64eac3b541e7f50d39a37e1",
+      "responseBytes": 13,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 5,
+        "piiRedacted": 2
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4"
+      },
+      "samples": 1
+    },
+    {
+      "file": "2026-10-31/getPending.post.json",
+      "mode": "live",
+      "capturedAt": "2026-10-31T00:19:53.632Z",
+      "operation": {
+        "path": "/cloud/api/Manager/getPending",
+        "method": "POST",
+        "operationId": "postCloudApiManagerGetPending"
+      },
+      "captureHash": "fc7ce31bf46d2b1b73ca2dd16ed71e73cd7999d23f9c545ec9c3b2d15c0ddb90",
+      "requestBodySha256": "83a7f447299604af587427d8df4e1d2c5540da8a98b4bd2a9fd50abcd1f810e1",
+      "responseStatus": 500,
+      "responseBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "responseBytes": 0,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 5,
+        "piiRedacted": 2
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4"
+      },
+      "samples": 1
+    },
+    {
+      "file": "2026-10-31/getSportsVigSetup.post.json",
+      "mode": "live",
+      "capturedAt": "2026-10-31T00:19:53.742Z",
+      "operation": {
+        "path": "/cloud/api/Manager/getSportsVigSetup",
+        "method": "POST",
+        "operationId": "postCloudApiManagerGetSportsVigSetup"
+      },
+      "captureHash": "25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606",
+      "requestBodySha256": "82aeda4769109092b977519e475ec3eacbe665455e31c6a9ccbf29286d6b729b",
+      "responseStatus": 200,
+      "responseBodySha256": "9e34409b3ae72b41bea2421597ae611453b419fa9ff197ccd09ca6627fb4b677",
+      "responseBytes": 1070,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 4,
+        "piiRedacted": 1
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4"
+      },
+      "samples": 1
+    },
+    {
+      "file": "2026-10-31/getWebLog.post.json",
+      "mode": "live",
+      "capturedAt": "2026-10-31T00:19:51.204Z",
+      "operation": {
+        "path": "/cloud/api/Manager/getWebLog",
+        "method": "POST",
+        "operationId": "postCloudApiManagerGetWebLog"
+      },
+      "captureHash": "cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712",
+      "requestBodySha256": "cd6846cccd4c35ad7efdbb277528703a6688416638d2b4e81b1a3f7ba8429bd6",
+      "responseStatus": 200,
+      "responseBodySha256": "979266c4b6abea5fff0de99966ece0363c5354859c92f5260870ea9507d2abaf",
+      "responseBytes": 21,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 6,
+        "piiRedacted": 3
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4"
+      },
+      "samples": 1
+    }
+  ]
+}
