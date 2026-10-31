@@ -99,7 +99,41 @@ CLI flags win over environment, which wins over defaults.
   `moneyline|spreads|totals`, and the combo sits in a single game.
 - Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h by default; corrupted files are refetched.
 
-## 5. Coverage limits
+## 5. Backtesting (realized PnL)
+
+`dx combo backtest` measures what the combos actually did, from public activity:
+
+```bash
+./bin/dx combo backtest --wallets 0x26cf…c612 --days 30
+./bin/dx combo backtest --wallet-file wallets.txt --days 7 --json
+./bin/dx combo backtest --all-venues --days 30          # skip CFB attribution
+```
+
+Method:
+
+- cost = `SPLIT` / `TRADE` / `BUY` `amount_usdc`; payout = `REDEEM` `payout_usdc` plus
+  `MERGE` / `SELL` `amount_usdc`.
+- Combos are grouped by `combo_condition_id|wallet`; open combos are reported separately and are
+  **excluded** from realized cost/payout/PnL.
+- Win rate = settled combos with `pnl > 0`. Market-maker / split-arbitrage combos can settle at
+  roughly zero, so a very low win rate with a small positive ROI is expected.
+- Cross-game share is only defined when the CFB game index is loaded (default); `--all-venues`
+  reports it as `null`.
+- Per-day and per-game tables; `--json` returns every trade.
+
+First live run (single wallet, 7 days, all venues):
+
+```
+1,424 combos (743 settled / 681 open) | cost $387,213.54 | payout $390,417.06
+PnL +$3,203.52 | ROI 0.8% | win 0.4% | avg legs 3.42
+```
+
+Pricing calibration is a separate pass: `clob.polymarket.com/prices-history?market=<token>&startTs=&endTs=&fidelity=`
+is live-verified and can compare the product-of-legs fair price at the combo entry timestamp with the
+actual entry price. That requires mapping each leg to its CLOB token id; it is not part of the
+realized-PnL backtest yet.
+
+## 6. Coverage limits
 
 - Wallets that only trade combos and never appear in sampled CFB trades or the PnL leaderboard are
   not discoverable publicly. `--wallet-file` is the escape hatch.

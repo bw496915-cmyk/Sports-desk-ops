@@ -39,6 +39,7 @@ SPORTSDESK_LIVE_INGEST=1 ./bin/dx deploy
 - `./bin/dx shot <url>` — Bun.WebView screenshot (webkit on macOS, chrome elsewhere); `--f402-login` captures the manager after an opt-in login. Output goes to `scratch/shots/`.
 - `./bin/dx profile <0x|username>` — Polymarket address profile: PnL, win rate, open positions, category mix, activity summary and strategy pattern from public APIs.
 - `./bin/dx combo legs|price|wallet|uniqueness` — CFB combo legs, product-of-legs pricing, wallet combo positions and per-game unique combo/wallet counts.
+- `./bin/dx combo backtest` — realized combo PnL by day/game from public activity (open combos excluded).
 
 ## Schema registry & prod dump parity
 

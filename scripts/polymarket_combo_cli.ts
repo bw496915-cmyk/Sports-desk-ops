@@ -10,7 +10,13 @@
  *   ./bin/dx combo wallet 0x26cf...
  */
 
-import { buildComboUniquenessReport } from "../lib/combo_uniqueness.ts";
+import {
+  buildComboUniquenessReport,
+  buildGameIndex,
+  loadCfbGames,
+  seedWalletsFromLeaderboard,
+} from "../lib/combo_uniqueness.ts";
+import { runComboBacktest } from "../lib/combo_backtest.ts";
 import {
   CFB_SERIES_ID,
   fetchCfbComboEvents,
@@ -29,13 +35,19 @@ Usage:
   bun run scripts/polymarket_combo_cli.ts price --legs "<marketSlug>=<Outcome>,..." [--limit 10]
   bun run scripts/polymarket_combo_cli.ts wallet <0x> [--limit 100] [--max-pages 5] [--json]
   bun run scripts/polymarket_combo_cli.ts uniqueness [--strict-full-game] [--json]
+  bun run scripts/polymarket_combo_cli.ts backtest [--days 30] [--wallets 0x..] [--all-venues] [--json]
 
 Notes:
   • CFB markets come from Gamma series ${CFB_SERIES_ID}; legs are moneyline/spreads/totals.
   • Fair price is the product of leg probabilities (independent legs, raw prices include vig).
   • Combo discovery is user-anchored: /v2/positions/combos and /v2/activity/combos require a wallet.
   • uniqueness seeds wallets from the PnL leaderboard (add --seed-trades for CFB trades) and
-    caches combo responses under .cfb-combo-cache (TTL 24h, bypass with --fresh).
+    caches combo responses under scratch/cfb-combo-cache (CACHE_TTL_HOURS=24 by default,
+    --cache-ttl-hours overrides, --fresh bypasses).
+  • uniqueness flags: --strict-full-game (STRICT_FULL_GAME=1), --cache-dir, --cache-ttl-hours,
+    --seed-trades, --max-seed-markets, --wallet-file, --no-leaderboard.
+  • backtest computes realized PnL from SPLIT cost vs REDEEM/MERGE/SELL payout; open combos are
+    excluded from realized totals, and --all-venues skips CFB game attribution.
   • Public APIs only; no key.`;
 
 function flag(args: readonly string[], names: readonly string[], fallback: string): string {
@@ -198,6 +210,89 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     console.log(
       `   cache               : ${report.cache.hits} hit / ${report.cache.misses} miss (ttl ${report.cache.ttlHours}h)`,
     );
+    return;
+  }
+
+  if (sub === "backtest") {
+    const env = process.env;
+    const days = Number(flag(args, ["--days"], "30"));
+    const cfbOnly = !args.includes("--all-venues");
+    const walletArg = flag(args, ["--wallets"], "");
+    let wallets = walletArg
+      .split(",")
+      .map((wallet) => wallet.trim().toLowerCase())
+      .filter((wallet) => /^0x[0-9a-f]{40}$/.test(wallet));
+    const walletFile = flag(args, ["--wallet-file"], env.WALLET_FILE ?? "");
+    if (wallets.length === 0 && walletFile !== "") {
+      try {
+        wallets = (await Bun.file(walletFile).text())
+          .split(/\s+/)
+          .map((wallet) => wallet.trim().toLowerCase())
+          .filter((wallet) => /^0x[0-9a-f]{40}$/.test(wallet));
+      } catch {
+        console.error(`backtest: cannot read ${walletFile}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
+    if (wallets.length === 0) {
+      const seeded = await seedWalletsFromLeaderboard({
+        leaderboardLimit: Number(flag(args, ["--leaderboard-limit"], "25")),
+      });
+      wallets = [...seeded];
+    }
+    if (wallets.length === 0) {
+      console.error("backtest: no wallets (pass --wallets/--wallet-file or seed the leaderboard)");
+      process.exitCode = 1;
+      return;
+    }
+
+    let gameIndex: ReadonlyMap<string, string> | undefined;
+    let gameBySlug: ReadonlyMap<string, string> | undefined;
+    if (cfbOnly) {
+      const games = await loadCfbGames({ limitGames: Number(flag(args, ["--limit-games"], "50")) });
+      const index = buildGameIndex(games);
+      gameIndex = index.byConditionId;
+      gameBySlug = index.byMarketSlug;
+    }
+    const report = await runComboBacktest({
+      wallets,
+      days: Number.isFinite(days) ? days : 30,
+      cfbOnly,
+      ...(gameIndex === undefined ? {} : { gameIndex }),
+      ...(gameBySlug === undefined ? {} : { gameBySlug }),
+      maxPages: Number(flag(args, ["--max-combo-pages"], "5")),
+    });
+    if (json) {
+      console.log(JSON.stringify(report, null, 2));
+      return;
+    }
+    const roi = (value: number | null): string => (value === null ? "n/a" : `${value.toFixed(1)}%`);
+    console.log(
+      `Combo backtest ${report.fromIso.slice(0, 10)}..${report.toIso.slice(0, 10)} | wallets ${report.wallets} | ${report.cfbOnly ? "CFB only" : "all venues"}`,
+    );
+    console.log(
+      `  combos ${report.totals.combos} (settled ${report.totals.settled}, open ${report.totals.open}) | cost ${usd(report.totals.costUsd)} | payout ${usd(report.totals.payoutUsd)} | pnl ${usd(report.totals.pnlUsd)} | ROI ${roi(report.totals.roiPct)} | win ${roi(report.totals.winRatePct)}`,
+    );
+    console.log(
+      `  avg legs ${report.totals.avgLegs} | cross-game ${roi(report.totals.crossGamePct)}`,
+    );
+    if (report.byDay.length > 0) {
+      console.log("\n  Day         combos    cost     payout      pnl     ROI");
+      for (const day of report.byDay.slice(-14)) {
+        console.log(
+          `  ${day.date}  ${String(day.combos).padStart(5)}  ${usd(day.costUsd).padStart(9)}  ${usd(day.payoutUsd).padStart(9)}  ${usd(day.pnlUsd).padStart(8)}  ${roi(day.roiPct).padStart(8)}`,
+        );
+      }
+    }
+    if (report.byGame.length > 0) {
+      console.log("\n  Top games by PnL");
+      for (const game of report.byGame.slice(0, 10)) {
+        console.log(
+          `  ${game.game.padEnd(34)} combos ${String(game.combos).padStart(3)}  cost ${usd(game.costUsd).padStart(9)}  pnl ${usd(game.pnlUsd).padStart(9)}`,
+        );
+      }
+    }
     return;
   }
 

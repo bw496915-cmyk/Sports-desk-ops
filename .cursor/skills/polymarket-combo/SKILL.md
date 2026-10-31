@@ -18,6 +18,7 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
 ./bin/dx combo price --legs "cfb-fl-ga-2026-10-31=Georgia,cfb-nd-navy-2026-10-31=Notre Dame"
 ./bin/dx combo wallet 0x26cf…c612              # positions + activity
 ./bin/dx combo uniqueness --seed-trades --max-seed-markets 20 --strict-full-game
+./bin/dx combo backtest --wallets 0x26cf…c612 --days 30 [--all-venues]
 ```
 
 ## Rules
@@ -38,6 +39,13 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
    `CONCURRENCY`, `LEADERBOARD=0`, `LEADERBOARD_LIMIT`, `MAX_SEED_MARKETS`, `WALLET_FILE`.
    CLI flags win over env.
 8. `lb-api.polymarket.com` is retired (410); use `data-api/v2/leaderboard`.
+
+## Backtest
+
+`dx combo backtest` groups activity by `combo_condition_id|wallet`: cost from SPLIT/TRADE/BUY,
+payout from REDEEM/MERGE/SELL. Open combos are excluded from realized totals; win rate is
+`pnl > 0`. `--all-venues` skips CFB attribution and reports cross-game as null. It measures realized
+outcomes, not a simulated strategy; price-history calibration is separate.
 
 ## Limits
 
