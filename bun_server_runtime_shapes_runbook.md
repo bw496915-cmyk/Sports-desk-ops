@@ -525,10 +525,18 @@ For loss-tolerant, low-latency odds tick streaming and syndicate volume pings:
 const socket = await Bun.udpSocket({
   port: 9876,
   socket: {
-    data(socket, buf, port, addr) {
+    data(socket, buf, port, addr, flags) {
       // Buffer passed to callback without intermediate copy
+      // Truncation detection: flags.truncated indicates datagram exceeded buffer
+      if (flags.truncated) {
+        console.warn("Datagram was truncated by kernel receive buffer!");
+      }
     },
-    error(socket, err) {},
+    error(socket, err) {
+      // ICMP Error Handling (ECONNREFUSED, host unreachable, TTL expired)
+      // On modern Bun, ICMP errors surface here without silently closing the socket
+      console.error("UDP socket error:", err.code);
+    },
     drain(socket) {
       // Resume sending when buffer empties
     },
@@ -542,6 +550,8 @@ if (!sent) {
 ```
 
 - **Backpressure Contract**: `socket.send()` returns `false` when the datagram cannot fit in the OS socket buffer. `socket.sendMany()` returns a count smaller than the input packet array when saturated. In both conditions, `drain(socket)` fires when the kernel buffer is ready for more packets.
+- **ICMP Error Resilience**: Unlike legacy runtimes where sending a datagram to an unreachable port caused the kernel to silently close the socket, Bun surfaces ICMP errors (`ECONNREFUSED`, host unreachable, TTL exceeded) through the `error` callback while keeping the socket open for subsequent sends.
+- **Truncated Datagram Detection**: The `data` callback receives a fifth `flags` argument containing `{ truncated: boolean }`. This allows telemetry engines to differentiate partial packet reads from intact payloads when datagrams exceed the socket receive buffer.
 
 ### 8.4 Zero-Copy ASCII JSONL Stream Parsing (`Bun.JSONL`)
 
@@ -560,7 +570,7 @@ For stdio and socket-based JSON-RPC transports (such as Model Context Protocol b
 - Poison lines / crash tails: **`skipPoisonJsonlLine`** + **`corruptedLineSkips`** / **`trailingPartialBytes`** — never abort the full EOD replay for one bad line.
 - Post-replay: **`Bun.XML.parse(xml, { compact: false })`** → board price, optional **`ColorHexInt`** via **`parseAsColorHexInt`**, pattern table (**SPIKE_UP** / **DOWN**) via **`Bun.markdown.render`** + registry hex colors.
 
-### 8.5 Unix Domain Socket Dual-Endpoint Pattern
+### 8.5 Unix Domain Socket Dual-Endpoint Pattern & Node.js Lifecycle Alignment
 
 _Official Documentation: [https://bun.com/docs/api/http#unix-domain-sockets](https://bun.com/docs/api/http#unix-domain-sockets)_
 
@@ -580,3 +590,104 @@ const res = await fetch("http://localhost/health", {
   unix: "/run/sportsdesk/webview.sock",
 });
 ```
+
+#### Node.js / libuv Lifecycle Alignment
+
+Bun matches Node.js / libuv Unix domain socket lifecycle semantics:
+1. **Binding Collisions (`EADDRINUSE`)**: Binding to an existing `.sock` file on disk throws `EADDRINUSE` rather than silently unlinking and stealing the socket from another live daemon.
+2. **Automatic Socket Cleanup**: Calling `server.stop()` or `listener.stop()` automatically unlinks and removes the `.sock` file from disk (`existsSync(path) === false`), preventing orphaned socket files from blocking subsequent process launches.
+
+---
+
+## 9. Native In-Process Web Automation & Viewport Auditing (`Bun.WebView`)
+
+_Official Documentation: [https://bun.com/docs/api/webview](https://bun.com/docs/api/webview)_
+
+SportsDesk standardizes on native `Bun.WebView` for live Telegram Mini App viewport auditing, Fantasy402 Manager DOM forensic verification, and zero-Chromium accessibility gates. This replaces external Playwright, Puppeteer, and Chromium dependencies with a lightweight in-process webview engine.
+
+### 9.1 Core Architectural Principles
+
+- **OS-Level Event Dispatching (`isTrusted: true`)**: All mouse, keyboard, and scroll inputs are dispatched as operating-system-level events. Monitored sites and anti-bot systems cannot distinguish `view.click()` from physical hardware input (`isTrusted: true`).
+- **Playwright-Style Actionability Auto-Waiting**: Selector-based operations automatically wait for the target element to be attached to the DOM, visible, layout-stable, and unobscured before dispatching actions.
+- **Explicit Resource Management**: Implements `Disposable` and `AsyncDisposable`, enabling deterministic scope cleanup via `await using view = new Bun.WebView(...)`.
+- **Process Model & Tab Pooling**: One browser subprocess is shared per Bun process; subsequent `new Bun.WebView()` instances open isolated tabs within that existing subprocess.
+
+### 9.2 API Reference & Operational Methods
+
+```typescript
+await using view = new Bun.WebView({
+  width: 1280,
+  height: 800,
+  backend: "webkit", // "webkit" | "chrome" | { type: "chrome", path: string, argv: string[] }
+  console: true,     // Captures page console logs to terminal
+});
+
+await view.navigate("https://fantasy402.com/manager");
+await view.click("th[data-language='L-1029']"); // Auto-waits for actionability
+await view.scrollTo("#kpi-cards");
+const title = await view.evaluate("document.title");
+const jpeg = await view.screenshot({ format: "jpeg", quality: 90 });
+await Bun.write("reports/audit_viewport.jpg", jpeg);
+```
+
+| Method / Property | Description | SportsDesk Surveillance Application |
+| :--- | :--- | :--- |
+| `navigate(url)` | Navigates to target HTTP/HTTPS URL | Direct navigation to Fantasy402 Manager / Desk routes |
+| `evaluate(expr)` | Evaluates JavaScript expression in page context | DOM extraction of `data-language="L-1029"` headers and KPI cards |
+| `screenshot({format, quality, encoding})` | Captures JPEG, PNG, or WebP viewport | Automated forensic proof capture for whale ticket anomalies |
+| `click(x, y)` / `click(selector)` | Native OS mouse click with auto-wait | Interactive navigation across Manager tab bars |
+| `type(text)` | Types text into currently focused element | Automated credentials dispatch in testing environments |
+| `press(key, {modifiers})` | Presses key with optional modifier flags | Keyboard navigation and shortcut verification |
+| `scroll(dx, dy)` / `scrollTo(selector)` | Native wheel scroll or scroll-to-element | Infinite scroll pagination of pending ticket tickers |
+| `goBack()` / `goForward()` / `reload()` | Viewport navigation controls | Session revalidation after token expiration |
+| `resize(w, h)` | Dynamically resizes viewport dimensions | Telegram Mini App mobile (390x844) vs desktop testing |
+| `cdp(method, params)` | Dispatches raw Chrome DevTools Protocol calls | Low-level network interception and cookie extraction |
+| `view.url` / `view.title` / `view.loading` | Synchronous page state properties | Polling state assertions during navigation sequences |
+
+---
+
+## 10. Explicit Resource Management & JavaScriptCore Upgrades
+
+Bun v1.4+ features an upgraded WebKit JavaScriptCore (JSC) engine with native support for TC39 Explicit Resource Management:
+
+### 10.1 `using` and `await using` Declarations
+
+All long-lived resources across SportsDesk implement `[Symbol.dispose]` or `[Symbol.asyncDispose]`:
+
+```typescript
+// Synchronous disposal (Bun.serve, Bun.cron)
+function runHealthCheck() {
+  using server = Bun.serve({ port: 0, fetch: () => new Response("ok") });
+  // server[Symbol.dispose]() called deterministically on return
+}
+
+// Asynchronous disposal (Bun.WebView, DB connections)
+async function auditPortal() {
+  await using view = new Bun.WebView({ width: 800, height: 600 });
+  await view.navigate("http://localhost:4020");
+  // view[Symbol.asyncDispose]() awaited deterministically on return
+}
+```
+
+### 10.2 JavaScriptCore Optimizations & Native Async Stack Traces
+
+- **Native Async Stack Traces**: Complete async stack traces are preserved across native APIs (`node:fs`, `Bun.write`, `node:http`, `node:dns`), drastically reducing troubleshooting time for hanging network pipes.
+- **JIT Inlining & Intrinsics**: `Array.isArray()` is implemented as a direct JIT intrinsic; `String#includes` utilizes single-character search optimizations; promise resolution reactions run via optimized `PerformPromiseThen` nodes.
+
+---
+
+## 11. Outbound Proxy CONNECT Tunnel Pooling
+
+When routing outbound traffic through enterprise HTTP/HTTPS proxies, Bun's HTTP engine maintains a keep-alive pool of established TLS `CONNECT` tunnels:
+- Subsequent HTTPS requests to the same remote host reuse existing proxy tunnels rather than re-negotiating TCP + TLS handshakes through the proxy for every request.
+- Dramatically cuts latency on high-frequency external polling (e.g., Telegram Bot API and Cloudflare API calls).
+
+---
+
+## 12. Terminal Markdown Rendering (`Bun.markdown.ansi`) & OSC 8 Integration
+
+Bun provides zero-startup native Markdown rendering directly to the terminal:
+- **CLI Rendering**: Executing `bun ./file.md` renders formatted ANSI output directly to `stdout`.
+- **Programmatic API**: `Bun.markdown.ansi(markdownString, options)` generates styled ANSI strings with support for OSC 8 clickable terminal hyperlinks (`{ hyperlinks: true }`), terminal column wrapping (`{ columns: 80 }`), and inline Kitty Graphics Protocol imagery (`{ kittyGraphics: true }`).
+- SportsDesk standardizes on `Bun.markdown.ansi` in `lib/canonical_osc8_links.ts` and `sportsdesk_cli.ts` for rendering interactive operational briefs directly inside developer and operator terminals.
+
