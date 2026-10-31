@@ -147,8 +147,10 @@ async function loginF402(view: ManagedWebView, timeoutMs: number): Promise<void>
   }
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+export const DEFAULT_SHOT_DIR = "scratch/shots";
+
+export async function runWebviewShot(argv: readonly string[]): Promise<void> {
+  const args = [...argv];
   if (args.includes("-h") || args.includes("--help")) {
     console.log(HELP);
     return;
@@ -164,7 +166,7 @@ async function main(): Promise<void> {
   const extension = options.format === "jpeg" ? "jpg" : options.format;
   const out =
     options.out ??
-    join("scratch", "shots", `webview-${Date.now()}.${extension}`);
+    join(DEFAULT_SHOT_DIR, `webview-${Date.now()}.${extension}`);
 
   const view = ManagedWebView.launch({
     backend: options.backend,
@@ -220,7 +222,7 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  main().catch((error: unknown) => {
+  runWebviewShot(process.argv.slice(2)).catch((error: unknown) => {
     console.error(`webview-shot: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
   });

@@ -329,6 +329,11 @@ Usage: \`bun sportsdesk_cli.ts [command|option] [parameters...]\`
 * **wire vig** [\`-c\` CUST_ID] [\`-s\` SPORT] [\`--spread\` 15] [\`--derivative\` 20]: Set +15c/+20c vig shading via vigSetupInsert
 * **wire weblog** [\`-m\` A|B|C|I] [\`-c\` CUST_ID] [\`--ip\` IP]: Query getWebLog IP Tracker across modes A, B, C, I
 * **wire info** [\`-c\` CUST_ID]: Execute getInfoPlayer read-back verification
+
+### 9. OPERATOR SURFACES (GSLive, stale lines, screenshots):
+* **gslive** [LOGIN] [\`--date\` YYYY-MM-DD] [\`--json\`]: GSLive 7-param report + bet-history sidecar links
+* **stale** \`-i\` FILE [\`--window-min\` N] [\`--json\`]: Stale-line / post-move bet cohort
+* **shot** <URL> [\`--out\` PATH] [\`--f402-login\`] [\`--format\` png|jpeg|webp]: Bun.WebView screenshot (default \`scratch/shots/\`)
 `;
   printAnsiMarkdown(helpMd);
   return;
@@ -1263,6 +1268,12 @@ export async function main(): Promise<void> {
       console.log(`  [${spec.domain.padEnd(18)}] ${spec.modeLabel.padEnd(25)} | Checks: ${spec.checksSummary.padEnd(55)} | Output: ${spec.outputSummary}`);
     }
     console.log("========================================================================================================================");
+    return;
+  }
+
+  if (cmd === "shot" || cmd === "screenshot") {
+    const { runWebviewShot } = await import("./scripts/webview_shot_cli.ts");
+    await runWebviewShot(rawArgs.slice(1));
     return;
   }
 

@@ -100,6 +100,10 @@ bun sportsdesk_cli.ts wire vig -c ABC700 -s Basketball --spread 15 --derivative 
 
 # 7. Poll live feeds and publish updated 6-Tab Portal & rich-metadata images to Cloudflare R2
 ./bin/dx deploy
+
+# 8. Bun.WebView screenshots (default output: scratch/shots/)
+./bin/dx shot https://fantasy402-docs-4ay.pages.dev/graph.html --out scratch/shots/portal.png
+F402_LIVE_LOGIN=1 ./bin/dx shot --f402-login --f402-page /manager --out scratch/shots/f402.png
 ```
 
 ---

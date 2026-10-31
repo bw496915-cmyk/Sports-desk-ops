@@ -88,7 +88,7 @@ SportsDesk DX — operator commands
   ./bin/dx gslive <LOGIN>         GSLive 7-param report + live bet-history links
   ./bin/dx docs [gslive|--json]   Deployed API docs (Scalar, R2, local artifacts)
   ./bin/dx stale -i <export>      Stale-line / post-move bet cohort
-  ./bin/dx shot <url>             Bun.WebView screenshot; add --f402-login for the manager
+  ./bin/dx shot <url>             Bun.WebView screenshot → scratch/shots/ (--f402-login)
   ./bin/dx backtest               4-week CFB + NBA parlay/combo backtest
   ./bin/dx poll [--once] [--live] [--live-f402]
                                   Poll feeds (--live = Polymarket, --live-f402 = F402 probe)
@@ -112,6 +112,7 @@ EOF
     echo "  • Git Branch & Tip     : $(git log -n 1 --oneline)"
     echo "  • Staged dist/ Assets  : $(ls -1 "$REPO_ROOT/dist" 2>/dev/null | tr '\n' ' ')"
     echo "  • Live R2 Edge Portal  : https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html (✅ SigV4 Ready)"
+    echo "  • Screenshot Output    : $REPO_ROOT/scratch/shots (Bun.WebView; dx shot <url>)"
     echo "================================================================================"
     ;;
   iptracker)
@@ -190,7 +191,7 @@ EOF
     ;;
   shot|screenshot)
     cd "$REPO_ROOT"
-    exec bun run scripts/webview_shot_cli.ts "$@"
+    exec bun run sportsdesk_cli.ts shot "$@"
     ;;
   backtest)
     cd "$REPO_ROOT"
