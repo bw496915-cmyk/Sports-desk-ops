@@ -62,15 +62,20 @@ Caveats:
 # a wallet's combo positions/activity
 ./bin/dx combo wallet 0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612
 
-# per-game unique combos and wallets
+# three gates: permissive → all-legs-cfb → full-game
 ./bin/dx combo uniqueness --seed-trades --max-seed-markets 20 --limit-games 20
+./bin/dx combo uniqueness --all-legs-cfb --json
 ./bin/dx combo uniqueness --strict-full-game --json
 
-# empirical strict-subset check (comm must print nothing)
+# empirical subset check, in one process (exit 1 = leak, 2 = vacuous)
+./bin/dx combo verify-subset --wallet-file scratch/seed.txt --limit-games 100
+./bin/dx combo verify-subset --all-legs-cfb --wallet-file scratch/seed.txt --limit-games 100
+
+# file-based equivalent for comm
 ./bin/dx combo uniqueness --seed-trades --max-seed-markets 20 --limit-games 20 --dump-wallets scratch/seed.txt
-LEADERBOARD=0 WALLET_FILE=scratch/seed.txt ./bin/dx combo uniqueness --limit-games 20 --emit-ids scratch/any.txt
+LEADERBOARD=0 WALLET_FILE=scratch/seed.txt ./bin/dx combo uniqueness --limit-games 20 --all-legs-cfb --emit-ids scratch/cfb.txt
 LEADERBOARD=0 WALLET_FILE=scratch/seed.txt ./bin/dx combo uniqueness --limit-games 20 --strict-full-game --emit-ids scratch/strict.txt
-comm -23 <(LC_ALL=C sort scratch/strict.txt) <(LC_ALL=C sort scratch/any.txt)
+comm -23 <(LC_ALL=C sort scratch/strict.txt) <(LC_ALL=C sort scratch/cfb.txt)
 ```
 
 `--emit-ids` writes sorted `comboId|wallet` lines for kept combos; `--dump-wallets` writes the
@@ -90,7 +95,8 @@ CLI flags win over environment, which wins over defaults.
 | `CACHE_TTL_HOURS` | `24` | Cache age before a wallet is refetched; `0` disables reuse |
 | `CACHE_DIR` | `scratch/cfb-combo-cache` | Cache location |
 | `FRESH` | unset | `1` ignores the cache for this run |
-| `STRICT_FULL_GAME` | unset | `1` enables single-game ML/spread/total-only counts |
+| `STRICT_FULL_GAME` | unset | `1` enables the `full-game` gate (all-legs-CFB **and** single game) |
+| `ALL_LEGS_CFB` | unset | `1` enables the `all-legs-cfb` gate (CFB-only, cross-game allowed) |
 | `SEED_TRADES` | unset | `1` seeds wallets from sampled CFB trades |
 | `CONCURRENCY` | `6` | Wallet fetch parallelism |
 | `LEADERBOARD` | enabled | `0` skips leaderboard seeding |
@@ -111,12 +117,23 @@ CLI flags win over environment, which wins over defaults.
 - `comboId` falls back to a SHA-256 of the sorted leg signatures.
 - `--strict-full-game` is a **pure gate applied after attribution**, never inside it. Every strict
   result is therefore a subset of the permissive result, and `fullyWithinGame` is identical in both
-  modes. `--json` exposes `permissiveCombos`, `duplicatesCollapsed`, per-reason
-  `strictExclusions`, and a per-combo `kept`/`dropReason` audit trail (`--no-audit` omits it).
-- Strict drop reasons, in precedence order: `UNRESOLVED_LEGS` (a leg could not be attributed to
-  any CFB game), `CROSS_GAME`, `INELIGIBLE_LEG_TYPE`. If `UNRESOLVED_LEGS > 0`, the strict count
-  is a **floor**, not a point estimate — unresolved legs correlate with low-volume or delisted
-  markets, so the exclusion is not random.
+  modes. `--json` exposes `gate`, `permissiveCombos`, `duplicatesCollapsed`, per-reason
+  `exclusions`, `includedCrossGame`, and a per-combo `kept`/`dropReason` audit (`--no-audit` omits
+  it).
+- Three gates, layered:
+  - `permissive` (default) — any combo touching a CFB game.
+  - `--all-legs-cfb` — every leg is CFB and every leg's `market_sport_type` is
+    `moneyline|spreads|totals`. **Cross-game is allowed.**
+  - `--strict-full-game` — `all-legs-cfb` **and** single game.
+- `eligible` means exactly `market_sport_type ∈ {moneyline, spreads, totals}`
+  (`ELIGIBLE_LEG_TYPES`), the same predicate in both gated modes.
+- Exclusions are **mode-relative and precedence-ordered**: `UNRESOLVED_LEGS` → `CROSS_GAME` (only
+  when the gate is `full-game`) → `INELIGIBLE_LEG_TYPE`. Under `all-legs-cfb`, cross-game combos are
+  counted in `includedCrossGame`, never in `CROSS_GAME`. Because of precedence, a bucket count is
+  not comparable across gates — a cross-game combo with an ineligible leg is `CROSS_GAME` under
+  `full-game` and `INELIGIBLE_LEG_TYPE` under `all-legs-cfb`.
+- If `UNRESOLVED_LEGS > 0`, the gated count is a **floor**, not a point estimate — unresolved legs
+  correlate with low-volume or delisted markets, so the exclusion is not random.
 - Dedupe diagnostics: `duplicatesCollapsedById` and `duplicatesCollapsedByLegSet` are reported
   separately. A non-zero leg-set count proves the cross-indexer pass is doing work;
   `diagnostics.legsWithoutSide` shows whether any source lacks a side (which would make that pass
@@ -124,19 +141,26 @@ CLI flags win over environment, which wins over defaults.
 
 ### Live result (2026-10-31)
 
-With 322 seeded wallets, `--limit-games 100`:
+With 322 seeded wallets and `--limit-games 100`:
+
+| Gate | Kept | Exclusions |
+| :--- | ---: | :--- |
+| `permissive` | 82 | — (all 82; 34 span >1 game) |
+| `all-legs-cfb` | **34** | 46 unresolved, 2 ineligible |
+| `full-game` | **0** | 46 unresolved, 36 cross-game, 0 ineligible |
 
 ```
-permissive 82 | strict 0
-exclusions { UNRESOLVED_LEGS: 46, CROSS_GAME: 36, INELIGIBLE_LEG_TYPE: 0 }
-duplicatesCollapsedByLegSet 10 | legsWithoutSide 0
-comm -23 strict any → empty (0 bytes)
+verify-subset --all-legs-cfb : permissive 82, treatment 34, leaks 0, exit 0
+verify-subset               : permissive 82, treatment  0, leaks 0, VACUOUS, exit 2
 ```
 
-The check passes, but it is **vacuous**: strict is 0 because all 36 fully-CFB combos span more
-than one game (`games == legs` for most). This wallet set trades cross-game CFB parlays, so
-single-game strict is the wrong gate for it. `--all-legs-cfb` (CFB-only, any number of games) would
-separate "index gap" from "style", and is the next mode worth adding.
+So the three-mode layering answers the question the two-mode version could not: there are 34
+CFB-only combos, and single-game strict is empty because **every one of them is cross-game**. The
+`2 ineligible` under `all-legs-cfb` are cross-game combos that were counted as `CROSS_GAME` under
+`full-game` — precedence, not a new population.
+
+`--strict-full-game` is therefore not a useful gate for this wallet set. Use `--all-legs-cfb` to
+measure CFB combo activity, and treat `full-game` as a separate single-game view.
 - Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h by default; corrupted files are refetched.
 
 ## 5. Backtesting (realized PnL)

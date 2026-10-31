@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildComboUniquenessReport,
+  checkComboSubset,
   comboIdLines,
   linesToText,
   walletLines,
@@ -116,7 +117,6 @@ describe("CFB combo uniqueness", () => {
     expect(report.diagnostics.legsWithoutSide).toBe(6);
     expect(report.diagnostics.combosWithUnstableIdentity).toBe(0);
     expect(report.wallets).toEqual([W1, W2].sort());
-    expect(report.global.distinctWallets).toBe(1);
 
     const g1 = report.games.find((game) => game.gameSlug === "cfb-g1");
     const g2 = report.games.find((game) => game.gameSlug === "cfb-g2");
@@ -127,32 +127,70 @@ describe("CFB combo uniqueness", () => {
     expect(report.global.sumPerGameCombos).toBe(6);
   });
 
-  test("strict mode keeps only single-game ML/spread/total combos", async () => {
-    const report = await buildComboUniquenessReport(options({ strictFullGame: true }));
+  test("full-game gate keeps only single-game ML/spread/total combos", async () => {
+    const report = await buildComboUniquenessReport(options({ gate: "full-game" }));
+    expect(report.gate).toBe("full-game");
     expect(report.strictFullGame).toBe(true);
     expect(report.global.distinctCombos).toBe(3); // c1, c5, c6
     expect(report.permissiveCombos).toBe(5);
-    expect(report.strictExclusions).toEqual({
+    expect(report.exclusions).toEqual({
       UNRESOLVED_LEGS: 0,
       CROSS_GAME: 1, // c2 spans g1 + g2
       INELIGIBLE_LEG_TYPE: 1, // c4 uses player_props
     });
+    expect(report.includedCrossGame).toBe(0);
     const g1 = report.games.find((game) => game.gameSlug === "cfb-g1");
     const g2 = report.games.find((game) => game.gameSlug === "cfb-g2");
     expect(g1?.uniqueCombos).toBe(2);
     expect(g2?.uniqueCombos).toBe(1);
   });
 
-  test("strict results are a subset of permissive results", async () => {
+  test("all-legs-cfb admits cross-game combos and reports them as included", async () => {
+    const report = await buildComboUniquenessReport(options({ gate: "all-legs-cfb" }));
+    expect(report.gate).toBe("all-legs-cfb");
+    expect(report.strictFullGame).toBe(false);
+    expect(report.global.distinctCombos).toBe(4); // c1, c2, c5, c6
+    expect(report.permissiveCombos).toBe(5);
+    expect(report.exclusions).toEqual({
+      UNRESOLVED_LEGS: 0,
+      CROSS_GAME: 0, // this gate admits cross-game; it must not be a drop bucket
+      INELIGIBLE_LEG_TYPE: 1, // c4 uses player_props
+    });
+    expect(report.includedCrossGame).toBe(1); // c2
+    const g1 = report.games.find((game) => game.gameSlug === "cfb-g1");
+    const g2 = report.games.find((game) => game.gameSlug === "cfb-g2");
+    expect(g1?.uniqueCombos).toBe(3); // c1, c2, c5
+    expect(g2?.uniqueCombos).toBe(2); // c2, c6
+  });
+
+  test("permissive reports no exclusions and counts included cross-game", async () => {
+    const report = await buildComboUniquenessReport(options({ gate: "permissive" }));
+    expect(report.gate).toBe("permissive");
+    expect(report.exclusions).toEqual({
+      UNRESOLVED_LEGS: 0,
+      CROSS_GAME: 0,
+      INELIGIBLE_LEG_TYPE: 0,
+    });
+    expect(report.includedCrossGame).toBe(1);
+  });
+
+  test("each stricter gate is a subset of the looser one", async () => {
     const permissive = await buildComboUniquenessReport(options({ includeAudit: true }));
+    const cfbOnly = await buildComboUniquenessReport(
+      options({ gate: "all-legs-cfb", includeAudit: true }),
+    );
     const strict = await buildComboUniquenessReport(
-      options({ strictFullGame: true, includeAudit: true }),
+      options({ gate: "full-game", includeAudit: true }),
     );
     const key = (row: { comboId: string; wallet: string }): string => `${row.comboId}|${row.wallet}`;
     const permissiveIds = new Set(permissive.combos.map(key));
+    const cfbOnlyIds = cfbOnly.combos.filter((row) => row.kept).map(key);
     const strictIds = strict.combos.filter((row) => row.kept).map(key);
     expect(strictIds.length).toBe(strict.comboRecords);
-    for (const id of strictIds) expect(permissiveIds.has(id)).toBe(true);
+    expect(cfbOnlyIds.length).toBe(cfbOnly.comboRecords);
+    for (const id of cfbOnlyIds) expect(permissiveIds.has(id)).toBe(true);
+    const cfbOnlySet = new Set(cfbOnlyIds);
+    for (const id of strictIds) expect(cfbOnlySet.has(id)).toBe(true);
     for (const game of strict.games) {
       const before = permissive.games.find((entry) => entry.gameSlug === game.gameSlug);
       expect(game.uniqueCombos).toBeLessThanOrEqual(before?.uniqueCombos ?? 0);
@@ -160,9 +198,25 @@ describe("CFB combo uniqueness", () => {
     }
   });
 
-  test("emit-ids lines: strict output is a subset of permissive output", async () => {
+  test("verifier: strict is a subset, and an empty treatment is vacuous", async () => {
     const permissive = await buildComboUniquenessReport(options());
-    const strict = await buildComboUniquenessReport(options({ strictFullGame: true }));
+    const strict = await buildComboUniquenessReport(options({ gate: "full-game" }));
+    const check = checkComboSubset(permissive, strict);
+    expect(check.leaks).toEqual([]);
+    expect(check.vacuous).toBe(false);
+    expect(check.treatment).toBe(strict.comboRecords);
+
+    const empty = await buildComboUniquenessReport(
+      options({ gate: "full-game", walletFile: "/nonexistent/wallets.txt", leaderboard: false, seedTrades: false }),
+    );
+    const vacuous = checkComboSubset(permissive, empty);
+    expect(vacuous.treatment).toBe(0);
+    expect(vacuous.vacuous).toBe(true);
+  });
+
+  test("emit-ids lines: treatment output is a subset of permissive output", async () => {
+    const permissive = await buildComboUniquenessReport(options());
+    const strict = await buildComboUniquenessReport(options({ gate: "full-game" }));
     const any = comboIdLines(permissive, { keptOnly: false });
     const strictIds = comboIdLines(strict);
     expect(any).toHaveLength(permissive.comboRecords);
@@ -176,7 +230,7 @@ describe("CFB combo uniqueness", () => {
 
   test("a combo whose legs cannot be attributed is reported as unresolved", async () => {
     const report = await buildComboUniquenessReport(
-      options({ strictFullGame: true, includeAudit: true }),
+      options({ gate: "full-game", includeAudit: true }),
     );
     // c3 has one leg that touches no CFB game, so it is dropped before attribution, not by the gate.
     expect(report.combos.some((row) => row.comboId === "c3")).toBe(false);

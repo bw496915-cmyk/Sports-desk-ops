@@ -23,6 +23,8 @@ export interface ComboUniquenessOptions {
   readonly leaderboardLimit?: number;
   readonly walletFile?: string;
   readonly strictFullGame?: boolean;
+  /** Explicit gate; overrides `strictFullGame`. */
+  readonly gate?: ComboGate;
   /** Include the per-combo audit trail in the report (default true). */
   readonly includeAudit?: boolean;
   readonly seedTrades?: boolean;
@@ -57,6 +59,8 @@ export interface ComboGameStats {
   }[];
 }
 
+export type ComboGate = "permissive" | "all-legs-cfb" | "full-game";
+
 export type StrictDropReason =
   | "UNRESOLVED_LEGS"
   | "CROSS_GAME"
@@ -76,6 +80,8 @@ export interface ComboAuditRow {
 }
 
 export interface ComboUniquenessReport {
+  readonly gate: ComboGate;
+  /** Back-compat: true only for `full-game`. */
   readonly strictFullGame: boolean;
   readonly games: readonly ComboGameStats[];
   readonly global: {
@@ -94,8 +100,10 @@ export interface ComboUniquenessReport {
   readonly duplicatesCollapsedById: number;
   /** Non-zero proves the cross-indexer leg-set pass is doing work. */
   readonly duplicatesCollapsedByLegSet: number;
-  /** Why strict mode dropped a combo. Sum equals `permissiveCombos - comboRecords`. */
-  readonly strictExclusions: Readonly<Record<StrictDropReason, number>>;
+  /** Why the active gate dropped a combo. Sum equals `permissiveCombos - comboRecords`. */
+  readonly exclusions: Readonly<Record<StrictDropReason, number>>;
+  /** Kept combos that span more than one game. Admitted by `permissive` and `all-legs-cfb`. */
+  readonly includedCrossGame: number;
   readonly diagnostics: {
     /** Legs with no outcome/side; such rows cannot match a sided source. */
     readonly legsWithoutSide: number;
@@ -554,7 +562,9 @@ export async function buildComboUniquenessReport(
     );
   });
 
-  const strict = options?.strictFullGame === true;
+  const gate: ComboGate =
+    options?.gate ?? (options?.strictFullGame === true ? "full-game" : "permissive");
+  const strict = gate === "full-game";
 
   // Two dedupe passes, in order of certainty:
   //   1. `comboId|wallet` — the upstream identity when it exists.
@@ -587,17 +597,19 @@ export async function buildComboUniquenessReport(
     combosWithUnstableIdentity: dedupedAll.filter((combo) => combo.unstableLegs > 0).length,
   };
 
-  // Attribution above is mode-independent. The strict gate is pure and runs afterwards, so the
-  // strict result is always a subset of the permissive one and `fullyWithinGame` is monotonic.
-  const strictExclusions: Record<StrictDropReason, number> = {
+  // Attribution above is mode-independent. Each gate is a pure filter applied afterwards, so a
+  // stricter gate is always a subset of a looser one and `fullyWithinGame` is monotonic.
+  // `eligible` is exactly `market_sport_type ∈ {moneyline, spreads, totals}` (ELIGIBLE_LEG_TYPES),
+  // the same predicate `full-game` uses.
+  const exclusions: Record<StrictDropReason, number> = {
     UNRESOLVED_LEGS: 0,
     CROSS_GAME: 0,
     INELIGIBLE_LEG_TYPE: 0,
   };
   const dropReasonOf = (combo: NormalizedCombo): StrictDropReason | null => {
-    if (!strict) return null;
+    if (gate === "permissive") return null;
     if (!combo.allLegsCfb) return "UNRESOLVED_LEGS";
-    if (!combo.fullyWithinGame) return "CROSS_GAME";
+    if (gate === "full-game" && !combo.fullyWithinGame) return "CROSS_GAME";
     if (!combo.allCfbLegsEligible) return "INELIGIBLE_LEG_TYPE";
     return null;
   };
@@ -606,7 +618,7 @@ export async function buildComboUniquenessReport(
   for (const combo of dedupedAll) {
     const dropReason = dropReasonOf(combo);
     if (dropReason === null) kept.push(combo);
-    else strictExclusions[dropReason] += 1;
+    else exclusions[dropReason] += 1;
     if (options?.includeAudit !== false) {
       audit.push({
         comboId: combo.comboId,
@@ -623,6 +635,7 @@ export async function buildComboUniquenessReport(
   }
   const normalized = kept;
   const deduped = normalized;
+  const includedCrossGame = normalized.filter((combo) => !combo.fullyWithinGame).length;
 
   const byGame = new Map<string, { combos: Set<string>; wallets: Set<string>; full: number; samples: NormalizedCombo[] }>();
   for (const game of games) {
@@ -665,6 +678,7 @@ export async function buildComboUniquenessReport(
   const sumWallets = gamesReport.reduce((sum, game) => sum + game.uniqueWallets, 0);
 
   return {
+    gate,
     strictFullGame: strict,
     games: gamesReport,
     global: {
@@ -680,7 +694,8 @@ export async function buildComboUniquenessReport(
     duplicatesCollapsed,
     duplicatesCollapsedById,
     duplicatesCollapsedByLegSet,
-    strictExclusions,
+    exclusions,
+    includedCrossGame,
     diagnostics,
     wallets: [...wallets].sort(),
     combos: audit,
@@ -708,4 +723,31 @@ export function walletLines(report: ComboUniquenessReport): string[] {
 /** Join lines for file emission; an empty set writes an empty file, never a blank line. */
 export function linesToText(lines: readonly string[]): string {
   return lines.length === 0 ? "" : `${lines.join("\n")}\n`;
+}
+
+export interface ComboSubsetCheck {
+  readonly permissive: number;
+  readonly treatment: number;
+  readonly leaks: readonly string[];
+  /** True when the treatment set is empty: an empty diff proves nothing. */
+  readonly vacuous: boolean;
+}
+
+/**
+ * Empirical subset proof: every treatment combo must exist in the permissive set.
+ * An empty treatment set is reported as `vacuous` rather than as a pass.
+ */
+export function checkComboSubset(
+  permissive: ComboUniquenessReport,
+  treatment: ComboUniquenessReport,
+): ComboSubsetCheck {
+  const anyIds = new Set(comboIdLines(permissive, { keptOnly: false }));
+  const treatmentIds = comboIdLines(treatment);
+  const leaks = treatmentIds.filter((line) => !anyIds.has(line));
+  return {
+    permissive: anyIds.size,
+    treatment: treatmentIds.length,
+    leaks,
+    vacuous: treatmentIds.length === 0,
+  };
 }

@@ -13,11 +13,14 @@
 import {
   buildComboUniquenessReport,
   buildGameIndex,
+  checkComboSubset,
   comboIdLines,
   linesToText,
   loadCfbGames,
   seedWalletsFromLeaderboard,
   walletLines,
+  type ComboGate,
+  type ComboUniquenessOptions,
 } from "../lib/combo_uniqueness.ts";
 import { runComboBacktest } from "../lib/combo_backtest.ts";
 import {
@@ -37,7 +40,8 @@ Usage:
   bun run scripts/polymarket_combo_cli.ts price --prices 0.38,0.80 [--stake 10] [--quoted 0.32]
   bun run scripts/polymarket_combo_cli.ts price --legs "<marketSlug>=<Outcome>,..." [--limit 10]
   bun run scripts/polymarket_combo_cli.ts wallet <0x> [--limit 100] [--max-pages 5] [--json]
-  bun run scripts/polymarket_combo_cli.ts uniqueness [--strict-full-game] [--json]
+  bun run scripts/polymarket_combo_cli.ts uniqueness [--strict-full-game|--all-legs-cfb] [--json]
+  bun run scripts/polymarket_combo_cli.ts verify-subset [--all-legs-cfb] [--wallet-file <path>]
   bun run scripts/polymarket_combo_cli.ts backtest [--days 30] [--wallets 0x..] [--all-venues] [--json]
 
 Notes:
@@ -47,13 +51,18 @@ Notes:
   • uniqueness seeds wallets from the PnL leaderboard (add --seed-trades for CFB trades) and
     caches combo responses under scratch/cfb-combo-cache (CACHE_TTL_HOURS=24 by default,
     --cache-ttl-hours overrides, --fresh bypasses).
-  • uniqueness flags: --strict-full-game (STRICT_FULL_GAME=1), --cache-dir, --cache-ttl-hours,
-    --seed-trades, --max-seed-markets, --wallet-file, --no-leaderboard, --no-audit,
-    --emit-ids <path>, --dump-wallets <path>.
-  • attribution is mode-independent; --strict-full-game is a pure gate, so strict results are a
-    subset of permissive ones. --json returns per-combo dropReason plus exclusion counts.
-  • empirical check: dump seed wallets, emit ids in both modes, then run
-    comm -23 strict.txt any.txt — the output must be empty.
+  • uniqueness flags: --strict-full-game (STRICT_FULL_GAME=1), --all-legs-cfb, --cache-dir,
+    --cache-ttl-hours, --seed-trades, --max-seed-markets, --wallet-file, --no-leaderboard,
+    --no-audit, --emit-ids <path>, --dump-wallets <path>.
+  • three gates, each a pure filter after attribution:
+      permissive    = any combo touching a CFB game
+      all-legs-cfb  = every leg is CFB and every leg's market_sport_type is
+                      moneyline|spreads|totals (cross-game allowed)
+      full-game     = all-legs-cfb AND single game
+    A stricter gate is always a subset of a looser one. --json returns the active
+    gate, mode-relative exclusions, includedCrossGame and a kept/dropReason audit.
+  • verify-subset runs the permissive and treatment reports in one process and
+    prints leaks; exit 1 = leak, exit 2 = vacuous (empty treatment set).
   • backtest computes realized PnL from SPLIT cost vs REDEEM/MERGE/SELL payout; open combos are
     excluded from realized totals, and --all-venues skips CFB game attribution.
   • Public APIs only; no key.`;
@@ -64,6 +73,31 @@ function flag(args: readonly string[], names: readonly string[], fallback: strin
     if (index !== -1 && index + 1 < args.length) return args[index + 1]!;
   }
   return fallback;
+}
+
+/** Shared `uniqueness` / `verify-subset` options. `gate` is the only per-run difference. */
+function comboUniquenessOptions(
+  args: readonly string[],
+  gate: ComboGate,
+): ComboUniquenessOptions {
+  const env = process.env;
+  const envFlag = (key: string): boolean => env[key] === "1";
+  const walletFile = flag(args, ["--wallet-file"], env.WALLET_FILE ?? "");
+  return {
+    gate,
+    fresh: args.includes("--fresh") || envFlag("FRESH"),
+    leaderboard: !args.includes("--no-leaderboard") && env.LEADERBOARD !== "0",
+    seedTrades: args.includes("--seed-trades") || envFlag("SEED_TRADES"),
+    ...(walletFile !== "" ? { walletFile } : {}),
+    limitGames: Number(flag(args, ["--limit-games"], "50")),
+    concurrency: Number(flag(args, ["--concurrency"], env.CONCURRENCY ?? "6")),
+    leaderboardLimit: Number(flag(args, ["--leaderboard-limit"], env.LEADERBOARD_LIMIT ?? "100")),
+    maxSeedMarkets: Number(flag(args, ["--max-seed-markets"], env.MAX_SEED_MARKETS ?? "60")),
+    maxComboPages: Number(flag(args, ["--max-combo-pages"], "3")),
+    cacheDir: flag(args, ["--cache-dir"], env.CACHE_DIR ?? "scratch/cfb-combo-cache"),
+    cacheTtlHours: Number(flag(args, ["--cache-ttl-hours"], env.CACHE_TTL_HOURS ?? "24")),
+    includeAudit: !args.includes("--no-audit"),
+  };
 }
 
 const cents = (price: number): string => `${(price * 100).toFixed(1)}¢`;
@@ -174,25 +208,40 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     return;
   }
 
-  if (sub === "uniqueness") {
-    const env = process.env;
-    const envFlag = (key: string): boolean => env[key] === "1";
-    const walletFile = flag(args, ["--wallet-file"], env.WALLET_FILE ?? "");
-    const report = await buildComboUniquenessReport({
-      strictFullGame: args.includes("--strict-full-game") || envFlag("STRICT_FULL_GAME"),
-      fresh: args.includes("--fresh") || envFlag("FRESH"),
-      leaderboard: !args.includes("--no-leaderboard") && env.LEADERBOARD !== "0",
-      seedTrades: args.includes("--seed-trades") || envFlag("SEED_TRADES"),
-      ...(walletFile !== "" ? { walletFile } : {}),
-      limitGames: Number(flag(args, ["--limit-games"], "50")),
-      concurrency: Number(flag(args, ["--concurrency"], env.CONCURRENCY ?? "6")),
-      leaderboardLimit: Number(flag(args, ["--leaderboard-limit"], env.LEADERBOARD_LIMIT ?? "100")),
-      maxSeedMarkets: Number(flag(args, ["--max-seed-markets"], env.MAX_SEED_MARKETS ?? "60")),
-      maxComboPages: Number(flag(args, ["--max-combo-pages"], "3")),
-      cacheDir: flag(args, ["--cache-dir"], env.CACHE_DIR ?? "scratch/cfb-combo-cache"),
-      cacheTtlHours: Number(flag(args, ["--cache-ttl-hours"], env.CACHE_TTL_HOURS ?? "24")),
-      includeAudit: !args.includes("--no-audit"),
-    });
+  if (sub === "uniqueness" || sub === "verify-subset") {
+    const gate: ComboGate =
+      args.includes("--all-legs-cfb") || process.env.ALL_LEGS_CFB === "1"
+        ? "all-legs-cfb"
+        : args.includes("--strict-full-game") || process.env.STRICT_FULL_GAME === "1"
+          ? "full-game"
+          : "permissive";
+
+    if (sub === "verify-subset") {
+      const treatmentGate: ComboGate = args.includes("--all-legs-cfb") ? "all-legs-cfb" : "full-game";
+      const permissive = await buildComboUniquenessReport(
+        comboUniquenessOptions(args, "permissive"),
+      );
+      const treatment = await buildComboUniquenessReport(
+        comboUniquenessOptions(args, treatmentGate),
+      );
+      const check = checkComboSubset(permissive, treatment);
+      if (json) {
+        console.log(JSON.stringify({ treatmentGate, ...check }, null, 2));
+      } else {
+        console.log(
+          `subset check (${treatmentGate}) — permissive ${check.permissive}, treatment ${check.treatment}, leaks ${check.leaks.length}`,
+        );
+        if (check.vacuous) {
+          console.log("WARNING: treatment set empty — subset check is VACUOUS");
+        }
+        for (const leak of check.leaks.slice(0, 20)) console.log(`  LEAK ${leak}`);
+      }
+      if (check.leaks.length > 0) process.exitCode = 1;
+      else if (check.vacuous) process.exitCode = 2;
+      return;
+    }
+
+    const report = await buildComboUniquenessReport(comboUniquenessOptions(args, gate));
     const emitPath = flag(args, ["--emit-ids"], "");
     const dumpPath = flag(args, ["--dump-wallets"], "");
     if (emitPath !== "") {
@@ -205,8 +254,14 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
       console.log(JSON.stringify(report, null, 2));
       return;
     }
+    const gateLabel =
+      report.gate === "permissive"
+        ? ""
+        : report.gate === "full-game"
+          ? " (strict full-game)"
+          : " (all legs CFB)";
     console.log(
-      `CFB combo uniqueness${report.strictFullGame ? " (strict full-game)" : ""} — games ${report.games.length}, wallets scanned ${report.walletsScanned}`,
+      `CFB combo uniqueness${gateLabel} — games ${report.games.length}, wallets scanned ${report.walletsScanned}`,
     );
     for (const game of report.games.filter((entry) => entry.uniqueCombos > 0)) {
       console.log(`\n🏈 ${game.title} (${game.gameSlug})`);
@@ -224,7 +279,7 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     console.log(`   distinct combos     : ${report.global.distinctCombos}`);
     console.log(`   distinct wallets    : ${report.global.distinctWallets}`);
     console.log(`   sum per-game combos : ${report.global.sumPerGameCombos}`);
-    console.log(`   permissive combos   : ${report.permissiveCombos} (before the strict gate)`);
+    console.log(`   permissive combos   : ${report.permissiveCombos} (before the gate)`);
     console.log(`   duplicates collapsed: ${report.duplicatesCollapsed} (comboId or leg-set)`);
     console.log(
       `   dedupe by id / leg-set: ${report.duplicatesCollapsedById} / ${report.duplicatesCollapsedByLegSet}`,
@@ -235,14 +290,15 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
         "   note                : unsided legs cannot match a sided source; cross-indexer dedupe is inert for them",
       );
     }
-    if (report.strictFullGame) {
-      const e = report.strictExclusions;
+    if (report.gate !== "permissive") {
+      const e = report.exclusions;
+      const crossGame = report.gate === "full-game" ? `cross-game ${e.CROSS_GAME}` : "cross-game included";
       console.log(
-        `   strict drops        : unresolved legs ${e.UNRESOLVED_LEGS} | cross-game ${e.CROSS_GAME} | ineligible type ${e.INELIGIBLE_LEG_TYPE}`,
+        `   gate drops          : unresolved legs ${e.UNRESOLVED_LEGS} | ${crossGame} | ineligible type ${e.INELIGIBLE_LEG_TYPE}`,
       );
-      const strictFloor = e.UNRESOLVED_LEGS > 0;
-      if (strictFloor) {
-        console.log("   note                : strict count is a FLOOR (unresolved legs are dropped)");
+      console.log(`   included cross-game : ${report.includedCrossGame}`);
+      if (e.UNRESOLVED_LEGS > 0) {
+        console.log("   note                : count is a FLOOR (unresolved legs are dropped)");
       }
     }
     console.log(
