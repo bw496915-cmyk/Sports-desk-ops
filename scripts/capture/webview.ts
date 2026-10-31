@@ -75,7 +75,9 @@ export interface ScreenshotResult {
 }
 
 export type ScreenshotOptions =
-  { format: "png" } | { format: "jpeg"; quality: number };
+  | { format: "png" }
+  | { format: "jpeg"; quality: number }
+  | { format: "webp"; quality: number };
 
 /** Read-side contract used by the pure load-wait helper (fake in tests). */
 export interface LoadState {
@@ -513,7 +515,12 @@ export class ManagedWebView {
                 format: "jpeg",
                 quality: options.quality,
               })
-            : await this.view.screenshot({ format: "png" });
+            : options.format === "webp"
+              ? await this.view.screenshot({
+                  format: "webp",
+                  quality: options.quality,
+                })
+              : await this.view.screenshot({ format: "png" });
     } catch (error) {
       throw new WebViewError(
         "screenshot-failed",

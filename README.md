@@ -36,6 +36,7 @@ SPORTSDESK_LIVE_INGEST=1 ./bin/dx deploy
 - `./bin/dx gslive <LOGIN>` — GSLive Partner 118 links for one account: the 7-parameter `#/reports/users` deep link (`bot=true`, desk-day ISO window, `text=player_<LOGIN>`) and the `#/events/bet-history` sidecar (`calcTime` / `betTime`, epoch `from`/`to`, raw `partnerUserId`).
 - `./bin/dx docs` / `./bin/dx docs gslive` — deployed docs portal URLs, or the GSLive surface section.
 - `./bin/dx stale -i <export>` — stale-line cohort over a bet-log export (CSV/JSON/JSONL); seeds on operator stale notes or graded-then-cancelled tickets, then clusters other customers on the same market and window.
+- `./bin/dx shot <url>` — Bun.WebView screenshot (webkit on macOS, chrome elsewhere); `--f402-login` captures the manager after an opt-in login. Output goes to `scratch/shots/`.
 
 ## Schema registry & prod dump parity
 

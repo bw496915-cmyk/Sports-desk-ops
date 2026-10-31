@@ -39,8 +39,14 @@ describe("Bun PTY terminal automation", () => {
     expect(result.out).toContain("./bin/dx stale");
   });
 
-  test("dx docs --json parses from PTY output", async () => {
-    const result = await runInPty(["./bin/dx", "docs", "--json"]);
+  test("dx shot --help renders without launching a browser", async () => {
+    const result = await runInPty(["./bin/dx", "shot", "--help"]);
+    expect(result.code).toBe(0);
+    expect(result.out).toContain("Bun.WebView screenshot tool");
+    expect(result.out).toContain("--f402-login");
+  });
+
+  test("dx docs --json parses from PTY output", async () => {    const result = await runInPty(["./bin/dx", "docs", "--json"]);
     expect(result.code).toBe(0);
     const extension = JSON.parse(result.out.trim()) as {
       provider?: string;

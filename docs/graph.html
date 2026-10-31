@@ -424,7 +424,8 @@
       <div>
         <span class="pulse-dot" aria-hidden="true"></span>
         <strong>LIVE POLLER ACTIVE:</strong>
-        <code>Bun.cron("* * * * *")</code> + <code>bun --watch</code> + <code>&lt;500ms CLOB WSS</code>
+        <code>Bun.cron("* * * * *")</code> + <code>bun --watch</code> ·
+        <span style="color: #fbbf24">WSS: not ingested</span>
         <span style="margin: 0 0.4rem; color: var(--text-muted)">|</span>
         <span>Last Updated: <strong id="live-last-updated-ts" style="color: #6ee7b7">— awaiting live feed —</strong></span>
         <span style="margin-left: 0.35rem" class="pill pill-emerald" id="live-last-updated-age">0s ago</span>
@@ -474,8 +475,8 @@
       <section class="kpi-strip" aria-label="Real-Time Telemetry KPIs">
         <div class="kpi-card">
           <div class="label">Tracked Polymarket Wallets</div>
-          <div class="value" style="color: var(--accent-cyan)">39 Active 0x Wallets</div>
-          <div class="sub">Direct PM Profile &amp; F402 Customer Links</div>
+          <div class="value" style="color: var(--accent-cyan)"><span id="kpi-active-wallets">39</span> Active 0x Wallets</div>
+          <div class="sub" id="kpi-wallet-provenance">Direct PM Profile &amp; F402 Customer Links</div>
         </div>
         <div class="kpi-card">
           <div class="label">Today's Matched Parlay Book</div>
@@ -517,7 +518,7 @@
           aria-selected="false"
           data-tab-target="TAB_PENDING_BETS"
         >
-          ⏳ 2. Pending Bets &amp; Live Sync Feed (222 Active Legs • Last Updated)
+          ⏳ 2. Pending Bets &amp; Live Sync Feed (<span id="tab-pending-legs">222</span> Active Legs • Last Updated)
         </button>
         <button
           type="button"
@@ -804,7 +805,7 @@
         <section class="section-panel" style="margin-top: 1.25rem" aria-label="Cluster Summary">
           <div class="section-header">
             <h2>
-              🔥 Today's 14 Syndicate Cluster Summary ($702,700 Total Exposure Across 222 Active Legs)
+              🔥 Today's 14 Syndicate Cluster Summary ($<span id="topology-exposure">702,700</span> Total Exposure Across <span id="topology-legs">222</span> Active Legs)
             </h2>
             <div style="display: flex; gap: 0.4rem; flex-wrap: wrap">
               <button type="button" class="btn active" data-bet-filter="ALL">All Clusters (14)</button>

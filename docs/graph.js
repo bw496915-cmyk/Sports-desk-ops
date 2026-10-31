@@ -287,6 +287,11 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
   const pollSeqEl = document.getElementById("live-poll-seq");
   const dataModeEl = document.getElementById("live-data-mode");
   const liveTicksBody = document.getElementById("live-ticks-tbody");
+  const kpiActiveWallets = document.getElementById("kpi-active-wallets");
+  const kpiWalletProvenance = document.getElementById("kpi-wallet-provenance");
+  const tabPendingLegs = document.getElementById("tab-pending-legs");
+  const topologyExposure = document.getElementById("topology-exposure");
+  const topologyLegs = document.getElementById("topology-legs");
   const pollNowBtn = document.getElementById("poll-now-btn");
   const cellSyncStamps = document.querySelectorAll(".live-sync-ts");
 
@@ -372,6 +377,23 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
       dataModeEl.textContent = "data: " + mode;
       dataModeEl.className =
         "pill " + (mode === "LIVE" ? "pill-emerald" : mode === "PARTIAL" ? "pill-amber" : "pill-rose");
+    }
+
+    if (kpiActiveWallets) {
+      kpiActiveWallets.textContent = String(data.activeSyndicateWalletsCount ?? 39);
+    }
+    if (kpiWalletProvenance) {
+      const pm = data.provenance && data.provenance.polymarket;
+      if (pm && pm.source !== "fixture") {
+        kpiWalletProvenance.textContent =
+          pm.walletsOk + " live · " + (pm.walletsInvalid ?? 0) + " quarantined · " +
+          (data.configuredWalletsCount ?? 39) + " configured";
+      }
+    }
+    if (tabPendingLegs) tabPendingLegs.textContent = String(data.totalOpenLegsCount ?? 222);
+    if (topologyLegs) topologyLegs.textContent = String(data.totalOpenLegsCount ?? 222);
+    if (topologyExposure) {
+      topologyExposure.textContent = Number(data.totalOpenExposureUsd ?? 0).toLocaleString("en-US");
     }
   }
 

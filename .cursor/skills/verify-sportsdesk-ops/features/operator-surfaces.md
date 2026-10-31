@@ -22,10 +22,27 @@ surface rules in [`docs/report-surfaces.md`](../../../../docs/report-surfaces.md
 | `gslive-links` | `./bin/dx gslive AF12` | report URL has `text=player_AF12`; bet-history has `partnerUserId=AF12` and both `dateFilterBy` values |
 | `gslive-docs` | `./bin/dx docs --json` | JSON has `provider: "GSLive Manager (Partner 118)"` and 3 surfaces |
 | `stale-cohort` | `./bin/dx stale -i <export.csv> --window-min 10` | seeded event cluster lists the seed `★` and other customers |
+| `webview-shot` | `./bin/dx shot <url> --out scratch/shots/page.png` | JSON with `screenshot`, `bytes`, `sha256`, `backend`; non-zero on failure |
 | `poll-fixture` | `./bin/dx poll --once` | feed `dataMode: "FIXTURE"`, 39 profiles |
 | `poll-live` | `./bin/dx poll --once --live` | feed `dataMode: "PARTIAL"`, `provenance.polymarket.walletsOk` 20–23, `walletsInvalid` 16 |
 | `poll-f402-off` | `./bin/dx poll --once --live-f402` without `F402_LIVE_LOGIN=1` | warns `F402 live login disabled`; exit 0; `provenance.f402.source: "fixture"` |
 | `portal-contract` | `bun test tests/gslive_portal_links.test.ts tests/cli_terminal_automation.test.ts tests/pipeline_assets.test.ts` | pass |
+
+### WebView screenshots
+
+```bash
+# public page (webkit on macOS, chrome elsewhere)
+./bin/dx shot https://fantasy402-docs-4ay.pages.dev/graph.html --out scratch/shots/portal.png
+
+# F402 manager after one login (opt-in; never prints credentials)
+F402_LIVE_LOGIN=1 ./bin/dx shot --f402-login --f402-page /manager --out scratch/shots/f402.png
+
+# webp requires the chrome backend
+./bin/dx shot <url> --format webp --quality 82 --out scratch/shots/page.webp
+```
+
+`Bun.WebView` is experimental; a failed launch or navigation exits non-zero and prints a redacted
+error. Screenshots land under `scratch/` and are not committed.
 
 ## Mapping checks
 
