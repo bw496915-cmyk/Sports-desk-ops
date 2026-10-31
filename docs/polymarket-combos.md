@@ -94,9 +94,19 @@ CLI flags win over environment, which wins over defaults.
   `market.condition_id`), `market.slug` / `market_slug`, then CLOB token id.
 - A combo spanning N games is counted once in **each** of those games, so
   `sum of per-game combos ≥ distinct combos (global)`.
-- Dedupe key is `comboId|wallet`; `comboId` falls back to a SHA-256 of the sorted leg keys.
-- `--strict-full-game` keeps only combos where every leg is CFB, all CFB legs are
-  `moneyline|spreads|totals`, and the combo sits in a single game.
+- Dedupe runs twice: first on `comboId|wallet`, then on `legSignatures|wallet`, where a leg
+  signature is `legKey|outcome|marketType`. The second pass catches the same combo surfaced by
+  two indexers with different ids; it does **not** collapse two combos that share a condition id
+  but differ by outcome or market type.
+- `comboId` falls back to a SHA-256 of the sorted leg signatures.
+- `--strict-full-game` is a **pure gate applied after attribution**, never inside it. Every strict
+  result is therefore a subset of the permissive result, and `fullyWithinGame` is identical in both
+  modes. `--json` exposes `permissiveCombos`, `duplicatesCollapsed`, per-reason
+  `strictExclusions`, and a per-combo `kept`/`dropReason` audit trail (`--no-audit` omits it).
+- Strict drop reasons, in precedence order: `UNRESOLVED_LEGS` (a leg could not be attributed to
+  any CFB game), `CROSS_GAME`, `INELIGIBLE_LEG_TYPE`. If `UNRESOLVED_LEGS > 0`, the strict count
+  is a **floor**, not a point estimate — unresolved legs correlate with low-volume or delisted
+  markets, so the exclusion is not random.
 - Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h by default; corrupted files are refetched.
 
 ## 5. Backtesting (realized PnL)

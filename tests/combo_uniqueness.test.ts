@@ -69,7 +69,7 @@ beforeAll(() => {
       if (url.pathname.endsWith("/v2/positions/combos")) {
         const user = url.searchParams.get("user");
         return Response.json({
-          data: user === W1 ? [COMBOS[0]] : [],
+          data: user === W1 ? [COMBOS[0], { ...COMBOS[0], id: "c1-alt" }] : [],
           pagination: { next_cursor: "" },
         });
       }
@@ -100,7 +100,9 @@ describe("CFB combo uniqueness", () => {
   test("attributes by condition id, slug and token id; dedupes across endpoints", async () => {
     const report = await buildComboUniquenessReport(options());
     expect(report.walletsScanned).toBe(2);
-    expect(report.comboRecords).toBe(6); // c1 appears in both endpoints
+    expect(report.comboRecords).toBe(5); // c1 appears in both endpoints, plus a c1-alt id
+    expect(report.permissiveCombos).toBe(5);
+    expect(report.duplicatesCollapsed).toBe(2); // same id, then same leg set with a different id
     expect(report.global.distinctCombos).toBe(5);
     expect(report.global.distinctWallets).toBe(1);
 
@@ -117,10 +119,41 @@ describe("CFB combo uniqueness", () => {
     const report = await buildComboUniquenessReport(options({ strictFullGame: true }));
     expect(report.strictFullGame).toBe(true);
     expect(report.global.distinctCombos).toBe(3); // c1, c5, c6
+    expect(report.permissiveCombos).toBe(5);
+    expect(report.strictExclusions).toEqual({
+      UNRESOLVED_LEGS: 0,
+      CROSS_GAME: 1, // c2 spans g1 + g2
+      INELIGIBLE_LEG_TYPE: 1, // c4 uses player_props
+    });
     const g1 = report.games.find((game) => game.gameSlug === "cfb-g1");
     const g2 = report.games.find((game) => game.gameSlug === "cfb-g2");
     expect(g1?.uniqueCombos).toBe(2);
     expect(g2?.uniqueCombos).toBe(1);
+  });
+
+  test("strict results are a subset of permissive results", async () => {
+    const permissive = await buildComboUniquenessReport(options({ includeAudit: true }));
+    const strict = await buildComboUniquenessReport(
+      options({ strictFullGame: true, includeAudit: true }),
+    );
+    const key = (row: { comboId: string; wallet: string }): string => `${row.comboId}|${row.wallet}`;
+    const permissiveIds = new Set(permissive.combos.map(key));
+    const strictIds = strict.combos.filter((row) => row.kept).map(key);
+    expect(strictIds.length).toBe(strict.comboRecords);
+    for (const id of strictIds) expect(permissiveIds.has(id)).toBe(true);
+    for (const game of strict.games) {
+      const before = permissive.games.find((entry) => entry.gameSlug === game.gameSlug);
+      expect(game.uniqueCombos).toBeLessThanOrEqual(before?.uniqueCombos ?? 0);
+      expect(game.fullyWithinGame).toBeLessThanOrEqual(before?.fullyWithinGame ?? 0);
+    }
+  });
+
+  test("a combo whose legs cannot be attributed is reported as unresolved", async () => {
+    const report = await buildComboUniquenessReport(
+      options({ strictFullGame: true, includeAudit: true }),
+    );
+    // c3 has one leg that touches no CFB game, so it is dropped before attribution, not by the gate.
+    expect(report.combos.some((row) => row.comboId === "c3")).toBe(false);
   });
 
   test("cache honors TTL and fresh bypass", async () => {

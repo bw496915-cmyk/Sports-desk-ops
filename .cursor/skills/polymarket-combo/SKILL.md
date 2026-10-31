@@ -33,9 +33,14 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
 5. Attribution order: `leg_condition_id`/`conditionId` (incl. `market.condition_id`) → `market.slug`
    → CLOB token id. The v2 combo payload nests the market under `legs[].market`.
 6. `--strict-full-game` keeps only single-game combos where every leg is CFB and every CFB leg is
-   `moneyline|spreads|totals`.
-7. Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h (`--cache-ttl-hours`), `--fresh` bypasses.
-8. Env aliases: `CACHE_TTL_HOURS`, `CACHE_DIR`, `FRESH=1`, `STRICT_FULL_GAME=1`, `SEED_TRADES=1`,
+   `moneyline|spreads|totals`. It is a **pure gate after attribution**, so strict results are a
+   subset of permissive ones. `--json` reports `permissiveCombos`, `duplicatesCollapsed`,
+   `strictExclusions` and a per-combo `kept`/`dropReason` audit (`--no-audit` to omit).
+7. Dedupe twice: `comboId|wallet`, then `legSignatures|wallet` (`legKey|outcome|marketType`) to
+   collapse cross-indexer duplicates without merging distinct same-condition markets.
+   `UNRESOLVED_LEGS > 0` means the strict count is a floor.
+8. Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h (`--cache-ttl-hours`), `--fresh` bypasses.
+9. Env aliases: `CACHE_TTL_HOURS`, `CACHE_DIR`, `FRESH=1`, `STRICT_FULL_GAME=1`, `SEED_TRADES=1`,
    `CONCURRENCY`, `LEADERBOARD=0`, `LEADERBOARD_LIMIT`, `MAX_SEED_MARKETS`, `WALLET_FILE`.
    CLI flags win over env.
 8. `lb-api.polymarket.com` is retired (410); use `data-api/v2/leaderboard`.

@@ -45,7 +45,9 @@ Notes:
     caches combo responses under scratch/cfb-combo-cache (CACHE_TTL_HOURS=24 by default,
     --cache-ttl-hours overrides, --fresh bypasses).
   • uniqueness flags: --strict-full-game (STRICT_FULL_GAME=1), --cache-dir, --cache-ttl-hours,
-    --seed-trades, --max-seed-markets, --wallet-file, --no-leaderboard.
+    --seed-trades, --max-seed-markets, --wallet-file, --no-leaderboard, --no-audit.
+  • attribution is mode-independent; --strict-full-game is a pure gate, so strict results are a
+    subset of permissive ones. --json returns per-combo dropReason plus exclusion counts.
   • backtest computes realized PnL from SPLIT cost vs REDEEM/MERGE/SELL payout; open combos are
     excluded from realized totals, and --all-venues skips CFB game attribution.
   • Public APIs only; no key.`;
@@ -183,6 +185,7 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
       maxComboPages: Number(flag(args, ["--max-combo-pages"], "3")),
       cacheDir: flag(args, ["--cache-dir"], env.CACHE_DIR ?? "scratch/cfb-combo-cache"),
       cacheTtlHours: Number(flag(args, ["--cache-ttl-hours"], env.CACHE_TTL_HOURS ?? "24")),
+      includeAudit: !args.includes("--no-audit"),
     });
     if (json) {
       console.log(JSON.stringify(report, null, 2));
@@ -207,6 +210,18 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     console.log(`   distinct combos     : ${report.global.distinctCombos}`);
     console.log(`   distinct wallets    : ${report.global.distinctWallets}`);
     console.log(`   sum per-game combos : ${report.global.sumPerGameCombos}`);
+    console.log(`   permissive combos   : ${report.permissiveCombos} (before the strict gate)`);
+    console.log(`   duplicates collapsed: ${report.duplicatesCollapsed} (comboId or leg-set)`);
+    if (report.strictFullGame) {
+      const e = report.strictExclusions;
+      console.log(
+        `   strict drops        : unresolved legs ${e.UNRESOLVED_LEGS} | cross-game ${e.CROSS_GAME} | ineligible type ${e.INELIGIBLE_LEG_TYPE}`,
+      );
+      const strictFloor = e.UNRESOLVED_LEGS > 0;
+      if (strictFloor) {
+        console.log("   note                : strict count is a FLOOR (unresolved legs are dropped)");
+      }
+    }
     console.log(
       `   cache               : ${report.cache.hits} hit / ${report.cache.misses} miss (ttl ${report.cache.ttlHours}h)`,
     );

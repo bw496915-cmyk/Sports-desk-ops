@@ -23,6 +23,8 @@ export interface ComboUniquenessOptions {
   readonly leaderboardLimit?: number;
   readonly walletFile?: string;
   readonly strictFullGame?: boolean;
+  /** Include the per-combo audit trail in the report (default true). */
+  readonly includeAudit?: boolean;
   readonly seedTrades?: boolean;
   readonly maxSeedMarkets?: number;
   readonly perMarket?: number;
@@ -55,6 +57,24 @@ export interface ComboGameStats {
   }[];
 }
 
+export type StrictDropReason =
+  | "UNRESOLVED_LEGS"
+  | "CROSS_GAME"
+  | "INELIGIBLE_LEG_TYPE";
+
+export interface ComboAuditRow {
+  readonly comboId: string;
+  readonly wallet: string;
+  readonly legs: number;
+  readonly games: number;
+  readonly allLegsCfb: boolean;
+  readonly fullyWithinGame: boolean;
+  readonly allCfbLegsEligible: boolean;
+  /** False only under `--strict-full-game`; permissive attribution is mode-independent. */
+  readonly kept: boolean;
+  readonly dropReason: StrictDropReason | null;
+}
+
 export interface ComboUniquenessReport {
   readonly strictFullGame: boolean;
   readonly games: readonly ComboGameStats[];
@@ -67,6 +87,14 @@ export interface ComboUniquenessReport {
   };
   readonly walletsScanned: number;
   readonly comboRecords: number;
+  /** Distinct combos before the strict gate; `strict` is always a subset of this. */
+  readonly permissiveCombos: number;
+  /** Records collapsed by the `comboId|wallet` or `legKeys|wallet` dedupe passes. */
+  readonly duplicatesCollapsed: number;
+  /** Why strict mode dropped a combo. Sum equals `permissiveCombos - comboRecords`. */
+  readonly strictExclusions: Readonly<Record<StrictDropReason, number>>;
+  /** Per-combo audit trail; empty under `--json` only if `includeAudit: false`. */
+  readonly combos: readonly ComboAuditRow[];
   readonly cache: { readonly hits: number; readonly misses: number; readonly ttlHours: number };
 }
 
@@ -84,6 +112,8 @@ interface NormalizedCombo {
   readonly wallet: string;
   readonly gameSlugs: ReadonlySet<string>;
   readonly legKeys: readonly string[];
+  /** `legKey|outcome|marketType` — distinguishes legs that share a condition id. */
+  readonly legSignatures: readonly string[];
   readonly allLegsCfb: boolean;
   readonly allCfbLegsEligible: boolean;
   readonly fullyWithinGame: boolean;
@@ -256,11 +286,23 @@ function legKey(leg: Record<string, unknown>): string {
   ).toLowerCase();
 }
 
+/**
+ * Dedupe signature for a single leg. `legKey` alone is too coarse: two combos can reference the
+ * same condition id on different outcomes or market types (moneyline vs player_props).
+ */
+function legSignature(leg: Record<string, unknown>): string {
+  const outcome = (
+    text(leg.leg_outcome_label) ||
+    text(leg.outcome) ||
+    text(leg.leg_outcome)
+  ).toUpperCase();
+  return `${legKey(leg)}|${outcome}|${legMarketType(leg)}`;
+}
+
 function attributeLeg(
   leg: Record<string, unknown>,
   index: GameIndex,
-): { game: string | null; type: string } {
-  for (const id of legConditionIds(leg)) {
+): { game: string | null; type: string } {  for (const id of legConditionIds(leg)) {
     const game = index.byConditionId.get(id);
     if (game !== undefined) return { game, type: legMarketType(leg) };
   }
@@ -300,13 +342,16 @@ function normalizeCombo(
   if (games.size === 0) return null;
 
   const legKeys = legs.map(legKey).sort();
-  const comboId = text(record.comboId) || text(record.id) || `sha256:${hashKeys(legKeys)}`;
+  const legSignatures = legs.map(legSignature).sort();
+  const comboId =
+    text(record.comboId) || text(record.id) || `sha256:${hashKeys(legSignatures)}`;
   const wallet = (text(record.user) || text(record.wallet) || fallbackWallet).toLowerCase();
   return {
     comboId,
     wallet,
     gameSlugs: games,
     legKeys,
+    legSignatures,
     allLegsCfb: attributed === legs.length,
     allCfbLegsEligible: eligible,
     fullyWithinGame: games.size === 1,
@@ -484,18 +529,63 @@ export async function buildComboUniquenessReport(
   });
 
   const strict = options?.strictFullGame === true;
-  const normalized = perWallet.flat().filter(
-    (combo) => !strict || (combo.fullyWithinGame && combo.allLegsCfb && combo.allCfbLegsEligible),
-  );
 
-  const seen = new Set<string>();
-  const deduped: NormalizedCombo[] = [];
-  for (const combo of normalized) {
-    const key = `${combo.comboId}|${combo.wallet}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(combo);
+  // Two dedupe passes, in order of certainty:
+  //   1. `comboId|wallet` — the upstream identity when it exists.
+  //   2. `legKeys|wallet` — cross-indexer fallback: the same combo surfaced by two endpoints
+  //      can carry different ids, but its resolved leg set and wallet are the same.
+  const seenIds = new Set<string>();
+  const seenLegSets = new Set<string>();
+  const dedupedAll: NormalizedCombo[] = [];
+  let duplicatesCollapsed = 0;
+  for (const combo of perWallet.flat()) {
+    const idKey = `${combo.comboId}|${combo.wallet}`;
+    const legKey = `${combo.legSignatures.join(";")}|${combo.wallet}`;
+    if (seenIds.has(idKey) || seenLegSets.has(legKey)) {
+      duplicatesCollapsed += 1;
+      continue;
+    }
+    seenIds.add(idKey);
+    seenLegSets.add(legKey);
+    dedupedAll.push(combo);
   }
+
+  // Attribution above is mode-independent. The strict gate is pure and runs afterwards, so the
+  // strict result is always a subset of the permissive one and `fullyWithinGame` is monotonic.
+  const strictExclusions: Record<StrictDropReason, number> = {
+    UNRESOLVED_LEGS: 0,
+    CROSS_GAME: 0,
+    INELIGIBLE_LEG_TYPE: 0,
+  };
+  const dropReasonOf = (combo: NormalizedCombo): StrictDropReason | null => {
+    if (!strict) return null;
+    if (!combo.allLegsCfb) return "UNRESOLVED_LEGS";
+    if (!combo.fullyWithinGame) return "CROSS_GAME";
+    if (!combo.allCfbLegsEligible) return "INELIGIBLE_LEG_TYPE";
+    return null;
+  };
+  const kept: NormalizedCombo[] = [];
+  const audit: ComboAuditRow[] = [];
+  for (const combo of dedupedAll) {
+    const dropReason = dropReasonOf(combo);
+    if (dropReason === null) kept.push(combo);
+    else strictExclusions[dropReason] += 1;
+    if (options?.includeAudit !== false) {
+      audit.push({
+        comboId: combo.comboId,
+        wallet: combo.wallet,
+        legs: combo.legKeys.length,
+        games: combo.gameSlugs.size,
+        allLegsCfb: combo.allLegsCfb,
+        fullyWithinGame: combo.fullyWithinGame,
+        allCfbLegsEligible: combo.allCfbLegsEligible,
+        kept: dropReason === null,
+        dropReason,
+      });
+    }
+  }
+  const normalized = kept;
+  const deduped = normalized;
 
   const byGame = new Map<string, { combos: Set<string>; wallets: Set<string>; full: number; samples: NormalizedCombo[] }>();
   for (const game of games) {
@@ -549,6 +639,10 @@ export async function buildComboUniquenessReport(
     },
     walletsScanned: wallets.size,
     comboRecords: normalized.length,
+    permissiveCombos: dedupedAll.length,
+    duplicatesCollapsed,
+    strictExclusions,
+    combos: audit,
     cache: { ...stats, ttlHours: options?.cacheTtlHours ?? DEFAULT_CACHE_TTL_HOURS },
   };
 }
