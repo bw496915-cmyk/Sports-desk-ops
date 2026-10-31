@@ -21,6 +21,7 @@ const GAMES = [
     slug: "cfb-g1",
     title: "Game One",
     volume24hr: 1000,
+    endDate: "2026-10-31",
     markets: [
       { conditionId: "0x1", slug: "g1-ml", clobTokenIds: '["t1","t2"]', sportsMarketType: "moneyline" },
     ],
@@ -30,6 +31,7 @@ const GAMES = [
     slug: "cfb-g2",
     title: "Game Two",
     volume24hr: 500,
+    endDate: "2026-10-30",
     markets: [
       { conditionId: "0x2", slug: "g2-ml", clobTokenIds: '["t3","t4"]', sportsMarketType: "moneyline" },
     ],
@@ -60,6 +62,7 @@ const CLOSED_GAMES = [
     slug: "cfb-g0",
     title: "Closed Game",
     volume24hr: 0,
+    endDate: "2026-09-26",
     markets: [
       { conditionId: "0x0", slug: "g0-ml", clobTokenIds: '["t0"]', sportsMarketType: "moneyline" },
     ],
@@ -128,6 +131,7 @@ function fakeReport(
   return {
     gate,
     strictFullGame: gate === "full-game",
+    index: { games: 4, activeOnly: false, since: null },
     games: [],
     global: {
       gamesWithActivity: 0,
@@ -159,6 +163,7 @@ function fakeReport(
       combosWithoutAttribution: 0,
       recordsWithoutLegs: 0,
       cfbTouchRatePct: 100,
+      suspectedComboOfComboLegKeys: 0,
     },
     wallets: ["0x1", "0x2"],
     combos: all.map((comboId) => ({
@@ -181,15 +186,15 @@ describe("CFB combo uniqueness", () => {
   test("attributes by condition id, slug and token id; dedupes across endpoints", async () => {
     const report = await buildComboUniquenessReport(options());
     expect(report.walletsScanned).toBe(2);
-    expect(report.comboRecords).toBe(5); // c1 appears in both endpoints, plus a c1-alt id
-    expect(report.permissiveCombos).toBe(5);
+    expect(report.comboRecords).toBe(6); // c0 (closed) + c1..c6, minus unresolved c3
+    expect(report.permissiveCombos).toBe(6);
     expect(report.duplicatesCollapsed).toBe(2); // same id, then same leg set with a different id
     expect(report.duplicatesCollapsedById).toBe(1);
     expect(report.duplicatesCollapsedByLegSet).toBe(1);
-    expect(report.global.distinctCombos).toBe(5);
+    expect(report.global.distinctCombos).toBe(6);
     expect(report.global.distinctWallets).toBe(1);
     // Fixture legs carry no outcome label, so the unsided diagnostic must see them.
-    expect(report.diagnostics.legsWithoutSide).toBe(6);
+    expect(report.diagnostics.legsWithoutSide).toBe(7);
     expect(report.diagnostics.combosWithUnstableIdentity).toBe(0);
     expect(report.wallets).toEqual([W1, W2].sort());
 
@@ -199,15 +204,15 @@ describe("CFB combo uniqueness", () => {
     expect(g1?.fullyWithinGame).toBe(3); // c1, c4, c5
     expect(g2?.uniqueCombos).toBe(2); // c2, c6
     expect(g2?.fullyWithinGame).toBe(1); // c6
-    expect(report.global.sumPerGameCombos).toBe(6);
+    expect(report.global.sumPerGameCombos).toBe(7);
   });
 
   test("full-game gate keeps only single-game ML/spread/total combos", async () => {
     const report = await buildComboUniquenessReport(options({ gate: "full-game" }));
     expect(report.gate).toBe("full-game");
     expect(report.strictFullGame).toBe(true);
-    expect(report.global.distinctCombos).toBe(3); // c1, c5, c6
-    expect(report.permissiveCombos).toBe(5);
+    expect(report.global.distinctCombos).toBe(4); // c0, c1, c5, c6
+    expect(report.permissiveCombos).toBe(6);
     expect(report.exclusions).toEqual({
       UNRESOLVED_LEGS: 0,
       CROSS_GAME: 1, // c2 spans g1 + g2
@@ -224,8 +229,8 @@ describe("CFB combo uniqueness", () => {
     const report = await buildComboUniquenessReport(options({ gate: "all-legs-cfb" }));
     expect(report.gate).toBe("all-legs-cfb");
     expect(report.strictFullGame).toBe(false);
-    expect(report.global.distinctCombos).toBe(4); // c1, c2, c5, c6
-    expect(report.permissiveCombos).toBe(5);
+    expect(report.global.distinctCombos).toBe(5); // c0, c1, c2, c5, c6
+    expect(report.permissiveCombos).toBe(6);
     expect(report.exclusions).toEqual({
       UNRESOLVED_LEGS: 0,
       CROSS_GAME: 0, // this gate admits cross-game; it must not be a drop bucket
@@ -273,17 +278,25 @@ describe("CFB combo uniqueness", () => {
     }
   });
 
-  test("closed events are opt-in for historical attribution", async () => {
-    const without = await buildComboUniquenessReport(options());
-    expect(without.combos.some((row) => row.comboId === "c0")).toBe(false);
-    expect(without.permissiveCombos).toBe(5);
+  test("closed events are included by default; --open-only drops them", async () => {
+    const byDefault = await buildComboUniquenessReport(options());
+    expect(byDefault.combos.some((row) => row.comboId === "c0")).toBe(true);
+    expect(byDefault.permissiveCombos).toBe(6);
+    expect(byDefault.index.activeOnly).toBe(false);
 
-    const withClosed = await buildComboUniquenessReport(options({ includeClosedGames: true }));
-    const c0 = withClosed.combos.find((row) => row.comboId === "c0");
-    expect(c0?.kept).toBe(true);
-    expect(withClosed.permissiveCombos).toBe(6);
-    const g0 = withClosed.games.find((game) => game.gameSlug === "cfb-g0");
-    expect(g0?.uniqueCombos).toBe(1);
+    const openOnly = await buildComboUniquenessReport(options({ includeClosedGames: false }));
+    expect(openOnly.combos.some((row) => row.comboId === "c0")).toBe(false);
+    expect(openOnly.permissiveCombos).toBe(5);
+    expect(openOnly.index.activeOnly).toBe(true);
+  });
+
+  test("--since bounds the index by game date", async () => {
+    const all = await buildComboUniquenessReport(options());
+    expect(all.permissiveCombos).toBe(6);
+    const recent = await buildComboUniquenessReport(options({ since: "2026-10-01" }));
+    expect(recent.permissiveCombos).toBe(5); // c0 (2026-09-26) is filtered out
+    const none = await buildComboUniquenessReport(options({ since: "2026-12-01" }));
+    expect(none.permissiveCombos).toBe(0);
   });
 
   test("synthetic audit fixture: gated references use kept sets only", () => {

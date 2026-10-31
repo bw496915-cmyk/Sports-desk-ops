@@ -32,8 +32,12 @@ export interface ComboUniquenessOptions {
   readonly perMarket?: number;
   readonly maxComboPages?: number;
   readonly limitGames?: number;
-  /** Also index settled CFB events (`closed=true`). Historical legs need this. */
+  /** Also index settled CFB events (`closed=true`). Default true; pass false for open-only. */
   readonly includeClosedGames?: boolean;
+  /** Keep only games on/after this ISO date (e.g. `2026-09-01`). */
+  readonly since?: string;
+  /** Safety cap on paginated event fetches (default 30 pages × 100). */
+  readonly maxGamePages?: number;
   readonly now?: number;
   readonly timeoutMs?: number;
   readonly gammaBase?: string;
@@ -87,6 +91,11 @@ export interface ComboUniquenessReport {
   readonly gate: ComboGate;
   /** Back-compat: true only for `full-game`. */
   readonly strictFullGame: boolean;
+  readonly index: {
+    readonly games: number;
+    readonly activeOnly: boolean;
+    readonly since: string | null;
+  };
   readonly games: readonly ComboGameStats[];
   readonly global: {
     readonly gamesWithActivity: number;
@@ -129,6 +138,8 @@ export interface ComboUniquenessReport {
     readonly recordsWithoutLegs: number;
     /** Share of observed combos that touch an indexed CFB game. Non-CFB combos are in the denominator. */
     readonly cfbTouchRatePct: number;
+    /** Unresolved leg keys shaped like zero-padded combo conditions (no CLOB market). */
+    readonly suspectedComboOfComboLegKeys: number;
   };
   /** Sorted, unique wallets scanned — the input for `--dump-wallets`. */
   readonly wallets: readonly string[];
@@ -141,6 +152,7 @@ interface CfbGame {
   readonly slug: string;
   readonly title: string;
   readonly volume24hr: number;
+  readonly endIso: string | null;
   readonly conditionIds: readonly string[];
   readonly marketSlugs: readonly string[];
   readonly clobTokenIds: readonly string[];
@@ -214,30 +226,36 @@ async function mapLimit<T, R>(
 
 /** Loads CFB events and indexes their condition IDs, slugs and CLOB token IDs. */
 export async function loadCfbGames(options?: ComboUniquenessOptions): Promise<CfbGame[]> {
-  const limit = Math.min(Math.max(options?.limitGames ?? 50, 1), 100);
   const gamma = (options?.gammaBase ?? GAMMA_API).replace(/\/$/, "");
-  const urls = [
-    `${gamma}/events?series_id=${CFB_SERIES_ID}&active=true&closed=false&order=volume24hr&ascending=false&limit=${limit}`,
-  ];
-  if (options?.includeClosedGames === true) {
-    // Historical combo legs reference games that have since settled. Without this, those legs are
-    // unattributable and every gated count is a floor.
-    urls.push(
-      `${gamma}/events?series_id=${CFB_SERIES_ID}&closed=true&order=endDate&ascending=false&limit=${limit}`,
-    );
-  }
+  const since = options?.since ?? null;
+  const sources: Array<"active" | "closed"> =
+    options?.includeClosedGames === false ? ["active"] : ["active", "closed"];
+
   const games: CfbGame[] = [];
   const seen = new Set<string>();
-  for (const url of urls) {
-    const body = await getJson(url, options);
-    if (!Array.isArray(body)) continue;
-    for (const game of mapCfbEvents(body)) {
-      if (seen.has(game.slug)) continue;
-      seen.add(game.slug);
-      games.push(game);
+  for (const source of sources) {
+    const pageSize = 100;
+    const maxPages = Math.max(1, options?.maxGamePages ?? 30);
+    for (let page = 0; page < maxPages; page += 1) {
+      const ordering =
+        source === "active"
+          ? "active=true&closed=false&order=volume24hr&ascending=false"
+          : "closed=true&order=endDate&ascending=false";
+      const url = `${gamma}/events?series_id=${CFB_SERIES_ID}&${ordering}&limit=${pageSize}&offset=${page * pageSize}`;
+      const body = await getJson(url, options);
+      if (!Array.isArray(body) || body.length === 0) break;
+      for (const game of mapCfbEvents(body)) {
+        if (since !== null && (game.endIso === null || game.endIso.slice(0, 10) < since)) continue;
+        if (seen.has(game.slug)) continue;
+        seen.add(game.slug);
+        games.push(game);
+      }
+      if (body.length < pageSize) break;
     }
   }
-  return games;
+
+  const cap = options?.limitGames ?? 0;
+  return cap > 0 ? games.slice(0, cap) : games;
 }
 
 function mapCfbEvents(body: readonly unknown[]): CfbGame[] {
@@ -260,6 +278,7 @@ function mapCfbEvents(body: readonly unknown[]): CfbGame[] {
         if (marketSlug !== "") marketSlugs.push(marketSlug);
         tokenIds.push(...jsonArray(market.clobTokenIds));
       }
+      const endIso = text(event.endDate) || text(event.startTime) || null;
       return {
         slug,
         title: text(event.title),
@@ -267,6 +286,7 @@ function mapCfbEvents(body: readonly unknown[]): CfbGame[] {
         conditionIds,
         marketSlugs,
         clobTokenIds: tokenIds,
+        endIso,
       };
     })
     .filter((game): game is CfbGame => game !== null);
@@ -449,6 +469,11 @@ function normalizeCombo(
 
 function hashKeys(keys: readonly string[]): string {
   return new Bun.CryptoHasher("sha256").update(keys.join("|")).digest("hex");
+}
+
+/** Zero-padded condition ids look like combo conditions; CLOB answers 404 for them. */
+function looksLikeComboCondition(key: string): boolean {
+  return /^0x[0-9a-f]{40,}0{16,}$/.test(key);
 }
 
 /** Seeds wallets from public CFB trades (one request per sampled market). */
@@ -692,6 +717,8 @@ export async function buildComboUniquenessReport(
             (dedupedAll.length / (dedupedAll.length + combosWithoutAttribution)) * 10_000,
           ) / 100
         : 0,
+    suspectedComboOfComboLegKeys: [...unresolvedByKey.keys()].filter(looksLikeComboCondition)
+      .length,
   };
 
   // Attribution above is mode-independent. Each gate is a pure filter applied afterwards, so a
@@ -778,6 +805,11 @@ export async function buildComboUniquenessReport(
   return {
     gate,
     strictFullGame: strict,
+    index: {
+      games: games.length,
+      activeOnly: options?.includeClosedGames === false,
+      since: options?.since ?? null,
+    },
     games: gamesReport,
     global: {
       gamesWithActivity: gamesReport.filter((game) => game.uniqueCombos > 0).length,

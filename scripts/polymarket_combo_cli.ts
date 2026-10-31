@@ -53,9 +53,12 @@ Notes:
   • uniqueness seeds wallets from the PnL leaderboard (add --seed-trades for CFB trades) and
     caches combo responses under scratch/cfb-combo-cache (CACHE_TTL_HOURS=24 by default,
     --cache-ttl-hours overrides, --fresh bypasses).
-  • uniqueness flags: --strict-full-game (STRICT_FULL_GAME=1), --all-legs-cfb, --cache-dir,
-    --cache-ttl-hours, --seed-trades, --max-seed-markets, --wallet-file, --no-leaderboard,
-    --no-audit, --emit-ids <path>, --dump-wallets <path>, --include-closed-games.
+  • uniqueness flags: --open-only (active games only), --since YYYY-MM-DD, --max-game-pages N,
+    --strict-full-game (STRICT_FULL_GAME=1), --all-legs-cfb, --cache-dir, --cache-ttl-hours,
+    --seed-trades, --max-seed-markets, --wallet-file, --no-leaderboard, --no-audit,
+    --emit-ids <path>, --dump-wallets <path>.
+  • the game index is active+closed by default (settled games still hold unique combos) and
+    paginates the whole series 12756; --open-only restores the old narrow view.
   • three gates, each a pure filter after attribution:
       permissive    = any combo touching a CFB game
       all-legs-cfb  = every leg is CFB and every leg's market_sport_type is
@@ -96,8 +99,10 @@ function comboUniquenessOptions(
     leaderboard: !args.includes("--no-leaderboard") && env.LEADERBOARD !== "0",
     seedTrades: args.includes("--seed-trades") || envFlag("SEED_TRADES"),
     ...(walletFile !== "" ? { walletFile } : {}),
-    limitGames: Number(flag(args, ["--limit-games"], "50")),
-    includeClosedGames: args.includes("--include-closed-games") || envFlag("INCLUDE_CLOSED_GAMES"),
+    limitGames: Number(flag(args, ["--limit-games"], "0")),
+    includeClosedGames: !args.includes("--open-only") && env.INCLUDE_CLOSED_GAMES !== "0",
+    ...(flag(args, ["--since"], "") === "" ? {} : { since: flag(args, ["--since"], "") }),
+    maxGamePages: Number(flag(args, ["--max-game-pages"], "30")),
     concurrency: Number(flag(args, ["--concurrency"], env.CONCURRENCY ?? "6")),
     leaderboardLimit: Number(flag(args, ["--leaderboard-limit"], env.LEADERBOARD_LIMIT ?? "100")),
     maxSeedMarkets: Number(flag(args, ["--max-seed-markets"], env.MAX_SEED_MARKETS ?? "60")),
@@ -315,6 +320,9 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     console.log(
       `CFB combo uniqueness${gateLabel} — games ${report.games.length}, wallets scanned ${report.walletsScanned}`,
     );
+    console.log(
+      `   index               : ${report.index.games} games · ${report.index.activeOnly ? "open-only" : "active+closed"}${report.index.since === null ? "" : ` · since ${report.index.since}`}`,
+    );
     for (const game of report.games.filter((entry) => entry.uniqueCombos > 0)) {
       console.log(`\n🏈 ${game.title} (${game.gameSlug})`);
       console.log(
@@ -360,7 +368,10 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
           `${unresolved.legs} legs, ${unresolved.distinctLegKeys} distinct (${unresolved.oneOffLegKeys} one-off / ${unresolved.systemicLegKeys} systemic)`,
       );
       console.log(
-        `   CFB touch rate      : ${report.diagnostics.cfbTouchRatePct}% of observed combos (non-CFB combos count against it)`,
+        `   resolution rate     : ${report.diagnostics.cfbTouchRatePct}% of observed combos (non-CFB combos count against it)`,
+      );
+      console.log(
+        `   combo-of-combo keys : ${report.diagnostics.suspectedComboOfComboLegKeys} (zero-padded, 404 on CLOB)`,
       );
       for (const entry of unresolved.top.slice(0, 3)) {
         console.log(`     • ${entry.legKey.slice(0, 46)} in ${entry.combos} combo${entry.combos === 1 ? "" : "s"}`);
