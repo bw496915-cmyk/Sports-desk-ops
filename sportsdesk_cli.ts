@@ -55,6 +55,23 @@ import {
   ALL_QWEN_TOKENS,
 } from "./domain-branded-types.ts";
 import { assertUniqueTokenColors } from "./validation/token_validator.ts";
+import {
+  printAnsiMarkdown,
+  formatCustomerOsc8Markdown,
+  formatAgentOsc8Markdown,
+  formatDocsOsc8Markdown,
+  formatOpenApiSpecOsc8Markdown,
+  CANONICAL_DOMAINS,
+} from "./lib/canonical_osc8_links.ts";
+import {
+  executePlayerColumnMutation,
+  executeVigSetupInsert,
+  queryIpTrackerWebLog,
+  fetchPlayerInfo,
+  PlayerMutationResultCode,
+  MutationClassification,
+} from "./lib/fantasy402_manager_wire.ts";
+
 
 interface DownlineMetadata {
   readonly master_agent: string;
@@ -251,9 +268,63 @@ function loadDownlineData(): DownlinePayload {
 }
 
 export function printHelp(): void {
+  const helpMd = `
+# SportsDesk & Fantasy402 Operations & Intelligence CLI (Bun v1.4+)
+> Grounded in [Sports-desk-ops](https://github.com/bw496915-cmyk/Sports-desk-ops) • [Official API Reference](https://fantasy402-docs-4ay.pages.dev) • [Telegram Bot](https://t.me/demodevdeskbot)
+
+Usage: \`bun sportsdesk_cli.ts [command|option] [parameters...]\`
+
+### 1. SURVEILLANCE & LEADERBOARDS:
+* **winners** [\`-p\` PERIOD] [\`--limit\` N] [\`--sort-by\` net|volume] [\`--format\` table|json|csv]
+* **losers** [\`-p\` PERIOD] [\`--limit\` N] [\`--sort-by\` net|gross_hold] [\`--format\` table|json|csv]
+* **leaderboard** [\`-p\` PERIOD] [\`--limit\` N] [\`--format\` table|json|csv]
+  *(Periods: 24h, 48h, 7d, month, lifetime, all)*
+
+### 2. CORE FORENSICS & SIMULATION:
+* **-f, --forensics, --sharps, --audit-sharps**: Run forensic sharp audit (deficit drivers & playbooks)
+* **-S, --simulate, --sim, --run-sim**: Run full 52-week dual-basis bettor churn simulation
+* **-o, --onepass, --liability, --agent-risk**: Run streaming Agent OnePass 50% liability aggregator
+
+### 3. HIERARCHY & SURVEILLANCE:
+* **-k, --walk-tree, --tree** [AGENT_ID]: Walk downline tree and display customer snapshot telemetry
+* **-C, --customer, --cust** <CUSTOMER_ID>: Lookup individual bettor profile across 9,435 accounts
+* **-d, --downline, --agent** [AGENT_ID]: Query specific sub-agent volume and 50% hold share
+* **-s, --summary**: Display executive master overview (668 agents, 9,435 bettors)
+
+### 4. PLANE 3 INGESTION REPLAY:
+* **replay** [\`--path\` FILE] [\`--pull-raw\` [URL]] [\`--pull-raw-only\`] [\`--channel\` CODE]...
+  *(Self-healing JSONL replay; --pull-raw fetches source bytes before replay)*
+
+### 5. CLOUDFLARE R2 & BACKUP:
+* **r2 --info**: Display Cloudflare R2 bucket & [Public Gateway](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev)
+* **r2 --verify**: Verify Cloudflare API Token status via HTTPS REST API
+* **r2 --sync** [DIR]: Sync report files to Cloudflare R2 bucket
+* **r2 --list**: List remote report objects in R2 bucket
+
+### 6. DOMAIN SPECIFICATIONS & TELEGRAM:
+* **-b, --brands, --types**: Inspect 16 specification-grade nominal branded types
+* **-N, --neurons, --layers**: Inspect 13-entity Qwen3.5-4B (Layers 18-28) neuron registry
+* **-L, --lkeys, --l-keys**: Inspect complete L-key dictionary (Neuron Layers 18-28 & Manager DOM data-language keys)
+* **-W, --writers, --ticket-writers**: Inspect TicketWriter ingestion channel contracts & wire exposure
+* **-t, --telegram, --bot**: Launch Telegram Bot & Scheduled Reporting Service daemon
+* **-A, --telegram-alert** [CUST_ID]: Dispatch instant watch list wager alert (default: RF2003)
+* **-R, --telegram-report** [TYPE]: Dispatch executive report (MORNING_BRIEFING, MIDDAY_STEAM, EVENING_SETTLEMENT)
+
+### 7. API DOCUMENTATION & WIRE SPEC:
+* **docs** [\`--test\`] [\`--dry-run\`] [\`--project\` NAME]: Verify, stage, or deploy [Official API Portal](https://fantasy402-docs-4ay.pages.dev)
+
+### 8. FANTASY402 WIRE OPERATIONS:
+* **wire mutate** [\`-c\` CUST_ID] [\`-a\` AGENT_ID] [\`--col\` COL] [\`--val\` VAL]: Execute updateByColumn with 11-char padding & scope checks
+* **wire vig** [\`-c\` CUST_ID] [\`-s\` SPORT] [\`--spread\` 15] [\`--derivative\` 20]: Set +15c/+20c vig shading via vigSetupInsert
+* **wire weblog** [\`-m\` A|B|C|I] [\`-c\` CUST_ID] [\`--ip\` IP]: Query getWebLog IP Tracker across modes A, B, C, I
+* **wire info** [\`-c\` CUST_ID]: Execute getInfoPlayer read-back verification
+`;
+  printAnsiMarkdown(helpMd);
+  return;
+}
+
+export function printHelpOld(): void {
   console.log(`
-SportsDesk & Fantasy402 Operations & Intelligence CLI (Bun v1.4+)
-Usage: bun sportsdesk_cli.ts [command|option] [parameters...]
 
 1. SURVEILLANCE & LEADERBOARDS:
   winners [-p PERIOD] [--limit N] [--sort-by net|volume] [--format table|json|csv]
@@ -288,6 +359,9 @@ Usage: bun sportsdesk_cli.ts [command|option] [parameters...]
   -t, --telegram, --bot                       Launch Telegram Bot & Scheduled Reporting Service daemon
   -A, --telegram-alert [CUST_ID]              Dispatch instant watch list wager alert (default: RF2003)
   -R, --telegram-report [TYPE]                Dispatch executive report (MORNING_BRIEFING, MIDDAY_STEAM, EVENING_SETTLEMENT)
+
+7. API DOCUMENTATION & WIRE SPEC:
+  docs [--test] [--dry-run] [--project NAME]  Verify, stage, or deploy official OpenAPI 3.1 portal
 `);
 }
 
@@ -568,6 +642,157 @@ export function printNeuronRegistry(): void {
         `${n.colorDepth}`,
     );
   });
+  console.log(
+    "========================================================================================================================\n",
+  );
+}
+
+export function printLKeyDictionary(): void {
+  const reset = "\x1b[0m";
+
+  console.log(
+    "========================================================================================================================",
+  );
+  console.log(
+    "L-KEY DICTIONARY: QWEN3.5-4B NEURON TOKENS (LAYERS 18-28) & FANTASY402 MANAGER DOM LOCALIZATION",
+  );
+  console.log(
+    "========================================================================================================================",
+  );
+
+  console.log(
+    "\n--- PART 1: NEURON LAYER TOKENS (LAYERS 18-28) • COLOR SWATCHES & OPERATIONAL ROLES ---",
+  );
+  console.log(
+    " Token ID    | Channel / Route      | Hex Code | ANSI Swatch   | Latency / Gate Threshold | Operational Role",
+  );
+  console.log(
+    "-------------+----------------------+----------+---------------+--------------------------+-------------------------------------------------------",
+  );
+
+  const neuronRows = [
+    { id: "L18.N0204", chan: "Internet", hex: "#1d84b5", gate: "1,500 ms SLA", role: "Retail pregame baseline; target twin counterpart" },
+    { id: "L19.N0518", chan: "BLOCKED", hex: "#64748b", gate: "Sentinel Drop", role: "Noise sentinel; dropped before parent ticket grouping" },
+    { id: "L20.N1105", chan: "GATEWAY", hex: "#10b981", gate: "1,000 ms SLA", role: "Equilibrium sweep; monitors hold & +15c/+20c vig persist" },
+    { id: "L21.N0884", chan: "ALERT", hex: "#ef4444", gate: "250 ms SLA", role: "Syndicate alert twin; canonicalVolumeCents = 0 buffer" },
+    { id: "L22.N1402", chan: "GSBUILDER", hex: "#f59e0b", gate: "1,000 ms SLA", role: "Same-game prop builder; M.G<id> join; steerable" },
+    { id: "L23.N0412", chan: "GSLIVE", hex: "#28a745", gate: "500 ms SLA", role: "In-play whale sizing ($2k+); M.G<id>; +20c vig tax" },
+    { id: "L24.N2019", chan: "CSLEVEL2", hex: "#38bdf8", gate: "2,000 ms SLA", role: "Clerk telephone orders; longshot recreational bias" },
+    { id: "L25.N1882", chan: "--sd-route-devig", hex: "#06b6d4", gate: "Lag <= 5,000 ms", role: "Steam convergence; consensus devig reprice" },
+    { id: "L26.N3104", chan: "--sd-route-sharp", hex: "#a855f7", gate: "tau*=0.68, N>=8", role: "Online Empirical Bayes sharp shrinkage detector" },
+    { id: "L27.N0912", chan: "--sd-route-pending", hex: "#d97706", gate: "Depth < $1,000", role: "Liquidity exhaustion circuit breaker trip" },
+    { id: "L28.N2501", chan: "--sd-route-manager", hex: "#f43f5e", gate: "MFCS >= 80", role: "Terminal execution write-gate; 6s delay & limit clamp" },
+  ];
+
+  neuronRows.forEach((n) => {
+    let ansi = "";
+    try {
+      if (typeof Bun !== "undefined") {
+        ansi = Bun.color(n.hex, "ansi-16m") ?? "";
+      }
+    } catch {}
+    const swatch = `${ansi}████████${reset}`;
+    console.log(
+      `${n.id.padEnd(12)} | ` +
+      `${n.chan.padEnd(20)} | ` +
+      `${n.hex.padEnd(8)} | ` +
+      `${swatch.padEnd(15)} | ` +
+      `${n.gate.padEnd(24)} | ` +
+      `${n.role}`,
+    );
+  });
+
+  console.log(
+    "\n--- PART 2: FANTASY402 MANAGER DOM LOCALIZATION KEYS (data-language=\"L-xxxx\") ---",
+  );
+  console.log(
+    " DOM L-Key  | DOM Header / Element | Wire Mapping Property | Purpose & Telemetry Binding",
+  );
+  console.log(
+    "------------+----------------------+-----------------------+----------------------------------------------------------------------",
+  );
+
+  const domRows = [
+    { key: "L-1029", label: "Source", prop: "TicketWriter", desc: "Channel discriminator (Internet, ALERT, GSLIVE, GSBUILDER, CSLEVEL2)" },
+    { key: "L-1028", label: "Ticket #", prop: "WagerNumber", desc: "Monotonic parent wager ID; half of composite key ${Login}|${WagerNumber}" },
+    { key: "L-1031", label: "Player / Account", prop: "Login / customerID", desc: "Customer login; trimmed for queries, 11-char space-padded on writes" },
+    { key: "L-1032", label: "Agent", prop: "agentOwner / agentID", desc: "Direct owning sub-agent hierarchy; prevents REJECTED_SCOPE (-1)" },
+    { key: "L-1033", label: "Date / Time", prop: "PlacedTimestamp", desc: "Placed timestamp (UTC); calculates post-login dwell velocity (<15s)" },
+    { key: "L-1034", label: "Sport", prop: "SportType", desc: "Sport name; padded to strictly 20 chars on vigSetupInsert" },
+    { key: "L-1035", label: "Description", prop: "ShortDesc", desc: "Market description, ShortDesc[0] code, <br> legs, M.G<id> headers" },
+    { key: "L-1036", label: "Risk", prop: "Risk", desc: "Stake in USD; integer Cents in SQLite; zeroed out on ALERT slips" },
+    { key: "L-1037", label: "To Win", prop: "Win / ToWin", desc: "Potential payout in USD; integer Cents in SQLite" },
+    { key: "L-1038", label: "Result / Status", prop: "Result / Status", desc: "Resolution status (Pending, Won, Lost, Pushed, Canceled)" },
+    { key: "L-1039", label: "IP Address", prop: "ipAddress", desc: "Client auth IP; feeds Mode B global matcher and /24 subnet clustering" },
+    { key: "L-1040", label: "Delay", prop: "Delay", desc: "Dynamic delay gate in seconds; mutated via updateByColumn (0s to 15s)" },
+    { key: "L-1045", label: "Balance", prop: "CurrentBalance", desc: "Player outstanding balance; verified via getInfoPlayer read-back" },
+    { key: "L-1050", label: "Weekly Total", prop: "grandTotalWeekly", desc: "Mobile header KPI; verified against Report/getWeeklyFigure" },
+  ];
+
+  domRows.forEach((d) => {
+    console.log(
+      `${d.key.padEnd(11)} | ` +
+      `${d.label.padEnd(20)} | ` +
+      `${d.prop.padEnd(21)} | ` +
+      `${d.desc}`,
+    );
+  });
+
+  console.log(
+    "========================================================================================================================\n",
+  );
+}
+
+export function printTicketWriters(): void {
+  const reset = "\x1b[0m";
+
+  console.log(
+    "========================================================================================================================",
+  );
+  console.log(
+    "FANTASY402 TICKETWRITER INGESTION CHANNELS & WIRE CONTRACT MATRIX",
+  );
+  console.log(
+    "========================================================================================================================",
+  );
+
+  console.log(
+    " Channel Name | Neuron Layer | Hex Code | ANSI Swatch   | ShortDesc[0] | SLA Target | Volume Rule (Cents) | Core Forensic Exposure",
+  );
+  console.log(
+    "--------------+--------------+-----------+---------------+--------------+------------+---------------------+---------------------------------------------------",
+  );
+
+  const writerRows = [
+    { name: "Internet", layer: "L18.N0204", hex: "#1d84b5", code: "S,P,T,C,E", sla: "1,500 ms", vol: "min(Risk, Win)", desc: "Retail pregame baseline; target twin counterpart" },
+    { name: "ALERT", layer: "L21.N0884", hex: "#ef4444", code: "S,P,L,G,M", sla: "250 ms", vol: "STRICTLY 0", desc: "Syndicate sub-account mirror; gapDurationSeconds <= 6s" },
+    { name: "GSLIVE", layer: "L23.N0412", hex: "#28a745", code: "M (tick)/G (pend)", sla: "500 ms", vol: "min(Risk, Win)", desc: "In-play whale sizing; M.G<id> header; empty Team/Line; +20c vig" },
+    { name: "GSBUILDER", layer: "L22.N1402", hex: "#f59e0b", code: "C,M,P", sla: "1,000 ms", vol: "min(Risk, Win)", desc: "Same-Game Parlay builder; <br> delimited legs; correlated props" },
+    { name: "CSLEVEL2", layer: "L24.N2019", hex: "#38bdf8", code: "L,S,C,E", sla: "2,000 ms", vol: "min(Risk, Win)", desc: "Clerk telephone desk entries; doubles tennis; longshot bias" },
+    { name: "BLOCKED", layer: "L19.N0518", hex: "#64748b", code: "Empty / any", sla: "DROP", vol: "DROPPED (0)", desc: "Noise filter sentinel; must drop before multi-leg grouping" },
+    { name: "GATEWAY", layer: "L20.N1105", hex: "#10b981", code: "Empty", sla: "1,000 ms", vol: "DIAGNOSTIC", desc: "Equilibrium telemetry; verifies +15c/+20c vig persist read-backs" },
+  ];
+
+  writerRows.forEach((w) => {
+    let ansi = "";
+    try {
+      if (typeof Bun !== "undefined") {
+        ansi = Bun.color(w.hex, "ansi-16m") ?? "";
+      }
+    } catch {}
+    const swatch = `${ansi}████████${reset}`;
+    console.log(
+      `${w.name.padEnd(13)} | ` +
+      `${w.layer.padEnd(12)} | ` +
+      `${w.hex.padEnd(9)} | ` +
+      `${swatch.padEnd(15)} | ` +
+      `${w.code.padEnd(12)} | ` +
+      `${w.sla.padEnd(10)} | ` +
+      `${w.vol.padEnd(19)} | ` +
+      `${w.desc}`,
+    );
+  });
+
   console.log(
     "========================================================================================================================\n",
   );
@@ -881,6 +1106,105 @@ function getArgValue(
   return defaultValue;
 }
 
+export async function handleWireCommand(args: string[]): Promise<void> {
+  const sub = args[0]?.toLowerCase();
+  if (sub === "mutate" || sub === "mutation" || sub === "update") {
+    const custId = getArgValue(args, ["-c", "--customer", "--customer-id"], "CB112_1");
+    const agentId = getArgValue(args, ["-a", "--agent", "--agent-owner"], "CUB22HR");
+    const col = getArgValue(args, ["--col", "--column"], "confirmationDelaySeconds");
+    const val = getArgValue(args, ["--val", "--value"], "5");
+    const verify = !args.includes("--no-verify");
+
+    console.log(`[Wire Mutation] Executing updateByColumn for ${custId} (Agent: ${agentId}, Col: ${col}, Val: ${val})...`);
+    try {
+      const res = await executePlayerColumnMutation({
+        customerIdentifier: custId,
+        agentOwnerIdentifier: agentId,
+        column: col,
+        value: val,
+        verifyReadBack: verify,
+      });
+      console.log(`[Wire Mutation] Classification: ${res.classification} (Committed: ${res.isCommitted}, ReadBack: ${res.readBackVerified})`);
+      console.log(`  Customer (padded) : "${res.customerId}"`);
+      console.log(`  Agent Owner       : "${res.agentOwner}"`);
+      console.log(`  Column / Value    : ${res.column} = ${res.value}`);
+    } catch (err: any) {
+      console.error(`[Wire Mutation Error] ${err.message}`);
+      process.exitCode = err.exitCode ?? 1;
+    }
+    return;
+  }
+
+  if (sub === "vig" || sub === "vig-setup" || sub === "vigsetup") {
+    const custId = getArgValue(args, ["-c", "--customer", "--customer-id"], "CB112_1");
+    const sport = getArgValue(args, ["-s", "--sport"], "Football");
+    const spread = getArgValue(args, ["--spread"], "15");
+    const deriv = getArgValue(args, ["--derivative"], "20");
+    const verify = !args.includes("--no-verify");
+
+    console.log(`[Wire Vig] Executing vigSetupInsert for ${custId} (${sport}, +${spread}c spread, +${deriv}c derivative)...`);
+    try {
+      const res = await executeVigSetupInsert({
+        customerIdentifier: custId,
+        sportType: sport,
+        vigSpread: spread,
+        vigDerivative: deriv,
+        verifyReadBack: verify,
+      });
+      console.log(`[Wire Vig] Success: ${res.success} (ReadBack: ${res.readBackVerified})`);
+      console.log(`  Sport (20-pad)    : "${res.sportType}"`);
+      console.log(`  Player (11-pad)   : "${res.player}"`);
+      console.log(`  Vig Spread / Deriv: +${res.vigSpread}c / +${res.vigDerivative}c`);
+    } catch (err: any) {
+      console.error(`[Wire Vig Error] ${err.message}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (sub === "weblog" || sub === "ip-tracker" || sub === "iptracker") {
+    const mode = (getArgValue(args, ["-m", "--mode"], "B").toUpperCase()) as "A" | "B" | "C" | "I";
+    const custId = getArgValue(args, ["-c", "--customer"], "0");
+    const ip = getArgValue(args, ["--ip"], "");
+    console.log(`[Wire IP Tracker] Querying getWebLog mode ${mode} (Customer: ${custId}, IP: ${ip || "ALL"})...`);
+    try {
+      const res = await queryIpTrackerWebLog({
+        mode,
+        customerId: custId,
+        ip,
+      });
+      console.log(`[Wire IP Tracker] Mode ${res.mode} returned ${res.rowCount} row(s) at ${res.queryTimestamp}`);
+    } catch (err: any) {
+      console.error(`[Wire IP Tracker Error] ${err.message}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (sub === "info" || sub === "player") {
+    const custId = getArgValue(args, ["-c", "--customer"], "CB112_1");
+    console.log(`[Wire Read-Back] Fetching getInfoPlayer for ${custId}...`);
+    try {
+      const res = await fetchPlayerInfo({ customerIdentifier: custId });
+      console.log(`[Wire Read-Back] Result:`, res);
+    } catch (err: any) {
+      console.error(`[Wire Read-Back Error] ${err.message}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  console.log(`
+Usage: bun sportsdesk_cli.ts wire <subcommand> [options]
+
+Subcommands:
+  mutate   Execute updateByColumn mutation (-c <CUST_ID> -a <AGENT_ID> --col <COL> --val <VAL>)
+  vig      Execute vigSetupInsert (+15c/+20c) (-c <CUST_ID> -s <SPORT> --spread 15 --derivative 20)
+  weblog   Query getWebLog IP Tracker (-m A|B|C|I -c <CUST_ID> --ip <IP>)
+  info     Fetch getInfoPlayer read-back (-c <CUST_ID>)
+`);
+}
+
 export async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
 
@@ -895,6 +1219,11 @@ export async function main(): Promise<void> {
     return;
   }
   const cmd = cmdArg.toLowerCase();
+
+  if (cmd === "wire" || rawArgs.includes("--wire")) {
+    await handleWireCommand(rawArgs.slice(1));
+    return;
+  }
 
   if (cmd === "winners" || cmd === "win") {
     printWinners(rawArgs.slice(1));
@@ -959,6 +1288,28 @@ export async function main(): Promise<void> {
     cmd === "layers"
   ) {
     printNeuronRegistry();
+    return;
+  }
+
+  if (
+    rawArgs.includes("-L") ||
+    rawArgs.includes("--lkeys") ||
+    rawArgs.includes("--l-keys") ||
+    cmd === "lkeys" ||
+    cmd === "l-keys"
+  ) {
+    printLKeyDictionary();
+    return;
+  }
+
+  if (
+    rawArgs.includes("-W") ||
+    rawArgs.includes("--writers") ||
+    rawArgs.includes("--ticket-writers") ||
+    cmd === "writers" ||
+    cmd === "ticket-writers"
+  ) {
+    printTicketWriters();
     return;
   }
 
@@ -1052,6 +1403,50 @@ export async function main(): Promise<void> {
     console.log(
       "================================================================================\n",
     );
+    return;
+  }
+
+  if (cmd === "docs" || cmd === "doc" || rawArgs.includes("--docs")) {
+    // Automated Documentation Error Finder via Bun.cron & Bun.WebView
+    if (rawArgs.includes("--audit")) {
+      const proc = Bun.spawn(["bun", "run", "scripts/audit_docs_webview_cron.ts"], {
+        cwd: currentDir,
+        stdout: "inherit",
+        stderr: "inherit",
+        stdin: "inherit",
+      });
+      process.exitCode = await proc.exited;
+      return;
+    }
+
+    if (rawArgs.includes("--watch") || rawArgs.includes("-w")) {
+      const proc = Bun.spawn(["bun", "run", "scripts/audit_docs_webview_cron.ts", "--watch"], {
+        cwd: currentDir,
+        stdout: "inherit",
+        stderr: "inherit",
+        stdin: "inherit",
+      });
+      process.exitCode = await proc.exited;
+      return;
+    }
+
+    const scriptArgs = ["./deploy_docs.sh"];
+    if (rawArgs.includes("--test") || rawArgs.includes("-t")) scriptArgs.push("--test-only");
+    if (rawArgs.includes("--dry-run") || rawArgs.includes("-d")) scriptArgs.push("--dry-run");
+    if (rawArgs.includes("--project") || rawArgs.includes("-p")) {
+      const idx = rawArgs.findIndex(function(a) { return a === "--project" || a === "-p"; });
+      if (idx !== -1 && rawArgs[idx + 1]) {
+        scriptArgs.push("--project", rawArgs[idx + 1]);
+      }
+    }
+
+    const proc = Bun.spawn(scriptArgs, {
+      cwd: currentDir,
+      stdout: "inherit",
+      stderr: "inherit",
+      stdin: "inherit",
+    });
+    process.exitCode = await proc.exited;
     return;
   }
 

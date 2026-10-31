@@ -85,10 +85,14 @@ if command -v bun >/dev/null 2>&1; then
 else
   mkdir -p dist
   cp docs/index.html dist/index.html
+  cp docs/graph.html dist/graph.html
+  cp docs/graph.js dist/graph.js
   cp docs/openapi.json dist/openapi.json
   cp functions/_headers dist/_headers
 fi
 echo "✓ Staged dist/index.html ($(wc -c < dist/index.html | tr -d ' ') bytes)"
+test -f dist/graph.html && echo "✓ Staged dist/graph.html ($(wc -c < dist/graph.html | tr -d ' ') bytes)"
+test -f dist/graph.js && echo "✓ Staged dist/graph.js ($(wc -c < dist/graph.js | tr -d ' ') bytes)"
 echo "✓ Staged dist/openapi.json ($(wc -c < dist/openapi.json | tr -d ' ') bytes)"
 test -f dist/_headers && echo "✓ Staged dist/_headers ($(wc -c < dist/_headers | tr -d ' ') bytes)"
 

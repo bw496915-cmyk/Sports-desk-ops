@@ -71,7 +71,7 @@
     "onepass": "bun run agent_onepass_plugin.ts",
     "serve": "bun run sportsdesk_webview_server.ts",
     "deploy": "./deploy_to_vps.sh",
-    "docs:stage": "mkdir -p dist && cp docs/index.html dist/index.html && cp docs/openapi.json dist/openapi.json && cp functions/_headers dist/_headers",
+    "docs:stage": "mkdir -p dist && cp docs/index.html dist/index.html && cp docs/graph.html dist/graph.html && cp docs/graph.js dist/graph.js && cp docs/openapi.json dist/openapi.json && cp functions/_headers dist/_headers",
     "docs:openapi": "bun run scripts/generate_openapi.ts",
     "docs:deploy": "bun run test:docs && bun run verify:docs && bun run docs:stage && ./wrangler pages deploy dist --project-name=fantasy402-docs --branch=main",
     "docs:verify:live": "bun run scripts/verify_docs.ts --live https://fantasy402-docs-4ay.pages.dev",
@@ -85,8 +85,16 @@
     "crawl:tiles": "bun run scripts/portal_tile_crawler.ts --offline",
     "test:capture": "bun test tests/capture_*.test.ts tests/portal_audit.test.ts",
     "deploy:docs": "./deploy_docs.sh",
+    "dx": "./bin/dx status",
+    "dx:stage": "./bin/dx stage",
+    "dx:deploy": "./bin/dx deploy",
+    "dx:ship": "./bin/dx ship",
     "catalog:probe": "bun run scripts/catalog_probe.ts",
-    "catalog:probe:dry": "bun run scripts/catalog_probe.ts --dry-run"
+    "catalog:probe:dry": "bun run scripts/catalog_probe.ts --dry-run",
+    "graph:poll": "./bin/dx poll",
+    "graph:watch": "./bin/dx watch",
+    "graph:deploy": "./bin/dx deploy",
+    "backtest:4wk": "./bin/dx backtest"
   },
   "keywords": [
     "sportsdesk",

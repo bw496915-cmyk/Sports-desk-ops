@@ -1,25 +1,18 @@
 # SportsDesk ops docs
 
-Evidence-labelled API documentation for the SportsDesk & Fantasy402 wire surface. The portal is
+Evidence-labelled API documentation and real-time surveillance topology for the SportsDesk & Fantasy402 wire surface. The portal is
 **Scalar**, pinned to a single CDN version with SRI; the markdown reference is **generated** from the
 OpenAPI spec plus the evidence ledger, so a claim cannot drift away from its evidence tier.
 
 ## What is verified vs inferred
 
-- **Verified (tier B):** a small number of operations have a captured request or an
-  implementation-verified route. The only real wire capture is the 2026-10-28 Manager HAR
-  (portal `v1.0.279`, request side only).
-- **Inferred (tier C):** most operations are authored proposals — no request or response was ever
-  observed, and their request/response shapes are not contracts.
-- **Captured responses (tier A):** none yet. The live capture tooling is available but has not been run
-  for this release, so **every response schema in these docs is authored unless its row says otherwise**.
-  GS Partner 118 live acquisition is `blocked_contract` by design.
+- **Captured responses (tier A):** 5 Manager operations (`2026-10-31` live capture session) carry full request+response captures and capture-derived schemas (`x-capture`).
+- **Verified (tier B):** operations with a captured request or an implementation-verified route (`2026-10-28` Manager HAR, portal `v1.0.279`).
+- **Inferred (tier C):** authored proposals where no request or response was observed; kept clearly labelled.
+- **GS Partner 118:** live acquisition is `blocked_contract` by design (see [gs-manager-contracts.md](./gs-manager-contracts.md)).
 
 Read the full model in [EVIDENCE.md](./EVIDENCE.md). The machine-readable source of truth is
-[evidence/ledger.json](./evidence/ledger.json); the capture plan is
-[evidence/capture-requests.md](./evidence/capture-requests.md); the missing-surface inventory is
-[evidence/surfaces.md](./evidence/surfaces.md); the capture/apply tooling is
-[evidence/capture-tooling.md](./evidence/capture-tooling.md).
+[evidence/ledger.json](./evidence/ledger.json).
 
 ## Docs set
 
@@ -27,12 +20,23 @@ Read the full model in [EVIDENCE.md](./EVIDENCE.md). The machine-readable source
 | ------------------------------------------------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | [api-reference.md](./api-reference.md)                                         | Developers & Risk  | Generated reference: evidence tiers, headers matrix, auth, per-operation sections, inferred/missing-surface appendices           |
 | [openapi.json](./openapi.json)                                                 | API / OpenAPI 3.1  | Machine-readable spec (`info.version` 2026.10.31) with per-operation `x-evidence`                                                |
-| [index.html](./index.html)                                                     | Interactive portal | Scalar viewer (`@scalar/api-reference@1.76.4`, SRI-pinned), dark theme                                                           |
+| [index.html](./index.html)                                                     | Interactive portal | Scalar viewer (`@scalar/api-reference@1.76.4`, SRI-pinned), dark theme, header link to `./graph.html`                            |
+| [graph.html](./graph.html)                                                     | Surveillance & Ops | Dedicated Phase 6C Surveillance Graph, 39-Wallet Polymarket Registry, Today's Open Bets ($702.7K), & 1Q–4Q / Alt Ring Drawer     |
+| [cross-market-parlay-matching.md](./cross-market-parlay-matching.md)           | Risk & Quant Desk  | Phase 1–6C architecture: LineHundredths, sub-500ms WSS Shadow Syncer, 180s Quarantine Auto-Resolver, & 15% Siloed Capital Cap    |
 | [EVIDENCE.md](./EVIDENCE.md)                                                   | Auditors           | Evidence standard, tier legend, what is verified vs inferred, contradictions, limitations                                        |
 | [gs-manager-contracts.md](./gs-manager-contracts.md)                           | GS integration     | Why the GS manager CLI has **no** HTTP contract: 6 report kinds, all `blocked_contract`, the one observed `getBetReport` payload |
 | [evidence/capture-tooling.md](./evidence/capture-tooling.md)                   | Capture operators  | WebView+FetchSession architecture, capture store schema v1, live gating, read-only allowlist, redaction, B→A upgrade rules       |
 | [schema-dump-operations.md](./schema-dump-operations.md)                       | Registry + release | `dump-prod` vs `sync-prod-dump`, snapshot parity, allowlist, `captured_at` / dump lag                                            |
 | [schema-sqlite-failure-mode-matrix.md](./schema-sqlite-failure-mode-matrix.md) | Debug parity exits | Exit **2** / **3**, env knobs, SQLite strict/sentinel, EOD WAL                                                                   |
+
+## Zero-Friction DX Workflow (`./bin/dx`)
+
+```bash
+./bin/dx status                           # Verify sandbox $HOME, XDG re-anchoring, Git config, Wrangler 4.156.0 & dist/
+./bin/dx stage                            # Stage docs/{index.html,graph.html,graph.js,openapi.json} + functions/_headers -> dist/
+./bin/dx deploy                           # Stage + publish dist/ to Cloudflare R2 Edge (pub-d061f943df0e4477ba7ff200721eddb1.r2.dev) & Pages
+./bin/dx ship                             # Stage + deploy to Cloudflare Edge + push main to origin
+```
 
 ## Regenerating and gating the docs
 
@@ -46,31 +50,11 @@ bun run verify:docs                       # structural gate + markdown freshness
 `docs/api-reference.md` is generated, not edited by hand. If you change [openapi.json](./openapi.json)
 or [evidence/ledger.json](./evidence/ledger.json), re-run the generator and commit the result.
 
-## Capturing and applying evidence
+**Portal deploy staging:** `bun run docs:stage` (or `./bin/dx stage`) copies `docs/index.html`, `docs/graph.html`, `docs/graph.js`, `docs/openapi.json`, and
+`functions/_headers` into `dist/`. Do not unpin the Scalar version or remove the `integrity`/`crossorigin` attributes.
 
-```bash
-bun run capture:evidence                  # mock/offline capture run (CI-safe, never upgrades evidence)
-F402_LIVE_CAPTURE=1 bun run capture:evidence:live   # gated live run; credentials in .env, never argv
-bun run apply:captures                    # dry-run: validate the store and print the B->A plan
-bun run apply:captures -- --write         # apply, regenerate spec+markdown, run the docs gate, audit
-bun run docs:audit:portal                 # one console/DOM audit of the deployed docs portal
-bun run crawl:tiles                       # offline launcher-tile discovery (candidates, no wire claims)
-```
-
-Tier A is populated by the 2026-10-31 live capture session (5 Manager responses); `apply_captures` refuses mock captures, requires a
-clean-redaction live 2xx response with a body skeleton, resolves a contradicted row only through such a
-capture (recording the previous reason), and is idempotent. `--write` is capture-ready: it upgrades B→A
-from live captures, regenerates the spec and markdown, and the docs gate accepts a valid `x-capture` (see
-[evidence/capture-tooling.md](./evidence/capture-tooling.md)).
-
-**Portal deploy staging:** `bun run docs:stage` copies `docs/index.html`, `docs/openapi.json` and
-`functions/_headers` into `dist/`; Cloudflare Pages only applies `_headers` when it is at the deploy
-root. Do not unpin the Scalar version or remove the `integrity`/`crossorigin` attributes.
-
-**CLI entry:** `bun run sportsdesk_schema_cli.ts --help` · `bun sportsdesk_cli.ts forensics --help`
-
-**CI:** `bun run schema:gate` — typecheck, snapshot parity (`CI=true`), fixture drift check, parity gauntlet, EOD smoke.
-
-**Drills:** `schema:parity-gauntlet` · `schema:check-fixture-drift` · `eod:smoke`
+**Live Edge URLs:**
+- **Surveillance Graph & Shadow Portfolio:** `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html` (and `https://desk.bookdeskops.com/graph`)
+- **API Reference Portal:** `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/index.html` (and `https://fantasy402-docs-4ay.pages.dev`)
 
 **Diagram:** [assets/ARCH-Guide.png](./assets/ARCH-Guide.png)
