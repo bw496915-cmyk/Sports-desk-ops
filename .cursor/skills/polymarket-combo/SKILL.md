@@ -34,6 +34,9 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
 6. `--strict-full-game` keeps only single-game combos where every leg is CFB and every CFB leg is
    `moneyline|spreads|totals`.
 7. Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h (`--cache-ttl-hours`), `--fresh` bypasses.
+8. Env aliases: `CACHE_TTL_HOURS`, `CACHE_DIR`, `FRESH=1`, `STRICT_FULL_GAME=1`, `SEED_TRADES=1`,
+   `CONCURRENCY`, `LEADERBOARD=0`, `LEADERBOARD_LIMIT`, `MAX_SEED_MARKETS`, `WALLET_FILE`.
+   CLI flags win over env.
 8. `lb-api.polymarket.com` is retired (410); use `data-api/v2/leaderboard`.
 
 ## Limits

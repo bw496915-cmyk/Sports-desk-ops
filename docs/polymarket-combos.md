@@ -71,6 +71,23 @@ Caveats:
 `--no-leaderboard`, `--leaderboard-limit`, `--seed-trades`, `--max-seed-markets`, `--wallet-file`,
 `--strict-full-game`, `--limit-games`, `--max-combo-pages`.
 
+### Environment knobs
+
+CLI flags win over environment, which wins over defaults.
+
+| Variable | Default | Effect |
+| :--- | :--- | :--- |
+| `CACHE_TTL_HOURS` | `24` | Cache age before a wallet is refetched; `0` disables reuse |
+| `CACHE_DIR` | `scratch/cfb-combo-cache` | Cache location |
+| `FRESH` | unset | `1` ignores the cache for this run |
+| `STRICT_FULL_GAME` | unset | `1` enables single-game ML/spread/total-only counts |
+| `SEED_TRADES` | unset | `1` seeds wallets from sampled CFB trades |
+| `CONCURRENCY` | `6` | Wallet fetch parallelism |
+| `LEADERBOARD` | enabled | `0` skips leaderboard seeding |
+| `LEADERBOARD_LIMIT` | `100` | Rows per leaderboard period |
+| `MAX_SEED_MARKETS` | `60` | Condition IDs sampled by the trade seeder |
+| `WALLET_FILE` | unset | Extra wallet addresses (whitespace-separated) |
+
 ## 4. Uniqueness semantics
 
 - A combo is attributed to a game by, in order: `leg_condition_id` / `conditionId` (including

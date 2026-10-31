@@ -155,21 +155,22 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
   }
 
   if (sub === "uniqueness") {
+    const env = process.env;
+    const envFlag = (key: string): boolean => env[key] === "1";
+    const walletFile = flag(args, ["--wallet-file"], env.WALLET_FILE ?? "");
     const report = await buildComboUniquenessReport({
-      strictFullGame: args.includes("--strict-full-game"),
-      fresh: args.includes("--fresh"),
-      leaderboard: !args.includes("--no-leaderboard"),
-      seedTrades: args.includes("--seed-trades"),
-      ...(flag(args, ["--wallet-file"], "") !== ""
-        ? { walletFile: flag(args, ["--wallet-file"], "") }
-        : {}),
+      strictFullGame: args.includes("--strict-full-game") || envFlag("STRICT_FULL_GAME"),
+      fresh: args.includes("--fresh") || envFlag("FRESH"),
+      leaderboard: !args.includes("--no-leaderboard") && env.LEADERBOARD !== "0",
+      seedTrades: args.includes("--seed-trades") || envFlag("SEED_TRADES"),
+      ...(walletFile !== "" ? { walletFile } : {}),
       limitGames: Number(flag(args, ["--limit-games"], "50")),
-      concurrency: Number(flag(args, ["--concurrency"], "6")),
-      leaderboardLimit: Number(flag(args, ["--leaderboard-limit"], "100")),
-      maxSeedMarkets: Number(flag(args, ["--max-seed-markets"], "60")),
+      concurrency: Number(flag(args, ["--concurrency"], env.CONCURRENCY ?? "6")),
+      leaderboardLimit: Number(flag(args, ["--leaderboard-limit"], env.LEADERBOARD_LIMIT ?? "100")),
+      maxSeedMarkets: Number(flag(args, ["--max-seed-markets"], env.MAX_SEED_MARKETS ?? "60")),
       maxComboPages: Number(flag(args, ["--max-combo-pages"], "3")),
-      cacheDir: flag(args, ["--cache-dir"], "scratch/cfb-combo-cache"),
-      cacheTtlHours: Number(flag(args, ["--cache-ttl-hours"], "24")),
+      cacheDir: flag(args, ["--cache-dir"], env.CACHE_DIR ?? "scratch/cfb-combo-cache"),
+      cacheTtlHours: Number(flag(args, ["--cache-ttl-hours"], env.CACHE_TTL_HOURS ?? "24")),
     });
     if (json) {
       console.log(JSON.stringify(report, null, 2));
