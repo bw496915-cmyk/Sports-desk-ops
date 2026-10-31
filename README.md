@@ -1,8 +1,34 @@
 # SportsDesk & Fantasy402 Operations Suite
 
-Production intelligence, downline risk surveillance, Cloudflare R2 backup, Qwen3.5-4B neuron token taxonomy, and automated reporting pipeline built on the **Bun runtime (v1.4.4)** for SportsDesk and Fantasy402 books.
+Production intelligence, downline risk surveillance, 10-Mode Forensic/Risk/Cross-Market/Reconciliation engine, Cloudflare R2 edge portal, Qwen3.5-4B neuron token taxonomy, and automated reporting pipeline built on the **Bun runtime (v1.4.4)** for SportsDesk and Fantasy402 books.
 
 Repository: [bw496915-cmyk/Sports-desk-ops](https://github.com/bw496915-cmyk/Sports-desk-ops)
+
+## 🚀 Day-1 Operator Onboarding & 60-Second Triage Guide
+
+If you are opening this repository for the first time or starting a desk shift, read the **[Operator Quickstart, Data Cleaning Pipeline & 10-Mode Action Runbook](docs/OPERATOR_QUICKSTART_AND_10_MODE_RUNBOOK.md)** and open the **[Live 6-Tab Surveillance, ROT Bet-Ticker & 10-Mode Forensic Portal (`graph.html`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html)**.
+
+Always use **`./bin/dx`** as your primary entrypoint—it automatically configures sandbox/host `$HOME/.gitconfig`, links `/Users/nolarose/dotfiles`, loads Cloudflare R2 credentials, and runs across both Bun (`v1.4.4`) and Node (`v22+` native TypeScript):
+
+```bash
+# 1. Verify environment, Git config, staged dist/ assets, and live Cloudflare R2 gateway
+./bin/dx status
+
+# 2. Run the 10-Mode Forensic, Risk, Cross-Market & Data Integrity Matrix (all 10 modes or a single mode 1..10)
+./bin/dx modes
+./bin/dx modes 6    # Mode 6: Activity Overlap (Confirmed Session Overlap vs Nearby Point Events)
+./bin/dx modes 9    # Mode 9: Pending Exposure (Stake vs Potential Payout vs Defined Liability)
+./bin/dx modes 10   # Mode 10: Reconciliation (Report Totals vs Settled Tickets vs Ledger, Gap = $0.00)
+
+# 3. Audit all 13 Per-Office (type="B" customerID=<Office>) & Cross-Office (customerID="0") IP-Tracker Clusters
+./bin/dx iptracker
+
+# 4. Run the 4-Week Full-Customer (57,755 accounts) CFB & NBA Parlay/Combo Backtest
+./bin/dx backtest
+
+# 5. Poll all 39 Polymarket 0x wallets + 49 F402 logins and publish the 6-Tab Portal to Cloudflare R2
+./bin/dx deploy
+```
 
 ## Schema registry & prod dump parity
 
