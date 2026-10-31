@@ -6,13 +6,17 @@ export type SchemaBrandKind =
 
 export class SchemaBrandError extends TypeError {
   override readonly name = "SchemaBrandError";
+  readonly kind: SchemaBrandKind;
+  readonly identifier: string;
 
   constructor(
     message: string,
-    readonly kind: SchemaBrandKind,
-    readonly identifier: string,
+    kind: SchemaBrandKind,
+    identifier: string,
   ) {
     super(message);
+    this.kind = kind;
+    this.identifier = identifier;
   }
 }
 
