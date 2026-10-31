@@ -30,6 +30,13 @@ import {
   type PositionCache,
   type WalletIngestState,
 } from "../lib/polymarket_ingest.ts";
+import { probeF402BetTicker, type F402Probe } from "../lib/f402_ingest.ts";
+import {
+  describeF402Session,
+  readF402Session,
+  refreshF402Session,
+  writeF402Session,
+} from "../lib/f402_session.ts";
 
 const repoRoot = path.resolve(import.meta.dirname ?? path.dirname(process.argv[1] ?? process.cwd()), "..");
 
@@ -74,7 +81,18 @@ export interface FeedProvenance {
         readonly truncatedWallets: readonly string[];
       }
     | { readonly source: "fixture"; readonly reason: string };
-  readonly f402: { readonly source: "fixture"; readonly reason: string };
+  readonly f402:
+    | {
+        readonly source: "live";
+        readonly endpoint: string;
+        readonly httpStatus: number;
+        readonly rows: number;
+        readonly fetchedAtIso: string;
+        readonly durationMs: number;
+        readonly error: string | null;
+        readonly mapped: false;
+      }
+    | { readonly source: "fixture"; readonly reason: string };
 }
 
 export interface PendingBetRow {
@@ -189,6 +207,7 @@ export function buildGraphLiveFeed(
   options?: {
     readonly ingest?: readonly WalletIngestState[] | null;
     readonly snapshot?: PolymarketSnapshot | null;
+    readonly f402Probe?: F402Probe | null;
   },
 ): GraphLiveFeedPayload {
   const now = new Date();
@@ -557,6 +576,7 @@ export function buildGraphLiveFeed(
 
   const liveWallets = walletProfiles.filter((wallet) => wallet.dataSource !== "FIXTURE");
   const liveSnapshot = options?.snapshot ?? null;
+  const f402Probe = options?.f402Probe ?? null;
   const totalOpenLegsCount =
     liveWallets.length > 0
       ? liveWallets.reduce((sum, wallet) => sum + wallet.openLegsCount, 0)
@@ -580,7 +600,18 @@ export function buildGraphLiveFeed(
           source: "fixture",
           reason: "live ingest disabled (pass --live or set SPORTSDESK_LIVE_INGEST=1)",
         },
-    f402: { source: "fixture", reason: "no F402 session cache; pendingBets remain fixture rows" },
+    f402: f402Probe
+      ? {
+          source: "live",
+          endpoint: f402Probe.endpoint,
+          httpStatus: f402Probe.httpStatus,
+          rows: f402Probe.rows,
+          fetchedAtIso: f402Probe.fetchedAtIso,
+          durationMs: f402Probe.durationMs,
+          error: f402Probe.error,
+          mapped: false,
+        }
+      : { source: "fixture", reason: "no F402 session; pendingBets remain fixture rows" },
   };
 
   return {
@@ -589,7 +620,7 @@ export function buildGraphLiveFeed(
     lastUpdatedCdt: nowCdt,
     pollEpochMs: now.getTime(),
     pollSequence,
-    dataMode: liveSnapshot === null ? "FIXTURE" : "PARTIAL",
+    dataMode: liveSnapshot === null && f402Probe === null ? "FIXTURE" : "PARTIAL",
     provenance,
     schedulerEngine: "Bun.cron('* * * * *') + bun --watch + <500ms CLOB WSS",
     wsStreamSlaMs: 345,
@@ -630,10 +661,11 @@ function writePositionCache(filePath: string, cache: PositionCache): void {
 
 export async function writeGraphLiveFeedOnce(
   syncR2 = false,
-  options?: { readonly live?: boolean },
+  options?: { readonly live?: boolean; readonly liveF402?: boolean },
 ): Promise<GraphLiveFeedPayload> {
   let snapshot: PolymarketSnapshot | null = null;
   let ingest: readonly WalletIngestState[] | null = null;
+  let f402Probe: F402Probe | null = null;
 
   if (options?.live) {
     const cachePath = path.join(repoRoot, POSITION_CACHE_REL);
@@ -654,7 +686,46 @@ export async function writeGraphLiveFeedOnce(
     }
   }
 
-  const payload = buildGraphLiveFeed(pollCounter++, { ingest, snapshot });
+  if (options?.liveF402) {
+    const offline = process.env.F402_OFFLINE_ONLY?.trim() === "1";
+    if (offline) {
+      console.warn("[GraphPoller] f402: F402_OFFLINE_ONLY=1 — session probe skipped");
+    } else {
+      const agentId = process.env.F402_AGENT_ID?.trim() || "BILLY666";
+      const baseUrl = process.env.F402_BASE_URL?.trim() || "https://fantasy402.com";
+      let session = readF402Session();
+      if (session === null) {
+        try {
+          session = await refreshF402Session();
+          writeF402Session(session);
+          console.log(`[GraphPoller] f402 logged in: ${describeF402Session(session)}`);
+        } catch (error) {
+          console.warn(`[GraphPoller] f402 session unavailable: ${(error as Error).message}`);
+        }
+      } else {
+        console.log(`[GraphPoller] f402 cached: ${describeF402Session(session)}`);
+      }
+
+      if (session !== null) {
+        f402Probe = await probeF402BetTicker(session, { baseUrl, agentId });
+        if (f402Probe.error === "unauthorized") {
+          try {
+            session = await refreshF402Session();
+            writeF402Session(session);
+            f402Probe = await probeF402BetTicker(session, { baseUrl, agentId });
+            console.log("[GraphPoller] f402 session refreshed after 401");
+          } catch (error) {
+            console.warn(`[GraphPoller] f402 refresh failed: ${(error as Error).message}`);
+          }
+        }
+        console.log(
+          `[GraphPoller] f402 probe: http=${f402Probe.httpStatus} rows=${f402Probe.rows} mapped=false${f402Probe.error ? ` error=${f402Probe.error}` : ""}`,
+        );
+      }
+    }
+  }
+
+  const payload = buildGraphLiveFeed(pollCounter++, { ingest, snapshot, f402Probe });
   const docsTarget = path.join(repoRoot, "docs", "graph-live-feed.json");
   const distDir = path.join(repoRoot, "dist");
   const distTarget = path.join(distDir, "graph-live-feed.json");
@@ -693,10 +764,11 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
   const syncR2 = args.includes("--r2");
   const live = args.includes("--live") || process.env.SPORTSDESK_LIVE_INGEST === "1";
+  const liveF402 = args.includes("--live-f402") || process.env.SPORTSDESK_LIVE_F402 === "1";
 
   const run = async (): Promise<void> => {
     try {
-      await writeGraphLiveFeedOnce(syncR2, { live });
+      await writeGraphLiveFeedOnce(syncR2, { live, liveF402 });
     } catch (error) {
       console.error(`[GraphPoller] ✗ poll failed: ${(error as Error).message}`);
       process.exitCode = 1;
@@ -714,7 +786,7 @@ if (import.meta.main) {
   }
   if (args.includes("--cron") || args.includes("--daemon") || args.includes("--watch")) {
     console.log(
-      `[GraphPoller] Starting continuous 60s schedule (in-process Bun.cron, live=${live}, syncR2=${syncR2})...`
+      `[GraphPoller] Starting continuous 60s schedule (in-process Bun.cron, live=${live}, liveF402=${liveF402}, syncR2=${syncR2})...`
     );
     Bun.cron("* * * * *", () => {
       void run();

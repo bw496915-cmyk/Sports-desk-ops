@@ -95,11 +95,31 @@ one-line summary: `ok=38 failed=1 stale=1`.
 
 1. **4a (shipped):** `--live` fetches Polymarket positions; wallet aggregates and summaries become
    observed; pending bets and F402 remain fixture and are labelled.
-2. **4b (next):** F402 session cache — one WebView login, cookie file 0600, refresh on 401, then
-   `getPending` populates `pendingBets` with `sourceVenue: "F402_LIVE"`.
+2. **4b (shipped as a probe):** F402 session cache — one WebView login (`F402_LIVE_LOGIN=1`),
+   cookie file `0600` at `~/.cache/sportsdesk/f402-session.json` (override `F402_SESSION_FILE`),
+   TTL 30 min (`F402_SESSION_TTL_MIN`), refresh once on 401. `getBetTicker` (tier A) is probed and
+   its row count recorded in `provenance.f402`; rows are **not** mapped yet, so `pendingBets`
+   remains fixture and `mapped: false` is explicit. `getPending` stays out until a response is
+   captured (tier C today).
 3. **4c:** CLOB WSS stream replaces the 60 s positions poll for latency-sensitive rows.
 4. Canary: run `--live` for one poll, diff wallet counts against the fixture, confirm no `NaN`/`null`
    leaks, then enable `SPORTSDESK_LIVE_INGEST=1` in the daemon.
+
+### F402 command surface
+
+```bash
+# read-only probe with a cached session (login only if the cache is missing/expired)
+F402_LIVE_LOGIN=1 ./bin/dx poll --live-f402
+
+# both planes in one poll
+./bin/dx poll --live --live-f402
+
+# continuous daemon
+SPORTSDESK_LIVE_INGEST=1 SPORTSDESK_LIVE_F402=1 ./bin/dx watch
+```
+
+`F402_OFFLINE_ONLY=1` disables the probe. The cache is refused when group/world-readable, expired,
+or malformed; logs list cookie names only.
 
 ### Observed on the first live run (2026-10-31)
 

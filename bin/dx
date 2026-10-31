@@ -89,7 +89,8 @@ SportsDesk DX — operator commands
   ./bin/dx docs [gslive|--json]   Deployed API docs (Scalar, R2, local artifacts)
   ./bin/dx stale -i <export>      Stale-line / post-move bet cohort
   ./bin/dx backtest               4-week CFB + NBA parlay/combo backtest
-  ./bin/dx poll [--once] [--live]  Poll feeds (add --live for real Polymarket positions)
+  ./bin/dx poll [--once] [--live] [--live-f402]
+                                  Poll feeds (--live = Polymarket, --live-f402 = F402 probe)
   ./bin/dx watch                  In-process Bun.cron daemon (60s) + R2 sync
   ./bin/dx stage                  Regenerate + stage dist/ (no upload)
   ./bin/dx deploy                 Stage, publish to R2 and Cloudflare Pages
