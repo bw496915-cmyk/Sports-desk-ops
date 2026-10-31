@@ -73,16 +73,17 @@ surface (which has no implementation at all).
 
 ---
 
-## Capture tooling (available, not yet run)
+## Capture tooling (live run completed 2026-10-31)
 
 Live capture is implemented and gated behind `F402_LIVE_CAPTURE=1` plus credentials in `.env` (never argv).
 It records an authenticated request and the live response as a value-free capture record — sha256 plus a
 schema skeleton, a redaction report and provenance — under the live-only store
-`docs/evidence/captures/` (mock fixtures stay in `tests/fixtures/captures/`), so tier A stays 0 until a
-live capture actually lands. `scripts/apply_captures.ts` is the only sanctioned upgrade path: dry-run by
-default, B→A only, and it refuses mock, redaction-dirty, response-less and mutation captures. Contradicted
-rows are left untouched, the same capture hash is an idempotent no-op, and `--write` regenerates the spec
-and markdown, runs the docs gate, and restores ledger/spec/markdown byte-for-byte on any failure. The
+`docs/evidence/captures/` (mock fixtures stay in `tests/fixtures/captures/`). The 2026-10-31 live run
+captured five read-only Manager responses, which is why tier A is 5. `scripts/apply_captures.ts` is the
+only sanctioned upgrade path: dry-run by default, B/C→A, and it refuses mock, redaction-dirty,
+response-less and mutation captures. A contradicted B row is resolved only through a valid live capture
+(previous reason preserved), the same capture hash is an idempotent no-op, and `--write` regenerates the
+spec and markdown, re-stages dist, runs the docs gate, and restores ledger/spec/markdown on any failure. The
 architecture, commands, read-only allowlist, redaction policy, tier-upgrade rules, release-baseline
 blocker and limitations are in [evidence/capture-tooling.md](./evidence/capture-tooling.md).
 
@@ -186,11 +187,14 @@ Full inventory with evidence: [evidence/surfaces.md](./evidence/surfaces.md).
 
 ## Limitations (quotable paragraph for the docs generator)
 
-> The ledger distinguishes captured wire evidence from observation and inference: no operation in this
-> release has a captured response body, so every response schema here is authored unless its row says
-> otherwise. The only real wire artifact is the 2026-10-28 Manager HAR request capture (portal v1.0.279),
-> which recorded one `getWebLog` mode-B request and the `getInfoPlayer` read request but no response
-> bodies; `getWebLog` modes A, C and I and the `getWebLog` response/auth shape remain unverified. GS
+> The ledger distinguishes captured wire evidence from observation and inference: five Manager operations
+> (`getWebLog`, `getInfoPlayer`, `getBetTicker`, `getBetTickerConfig`, `getSportsVigSetup`) have live
+> request+response captures from 2026-10-31 and publish capture-derived response schemas; every other
+> response schema is authored unless its row says otherwise. Earlier wire artifacts are the 2026-10-28
+> Manager HAR (mode-B request only) and the 2026-10-31 live run, whose three remaining requests
+> (`getPending`, `getInfoManager`, `getCustomerNotes`) returned HTTP 500 with the current request
+> template. Sub-sport lanes and period menus are desk-navigation catalog data, not yet captured live;
+> live pregame sports parity is verified separately (19/19 sports, `getSportsType`). GS
 > Buckeye 2 Partner 118 live acquisition is blocked by design — no endpoint, method, authentication
 > mechanism or response contract for any GS report has been verified, and the observed `getBetReport`
 > payload does not establish a transport. The 11 "Tracked Operational Domains" entries are UI/DOM
