@@ -76,6 +76,8 @@ export interface FeedProvenance {
         readonly walletsRequested: number;
         readonly walletsOk: number;
         readonly walletsFailed: number;
+        readonly walletsStale: number;
+        readonly walletsInvalid: number;
         readonly fetchedAtIso: string;
         readonly durationMs: number;
         readonly truncatedWallets: readonly string[];
@@ -577,6 +579,11 @@ export function buildGraphLiveFeed(
   const liveWallets = walletProfiles.filter((wallet) => wallet.dataSource !== "FIXTURE");
   const liveSnapshot = options?.snapshot ?? null;
   const f402Probe = options?.f402Probe ?? null;
+  const ingestStates = options?.ingest ?? [];
+  const walletsStale = ingestStates.filter((state) => state.dataSource === "STALE").length;
+  const walletsInvalid = TRACKED_WALLET_ADDRESSES.filter(
+    (address) => !isValidWalletAddress(address),
+  ).length;
   const totalOpenLegsCount =
     liveWallets.length > 0
       ? liveWallets.reduce((sum, wallet) => sum + wallet.openLegsCount, 0)
@@ -592,6 +599,8 @@ export function buildGraphLiveFeed(
           walletsRequested: liveSnapshot.requested,
           walletsOk: liveSnapshot.ok,
           walletsFailed: liveSnapshot.failed,
+          walletsStale,
+          walletsInvalid,
           fetchedAtIso: liveSnapshot.fetchedAtIso,
           durationMs: liveSnapshot.durationMs,
           truncatedWallets: liveSnapshot.truncatedWallets,

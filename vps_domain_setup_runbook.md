@@ -35,5 +35,5 @@ The script automatically:
 | Component           | Command / URL                                | Expected Result                        |
 | :------------------ | :------------------------------------------- | :------------------------------------- |
 | **Systemd Service** | `systemctl status sportsdesk-ops`            | `Active: active (running)`             |
-| **Public Health**   | `curl -s https://desk.yourdomain.com/health` | `HTTP 200 OK`                          |
+| **Public Health**   | `bun -e 'const r = await fetch("https://desk.yourdomain.com/health"); console.log(r.status)'` | `200`                       |
 | **Telegram Bot**    | `https://t.me/demodevdeskbot`                | Interactive `/start` menu and Mini App |

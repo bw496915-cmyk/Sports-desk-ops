@@ -7,7 +7,8 @@ This guide details the integration of your Cloudflare Account, Scoped API Token,
 | Variable                    | Configured Value                                                    | Operational Purpose                                    |
 | :-------------------------- | :------------------------------------------------------------------ | :----------------------------------------------------- |
 | **`CLOUDFLARE_ACCOUNT_ID`** | `7a470541a704caaf91e71efccc78fd36`                                  | Scopes Cloudflare API requests & R2 namespace          |
-| **`CLOUDFLARE_API_TOKEN`**  | `<CLOUDFLARE_API_TOKEN>` _(configured in `.env`)_                   | Edge DNS, Tunnel authentication & API verification     |
+| **`CLOUDFLARE_API_TOKEN`**  | `<CLOUDFLARE_API_TOKEN>` _(configured in `.env`)_                   | Pages deploy, DNS & account API verification            |
+| **`CLOUDFLARE_R2_API_TOKEN`** | `<CLOUDFLARE_R2_API_TOKEN>` _(configured in `.env`)_             | R2-scoped token; kept separate so Wrangler does not shadow it |
 | **`R2_ACCESS_KEY_ID`**      | `<R2_ACCESS_KEY_ID>` _(configured in `.env`)_                       | S3-compatible client access key                        |
 | **`R2_SECRET_ACCESS_KEY`**  | `<R2_SECRET_ACCESS_KEY>` _(configured in `.env`)_                   | S3-compatible secret signing key (SigV4)               |
 | **`R2_ENDPOINT`**           | `https://7a470541a704caaf91e71efccc78fd36.r2.cloudflarestorage.com` | Global S3 REST endpoint                                |
@@ -16,13 +17,19 @@ This guide details the integration of your Cloudflare Account, Scoped API Token,
 
 ## 2. Token Verification & Cloudflare Edge Services
 
-### 2.1. Instant Verification via Curl
+### 2.1. Instant Verification (Bun, no curl)
 
-Run this command from your terminal or VPS to verify the token status:
+Run this from the repo root; it prints the token status without shelling out to `curl`:
 
 ```bash
-curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/7a470541a704caaf91e71efccc78fd36/tokens/verify" \
-  -H "Authorization: Bearer \${CLOUDFLARE_API_TOKEN}"
+bun -e '
+const token = process.env.CLOUDFLARE_API_TOKEN;
+if (!token) { console.error("CLOUDFLARE_API_TOKEN is unset"); process.exit(1); }
+const res = await fetch("https://api.cloudflare.com/client/v4/accounts/7a470541a704caaf91e71efccc78fd36/tokens/verify", {
+  headers: { authorization: `Bearer ${token}` },
+});
+console.log(res.status, JSON.stringify(await res.json()));
+'
 ```
 
 _Expected response:_

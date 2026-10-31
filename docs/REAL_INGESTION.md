@@ -1,14 +1,16 @@
 # Real Ingestion — Polymarket + Fantasy402 (Phase 4)
 
-Status: **proposed + partially implemented**. Polymarket positions are live-capable; F402 remains
-fixture-backed until a session cache exists. This page states exactly what is verified.
+Status: **partially implemented**. Polymarket positions are live (`--live`), F402 has a session
+cache and a read-only `getBetTicker` probe (`--live-f402`), and pending-bet row mapping is still
+fixture. This page states exactly what is verified.
 
 ## 1. Why
 
-`docs/graph-live-feed.json` is currently a deterministic fixture: 39 wallet rows, 14 synthetic
-pending bets and a static $702,700 exposure figure. Operators read it as telemetry. The goal is to
-replace the numbers with observed data, keep provenance per wallet, and never let a failed fetch
-silently look live.
+`docs/graph-live-feed.json` starts as a deterministic fixture: 39 configured wallet rows, 14
+synthetic pending bets and a static $702,700 figure. With `--live`, the 23 valid wallet rows are
+replaced by observed Polymarket positions; the 16 placeholder addresses are quarantined and
+`pendingBets` stays fixture until its mapping is captured. Operators read the feed as telemetry, so
+provenance is per wallet and a failure never silently looks live.
 
 ## 2. Sources and evidence level
 
@@ -16,7 +18,7 @@ silently look live.
 | :--- | :--- | :--- | :--- |
 | Polymarket positions | `GET https://data-api.polymarket.com/positions?user=<0x>&limit=500&offset=0` | none | **Live-verified** 2026-10-31: HTTP 200, 214 positions for `0x26cf…c612`, ~0.6 s |
 | Polymarket CLOB WSS | `wss://ws-subscriptions-clob.polymarket.com/ws/...` | none | Not implemented here; see the shadow-stream runbooks |
-| F402 `getPending` | `POST /cloud/api/Manager/getPending` | session cookie / JWT | **Tier B** (request side only); response uncaptured |
+| F402 `getPending` | `POST /cloud/api/Manager/getPending` | session cookie / JWT | **Tier C** — request and response uncaptured; content type disputed |
 | F402 `getBetTicker` | `POST /cloud/api/Manager/getBetTicker` | session cookie / JWT | **Tier A** capture exists (2026-10-31) |
 
 F402 auth is not a password grant. `scripts/evidence_capture.ts` logs in through a headless
@@ -34,7 +36,8 @@ Top-level:
   "provenance": {
     "polymarket": {
       "source": "https://data-api.polymarket.com/positions",
-      "walletsRequested": 39, "walletsOk": 38, "walletsFailed": 1,
+      "walletsRequested": 39, "walletsOk": 23, "walletsFailed": 16,
+      "walletsStale": 0, "walletsInvalid": 16,
       "fetchedAtIso": "…", "durationMs": 4120,
       "truncatedWallets": []
     },
@@ -58,8 +61,28 @@ Per wallet, additive fields (existing keys stay):
 }
 ```
 
-`dataMode` is `LIVE` only when every requested wallet returned fresh data and F402 is live;
-`PARTIAL` when any wallet is stale or F402 is fixture; `FIXTURE` when live ingest is off.
+`dataMode` is `PARTIAL` whenever any plane is live but pending bets are still fixture. `LIVE` is
+reserved for the point where every wallet is fresh **and** F402 pending rows are mapped; that is not
+reachable yet. `FIXTURE` means live ingest is off.
+
+`openVolumeUsd` is **cost basis** (sum `initialValue`), `positionsValueUsd` is current mark
+(sum `currentValue`), and `openPnlUsd` is `cashPnl`. `totalOpenExposureUsd` is the sum of current
+position value, **not** defined liability.
+
+## 3.1 Wire → feed mapping
+
+| Source shape | Canonical mapper | Feed / UI output | Status |
+| :--- | :--- | :--- | :--- |
+| F402 `RawPendingLegRow` (cents, UTC-5, per-leg) | `reconstructParentPendingTickets` (`simulate_bettor_churn_suite.ts`) → `ReconstructedTicket` (`ticketId`, `riskCents`, `winCents`, padded id, `is_live_wager`) | `pendingBets[].ticketId/riskUsd/toWinUsd` | **Gap** — no adapter; feed rows are hand-authored |
+| F402 report leg (`AdjSpread`/`AdjTotalPoints`) | `mapF402ReportLeg` + `computeEffectiveLineHundredths` (`combo_identity.ts`) | Mode 7 `lineHundredths` | Implemented |
+| F402 `RawBetTickerTick` (cents, UTC-5) | none yet | `provenance.f402.rows` only | Probe only; captured response exists (tier A) |
+| Polymarket position | `parsePolymarketPosition` → `aggregatePositions` (`lib/polymarket_ingest.ts`) | `walletProfiles[].openVolumeUsd/openLegsCount/positionsValueUsd/openPnlUsd/openBetsSummary` | Implemented |
+| GSLive account | `formatGsLivePlayerToken` / `formatGsLivePartnerUserId` | report `text=player_<LOGIN>`; bet-history `partnerUserId=<LOGIN>` | Implemented, documented in `report-surfaces.md` |
+| 4-part identity | `gslive_manager_watchlist.ts` tuple | `customerLogin + agentId + gsLivePlayerId + proxyWallet` | Implemented, runbook §2.6 |
+
+Timestamps: wire rows are UTC-5 (`InsertDateTime`), the feed uses UTC ISO, and desk-day windows use
+`America/Chicago` via `resolveDeskDateYmd` / `computeDeskDayStartEpochSeconds`. Money: wire `Risk` /
+`ToWin` are **cents**, the feed publishes **USD**; never mix them in one calculation.
 
 ## 4. Poll behavior
 

@@ -26,8 +26,9 @@ Always use **`./bin/dx`** as your primary entrypoint—it automatically configur
 # 4. Run the 4-Week Full-Customer (57,755 accounts) CFB & NBA Parlay/Combo Backtest
 ./bin/dx backtest
 
-# 5. Poll all 39 Polymarket 0x wallets + 49 F402 logins and publish the 6-Tab Portal to Cloudflare R2
-./bin/dx deploy
+# 5. Poll configured Polymarket wallets (23 valid), stage the 6-Tab Portal and publish to R2
+#    Add SPORTSDESK_LIVE_INGEST=1 (Polymarket) and/or SPORTSDESK_LIVE_F402=1 (F402 probe)
+SPORTSDESK_LIVE_INGEST=1 ./bin/dx deploy
 ```
 
 **Operator tools:**
