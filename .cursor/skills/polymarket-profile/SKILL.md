@@ -32,7 +32,8 @@ Do not shell out to curl; do not add npm packages.
 | :--- | :--- |
 | `data-api.polymarket.com/positions?user=<0x>&sizeThreshold=0&limit=500&offset=` | current positions |
 | `data-api.polymarket.com/activity?user=<0x>&limit=500&end=<last timestamp>` | activity, cursor by timestamp |
-| `data-api.polymarket.com/v2/leaderboard?window=all&limit=500&cursor=` | username → wallet (lb-api is retired) |
+| `data-api.polymarket.com/v2/leaderboard?user=<0x>&time_period=all\|month\|week` | PnL snapshot (single user; not `day`) |
+| `data-api.polymarket.com/v2/leaderboard?limit=500&cursor=` | username → wallet (lb-api is retired) |
 | `gamma-api.polymarket.com/events?slug=<eventSlug>` | category/tags |
 
 ## Rules that matter
@@ -45,9 +46,11 @@ Do not shell out to curl; do not add npm packages.
 4. **Win rate** = won / (won + lost), where `redeemable == true` and `currentValue > 0` means won;
    `redeemable == true` and `currentValue == 0` means lost. Never use `cashPnl > 0` as the win test.
    If won+lost < 3, estimate from REDEEM vs TRADE activity and label it.
-5. **PnL**: `lb-api` is retired (HTTP 410). Use the sum of position `cashPnl` and label it as such;
-   a ranked address can also be looked up on the v2 leaderboard, but the endpoint has no address
-   filter, so the CLI does not paginate the whole board for it.
+5. **PnL**: `lb-api` is retired (HTTP 410). Use
+   `data-api/v2/leaderboard?user=<0x>&time_period=all|month|week` (omit `time_period` and it
+   behaves like `day`). The number is **pre-fee**; `pnlAudit` replays activity for a fee-aware
+   cashflow PnL and withholds it when pagination truncates. Unranked wallets return `data: null` —
+   report "no PnL figure", never zero.
 6. **Categories**: Gamma `category` first, then tag labels, then title keywords. Old markets may
    return `[]`; fall back to title inference.
 7. **Pattern classification** (SPLIT arbitrage, market maker, whale/concentrated, diversified,

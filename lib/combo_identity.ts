@@ -79,33 +79,33 @@ export const F402_WAGER_TYPE_MAP: Readonly<Record<F402ReportWagerTypeCode, F402W
 export interface F402CustomerReportPendingRow {
   readonly TicketNumber: string | number;
   readonly WagerNumber: string | number;
-  readonly CustomerID?: string;
-  readonly Login?: string;
-  readonly AgentID?: string;
+  readonly CustomerID?: string | undefined;
+  readonly Login?: string | undefined;
+  readonly AgentID?: string | undefined;
   readonly AmountWagered: number; // Always stored in integer cents
   readonly ToWinAmount: number; // Always stored in integer cents
-  readonly Description?: string;
+  readonly Description?: string | undefined;
   readonly WagerType: F402ReportWagerTypeCode | string;
-  readonly totalPicks?: number;
-  readonly GameDateTime?: string;
-  readonly SportType?: string;
-  readonly SportSubType?: string;
-  readonly PeriodNumber?: number | string;
-  readonly Team1ID?: string;
-  readonly Team2ID?: string;
-  readonly ChosenTeamID?: string;
-  readonly Team1RotNum?: number | string;
-  readonly Team2RotNum?: number | string;
-  readonly AdjSpread?: number | string | null;
-  readonly AdjTotalPoints?: number | string | null;
-  readonly TotalPointsOU?: "o" | "u" | "O" | "U" | string | null;
-  readonly TeaserPoints?: number | string | null;
-  readonly FreePlayFlag?: "Y" | "N" | string;
-  readonly WagerStatus?: "W" | "L" | "X" | "P" | string;
-  readonly PlacedOn?: string;
-  readonly TicketWriter?: string;
-  readonly ListedPitcher1?: string;
-  readonly Pitcher1ReqFlag?: string;
+  readonly totalPicks?: number | undefined;
+  readonly GameDateTime?: string | undefined;
+  readonly SportType?: string | undefined;
+  readonly SportSubType?: string | undefined;
+  readonly PeriodNumber?: number | string | undefined;
+  readonly Team1ID?: string | undefined;
+  readonly Team2ID?: string | undefined;
+  readonly ChosenTeamID?: string | undefined;
+  readonly Team1RotNum?: number | string | undefined;
+  readonly Team2RotNum?: number | string | undefined;
+  readonly AdjSpread?: number | string | null | undefined;
+  readonly AdjTotalPoints?: number | string | null | undefined;
+  readonly TotalPointsOU?: "o" | "u" | "O" | "U" | string | null | undefined;
+  readonly TeaserPoints?: number | string | null | undefined;
+  readonly FreePlayFlag?: "Y" | "N" | string | undefined;
+  readonly WagerStatus?: "W" | "L" | "X" | "P" | string | undefined;
+  readonly PlacedOn?: string | undefined;
+  readonly TicketWriter?: string | undefined;
+  readonly ListedPitcher1?: string | undefined;
+  readonly Pitcher1ReqFlag?: string | undefined;
 }
 
 /**
@@ -551,14 +551,18 @@ export function mapPolyLeg(raw: PolymarketRawOrderLeg): CanonicalLeg {
 
   let side: MarketSide = "UNKNOWN";
   const rawSide = (raw.side ?? "").toUpperCase();
-  if (rawSide.includes("OVER")) side = "OVER";
+  // Exact tokens first: "UNDERDOG" contains "UNDER", so substring matching alone
+  // would mislabel every underdog spread as a total Under.
+  if (rawSide === "UNDERDOG") side = "UNDERDOG";
+  else if (rawSide === "FAVORITE") side = "FAVORITE";
+  else if (rawSide === "OVER") side = "OVER";
+  else if (rawSide === "UNDER") side = "UNDER";
+  else if (rawSide === "YES") side = "YES";
+  else if (rawSide === "NO") side = "NO";
+  else if (rawSide.includes("OVER")) side = "OVER";
   else if (rawSide.includes("UNDER")) side = "UNDER";
   else if (rawSide.includes("HOME")) side = "HOME";
   else if (rawSide.includes("AWAY")) side = "AWAY";
-  else if (rawSide === "YES") side = "YES";
-  else if (rawSide === "NO") side = "NO";
-  else if (rawSide === "FAVORITE") side = "FAVORITE";
-  else if (rawSide === "UNDERDOG") side = "UNDERDOG";
   else if (raw.line !== undefined && raw.line !== null) {
     const l = parseFloat(String(raw.line));
     side = l < 0 ? "FAVORITE" : "UNDERDOG";

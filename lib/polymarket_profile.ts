@@ -9,6 +9,7 @@
 
 import { parsePolymarketPosition, type PolymarketPosition } from "./polymarket_ingest.ts";
 
+/** Retired (HTTP 410). Kept only so callers can recognise stale references. */
 export const LB_API = "https://lb-api.polymarket.com";
 export const DATA_API = "https://data-api.polymarket.com";
 export const GAMMA_API = "https://gamma-api.polymarket.com";
@@ -21,6 +22,12 @@ export interface PolymarketActivity {
   readonly timestamp: number;
   readonly title: string;
   readonly outcome: string;
+  /** Share count; present on TRADE rows and required for the fee residual. */
+  readonly size?: number;
+  /** Fill price; present on TRADE rows and required for the fee residual. */
+  readonly price?: number;
+  /** True for combo/CTF fills (`isCombo` on the wire). */
+  readonly isCombo?: boolean;
 }
 
 export interface ProfileFetchOptions {
@@ -48,6 +55,8 @@ export interface ActivitySummary {
   readonly splitVolume: number;
   readonly mergeVolume: number;
   readonly redeemVolume: number;
+  readonly comboTrades: number;
+  readonly comboTradeVolume: number;
   readonly uniqueMarkets: number;
   readonly firstTimestamp: number | null;
   readonly lastTimestamp: number | null;
@@ -90,6 +99,7 @@ export interface AddressProfile {
   readonly topWins: readonly PolymarketPosition[];
   readonly topLosses: readonly PolymarketPosition[];
   readonly strategy: StrategyPattern;
+  readonly pnlAudit: PnlAudit;
   readonly pagesFetched: number;
   readonly activityTruncated: boolean;
 }
@@ -166,16 +176,29 @@ export async function resolvePolymarketAddress(
   return null;
 }
 
+/**
+ * PnL snapshot from the v2 leaderboard single-user lookup.
+ *
+ * `lb-api.polymarket.com/profit` is retired (HTTP 410). `data-api/v2/leaderboard?user=<0x>`
+ * returns one object and honours `time_period`: `all` = lifetime, `month` = 30d, `week` = 7d.
+ * Omitting `time_period` behaves like `day`, so it is never used here.
+ */
 async function fetchPnlWindow(
   address: string,
   window: "all" | "7d" | "30d",
   options?: ProfileFetchOptions,
 ): Promise<{ amount: number | null; name: string | null }> {
-  const base = (options?.lbBase ?? LB_API).replace(/\/$/, "");
+  const base = (options?.dataBase ?? DATA_API).replace(/\/$/, "");
+  const period = window === "all" ? "all" : window === "7d" ? "week" : "month";
   try {
-    const rows: unknown = await requestJson(`${base}/profit?window=${window}&address=${address}`, options);
-    const first = Array.isArray(rows) ? asRecord(rows[0]) : null;
-    return { amount: first ? num(first.amount) : null, name: first ? str(first.name) || null : null };
+    const body: unknown = await requestJson(
+      `${base}/v2/leaderboard?user=${address}&time_period=${period}`,
+      options,
+    );
+    const record = asRecord(body);
+    const row = asRecord(record?.data);
+    if (row === null) return { amount: null, name: null };
+    return { amount: num(row.pnl), name: str(row.user_name) || null };
   } catch {
     return { amount: null, name: null };
   }
@@ -229,6 +252,9 @@ function parseActivity(row: unknown): PolymarketActivity | null {
     timestamp: num(record.timestamp),
     title: str(record.title),
     outcome: str(record.outcome),
+    ...(record.size === undefined ? {} : { size: num(record.size) }),
+    ...(record.price === undefined ? {} : { price: num(record.price) }),
+    isCombo: record.isCombo === true,
   };
 }
 
@@ -338,6 +364,8 @@ export function summarizeActivity(rows: readonly PolymarketActivity[]): Activity
   let splitVolume = 0;
   let mergeVolume = 0;
   let redeemVolume = 0;
+  let comboTrades = 0;
+  let comboTradeVolume = 0;
   const markets = new Set<string>();
   let first: number | null = null;
   let last: number | null = null;
@@ -351,6 +379,10 @@ export function summarizeActivity(rows: readonly PolymarketActivity[]): Activity
       tradeVolume += row.usdcSize;
       if (row.side === "SELL") tradeSells += 1;
       else tradeBuys += 1;
+      if (row.isCombo === true) {
+        comboTrades += 1;
+        comboTradeVolume += row.usdcSize;
+      }
     } else if (row.type === "SPLIT") splitVolume += row.usdcSize;
     else if (row.type === "MERGE") mergeVolume += row.usdcSize;
     else if (row.type === "REDEEM") redeemVolume += row.usdcSize;
@@ -362,10 +394,110 @@ export function summarizeActivity(rows: readonly PolymarketActivity[]): Activity
     splitVolume,
     mergeVolume,
     redeemVolume,
+    comboTrades,
+    comboTradeVolume,
     uniqueMarkets: markets.size,
     firstTimestamp: first,
     lastTimestamp: last,
   };
+}
+
+// ============================================================================
+// FEE-AWARE PNL AUDIT
+// ============================================================================
+
+export interface PnlAudit {
+  /** Cashflow PnL: (SELL + REDEEM + MERGE + REBATE) − (BUY + SPLIT) + open value. */
+  readonly cashflowPnlUsd: number | null;
+  readonly grossInUsd: number;
+  readonly grossOutUsd: number;
+  readonly openValueUsd: number;
+  readonly lbApiPnlUsd: number | null;
+  /** `cashflowPnl − lbApiPnl`; positive means the official number understates net. */
+  readonly gapUsd: number | null;
+  readonly gapPct: number | null;
+  /** Residual of `usdcSize` vs `size × price` on TRADE rows; a lower bound on taker fees. */
+  readonly feeResidualUsd: number | null;
+  readonly feeRows: number;
+  readonly tradeRows: number;
+  /** False when activity pagination stopped early, which makes the cashflow number partial. */
+  readonly complete: boolean;
+  readonly reason: string | null;
+}
+
+const INFLOW_TYPES = new Set(["SELL", "REDEEM", "MERGE", "REBATE"]);
+const OUTFLOW_TYPES = new Set(["BUY", "SPLIT"]);
+
+/**
+ * Reconstructs a fee-aware PnL from the activity log and compares it with the official
+ * (pre-fee) leaderboard number.
+ *
+ * `complete: false` when pagination was truncated — the cashflow number is then `null`
+ * rather than a partial figure that would look authoritative.
+ */
+export function auditActivityPnl(
+  rows: readonly PolymarketActivity[],
+  openValueUsd: number,
+  options?: { readonly lbApiPnlUsd?: number | null; readonly activityTruncated?: boolean },
+): PnlAudit {
+  const truncated = options?.activityTruncated === true;
+  const lbApiPnlUsd = options?.lbApiPnlUsd ?? null;
+  let grossIn = 0;
+  let grossOut = 0;
+  let feeResidual = 0;
+  let feeRows = 0;
+  let tradeRows = 0;
+
+  for (const row of rows) {
+    const directional = row.type === "TRADE" ? row.side : row.type;
+    if (INFLOW_TYPES.has(directional)) grossIn += row.usdcSize;
+    else if (OUTFLOW_TYPES.has(directional)) grossOut += row.usdcSize;
+
+    if (row.type === "TRADE" && row.size !== undefined && row.price !== undefined) {
+      tradeRows += 1;
+      const notional = row.size * row.price;
+      if (notional > 0) {
+        const residual =
+          row.side === "SELL" ? notional - row.usdcSize : row.usdcSize - notional;
+        if (residual > 0.005) {
+          feeResidual += residual;
+          feeRows += 1;
+        }
+      }
+    }
+  }
+
+  const complete = !truncated && rows.length > 0;
+  const cashflowPnlUsd = complete ? round2(grossIn - grossOut + openValueUsd) : null;
+  const gapUsd =
+    cashflowPnlUsd === null || lbApiPnlUsd === null ? null : round2(cashflowPnlUsd - lbApiPnlUsd);
+  const gapPct =
+    gapUsd === null || lbApiPnlUsd === null || lbApiPnlUsd === 0
+      ? null
+      : round2((gapUsd / Math.abs(lbApiPnlUsd)) * 100);
+
+  return {
+    cashflowPnlUsd,
+    grossInUsd: round2(grossIn),
+    grossOutUsd: round2(grossOut),
+    openValueUsd: round2(openValueUsd),
+    lbApiPnlUsd,
+    gapUsd,
+    gapPct,
+    feeResidualUsd: tradeRows === 0 ? null : round2(feeResidual),
+    feeRows,
+    tradeRows,
+    complete,
+    reason: complete
+      ? null
+      : truncated
+        ? "ACTIVITY_TRUNCATED: pagination stopped early, cashflow PnL withheld"
+        : "NO_ACTIVITY_ROWS: nothing to replay",
+  };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function chooseStrategy(
@@ -496,6 +628,10 @@ export function buildAddressProfile(input: {
     topWins,
     topLosses,
     strategy: chooseStrategy(activitySummary, positions, open, portfolioValue),
+    pnlAudit: auditActivityPnl(input.activity, portfolioValue, {
+      lbApiPnlUsd: input.pnl.all,
+      activityTruncated: input.activityTruncated,
+    }),
     pagesFetched: input.pagesFetched,
     activityTruncated: input.activityTruncated,
   };

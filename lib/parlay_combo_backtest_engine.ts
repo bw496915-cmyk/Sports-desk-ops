@@ -195,7 +195,12 @@ interface RawEnrichedCustomer {
   }>;
 }
 
-const CUSTOMER_TO_POLY_WALLET: Readonly<Record<string, string>> = {
+/**
+ * Bridged `customerId -> 0x proxy wallet` map. Consumed by the backtest engine and
+ * `lib/customer_poly_bridge.ts`; entries that are not 42-char hex are placeholders and are
+ * quarantined by the bridge rather than queried.
+ */
+export const CUSTOMER_TO_POLY_WALLET: Readonly<Record<string, string>> = {
   BGD101: "0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612",
   BB5127: "0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612",
   MJ102: "0x07db5765beba17be154cbfbd6324a15f3c81fa4f",
@@ -232,6 +237,11 @@ const CUSTOMER_TO_POLY_WALLET: Readonly<Record<string, string>> = {
   AC9901: "0x99e811a266d432c099f534c122a634e003f111a8",
 };
 
+/** Null-safe accessor: `noUncheckedIndexedAccess` makes map reads `string | undefined`. */
+function polyWalletOf(customerId: string): string | null {
+  return CUSTOMER_TO_POLY_WALLET[customerId] ?? null;
+}
+
 function formatCdt(date: Date): string {
   try {
     return (
@@ -252,7 +262,7 @@ function formatCdt(date: Date): string {
 }
 
 export function runFourWeekParlayComboBacktest(
-  repoRoot: string = path.resolve(import.meta.dirname ?? path.dirname(process.argv[1]), "..")
+  repoRoot: string = path.resolve(import.meta.dirname, "..")
 ): FourWeekParlayBacktestReport {
   const now = new Date();
   const enrichedPath = path.join(repoRoot, "enriched_customers_full.json");
@@ -590,7 +600,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.14.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.BGD101,
+      proxyWallet: polyWalletOf("BGD101"),
       cfbTickets: 28,
       cfbHandleUsd: 142000,
       cfbBaselineNet: -64200,
@@ -612,7 +622,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.34.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.MJ102,
+      proxyWallet: polyWalletOf("MJ102"),
       cfbTickets: 18,
       cfbHandleUsd: 84000,
       cfbBaselineNet: -31200,
@@ -634,7 +644,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.34.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.EJ8834,
+      proxyWallet: polyWalletOf("EJ8834"),
       cfbTickets: 22,
       cfbHandleUsd: 96000,
       cfbBaselineNet: -38400,
@@ -656,7 +666,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "PARLAY_EXTRACTOR",
       ipSubnet: "192.168.9.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.CHURN_059,
+      proxyWallet: polyWalletOf("CHURN_059"),
       cfbTickets: 12,
       cfbHandleUsd: 48000,
       cfbBaselineNet: -16400,
@@ -678,7 +688,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "STEAM_CHASER",
       ipSubnet: "172.56.25.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.AT10359,
+      proxyWallet: polyWalletOf("AT10359"),
       cfbTickets: 24,
       cfbHandleUsd: 92000,
       cfbBaselineNet: -29800,
@@ -700,7 +710,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "STEAM_CHASER",
       ipSubnet: "104.28.55.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.CUB22_T1,
+      proxyWallet: polyWalletOf("CUB22_T1"),
       cfbTickets: 46,
       cfbHandleUsd: 184000,
       cfbBaselineNet: -72400,
@@ -722,7 +732,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.14.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.BB5127,
+      proxyWallet: polyWalletOf("BB5127"),
       cfbTickets: 19,
       cfbHandleUsd: 76000,
       cfbBaselineNet: -28400,
@@ -744,7 +754,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.26.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.DA4401,
+      proxyWallet: polyWalletOf("DA4401"),
       cfbTickets: 21,
       cfbHandleUsd: 78000,
       cfbBaselineNet: -26800,
@@ -766,7 +776,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "STEAM_CHASER",
       ipSubnet: "172.56.25.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.BL4402,
+      proxyWallet: polyWalletOf("BL4402"),
       cfbTickets: 25,
       cfbHandleUsd: 88000,
       cfbBaselineNet: -29400,
@@ -788,7 +798,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.30.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.DN2019,
+      proxyWallet: polyWalletOf("DN2019"),
       cfbTickets: 16,
       cfbHandleUsd: 62000,
       cfbBaselineNet: -21400,
@@ -810,7 +820,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.18.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.BR7711,
+      proxyWallet: polyWalletOf("BR7711"),
       cfbTickets: 24,
       cfbHandleUsd: 82000,
       cfbBaselineNet: -29600,
@@ -832,7 +842,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.22.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.CW9012,
+      proxyWallet: polyWalletOf("CW9012"),
       cfbTickets: 23,
       cfbHandleUsd: 79000,
       cfbBaselineNet: -27200,
@@ -854,7 +864,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "STEAM_CHASER",
       ipSubnet: "172.56.37.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.GP300,
+      proxyWallet: polyWalletOf("GP300"),
       cfbTickets: 15,
       cfbHandleUsd: 54000,
       cfbBaselineNet: -16800,
@@ -876,7 +886,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.38.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.FL3301,
+      proxyWallet: polyWalletOf("FL3301"),
       cfbTickets: 20,
       cfbHandleUsd: 68000,
       cfbBaselineNet: -22400,
@@ -898,7 +908,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.42.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.HB7720,
+      proxyWallet: polyWalletOf("HB7720"),
       cfbTickets: 14,
       cfbHandleUsd: 48000,
       cfbBaselineNet: -14800,
@@ -920,7 +930,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "STEAM_CHASER",
       ipSubnet: "172.56.21.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.AK1092,
+      proxyWallet: polyWalletOf("AK1092"),
       cfbTickets: 18,
       cfbHandleUsd: 62000,
       cfbBaselineNet: -19400,
@@ -942,7 +952,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "STEAM_CHASER",
       ipSubnet: "172.56.29.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.CM5510,
+      proxyWallet: polyWalletOf("CM5510"),
       cfbTickets: 19,
       cfbHandleUsd: 64000,
       cfbBaselineNet: -18200,
@@ -964,7 +974,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "STEAM_CHASER",
       ipSubnet: "172.56.33.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.DF8821,
+      proxyWallet: polyWalletOf("DF8821"),
       cfbTickets: 21,
       cfbHandleUsd: 72000,
       cfbBaselineNet: -21600,
@@ -986,7 +996,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "PARLAY_EXTRACTOR",
       ipSubnet: "199.27.128.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.AC9901,
+      proxyWallet: polyWalletOf("AC9901"),
       cfbTickets: 22,
       cfbHandleUsd: 74000,
       cfbBaselineNet: -24200,
@@ -1008,7 +1018,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.34.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.MJ103,
+      proxyWallet: polyWalletOf("MJ103"),
       cfbTickets: 8,
       cfbHandleUsd: 32000,
       cfbBaselineNet: -12400,
@@ -1030,7 +1040,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "EXECUTION_SNIPER",
       ipSubnet: "104.28.34.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.EJ8835,
+      proxyWallet: polyWalletOf("EJ8835"),
       cfbTickets: 7,
       cfbHandleUsd: 28000,
       cfbBaselineNet: -10800,
@@ -1052,7 +1062,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "STEAM_CHASER",
       ipSubnet: "172.56.25.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.NOISE_BOT_77,
+      proxyWallet: polyWalletOf("NOISE_BOT_77"),
       cfbTickets: 9,
       cfbHandleUsd: 34000,
       cfbBaselineNet: -11200,
@@ -1074,7 +1084,7 @@ export function runFourWeekParlayComboBacktest(
       masterAgent: "BILLY666",
       contextType: "WHALE_VOLATILITY",
       ipSubnet: "198.51.100.0/24",
-      proxyWallet: CUSTOMER_TO_POLY_WALLET.RF2003,
+      proxyWallet: polyWalletOf("RF2003"),
       cfbTickets: 42,
       cfbHandleUsd: 310000,
       cfbBaselineNet: 42800,

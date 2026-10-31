@@ -40,6 +40,7 @@ SPORTSDESK_LIVE_INGEST=1 ./bin/dx deploy
 - `./bin/dx profile <0x|username>` — Polymarket address profile: PnL, win rate, open positions, category mix, activity summary and strategy pattern from public APIs.
 - `./bin/dx combo legs|price|wallet|uniqueness` — CFB combo legs, product-of-legs pricing, wallet combo positions and per-game unique combo/wallet counts.
 - `./bin/dx combo backtest` — realized combo PnL by day/game from public activity (open combos excluded).
+- `./bin/dx bridge coverage|value|match` — cross-domain join between our customer book and Polymarket wallets: attribution health, fee-aware cross-venue PnL, and leg-level mirror/opposite matching.
 
 ## Schema registry & prod dump parity
 

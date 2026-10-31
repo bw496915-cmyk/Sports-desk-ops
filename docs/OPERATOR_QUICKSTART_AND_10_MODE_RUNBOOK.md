@@ -111,6 +111,11 @@ F402_LIVE_LOGIN=1 ./bin/dx shot --f402-login --f402-page /manager --out scratch/
 ./bin/dx combo price --prices 0.38,0.80 --stake 10 --quoted 0.32
 ./bin/dx combo uniqueness --seed-trades --max-seed-markets 20
 ./bin/dx combo backtest --wallets 0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612 --days 30
+
+# 10. Cross-domain value: our customer book ↔ Polymarket wallets
+./bin/dx bridge coverage
+./bin/dx bridge value --live --customer BGD101 --customer MJ102
+./bin/dx bridge match --seed --db scratch/cross-domain.sqlite
 ```
 
 ---

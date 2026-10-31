@@ -50,6 +50,12 @@ beforeAll(() => {
     async fetch(request) {
       const url = new URL(request.url);
       if (url.pathname.endsWith("/v2/leaderboard")) {
+        const user = url.searchParams.get("user");
+        if (user !== null) {
+          const period = url.searchParams.get("time_period") ?? "day";
+          const pnl = period === "all" ? 1200 : 100;
+          return Response.json({ data: { user_id: user, pnl, user_name: "AF12" } });
+        }
         return Response.json({
           data: [{ user_name: "AF12", user_id: ADDRESS }],
           pagination: { next_cursor: "" },
@@ -153,7 +159,6 @@ describe("Polymarket profile", () => {
 
   test("builds a profile end to end", async () => {
     const profile = await profilePolymarketAddress(ADDRESS, {
-      lbBase: base,
       dataBase: base,
       gammaBase: base,
       sleepMs: 0,
@@ -165,6 +170,9 @@ describe("Polymarket profile", () => {
     expect(profile.address).toBe(ADDRESS.toLowerCase());
     expect(profile.pnl.all).toBe(1200);
     expect(profile.pnl.d7).toBe(100);
+    expect(profile.pnl.d30).toBe(100);
+    expect(profile.pnlAudit.lbApiPnlUsd).toBe(1200);
+    expect(profile.pnlAudit.gapUsd).not.toBeNull();
     expect(profile.wins).toBe(2);
     expect(profile.losses).toBe(2);
     expect(profile.winRate).toBe(50);

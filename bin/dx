@@ -90,6 +90,8 @@ SportsDesk DX — operator commands
   ./bin/dx stale -i <export>      Stale-line / post-move bet cohort
   ./bin/dx profile <0x|user>      Polymarket PnL, win rate, positions, categories
   ./bin/dx combo legs|price|wallet CFB combo legs and product-of-legs pricing
+  ./bin/dx bridge coverage|value|match
+                                  Cross-domain customer book ↔ Polymarket wallet join
   ./bin/dx shot <url>             Bun.WebView screenshot → scratch/shots/ (--f402-login)
   ./bin/dx backtest               4-week CFB + NBA parlay/combo backtest
   ./bin/dx poll [--once] [--live] [--live-f402]
@@ -198,6 +200,10 @@ EOF
   combo)
     cd "$REPO_ROOT"
     exec bun run sportsdesk_cli.ts combo "$@"
+    ;;
+  bridge|crossdomain)
+    cd "$REPO_ROOT"
+    exec bun run sportsdesk_cli.ts bridge "$@"
     ;;
   shot|screenshot)
     cd "$REPO_ROOT"

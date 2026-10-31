@@ -334,6 +334,7 @@ Usage: \`bun sportsdesk_cli.ts [command|option] [parameters...]\`
 * **gslive** [LOGIN] [\`--date\` YYYY-MM-DD] [\`--json\`]: GSLive 7-param report + bet-history sidecar links
 * **profile** <0x|username> [\`--json\`]: Polymarket PnL, win rate, positions, categories, strategy
 * **combo** legs|price|wallet: CFB combo legs, product-of-legs pricing, wallet combo positions
+* **bridge** coverage|value|match: cross-domain join between the customer book and Polymarket wallets
 * **stale** \`-i\` FILE [\`--window-min\` N] [\`--json\`]: Stale-line / post-move bet cohort
 * **shot** <URL> [\`--out\` PATH] [\`--f402-login\`] [\`--format\` png|jpeg|webp]: Bun.WebView screenshot (default \`scratch/shots/\`)
 `;
@@ -1282,6 +1283,12 @@ export async function main(): Promise<void> {
   if (cmd === "profile") {
     const { runPolymarketProfile } = await import("./scripts/polymarket_profile_cli.ts");
     await runPolymarketProfile(rawArgs.slice(1));
+    return;
+  }
+
+  if (cmd === "bridge" || cmd === "crossdomain") {
+    const { runCustomerBridge } = await import("./scripts/customer_bridge_cli.ts");
+    await runCustomerBridge(rawArgs.slice(1));
     return;
   }
 
