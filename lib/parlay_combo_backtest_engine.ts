@@ -7,7 +7,8 @@
  *   1. Full Enriched Customer List (`enriched_customers_full.json`: 220 profiled accounts + 1,100 sampled tickets)
  *      — a **demo fixture**, not captured customer behavior. Its ticket `result`/`net_usd` fields disagree
  *      on 338/1,100 rows and its `hold_pct` never equals net/volume; the engine derives holds from the
- *      money fields and never trusts `hold_pct`. Audit with `bun run scripts/audit_customer_book.ts`.
+ *      money fields and never trusts `hold_pct`. Audit with `bun run audit:customer-book`; repair with
+ *      `bun run normalize:customer-book --write`.
  *   2. Master Downline & Open Book (`sportsdesk_downline_data.json`: 9,435 provisioned accounts / 2,236 active sports bettors / 57,755 master book)
  *   3. 39 Bridged Polymarket `0x` Proxy Wallets (`wallet_customer_attributions` + Off-Tracker CTF Combo Tokens)
  *

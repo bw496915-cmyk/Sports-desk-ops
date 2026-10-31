@@ -15,9 +15,13 @@ export type CustomerBookIssueKind =
   | "NON_FINITE_AMOUNT"
   | "DUPLICATE_WAGER_NUMBER";
 
+export type CustomerBookSeverity = "error" | "warning";
+
 export interface CustomerBookIssue {
   readonly customerId: string;
   readonly kind: CustomerBookIssueKind;
+  /** `warning` issues are suspicious but not provably wrong (e.g. a per-agent wager sequence). */
+  readonly severity: CustomerBookSeverity;
   readonly detail: string;
 }
 
@@ -26,6 +30,8 @@ export interface CustomerBookAudit {
   readonly tickets: number;
   readonly issues: readonly CustomerBookIssue[];
   readonly byKind: Readonly<Record<CustomerBookIssueKind, number>>;
+  readonly errors: number;
+  readonly warnings: number;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -57,9 +63,10 @@ export function auditCustomerBook(rows: readonly unknown[]): CustomerBookAudit {
     customerId: string,
     kind: CustomerBookIssueKind,
     detail: string,
+    severity: CustomerBookSeverity = "error",
   ): void => {
     byKind[kind] += 1;
-    issues.push({ customerId, kind, detail });
+    issues.push({ customerId, kind, severity, detail });
   };
 
   const seenWagers = new Map<number, string>();
@@ -141,6 +148,7 @@ export function auditCustomerBook(rows: readonly unknown[]): CustomerBookAudit {
             label,
             "DUPLICATE_WAGER_NUMBER",
             `wager ${wager} also seen as ${previous}`,
+            "warning",
           );
         } else {
           seenWagers.set(wager, signature);
@@ -149,5 +157,13 @@ export function auditCustomerBook(rows: readonly unknown[]): CustomerBookAudit {
     }
   }
 
-  return { customers: rows.length, tickets, issues, byKind };
+  const errors = issues.filter((issue) => issue.severity === "error").length;
+  return {
+    customers: rows.length,
+    tickets,
+    issues,
+    byKind,
+    errors,
+    warnings: issues.length - errors,
+  };
 }

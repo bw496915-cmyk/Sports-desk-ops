@@ -65,4 +65,4 @@ if (json) {
     console.log(`    … ${order.length - maxPrinted} more`);
 }
 
-process.exitCode = audit.issues.length > 0 ? 1 : 0;
+process.exitCode = audit.errors > 0 ? 1 : 0;

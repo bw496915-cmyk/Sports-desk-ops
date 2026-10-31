@@ -94,6 +94,8 @@ describe("customer book audit", () => {
     expect(audit.byKind.UNKNOWN_RESULT).toBe(1);
     expect(audit.byKind.NON_FINITE_AMOUNT).toBeGreaterThanOrEqual(1);
     expect(audit.byKind.DUPLICATE_WAGER_NUMBER).toBe(1);
+    expect(audit.errors).toBeGreaterThanOrEqual(2);
+    expect(audit.warnings).toBe(1);
   });
 
   test("same wager number on the same customer/selection is not a duplicate", () => {
