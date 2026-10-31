@@ -77,6 +77,11 @@ export interface FetchSnapshotOptions extends FetchWalletOptions {
 
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
 
+/** True for a 20-byte hex address; placeholder rows in the watchlist fail this. */
+export function isValidWalletAddress(address: string): boolean {
+  return ADDRESS_PATTERN.test(address);
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -186,7 +191,7 @@ export async function fetchWalletPositions(
     truncated: false,
   });
 
-  if (!ADDRESS_PATTERN.test(address)) return fail("invalid address");
+  if (!isValidWalletAddress(address)) return fail("invalid address");
 
   const positions: PolymarketPosition[] = [];
   let pages = 0;

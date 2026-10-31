@@ -4,6 +4,7 @@ import {
   cacheFromSnapshot,
   fetchPolymarketSnapshot,
   fetchWalletPositions,
+  isValidWalletAddress,
   parsePolymarketPosition,
   reconcileSnapshot,
   type PositionCache,
@@ -86,6 +87,13 @@ afterAll(() => {
 });
 
 describe("Polymarket positions ingestion", () => {
+  test("validates 20-byte addresses", () => {
+    expect(isValidWalletAddress(`0x${"0".repeat(40)}`)).toBe(true);
+    expect(isValidWalletAddress("0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612")).toBe(true);
+    expect(isValidWalletAddress("0x9cD44e12A8b7F30192c44d8E11a08B3e7")).toBe(false);
+    expect(isValidWalletAddress("")).toBe(false);
+  });
+
   test("parses rows and rejects unusable ones", () => {
     expect(parsePolymarketPosition(position())?.asset).toBe("asset-1");
     expect(parsePolymarketPosition({ ...position(), asset: "" })).toBeNull();

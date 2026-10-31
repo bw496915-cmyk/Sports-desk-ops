@@ -24,6 +24,7 @@ import { buildGsLiveUsersReportDeepLink, buildGsLiveBetHistorySidecarUrl, buildG
 import {
   cacheFromSnapshot,
   fetchPolymarketSnapshot,
+  isValidWalletAddress,
   reconcileSnapshot,
   type PolymarketSnapshot,
   type PositionCache,
@@ -53,6 +54,7 @@ export interface TrackedWalletProfile {
   readonly enforcementStatus: string;
   readonly lastSyncedIso: string;
   readonly dataSource?: "LIVE" | "STALE" | "FIXTURE";
+  readonly walletAddressValid?: boolean;
   readonly positionsValueUsd?: number;
   readonly openPnlUsd?: number;
   readonly fetchedAtIso?: string;
@@ -205,6 +207,7 @@ export function buildGraphLiveFeed(
     ([rank, addr, f402Id, agent, arch, summary, vol, legs, status]) => {
       const live = ingestByAddress.get(addr.toLowerCase());
       const aggregate = live?.aggregate ?? null;
+      const addressValid = isValidWalletAddress(addr);
       return {
         rank,
         proxyWallet: addr,
@@ -235,17 +238,22 @@ export function buildGraphLiveFeed(
           dateFilterBy: "calcTime",
           tickEpochMs: now.getTime(),
         }),
-        openBetsSummary: aggregate?.summary ?? summary,
-        openVolumeUsd: aggregate !== null ? Math.round(aggregate.openCostUsd) : vol,
-        openLegsCount: aggregate !== null ? aggregate.openLegsCount : legs,
+        openBetsSummary:
+          aggregate?.summary ??
+          (addressValid ? summary : "wallet address unverified — not tracked live"),
+        openVolumeUsd: aggregate !== null ? Math.round(aggregate.openCostUsd) : addressValid ? vol : 0,
+        openLegsCount: aggregate !== null ? aggregate.openLegsCount : addressValid ? legs : 0,
         enforcementStatus: status,
         lastSyncedIso: nowIso,
         dataSource: live?.dataSource ?? "FIXTURE",
+        walletAddressValid: addressValid,
         positionsValueUsd: aggregate?.openValueUsd ?? 0,
         openPnlUsd: aggregate?.openPnlUsd ?? 0,
         fetchedAtIso: live?.fetchedAtIso ?? nowIso,
         staleSinceIso: live?.staleSinceIso ?? null,
-        lastError: live?.lastError ?? null,
+        lastError:
+          live?.lastError ??
+          (addressValid ? null : "invalid address (placeholder in watchlist)"),
       };
     },
   );
