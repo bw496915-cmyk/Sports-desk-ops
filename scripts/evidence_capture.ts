@@ -653,6 +653,9 @@ async function persistRecords(
   const captures: WrittenCapture[] = [];
   for (const record of records) captures.push(await store.write(record));
   const manifest = await store.finalize();
+  // Keep committed capture records formatter-clean (repo CI runs
+  // `format:check` over docs/evidence/captures when the store is committed).
+  Bun.spawnSync([process.execPath, "fmt", outDir], { cwd: outDir });
   return {
     outDir,
     manifestPath: join(outDir, "manifest.json"),

@@ -61,9 +61,7 @@
       "request.headers.authorization",
       "request.headers.cookie"
     ],
-    "piiRedacted": [
-      "agent-id"
-    ]
+    "piiRedacted": ["agent-id"]
   },
   "provenance": {
     "portalHost": "fantasy402.com",

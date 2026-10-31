@@ -452,6 +452,9 @@ export async function runCatalogProbe(
       probeLease: "live",
     });
     await write(REPORT_RELATIVE_PATH, report);
+    // Keep committed probe artifacts formatter-clean (CI runs format:check).
+    Bun.spawnSync([process.execPath, "fmt", args.out], { cwd: args.out });
+    Bun.spawnSync([process.execPath, "fmt", REPORT_RELATIVE_PATH]);
     const summary = {
       ok: true,
       command: CLI_NAME,

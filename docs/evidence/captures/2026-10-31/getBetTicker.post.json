@@ -112,13 +112,7 @@
               "WagerType": {
                 "type": "string",
                 "nullable": false,
-                "enumCandidates": [
-                  "L",
-                  "M",
-                  "P",
-                  "S",
-                  "T"
-                ]
+                "enumCandidates": ["L", "M", "P", "S", "T"]
               }
             }
           },
@@ -2030,11 +2024,7 @@
       "response.body.LIST[9].CustomerID",
       "response.body.LIST[9].Login"
     ],
-    "piiRedacted": [
-      "agent-id",
-      "customer-id",
-      "login"
-    ]
+    "piiRedacted": ["agent-id", "customer-id", "login"]
   },
   "provenance": {
     "portalHost": "fantasy402.com",
