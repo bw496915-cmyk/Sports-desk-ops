@@ -55,7 +55,7 @@ Notes:
     --cache-ttl-hours overrides, --fresh bypasses).
   • uniqueness flags: --strict-full-game (STRICT_FULL_GAME=1), --all-legs-cfb, --cache-dir,
     --cache-ttl-hours, --seed-trades, --max-seed-markets, --wallet-file, --no-leaderboard,
-    --no-audit, --emit-ids <path>, --dump-wallets <path>.
+    --no-audit, --emit-ids <path>, --dump-wallets <path>, --include-closed-games.
   • three gates, each a pure filter after attribution:
       permissive    = any combo touching a CFB game
       all-legs-cfb  = every leg is CFB and every leg's market_sport_type is
@@ -97,6 +97,7 @@ function comboUniquenessOptions(
     seedTrades: args.includes("--seed-trades") || envFlag("SEED_TRADES"),
     ...(walletFile !== "" ? { walletFile } : {}),
     limitGames: Number(flag(args, ["--limit-games"], "50")),
+    includeClosedGames: args.includes("--include-closed-games") || envFlag("INCLUDE_CLOSED_GAMES"),
     concurrency: Number(flag(args, ["--concurrency"], env.CONCURRENCY ?? "6")),
     leaderboardLimit: Number(flag(args, ["--leaderboard-limit"], env.LEADERBOARD_LIMIT ?? "100")),
     maxSeedMarkets: Number(flag(args, ["--max-seed-markets"], env.MAX_SEED_MARKETS ?? "60")),
@@ -350,6 +351,19 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
       console.log(`   included cross-game : ${report.includedCrossGame}`);
       if (e.UNRESOLVED_LEGS > 0) {
         console.log("   note                : count is a FLOOR (unresolved legs are dropped)");
+      }
+    }
+    const unresolved = report.diagnostics.unresolved;
+    if (unresolved.combos > 0 || report.diagnostics.combosWithoutAttribution > 0) {
+      console.log(
+        `   unresolved legs     : ${unresolved.combos} partial, ${report.diagnostics.combosWithoutAttribution} fully unresolved, ` +
+          `${unresolved.legs} legs, ${unresolved.distinctLegKeys} distinct (${unresolved.oneOffLegKeys} one-off / ${unresolved.systemicLegKeys} systemic)`,
+      );
+      console.log(
+        `   CFB touch rate      : ${report.diagnostics.cfbTouchRatePct}% of observed combos (non-CFB combos count against it)`,
+      );
+      for (const entry of unresolved.top.slice(0, 3)) {
+        console.log(`     • ${entry.legKey.slice(0, 46)} in ${entry.combos} combo${entry.combos === 1 ? "" : "s"}`);
       }
     }
     console.log(

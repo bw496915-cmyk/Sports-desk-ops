@@ -66,6 +66,7 @@ Caveats:
 ./bin/dx combo uniqueness --seed-trades --max-seed-markets 20 --limit-games 20
 ./bin/dx combo uniqueness --all-legs-cfb --json
 ./bin/dx combo uniqueness --strict-full-game --json
+./bin/dx combo uniqueness --all-legs-cfb --include-closed-games --json   # historical legs
 
 # empirical subset chain, in one process: full-game ⊆ all-legs-cfb ⊆ permissive
 ./bin/dx combo verify-subset --chain --wallet-file scratch/seed.txt --limit-games 100
@@ -97,6 +98,7 @@ CLI flags win over environment, which wins over defaults.
 | `CACHE_DIR` | `scratch/cfb-combo-cache` | Cache location |
 | `FRESH` | unset | `1` ignores the cache for this run |
 | `STRICT_FULL_GAME` | unset | `1` enables the `full-game` gate (all-legs-CFB **and** single game) |
+| `INCLUDE_CLOSED_GAMES` | unset | `1` also indexes recently closed CFB events (historical legs) |
 | `ALL_LEGS_CFB` | unset | `1` enables the `all-legs-cfb` gate (CFB-only, cross-game allowed) |
 | `SEED_TRADES` | unset | `1` seeds wallets from sampled CFB trades |
 | `CONCURRENCY` | `6` | Wallet fetch parallelism |
@@ -140,19 +142,57 @@ CLI flags win over environment, which wins over defaults.
   `diagnostics.legsWithoutSide` shows whether any source lacks a side (which would make that pass
   inert against a sided source).
 
+### Unresolved legs and index scope
+
+`diagnostics.unresolved` counts combos that resolved **at least one** leg but not all:
+`combos`, `legs`, `distinctLegKeys`, `oneOffLegKeys` vs `systemicLegKeys`, and the top keys.
+`diagnostics.combosWithoutAttribution` counts combos that touched **zero** indexed games.
+
+Live run (322 wallets, 100 games, 3 combo pages), open-only index:
+
+```
+permissive 80 | all-legs-cfb 34
+partial unresolved: 44 combos, 143 legs, 121 distinct (108 one-off / 13 systemic)
+```
+
+Classifying the 13 systemic keys through CLOB (`/markets/{conditionId}` — Gamma's
+`condition_ids`/`condition_id` filters do not filter):
+
+| Result | Count |
+| :--- | ---: |
+| Resolves, **closed** | 7 |
+| Resolves, open | 2 |
+| 404 even on CLOB (zero-padded ids) | 4 |
+
+The 7 closed ones are real CFB/NBA markets (Arizona–Texas Tech, SMU–Syracuse, Nuggets–Suns, …).
+They were unresolvable because `loadCfbGames` only indexes `active=true&closed=false`. That is a
+**resolver-scope bug**, not a long tail:
+
+```
+open-only : permissive  80 | all-legs-cfb 34
++ closed  : permissive 201 | all-legs-cfb 74
+```
+
+`--include-closed-games` (env `INCLUDE_CLOSED_GAMES=1`) indexes both active and recently closed
+events, more than doubling attributed CFB combos. Use it for historical activity.
+
+`diagnostics.cfbTouchRatePct` is the share of **all observed combos** that touch an indexed CFB
+game. It is not a resolver-quality metric: non-CFB combos (LoL, politics, crypto) sit in the
+denominator. The resolver metric is the partial-unresolved leg list above.
+
 ### Live result (2026-10-31)
 
-With 322 seeded wallets and `--limit-games 100`:
+With 322 seeded wallets, `--limit-games 100`, open-only index:
 
 | Gate | Kept | Exclusions |
 | :--- | ---: | :--- |
-| `permissive` | 82 | — (all 82; 34 span >1 game) |
-| `all-legs-cfb` | **34** | 46 unresolved, 2 ineligible |
-| `full-game` | **0** | 46 unresolved, 36 cross-game, 0 ineligible |
+| `permissive` | 80 | — (34 span >1 game) |
+| `all-legs-cfb` | **34** | 44 partial-unresolved, 2 ineligible |
+| `full-game` | **0** | 44 unresolved, 36 cross-game, 2 ineligible |
 
 ```
 verify-subset --chain :
-  all-legs-cfb ⊆ permissive   reference 82, treatment 34, leaks 0
+  all-legs-cfb ⊆ permissive   reference 80, treatment 34, leaks 0
   full-game    ⊆ all-legs-cfb reference 34, treatment  0, leaks 0, VACUOUS
   exit 0 (exit 2 only with --strict-exit)
 ```
@@ -160,12 +200,12 @@ verify-subset --chain :
 The chain asserts the definition `full-game = all-legs-cfb ∧ single-game` edge by edge, rather
 than inferring it from two independent permissive comparisons. A gated reference is compared on its
 **kept** set; using its audit rows would silently widen it back to permissive, which is exactly the
-bug the inner edge caught on the first run (`reference 82` instead of `34`).
+bug the inner edge caught on the first run (`reference` came back as the permissive 80 instead of 34).
 
 Combined with `includedCrossGame == kept == 34`, this is definitive: **every** CFB combo in this
-book is cross-game, so single-game CFB combos are not a style this customer set uses. The 46
-`UNRESOLVED_LEGS` are the only gap between permissive and all-legs-cfb, and they are a floor, not a
-correctness issue.
+book is cross-game, so single-game CFB combos are not a style this customer set uses. The
+unresolved legs are the only gap between permissive and all-legs-cfb, and with
+`--include-closed-games` that gap shrinks (kept 34 → 74).
 
 Exit codes: `1` = leak always; `2` = vacuous **only** with `--strict-exit`. Default vacuous is a
 warning plus exit 0, so a structurally-zero gate does not fail unattended runs.

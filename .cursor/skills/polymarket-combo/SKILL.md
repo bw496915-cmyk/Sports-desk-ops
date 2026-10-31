@@ -19,6 +19,7 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
 ./bin/dx combo wallet 0x26cf…c612              # positions + activity
 ./bin/dx combo uniqueness --seed-trades --max-seed-markets 20 --strict-full-game
 ./bin/dx combo uniqueness --all-legs-cfb              # CFB-only, cross-game allowed
+./bin/dx combo uniqueness --all-legs-cfb --include-closed-games   # historical legs
 ./bin/dx combo verify-subset [--all-legs-cfb] --wallet-file scratch/seed.txt
 ./bin/dx combo backtest --wallets 0x26cf…c612 --days 30 [--all-venues]
 ```
@@ -52,15 +53,19 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
 8. Dedupe twice: `comboId|wallet`, then `legSignatures|wallet` (`legKey|outcome|marketType`) to
    collapse cross-indexer duplicates without merging distinct same-condition markets.
    `UNRESOLVED_LEGS > 0` means the gated count is a floor.
-9. Verify, don't inspect: `--dump-wallets` then `--emit-ids` in both modes, and
+9. Historical activity needs `--include-closed-games`: the default index is `active&&!closed`, so
+   settled games are unattributable. That flag roughly doubles attributed CFB combos (34 → 74 on the
+   seeded book). Check `diagnostics.unresolved` (one-off vs systemic) and
+   `combosWithoutAttribution`; the latter is mostly non-CFB noise, not resolver failure.
+10. Verify, don't inspect: `--dump-wallets` then `--emit-ids` in both modes, and
    `comm -23 <(sort strict) <(sort any)` must print nothing. Empty sets write empty files.
    Check `diagnostics.legsWithoutSide` and `duplicatesCollapsedByLegSet`: if sides are empty the
    cross-indexer pass is inert; if leg-set collapses are zero it may be doing nothing.
-10. Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h (`--cache-ttl-hours`), `--fresh` bypasses.
-11. Env aliases: `CACHE_TTL_HOURS`, `CACHE_DIR`, `FRESH=1`, `STRICT_FULL_GAME=1`, `ALL_LEGS_CFB=1`, `SEED_TRADES=1`,
+11. Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h (`--cache-ttl-hours`), `--fresh` bypasses.
+12. Env aliases: `CACHE_TTL_HOURS`, `CACHE_DIR`, `FRESH=1`, `STRICT_FULL_GAME=1`, `ALL_LEGS_CFB=1`, `INCLUDE_CLOSED_GAMES=1`, `SEED_TRADES=1`,
    `CONCURRENCY`, `LEADERBOARD=0`, `LEADERBOARD_LIMIT`, `MAX_SEED_MARKETS`, `WALLET_FILE`.
    CLI flags win over env.
-12. `lb-api.polymarket.com` is retired (410); use `data-api/v2/leaderboard`.
+13. `lb-api.polymarket.com` is retired (410); use `data-api/v2/leaderboard`.
 
 ## Backtest
 

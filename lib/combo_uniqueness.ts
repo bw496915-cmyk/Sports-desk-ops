@@ -32,6 +32,8 @@ export interface ComboUniquenessOptions {
   readonly perMarket?: number;
   readonly maxComboPages?: number;
   readonly limitGames?: number;
+  /** Also index settled CFB events (`closed=true`). Historical legs need this. */
+  readonly includeClosedGames?: boolean;
   readonly now?: number;
   readonly timeoutMs?: number;
   readonly gammaBase?: string;
@@ -74,9 +76,11 @@ export interface ComboAuditRow {
   readonly allLegsCfb: boolean;
   readonly fullyWithinGame: boolean;
   readonly allCfbLegsEligible: boolean;
-  /** False only under `--strict-full-game`; permissive attribution is mode-independent. */
+  /** False only under a gated mode; permissive attribution is mode-independent. */
   readonly kept: boolean;
   readonly dropReason: StrictDropReason | null;
+  /** Leg keys that failed to resolve to any CFB game. */
+  readonly unresolvedLegKeys: readonly string[];
 }
 
 export interface ComboUniquenessReport {
@@ -109,6 +113,22 @@ export interface ComboUniquenessReport {
     readonly legsWithoutSide: number;
     readonly legsWithoutStableId: number;
     readonly combosWithUnstableIdentity: number;
+    /** Resolution gap: which permissive combos die on legs that match no indexed CFB game. */
+    readonly unresolved: {
+      readonly combos: number;
+      readonly legs: number;
+      readonly distinctLegKeys: number;
+      /** Leg keys seen in exactly one combo (long tail). */
+      readonly oneOffLegKeys: number;
+      /** Leg keys seen in two or more combos (systemic). */
+      readonly systemicLegKeys: number;
+      readonly top: readonly { readonly legKey: string; readonly combos: number }[];
+    };
+    /** Combos with legs that resolved to **zero** indexed games; they never reach the report. */
+    readonly combosWithoutAttribution: number;
+    readonly recordsWithoutLegs: number;
+    /** Share of observed combos that touch an indexed CFB game. Non-CFB combos are in the denominator. */
+    readonly cfbTouchRatePct: number;
   };
   /** Sorted, unique wallets scanned — the input for `--dump-wallets`. */
   readonly wallets: readonly string[];
@@ -140,6 +160,8 @@ interface NormalizedCombo {
   readonly allLegsCfb: boolean;
   readonly allCfbLegsEligible: boolean;
   readonly fullyWithinGame: boolean;
+  /** `legKey` of every leg that could not be attributed to a CFB game. */
+  readonly unresolvedLegKeys: readonly string[];
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -194,11 +216,31 @@ async function mapLimit<T, R>(
 export async function loadCfbGames(options?: ComboUniquenessOptions): Promise<CfbGame[]> {
   const limit = Math.min(Math.max(options?.limitGames ?? 50, 1), 100);
   const gamma = (options?.gammaBase ?? GAMMA_API).replace(/\/$/, "");
-  const body = await getJson(
+  const urls = [
     `${gamma}/events?series_id=${CFB_SERIES_ID}&active=true&closed=false&order=volume24hr&ascending=false&limit=${limit}`,
-    options,
-  );
-  if (!Array.isArray(body)) return [];
+  ];
+  if (options?.includeClosedGames === true) {
+    // Historical combo legs reference games that have since settled. Without this, those legs are
+    // unattributable and every gated count is a floor.
+    urls.push(
+      `${gamma}/events?series_id=${CFB_SERIES_ID}&closed=true&order=endDate&ascending=false&limit=${limit}`,
+    );
+  }
+  const games: CfbGame[] = [];
+  const seen = new Set<string>();
+  for (const url of urls) {
+    const body = await getJson(url, options);
+    if (!Array.isArray(body)) continue;
+    for (const game of mapCfbEvents(body)) {
+      if (seen.has(game.slug)) continue;
+      seen.add(game.slug);
+      games.push(game);
+    }
+  }
+  return games;
+}
+
+function mapCfbEvents(body: readonly unknown[]): CfbGame[] {
   return body
     .map((raw): CfbGame | null => {
       const event = asRecord(raw);
@@ -334,7 +376,8 @@ function hasStableLegId(leg: Record<string, unknown>): boolean {
 function attributeLeg(
   leg: Record<string, unknown>,
   index: GameIndex,
-): { game: string | null; type: string } {  for (const id of legConditionIds(leg)) {
+): { game: string | null; type: string } {
+  for (const id of legConditionIds(leg)) {
     const game = index.byConditionId.get(id);
     if (game !== undefined) return { game, type: legMarketType(leg) };
   }
@@ -349,29 +392,37 @@ function attributeLeg(
   return { game: null, type: legMarketType(leg) };
 }
 
+type NormalizeResult =
+  | { readonly ok: true; readonly combo: NormalizedCombo }
+  | { readonly ok: false; readonly reason: "NO_LEGS" | "NO_ATTRIBUTION" };
+
 function normalizeCombo(
   raw: unknown,
   fallbackWallet: string,
   index: GameIndex,
-): NormalizedCombo | null {
+): NormalizeResult {
   const record = asRecord(raw);
-  if (record === null) return null;
+  if (record === null) return { ok: false, reason: "NO_LEGS" };
   const legsRaw = Array.isArray(record.legs) ? record.legs : Array.isArray(record.components) ? record.components : [];
-  if (legsRaw.length === 0) return null;
+  if (legsRaw.length === 0) return { ok: false, reason: "NO_LEGS" };
   const legs = legsRaw.map(asRecord).filter((leg): leg is Record<string, unknown> => leg !== null);
-  if (legs.length === 0) return null;
+  if (legs.length === 0) return { ok: false, reason: "NO_LEGS" };
 
   const games = new Set<string>();
+  const unresolvedLegKeys: string[] = [];
   let attributed = 0;
   let eligible = true;
   for (const leg of legs) {
     const result = attributeLeg(leg, index);
-    if (result.game === null) continue;
+    if (result.game === null) {
+      unresolvedLegKeys.push(legKey(leg));
+      continue;
+    }
     attributed += 1;
     games.add(result.game);
     if (!ELIGIBLE_LEG_TYPES.has(result.type)) eligible = false;
   }
-  if (games.size === 0) return null;
+  if (games.size === 0) return { ok: false, reason: "NO_ATTRIBUTION" };
 
   const legKeys = legs.map(legKey).sort();
   const legSignatures = legs.map(legSignature).sort();
@@ -379,16 +430,20 @@ function normalizeCombo(
     text(record.comboId) || text(record.id) || `sha256:${hashKeys(legSignatures)}`;
   const wallet = (text(record.user) || text(record.wallet) || fallbackWallet).toLowerCase();
   return {
-    comboId,
-    wallet,
-    gameSlugs: games,
-    legKeys,
-    legSignatures,
-    legsWithoutSide: legs.filter((leg) => legOutcome(leg) === "").length,
-    unstableLegs: legs.filter((leg) => !hasStableLegId(leg)).length,
-    allLegsCfb: attributed === legs.length,
-    allCfbLegsEligible: eligible,
-    fullyWithinGame: games.size === 1,
+    ok: true,
+    combo: {
+      comboId,
+      wallet,
+      gameSlugs: games,
+      legKeys,
+      legSignatures,
+      legsWithoutSide: legs.filter((leg) => legOutcome(leg) === "").length,
+      unstableLegs: legs.filter((leg) => !hasStableLegId(leg)).length,
+      allLegsCfb: attributed === legs.length,
+      allCfbLegsEligible: eligible,
+      fullyWithinGame: games.size === 1,
+      unresolvedLegKeys,
+    },
   };
 }
 
@@ -555,11 +610,22 @@ export async function buildComboUniquenessReport(
   }
 
   const stats = { hits: 0, misses: 0 };
+  let recordsWithoutLegs = 0;
+  let combosWithoutAttribution = 0;
   const perWallet = await mapLimit([...wallets], options?.concurrency ?? 6, async (wallet) => {
     const records = await cachedCombos(wallet, options, stats);
-    return records.map((record) => normalizeCombo(record, wallet, index)).filter(
-      (combo): combo is NormalizedCombo => combo !== null,
-    );
+    const combos: NormalizedCombo[] = [];
+    for (const record of records) {
+      const result = normalizeCombo(record, wallet, index);
+      if (result.ok) {
+        combos.push(result.combo);
+      } else if (result.reason === "NO_ATTRIBUTION") {
+        combosWithoutAttribution += 1;
+      } else {
+        recordsWithoutLegs += 1;
+      }
+    }
+    return combos;
   });
 
   const gate: ComboGate =
@@ -591,10 +657,41 @@ export async function buildComboUniquenessReport(
     dedupedAll.push(combo);
   }
   const duplicatesCollapsed = duplicatesCollapsedById + duplicatesCollapsedByLegSet;
+  const unresolvedByKey = new Map<string, number>();
+  let unresolvedCombos = 0;
+  let unresolvedLegs = 0;
+  for (const combo of dedupedAll) {
+    if (combo.unresolvedLegKeys.length === 0) continue;
+    unresolvedCombos += 1;
+    unresolvedLegs += combo.unresolvedLegKeys.length;
+    for (const key of new Set(combo.unresolvedLegKeys)) {
+      unresolvedByKey.set(key, (unresolvedByKey.get(key) ?? 0) + 1);
+    }
+  }
+  const unresolvedTop = [...unresolvedByKey.entries()]
+    .map(([legKey, combos]) => ({ legKey, combos }))
+    .sort((a, b) => b.combos - a.combos || a.legKey.localeCompare(b.legKey))
+    .slice(0, 10);
   const diagnostics = {
     legsWithoutSide: dedupedAll.reduce((sum, combo) => sum + combo.legsWithoutSide, 0),
     legsWithoutStableId: dedupedAll.reduce((sum, combo) => sum + combo.unstableLegs, 0),
     combosWithUnstableIdentity: dedupedAll.filter((combo) => combo.unstableLegs > 0).length,
+    unresolved: {
+      combos: unresolvedCombos,
+      legs: unresolvedLegs,
+      distinctLegKeys: unresolvedByKey.size,
+      oneOffLegKeys: [...unresolvedByKey.values()].filter((count) => count === 1).length,
+      systemicLegKeys: [...unresolvedByKey.values()].filter((count) => count >= 2).length,
+      top: unresolvedTop,
+    },
+    combosWithoutAttribution,
+    recordsWithoutLegs,
+    cfbTouchRatePct:
+      dedupedAll.length + combosWithoutAttribution > 0
+        ? Math.round(
+            (dedupedAll.length / (dedupedAll.length + combosWithoutAttribution)) * 10_000,
+          ) / 100
+        : 0,
   };
 
   // Attribution above is mode-independent. Each gate is a pure filter applied afterwards, so a
@@ -630,6 +727,7 @@ export async function buildComboUniquenessReport(
         allCfbLegsEligible: combo.allCfbLegsEligible,
         kept: dropReason === null,
         dropReason,
+        unresolvedLegKeys: combo.unresolvedLegKeys,
       });
     }
   }
@@ -703,14 +801,16 @@ export async function buildComboUniquenessReport(
   };
 }
 
-/** Sorted `comboId|wallet` lines. Kept-only by default, matching the strict gate. */
-export function comboIdLines(
-  report: ComboUniquenessReport,
-  options?: { readonly keptOnly?: boolean },
-): string[] {
-  const keptOnly = options?.keptOnly ?? true;
+/**
+ * Sorted `comboId|wallet` lines for **kept** combos only.
+ *
+ * There is deliberately no "include dropped" option: a subset check is only meaningful against
+ * kept sets, and an ambiguous boolean here previously widened a gated reference back to the audit
+ * population.
+ */
+export function comboIdLines(report: ComboUniquenessReport): string[] {
   return report.combos
-    .filter((row) => !keptOnly || row.kept)
+    .filter((row) => row.kept)
     .map((row) => `${row.comboId}|${row.wallet}`)
     .sort();
 }

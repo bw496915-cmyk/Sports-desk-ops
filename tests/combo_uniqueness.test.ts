@@ -8,6 +8,8 @@ import {
   comboIdLines,
   linesToText,
   walletLines,
+  type ComboGate,
+  type ComboUniquenessReport,
 } from "../lib/combo_uniqueness.ts";
 
 const W1 = `0x${"1".repeat(40)}`;
@@ -43,12 +45,25 @@ function leg(conditionId: string, type = "moneyline", extra: Record<string, unkn
 }
 
 const COMBOS = [
+  { id: "c0", legs: [leg("0x0")] },
   { id: "c1", legs: [leg("0x1")] },
   { id: "c2", legs: [leg("0x1"), leg("0x2")] },
   { id: "c3", legs: [leg("0x9")] },
   { id: "c4", legs: [leg("0x1", "player_props")] },
   { id: "c5", legs: [{ marketSlug: "g1-ml", market: { sports_market_type: "moneyline" } }] },
   { id: "c6", legs: [{ clobTokenId: "t3", market: { sports_market_type: "moneyline" } }] },
+];
+
+const CLOSED_GAMES = [
+  {
+    id: "g0",
+    slug: "cfb-g0",
+    title: "Closed Game",
+    volume24hr: 0,
+    markets: [
+      { conditionId: "0x0", slug: "g0-ml", clobTokenIds: '["t0"]', sportsMarketType: "moneyline" },
+    ],
+  },
 ];
 
 let server: ReturnType<typeof Bun.serve>;
@@ -61,7 +76,9 @@ beforeAll(() => {
     port: 0,
     async fetch(request) {
       const url = new URL(request.url);
-      if (url.pathname.endsWith("/events")) return Response.json(GAMES);
+      if (url.pathname.endsWith("/events")) {
+        return Response.json(url.searchParams.get("closed") === "true" ? CLOSED_GAMES : GAMES);
+      }
       if (url.pathname.endsWith("/v2/leaderboard")) {
         return Response.json({ data: [{ user_id: W1 }, { user_id: W2 }] });
       }
@@ -75,7 +92,7 @@ beforeAll(() => {
       if (url.pathname.endsWith("/v2/positions/combos")) {
         const user = url.searchParams.get("user");
         return Response.json({
-          data: user === W1 ? [COMBOS[0], { ...COMBOS[0], id: "c1-alt" }] : [],
+          data: user === W1 ? [COMBOS[1], { ...COMBOS[1], id: "c1-alt" }] : [],
           pagination: { next_cursor: "" },
         });
       }
@@ -99,6 +116,64 @@ function options(overrides: Record<string, unknown> = {}) {
     cacheTtlHours: 24,
     leaderboardLimit: 10,
     ...overrides,
+  };
+}
+
+function fakeReport(
+  gate: ComboGate,
+  kept: readonly string[],
+  all: readonly string[],
+): ComboUniquenessReport {
+  const keptSet = new Set(kept);
+  return {
+    gate,
+    strictFullGame: gate === "full-game",
+    games: [],
+    global: {
+      gamesWithActivity: 0,
+      sumPerGameCombos: 0,
+      sumPerGameWallets: 0,
+      distinctCombos: kept.length,
+      distinctWallets: 1,
+    },
+    walletsScanned: 1,
+    comboRecords: kept.length,
+    permissiveCombos: all.length,
+    duplicatesCollapsed: 0,
+    duplicatesCollapsedById: 0,
+    duplicatesCollapsedByLegSet: 0,
+    exclusions: { UNRESOLVED_LEGS: 0, CROSS_GAME: 0, INELIGIBLE_LEG_TYPE: 0 },
+    includedCrossGame: 0,
+    diagnostics: {
+      legsWithoutSide: 0,
+      legsWithoutStableId: 0,
+      combosWithUnstableIdentity: 0,
+      unresolved: {
+        combos: 0,
+        legs: 0,
+        distinctLegKeys: 0,
+        oneOffLegKeys: 0,
+        systemicLegKeys: 0,
+        top: [],
+      },
+      combosWithoutAttribution: 0,
+      recordsWithoutLegs: 0,
+      cfbTouchRatePct: 100,
+    },
+    wallets: ["0x1", "0x2"],
+    combos: all.map((comboId) => ({
+      comboId,
+      wallet: comboId === "a" || comboId === "b" ? "0x1" : "0x2",
+      legs: 1,
+      games: 1,
+      allLegsCfb: true,
+      fullyWithinGame: true,
+      allCfbLegsEligible: true,
+      kept: keptSet.has(comboId),
+      dropReason: keptSet.has(comboId) ? null : "CROSS_GAME",
+      unresolvedLegKeys: [],
+    })),
+    cache: { hits: 0, misses: 0, ttlHours: 24 },
   };
 }
 
@@ -198,6 +273,42 @@ describe("CFB combo uniqueness", () => {
     }
   });
 
+  test("closed events are opt-in for historical attribution", async () => {
+    const without = await buildComboUniquenessReport(options());
+    expect(without.combos.some((row) => row.comboId === "c0")).toBe(false);
+    expect(without.permissiveCombos).toBe(5);
+
+    const withClosed = await buildComboUniquenessReport(options({ includeClosedGames: true }));
+    const c0 = withClosed.combos.find((row) => row.comboId === "c0");
+    expect(c0?.kept).toBe(true);
+    expect(withClosed.permissiveCombos).toBe(6);
+    const g0 = withClosed.games.find((game) => game.gameSlug === "cfb-g0");
+    expect(g0?.uniqueCombos).toBe(1);
+  });
+
+  test("synthetic audit fixture: gated references use kept sets only", () => {
+    // a is kept by every gate, b only by all-legs-cfb, c and d only by permissive.
+    const all = ["a", "b", "c", "d"];
+    const permissive = fakeReport("permissive", all, all);
+    const cfbOnly = fakeReport("all-legs-cfb", ["a", "b"], all);
+    const fullGame = fakeReport("full-game", ["a"], all);
+
+    const outer = checkComboSubset(permissive, cfbOnly);
+    expect(outer.reference).toBe(4);
+    expect(outer.treatment).toBe(2);
+    expect(outer.leaks).toEqual([]);
+
+    // The bug this pins: an all-rows reference would report 4 here, not 2.
+    const inner = checkComboSubset(cfbOnly, fullGame);
+    expect(inner.reference).toBe(2);
+    expect(inner.treatment).toBe(1);
+    expect(inner.leaks).toEqual([]);
+
+    // A genuinely foreign treatment id is still a leak.
+    const leaky = fakeReport("full-game", ["a", "e"], [...all, "e"]);
+    expect(checkComboSubset(cfbOnly, leaky).leaks).toEqual(["e|0x2"]);
+  });
+
   test("verifier: the chain full-game ⊆ all-legs-cfb ⊆ permissive holds", async () => {
     const permissive = await buildComboUniquenessReport(options());
     const cfbOnly = await buildComboUniquenessReport(options({ gate: "all-legs-cfb" }));
@@ -236,7 +347,7 @@ describe("CFB combo uniqueness", () => {
   test("emit-ids lines: treatment output is a subset of permissive output", async () => {
     const permissive = await buildComboUniquenessReport(options());
     const strict = await buildComboUniquenessReport(options({ gate: "full-game" }));
-    const any = comboIdLines(permissive, { keptOnly: false });
+    const any = comboIdLines(permissive);
     const strictIds = comboIdLines(strict);
     expect(any).toHaveLength(permissive.comboRecords);
     expect(strictIds).toHaveLength(strict.comboRecords);
