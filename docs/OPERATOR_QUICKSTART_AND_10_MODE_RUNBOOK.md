@@ -8,7 +8,7 @@
 
 ## 1. Day-1 Operator Onboarding: What to Run in Your First 60 Seconds
 
-When you open `/Users/nolarose/code/sportsdesk-ops`, **always start with `./bin/dx`**. It automatically configures your shell environment, silences macOS sandbox/Git `EPERM` warnings, loads Cloudflare R2 credentials, and dispatches either Bun (`v1.4.4`) or Node (`v22+`/`v26+` native TypeScript).
+When you open `/Users/nolarose/code/sportsdesk-ops`, **always start with `./bin/dx`**. It automatically configures your shell environment, silences macOS sandbox/Git `EPERM` warnings, loads Cloudflare R2 credentials, and runs its tooling through Bun (`v1.4.4`).
 
 | Step | Command | What It Checks / Executes | When to Run |
 | :--- | :--- | :--- | :--- |
@@ -17,7 +17,7 @@ When you open `/Users/nolarose/code/sportsdesk-ops`, **always start with `./bin/
 | **3. Per-Office & Cross-Office IP Audit** | `./bin/dx iptracker` | Audits all **13 Office & Cross-Office IP Clusters** (`getWebLog` Mode `B` `customerID=<OfficeAgentID>` vs `customerID="0"`) joined with Mode `A` dwell and MFCS scores. | Whenever a sharp cluster hits the Bet-Ticker |
 | **4. 4-Week CFB & NBA Parlay Backtest** | `./bin/dx backtest` | Runs the 4-week full-customer (`57,755` accounts) CFB & NBA parlay/combo backtest (`+$1,171,420` net hold swing). | Weekly risk review / teaser & alt-spread tuning |
 | **5. Live Poll & R2 Edge Publish** | `./bin/dx deploy` *(or `./bin/dx watch`)* | Polls all 39 Polymarket `0x` wallets + 49 F402 watchlist logins, regenerates `graph-live-feed.json`, updates `graph.html`, and publishes to Cloudflare R2 via SigV4. | After config changes or continuous 60s daemon (`./bin/dx watch`) |
-| **6. Verification Gate** | `node --test tests/forensic_diagnostic_modes.test.ts tests/bet_ticker_ip_tracker_bridge.test.ts` | Executes the 14 deterministic unit tests covering Modes 1–10 and the Bet-Ticker ↔ IP-Tracker wire bridge. | Before committing any code or rule change |
+| **6. Verification Gate** | `bun test tests/forensic_diagnostic_modes.test.ts tests/bet_ticker_ip_tracker_bridge.test.ts` | Executes the deterministic unit tests covering Modes 1–10 and the Bet-Ticker ↔ IP-Tracker wire bridge. | Before committing any code or rule change |
 
 ---
 
@@ -50,7 +50,7 @@ Raw payloads from Fantasy402 (`customer/report/report.js`, `manager/report/help-
 6. **Dual-Identity Cross-Surface Linking (`LoginID` + `AgentLogin` + `player_[login]` + `0x` Wallet)**:
    - Every watchlist record links four surfaces simultaneously:
      1. **Fantasy402 Customer & Office**: `https://desk.bookdeskops.com/dashboard?customer=<LoginID>&agent=<OfficeAgentID>`
-     2. **GSLive Partner 118 Profile**: `https://plive.sportswidgets.pro/manager-tools/#/reports/users?partnerId=118&searchBy=player&text=player_<LoginID>&agent=<OfficeAgentID>`
+     2. **GSLive Partner 118 Profile**: `https://plive.sportswidgets.pro/manager-tools/#/reports/users?bot=true&eventId=&from=<desk-day start ISO>&partnerId=118&searchBy=player&text=player_<LoginID>&to=<desk-day end ISO>` (the `player_` token belongs to this report surface only; `#/events/bet-history` uses the raw login, e.g. `partnerUserId=AF12`). Generate with `./bin/dx gslive <LoginID>`.
      3. **Polymarket On-Chain Profile**: `https://polymarket.com/profile/<0xProxyWallet>`
      4. **Write Mutation Identity (`PaddedCustomerId`)**: Right-space-padded to exactly 11 characters (`padEnd(11, " ")`) with direct owning `agentID` (never `BILLY666`) on `POST /cloud/api/Manager/updateByColumn`.
 
@@ -106,12 +106,81 @@ bun sportsdesk_cli.ts wire vig -c ABC700 -s Basketball --spread 15 --derivative 
 
 ## 5. Rich-Metadata Visual Pipeline Artifacts (Public Cloudflare R2 & Repository Catalog)
 
-Every visual reference diagram is generated deterministically by [`scripts/generate_pipeline_reference_images.ts`](../scripts/generate_pipeline_reference_images.ts) with **5 embedded metadata layers** (W3C RDF / Dublin Core `<dc:*>`, Adobe XMP `XML:com.adobe.xmp`, Schema.org `ImageObject` JSON-LD, RFC-2083 PNG `tEXt` & `iTXt` chunks with CRC-32 verification, and Cloudflare R2 `x-amz-meta-*` object headers):
+Every visual reference diagram is generated deterministically by [`scripts/generate_pipeline_reference_images.ts`](../scripts/generate_pipeline_reference_images.ts) from its SVG source via `rsvg-convert` (with `qlmanage` as a fallback and a hard ink/color gate — a blank raster fails the build). The SVG and PNG carry the metadata layers (W3C RDF / Dublin Core `<dc:*>`, Adobe XMP `XML:com.adobe.xmp`, Schema.org `ImageObject` JSON-LD, RFC-2083 PNG `tEXt` & `iTXt` chunks with CRC-32 verification); the WebP sibling is a lighter raster with no metadata:
 
 | Artifact ID | Pipeline Reference Diagram | Public Cloudflare R2 Edge URLs (`HTTP 200`) | Local Repository Paths | Embedded Metadata Standards |
 | :--- | :--- | :--- | :--- | :--- |
-| **`SD-ARTIFACT-01-10MODE-PIPELINE`** | **End-to-End 10-Mode Engine & Operator Action Pipeline** | • [Vector SVG (`19,476 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.svg)<br/>• [Rich-Chunk PNG (`32,346 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.png) | `docs/assets/pipeline-10-mode-architecture.{svg,png}` | XMP + Dublin Core + Schema.org JSON-LD + PNG `iTXt`/`tEXt` + R2 `x-amz-meta-*` |
-| **`SD-ARTIFACT-02-6LAYER-CLEANING`** | **Rosetta Stone 6-Layer Data Cleaning & Field Mapping Pipeline** | • [Vector SVG (`16,048 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.svg)<br/>• [Rich-Chunk PNG (`32,650 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.png) | `docs/assets/pipeline-6-layer-data-cleaning.{svg,png}` | XMP + Dublin Core + Schema.org JSON-LD + PNG `iTXt`/`tEXt` + R2 `x-amz-meta-*` |
-| **`SD-ARTIFACT-03-IP-AND-RECONCILIATION`** | **Per-Office IP-Tracker (`Modes 2–6`) & Scope-Locked Reconciliation (`Modes 1, 8, 9, 10`)** | • [Vector SVG (`15,495 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.svg)<br/>• [Rich-Chunk PNG (`31,953 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.png) | `docs/assets/pipeline-per-office-ip-and-reconciliation.{svg,png}` | XMP + Dublin Core + Schema.org JSON-LD + PNG `iTXt`/`tEXt` + R2 `x-amz-meta-*` |
+| **`SD-ARTIFACT-01-10MODE-PIPELINE`** | **End-to-End 10-Mode Engine & Operator Action Pipeline** | • [SVG (`22,337 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.svg)<br/>• [PNG (`512,513 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.png)<br/>• [WebP (`186,198 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.webp) | `docs/assets/pipeline-10-mode-architecture.{svg,png,webp}` | SVG: RDF/Dublin Core + JSON-LD · PNG: XMP + JSON-LD + `iTXt`/`tEXt` · WebP: raster only |
+| **`SD-ARTIFACT-02-6LAYER-CLEANING`** | **Rosetta Stone 6-Layer Data Cleaning & Field Mapping Pipeline** | • [SVG (`17,368 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.svg)<br/>• [PNG (`398,783 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.png)<br/>• [WebP (`161,124 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.webp) | `docs/assets/pipeline-6-layer-data-cleaning.{svg,png,webp}` | SVG: RDF/Dublin Core + JSON-LD · PNG: XMP + JSON-LD + `iTXt`/`tEXt` · WebP: raster only |
+| **`SD-ARTIFACT-03-IP-AND-RECONCILIATION`** | **Per-Office IP-Tracker (`Modes 2–6`) & Scope-Locked Reconciliation (`Modes 1, 8, 9, 10`)** | • [SVG (`16,943 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.svg)<br/>• [PNG (`516,794 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.png)<br/>• [WebP (`193,760 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.webp) | `docs/assets/pipeline-per-office-ip-and-reconciliation.{svg,png,webp}` | SVG: RDF/Dublin Core + JSON-LD · PNG: XMP + JSON-LD + `iTXt`/`tEXt` · WebP: raster only |
+| **`SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE`** | **Dual-Surface GSLive Model — Account Report vs Live Bet-History Sidecar** | • [SVG (`18,640 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-dual-surface-gslive-model.svg)<br/>• [PNG (`472,546 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-dual-surface-gslive-model.png)<br/>• [WebP (`172,134 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-dual-surface-gslive-model.webp) | `docs/assets/pipeline-dual-surface-gslive-model.{svg,png,webp}` | SVG: RDF/Dublin Core + JSON-LD · PNG: XMP + JSON-LD + `iTXt`/`tEXt` · WebP: raster only |
 | **`MANIFEST-JSON`** | **Machine-Readable Artifact & SHA-256 Metadata Catalog** | • [Catalog JSON (`9,253 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-artifacts-metadata.json) | `docs/assets/pipeline-artifacts-metadata.json` | Full SHA-256 digests, upstream module map, and CLI command bindings |
 
+
+---
+
+## 6. Stale-Line / Post-Move Cohort (Rooting Out Bots)
+
+A stale line is a price the desk left on the board after the reference market moved. The operator
+note on the ticket (“Stale lines / Lines should have been down…”) is the ground truth; the detector
+below uses that note (or a graded-then-cancelled reversal) as a seed and then finds everyone else
+who hit the same market in the same window.
+
+### 6.1 In the GSLive console
+
+- `#/events/bet-history` with `dateFilterBy=calcTime` shows the **settlement/cancellation audit**
+  (the stale-line note and the cancel). Use `dateFilterBy=betTime` to see **placement** history and
+  placement tempo.
+- The player filter is the **raw login**: `partnerUserId=AF12`, not `player_AF12`. The `player_`
+  prefix belongs to `#/reports/users?text=`.
+- To see who else was on the event, load the placement view for that desk day and add
+  `eventId=<ROT or event id>` (supported by `./bin/dx gslive`, unverified in the SPA). If the grid
+  ignores it, scan the day grid around the flagged placement time.
+
+```
+# desk day of the placement, placement order, event-scoped
+https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793250000&to=1793250000&toTime=86399&dateFilterBy=betTime&t=<fresh epoch ms>&eventId=ROT-451
+```
+
+`1793250000` = 2026-10-29 00:00 CDT. Generate exact values with `./bin/dx gslive <LOGIN>`.
+
+### 6.2 With a bet-log export
+
+Export the bet log (CSV/JSON/JSONL) with these columns — names are case/punctuation insensitive:
+
+| Column | Required | Notes |
+| :--- | :--- | :--- |
+| `customer` | yes | Raw login, e.g. `AF12` |
+| `placedAt` | yes | ISO-8601 or epoch (seconds or ms) |
+| `eventId` | for clustering | Rotation or event id |
+| `market`, `period`, `side` | recommended | Clustering key |
+| `priceAmerican`, `stakeUsd` | recommended | Same-price and same-stake fingerprints |
+| `settledAt`, `canceledAt`, `status` | recommended | Detects graded-then-cancelled reversals |
+| `staleNote`, `notedBy` | recommended | Operator label / reviewer |
+| `agent`, `ip` | recommended | Linkage hints |
+
+```bash
+# Human-readable cohort report (default ±10m window)
+./bin/dx stale -i bets.csv --window-min 10
+
+# Full JSON for automation
+./bin/dx stale -i bets.json --json
+
+# Pipe from another tool
+cat bets.jsonl | ./bin/dx stale -i -
+```
+
+The report prints, per seeded event: the seed ticket, every other customer at the same
+market/period/side within the window, their price/stake/status, and a GSLive follow-up URL for that
+desk day. It also ranks customers by seed count and stale rate, with cancelled / graded-then-cancelled
+counts, stake fingerprints, and `/24` IP hints.
+
+### 6.3 What it does and does not prove
+
+- Seeds are **operator-labelled** (or graded-then-cancelled). The tool does not infer “stale” from a
+  price comparison, because no reference line series is ingested yet.
+- A same-event cluster is a **lead**, not a verdict: the other tickets may be legitimate. Escalate
+  with Mode 6 (activity overlap), Modes 3–5 (shared IP/subnet), and the CLV triangulation in
+  `operational_guardrails_runbook.md`.
+- To upgrade to a quantitative detector, add a sharp reference price series per event and compute
+  `edge_bps` at placement and `lag_s` since the last reference move.

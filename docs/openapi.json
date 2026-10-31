@@ -3,7 +3,7 @@
   "info": {
     "title": "SportsDesk & Fantasy402 Wire API (evidence-labelled)",
     "version": "2026.10.31",
-    "description": "Evidence model: every operation carries x-evidence.tier — A means a captured request and response are verified, B means observed first-party evidence (a captured request or a handler-verified route) without a captured response, C means inferred only with no capture, and D means a real surface missing from the spec; tier-A rows are backed by live capture records in docs/evidence/captures and publish capture-derived response schemas (see docs/EVIDENCE.md)."
+    "description": "Evidence model: every operation carries x-evidence.tier — A means a captured request and response are verified, B means observed first-party evidence (a captured request or a handler-verified route) without a captured response, C means inferred only with no capture, and D means a real surface missing from the spec; tier-A rows are backed by live capture records in docs/evidence/captures and publish capture-derived response schemas (see docs/EVIDENCE.md).\n\n## GSLive Manager (Partner 118): operator deep links\n\nGSLive is a third-party operator console, **not** a server of this API. The links below are\ndeep links an operator opens in a browser; they carry no request contract of ours. Every\nper-account link is produced by `lib/gslive_manager_deeplink_sidecar.ts` and can be generated\nwith `./bin/dx gslive <LOGIN>`.\n\n| Surface | Route | What it answers |\n| :--- | :--- | :--- |\n| Account report (batch) | `#/reports/users` | Profit, bets, hold %, wager and leg counts for one `player_<LOGIN>` over a day window. |\n| Live settling stream (`calcTime`) | `#/events/bet-history` | Tickets as they settle/populate for the current desk day. |\n| Live placement stream (`betTime`) | `#/events/bet-history` | Tickets as they are placed. |\n\n### Account report rules\n\n- `bot=true` is mandatory. The SPA defaults the bot switch off, which hides syndicate accounts such as `player_CHURN_003` and `player_NOISE_BOT_77`.\n- `from` and `to` must be explicit ISO-8601 UTC desk-day boundaries (`00:00:00` to `23:59:59` in `America/Chicago`). A bare `text=` search renders an empty grid.\n- `searchBy=player` and `text=player_<LOGIN>`; `partnerId=118`.\n\nExample (fixed churn window; the CLI emits today's rolling window):\n\n```text\nhttps://plive.sportswidgets.pro/manager-tools/#/reports/users?bot=true&eventId=&from=2026-10-18T05%3A00%3A00.000Z&partnerId=118&searchBy=player&text=player_CHURN_003&to=2026-10-26T04%3A59%3A59.000Z\n```\n\n### Live bet-history rules\n\n- `from` and `to` are the desk-day start in **epoch seconds**; `toTime` is the offset to the last second of that day (`86399`, or `89999`/`82799` on US DST transition days).\n- `minVolume=0` and `maxTimeUntilScore=0` disable volume/score-time filtering so live tickets appear immediately.\n- `t` is an epoch-millisecond cache-buster and must be fresh on every open.\n- `dateFilterBy=calcTime` follows settlement; `dateFilterBy=betTime` follows placement.\n- `partnerUserId=<LOGIN>` (raw login, e.g. `AF12`) filters to one player; the live console emits the unprefixed form. It is **unverified** as a server-side filter — confirm by row count, and if the grid is not filtered, filter in the console.\n\n```text\nhttps://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793422800&to=1793422800&toTime=86399&dateFilterBy=calcTime&t=1793469958152\nhttps://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793422800&to=1793422800&toTime=86399&dateFilterBy=betTime&t=1793469958152\n```\n\nPer-player variant (adds `partnerUserId`):\n\n```text\nhttps://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793422800&to=1793422800&toTime=86399&dateFilterBy=calcTime&t=1793469958152&partnerUserId=CHURN_003\n```\n\n### Related documentation\n\n- `docs/gs-manager-contracts.md` — observed payloads and open questions.\n- `docs/OPERATOR_QUICKSTART_AND_10_MODE_RUNBOOK.md` — which surface to use for Modes 1, 6, 7, 8, 9 and 10.\n"
   },
   "servers": [
     {
@@ -1966,6 +1966,72 @@
         "x-surface-id": "surface.daemon-dashboard"
       }
     }
+  },
+  "x-sportsdesk-gslive": {
+    "provider": "GSLive Manager (Partner 118)",
+    "kind": "operator-deep-links-not-wire-operations",
+    "origin": "https://plive.sportswidgets.pro",
+    "managerPath": "/manager-tools/",
+    "partnerId": 118,
+    "cli": "./bin/dx gslive <LOGIN>",
+    "contractDoc": "docs/gs-manager-contracts.md",
+    "surfaces": [
+      {
+        "id": "users-report",
+        "route": "#/reports/users",
+        "purpose": "Per-account batch report (profit, bets, hold %, wager and leg counts).",
+        "windows": ["today", "7d", "14d", "churn"],
+        "requiredQuery": {
+          "bot": "true",
+          "eventId": "",
+          "from": "<desk-day start, ISO-8601 UTC>",
+          "partnerId": "118",
+          "searchBy": "player",
+          "text": "player_<LOGIN>",
+          "to": "<desk-day end, ISO-8601 UTC>"
+        },
+        "notes": [
+          "bot=true is mandatory; the SPA defaults the bot switch off and hides syndicate accounts.",
+          "from/to must be explicit desk-day boundaries; a bare text search renders an empty grid."
+        ],
+        "example": "https://plive.sportswidgets.pro/manager-tools/#/reports/users?bot=true&eventId=&from=2026-10-18T05%3A00%3A00.000Z&partnerId=118&searchBy=player&text=player_CHURN_003&to=2026-10-26T04%3A59%3A59.000Z"
+      },
+      {
+        "id": "bet-history-calctime",
+        "route": "#/events/bet-history",
+        "purpose": "Live settling/populating ticket stream (calcTime).",
+        "requiredQuery": {
+          "minVolume": "0",
+          "maxTimeUntilScore": "0",
+          "from": "<desk-day start, epoch seconds>",
+          "to": "<desk-day start, epoch seconds>",
+          "toTime": "<desk day length - 1: 86399, or 89999/82799 on DST days>",
+          "dateFilterBy": "calcTime",
+          "t": "<epoch milliseconds cache-buster>"
+        },
+        "notes": [
+          "partnerUserId is the raw login (e.g. AF12), not player_AF12; it is still unverified as a server-side filter in the SPA router.",
+          "t must be refreshed on every open; a frozen value serves a cached grid."
+        ],
+        "example": "https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793422800&to=1793422800&toTime=86399&dateFilterBy=calcTime&t=1793469958152"
+      },
+      {
+        "id": "bet-history-bettime",
+        "route": "#/events/bet-history",
+        "purpose": "Live placement stream (betTime).",
+        "requiredQuery": {
+          "minVolume": "0",
+          "maxTimeUntilScore": "0",
+          "from": "<desk-day start, epoch seconds>",
+          "to": "<desk-day start, epoch seconds>",
+          "toTime": "<desk day length - 1: 86399, or 89999/82799 on DST days>",
+          "dateFilterBy": "betTime",
+          "t": "<epoch milliseconds cache-buster>"
+        },
+        "notes": ["Same day window as calcTime; only dateFilterBy differs."],
+        "example": "https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793422800&to=1793422800&toTime=86399&dateFilterBy=betTime&t=1793469958152"
+      }
+    ]
   },
   "components": {
     "securitySchemes": {

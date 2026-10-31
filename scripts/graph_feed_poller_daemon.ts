@@ -6,8 +6,8 @@
  * Capabilities:
  *   1. Polls Polymarket Data API (`https://data-api.polymarket.com/positions?user=<0x>`) and Fantasy402
  *      `Manager/getPending` across all 39 tracked syndicate `0x` wallets.
- *   2. Generates `docs/graph-live-feed.json` and `dist/graph-live-feed.json`, and updates the inline
- *      `#live-last-updated-ts` and `.live-sync-ts` timestamps in `docs/graph.html` and `dist/graph.html`.
+ *   2. Generates `docs/graph-live-feed.json` and `dist/graph-live-feed.json`. The portal hydrates
+ *      its GSLive links and timestamps client-side from that feed, so no HTML is rewritten here.
  *   3. Supports three execution modes:
  *      - `--once`   : Execute a single poll cycle and write `graph-live-feed.json` + `graph.html`
  *      - `--cron`   : Run continuous in-process `Bun.cron("* * * * *", ...)` (60s cadence)
@@ -20,9 +20,9 @@ import { spawnSync } from "node:child_process";
 import { runFourWeekParlayComboBacktest, type FourWeekParlayBacktestReport } from "../lib/parlay_combo_backtest_engine.ts";
 import { PER_OFFICE_IP_TRACKER_CLUSTERS, type OfficeIpClusterSummary } from "../lib/bet_ticker_ip_tracker_bridge.ts";
 import { buildTenModeLiveSnapshot, type TenModeLiveSnapshot } from "../lib/forensic_diagnostic_modes.ts";
-import { buildGsLiveUsersReportDeepLink, buildGsLiveBetHistorySidecarUrl, buildGsLiveDualSurfaceDescriptor, type GsLiveDualSurfaceDescriptor } from "../lib/gslive_manager_deeplink_sidecar.ts";
+import { buildGsLiveUsersReportDeepLink, buildGsLiveBetHistorySidecarUrl, buildGsLiveDualSurfaceDescriptor, computeDeskDayStartEpochSeconds, deskWindowIso, resolveDeskDateYmd, type GsLiveDualSurfaceDescriptor } from "../lib/gslive_manager_deeplink_sidecar.ts";
 
-const repoRoot = path.resolve(import.meta.dirname ?? path.dirname(process.argv[1]), "..");
+const repoRoot = path.resolve(import.meta.dirname ?? path.dirname(process.argv[1] ?? process.cwd()), "..");
 
 export interface TrackedWalletProfile {
   readonly rank: number;
@@ -37,6 +37,7 @@ export interface TrackedWalletProfile {
   readonly f402CustomerProfileUrl: string;
   readonly gsLivePlayerId: string;
   readonly gsLivePlayerReportUrl: string;
+  readonly gsLivePlayerReport7DayUrl: string;
   readonly gsLiveBetHistoryUrl: string;
   readonly openBetsSummary: string;
   readonly openVolumeUsd: number;
@@ -88,18 +89,17 @@ export interface GraphLiveFeedPayload {
 
 function formatCdtTimestamp(date: Date): string {
   try {
-    return (
-      new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/Chicago",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      }).format(date) + " CDT"
-    );
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZoneName: "short",
+    }).format(date);
   } catch {
     return date.toISOString();
   }
@@ -109,6 +109,9 @@ export function buildGraphLiveFeed(pollSequence = 1): GraphLiveFeedPayload {
   const now = new Date();
   const nowIso = now.toISOString();
   const nowCdt = formatCdtTimestamp(now);
+  const deskDateYmd = resolveDeskDateYmd(now);
+  const deskDayStartEpochSec = computeDeskDayStartEpochSeconds(deskDateYmd);
+  const deskWindow7 = deskWindowIso(deskDateYmd, 7);
 
   const rawWallets: Array<
     [number, string, string, string, string, string, number, number, string]
@@ -168,7 +171,23 @@ export function buildGraphLiveFeed(pollSequence = 1): GraphLiveFeedPayload {
       f402CustomerProfileUrl: `https://desk.bookdeskops.com/dashboard?customer=${encodeURIComponent(f402Id)}&agent=${encodeURIComponent(agent)}`,
       gsLivePlayerId: `player_${f402Id}`,
       gsLivePlayerReportUrl: buildGsLiveUsersReportDeepLink({ customerLogin: f402Id, bot: true }),
-      gsLiveBetHistoryUrl: buildGsLiveBetHistorySidecarUrl({ customerLogin: f402Id, tickEpochMs: now.getTime() }),
+      gsLivePlayerReport7DayUrl: buildGsLiveUsersReportDeepLink({
+        customerLogin: f402Id,
+        bot: true,
+        eventId: "",
+        fromIsoUtc: deskWindow7.fromIso,
+        toIsoUtc: deskWindow7.toIso,
+        partnerId: 118,
+        searchBy: "player",
+      }),
+      gsLiveBetHistoryUrl: buildGsLiveBetHistorySidecarUrl({
+        customerLogin: f402Id,
+        dateYmd: deskDateYmd,
+        fromEpochSec: deskDayStartEpochSec,
+        toEpochSec: deskDayStartEpochSec,
+        dateFilterBy: "calcTime",
+        tickEpochMs: now.getTime(),
+      }),
       openBetsSummary: summary,
       openVolumeUsd: vol,
       openLegsCount: legs,
@@ -487,7 +506,7 @@ export function buildGraphLiveFeed(pollSequence = 1): GraphLiveFeedPayload {
     totalOpenExposureUsd: 702700,
     pendingBets,
     walletProfiles,
-    gsLiveSidecar: buildGsLiveDualSurfaceDescriptor("CHURN_003", { dateYmd: "2026-10-31", tickEpochMs: now.getTime() }),
+    gsLiveSidecar: buildGsLiveDualSurfaceDescriptor("CHURN_003", { dateYmd: deskDateYmd, tickEpochMs: now.getTime() }),
     perOfficeIpTrackerClusters: PER_OFFICE_IP_TRACKER_CLUSTERS,
     tenModeSnapshot: buildTenModeLiveSnapshot(),
     backtest4Wk: runFourWeekParlayComboBacktest(repoRoot),
@@ -495,27 +514,6 @@ export function buildGraphLiveFeed(pollSequence = 1): GraphLiveFeedPayload {
 }
 
 let pollCounter = 1;
-
-function syncHtmlEmbeddedTimestamps(payload: GraphLiveFeedPayload): void {
-  for (const relPath of ["docs/graph.html", "dist/graph.html"]) {
-    const htmlPath = path.join(repoRoot, relPath);
-    if (!fs.existsSync(htmlPath)) continue;
-    let html = fs.readFileSync(htmlPath, "utf8");
-    html = html.replace(
-      /(<span id="live-last-updated-ts"[^>]*>)[^<]*(<\/span>)/g,
-      `$1${payload.lastUpdatedCdt} (${payload.lastUpdatedIso})$2`
-    );
-    html = html.replace(
-      /(<td class="live-sync-ts"[^>]*>)[^<]*(<\/td>)/g,
-      `$1${payload.lastUpdatedCdt}$2`
-    );
-    html = html.replace(
-      /(<span id="live-poll-seq"[^>]*>)[^<]*(<\/span>)/g,
-      `$1Poll #${payload.pollSequence}$2`
-    );
-    fs.writeFileSync(htmlPath, html, "utf8");
-  }
-}
 
 export function writeGraphLiveFeedOnce(syncR2 = false): GraphLiveFeedPayload {
   const payload = buildGraphLiveFeed(pollCounter++);
@@ -533,19 +531,20 @@ export function writeGraphLiveFeedOnce(syncR2 = false): GraphLiveFeedPayload {
   if (fs.existsSync(distDir)) {
     fs.writeFileSync(distTarget, serialized, "utf8");
   }
-  syncHtmlEmbeddedTimestamps(payload);
 
   console.log(
     `[GraphPoller] ✓ Poll #${payload.pollSequence}: Synced ${payload.pendingBets.length} pending clusters (${payload.totalOpenLegsCount} legs / $${payload.totalOpenExposureUsd.toLocaleString()}) & ${payload.walletProfiles.length} wallet profiles @ ${payload.lastUpdatedCdt} (${payload.lastUpdatedIso})`
   );
 
   if (syncR2) {
-    const res = spawnSync("node", [path.join(repoRoot, "scripts", "publish_r2_graph.mjs")], {
+    const res = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "publish_r2_graph.mjs")], {
       cwd: repoRoot,
       stdio: "inherit",
     });
     if (res.status === 0) {
       console.log(`[GraphPoller] ✓ Published live feed & graph.html to Cloudflare R2 edge @ ${payload.lastUpdatedCdt}`);
+    } else {
+      console.error(`[GraphPoller] ✗ R2 publish failed (status ${String(res.status)}; signal ${String(res.signal)})`);
     }
   }
 
@@ -566,16 +565,10 @@ if (import.meta.main) {
   }
   if (args.includes("--cron") || args.includes("--daemon") || args.includes("--watch")) {
     console.log(
-      `[GraphPoller] Starting continuous 60s schedule (Bun.cron("* * * * *") / interval fallback, syncR2=${syncR2})...`
+      `[GraphPoller] Starting continuous 60s schedule (in-process Bun.cron, syncR2=${syncR2})...`
     );
-    if (typeof Bun !== "undefined" && typeof (Bun as any).cron === "function") {
-      (Bun as any).cron("* * * * *", () => {
-        writeGraphLiveFeedOnce(syncR2);
-      });
-    } else {
-      setInterval(() => {
-        writeGraphLiveFeedOnce(syncR2);
-      }, 60_000);
-    }
+    Bun.cron("* * * * *", () => {
+      writeGraphLiveFeedOnce(syncR2);
+    });
   }
 }

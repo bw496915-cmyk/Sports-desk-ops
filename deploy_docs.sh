@@ -52,24 +52,16 @@ echo "==========================================================================
 
 # Step 1: Run automated verification tests
 echo "[1/3] Running API documentation and OpenAPI 3.1 verification tests..."
-if command -v node >/dev/null 2>&1; then
-  node --test tests/api_reference.test.ts
-elif command -v bun >/dev/null 2>&1; then
-  bun test tests/api_reference.test.ts
-else
-  echo "Error: Neither node nor bun found in PATH" >&2
+if ! command -v bun >/dev/null 2>&1; then
+  echo "Error: bun not found in PATH (this repo runs on Bun 1.4.4; Node is not supported)" >&2
   exit 1
 fi
+bun test tests/api_reference.test.ts
 echo "✓ All schema and documentation assertions passed cleanly."
 
 # Step 1b: Provenance / freshness / portal gates
-if command -v bun >/dev/null 2>&1; then
-  bun run scripts/verify_docs.ts
-  echo "✓ Evidence, freshness and portal gates passed."
-else
-  echo "Error: bun is required to run the docs provenance gates" >&2
-  exit 1
-fi
+bun run scripts/verify_docs.ts
+echo "✓ Evidence, freshness and portal gates passed."
 
 if [[ "${TEST_ONLY}" == true ]]; then
   echo ""
@@ -80,16 +72,7 @@ fi
 # Step 2: Stage distribution files
 echo ""
 echo "[2/3] Staging distribution bundle into dist/..."
-if command -v bun >/dev/null 2>&1; then
-  bun run docs:stage
-else
-  mkdir -p dist
-  cp docs/index.html dist/index.html
-  cp docs/graph.html dist/graph.html
-  cp docs/graph.js dist/graph.js
-  cp docs/openapi.json dist/openapi.json
-  cp functions/_headers dist/_headers
-fi
+bun run docs:stage
 echo "✓ Staged dist/index.html ($(wc -c < dist/index.html | tr -d ' ') bytes)"
 test -f dist/graph.html && echo "✓ Staged dist/graph.html ($(wc -c < dist/graph.html | tr -d ' ') bytes)"
 test -f dist/graph.js && echo "✓ Staged dist/graph.js ($(wc -c < dist/graph.js | tr -d ' ') bytes)"
@@ -110,15 +93,16 @@ if [[ -f "./wrangler" ]]; then
 elif command -v wrangler >/dev/null 2>&1; then
   wrangler pages deploy dist --project-name="${PROJECT_NAME}" --branch=main
 else
-  npx --yes wrangler pages deploy dist --project-name="${PROJECT_NAME}" --branch=main
+  echo "Error: wrangler not found. Restore the repo wrapper (./wrangler) or install wrangler with Bun; npx is not supported." >&2
+  exit 1
 fi
 
 echo ""
 echo "================================================================================"
 echo "✨ Deployment successful!"
 echo "Verify the live artifact before announcing it:"
-echo "  curl -fsS https://fantasy402-docs-4ay.pages.dev/openapi.json | sha256sum"
-echo "  (must equal: $(sha256sum dist/openapi.json | awk '{print $1}'))"
+echo "  bun run scripts/verify_docs.ts --live https://fantasy402-docs-4ay.pages.dev"
+echo "  (the live openapi.json sha256 must equal: $(sha256sum dist/openapi.json | awk '{print $1}'))"
 echo "Production URL : https://fantasy402-docs-4ay.pages.dev"
 echo "OpenAPI Spec   : https://fantasy402-docs-4ay.pages.dev/openapi.json"
 echo "Custom Domain  : https://docs.bookdeskops.com (once CNAME bound in Cloudflare)"

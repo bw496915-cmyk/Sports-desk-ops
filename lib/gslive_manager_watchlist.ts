@@ -10,8 +10,18 @@
  *   4. `proxyWallet`      : Bridged Polymarket CTF `0x` Proxy Wallet (or `null` for internal-only F402 sharp accounts)
  */
 
-export const GSLIVE_MANAGER_ORIGIN = "https://plive.sportswidgets.pro" as const;
-export const GSLIVE_MANAGER_BASE_URL = "https://plive.sportswidgets.pro/manager-tools/" as const;
+import {
+  GSLIVE_MANAGER_BASE_URL as CANONICAL_GSLIVE_MANAGER_BASE_URL,
+  addDaysYmd,
+  buildGsLiveManagerSurfaceUrls,
+  computeDeskDayStartEpochSeconds,
+  computeDeskDayToTimeSeconds,
+  formatGsLivePlayerToken,
+  resolveDeskDateYmd,
+} from "./gslive_manager_deeplink_sidecar.ts";
+
+export const GSLIVE_MANAGER_BASE_URL = CANONICAL_GSLIVE_MANAGER_BASE_URL;
+export const GSLIVE_MANAGER_ORIGIN = CANONICAL_GSLIVE_MANAGER_BASE_URL.replace(/\/manager-tools\/$/, "") as "https://plive.sportswidgets.pro";
 export const GSLIVE_PARTNER_ID = "118" as const;
 
 export interface GsLiveManagerUrls {
@@ -56,13 +66,10 @@ export interface WatchlistUnifiedEntry {
 
 /**
  * Formats a raw Fantasy402 customer login into GSLive Manager's `player_[customerlogin]` identifier.
+ * Delegates to the canonical formatter so every surface agrees (including `FUNDING_ROOT`).
  */
 export function toGsLivePlayerId(customerLogin: string): string {
-  const clean = customerLogin.trim().replace(/^player_/i, "").toUpperCase();
-  if (!clean || clean === "FUNDING_ROOT") {
-    return "player_UNMAPPED";
-  }
-  return `player_${clean}`;
+  return formatGsLivePlayerToken(customerLogin);
 }
 
 /**
@@ -73,29 +80,35 @@ export function fromGsLivePlayerId(input: string): string {
 }
 
 /**
- * Builds all 5 GSLive Manager (`https://plive.sportswidgets.pro/manager-tools/`) widget deep links
- * using the `player_[customerlogin]` convention and `partnerId=118`.
+ * Builds the GSLive Manager widget deep links for one account.
+ * Delegates to `buildGsLiveManagerSurfaceUrls`: the canonical 7-parameter user-report query
+ * (bot=true + ISO desk-day window) is reused for the sibling report routes, and the bet-history
+ * link carries the full `from`/`to`/`toTime`/`dateFilterBy` sidecar contract instead of a bare
+ * `partnerUserId` (which rendered an empty grid).
  */
 export function buildGsLiveManagerUrls(
   customerLogin: string,
-  agentId?: string
+  options?: { readonly dateYmd?: string; readonly tickEpochMs?: number }
 ): GsLiveManagerUrls {
-  const gsLivePlayerId = toGsLivePlayerId(customerLogin);
-  const encPlayer = encodeURIComponent(gsLivePlayerId);
-  const encAgent = agentId ? `&agent=${encodeURIComponent(agentId.trim().toUpperCase())}` : "";
+  const surfaces = buildGsLiveManagerSurfaceUrls({
+    customerLogin,
+    ...(options?.dateYmd ? { dateYmd: options.dateYmd } : {}),
+    ...(options?.tickEpochMs ? { tickEpochMs: options.tickEpochMs } : {}),
+  });
 
   return {
-    gsLivePlayerId,
-    playerReportUrl: `${GSLIVE_MANAGER_BASE_URL}#/reports/users?partnerId=${GSLIVE_PARTNER_ID}&searchBy=player&text=${encPlayer}${encAgent}`,
-    bettorReportUrl: `${GSLIVE_MANAGER_BASE_URL}#/reports/bettor?partnerId=${GSLIVE_PARTNER_ID}&searchBy=player&text=${encPlayer}${encAgent}`,
-    openBetReportUrl: `${GSLIVE_MANAGER_BASE_URL}#/reports/open-bets?partnerId=${GSLIVE_PARTNER_ID}&searchBy=player&text=${encPlayer}${encAgent}`,
-    betHistoryUrl: `${GSLIVE_MANAGER_BASE_URL}#/events/bet-history?partnerId=${GSLIVE_PARTNER_ID}&partnerUserId=${encPlayer}${encAgent}`,
-    summaryByPlayerUrl: `${GSLIVE_MANAGER_BASE_URL}#/reports/summary?bot=false&eventId=&partnerId=${GSLIVE_PARTNER_ID}&searchBy=player&text=${encPlayer}${encAgent}`,
+    gsLivePlayerId: surfaces.gsLivePlayerId,
+    playerReportUrl: surfaces.playerReportUrl,
+    bettorReportUrl: surfaces.bettorReportUrl,
+    openBetReportUrl: surfaces.openBetReportUrl,
+    betHistoryUrl: surfaces.betHistoryUrl,
+    summaryByPlayerUrl: surfaces.summaryByPlayerUrl,
   };
 }
 
 /**
- * Builds the observed GSLive `getBetReport` payload with `partnerUserId: "player_[customerlogin]"`.
+ * Builds the observed GSLive `getBetReport` payload with `partnerUserId` as the raw login
+ * (e.g. `AF12`), matching the live `#/events/bet-history` filter.
  */
 export function buildGsLiveGetBetReportPayload(options: {
   customerLogin: string;
@@ -107,9 +120,13 @@ export function buildGsLiveGetBetReportPayload(options: {
   toEpochSec?: number;
   period?: string;
 }) {
+  const dateYmd = resolveDeskDateYmd();
+  const dayStartEpoch = computeDeskDayStartEpochSeconds(dateYmd);
+  const dayEndEpoch = computeDeskDayStartEpochSeconds(addDaysYmd(dateYmd, 1)) - 1;
+  const toTimeSec = computeDeskDayToTimeSeconds(dateYmd);
   return {
     action: "getBetReport" as const,
-    partnerUserId: toGsLivePlayerId(options.customerLogin),
+    partnerUserId: fromGsLivePlayerId(options.customerLogin),
     agent: options.agentId ? options.agentId.trim().toUpperCase() : "",
     eventId: options.eventId ?? "",
     freeBetId: "",
@@ -118,10 +135,10 @@ export function buildGsLiveGetBetReportPayload(options: {
     minVolume: "0",
     maxTimeUntilScore: "0",
     mId: "",
-    from: options.fromEpochSec ?? 1793250000,
+    from: options.fromEpochSec ?? dayStartEpoch,
     fromTime: 0,
-    to: options.toEpochSec ?? 1793422799,
-    toTime: 86399,
+    to: options.toEpochSec ?? dayEndEpoch,
+    toTime: toTimeSec,
     betId: "",
     betGroupId: options.betGroupId ?? "",
     group: null,
@@ -204,7 +221,7 @@ const RAW_BRIDGED_WATCHLIST: ReadonlyArray<{
 
 export function getUnifiedWatchlistRegistry(): readonly WatchlistUnifiedEntry[] {
   return RAW_BRIDGED_WATCHLIST.map((r) => {
-    const gsLiveUrls = buildGsLiveManagerUrls(r.customerLogin, r.agentId);
+    const gsLiveUrls = buildGsLiveManagerUrls(r.customerLogin);
     const hasPending = r.openLegsCount > 0 && r.openVolumeUsd > 0;
     return {
       rank: r.rank,

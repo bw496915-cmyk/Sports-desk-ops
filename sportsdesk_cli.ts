@@ -1207,8 +1207,11 @@ export async function handleWireCommand(args: string[]): Promise<void> {
 
   if (sub === "gslive" || sub === "gs-live") {
     const custId = getArgValue(args, ["-c", "--customer"], "CHURN_003");
-    const dateYmd = getArgValue(args, ["--date"], "2026-10-31");
-    const desc = buildGsLiveDualSurfaceDescriptor(custId, { dateYmd, tickEpochMs: Date.now() });
+    const dateYmd = getArgValue(args, ["--date"], "");
+    const desc = buildGsLiveDualSurfaceDescriptor(custId, {
+      ...(dateYmd ? { dateYmd } : {}),
+      tickEpochMs: Date.now(),
+    });
     console.log(JSON.stringify(desc, null, 2));
     return;
   }
@@ -1264,9 +1267,27 @@ export async function main(): Promise<void> {
   }
 
   if (cmd === "gslive" || cmd === "gs-live" || rawArgs.includes("--gslive") || rawArgs.includes("-G")) {
-    const targetLogin = rawArgs.find((a, idx) => idx > 0 && !a.startsWith("-")) || getArgValue(rawArgs, ["-c", "--customer"], "CHURN_003");
-    const dateYmd = getArgValue(rawArgs, ["--date"], "2026-10-31");
-    const desc = buildGsLiveDualSurfaceDescriptor(targetLogin, { dateYmd, tickEpochMs: Date.now() });
+    // Flags that consume the next token; skip both so `--date 2026-11-01 MJ102` resolves MJ102.
+    const gsliveFlagValues = new Set(["-c", "--customer", "--date"]);
+    let positionalLogin: string | undefined;
+    const gsliveArgs = rawArgs.slice(1);
+    for (let index = 0; index < gsliveArgs.length; index += 1) {
+      const arg = gsliveArgs[index]!;
+      if (gsliveFlagValues.has(arg)) {
+        index += 1;
+        continue;
+      }
+      if (arg.startsWith("-")) continue;
+      positionalLogin = arg;
+      break;
+    }
+    const targetLogin =
+      positionalLogin || getArgValue(rawArgs, ["-c", "--customer"], "CHURN_003");
+    const dateYmd = getArgValue(rawArgs, ["--date"], "");
+    const desc = buildGsLiveDualSurfaceDescriptor(targetLogin, {
+      ...(dateYmd ? { dateYmd } : {}),
+      tickEpochMs: Date.now(),
+    });
     if (rawArgs.includes("--json")) {
       console.log(JSON.stringify(desc, null, 2));
       return;
@@ -1274,14 +1295,15 @@ export async function main(): Promise<void> {
     console.log("========================================================================================================================");
     console.log(`  🎯 GSLIVE MANAGER (PARTNER 118) DUAL-SURFACE DEEP-LINK & LIVE SIDECAR (${desc.gsLivePlayerId})`);
     console.log("========================================================================================================================");
-    console.log("  1. CANONICAL 7-PARAMETER #/reports/users DEEP LINKS (bot=true + UTC CDT 05:00:00.000Z..04:59:59.000Z):");
+    console.log("  1. CANONICAL 7-PARAMETER #/reports/users DEEP LINKS (bot=true + desk-day ISO window, America/Chicago):");
     console.log(`     • 7-Day Window  : ${desc.usersReportDeepLink7Day}`);
     console.log(`     • 14-Day Window : ${desc.usersReportDeepLink14Day}`);
     console.log(`     • Churn Window  : ${desc.usersReportChurnWindowDeepLink}`);
-    console.log("  2. LIVE POPULATING #/events/bet-history SIDECAR STREAM (from=1793422800, toTime=86399, minVolume=0):");
+    console.log("  2. LIVE POPULATING #/events/bet-history SIDECAR STREAM (desk-day window, minVolume=0, DST-aware toTime):");
     console.log(`     • Live calcTime : ${desc.liveBetHistorySidecarCalcTimeUrl}`);
     console.log(`     • Live betTime  : ${desc.liveBetHistorySidecarBetTimeUrl}`);
     console.log(`     • Player Filter : ${desc.playerBetHistoryDeepLinkUrl}`);
+    console.log("  3. API DOCS: ./bin/dx docs gslive  ·  Scalar: https://fantasy402-docs-4ay.pages.dev/");
     console.log("========================================================================================================================");
     return;
   }

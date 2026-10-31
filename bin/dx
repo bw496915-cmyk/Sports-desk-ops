@@ -78,6 +78,26 @@ cmd="${1:-status}"
 shift || true
 
 case "$cmd" in
+  help|--help|-h)
+    cat <<'EOF'
+SportsDesk DX — operator commands
+
+  ./bin/dx status                 Environment, git and R2 edge health
+  ./bin/dx modes [1..10]          10-mode forensic / risk / cross-market matrix
+  ./bin/dx iptracker              Per-office and cross-office IP clusters
+  ./bin/dx gslive <LOGIN>         GSLive 7-param report + live bet-history links
+  ./bin/dx docs [gslive|--json]   Deployed API docs (Scalar, R2, local artifacts)
+  ./bin/dx stale -i <export>      Stale-line / post-move bet cohort
+  ./bin/dx backtest               4-week CFB + NBA parlay/combo backtest
+  ./bin/dx poll [--once]          Poll feeds and write graph-live-feed.json
+  ./bin/dx watch                  In-process Bun.cron daemon (60s) + R2 sync
+  ./bin/dx stage                  Regenerate + stage dist/ (no upload)
+  ./bin/dx deploy                 Stage, publish to R2 and Cloudflare Pages
+  ./bin/dx ship                   Deploy, then push main
+
+Docs: README.md · docs/OPERATOR_QUICKSTART_AND_10_MODE_RUNBOOK.md
+EOF
+    ;;
   status)
     echo "================================================================================"
     echo "  🛠️  SPORTSDESK & DOTFILES ZERO-FRICTION DX DIAGNOSTIC"
@@ -86,7 +106,7 @@ case "$cmd" in
     echo "  • XDG_CONFIG_HOME      : $XDG_CONFIG_HOME (✅ re-anchored from host)"
     echo "  • DOTFILES_ROOT        : ${DOTFILES_ROOT:-unset} ($(test -d "${DOTFILES_ROOT:-}" && echo '✅ connected' || echo '❌ missing'))"
     echo "  • Git Config & Ignore  : $HOME/.gitconfig ($(git status -s >/dev/null 2>&1 && echo '✅ zero git warnings' || echo '⚠️ warning'))"
-    echo "  • Node / Wrangler      : $(node -v 2>/dev/null || echo 'missing') / $(./wrangler --version 2>/dev/null || echo 'wrangler ready')"
+    echo "  • Bun / Wrangler       : $(bun -v 2>/dev/null || echo 'missing') / $(./wrangler --version 2>/dev/null || echo 'wrangler ready')"
     echo "  • Git Branch & Tip     : $(git log -n 1 --oneline)"
     echo "  • Staged dist/ Assets  : $(ls -1 "$REPO_ROOT/dist" 2>/dev/null | tr '\n' ' ')"
     echo "  • Live R2 Edge Portal  : https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html (✅ SigV4 Ready)"
@@ -94,7 +114,7 @@ case "$cmd" in
     ;;
   iptracker)
     cd "$REPO_ROOT"
-    node -e '
+    bun -e '
       const { PER_OFFICE_IP_TRACKER_CLUSTERS, buildPerOfficeIpMatcherPayload } = require("./lib/bet_ticker_ip_tracker_bridge.ts");
       console.log("================================================================================================================");
       console.log("  🌐 BET-TICKER <-> IP-TRACKER (getWebLog Modes A/B/C/I) PER-OFFICE & CROSS-OFFICE MATCH REPORT");
@@ -109,7 +129,7 @@ case "$cmd" in
     ;;
   modes)
     cd "$REPO_ROOT"
-    node -e '
+    bun -e '
       const { buildTenModeLiveSnapshot } = require("./lib/forensic_diagnostic_modes.ts");
       const snap = buildTenModeLiveSnapshot();
       const filterMode = process.argv[1] ? Number(process.argv[1]) : null;
@@ -156,68 +176,50 @@ case "$cmd" in
     ;;
   gslive)
     cd "$REPO_ROOT"
-    node -e '
-      const { buildGsLiveDualSurfaceDescriptor } = require("./lib/gslive_manager_deeplink_sidecar.ts");
-      const target = process.argv[1] || "CHURN_003";
-      const d = buildGsLiveDualSurfaceDescriptor(target);
-      console.log("========================================================================================================================");
-      console.log(`  🎯 GSLIVE MANAGER (PARTNER 118) DUAL-SURFACE DEEP-LINK & LIVE SIDECAR REPORT (${d.gsLivePlayerId})`);
-      console.log("========================================================================================================================");
-      console.log("  1. CANONICAL 7-PARAMETER #/reports/users DEEP LINKS (bot=true + UTC CDT 05:00:00.000Z..04:59:59.000Z):");
-      console.log(`     • 7-Day Window  : ${d.usersReportDeepLink7Day}`);
-      console.log(`     • 14-Day Window : ${d.usersReportDeepLink14Day}`);
-      console.log(`     • Churn Window  : ${d.usersReportChurnWindowDeepLink}`);
-      console.log("  2. LIVE POPULATING #/events/bet-history SIDECAR STREAM (from=1793422800, toTime=86399, minVolume=0):");
-      console.log(`     • Live calcTime : ${d.liveBetHistorySidecarCalcTimeUrl}`);
-      console.log(`     • Live betTime  : ${d.liveBetHistorySidecarBetTimeUrl}`);
-      console.log(`     • Player Filter : ${d.playerBetHistoryDeepLinkUrl}`);
-      console.log("========================================================================================================================");
-    ' "$@"
+    exec bun run sportsdesk_cli.ts gslive "$@"
+    ;;
+  docs|api-docs|api)
+    cd "$REPO_ROOT"
+    exec bun run scripts/api_docs_cli.ts "$@"
+    ;;
+  stale)
+    cd "$REPO_ROOT"
+    exec bun run scripts/stale_line_cohort_cli.ts "$@"
     ;;
   backtest)
     cd "$REPO_ROOT"
-    if command -v bun >/dev/null 2>&1; then
-      bun run scripts/run_4wk_parlay_combo_backtest.ts "$@"
-    else
-      node scripts/run_4wk_parlay_combo_backtest.ts "$@"
-    fi
+    exec bun run scripts/run_4wk_parlay_combo_backtest.ts "$@"
     ;;
   poll)
     cd "$REPO_ROOT"
-    if command -v bun >/dev/null 2>&1; then
-      bun run scripts/graph_feed_poller_daemon.ts "$@"
-    else
-      node scripts/graph_feed_poller_daemon.ts "$@"
-    fi
+    exec bun run scripts/graph_feed_poller_daemon.ts "$@"
     ;;
   watch)
     cd "$REPO_ROOT"
-    if command -v bun >/dev/null 2>&1; then
-      exec bun --watch run scripts/graph_feed_poller_daemon.ts --cron "$@"
-    else
-      exec node scripts/graph_feed_poller_daemon.ts --cron --watch "$@"
-    fi
+    exec bun --watch run scripts/graph_feed_poller_daemon.ts --cron "$@"
     ;;
   stage)
     cd "$REPO_ROOT"
     "$0" poll --once
-    node scripts/generate_pipeline_reference_images.ts
+    bun run scripts/generate_pipeline_reference_images.ts
     mkdir -p dist/assets
     cp docs/index.html dist/index.html
     cp docs/graph.html dist/graph.html
     cp docs/graph.js dist/graph.js
+    cp docs/gslive-links.js dist/gslive-links.js
     cp docs/graph-live-feed.json dist/graph-live-feed.json
     cp docs/backtest-4wk-cfb-nba.json dist/backtest-4wk-cfb-nba.json
     cp docs/openapi.json dist/openapi.json
+    cp docs/api-reference.md dist/api-reference.md
     cp -f docs/assets/* dist/assets/ 2>/dev/null || true
     cp functions/_headers dist/_headers
-    echo "✓ Staged dist/index.html, dist/graph.html, dist/graph.js, dist/graph-live-feed.json, dist/openapi.json, dist/assets/*, dist/_headers"
-    shasum -a 256 dist/index.html dist/graph.html dist/graph.js dist/graph-live-feed.json dist/openapi.json dist/assets/pipeline-artifacts-metadata.json dist/_headers
+    echo "✓ Staged dist/index.html, dist/graph.html, dist/graph.js, dist/gslive-links.js, dist/graph-live-feed.json, dist/openapi.json, dist/api-reference.md, dist/assets/*, dist/_headers"
+    shasum -a 256 dist/index.html dist/graph.html dist/graph.js dist/gslive-links.js dist/graph-live-feed.json dist/openapi.json dist/api-reference.md dist/assets/pipeline-artifacts-metadata.json dist/_headers
     ;;
   deploy)
     "$0" stage
     cd "$REPO_ROOT"
-    node scripts/publish_r2_graph.mjs
+    bun run scripts/publish_r2_graph.mjs
     if [[ -n "${CLOUDFLARE_API_TOKEN:-}" ]]; then
       ./wrangler pages deploy dist --project-name=fantasy402-docs --branch=main "$@"
     fi

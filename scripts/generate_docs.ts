@@ -24,6 +24,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { renderGSLiveDocsMarkdown } from "../lib/gslive_api_docs.ts";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
@@ -119,9 +120,8 @@ const FABRICATED_FRAGMENTS: readonly [RegExp, string][] = [
   [/\/manager-tools\/ajax\.php/gi, "the removed fabricated GS route"],
   [/manager-tools\/ajax\.php/gi, "the removed fabricated GS route"],
   [/ajax\.php/gi, "the removed fabricated GS route"],
-  [/https?:\/\/plive\.sportswidgets\.pro/gi, "the removed GS gateway"],
-  [/plive\.sportswidgets\.pro/gi, "the removed GS gateway"],
-  [/sportswidgets\.pro/gi, "the removed GS gateway"],
+  // The GSLive host is a real operator console and is now published as a deep link target;
+  // only the fabricated ajax.php route is scrubbed.
 ];
 
 const KIND_LABELS: Readonly<Record<string, string>> = {
@@ -1660,6 +1660,8 @@ function ledgerIndex(ledger: Ledger): Map<string, LedgerOperation> {
 function render(context: RenderContext): string {
   const lines: string[] = [];
   lines.push(...renderIntro(context));
+  lines.push(...renderGSLiveDocsMarkdown().split("\n"));
+  lines.push("");
   lines.push(...renderDomains(context));
   lines.push(...renderHeadersMatrix(context));
   lines.push(...renderAuth(context));

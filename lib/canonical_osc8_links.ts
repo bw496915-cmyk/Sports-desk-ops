@@ -10,6 +10,12 @@
  *  - Cloudflare R2 Public Gateways
  */
 
+import {
+  buildGsLiveBetHistorySidecarUrl,
+  buildGsLiveUsersReportDeepLink,
+  formatGsLivePlayerToken,
+} from "./gslive_manager_deeplink_sidecar.ts";
+
 export const CANONICAL_DOMAINS = {
   FANTASY402_PORTAL: "https://fantasy402.com",
   SPORTSDESK_DESK: "https://desk.bookdeskops.com",
@@ -82,13 +88,16 @@ export function formatOpenApiSpecOsc8Markdown(
  */
 export function formatGsLiveUsersReportOsc8Markdown(
   customerId: string,
-  fromIso: string = "2026-10-18T05:00:00.000Z",
-  toIso: string = "2026-11-01T04:59:59.000Z",
+  fromIso?: string,
+  toIso?: string,
 ): string {
-  const cleanId = customerId.trim().replace(/^player_/i, "").toUpperCase();
-  const playerToken = `player_${cleanId}`;
-  const url = `https://plive.sportswidgets.pro/manager-tools/#/reports/users?bot=true&eventId=&from=${encodeURIComponent(fromIso)}&partnerId=118&searchBy=player&text=${encodeURIComponent(playerToken)}&to=${encodeURIComponent(toIso)}`;
-  return `[GSLive:${playerToken}](${url})`;
+  const url = buildGsLiveUsersReportDeepLink({
+    customerLogin: customerId,
+    bot: true,
+    ...(fromIso ? { fromIsoUtc: fromIso } : {}),
+    ...(toIso ? { toIsoUtc: toIso } : {}),
+  });
+  return `[GSLive:${formatGsLivePlayerToken(customerId)}](${url})`;
 }
 
 /**
@@ -97,13 +106,15 @@ export function formatGsLiveUsersReportOsc8Markdown(
 export function formatGsLiveSidecarOsc8Markdown(
   dateFilterBy: "calcTime" | "betTime" = "calcTime",
   customerId?: string,
-  fromEpochSec: number = 1793422800,
-  tickEpochMs: number = 1793469958152,
+  fromEpochSec?: number,
+  tickEpochMs?: number,
 ): string {
-  const base = `https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=${fromEpochSec}&to=${fromEpochSec}&toTime=86399&dateFilterBy=${dateFilterBy}&t=${tickEpochMs}`;
-  const url = customerId
-    ? `${base}&partnerUserId=${encodeURIComponent("player_" + customerId.trim().replace(/^player_/i, "").toUpperCase())}`
-    : base;
+  const url = buildGsLiveBetHistorySidecarUrl({
+    dateFilterBy,
+    ...(customerId ? { customerLogin: customerId } : {}),
+    ...(fromEpochSec !== undefined ? { fromEpochSec } : {}),
+    ...(tickEpochMs !== undefined ? { tickEpochMs } : {}),
+  });
   const label = customerId
     ? `GSLiveSidecar:${customerId.trim().toUpperCase()}(${dateFilterBy})`
     : `GSLiveSidecar(${dateFilterBy})`;

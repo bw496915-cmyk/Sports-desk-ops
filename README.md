@@ -8,7 +8,7 @@ Repository: [bw496915-cmyk/Sports-desk-ops](https://github.com/bw496915-cmyk/Spo
 
 If you are opening this repository for the first time or starting a desk shift, read the **[Operator Quickstart, Data Cleaning Pipeline & 10-Mode Action Runbook](docs/OPERATOR_QUICKSTART_AND_10_MODE_RUNBOOK.md)** and open the **[Live 6-Tab Surveillance, ROT Bet-Ticker & 10-Mode Forensic Portal (`graph.html`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html)**.
 
-Always use **`./bin/dx`** as your primary entrypoint—it automatically configures sandbox/host `$HOME/.gitconfig`, links `/Users/nolarose/dotfiles`, loads Cloudflare R2 credentials, and runs across both Bun (`v1.4.4`) and Node (`v22+` native TypeScript):
+Always use **`./bin/dx`** as your primary entrypoint—it automatically configures sandbox/host `$HOME/.gitconfig`, links `/Users/nolarose/dotfiles`, loads Cloudflare R2 credentials, and runs its tooling through Bun (`v1.4.4`):
 
 ```bash
 # 1. Verify environment, Git config, staged dist/ assets, and live Cloudflare R2 gateway
@@ -30,6 +30,12 @@ Always use **`./bin/dx`** as your primary entrypoint—it automatically configur
 ./bin/dx deploy
 ```
 
+**Operator tools:**
+
+- `./bin/dx gslive <LOGIN>` — GSLive Partner 118 links for one account: the 7-parameter `#/reports/users` deep link (`bot=true`, desk-day ISO window, `text=player_<LOGIN>`) and the `#/events/bet-history` sidecar (`calcTime` / `betTime`, epoch `from`/`to`, raw `partnerUserId`).
+- `./bin/dx docs` / `./bin/dx docs gslive` — deployed docs portal URLs, or the GSLive surface section.
+- `./bin/dx stale -i <export>` — stale-line cohort over a bet-log export (CSV/JSON/JSONL); seeds on operator stale notes or graded-then-cancelled tickets, then clusters other customers on the same market and window.
+
 ## Schema registry & prod dump parity
 
 - Operations: [docs/schema-dump-operations.md](docs/schema-dump-operations.md) (`schema:dump-prod`, `schema:sync-prod-dump`, fixture allowlist, `captured_at`)
@@ -37,7 +43,7 @@ Always use **`./bin/dx`** as your primary entrypoint—it automatically configur
 - CLI: `bun run sportsdesk_schema_cli.ts --help`
 - CI gate: `bun run schema:gate` · lag metric: `bun run schema:dump-lag`
 - After registry edits: `bun run schema:sync-prod-dump` then commit `tests/fixtures/prod-schema.json` (see [schema-dump-operations.md](docs/schema-dump-operations.md))
-- Index: [docs/README.md](docs/README.md) · diagram: [docs/assets/ARCH-Guide.png](docs/assets/ARCH-Guide.png)
+- Index: [docs/README.md](docs/README.md) · diagram: [docs/assets/ARCH-Guide.jpg](docs/assets/ARCH-Guide.jpg)
 
 ## Quick Start
 
@@ -311,3 +317,4 @@ The test suite consists of 10 test suites across 34 tests and 813 total assertio
 - [Cloudflare R2 & API Runbook](cloudflare_r2_and_api_runbook.md) — Complete Cloudflare API & R2 storage guide.
 - [OS Bun Cron Integration Guide](os_bun_cron_integration_guide.md) — OS crontab and systemd timer integration guide.
 - [VPS Domain Setup Runbook](vps_domain_setup_runbook.md) — Production VPS deployment guide.
+- [GSLive report surfaces](docs/report-surfaces.md) — Operator map of the `#/reports/users` deep link and the `#/events/bet-history` sidecar, with an evidence level per surface.

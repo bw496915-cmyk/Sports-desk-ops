@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 920" width="1600" height="920" role="img" aria-labelledby="pipeline-dual-surface-gslive-model-title pipeline-dual-surface-gslive-model-desc">
+  <title id="pipeline-dual-surface-gslive-model-title">DUAL-SURFACE GSLIVE MODEL — BATCH ACCOUNT REPORT vs LIVE BET-HISTORY STREAM</title>
+  <desc id="pipeline-dual-surface-gslive-model-desc">Reference model for the two GSLive Partner 118 surfaces and the rule that keeps them from double-counting. The batch surface #/reports/users returns one settled account row per player_[login] per desk day (handle, win/loss, wager count) and is authoritative for booked volume. The live surface #/events/bet-history pushes one event per wager state change, where betTime is the placement wall clock and calcTime is the grade/settle clock, and is authoritative for in-flight exposure and placement velocity. Both are bucketed into the America/Chicago desk day (00:00:00.000-23:59:59.999 CT), joined on (partnerId, login, ticketNumber, betTime), and refreshed with a `t` cache-buster tick (Math.floor(Date.now()/60000)) so a batch re-fetch never serves a stale edge copy and never disturbs the stream.</desc>
+  <metadata>
+    <?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+           xmlns:dc="http://purl.org/dc/elements/1.1/"
+           xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+           xmlns:sportsdesk="https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/ns/1.0/">
+    <rdf:Description rdf:about="https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-dual-surface-gslive-model.svg">
+      <dc:identifier>SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE</dc:identifier>
+      <dc:title><rdf:Alt><rdf:li xml:lang="x-default">DUAL-SURFACE GSLIVE MODEL — BATCH ACCOUNT REPORT vs LIVE BET-HISTORY STREAM</rdf:li></rdf:Alt></dc:title>
+      <dc:description><rdf:Alt><rdf:li xml:lang="x-default">Reference model for the two GSLive Partner 118 surfaces and the rule that keeps them from double-counting. The batch surface #/reports/users returns one settled account row per player_[login] per desk day (handle, win/loss, wager count) and is authoritative for booked volume. The live surface #/events/bet-history pushes one event per wager state change, where betTime is the placement wall clock and calcTime is the grade/settle clock, and is authoritative for in-flight exposure and placement velocity. Both are bucketed into the America/Chicago desk day (00:00:00.000-23:59:59.999 CT), joined on (partnerId, login, ticketNumber, betTime), and refreshed with a `t` cache-buster tick (Math.floor(Date.now()/60000)) so a batch re-fetch never serves a stale edge copy and never disturbs the stream.</rdf:li></rdf:Alt></dc:description>
+      <dc:creator><rdf:Seq><rdf:li>SportsDesk &amp; Fantasy402 Risk Engineering</rdf:li></rdf:Seq></dc:creator>
+      <dc:subject><rdf:Bag><rdf:li>Risk &amp; Exposure</rdf:li><rdf:li>Cross-Market</rdf:li><rdf:li>Data Integrity</rdf:li><rdf:li>GSLive Manager Partner 118 (#/reports/users)</rdf:li><rdf:li>GSLive Manager Partner 118 (#/events/bet-history)</rdf:li><rdf:li>app/manager/module/bet-ticker.js</rdf:li></rdf:Bag></dc:subject>
+      <xmp:CreatorTool>SportsDesk 10-Mode Pipeline Generator (Bun v1.4.4)</xmp:CreatorTool>
+      <sportsdesk:modesCovered>1,7,8,9,10</sportsdesk:modesCovered>
+      <sportsdesk:cliEntrypoint>./bin/dx gslive | ./bin/dx modes 7 | ./bin/dx modes 9 | ./bin/dx modes 10</sportsdesk:cliEntrypoint>
+      <sportsdesk:portalUrl>https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</sportsdesk:portalUrl>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>
+    <script type="application/ld+json"><![CDATA[{"@context":"https://schema.org","@type":"ImageObject","@id":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-dual-surface-gslive-model.svg","identifier":"SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE","name":"DUAL-SURFACE GSLIVE MODEL — BATCH ACCOUNT REPORT vs LIVE BET-HISTORY STREAM","alternateName":"GSLive Manager Partner 118: #/reports/users (batch) • #/events/bet-history (live) • desk-day window • betTime vs calcTime • `t` cache-buster tick","description":"Reference model for the two GSLive Partner 118 surfaces and the rule that keeps them from double-counting. The batch surface #/reports/users returns one settled account row per player_[login] per desk day (handle, win/loss, wager count) and is authoritative for booked volume. The live surface #/events/bet-history pushes one event per wager state change, where betTime is the placement wall clock and calcTime is the grade/settle clock, and is authoritative for in-flight exposure and placement velocity. Both are bucketed into the America/Chicago desk day (00:00:00.000-23:59:59.999 CT), joined on (partnerId, login, ticketNumber, betTime), and refreshed with a `t` cache-buster tick (Math.floor(Date.now()/60000)) so a batch re-fetch never serves a stale edge copy and never disturbs the stream.","contentUrl":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-dual-surface-gslive-model.svg","thumbnailUrl":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-dual-surface-gslive-model.png","encodingFormat":["image/svg+xml","image/png","image/webp"],"creator":{"@type":"Organization","name":"SportsDesk & Fantasy402 Risk Engineering"},"keywords":["Risk & Exposure","Cross-Market","Data Integrity","GSLive Manager Partner 118 (#/reports/users)","GSLive Manager Partner 118 (#/events/bet-history)","app/manager/module/bet-ticker.js","Desk-Day Bucketing in America/Chicago (00:00:00.000-23:59:59.999 CT)","betTime (placement) vs calcTime (settle) field split","`t` Cache-Buster Tick (Math.floor(Date.now()/60000))","Batch-Over-Stream Precedence for Settled Totals","(partnerId, login, ticketNumber, betTime) Ticket Dedupe"],"potentialAction":["./bin/dx gslive","./bin/dx modes 7","./bin/dx modes 9","./bin/dx modes 10"]}]]></script>
+  </metadata>
+  <defs>
+    <style>
+      .bg { fill: #070b14; }
+      .panel { fill: #0b1329; stroke-width: 2; rx: 12px; }
+      .card { fill: #101c38; stroke-width: 1.5; rx: 8px; }
+      .title { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 24px; font-weight: 800; fill: #f8fafc; letter-spacing: 0.03em; }
+      .subtitle { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; fill: #38bdf8; }
+      .col-hdr { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.05em; }
+      .card-title { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13.5px; font-weight: 700; fill: #f8fafc; }
+      .card-body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; fill: #cbd5e1; }
+      .card-accent { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 700; }
+      .mono-lg { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; font-weight: 700; fill: #f8fafc; }
+      .footer { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; fill: #6ee7b7; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1600" height="920" />
+  <!-- Header Banner -->
+  <rect x="24" y="18" width="1552" height="68" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1.5" />
+  <text x="48" y="48" class="title">DUAL-SURFACE GSLIVE MODEL — BATCH ACCOUNT REPORT vs LIVE BET-HISTORY STREAM</text>
+  <text x="48" y="70" class="subtitle">GSLive Manager Partner 118: #/reports/users (batch) • #/events/bet-history (live) • desk-day window • betTime vs calcTime • `t` cache-buster tick • ID: SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE</text>
+  
+      <!-- COLUMN 1: BATCH SURFACE -->
+      <rect class="panel" x="24" y="102" width="504" height="736" stroke="#06b6d4" />
+      <text x="44" y="132" class="col-hdr" fill="#38bdf8">SURFACE A — #/reports/users (BATCH)</text>
+      <text x="44" y="154" class="card-body">Pull model: one settled row per player_[login] per desk day</text>
+
+      <rect class="card" x="40" y="168" width="472" height="140" stroke="#06b6d4" />
+      <text x="56" y="193" class="card-title">🔗 Endpoint &amp; Query Contract</text>
+      <text x="56" y="216" class="card-body">GET /manager-tools/#/reports/users?partnerId=118</text>
+      <text x="56" y="234" class="card-body">    &amp;text=player_MJ102&amp;dateFrom=2026-10-25&amp;dateTo=2026-10-31</text>
+      <text x="56" y="252" class="card-body">dateFrom/dateTo are desk-day dates (YYYY-MM-DD, CT)</text>
+      <text x="56" y="276" class="card-accent" fill="#67e8f9">text= is a substring filter, not an exact login match</text>
+      <text x="56" y="296" class="card-body">→ always confirm the returned login == requested login</text>
+
+      <rect class="card" x="40" y="324" width="472" height="140" stroke="#10b981" />
+      <text x="56" y="349" class="card-title" fill="#6ee7b7">📄 Payload Shape (account × day)</text>
+      <text x="56" y="372" class="card-body">{ login, agentLogin, wagerCount,</text>
+      <text x="56" y="390" class="card-body">  handleCents, winLossCents, settledAt }</text>
+      <text x="56" y="408" class="card-body">Settled-only: a row appears after the day closes</text>
+      <text x="56" y="432" class="card-accent" fill="#6ee7b7">Authoritative for booked handle &amp; settled net</text>
+      <text x="56" y="452" class="card-body">No per-bet timestamps and no open-ticket rows</text>
+
+      <rect class="card" x="40" y="480" width="472" height="140" stroke="#f59e0b" />
+      <text x="56" y="505" class="card-title" fill="#fcd34d">⏱ Cadence &amp; Cache Posture</text>
+      <text x="56" y="528" class="card-body">Refresh on portal open + scheduled desk cron</text>
+      <text x="56" y="546" class="card-body">Edge and browser both cache the GET response</text>
+      <text x="56" y="564" class="card-body">A plain re-fetch can return yesterday's totals</text>
+      <text x="56" y="588" class="card-accent" fill="#fcd34d">Batch is pull-only: no push, no invalidation signal</text>
+      <text x="56" y="608" class="card-body">→ pair every batch call with a `t` cache-buster</text>
+
+      <rect class="card" x="40" y="636" width="472" height="182" stroke="#f43f5e" />
+      <text x="56" y="661" class="card-title" fill="#fda4af">⚠️ Batch-Only Failure Modes</text>
+      <text x="56" y="684" class="card-body">• Refetch before cutoff → previous desk-day totals</text>
+      <text x="56" y="702" class="card-body">• dateFrom &gt; dateTo → silent empty rows, not an error</text>
+      <text x="56" y="720" class="card-body">• substring `text=` filter → neighbouring logins leak in</text>
+      <text x="56" y="738" class="card-body">• T+N grade lag → settledAt lands after the report day</text>
+      <text x="56" y="762" class="card-accent" fill="#fda4af">Never size live liability or velocity from this surface</text>
+      <text x="56" y="784" class="card-body">Batch answers "what closed?" — not "what is open now?"</text>
+      <text x="56" y="806" class="card-accent" fill="#67e8f9">Gate: reject rows whose login != requested player_ login</text>
+
+      <!-- COLUMN 2: DESK DAY + CACHE BUSTER -->
+      <rect class="panel" x="548" y="102" width="504" height="736" stroke="#10b981" />
+      <text x="568" y="132" class="col-hdr" fill="#6ee7b7">DESK-DAY WINDOW &amp; `t` CACHE-BUSTER</text>
+      <text x="568" y="154" class="card-body">One shared clock so batch and stream agree on "today"</text>
+
+      <rect class="card" x="564" y="168" width="472" height="158" stroke="#10b981" />
+      <text x="580" y="193" class="card-title" fill="#6ee7b7">🗓 Desk-Day Window (America/Chicago)</text>
+      <text x="580" y="216" class="card-body">day = 00:00:00.000 → 23:59:59.999 CT</text>
+      <text x="580" y="234" class="card-body">CDT = UTC−5 • CST = UTC−6 (DST follows CT)</text>
+      <text x="580" y="252" class="card-body">week = Mon 00:00 CT → Sun 23:59:59.999 CT</text>
+      <text x="580" y="276" class="card-accent" fill="#6ee7b7">Batch dateFrom/dateTo are CT calendar dates</text>
+      <text x="580" y="296" class="card-body">Convert every stream timestamp to CT before bucketing</text>
+      <text x="580" y="314" class="card-body">Never bucket on UTC midnight — it splits the desk day</text>
+
+      <rect class="card" x="564" y="342" width="472" height="152" stroke="#38bdf8" />
+      <text x="580" y="367" class="card-title" fill="#7dd3fc">⏱ betTime vs calcTime — Two Questions</text>
+      <text x="580" y="390" class="card-body">betTime   = placement wall clock (who bet, when)</text>
+      <text x="580" y="408" class="card-body">calcTime  = grade/settle clock (when the book posted)</text>
+      <text x="580" y="426" class="card-body">Δ = calcTime − betTime</text>
+      <text x="580" y="450" class="card-accent" fill="#7dd3fc">Live: Δ ≈ 0s • Pre-match: seconds • T+N: hours/days</text>
+      <text x="580" y="470" class="card-body">calcTime may be null while the ticket is still open</text>
+      <text x="580" y="486" class="card-body">→ open ticket: count exposure, never count settled net</text>
+
+      <rect class="card" x="564" y="510" width="472" height="160" stroke="#a855f7" />
+      <text x="580" y="535" class="card-title" fill="#e9d5ff">🔁 The `t` Cache-Buster Tick</text>
+      <text x="580" y="558" class="card-body">…&amp;text=player_MJ102&amp;t=1761912000</text>
+      <text x="580" y="576" class="card-body">t = Math.floor(Date.now() / 60000)</text>
+      <text x="580" y="594" class="card-body">60s bucket → stable within a minute, fresh across minutes</text>
+      <text x="580" y="618" class="card-accent" fill="#e9d5ff">Busts edge + browser cache on the batch GET only</text>
+      <text x="580" y="638" class="card-body">The stream is untouched: no reconnect, no replay gap</text>
+      <text x="580" y="656" class="card-body">t must never enter the join key or the desk-day bucket</text>
+
+      <rect class="card" x="564" y="686" width="472" height="132" stroke="#f59e0b" />
+      <text x="580" y="711" class="card-title" fill="#fcd34d">✅ Allocation Rule (one desk day, one owner)</text>
+      <text x="580" y="734" class="card-body">betTime  ↦ desk day of placement   (velocity, count)</text>
+      <text x="580" y="752" class="card-body">calcTime ↦ desk day of settlement  (handle, win/loss)</text>
+      <text x="580" y="770" class="card-accent" fill="#fcd34d">A settle never rewrites the placement day's report</text>
+      <text x="580" y="792" class="card-body">Late calcTime ⇒ moves to tomorrow's batch, not today's</text>
+      <text x="580" y="808" class="card-body">Same rule for teasers and parlays: one parent, one day</text>
+
+      <!-- COLUMN 3: JOIN + RECONCILIATION -->
+      <rect class="panel" x="1072" y="102" width="504" height="736" stroke="#f59e0b" />
+      <text x="1092" y="132" class="col-hdr" fill="#fcd34d">SURFACE B — #/events/bet-history (LIVE)</text>
+      <text x="1092" y="154" class="card-body">Push model: one event per wager state change</text>
+
+      <rect class="card" x="1088" y="168" width="472" height="150" stroke="#f59e0b" />
+      <text x="1104" y="193" class="card-title" fill="#fcd34d">⚡ Stream Contract</text>
+      <text x="1104" y="216" class="card-body">WS/SSE: placed → line-changed → graded → settled</text>
+      <text x="1104" y="234" class="card-body">{ ticketNumber, login, betTime, calcTime,</text>
+      <text x="1104" y="252" class="card-body">  stakeCents, toWinCents, wagerStatus }</text>
+      <text x="1104" y="276" class="card-accent" fill="#fcd34d">calcTime is empty while the bet is in flight</text>
+      <text x="1104" y="296" class="card-body">Reconnect must replay from the last seen betTime</text>
+
+      <rect class="card" x="1088" y="334" width="472" height="164" stroke="#38bdf8" />
+      <text x="1104" y="359" class="card-title" fill="#7dd3fc">🔗 Join Key &amp; Precedence</text>
+      <text x="1104" y="382" class="card-body">key = (partnerId, login, ticketNumber, betTime)</text>
+      <text x="1104" y="400" class="card-body">Settled totals on conflict → batch wins (report of record)</text>
+      <text x="1104" y="418" class="card-body">Open / in-flight on conflict → stream wins (not booked yet)</text>
+      <text x="1104" y="442" class="card-accent" fill="#7dd3fc">Never SUM batch + stream for the same ticketNumber</text>
+      <text x="1104" y="462" class="card-body">Stream row with calcTime set and a batch row present ⇒</text>
+      <text x="1104" y="480" class="card-body">keep the batch row, drop the stream row (settled once)</text>
+
+      <rect class="card" x="1088" y="514" width="472" height="164" stroke="#10b981" />
+      <text x="1104" y="539" class="card-title" fill="#6ee7b7">🧮 Daily Reconciliation Loop</text>
+      <text x="1104" y="562" class="card-body">Σ stream settled(calcTime ∈ desk day)</text>
+      <text x="1104" y="580" class="card-body">  == batch.handleCents for the same desk day</text>
+      <text x="1104" y="598" class="card-body">Explained diffs: T+N grade lag, ledger adjustments</text>
+      <text x="1104" y="622" class="card-accent" fill="#6ee7b7">Unresolved gap must be $0.00 before settlement</text>
+      <text x="1104" y="642" class="card-body">Unexplained Σ ⇒ replay the stream, then re-pull batch</text>
+      <text x="1104" y="660" class="card-body">Re-pull always carries a new `t` — never the old URL</text>
+
+      <rect class="card" x="1088" y="694" width="472" height="124" stroke="#f43f5e" />
+      <text x="1104" y="719" class="card-title" fill="#fda4af">🛠 Operator Surfaces</text>
+      <text x="1104" y="742" class="card-body">Batch:  #/reports/users?partnerId=118&amp;text=player_[login]</text>
+      <text x="1104" y="760" class="card-body">Live:   #/events/bet-history (stream)</text>
+      <text x="1104" y="778" class="card-accent" fill="#fda4af">./bin/dx gslive • ./bin/dx modes 7 • ./bin/dx modes 9</text>
+      <text x="1104" y="798" class="card-body">./bin/dx modes 10 verifies batch == stream for the day</text>
+    
+  <!-- Footer Command Bar -->
+  <rect x="24" y="856" width="1552" height="46" rx="8" fill="#06281e" stroke="#10b981" stroke-width="1.8" />
+  <text x="48" y="884" class="footer">⚡ OPERATOR CLI &amp; LIVE LINKS: ./bin/dx gslive   |   ./bin/dx modes 7   |   ./bin/dx modes 9   |   ./bin/dx modes 10   →   https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</text>
+</svg>

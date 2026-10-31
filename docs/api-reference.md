@@ -10,6 +10,55 @@ Evidence-labelled reference generated from `docs/openapi.json` (version `2026.10
 
 Ledger totals across every recorded row (including rows removed from the final spec): A 5 · B 5 · C 28 · E 10 · surfaces D 7 / E 1. Full model: [docs/EVIDENCE.md](./EVIDENCE.md).
 
+## GSLive Manager (Partner 118): operator deep links
+
+GSLive is a third-party operator console, **not** a server of this API. The links below are
+deep links an operator opens in a browser; they carry no request contract of ours. Every
+per-account link is produced by `lib/gslive_manager_deeplink_sidecar.ts` and can be generated
+with `./bin/dx gslive <LOGIN>`.
+
+| Surface                           | Route                  | What it answers                                                                        |
+| :-------------------------------- | :--------------------- | :------------------------------------------------------------------------------------- |
+| Account report (batch)            | `#/reports/users`      | Profit, bets, hold %, wager and leg counts for one `player_<LOGIN>` over a day window. |
+| Live settling stream (`calcTime`) | `#/events/bet-history` | Tickets as they settle/populate for the current desk day.                              |
+| Live placement stream (`betTime`) | `#/events/bet-history` | Tickets as they are placed.                                                            |
+
+### Account report rules
+
+- `bot=true` is mandatory. The SPA defaults the bot switch off, which hides syndicate accounts such as `player_CHURN_003` and `player_NOISE_BOT_77`.
+- `from` and `to` must be explicit ISO-8601 UTC desk-day boundaries (`00:00:00` to `23:59:59` in `America/Chicago`). A bare `text=` search renders an empty grid.
+- `searchBy=player` and `text=player_<LOGIN>`; `partnerId=118`.
+
+Example (fixed churn window; the CLI emits today's rolling window):
+
+```text
+https://plive.sportswidgets.pro/manager-tools/#/reports/users?bot=true&eventId=&from=2026-10-18T05%3A00%3A00.000Z&partnerId=118&searchBy=player&text=player_CHURN_003&to=2026-10-26T04%3A59%3A59.000Z
+```
+
+### Live bet-history rules
+
+- `from` and `to` are the desk-day start in **epoch seconds**; `toTime` is the offset to the last second of that day (`86399`, or `89999`/`82799` on US DST transition days).
+- `minVolume=0` and `maxTimeUntilScore=0` disable volume/score-time filtering so live tickets appear immediately.
+- `t` is an epoch-millisecond cache-buster and must be fresh on every open.
+- `dateFilterBy=calcTime` follows settlement; `dateFilterBy=betTime` follows placement.
+- `partnerUserId=<LOGIN>` (raw login, e.g. `AF12`) filters to one player; the live console emits the unprefixed form. It is **unverified** as a server-side filter — confirm by row count, and if the grid is not filtered, filter in the console.
+
+```text
+https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793422800&to=1793422800&toTime=86399&dateFilterBy=calcTime&t=1793469958152
+https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793422800&to=1793422800&toTime=86399&dateFilterBy=betTime&t=1793469958152
+```
+
+Per-player variant (adds `partnerUserId`):
+
+```text
+https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793422800&to=1793422800&toTime=86399&dateFilterBy=calcTime&t=1793469958152&partnerUserId=CHURN_003
+```
+
+### Related documentation
+
+- `docs/gs-manager-contracts.md` — observed payloads and open questions.
+- `docs/OPERATOR_QUICKSTART_AND_10_MODE_RUNBOOK.md` — which surface to use for Modes 1, 6, 7, 8, 9 and 10.
+
 ## Operational domains
 
 | Domain / tag                       | Operations | Evidence tiers | Purpose                                                                                                                                                                        |

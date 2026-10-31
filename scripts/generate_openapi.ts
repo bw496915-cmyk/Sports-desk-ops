@@ -54,6 +54,10 @@ import { join, relative, resolve } from "node:path";
 
 import { checkLedger, checkOpenApi } from "./verify_docs.ts";
 import type { CheckOutcome } from "./verify_docs.ts";
+import {
+  GSLIVE_OPENAPI_EXTENSION,
+  renderGSLiveDocsMarkdown,
+} from "../lib/gslive_api_docs.ts";
 
 /* -------------------------------------------------------------------------- */
 /* Paths and run options                                                      */
@@ -2441,14 +2445,14 @@ function buildSchemas(ledger: Ledger): JsonObject {
 /* -------------------------------------------------------------------------- */
 
 function buildInfo(ledger: Ledger): JsonObject {
-  const description =
+  const evidenceModel =
     ledger.counts.A > 0
       ? "Evidence model: every operation carries x-evidence.tier — A means a captured request and response are verified, B means observed first-party evidence (a captured request or a handler-verified route) without a captured response, C means inferred only with no capture, and D means a real surface missing from the spec; tier-A rows are backed by live capture records in docs/evidence/captures and publish capture-derived response schemas (see docs/EVIDENCE.md)."
       : "Evidence model: every operation carries x-evidence.tier — A means a captured request and response are verified, B means observed first-party evidence (a captured request or a handler-verified route) without a captured response, C means inferred only with no capture, and D means a real surface missing from the spec; this release has no tier-A rows because no response body was ever captured (see docs/EVIDENCE.md).";
   return {
     title: "SportsDesk & Fantasy402 Wire API (evidence-labelled)",
     version: "2026.10.31",
-    description,
+    description: `${evidenceModel}\n\n${renderGSLiveDocsMarkdown()}`,
   };
 }
 
@@ -2574,6 +2578,7 @@ function buildSpec(ledger: Ledger, capturesDir: string): JsonObject {
     servers: buildServers(ledger),
     tags: buildTags(ledger),
     paths: buildPaths(ledger, capturesDir),
+    ...GSLIVE_OPENAPI_EXTENSION,
     components: {
       securitySchemes: buildSecuritySchemes(),
       parameters: buildParameters(),
@@ -2740,8 +2745,13 @@ function selfGate(
   if (rawText.includes("ajax.php")) {
     fail("generated spec must not mention ajax.php");
   }
-  if (rawText.includes("sportswidgets.pro")) {
-    fail("generated spec must not mention sportswidgets.pro");
+  // The GSLive host is documented as an operator console deep-link target, never as a wire
+  // server or a path. Keep it out of both structural locations.
+  if (JSON.stringify(spec.servers).includes("sportswidgets.pro")) {
+    fail("generated spec must not list the GSLive host as an API server");
+  }
+  if (JSON.stringify(spec.paths).includes("sportswidgets.pro")) {
+    fail("generated spec must not publish a GSLive path as a wire operation");
   }
   const credentialPatterns: readonly RegExp[] = [
     /Bearer\s+eyJ[A-Za-z0-9_-]+/,

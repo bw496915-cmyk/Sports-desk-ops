@@ -11,6 +11,7 @@
 
 import type { Database } from "bun:sqlite";
 import { formatLineHundredths, type LineHundredths } from "./combo_identity.ts";
+import { sqlInt, sqlIntOrNull } from "./sportsdesk_sqlite.ts";
 
 export interface LineDeltaMatch {
   readonly gameId: string;
@@ -153,34 +154,36 @@ export class LayoffRiskEngine {
         side: string;
         poly_ticket: string;
         poly_wallet: string;
-        poly_line: number | null;
+        poly_line: number | bigint | null;
         f402_ticket: string;
         customer_id: string;
         agent_id: string;
-        f402_line: number | null;
-        delta_hundredths: number;
+        f402_line: number | bigint | null;
+        delta_hundredths: number | bigint;
         agent_owner: string | null;
       }>;
 
     return rows.map((r) => {
+      const polyLine = sqlIntOrNull(r.poly_line);
+      const f402Line = sqlIntOrNull(r.f402_line);
       const betterVenue = evaluateBetterVenue(
         r.market_kind,
         r.side,
-        r.poly_line,
-        r.f402_line,
+        polyLine,
+        f402Line,
       );
 
       const keyNumberCrossed =
         r.market_kind === "spread"
-          ? detectKeyNumberCrossing(r.poly_line, r.f402_line, r.game_id)
+          ? detectKeyNumberCrossing(polyLine, f402Line, r.game_id)
           : null;
 
       const isLayoffRisk = betterVenue === "polymarket";
 
       let alertReason: string | null = null;
       if (isLayoffRisk) {
-        const polyStr = formatLineHundredths(r.poly_line as LineHundredths);
-        const f402Str = formatLineHundredths(r.f402_line as LineHundredths);
+        const polyStr = formatLineHundredths(polyLine as LineHundredths);
+        const f402Str = formatLineHundredths(f402Line as LineHundredths);
         const keyTag = keyNumberCrossed ? ` (Crosses Key ${keyNumberCrossed})` : "";
         alertReason = `SHARP_STILL_BETTER: PM ${polyStr} beats F402 ${f402Str}${keyTag}`;
       }
@@ -193,12 +196,12 @@ export class LayoffRiskEngine {
         side: r.side,
         polyTicket: r.poly_ticket,
         polyWallet: r.poly_wallet,
-        polyLineHundredths: r.poly_line as LineHundredths | null,
+        polyLineHundredths: polyLine as LineHundredths | null,
         f402Ticket: r.f402_ticket,
         customerId: r.customer_id,
         agentId: r.agent_id,
-        f402LineHundredths: r.f402_line as LineHundredths | null,
-        deltaHundredths: r.delta_hundredths,
+        f402LineHundredths: f402Line as LineHundredths | null,
+        deltaHundredths: sqlInt(r.delta_hundredths),
         betterVenue,
         keyNumberCrossed,
         isLayoffRisk,
@@ -216,7 +219,7 @@ export class LayoffRiskEngine {
       if (m.isLayoffRisk) {
         const shortWallet = m.polyWallet.length > 10 ? `${m.polyWallet.slice(0, 6)}...` : m.polyWallet;
         const polyLineStr = formatLineHundredths(m.polyLineHundredths);
-        const f402LineStr = formatLineHundredths(m.f402_lineHundredths);
+        const f402LineStr = formatLineHundredths(m.f402LineHundredths);
         const keyTag = m.keyNumberCrossed ? ` [KEY ${m.keyNumberCrossed}]` : "";
         const perTag = m.period !== "game" ? ` (${m.period.toUpperCase()})` : "";
         alerts.push(

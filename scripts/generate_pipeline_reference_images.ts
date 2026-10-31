@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * @file scripts/generate_pipeline_reference_images.ts
  * @description Generates specification-grade SVG & PNG pipeline reference diagrams with rich
@@ -10,15 +10,19 @@
  *     `SportsDesk:PipelineSpecJson` (canonical 10-Mode & 6-Layer JSON specification)
  *   - Sidecar catalog `docs/assets/pipeline-artifacts-metadata.json` with SHA-256 digests,
  *     public Cloudflare R2 URLs, repository paths, upstream module mappings, and CLI commands.
+ *
+ * Rasterization is a hard gate: the SVG is rendered by a real SVG engine (`rsvg-convert`, then
+ * `qlmanage`) and the resulting PNG must pass an ink/color check. If no backend produces visible
+ * ink, the script throws. There is no silent "blank banner" fallback — that path produced the
+ * text-free grid PNGs this generator used to commit.
  */
 
-import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
-import { spawnSync } from "node:child_process";
 
-const repoRoot = path.resolve(import.meta.dirname ?? path.dirname(process.argv[1]), "..");
+const repoRoot = path.resolve(import.meta.dirname, "..");
 const docsAssetsDir = path.join(repoRoot, "docs", "assets");
 const distAssetsDir = path.join(repoRoot, "dist", "assets");
 const publicR2Base = "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev";
@@ -79,63 +83,501 @@ function buildPngTextChunk(keyword: string, value: string): Buffer {
 
 function buildPngItxtChunk(keyword: string, utf8Value: string): Buffer {
   // iTXt: keyword \0 compressionFlag(0) compressionMethod(0) languageTag \0 translatedKeyword \0 text(UTF-8)
+  // Empty languageTag + translatedKeyword is 4 bytes after the keyword NUL, so the text follows immediately.
   const keyBuf = Buffer.from(keyword.slice(0, 79), "latin1");
-  const header = Buffer.from([0, 0, 0, 0, 0]);
+  const header = Buffer.from([0, 0, 0, 0]);
   const textBuf = Buffer.from(utf8Value, "utf8");
   return buildPngChunk("iTXt", Buffer.concat([keyBuf, header, textBuf]));
 }
 
 /**
- * Generates a valid 1600x900 dark-mode raster PNG with a subtle grid & color accent bars
- * when a system SVG rasterizer (`qlmanage` / `sips`) is unavailable, or injects rich `tEXt`
- * and `iTXt` (XMP + JSON-LD) chunks into any existing PNG buffer.
+ * `tEXt` is Latin-1 only, so any value with characters outside U+0000..U+00FF (em dashes,
+ * arrows, accented names) is written as an uncompressed UTF-8 `iTXt` chunk instead.
+ * Readers that only understand `tEXt` still get the ASCII keywords.
  */
-function createFallbackDarkBannerPng(width = 1600, height = 900, accentRgb: [number, number, number] = [6, 182, 212]): Buffer {
-  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth 8
-  ihdr[9] = 2; // color type 2 (RGB)
-  ihdr[10] = 0;
-  ihdr[11] = 0;
-  ihdr[12] = 0;
+function buildPngTextChunkSmart(keyword: string, value: string): Buffer {
+  // eslint-disable-next-line no-control-regex
+  const isLatin1 = !/[^\u0000-\u00ff]/.test(value);
+  return isLatin1 ? buildPngTextChunk(keyword, value) : buildPngItxtChunk(keyword, value);
+}
 
-  const rowStride = 1 + width * 3;
-  const raw = Buffer.alloc(rowStride * height);
-  for (let y = 0; y < height; y++) {
-    const rowOffset = y * rowStride;
-    raw[rowOffset] = 0; // filter None
-    const isBorderY = y < 8 || y >= height - 8 || y === 84 || y === height - 64;
-    const isGridY = y % 60 === 0;
-    for (let x = 0; x < width; x++) {
-      const px = rowOffset + 1 + x * 3;
-      const isBorderX = x < 8 || x >= width - 8 || x === 400 || x === 800 || x === 1200;
-      const isGridX = x % 60 === 0;
-      if (isBorderY || isBorderX) {
-        raw[px] = accentRgb[0];
-        raw[px + 1] = accentRgb[1];
-        raw[px + 2] = accentRgb[2];
-      } else if (isGridY || isGridX) {
-        raw[px] = 19;
-        raw[px + 1] = 35;
-        raw[px + 2] = 71;
-      } else {
-        raw[px] = 7;
-        raw[px + 1] = 11;
-        raw[px + 2] = 20;
+function sha256Hex(buf: Buffer): string {
+  return new Bun.CryptoHasher("sha256").update(buf).digest("hex");
+}
+
+// ============================================================================
+// XML TEXT ESCAPING (the generated SVG must be well-formed XML)
+// ============================================================================
+/**
+ * Escapes a raw string for use in SVG/XML text nodes and attribute values.
+ * Spec titles contain `&` (`SPORTSDESK & FANTASY402`), which used to make the
+ * committed SVGs unparseable for every conforming renderer.
+ */
+export function escapeXmlText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/** Average glyph advance as a fraction of font-size, per text class. Menlo is 0.60em, SF ~0.55em. */
+const TEXT_CLASS_METRICS: Record<string, { size: number; advance: number }> = {
+  title: { size: 24, advance: 0.58 },
+  subtitle: { size: 13, advance: 0.6 },
+  "col-hdr": { size: 15, advance: 0.58 },
+  "card-title": { size: 13.5, advance: 0.58 },
+  "card-body": { size: 11.5, advance: 0.6 },
+  "card-accent": { size: 11, advance: 0.6 },
+  "mono-lg": { size: 13, advance: 0.6 },
+  footer: { size: 12.5, advance: 0.6 },
+};
+
+function decodeXmlEntities(text: string): string {
+  return text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+/**
+ * Guarantees that no `<text>` line runs past the right edge of its enclosing panel/card.
+ *
+ * The diagram copy is authored for readability (long forensic lines), but a monospace line of
+ * 160 characters is wider than a 504px panel. For any line that would overflow, this pass
+ * shrinks the font-size proportionally (via inline `style`, which beats the class rule) and
+ * pins `textLength` + `lengthAdjust` so the renderer fits it exactly. Without it the raster
+ * silently clips the right-hand characters, which is how the old diagrams looked "garbled".
+ */
+export function fitSvgTextToWidth(svgBody: string, defaultRightEdge = 1576): string {
+  const EDGE_MARGIN = 14;
+  let rightEdge = defaultRightEdge;
+
+  return svgBody.replace(/<rect\b([^>]*)>|<text\b([^>]*)>([^<]*)<\/text>/g, (whole, rectAttrs: string | undefined, textAttrs: string | undefined, content: string | undefined) => {
+    if (rectAttrs !== undefined) {
+      if (/\bclass="(panel|card)"/.test(rectAttrs)) {
+        const x = /\bx="([\d.]+)"/.exec(rectAttrs);
+        const width = /\bwidth="([\d.]+)"/.exec(rectAttrs);
+        if (x && width) rightEdge = Number(x[1]) + Number(width[1]);
       }
+      return whole;
+    }
+
+    if (textAttrs === undefined || content === undefined) return whole;
+    const classMatch = /\bclass="([^"]+)"/.exec(textAttrs);
+    const xMatch = /\bx="([\d.]+)"/.exec(textAttrs);
+    if (!classMatch || !xMatch) return whole;
+    const metrics = TEXT_CLASS_METRICS[classMatch[1]!];
+    if (!metrics) return whole;
+
+    const chars = [...decodeXmlEntities(content)].length;
+    if (chars === 0) return whole;
+    const available = rightEdge - Number(xMatch[1]) - EDGE_MARGIN;
+    const estimated = chars * metrics.size * metrics.advance;
+    if (estimated <= available) return whole;
+
+    const fittedSize = Math.max(8, Math.round(((metrics.size * available) / estimated) * 10) / 10);
+    const fittedAttrs = `${textAttrs} style="font-size:${fittedSize}px" textLength="${Math.max(1, Math.floor(available))}" lengthAdjust="spacingAndGlyphs"`;
+    return `<text${fittedAttrs}>${content}</text>`;
+  });
+}
+
+// ============================================================================
+// PURE-BUN PNG DECODE + INK STATISTICS (used to reject blank rasters)
+// ============================================================================
+export interface DecodedRaster {
+  readonly width: number;
+  readonly height: number;
+  /** Channels per pixel after decode (always 3 = RGB or 4 = RGBA). */
+  readonly channels: 3 | 4;
+  readonly pixels: Uint8Array;
+  /** Per-pixel alpha when the source had an alpha channel, otherwise null. */
+  readonly alpha: Uint8Array | null;
+}
+
+export interface PngInkStats {
+  readonly width: number;
+  readonly height: number;
+  readonly uniqueColors: number;
+  /** Fraction of pixels differing from the modal (background) color by > 24 in any channel. */
+  readonly inkCoverage: number;
+  /** Fraction of near-white pixels (luma >= 200): the white diagram text. */
+  readonly brightCoverage: number;
+  readonly backgroundRgb: readonly [number, number, number];
+}
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function isPng(buf: Buffer): boolean {
+  return buf.length >= 8 && buf.subarray(0, 8).equals(PNG_SIGNATURE);
+}
+
+/** Decodes an 8-bit non-interlaced PNG (color types 0/2/4/6 and palette 3) without dependencies. */
+export function decodePngToRaster(png: Buffer): DecodedRaster {
+  if (!isPng(png)) throw new Error("decodePngToRaster: buffer is not a PNG (bad signature)");
+
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = -1;
+  let interlace = 0;
+  let palette: Buffer | null = null;
+  const idat: Buffer[] = [];
+
+  while (offset + 8 <= png.length) {
+    const len = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const data = png.subarray(offset + 8, offset + 8 + len);
+    offset += 12 + len;
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8]!;
+      colorType = data[9]!;
+      interlace = data[12]!;
+    } else if (type === "PLTE") {
+      palette = data;
+    } else if (type === "IDAT") {
+      idat.push(data);
+    } else if (type === "IEND") {
+      break;
     }
   }
 
-  const compressed = zlib.deflateSync(raw, { level: 6 });
-  return Buffer.concat([
-    signature,
-    buildPngChunk("IHDR", ihdr),
-    buildPngChunk("IDAT", compressed),
-    buildPngChunk("IEND", Buffer.alloc(0)),
-  ]);
+  if (width <= 0 || height <= 0) throw new Error("decodePngToRaster: missing or invalid IHDR");
+  if (bitDepth !== 8) throw new Error(`decodePngToRaster: unsupported bit depth ${bitDepth}`);
+  if (interlace !== 0) throw new Error("decodePngToRaster: interlaced PNG is not supported");
+  if (colorType !== 0 && colorType !== 2 && colorType !== 3 && colorType !== 4 && colorType !== 6) {
+    throw new Error(`decodePngToRaster: unsupported color type ${colorType}`);
+  }
+
+  const sourceChannels = colorType === 0 ? 1 : colorType === 2 ? 3 : colorType === 4 ? 2 : colorType === 6 ? 4 : 1;
+  const stride = width * sourceChannels;
+  // PNG IDAT is a zlib stream (RFC 1950): Bun.inflateSync only handles raw DEFLATE, so use node:zlib.
+  const inflated = new Uint8Array(zlib.inflateSync(Buffer.concat(idat)));
+  if (inflated.length < (stride + 1) * height) {
+    throw new Error(`decodePngToRaster: truncated IDAT (${inflated.length} < ${(stride + 1) * height})`);
+  }
+
+  const unfiltered = new Uint8Array(stride * height);
+  let prev = new Uint8Array(stride);
+  for (let y = 0; y < height; y++) {
+    const filter = inflated[y * (stride + 1)]!;
+    const lineOffset = y * (stride + 1) + 1;
+    const cur = unfiltered.subarray(y * stride, (y + 1) * stride);
+    for (let i = 0; i < stride; i++) {
+      const raw = inflated[lineOffset + i]!;
+      const a = i >= sourceChannels ? cur[i - sourceChannels]! : 0;
+      const b = prev[i]!;
+      const c = i >= sourceChannels ? prev[i - sourceChannels]! : 0;
+      let value: number;
+      switch (filter) {
+        case 0:
+          value = raw;
+          break;
+        case 1:
+          value = raw + a;
+          break;
+        case 2:
+          value = raw + b;
+          break;
+        case 3:
+          value = raw + ((a + b) >> 1);
+          break;
+        case 4: {
+          const p = a + b - c;
+          const pa = Math.abs(p - a);
+          const pb = Math.abs(p - b);
+          const pc = Math.abs(p - c);
+          value = raw + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
+          break;
+        }
+        default:
+          throw new Error(`decodePngToRaster: invalid scanline filter ${filter} on row ${y}`);
+      }
+      cur[i] = value & 0xff;
+    }
+    prev = cur;
+  }
+
+  // Palette PNGs (color type 3) expand to RGB through PLTE.
+  if (colorType === 3) {
+    if (!palette) throw new Error("decodePngToRaster: palette PNG without PLTE chunk");
+    const pixels = new Uint8Array(width * height * 3);
+    for (let i = 0; i < width * height; i++) {
+      const idx = unfiltered[i]!;
+      pixels[i * 3] = palette[idx * 3] ?? 0;
+      pixels[i * 3 + 1] = palette[idx * 3 + 1] ?? 0;
+      pixels[i * 3 + 2] = palette[idx * 3 + 2] ?? 0;
+    }
+    return { width, height, channels: 3, pixels, alpha: null };
+  }
+
+  if (sourceChannels === 3) {
+    return { width, height, channels: 3, pixels: unfiltered, alpha: null };
+  }
+
+  const pixels = new Uint8Array(width * height * 3);
+  if (sourceChannels === 4) {
+    const alpha = new Uint8Array(width * height);
+    for (let i = 0, j = 0; i < unfiltered.length; i += 4, j += 3) {
+      pixels[j] = unfiltered[i]!;
+      pixels[j + 1] = unfiltered[i + 1]!;
+      pixels[j + 2] = unfiltered[i + 2]!;
+      alpha[j / 3] = unfiltered[i + 3]!;
+    }
+    return { width, height, channels: 3, pixels, alpha };
+  }
+  if (sourceChannels === 2) {
+    const alpha = new Uint8Array(width * height);
+    for (let i = 0, j = 0; i < unfiltered.length; i += 2, j += 3) {
+      pixels[j] = unfiltered[i]!;
+      pixels[j + 1] = unfiltered[i]!;
+      pixels[j + 2] = unfiltered[i]!;
+      alpha[j / 3] = unfiltered[i + 1]!;
+    }
+    return { width, height, channels: 3, pixels, alpha };
+  }
+  for (let i = 0, j = 0; i < unfiltered.length; i += 1, j += 3) {
+    pixels[j] = unfiltered[i]!;
+    pixels[j + 1] = unfiltered[i]!;
+    pixels[j + 2] = unfiltered[i]!;
+  }
+  return { width, height, channels: 3, pixels, alpha: null };
 }
+
+/**
+ * Counts unique colors, ink coverage (pixels unlike the modal color) and near-white text pixels.
+ * Fully transparent pixels are excluded: `qlmanage` pads its square thumbnail canvas with
+ * transparent rows, which must not be counted as ink.
+ */
+export function computePngInkStats(png: Buffer): PngInkStats {
+  const { width, height, channels, pixels, alpha } = decodePngToRaster(png);
+  const histogram = new Map<number, number>();
+  const total = width * height;
+  for (let i = 0; i < total; i++) {
+    if (alpha && alpha[i]! < 8) continue;
+    const p = i * channels;
+    const key = (pixels[p]! << 16) | (pixels[p + 1]! << 8) | pixels[p + 2]!;
+    histogram.set(key, (histogram.get(key) ?? 0) + 1);
+  }
+  let counted = 0;
+  for (const count of histogram.values()) counted += count;
+  if (counted === 0) throw new Error("computePngInkStats: image has no opaque pixels");
+
+  let backgroundKey = 0;
+  let backgroundCount = -1;
+  for (const [key, count] of histogram) {
+    if (count > backgroundCount) {
+      backgroundCount = count;
+      backgroundKey = key;
+    }
+  }
+  const br = (backgroundKey >> 16) & 0xff;
+  const bg = (backgroundKey >> 8) & 0xff;
+  const bb = backgroundKey & 0xff;
+
+  let ink = 0;
+  let bright = 0;
+  for (let i = 0; i < total; i++) {
+    if (alpha && alpha[i]! < 8) continue;
+    const p = i * channels;
+    const r = pixels[p]!;
+    const g = pixels[p + 1]!;
+    const b = pixels[p + 2]!;
+    if (Math.abs(r - br) > 24 || Math.abs(g - bg) > 24 || Math.abs(b - bb) > 24) ink++;
+    if (0.2126 * r + 0.7152 * g + 0.0722 * b >= 200) bright++;
+  }
+
+  return {
+    width,
+    height,
+    uniqueColors: histogram.size,
+    inkCoverage: ink / counted,
+    brightCoverage: bright / counted,
+    backgroundRgb: [br, bg, bb],
+  };
+}
+
+// ============================================================================
+// SVG -> PNG RASTERIZATION (real renderer or loud failure, never a blank card)
+// ============================================================================
+const RASTER_WIDTH = 1600;
+const RASTER_HEIGHT = 920;
+
+/** A raster is accepted only when it contains real ink: many colors and near-white text. */
+export interface RasterGate {
+  readonly minUniqueColors: number;
+  readonly minInkCoverage: number;
+  readonly minBrightCoverage: number;
+}
+
+export const RASTER_GATE: RasterGate = {
+  minUniqueColors: 800,
+  minInkCoverage: 0.08,
+  minBrightCoverage: 0.008,
+};
+
+export function checkRasterGate(stats: PngInkStats, gate: RasterGate = RASTER_GATE): string | null {
+  if (!Number.isFinite(stats.inkCoverage)) return "raster stats unavailable";
+  if (stats.width < 1200 || stats.height < 800) {
+    return `raster ${stats.width}x${stats.height} is smaller than the 1200x800 minimum`;
+  }
+  if (stats.uniqueColors < gate.minUniqueColors) {
+    return `only ${stats.uniqueColors} unique colors (< ${gate.minUniqueColors}) — looks like a flat banner`;
+  }
+  if (stats.inkCoverage < gate.minInkCoverage) {
+    return `ink coverage ${(stats.inkCoverage * 100).toFixed(2)}% (< ${(gate.minInkCoverage * 100).toFixed(0)}%) — looks blank`;
+  }
+  if (stats.brightCoverage < gate.minBrightCoverage) {
+    return `near-white text coverage ${(stats.brightCoverage * 100).toFixed(3)}% (< ${(gate.minBrightCoverage * 100).toFixed(1)}%) — no label text`;
+  }
+  return null;
+}
+
+interface RasterizerAttempt {
+  readonly backend: string;
+  readonly command: string;
+  readonly ok: boolean;
+  readonly detail: string;
+  readonly png?: Buffer;
+  readonly stats?: PngInkStats;
+}
+
+interface RasterizedSvg {
+  readonly png: Buffer;
+  readonly backend: string;
+  readonly stats: PngInkStats;
+}
+
+function validateRasterCandidate(png: Buffer): { stats: PngInkStats | null; reason: string | null } {
+  if (!isPng(png)) return { stats: null, reason: "output is not a PNG" };
+  try {
+    const stats = computePngInkStats(png);
+    return { stats, reason: checkRasterGate(stats) };
+  } catch (error) {
+    return { stats: null, reason: (error as Error).message };
+  }
+}
+
+function runRasterizer(command: readonly string[], timeoutMs = 30_000): { status: number; stderr: string } {
+  const result = Bun.spawnSync({
+    cmd: [...command],
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: timeoutMs,
+  });
+  return {
+    status: result.exitCode ?? 1,
+    stderr: result.stderr ? Buffer.from(result.stderr).toString("utf8").trim() : "",
+  };
+}
+
+function attemptFromOutput(backend: string, command: readonly string[], produced: Buffer | null, status: number, stderr: string): RasterizerAttempt {
+  const rendered = command.join(" ");
+  if (status !== 0) return { backend, command: rendered, ok: false, detail: `exit ${status}: ${stderr || "no stderr"}` };
+  if (!produced || produced.length === 0) return { backend, command: rendered, ok: false, detail: "exited 0 but wrote no output" };
+  const { stats, reason } = validateRasterCandidate(produced);
+  if (!stats) return { backend, command: rendered, ok: false, detail: reason ?? "unreadable output" };
+  if (reason) return { backend, command: rendered, ok: false, detail: reason };
+  return { backend, command: rendered, ok: true, detail: `${stats.width}x${stats.height}`, png: produced, stats };
+}
+
+/** `rsvg-convert` renders at the SVG's exact 1600x920 aspect ratio. */
+function rasterizeWithRsvgConvert(svgPath: string, tmpDir: string): RasterizerAttempt {
+  const outPath = path.join(tmpDir, "rsvg.png");
+  const command = [
+    "rsvg-convert",
+    "--width",
+    String(RASTER_WIDTH),
+    "--height",
+    String(RASTER_HEIGHT),
+    "--output",
+    outPath,
+    svgPath,
+  ];
+  try {
+    const { status, stderr } = runRasterizer(command);
+    const produced = status === 0 && fs.existsSync(outPath) ? fs.readFileSync(outPath) : null;
+    return attemptFromOutput("rsvg-convert", command, produced, status, stderr);
+  } catch (error) {
+    return {
+      backend: "rsvg-convert",
+      command: command.join(" "),
+      ok: false,
+      detail: `not runnable: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * `qlmanage` always renders a square thumbnail canvas, so it is only a fallback for hosts without
+ * librsvg. It still produces real ink, which is what the gate checks.
+ */
+function rasterizeWithQlmanage(svgPath: string, tmpDir: string): RasterizerAttempt {
+  const command = ["qlmanage", "-t", "-s", String(RASTER_WIDTH), "-o", tmpDir, svgPath];
+  try {
+    const { status, stderr } = runRasterizer(command);
+    const producedPath = path.join(tmpDir, `${path.basename(svgPath)}.png`);
+    const produced = status === 0 && fs.existsSync(producedPath) ? fs.readFileSync(producedPath) : null;
+    return attemptFromOutput("qlmanage", command, produced, status, stderr);
+  } catch (error) {
+    return {
+      backend: "qlmanage",
+      command: command.join(" "),
+      ok: false,
+      detail: `not runnable: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Rasterizes an SVG to a verified PNG. Backends run in order and stop at the first verified
+ * output, so a fallback can never overwrite a better render. Throws when every backend fails —
+ * a broken image must stop the build instead of committing a text-free dark grid.
+ */
+export function rasterizeSvgToPng(svgPath: string, outPath: string): RasterizedSvg {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sportsdesk-raster-"));
+  const attempts: RasterizerAttempt[] = [];
+  try {
+    const backends = [rasterizeWithRsvgConvert, rasterizeWithQlmanage];
+    let winner: (RasterizerAttempt & { png: Buffer; stats: PngInkStats }) | null = null;
+
+    for (const backend of backends) {
+      const attempt = backend(svgPath, tmpDir);
+      attempts.push(attempt);
+      if (attempt.ok && attempt.png && attempt.stats) {
+        winner = { ...attempt, png: attempt.png, stats: attempt.stats };
+        break;
+      }
+    }
+
+    if (!winner) {
+      const report = attempts.map((a) => `  • ${a.backend}: ${a.detail}\n    $ ${a.command}`).join("\n");
+      throw new Error(
+        `SVG rasterization failed for ${path.relative(repoRoot, svgPath)} — refusing to write a blank fallback PNG.\n` +
+          `Install librsvg (\`brew install librsvg\`) or run on a host with a working QuickLook SVG renderer.\n${report}`
+      );
+    }
+
+    // Gate re-check on the exact bytes that will be committed (metadata chunks are added later).
+    const gateFailure = checkRasterGate(winner.stats);
+    if (gateFailure) {
+      throw new Error(`Rasterizer ${winner.backend} produced an unusable PNG for ${svgPath}: ${gateFailure}`);
+    }
+
+    fs.writeFileSync(outPath, winner.png);
+    return { png: winner.png, backend: winner.backend, stats: winner.stats };
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+
 
 function injectRichMetadataIntoPng(
   pngBuf: Buffer,
@@ -157,12 +599,12 @@ function injectRichMetadataIntoPng(
 
     if (type === "IHDR") {
       chunks.push(rawChunk);
-      chunks.push(buildPngTextChunk("Title", spec.title));
-      chunks.push(buildPngTextChunk("Author", "SportsDesk & Fantasy402 Risk Engineering (BILLY666 Master)"));
-      chunks.push(buildPngTextChunk("Description", spec.description));
-      chunks.push(buildPngTextChunk("Software", "SportsDesk 10-Mode Forensic & Canonical Pipeline Generator (Bun v1.4.4)"));
-      chunks.push(buildPngTextChunk("Source", `${publicR2Base}/assets/${spec.slug}.svg`));
-      chunks.push(buildPngTextChunk("Copyright", "SportsDesk Ops Specification-Grade Reference Artifact"));
+      chunks.push(buildPngTextChunkSmart("Title", spec.title));
+      chunks.push(buildPngTextChunkSmart("Author", "SportsDesk & Fantasy402 Risk Engineering (BILLY666 Master)"));
+      chunks.push(buildPngTextChunkSmart("Description", spec.description));
+      chunks.push(buildPngTextChunkSmart("Software", "SportsDesk 10-Mode Forensic & Canonical Pipeline Generator (Bun v1.4.4)"));
+      chunks.push(buildPngTextChunkSmart("Source", `${publicR2Base}/assets/${spec.slug}.svg`));
+      chunks.push(buildPngTextChunkSmart("Copyright", "SportsDesk Ops Specification-Grade Reference Artifact"));
       chunks.push(buildPngItxtChunk("XML:com.adobe.xmp", xmpXml));
       chunks.push(buildPngItxtChunk("SportsDesk:PipelineSpecJson", jsonLdString));
       injected = true;
@@ -174,11 +616,14 @@ function injectRichMetadataIntoPng(
     offset += totalChunkLen;
   }
 
-  if (!injected) return pngBuf;
+  if (!injected) {
+    throw new Error("injectRichMetadataIntoPng: no IHDR chunk found — refusing to write a PNG without metadata");
+  }
   return Buffer.concat(chunks);
 }
 
 function buildXmpPacket(spec: PipelineArtifactSpec): string {
+  const subject = [...spec.domainsCovered, ...spec.upstreamModules].map((tag) => `<rdf:li>${escapeXmlText(tag)}</rdf:li>`).join("");
   return `<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -186,14 +631,14 @@ function buildXmpPacket(spec: PipelineArtifactSpec): string {
            xmlns:xmp="http://ns.adobe.com/xap/1.0/"
            xmlns:sportsdesk="https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/ns/1.0/">
     <rdf:Description rdf:about="${publicR2Base}/assets/${spec.slug}.svg">
-      <dc:identifier>${spec.id}</dc:identifier>
-      <dc:title><rdf:Alt><rdf:li xml:lang="x-default">${spec.title}</rdf:li></rdf:Alt></dc:title>
-      <dc:description><rdf:Alt><rdf:li xml:lang="x-default">${spec.description}</rdf:li></rdf:Alt></dc:description>
+      <dc:identifier>${escapeXmlText(spec.id)}</dc:identifier>
+      <dc:title><rdf:Alt><rdf:li xml:lang="x-default">${escapeXmlText(spec.title)}</rdf:li></rdf:Alt></dc:title>
+      <dc:description><rdf:Alt><rdf:li xml:lang="x-default">${escapeXmlText(spec.description)}</rdf:li></rdf:Alt></dc:description>
       <dc:creator><rdf:Seq><rdf:li>SportsDesk &amp; Fantasy402 Risk Engineering</rdf:li></rdf:Seq></dc:creator>
-      <dc:subject><rdf:Bag>${spec.domainsCovered.map((d) => `<rdf:li>${d}</rdf:li>`).join("")}${spec.upstreamModules.map((m) => `<rdf:li>${m}</rdf:li>`).join("")}</rdf:Bag></dc:subject>
+      <dc:subject><rdf:Bag>${subject}</rdf:Bag></dc:subject>
       <xmp:CreatorTool>SportsDesk 10-Mode Pipeline Generator (Bun v1.4.4)</xmp:CreatorTool>
       <sportsdesk:modesCovered>${spec.modesCovered.join(",")}</sportsdesk:modesCovered>
-      <sportsdesk:cliEntrypoint>${spec.operatorCliCommands.join(" | ")}</sportsdesk:cliEntrypoint>
+      <sportsdesk:cliEntrypoint>${escapeXmlText(spec.operatorCliCommands.join(" | "))}</sportsdesk:cliEntrypoint>
       <sportsdesk:portalUrl>${publicR2Base}/graph.html</sportsdesk:portalUrl>
     </rdf:Description>
   </rdf:RDF>
@@ -201,14 +646,22 @@ function buildXmpPacket(spec: PipelineArtifactSpec): string {
 <?xpacket end="w"?>`;
 }
 
+/**
+ * JSON-LD lives inside an XML document, so it is wrapped in CDATA: raw `&` and `<` in the
+ * description would otherwise make the SVG unparseable for every conforming renderer.
+ */
+function embedJsonLdInCdata(jsonLdString: string): string {
+  return `<![CDATA[${jsonLdString.replace(/]]>/g, "]]]]><![CDATA[>")}]]>`;
+}
+
 function buildFullSvgDocument(spec: PipelineArtifactSpec, xmpXml: string, jsonLdObj: object): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 920" width="1600" height="920" role="img" aria-labelledby="${spec.slug}-title ${spec.slug}-desc">
-  <title id="${spec.slug}-title">${spec.title}</title>
-  <desc id="${spec.slug}-desc">${spec.description}</desc>
+  <title id="${spec.slug}-title">${escapeXmlText(spec.title)}</title>
+  <desc id="${spec.slug}-desc">${escapeXmlText(spec.description)}</desc>
   <metadata>
     ${xmpXml}
-    <script type="application/ld+json">${JSON.stringify(jsonLdObj)}</script>
+    <script type="application/ld+json">${embedJsonLdInCdata(JSON.stringify(jsonLdObj))}</script>
   </metadata>
   <defs>
     <style>
@@ -221,24 +674,25 @@ function buildFullSvgDocument(spec: PipelineArtifactSpec, xmpXml: string, jsonLd
       .card-title { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13.5px; font-weight: 700; fill: #f8fafc; }
       .card-body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; fill: #cbd5e1; }
       .card-accent { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 700; }
+      .mono-lg { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; font-weight: 700; fill: #f8fafc; }
       .footer { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; fill: #6ee7b7; }
     </style>
   </defs>
   <rect class="bg" x="0" y="0" width="1600" height="920" />
   <!-- Header Banner -->
   <rect x="24" y="18" width="1552" height="68" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1.5" />
-  <text x="48" y="48" class="title">${spec.title}</text>
-  <text x="48" y="70" class="subtitle">${spec.subtitle} • ID: ${spec.id} • Live R2 Portal: ${publicR2Base}/graph.html</text>
-  ${spec.renderSvgBody()}
+  <text x="48" y="48" class="title">${escapeXmlText(spec.title)}</text>
+  <text x="48" y="70" class="subtitle">${escapeXmlText(spec.subtitle)} • ID: ${escapeXmlText(spec.id)}</text>
+  ${fitSvgTextToWidth(spec.renderSvgBody())}
   <!-- Footer Command Bar -->
   <rect x="24" y="856" width="1552" height="46" rx="8" fill="#06281e" stroke="#10b981" stroke-width="1.8" />
-  <text x="48" y="884" class="footer">⚡ OPERATOR CLI &amp; LIVE LINKS: ${spec.operatorCliCommands.join("   |   ")}   →   ${publicR2Base}/graph.html</text>
+  <text x="48" y="884" class="footer">⚡ OPERATOR CLI &amp; LIVE LINKS: ${escapeXmlText(spec.operatorCliCommands.join("   |   "))}   →   ${publicR2Base}/graph.html</text>
 </svg>
 `;
 }
 
 // ============================================================================
-// 3 CANONICAL PIPELINE REFERENCE DIAGRAM SPECIFICATIONS
+// 4 CANONICAL PIPELINE REFERENCE DIAGRAM SPECIFICATIONS
 // ============================================================================
 export const PIPELINE_ARTIFACTS: readonly PipelineArtifactSpec[] = [
   {
@@ -446,7 +900,7 @@ export const PIPELINE_ARTIFACTS: readonly PipelineArtifactSpec[] = [
       "./bin/dx modes 7",
       "./bin/dx modes 9",
       "./bin/dx modes 10",
-      "node --test tests/forensic_diagnostic_modes.test.ts",
+      "bun test tests/forensic_diagnostic_modes.test.ts",
     ],
     renderSvgBody: () => `
       <!-- ROW 1: LAYERS 1, 2, 3 -->
@@ -626,10 +1080,181 @@ export const PIPELINE_ARTIFACTS: readonly PipelineArtifactSpec[] = [
       <text x="848" y="792" class="card-accent" fill="#6ee7b7">✅ VERDICT: Unresolved Gap = $0.00 across both accounts (RECONCILED_WITH_EXPLAINED_DIFFS &amp; RECONCILED_EXACT)</text>
     `,
   },
+  {
+    id: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE",
+    slug: "pipeline-dual-surface-gslive-model",
+    title: "DUAL-SURFACE GSLIVE MODEL — BATCH ACCOUNT REPORT vs LIVE BET-HISTORY STREAM",
+    subtitle: "GSLive Manager Partner 118: #/reports/users (batch) • #/events/bet-history (live) • desk-day window • betTime vs calcTime • `t` cache-buster tick",
+    description:
+      "Reference model for the two GSLive Partner 118 surfaces and the rule that keeps them from double-counting. The batch surface #/reports/users returns one settled account row per player_[login] per desk day (handle, win/loss, wager count) and is authoritative for booked volume. The live surface #/events/bet-history pushes one event per wager state change, where betTime is the placement wall clock and calcTime is the grade/settle clock, and is authoritative for in-flight exposure and placement velocity. Both are bucketed into the America/Chicago desk day (00:00:00.000-23:59:59.999 CT), joined on (partnerId, login, ticketNumber, betTime), and refreshed with a `t` cache-buster tick (Math.floor(Date.now()/60000)) so a batch re-fetch never serves a stale edge copy and never disturbs the stream.",
+    domainsCovered: ["Risk & Exposure", "Cross-Market", "Data Integrity"],
+    modesCovered: [1, 7, 8, 9, 10],
+    upstreamModules: [
+      "GSLive Manager Partner 118 (#/reports/users)",
+      "GSLive Manager Partner 118 (#/events/bet-history)",
+      "app/manager/module/bet-ticker.js",
+    ],
+    cleaningLayers: [
+      "Desk-Day Bucketing in America/Chicago (00:00:00.000-23:59:59.999 CT)",
+      "betTime (placement) vs calcTime (settle) field split",
+      "`t` Cache-Buster Tick (Math.floor(Date.now()/60000))",
+      "Batch-Over-Stream Precedence for Settled Totals",
+      "(partnerId, login, ticketNumber, betTime) Ticket Dedupe",
+    ],
+    operatorCliCommands: [
+      "./bin/dx gslive",
+      "./bin/dx modes 7",
+      "./bin/dx modes 9",
+      "./bin/dx modes 10",
+    ],
+    renderSvgBody: () => `
+      <!-- COLUMN 1: BATCH SURFACE -->
+      <rect class="panel" x="24" y="102" width="504" height="736" stroke="#06b6d4" />
+      <text x="44" y="132" class="col-hdr" fill="#38bdf8">SURFACE A — #/reports/users (BATCH)</text>
+      <text x="44" y="154" class="card-body">Pull model: one settled row per player_[login] per desk day</text>
+
+      <rect class="card" x="40" y="168" width="472" height="140" stroke="#06b6d4" />
+      <text x="56" y="193" class="card-title">🔗 Endpoint &amp; Query Contract</text>
+      <text x="56" y="216" class="card-body">GET /manager-tools/#/reports/users?partnerId=118</text>
+      <text x="56" y="234" class="card-body">    &amp;text=player_MJ102&amp;dateFrom=2026-10-25&amp;dateTo=2026-10-31</text>
+      <text x="56" y="252" class="card-body">dateFrom/dateTo are desk-day dates (YYYY-MM-DD, CT)</text>
+      <text x="56" y="276" class="card-accent" fill="#67e8f9">text= is a substring filter, not an exact login match</text>
+      <text x="56" y="296" class="card-body">→ always confirm the returned login == requested login</text>
+
+      <rect class="card" x="40" y="324" width="472" height="140" stroke="#10b981" />
+      <text x="56" y="349" class="card-title" fill="#6ee7b7">📄 Payload Shape (account × day)</text>
+      <text x="56" y="372" class="card-body">{ login, agentLogin, wagerCount,</text>
+      <text x="56" y="390" class="card-body">  handleCents, winLossCents, settledAt }</text>
+      <text x="56" y="408" class="card-body">Settled-only: a row appears after the day closes</text>
+      <text x="56" y="432" class="card-accent" fill="#6ee7b7">Authoritative for booked handle &amp; settled net</text>
+      <text x="56" y="452" class="card-body">No per-bet timestamps and no open-ticket rows</text>
+
+      <rect class="card" x="40" y="480" width="472" height="140" stroke="#f59e0b" />
+      <text x="56" y="505" class="card-title" fill="#fcd34d">⏱ Cadence &amp; Cache Posture</text>
+      <text x="56" y="528" class="card-body">Refresh on portal open + scheduled desk cron</text>
+      <text x="56" y="546" class="card-body">Edge and browser both cache the GET response</text>
+      <text x="56" y="564" class="card-body">A plain re-fetch can return yesterday's totals</text>
+      <text x="56" y="588" class="card-accent" fill="#fcd34d">Batch is pull-only: no push, no invalidation signal</text>
+      <text x="56" y="608" class="card-body">→ pair every batch call with a \`t\` cache-buster</text>
+
+      <rect class="card" x="40" y="636" width="472" height="182" stroke="#f43f5e" />
+      <text x="56" y="661" class="card-title" fill="#fda4af">⚠️ Batch-Only Failure Modes</text>
+      <text x="56" y="684" class="card-body">• Refetch before cutoff → previous desk-day totals</text>
+      <text x="56" y="702" class="card-body">• dateFrom &gt; dateTo → silent empty rows, not an error</text>
+      <text x="56" y="720" class="card-body">• substring \`text=\` filter → neighbouring logins leak in</text>
+      <text x="56" y="738" class="card-body">• T+N grade lag → settledAt lands after the report day</text>
+      <text x="56" y="762" class="card-accent" fill="#fda4af">Never size live liability or velocity from this surface</text>
+      <text x="56" y="784" class="card-body">Batch answers "what closed?" — not "what is open now?"</text>
+      <text x="56" y="806" class="card-accent" fill="#67e8f9">Gate: reject rows whose login != requested player_ login</text>
+
+      <!-- COLUMN 2: DESK DAY + CACHE BUSTER -->
+      <rect class="panel" x="548" y="102" width="504" height="736" stroke="#10b981" />
+      <text x="568" y="132" class="col-hdr" fill="#6ee7b7">DESK-DAY WINDOW &amp; \`t\` CACHE-BUSTER</text>
+      <text x="568" y="154" class="card-body">One shared clock so batch and stream agree on "today"</text>
+
+      <rect class="card" x="564" y="168" width="472" height="158" stroke="#10b981" />
+      <text x="580" y="193" class="card-title" fill="#6ee7b7">🗓 Desk-Day Window (America/Chicago)</text>
+      <text x="580" y="216" class="card-body">day = 00:00:00.000 → 23:59:59.999 CT</text>
+      <text x="580" y="234" class="card-body">CDT = UTC−5 • CST = UTC−6 (DST follows CT)</text>
+      <text x="580" y="252" class="card-body">week = Mon 00:00 CT → Sun 23:59:59.999 CT</text>
+      <text x="580" y="276" class="card-accent" fill="#6ee7b7">Batch dateFrom/dateTo are CT calendar dates</text>
+      <text x="580" y="296" class="card-body">Convert every stream timestamp to CT before bucketing</text>
+      <text x="580" y="314" class="card-body">Never bucket on UTC midnight — it splits the desk day</text>
+
+      <rect class="card" x="564" y="342" width="472" height="152" stroke="#38bdf8" />
+      <text x="580" y="367" class="card-title" fill="#7dd3fc">⏱ betTime vs calcTime — Two Questions</text>
+      <text x="580" y="390" class="card-body">betTime   = placement wall clock (who bet, when)</text>
+      <text x="580" y="408" class="card-body">calcTime  = grade/settle clock (when the book posted)</text>
+      <text x="580" y="426" class="card-body">Δ = calcTime − betTime</text>
+      <text x="580" y="450" class="card-accent" fill="#7dd3fc">Live: Δ ≈ 0s • Pre-match: seconds • T+N: hours/days</text>
+      <text x="580" y="470" class="card-body">calcTime may be null while the ticket is still open</text>
+      <text x="580" y="486" class="card-body">→ open ticket: count exposure, never count settled net</text>
+
+      <rect class="card" x="564" y="510" width="472" height="160" stroke="#a855f7" />
+      <text x="580" y="535" class="card-title" fill="#e9d5ff">🔁 The \`t\` Cache-Buster Tick</text>
+      <text x="580" y="558" class="card-body">…&amp;text=player_MJ102&amp;t=1761912000</text>
+      <text x="580" y="576" class="card-body">t = Math.floor(Date.now() / 60000)</text>
+      <text x="580" y="594" class="card-body">60s bucket → stable within a minute, fresh across minutes</text>
+      <text x="580" y="618" class="card-accent" fill="#e9d5ff">Busts edge + browser cache on the batch GET only</text>
+      <text x="580" y="638" class="card-body">The stream is untouched: no reconnect, no replay gap</text>
+      <text x="580" y="656" class="card-body">t must never enter the join key or the desk-day bucket</text>
+
+      <rect class="card" x="564" y="686" width="472" height="132" stroke="#f59e0b" />
+      <text x="580" y="711" class="card-title" fill="#fcd34d">✅ Allocation Rule (one desk day, one owner)</text>
+      <text x="580" y="734" class="card-body">betTime  ↦ desk day of placement   (velocity, count)</text>
+      <text x="580" y="752" class="card-body">calcTime ↦ desk day of settlement  (handle, win/loss)</text>
+      <text x="580" y="770" class="card-accent" fill="#fcd34d">A settle never rewrites the placement day's report</text>
+      <text x="580" y="792" class="card-body">Late calcTime ⇒ moves to tomorrow's batch, not today's</text>
+      <text x="580" y="808" class="card-body">Same rule for teasers and parlays: one parent, one day</text>
+
+      <!-- COLUMN 3: JOIN + RECONCILIATION -->
+      <rect class="panel" x="1072" y="102" width="504" height="736" stroke="#f59e0b" />
+      <text x="1092" y="132" class="col-hdr" fill="#fcd34d">SURFACE B — #/events/bet-history (LIVE)</text>
+      <text x="1092" y="154" class="card-body">Push model: one event per wager state change</text>
+
+      <rect class="card" x="1088" y="168" width="472" height="150" stroke="#f59e0b" />
+      <text x="1104" y="193" class="card-title" fill="#fcd34d">⚡ Stream Contract</text>
+      <text x="1104" y="216" class="card-body">WS/SSE: placed → line-changed → graded → settled</text>
+      <text x="1104" y="234" class="card-body">{ ticketNumber, login, betTime, calcTime,</text>
+      <text x="1104" y="252" class="card-body">  stakeCents, toWinCents, wagerStatus }</text>
+      <text x="1104" y="276" class="card-accent" fill="#fcd34d">calcTime is empty while the bet is in flight</text>
+      <text x="1104" y="296" class="card-body">Reconnect must replay from the last seen betTime</text>
+
+      <rect class="card" x="1088" y="334" width="472" height="164" stroke="#38bdf8" />
+      <text x="1104" y="359" class="card-title" fill="#7dd3fc">🔗 Join Key &amp; Precedence</text>
+      <text x="1104" y="382" class="card-body">key = (partnerId, login, ticketNumber, betTime)</text>
+      <text x="1104" y="400" class="card-body">Settled totals on conflict → batch wins (report of record)</text>
+      <text x="1104" y="418" class="card-body">Open / in-flight on conflict → stream wins (not booked yet)</text>
+      <text x="1104" y="442" class="card-accent" fill="#7dd3fc">Never SUM batch + stream for the same ticketNumber</text>
+      <text x="1104" y="462" class="card-body">Stream row with calcTime set and a batch row present ⇒</text>
+      <text x="1104" y="480" class="card-body">keep the batch row, drop the stream row (settled once)</text>
+
+      <rect class="card" x="1088" y="514" width="472" height="164" stroke="#10b981" />
+      <text x="1104" y="539" class="card-title" fill="#6ee7b7">🧮 Daily Reconciliation Loop</text>
+      <text x="1104" y="562" class="card-body">Σ stream settled(calcTime ∈ desk day)</text>
+      <text x="1104" y="580" class="card-body">  == batch.handleCents for the same desk day</text>
+      <text x="1104" y="598" class="card-body">Explained diffs: T+N grade lag, ledger adjustments</text>
+      <text x="1104" y="622" class="card-accent" fill="#6ee7b7">Unresolved gap must be $0.00 before settlement</text>
+      <text x="1104" y="642" class="card-body">Unexplained Σ ⇒ replay the stream, then re-pull batch</text>
+      <text x="1104" y="660" class="card-body">Re-pull always carries a new \`t\` — never the old URL</text>
+
+      <rect class="card" x="1088" y="694" width="472" height="124" stroke="#f43f5e" />
+      <text x="1104" y="719" class="card-title" fill="#fda4af">🛠 Operator Surfaces</text>
+      <text x="1104" y="742" class="card-body">Batch:  #/reports/users?partnerId=118&amp;text=player_[login]</text>
+      <text x="1104" y="760" class="card-body">Live:   #/events/bet-history (stream)</text>
+      <text x="1104" y="778" class="card-accent" fill="#fda4af">./bin/dx gslive • ./bin/dx modes 7 • ./bin/dx modes 9</text>
+      <text x="1104" y="798" class="card-body">./bin/dx modes 10 verifies batch == stream for the day</text>
+    `,
+  },
 ];
 
-function sha256Hex(buf: Buffer): string {
-  return crypto.createHash("sha256").update(buf).digest("hex");
+export interface GeneratedArtifactFiles {
+  readonly svgRepoPath: string;
+  readonly pngRepoPath: string;
+  readonly webpRepoPath: string;
+  readonly svgPublicR2Url: string;
+  readonly pngPublicR2Url: string;
+  readonly webpPublicR2Url: string;
+  readonly svgBytes: number;
+  readonly pngBytes: number;
+  readonly webpBytes: number;
+  readonly svgSha256: string;
+  readonly pngSha256: string;
+  readonly webpSha256: string;
+  /** The PNG carries the tEXt/iTXt/XMP/JSON-LD chunks; the WebP is a bare re-encode. */
+  readonly pngMetadataBearing: true;
+  readonly webpMetadataBearing: false;
+  readonly pngMimeType: "image/png";
+  readonly webpMimeType: "image/webp";
+}
+
+export interface GeneratedArtifactRender {
+  readonly rasterizer: string;
+  readonly width: number;
+  readonly height: number;
+  readonly uniqueColors: number;
+  readonly inkCoverage: number;
+  readonly brightCoverage: number;
 }
 
 export interface GeneratedArtifactCatalogEntry {
@@ -643,43 +1268,40 @@ export interface GeneratedArtifactCatalogEntry {
   readonly upstreamModules: readonly string[];
   readonly cleaningLayers: readonly string[];
   readonly operatorCliCommands: readonly string[];
-  readonly files: {
-    readonly svgRepoPath: string;
-    readonly pngRepoPath: string;
-    readonly svgPublicR2Url: string;
-    readonly pngPublicR2Url: string;
-    readonly svgBytes: number;
-    readonly pngBytes: number;
-    readonly svgSha256: string;
-    readonly pngSha256: string;
-  };
+  readonly files: GeneratedArtifactFiles;
+  readonly render: GeneratedArtifactRender;
   readonly embeddedMetadataStandards: readonly string[];
 }
 
-export function generateAllPipelineReferenceImages(): readonly GeneratedArtifactCatalogEntry[] {
-  const catalogEntries: GeneratedArtifactCatalogEntry[] = [];
-  const accentColors: [number, number, number][] = [
-    [6, 182, 212],
-    [16, 185, 129],
-    [245, 158, 11],
-  ];
+async function encodeWebpFromPng(pngBuf: Buffer, slug: string): Promise<Buffer> {
+  const encoded = await new Bun.Image(pngBuf).webp({ quality: 82 }).bytes();
+  const webp = Buffer.from(encoded);
+  if (webp.length < 16 || webp.toString("ascii", 0, 4) !== "RIFF" || webp.toString("ascii", 8, 12) !== "WEBP") {
+    throw new Error(`WebP encode failed for ${slug}: output is not a RIFF/WEBP container`);
+  }
+  return webp;
+}
 
-  // Also enrich existing docs/assets/ARCH-Guide.png with PNG tEXt/iTXt chunks if present
-  const existingArchPng = path.join(docsAssetsDir, "ARCH-Guide.png");
-  if (fs.existsSync(existingArchPng)) {
-    const rawArch = fs.readFileSync(existingArchPng);
-    const archSpec = PIPELINE_ARTIFACTS[0]!;
-    const enrichedArch = injectRichMetadataIntoPng(
-      rawArch,
-      archSpec,
-      buildXmpPacket(archSpec),
-      JSON.stringify({ "@context": "https://schema.org", "@type": "ImageObject", name: archSpec.title })
-    );
-    fs.writeFileSync(existingArchPng, enrichedArch);
-    fs.writeFileSync(path.join(distAssetsDir, "ARCH-Guide.png"), enrichedArch);
+/** Copies a file into dist/assets, preserving bytes (ARCH-Guide is a JPEG payload and must not be rewritten). */
+function copyToDist(fileName: string): void {
+  const src = path.join(docsAssetsDir, fileName);
+  const dest = path.join(distAssetsDir, fileName);
+  if (!fs.existsSync(src)) return;
+  fs.copyFileSync(src, dest);
+}
+
+export async function generateAllPipelineReferenceImages(): Promise<readonly GeneratedArtifactCatalogEntry[]> {
+  const catalogEntries: GeneratedArtifactCatalogEntry[] = [];
+
+  // ARCH-Guide is an upstream JPEG baseline: it carries no PNG tEXt/iTXt chunks, so it is copied
+  // byte-for-byte. The filename extension matches the payload so Pages/R2 serve image/jpeg.
+  const existingArch = path.join(docsAssetsDir, "ARCH-Guide.jpg");
+  if (fs.existsSync(existingArch)) {
+    copyToDist("ARCH-Guide.jpg");
+    console.log("  • docs/assets/ARCH-Guide.jpg is a JPEG baseline — copied unchanged (no PNG chunks)");
   }
 
-  PIPELINE_ARTIFACTS.forEach((spec, idx) => {
+  for (const spec of PIPELINE_ARTIFACTS) {
     const xmpXml = buildXmpPacket(spec);
     const jsonLdObj = {
       "@context": "https://schema.org",
@@ -691,7 +1313,7 @@ export function generateAllPipelineReferenceImages(): readonly GeneratedArtifact
       description: spec.description,
       contentUrl: `${publicR2Base}/assets/${spec.slug}.svg`,
       thumbnailUrl: `${publicR2Base}/assets/${spec.slug}.png`,
-      encodingFormat: ["image/svg+xml", "image/png"],
+      encodingFormat: ["image/svg+xml", "image/png", "image/webp"],
       creator: {
         "@type": "Organization",
         name: "SportsDesk & Fantasy402 Risk Engineering",
@@ -708,32 +1330,21 @@ export function generateAllPipelineReferenceImages(): readonly GeneratedArtifact
     fs.writeFileSync(svgDocsPath, svgBuf);
     fs.writeFileSync(svgDistPath, svgBuf);
 
-    // Attempt macOS QuickLook/sips rasterization of SVG -> PNG, falling back to deterministic PNG generator
+    // Real SVG rasterization, verified for ink. Throws instead of writing a blank banner.
     const pngDocsPath = path.join(docsAssetsDir, `${spec.slug}.png`);
     const pngDistPath = path.join(distAssetsDir, `${spec.slug}.png`);
-    let basePngBuf: Buffer | null = null;
-    try {
-      const sipsRes = spawnSync("sips", ["-s", "format", "png", svgDocsPath, "--out", pngDocsPath], {
-        stdio: "ignore",
-        timeout: 4000,
-      });
-      if (sipsRes.status === 0 && fs.existsSync(pngDocsPath)) {
-        const cand = fs.readFileSync(pngDocsPath);
-        if (cand.length > 100 && cand[0] === 0x89 && cand[1] === 0x50) {
-          basePngBuf = cand;
-        }
-      }
-    } catch {
-      basePngBuf = null;
-    }
+    const raster = rasterizeSvgToPng(svgDocsPath, pngDocsPath);
 
-    if (!basePngBuf) {
-      basePngBuf = createFallbackDarkBannerPng(1600, 900, accentColors[idx % accentColors.length]);
-    }
-
-    const richPngBuf = injectRichMetadataIntoPng(basePngBuf, spec, xmpXml, jsonLdString);
+    const richPngBuf = injectRichMetadataIntoPng(raster.png, spec, xmpXml, jsonLdString);
     fs.writeFileSync(pngDocsPath, richPngBuf);
     fs.writeFileSync(pngDistPath, richPngBuf);
+
+    // WebP sibling: Bun.Image re-encodes the raster and drops all ancillary PNG chunks.
+    const webpBuf = await encodeWebpFromPng(raster.png, spec.slug);
+    const webpDocsPath = path.join(docsAssetsDir, `${spec.slug}.webp`);
+    const webpDistPath = path.join(distAssetsDir, `${spec.slug}.webp`);
+    fs.writeFileSync(webpDocsPath, webpBuf);
+    fs.writeFileSync(webpDistPath, webpBuf);
 
     catalogEntries.push({
       id: spec.id,
@@ -749,12 +1360,28 @@ export function generateAllPipelineReferenceImages(): readonly GeneratedArtifact
       files: {
         svgRepoPath: `docs/assets/${spec.slug}.svg`,
         pngRepoPath: `docs/assets/${spec.slug}.png`,
+        webpRepoPath: `docs/assets/${spec.slug}.webp`,
         svgPublicR2Url: `${publicR2Base}/assets/${spec.slug}.svg`,
         pngPublicR2Url: `${publicR2Base}/assets/${spec.slug}.png`,
+        webpPublicR2Url: `${publicR2Base}/assets/${spec.slug}.webp`,
         svgBytes: svgBuf.length,
         pngBytes: richPngBuf.length,
+        webpBytes: webpBuf.length,
         svgSha256: sha256Hex(svgBuf),
         pngSha256: sha256Hex(richPngBuf),
+        webpSha256: sha256Hex(webpBuf),
+        pngMetadataBearing: true,
+        webpMetadataBearing: false,
+        pngMimeType: "image/png",
+        webpMimeType: "image/webp",
+      },
+      render: {
+        rasterizer: raster.backend,
+        width: raster.stats.width,
+        height: raster.stats.height,
+        uniqueColors: raster.stats.uniqueColors,
+        inkCoverage: Number(raster.stats.inkCoverage.toFixed(4)),
+        brightCoverage: Number(raster.stats.brightCoverage.toFixed(4)),
       },
       embeddedMetadataStandards: [
         "W3C RDF / Dublin Core (dc:title, dc:description, dc:creator, dc:subject, dc:identifier)",
@@ -762,9 +1389,10 @@ export function generateAllPipelineReferenceImages(): readonly GeneratedArtifact
         "Schema.org ImageObject JSON-LD (SportsDesk:PipelineSpecJson)",
         "PNG RFC-2083 tEXt & iTXt Chunks with CRC-32 Verification",
         "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers",
+        "WebP sibling carries NO XMP/tEXt chunks (metadataBearing: false) — use the PNG for metadata",
       ],
     });
-  });
+  }
 
   const manifestPayload = {
     schemaVersion: "2026.10.31",
@@ -772,6 +1400,11 @@ export function generateAllPipelineReferenceImages(): readonly GeneratedArtifact
     portalPublicUrl: `${publicR2Base}/graph.html`,
     metadataCatalogPublicUrl: `${publicR2Base}/assets/pipeline-artifacts-metadata.json`,
     totalArtifacts: catalogEntries.length,
+    formats: {
+      svg: { mimeType: "image/svg+xml", metadataBearing: true, role: "source of truth (RDF/XMP/JSON-LD in <metadata>)" },
+      png: { mimeType: "image/png", metadataBearing: true, role: "download + metadata-bearing raster (tEXt/iTXt/XMP/JSON-LD)" },
+      webp: { mimeType: "image/webp", metadataBearing: false, role: "lightweight raster sibling; Bun.Image re-encode drops XMP/tEXt" },
+    },
     artifacts: catalogEntries,
   };
 
@@ -783,12 +1416,18 @@ export function generateAllPipelineReferenceImages(): readonly GeneratedArtifact
 }
 
 if (import.meta.main) {
-  const entries = generateAllPipelineReferenceImages();
-  console.log("========================================================================================================");
-  console.log("  🖼️  GENERATED RICH-METADATA PIPELINE REFERENCE IMAGES (SVG + PNG + XMP + JSON-LD)");
-  console.log("========================================================================================================");
+  const entries = await generateAllPipelineReferenceImages();
+  console.log("================================================================================================================================");
+  console.log("  🖼️  GENERATED RICH-METADATA PIPELINE REFERENCE IMAGES (SVG + PNG + WebP + XMP + JSON-LD)");
+  console.log("================================================================================================================================");
   for (const e of entries) {
-    console.log(`  • ${e.id.padEnd(34)} | SVG: ${String(e.files.svgBytes).padStart(6)} B | PNG: ${String(e.files.pngBytes).padStart(6)} B | ${e.files.svgPublicR2Url}`);
+    const { files } = e;
+    console.log(
+      `  • ${e.id.padEnd(34)} | SVG ${String(files.svgBytes).padStart(6)} B | PNG ${String(files.pngBytes).padStart(6)} B | WebP ${String(files.webpBytes).padStart(6)} B\n` +
+        `      raster=${e.render.rasterizer} ${e.render.width}x${e.render.height} uniqueColors=${e.render.uniqueColors} ` +
+        `ink=${(e.render.inkCoverage * 100).toFixed(2)}% bright=${(e.render.brightCoverage * 100).toFixed(2)}%`
+    );
   }
-  console.log("========================================================================================================");
+  console.log("================================================================================================================================");
 }
+

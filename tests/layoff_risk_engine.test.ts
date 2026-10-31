@@ -273,6 +273,7 @@ describe("layoff_risk_engine", () => {
     const alerts = engine.formatLayoffRiskAlerts(matches);
     expect(alerts.length).toBe(1);
     expect(alerts[0]).toContain("[ALERT] Layoff Risk");
+    expect(alerts[0]).not.toContain("undefined");
     expect(alerts[0]).toContain("beats pending TKT-9982:1");
     expect(alerts[0]).toContain("[KEY 7]");
     expect(alerts[0]).toContain("CUB22HR/CB112_1");

@@ -23,20 +23,32 @@
  *      `https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793422800&to=1793422800&toTime=86399&dateFilterBy=calcTime&t=1793469958152`
  *      where:
  *        • `from=1793422800` & `to=1793422800` = `2026-10-31T05:00:00.000Z` (`00:00:00 CDT` start of day in epoch seconds)
- *        • `toTime=86399` = `+23h 59m 59s` (`23:59:59 CDT` end of day)
+ *        • `toTime=86399` = `+23h 59m 59s` (`23:59:59 CDT` end of day). This is the *offset within
+ *          the desk day*, so it is `89999` on the 25-hour fall-back day and `82799` on the
+ *          23-hour spring-forward day — always derive it, never hardcode it.
  *        • `minVolume=0` & `maxTimeUntilScore=0` = zero volume/score-time filtering so all live wagers appear immediately
  *        • `dateFilterBy=calcTime` (live settling/populating events) or `betTime` (live placement stream)
- *        • `t=<epochMs>` = monotonic cache-buster timestamp updated on every 60s `Bun.cron` / 15s UI poll tick.
+ *        • `t=<epochMs>` = monotonic cache-buster timestamp; defaults to `Date.now()` (never a constant).
  */
 
-export const GSLIVE_MANAGER_BASE_URL = "https://plive.sportswidgets.pro/manager-tools/";
+export const GSLIVE_MANAGER_BASE_URL =
+  "https://plive.sportswidgets.pro/manager-tools/";
+
+/** Chicago (Partner 118 desk) timezone — day windows are operator-local, not UTC. */
+export const GSLIVE_DESK_TIME_ZONE = "America/Chicago";
+
+/** Inclusive historical churn-study window used by the CHURN_* cohort analysis. */
+const GSLIVE_CHURN_WINDOW = {
+  fromYmd: "2026-10-18",
+  toYmd: "2026-10-25",
+} as const;
 
 export interface GsLiveUsersReportDeepLinkOptions {
   readonly customerLogin: string; // e.g., "CHURN_003", "MJ102", "player_CHURN_003"
   readonly bot?: boolean; // default: true (critical so bot/syndicate accounts are not hidden!)
   readonly eventId?: string; // default: ""
-  readonly fromIsoUtc?: string; // default: "2026-10-18T05:00:00.000Z" (00:00:00 CDT)
-  readonly toIsoUtc?: string; // default: "2026-11-01T04:59:59.000Z" (23:59:59 CDT)
+  readonly fromIsoUtc?: string; // default: start of a rolling 14-day desk window ending today
+  readonly toIsoUtc?: string; // default: end of today (desk timezone)
   readonly partnerId?: string | number; // default: 118
   readonly searchBy?: "player" | "agent"; // default: "player"
 }
@@ -44,11 +56,12 @@ export interface GsLiveUsersReportDeepLinkOptions {
 export interface GsLiveBetHistorySidecarOptions {
   readonly minVolume?: number; // default: 0
   readonly maxTimeUntilScore?: number; // default: 0
-  readonly fromEpochSec?: number; // default: 1793422800 (2026-10-31T05:00:00.000Z = 00:00:00 CDT)
-  readonly toEpochSec?: number; // default: 1793422800
-  readonly toTimeSec?: number; // default: 86399 (23:59:59 end-of-day offset)
+  readonly dateYmd?: string; // desk day; derives from/to and the DST-aware toTime
+  readonly fromEpochSec?: number; // default: desk day start (05:00Z CDT / 06:00Z CST)
+  readonly toEpochSec?: number; // default: same as fromEpochSec
+  readonly toTimeSec?: number; // default: last second of the desk day (86399, or 89999/82799 on DST days)
   readonly dateFilterBy?: "calcTime" | "betTime"; // default: "calcTime"
-  readonly tickEpochMs?: number; // default: 1793469958152 or Date.now()
+  readonly tickEpochMs?: number; // default: Date.now() — always pass a fresh tick in loops
   readonly customerLogin?: string; // optional per-player filter
   readonly eventId?: string; // optional eventId filter
 }
@@ -67,15 +80,128 @@ export function formatGsLivePlayerToken(rawLogin: string): string {
 }
 
 /**
- * Computes the UTC epoch seconds for `00:00:00 CDT` (`05:00:00.000Z`) for a given `YYYY-MM-DD` date.
- * For `2026-10-31`, returns `1793422800`.
+ * Raw partner account id used by the `#/events/bet-history` filter.
+ * The live console emits `partnerUserId=AF12`, not `partnerUserId=player_AF12`; the `player_`
+ * prefix belongs to the `#/reports/users` `text=` filter.
+ */
+export function formatGsLivePartnerUserId(rawLogin: string): string {
+  return formatGsLivePlayerToken(rawLogin).replace(/^player_/, "");
+}
+
+/**
+ * Offset (ms) of desk-local wall time from UTC at a given instant, e.g. `-5h` during CDT
+ * and `-6h` during CST. Derived from Intl so US DST transitions are handled automatically.
+ */
+function deskOffsetMsAt(instantMs: number): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: GSLIVE_DESK_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(instantMs));
+  const part = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const hour = part("hour") % 24; // some engines render midnight as 24
+  const asIfUtc = Date.UTC(
+    part("year"),
+    part("month") - 1,
+    part("day"),
+    hour,
+    part("minute"),
+    part("second"),
+  );
+  return asIfUtc - Math.floor(instantMs / 1000) * 1000;
+}
+
+/**
+ * UTC epoch seconds for `00:00:00` on a desk calendar day. DST-aware: returns `05:00Z` under
+ * CDT and `06:00Z` under CST. Never hardcode the offset — it changes on the DST transitions.
+ */
+export function computeDeskDayStartEpochSeconds(dateYmd: string): number {
+  const [y, m, d] = dateYmd.split("-").map(Number);
+  if (!y || !m || !d) {
+    return Math.floor(Date.now() / 1000);
+  }
+  const naiveUtc = Date.UTC(y, m - 1, d, 0, 0, 0);
+  // Two passes: sample the offset near the target, then re-sample at the resolved instant.
+  const firstGuess = naiveUtc - deskOffsetMsAt(naiveUtc);
+  const resolved = naiveUtc - deskOffsetMsAt(firstGuess);
+  return Math.floor(resolved / 1000);
+}
+
+/** Number of seconds in a desk calendar day (86399 normally, 89999/82799 on DST transition days). */
+export function computeDeskDayLengthSeconds(dateYmd: string): number {
+  return (
+    computeDeskDayStartEpochSeconds(addDaysYmd(dateYmd, 1)) -
+    computeDeskDayStartEpochSeconds(dateYmd)
+  );
+}
+
+/** End-of-day offset (`toTime`) for a desk calendar day: `86399` on normal days. */
+export function computeDeskDayToTimeSeconds(dateYmd: string): number {
+  return computeDeskDayLengthSeconds(dateYmd) - 1;
+}
+
+/**
+ * @deprecated Use {@link computeDeskDayStartEpochSeconds}. Kept as an alias for existing callers;
+ * this helper is DST-aware, so the `Cdt` name no longer describes its behaviour.
  */
 export function computeCdtDayStartEpochSeconds(dateYmd = "2026-10-31"): number {
-  const parts = dateYmd.split("-").map(Number);
-  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
-    return 1793422800;
-  }
-  return Math.floor(Date.UTC(parts[0]!, parts[1]! - 1, parts[2]!, 5, 0, 0, 0) / 1000);
+  return computeDeskDayStartEpochSeconds(dateYmd);
+}
+
+/**
+ * Resolves the operator's current calendar date (`YYYY-MM-DD`) in the desk timezone.
+ * Never derive "today" from `Date#toISOString()` — that is UTC and rolls at 19:00/20:00 desk time.
+ */
+export function resolveDeskDateYmd(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: GSLIVE_DESK_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const part = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+/** Adds (or subtracts) whole calendar days to a `YYYY-MM-DD` string. */
+export function addDaysYmd(dateYmd: string, days: number): string {
+  const [y, m, d] = dateYmd.split("-").map(Number);
+  if (!y || !m || !d) return dateYmd;
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/**
+ * ISO UTC instant for the first (`00:00:00`) or last (`23:59:59`, DST-aware) second of a desk day.
+ */
+export function deskDayBoundaryIso(
+  dateYmd: string,
+  boundary: "start" | "end",
+): string {
+  const startEpoch = computeDeskDayStartEpochSeconds(dateYmd);
+  const endEpoch =
+    boundary === "end"
+      ? computeDeskDayStartEpochSeconds(addDaysYmd(dateYmd, 1)) - 1
+      : startEpoch;
+  return new Date(endEpoch * 1000).toISOString();
+}
+
+/** Inclusive day window ending on `dateYmd` (e.g. `windowDays=14` covers date-13 .. date). */
+export function deskWindowIso(
+  dateYmd: string,
+  windowDays: number,
+): { fromIso: string; toIso: string } {
+  const span = Math.max(1, Math.trunc(windowDays));
+  return {
+    fromIso: deskDayBoundaryIso(addDaysYmd(dateYmd, -(span - 1)), "start"),
+    toIso: deskDayBoundaryIso(dateYmd, "end"),
+  };
 }
 
 /**
@@ -83,12 +209,14 @@ export function computeCdtDayStartEpochSeconds(dateYmd = "2026-10-31"): number {
  * `https://plive.sportswidgets.pro/manager-tools/#/reports/users?bot=true&eventId=&from=2026-10-18T05%3A00%3A00.000Z&partnerId=118&searchBy=player&text=player_CHURN_003&to=2026-10-26T04%3A59%3A59.000Z`
  */
 export function buildGsLiveUsersReportDeepLink(
-  options: GsLiveUsersReportDeepLinkOptions
+  options: GsLiveUsersReportDeepLinkOptions,
 ): string {
   const bot = options.bot ?? true;
   const eventId = options.eventId ?? "";
-  const fromIso = options.fromIsoUtc ?? "2026-10-18T05:00:00.000Z";
-  const toIso = options.toIsoUtc ?? "2026-11-01T04:59:59.000Z";
+  const todayYmd = resolveDeskDateYmd();
+  const rolling = deskWindowIso(todayYmd, 14);
+  const fromIso = options.fromIsoUtc ?? rolling.fromIso;
+  const toIso = options.toIsoUtc ?? rolling.toIso;
   const partnerId = String(options.partnerId ?? 118);
   const searchBy = options.searchBy ?? "player";
   const playerText =
@@ -115,15 +243,17 @@ export function buildGsLiveUsersReportDeepLink(
  * `https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=1793422800&to=1793422800&toTime=86399&dateFilterBy=calcTime&t=1793469958152`
  */
 export function buildGsLiveBetHistorySidecarUrl(
-  options?: GsLiveBetHistorySidecarOptions
+  options?: GsLiveBetHistorySidecarOptions,
 ): string {
   const minVolume = options?.minVolume ?? 0;
   const maxTimeUntilScore = options?.maxTimeUntilScore ?? 0;
-  const fromEpoch = options?.fromEpochSec ?? 1793422800;
+  const dateYmd = options?.dateYmd ?? resolveDeskDateYmd();
+  const fromEpoch =
+    options?.fromEpochSec ?? computeDeskDayStartEpochSeconds(dateYmd);
   const toEpoch = options?.toEpochSec ?? fromEpoch;
-  const toTime = options?.toTimeSec ?? 86399;
+  const toTime = options?.toTimeSec ?? computeDeskDayToTimeSeconds(dateYmd);
   const dateFilterBy = options?.dateFilterBy ?? "calcTime";
-  const tickMs = options?.tickEpochMs ?? 1793469958152;
+  const tickMs = options?.tickEpochMs ?? Date.now();
 
   const params: string[] = [
     `minVolume=${minVolume}`,
@@ -136,13 +266,78 @@ export function buildGsLiveBetHistorySidecarUrl(
   ];
 
   if (options?.customerLogin) {
-    params.push(`partnerUserId=${encodeURIComponent(formatGsLivePlayerToken(options.customerLogin))}`);
+    params.push(
+      `partnerUserId=${encodeURIComponent(formatGsLivePartnerUserId(options.customerLogin))}`,
+    );
   }
   if (options?.eventId) {
     params.push(`eventId=${encodeURIComponent(options.eventId)}`);
   }
 
   return `${GSLIVE_MANAGER_BASE_URL}#/events/bet-history?${params.join("&")}`;
+}
+
+/**
+ * All GSLive Manager surfaces for one account, generated from the canonical builders above.
+ * This is the only supported way to produce per-account links — do not hand-build URLs elsewhere.
+ */
+export interface GsLiveManagerSurfaceUrls {
+  readonly gsLivePlayerId: string;
+  readonly playerReportUrl: string;
+  readonly bettorReportUrl: string;
+  readonly openBetReportUrl: string;
+  readonly betHistoryUrl: string;
+  readonly summaryByPlayerUrl: string;
+}
+
+export function buildGsLiveManagerSurfaceUrls(options: {
+  readonly customerLogin: string;
+  readonly dateYmd?: string;
+  readonly tickEpochMs?: number;
+  readonly reportWindowDays?: number;
+  readonly dateFilterBy?: "calcTime" | "betTime";
+}): GsLiveManagerSurfaceUrls {
+  const dateYmd = options.dateYmd ?? resolveDeskDateYmd();
+  const tickEpochMs = options.tickEpochMs ?? Date.now();
+  const window = deskWindowIso(dateYmd, options.reportWindowDays ?? 14);
+  const playerReportUrl = buildGsLiveUsersReportDeepLink({
+    customerLogin: options.customerLogin,
+    bot: true,
+    eventId: "",
+    fromIsoUtc: window.fromIso,
+    toIsoUtc: window.toIso,
+    partnerId: 118,
+    searchBy: "player",
+  });
+  const dayStart = computeDeskDayStartEpochSeconds(dateYmd);
+
+  return {
+    gsLivePlayerId: formatGsLivePlayerToken(options.customerLogin),
+    playerReportUrl,
+    // Same router query as the verified user report; only the report route differs.
+    bettorReportUrl: playerReportUrl.replace(
+      "#/reports/users?",
+      "#/reports/bettor?",
+    ),
+    openBetReportUrl: playerReportUrl.replace(
+      "#/reports/users?",
+      "#/reports/open-bets?",
+    ),
+    betHistoryUrl: buildGsLiveBetHistorySidecarUrl({
+      minVolume: 0,
+      maxTimeUntilScore: 0,
+      dateYmd,
+      fromEpochSec: dayStart,
+      toEpochSec: dayStart,
+      dateFilterBy: options.dateFilterBy ?? "calcTime",
+      tickEpochMs,
+      customerLogin: options.customerLogin,
+    }),
+    summaryByPlayerUrl: playerReportUrl.replace(
+      "#/reports/users?",
+      "#/reports/summary?",
+    ),
+  };
 }
 
 export interface GsLiveDualSurfaceDescriptor {
@@ -168,7 +363,7 @@ export interface GsLiveDualSurfaceDescriptor {
     readonly from: number;
     readonly fromTime: 0;
     readonly to: number;
-    readonly toTime: 86399;
+    readonly toTime: number;
     readonly betId: string;
     readonly betGroupId: string;
     readonly group: null;
@@ -181,18 +376,25 @@ export interface GsLiveDualSurfaceDescriptor {
 /**
  * Builds the complete Dual-Surface GSLive descriptor for any account (e.g., `CHURN_003`, `MJ102`, `BGD101`),
  * combining the 7-parameter `#/reports/users` deep links with the `#/events/bet-history` live sidecar URLs.
+ * The 7-day / 14-day windows are rolling and end on `dateYmd` (desk timezone, today by default).
  */
 export function buildGsLiveDualSurfaceDescriptor(
   customerLogin: string,
   options?: {
     dateYmd?: string;
     tickEpochMs?: number;
-  }
+  },
 ): GsLiveDualSurfaceDescriptor {
   const gsLivePlayerId = formatGsLivePlayerToken(customerLogin);
   const cleanLogin = gsLivePlayerId.replace(/^player_/, "");
-  const dayStartEpoch = computeCdtDayStartEpochSeconds(options?.dateYmd ?? "2026-10-31");
-  const tickMs = options?.tickEpochMs ?? 1793469958152;
+  const dateYmd = options?.dateYmd ?? resolveDeskDateYmd();
+  const dayStartEpoch = computeDeskDayStartEpochSeconds(dateYmd);
+  const dayEndEpoch =
+    computeDeskDayStartEpochSeconds(addDaysYmd(dateYmd, 1)) - 1;
+  const dayToTimeSeconds = computeDeskDayToTimeSeconds(dateYmd);
+  const tickMs = options?.tickEpochMs ?? Date.now();
+  const window7 = deskWindowIso(dateYmd, 7);
+  const window14 = deskWindowIso(dateYmd, 14);
 
   return {
     customerLogin: cleanLogin,
@@ -201,8 +403,8 @@ export function buildGsLiveDualSurfaceDescriptor(
       customerLogin: cleanLogin,
       bot: true,
       eventId: "",
-      fromIsoUtc: "2026-10-25T05:00:00.000Z",
-      toIsoUtc: "2026-11-01T04:59:59.000Z",
+      fromIsoUtc: window7.fromIso,
+      toIsoUtc: window7.toIso,
       partnerId: 118,
       searchBy: "player",
     }),
@@ -210,8 +412,8 @@ export function buildGsLiveDualSurfaceDescriptor(
       customerLogin: cleanLogin,
       bot: true,
       eventId: "",
-      fromIsoUtc: "2026-10-18T05:00:00.000Z",
-      toIsoUtc: "2026-11-01T04:59:59.000Z",
+      fromIsoUtc: window14.fromIso,
+      toIsoUtc: window14.toIso,
       partnerId: 118,
       searchBy: "player",
     }),
@@ -219,42 +421,45 @@ export function buildGsLiveDualSurfaceDescriptor(
       customerLogin: cleanLogin,
       bot: true,
       eventId: "",
-      fromIsoUtc: "2026-10-18T05:00:00.000Z",
-      toIsoUtc: "2026-10-26T04:59:59.000Z",
+      fromIsoUtc: deskDayBoundaryIso(GSLIVE_CHURN_WINDOW.fromYmd, "start"),
+      toIsoUtc: deskDayBoundaryIso(GSLIVE_CHURN_WINDOW.toYmd, "end"),
       partnerId: 118,
       searchBy: "player",
     }),
     liveBetHistorySidecarCalcTimeUrl: buildGsLiveBetHistorySidecarUrl({
       minVolume: 0,
       maxTimeUntilScore: 0,
+      dateYmd,
       fromEpochSec: dayStartEpoch,
       toEpochSec: dayStartEpoch,
-      toTimeSec: 86399,
+      toTimeSec: dayToTimeSeconds,
       dateFilterBy: "calcTime",
       tickEpochMs: tickMs,
     }),
     liveBetHistorySidecarBetTimeUrl: buildGsLiveBetHistorySidecarUrl({
       minVolume: 0,
       maxTimeUntilScore: 0,
+      dateYmd,
       fromEpochSec: dayStartEpoch,
       toEpochSec: dayStartEpoch,
-      toTimeSec: 86399,
+      toTimeSec: dayToTimeSeconds,
       dateFilterBy: "betTime",
       tickEpochMs: tickMs,
     }),
     playerBetHistoryDeepLinkUrl: buildGsLiveBetHistorySidecarUrl({
       minVolume: 0,
       maxTimeUntilScore: 0,
+      dateYmd,
       fromEpochSec: dayStartEpoch,
       toEpochSec: dayStartEpoch,
-      toTimeSec: 86399,
+      toTimeSec: dayToTimeSeconds,
       dateFilterBy: "calcTime",
       tickEpochMs: tickMs,
       customerLogin: cleanLogin,
     }),
     getBetReportObservedPayload: {
       action: "getBetReport",
-      partnerUserId: "",
+      partnerUserId: cleanLogin,
       agent: "",
       eventId: "",
       freeBetId: "",
@@ -265,8 +470,10 @@ export function buildGsLiveDualSurfaceDescriptor(
       mId: "",
       from: dayStartEpoch,
       fromTime: 0,
-      to: dayStartEpoch + 86399,
-      toTime: 86399,
+      // Wire observation: `to` is the inclusive end epoch. The hash URL instead passes
+      // to=<dayStart>&toTime=<desk day length - 1>; both encode the same desk-day end.
+      to: dayEndEpoch,
+      toTime: dayToTimeSeconds,
       betId: "",
       betGroupId: "",
       group: null,

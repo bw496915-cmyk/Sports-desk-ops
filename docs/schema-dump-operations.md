@@ -80,4 +80,4 @@ When prod SQLite has diverged and ops needs a fresh observation:
   4. **`schema:parity-gauntlet`** — synthetic exit **2** / **3** drill (non-flaky; no live prod)
   5. **`eod:smoke`** — fixture JSONL + temp SQLite tar.gz member hashes (nested `audit/` paths)
 - **`bun run schema:dump-lag`:** JSON report: `captured_at`, last git commit time on the fixture file, and `dump_lag_days` (commit − observation). Large lag ⇒ fixture may be stale vs live prod even when parity passes.
-- **Drills (local):** `schema:parity-gauntlet` · `schema:check-fixture-drift` · `eod:smoke` · architecture diagram [docs/assets/ARCH-Guide.png](./assets/ARCH-Guide.png)
+- **Drills (local):** `schema:parity-gauntlet` · `schema:check-fixture-drift` · `eod:smoke` · architecture diagram [docs/assets/ARCH-Guide.jpg](./assets/ARCH-Guide.jpg)

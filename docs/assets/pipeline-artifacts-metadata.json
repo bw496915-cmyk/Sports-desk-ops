@@ -1,9 +1,26 @@
 {
   "schemaVersion": "2026.10.31",
-  "generatedAtIso": "2026-10-31T18:12:13.913Z",
+  "generatedAtIso": "2026-10-31T20:10:05.488Z",
   "portalPublicUrl": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html",
   "metadataCatalogPublicUrl": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-artifacts-metadata.json",
-  "totalArtifacts": 3,
+  "totalArtifacts": 4,
+  "formats": {
+    "svg": {
+      "mimeType": "image/svg+xml",
+      "metadataBearing": true,
+      "role": "source of truth (RDF/XMP/JSON-LD in <metadata>)"
+    },
+    "png": {
+      "mimeType": "image/png",
+      "metadataBearing": true,
+      "role": "download + metadata-bearing raster (tEXt/iTXt/XMP/JSON-LD)"
+    },
+    "webp": {
+      "mimeType": "image/webp",
+      "metadataBearing": false,
+      "role": "lightweight raster sibling; Bun.Image re-encode drops XMP/tEXt"
+    }
+  },
   "artifacts": [
     {
       "id": "SD-ARTIFACT-01-10MODE-PIPELINE",
@@ -54,19 +71,36 @@
       "files": {
         "svgRepoPath": "docs/assets/pipeline-10-mode-architecture.svg",
         "pngRepoPath": "docs/assets/pipeline-10-mode-architecture.png",
+        "webpRepoPath": "docs/assets/pipeline-10-mode-architecture.webp",
         "svgPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.svg",
         "pngPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.png",
-        "svgBytes": 19476,
-        "pngBytes": 32346,
-        "svgSha256": "9afcd15552d2e201ad9b65767570fd5020a101898be4eeaddf2b62df751dce1e",
-        "pngSha256": "c90824f170a7bfb2cec295419b61596adb295a3ba76d8122d7bc90ecc7ec07b8"
+        "webpPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.webp",
+        "svgBytes": 22337,
+        "pngBytes": 512513,
+        "webpBytes": 186198,
+        "svgSha256": "0a03f247b3fc7cbea8c92c66bc13c7fa5bb6c1eb2de1c8a0f636adf1992e9bb6",
+        "pngSha256": "b8ab07e72a9c55d31819d5dd1100349e5414f18fcd00627e3e44143cbf276811",
+        "webpSha256": "d16ee7bd936f91edfdee4021d6a382e3e1779da4619d7583453e01cc6d2c1190",
+        "pngMetadataBearing": true,
+        "webpMetadataBearing": false,
+        "pngMimeType": "image/png",
+        "webpMimeType": "image/webp"
+      },
+      "render": {
+        "rasterizer": "rsvg-convert",
+        "width": 1600,
+        "height": 920,
+        "uniqueColors": 4288,
+        "inkCoverage": 0.3023,
+        "brightCoverage": 0.0239
       },
       "embeddedMetadataStandards": [
         "W3C RDF / Dublin Core (dc:title, dc:description, dc:creator, dc:subject, dc:identifier)",
         "Adobe XMP Packet (XML:com.adobe.xmp)",
         "Schema.org ImageObject JSON-LD (SportsDesk:PipelineSpecJson)",
         "PNG RFC-2083 tEXt & iTXt Chunks with CRC-32 Verification",
-        "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers"
+        "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers",
+        "WebP sibling carries NO XMP/tEXt chunks (metadataBearing: false) — use the PNG for metadata"
       ]
     },
     {
@@ -111,24 +145,41 @@
         "./bin/dx modes 7",
         "./bin/dx modes 9",
         "./bin/dx modes 10",
-        "node --test tests/forensic_diagnostic_modes.test.ts"
+        "bun test tests/forensic_diagnostic_modes.test.ts"
       ],
       "files": {
         "svgRepoPath": "docs/assets/pipeline-6-layer-data-cleaning.svg",
         "pngRepoPath": "docs/assets/pipeline-6-layer-data-cleaning.png",
+        "webpRepoPath": "docs/assets/pipeline-6-layer-data-cleaning.webp",
         "svgPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.svg",
         "pngPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.png",
-        "svgBytes": 16048,
-        "pngBytes": 32650,
-        "svgSha256": "65c332d982f798e84cd3b1d0d9d7712b185f84b1ce33121236c4987ba16aaacf",
-        "pngSha256": "ea21eeb09165d3268f5f7de6a6e623ad3906ad176779fd18e177cd6002169541"
+        "webpPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.webp",
+        "svgBytes": 17368,
+        "pngBytes": 398783,
+        "webpBytes": 161124,
+        "svgSha256": "0eb4f0d173262aa41aa253c4921377964cf7834779b446cc77d3b8c8808d5bb1",
+        "pngSha256": "bf8529ec45de92c3801d8a43fbc6164d4c5666a32d315b3bf77fadbcec93d40a",
+        "webpSha256": "e093a1eb874eccacedb4ac7f28e3e3ee40f65fafaf39360446bed7254838eb21",
+        "pngMetadataBearing": true,
+        "webpMetadataBearing": false,
+        "pngMimeType": "image/png",
+        "webpMimeType": "image/webp"
+      },
+      "render": {
+        "rasterizer": "rsvg-convert",
+        "width": 1600,
+        "height": 920,
+        "uniqueColors": 3723,
+        "inkCoverage": 0.1008,
+        "brightCoverage": 0.0153
       },
       "embeddedMetadataStandards": [
         "W3C RDF / Dublin Core (dc:title, dc:description, dc:creator, dc:subject, dc:identifier)",
         "Adobe XMP Packet (XML:com.adobe.xmp)",
         "Schema.org ImageObject JSON-LD (SportsDesk:PipelineSpecJson)",
         "PNG RFC-2083 tEXt & iTXt Chunks with CRC-32 Verification",
-        "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers"
+        "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers",
+        "WebP sibling carries NO XMP/tEXt chunks (metadataBearing: false) — use the PNG for metadata"
       ]
     },
     {
@@ -172,19 +223,107 @@
       "files": {
         "svgRepoPath": "docs/assets/pipeline-per-office-ip-and-reconciliation.svg",
         "pngRepoPath": "docs/assets/pipeline-per-office-ip-and-reconciliation.png",
+        "webpRepoPath": "docs/assets/pipeline-per-office-ip-and-reconciliation.webp",
         "svgPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.svg",
         "pngPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.png",
-        "svgBytes": 15495,
-        "pngBytes": 31953,
-        "svgSha256": "010f98e14d07b43bdeb6a8b0d0313de9f0348e6383e810b0b7bc61362e325972",
-        "pngSha256": "955d594e9340c81d0a72ed0e9bc36c89ad2d0b68a652d1f84eb0ecc17a25dc36"
+        "webpPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.webp",
+        "svgBytes": 16943,
+        "pngBytes": 516794,
+        "webpBytes": 193760,
+        "svgSha256": "a97e7559c94b4bd8a72fa72f3dbd81aeb89cf971546d686b4ae7aa2315a646fb",
+        "pngSha256": "bab35f3ef534f72688692d5984b9c0a04c9faccb5828930ffb65dfe70ae9e0ac",
+        "webpSha256": "cee894685743a2944cbdb8bc0727cb7cab9d4b24ffe249ff80189e7c73f6d2cb",
+        "pngMetadataBearing": true,
+        "webpMetadataBearing": false,
+        "pngMimeType": "image/png",
+        "webpMimeType": "image/webp"
+      },
+      "render": {
+        "rasterizer": "rsvg-convert",
+        "width": 1600,
+        "height": 920,
+        "uniqueColors": 3218,
+        "inkCoverage": 0.2732,
+        "brightCoverage": 0.0218
       },
       "embeddedMetadataStandards": [
         "W3C RDF / Dublin Core (dc:title, dc:description, dc:creator, dc:subject, dc:identifier)",
         "Adobe XMP Packet (XML:com.adobe.xmp)",
         "Schema.org ImageObject JSON-LD (SportsDesk:PipelineSpecJson)",
         "PNG RFC-2083 tEXt & iTXt Chunks with CRC-32 Verification",
-        "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers"
+        "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers",
+        "WebP sibling carries NO XMP/tEXt chunks (metadataBearing: false) — use the PNG for metadata"
+      ]
+    },
+    {
+      "id": "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE",
+      "slug": "pipeline-dual-surface-gslive-model",
+      "title": "DUAL-SURFACE GSLIVE MODEL — BATCH ACCOUNT REPORT vs LIVE BET-HISTORY STREAM",
+      "subtitle": "GSLive Manager Partner 118: #/reports/users (batch) • #/events/bet-history (live) • desk-day window • betTime vs calcTime • `t` cache-buster tick",
+      "description": "Reference model for the two GSLive Partner 118 surfaces and the rule that keeps them from double-counting. The batch surface #/reports/users returns one settled account row per player_[login] per desk day (handle, win/loss, wager count) and is authoritative for booked volume. The live surface #/events/bet-history pushes one event per wager state change, where betTime is the placement wall clock and calcTime is the grade/settle clock, and is authoritative for in-flight exposure and placement velocity. Both are bucketed into the America/Chicago desk day (00:00:00.000-23:59:59.999 CT), joined on (partnerId, login, ticketNumber, betTime), and refreshed with a `t` cache-buster tick (Math.floor(Date.now()/60000)) so a batch re-fetch never serves a stale edge copy and never disturbs the stream.",
+      "domainsCovered": [
+        "Risk & Exposure",
+        "Cross-Market",
+        "Data Integrity"
+      ],
+      "modesCovered": [
+        1,
+        7,
+        8,
+        9,
+        10
+      ],
+      "upstreamModules": [
+        "GSLive Manager Partner 118 (#/reports/users)",
+        "GSLive Manager Partner 118 (#/events/bet-history)",
+        "app/manager/module/bet-ticker.js"
+      ],
+      "cleaningLayers": [
+        "Desk-Day Bucketing in America/Chicago (00:00:00.000-23:59:59.999 CT)",
+        "betTime (placement) vs calcTime (settle) field split",
+        "`t` Cache-Buster Tick (Math.floor(Date.now()/60000))",
+        "Batch-Over-Stream Precedence for Settled Totals",
+        "(partnerId, login, ticketNumber, betTime) Ticket Dedupe"
+      ],
+      "operatorCliCommands": [
+        "./bin/dx gslive",
+        "./bin/dx modes 7",
+        "./bin/dx modes 9",
+        "./bin/dx modes 10"
+      ],
+      "files": {
+        "svgRepoPath": "docs/assets/pipeline-dual-surface-gslive-model.svg",
+        "pngRepoPath": "docs/assets/pipeline-dual-surface-gslive-model.png",
+        "webpRepoPath": "docs/assets/pipeline-dual-surface-gslive-model.webp",
+        "svgPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-dual-surface-gslive-model.svg",
+        "pngPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-dual-surface-gslive-model.png",
+        "webpPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-dual-surface-gslive-model.webp",
+        "svgBytes": 18640,
+        "pngBytes": 472546,
+        "webpBytes": 172134,
+        "svgSha256": "b26b3298b115081fc733ce0a8d5d60222923b973be19d904b0c4c556b84e0546",
+        "pngSha256": "c42d873dd4a667974a8ad9c2a8b2efa2f6bc76b21ccc847d252f4e68dd5c2207",
+        "webpSha256": "c8624edd41e35ca44cc741906d04ade79fe26169b74ebfef23a6167e33f29a85",
+        "pngMetadataBearing": true,
+        "webpMetadataBearing": false,
+        "pngMimeType": "image/png",
+        "webpMimeType": "image/webp"
+      },
+      "render": {
+        "rasterizer": "rsvg-convert",
+        "width": 1600,
+        "height": 920,
+        "uniqueColors": 4208,
+        "inkCoverage": 0.2719,
+        "brightCoverage": 0.0184
+      },
+      "embeddedMetadataStandards": [
+        "W3C RDF / Dublin Core (dc:title, dc:description, dc:creator, dc:subject, dc:identifier)",
+        "Adobe XMP Packet (XML:com.adobe.xmp)",
+        "Schema.org ImageObject JSON-LD (SportsDesk:PipelineSpecJson)",
+        "PNG RFC-2083 tEXt & iTXt Chunks with CRC-32 Verification",
+        "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers",
+        "WebP sibling carries NO XMP/tEXt chunks (metadataBearing: false) — use the PNG for metadata"
       ]
     }
   ]

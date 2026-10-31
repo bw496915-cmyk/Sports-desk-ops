@@ -26,6 +26,7 @@ Read the full model in [EVIDENCE.md](./EVIDENCE.md). The machine-readable source
 | [cross-market-parlay-matching.md](./cross-market-parlay-matching.md)           | Risk & Quant Desk  | Phase 1–6C architecture: LineHundredths, sub-500ms WSS Shadow Syncer, 180s Quarantine Auto-Resolver, & 15% Siloed Capital Cap    |
 | [EVIDENCE.md](./EVIDENCE.md)                                                   | Auditors           | Evidence standard, tier legend, what is verified vs inferred, contradictions, limitations                                        |
 | [gs-manager-contracts.md](./gs-manager-contracts.md)                           | GS integration     | Why the GS manager CLI has **no** HTTP contract: 6 report kinds, all `blocked_contract`, the one observed `getBetReport` payload |
+| [report-surfaces.md](./report-surfaces.md)                                     | Operators          | Openable GSLive surfaces: 7-parameter `#/reports/users` deep link and `#/events/bet-history` sidecar, with an evidence level per surface |
 | [evidence/capture-tooling.md](./evidence/capture-tooling.md)                   | Capture operators  | WebView+FetchSession architecture, capture store schema v1, live gating, read-only allowlist, redaction, B→A upgrade rules       |
 | [schema-dump-operations.md](./schema-dump-operations.md)                       | Registry + release | `dump-prod` vs `sync-prod-dump`, snapshot parity, allowlist, `captured_at` / dump lag                                            |
 | [schema-sqlite-failure-mode-matrix.md](./schema-sqlite-failure-mode-matrix.md) | Debug parity exits | Exit **2** / **3**, env knobs, SQLite strict/sentinel, EOD WAL                                                                   |
@@ -37,6 +38,9 @@ Read the full model in [EVIDENCE.md](./EVIDENCE.md). The machine-readable source
 ./bin/dx stage                            # Stage docs/{index.html,graph.html,graph.js,openapi.json} + functions/_headers -> dist/
 ./bin/dx deploy                           # Stage + publish dist/ to Cloudflare R2 Edge (pub-d061f943df0e4477ba7ff200721eddb1.r2.dev) & Pages
 ./bin/dx ship                             # Stage + deploy to Cloudflare Edge + push main to origin
+./bin/dx gslive <LOGIN>                   # Partner 118 links: 7-param #/reports/users + #/events/bet-history sidecar
+./bin/dx docs                             # Deployed docs portal URLs (`./bin/dx docs gslive` for GSLive surfaces)
+./bin/dx stale -i <export>                # Stale-line cohort from a bet-log export (CSV/JSON/JSONL)
 ```
 
 ## Regenerating and gating the docs
@@ -58,4 +62,4 @@ or [evidence/ledger.json](./evidence/ledger.json), re-run the generator and comm
 - **Surveillance Graph & Shadow Portfolio:** `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html` (and `https://desk.bookdeskops.com/graph`)
 - **API Reference Portal:** `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/index.html` (and `https://fantasy402-docs-4ay.pages.dev`)
 
-**Diagram:** [assets/ARCH-Guide.png](./assets/ARCH-Guide.png)
+**Diagram:** [assets/ARCH-Guide.jpg](./assets/ARCH-Guide.jpg)

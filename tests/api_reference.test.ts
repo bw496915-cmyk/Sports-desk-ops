@@ -162,7 +162,52 @@ describe("openapi.json honesty invariants", () => {
       "/manager-tools/ajax.php",
     );
     expect(raw).not.toContain("manager-tools/ajax.php");
-    expect(JSON.stringify(spec)).not.toContain("sportswidgets.pro");
+
+    // GSLive may be documented as an operator console, but never as a server or a path.
+    const servers = JSON.stringify(spec.servers);
+    expect(servers).not.toContain("sportswidgets.pro");
+    expect(JSON.stringify(spec.paths)).not.toContain("sportswidgets.pro");
+  });
+
+  test("publishes the GSLive dual-surface deep links as documentation, not operations", () => {
+    const spec = loadSpec();
+    const info = spec.info;
+    if (!isRecord(info)) throw new Error("spec.info must be an object");
+    const description = info.description;
+    expect(typeof description).toBe("string");
+    expect(description).toContain("GSLive Manager (Partner 118)");
+    expect(description).toContain("#/reports/users");
+    expect(description).toContain("#/events/bet-history");
+    expect(description).toContain("bot=true");
+    expect(description).toContain("dateFilterBy=betTime");
+    expect(description).toContain("./bin/dx gslive");
+
+    const extension = spec["x-sportsdesk-gslive"];
+    if (!isRecord(extension)) {
+      throw new Error("spec must declare x-sportsdesk-gslive");
+    }
+    expect(extension.partnerId).toBe(118);
+    expect(extension.origin).toBe("https://plive.sportswidgets.pro");
+    expect(extension.kind).toBe("operator-deep-links-not-wire-operations");
+
+    const surfaces = extension.surfaces;
+    if (!Array.isArray(surfaces)) throw new Error("surfaces must be an array");
+    expect(surfaces.map((surface) => isRecord(surface) && surface.id)).toEqual([
+      "users-report",
+      "bet-history-calctime",
+      "bet-history-bettime",
+    ]);
+    for (const surface of surfaces) {
+      if (!isRecord(surface)) continue;
+      expect(String(surface.route)).toMatch(/^#\/(reports\/users|events\/bet-history)$/);
+      expect(String(surface.example)).toContain(
+        "https://plive.sportswidgets.pro/manager-tools/#/",
+      );
+    }
+
+    // No GSLive operation may leak into paths.
+    const operationPaths = operationsOf(spec).map((entry) => entry.path);
+    expect(operationPaths.filter((entry) => entry.includes("manager-tools"))).toEqual([]);
   });
 
   test("getWebLog is tier A with a valid live x-capture response schema", () => {
@@ -295,6 +340,20 @@ describe("generated markdown + portal artifacts", () => {
     expect(missing).toEqual([]);
     expect(markdown).toMatch(/evidence/i);
     expect(markdown).toMatch(/tier/i);
+  });
+
+  test("api-reference.md publishes the GSLive operator links with live example URLs", () => {
+    if (!existsSync(MARKDOWN_PATH)) {
+      throw new Error("docs/api-reference.md missing");
+    }
+    const markdown = readText(MARKDOWN_PATH);
+    expect(markdown).toContain("## GSLive Manager (Partner 118): operator deep links");
+    expect(markdown).toContain("#/reports/users");
+    expect(markdown).toContain("dateFilterBy=calcTime");
+    expect(markdown).toContain("dateFilterBy=betTime");
+    expect(markdown).toContain("partnerUserId=CHURN_003");
+    expect(markdown).toContain("./bin/dx gslive <LOGIN>");
+    expect(markdown).not.toContain("the removed GS gateway");
   });
 
   test("index.html pins Scalar to a version with SRI and loads ./openapi.json", () => {

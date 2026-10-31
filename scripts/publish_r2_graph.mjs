@@ -2,7 +2,7 @@
 /**
  * @file scripts/publish_r2_graph.mjs
  * @description Zero-dependency AWS SigV4 uploader for Cloudflare R2 Object Storage.
- * Publishes `dist/graph.html`, `dist/graph.js`, `dist/graph-live-feed.json`, `dist/index.html`,
+ * Publishes `dist/graph.html`, `dist/graph.js`, `dist/gslive-links.js`, `dist/graph-live-feed.json`, `dist/index.html`,
  * `dist/openapi.json`, and all rich-metadata pipeline visual reference artifacts under `dist/assets/`
  * (with custom `x-amz-meta-*` headers) directly to the public Cloudflare R2 edge domain
  * (`https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/`).
@@ -120,18 +120,26 @@ async function putObject(key, bodyBuf, contentType, customMeta = {}) {
 const filesToPublish = [
   { file: "dist/graph.html", key: "graph.html", type: "text/html; charset=utf-8", meta: { surface: "6-tab-surveillance-and-10-mode-portal", modes: "1-2-3-4-5-6-7-8-9-10" } },
   { file: "dist/graph.js", key: "graph.js", type: "application/javascript; charset=utf-8", meta: { surface: "graph-controller" } },
+  { file: "dist/gslive-links.js", key: "gslive-links.js", type: "application/javascript; charset=utf-8", meta: { surface: "gslive-link-hydration" } },
   { file: "dist/graph-live-feed.json", key: "graph-live-feed.json", type: "application/json; charset=utf-8", meta: { surface: "live-feed-and-10-mode-snapshot" } },
   { file: "dist/backtest-4wk-cfb-nba.json", key: "backtest-4wk-cfb-nba.json", type: "application/json; charset=utf-8", meta: { surface: "4wk-cfb-nba-parlay-backtest" } },
   { file: "dist/index.html", key: "index.html", type: "text/html; charset=utf-8", meta: { surface: "scalar-openapi-portal" } },
   { file: "dist/openapi.json", key: "openapi.json", type: "application/json; charset=utf-8", meta: { surface: "openapi-3-1-spec" } },
+  { file: "dist/api-reference.md", key: "api-reference.md", type: "text/markdown; charset=utf-8", meta: { surface: "generated-api-reference", includes: "gslive-operator-deep-links" } },
   { file: "dist/assets/pipeline-artifacts-metadata.json", key: "assets/pipeline-artifacts-metadata.json", type: "application/json; charset=utf-8", meta: { artifact: "pipeline-metadata-catalog", standards: "XMP-RDF-DublinCore-SchemaOrg-PNG-iTXt" } },
   { file: "dist/assets/pipeline-10-mode-architecture.svg", key: "assets/pipeline-10-mode-architecture.svg", type: "image/svg+xml; charset=utf-8", meta: { artifact: "SD-ARTIFACT-01-10MODE-PIPELINE", modes: "1,2,3,4,5,6,7,8,9,10", cli: "./bin/dx modes" } },
-  { file: "dist/assets/pipeline-10-mode-architecture.png", key: "assets/pipeline-10-mode-architecture.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-01-10MODE-PIPELINE", modes: "1,2,3,4,5,6,7,8,9,10", cli: "./bin/dx modes" } },
+  { file: "dist/assets/pipeline-10-mode-architecture.png", key: "assets/pipeline-10-mode-architecture.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-01-10MODE-PIPELINE", modes: "1,2,3,4,5,6,7,8,9,10", cli: "./bin/dx modes", metadata: "tEXt+iTXt+XMP+JSON-LD" } },
+  { file: "dist/assets/pipeline-10-mode-architecture.webp", key: "assets/pipeline-10-mode-architecture.webp", type: "image/webp", meta: { artifact: "SD-ARTIFACT-01-10MODE-PIPELINE", modes: "1,2,3,4,5,6,7,8,9,10", metadata: "none (raster sibling)" } },
   { file: "dist/assets/pipeline-6-layer-data-cleaning.svg", key: "assets/pipeline-6-layer-data-cleaning.svg", type: "image/svg+xml; charset=utf-8", meta: { artifact: "SD-ARTIFACT-02-6LAYER-CLEANING", modules: "report.js,help-report.js,bet-ticker.js,ip-tracker.js" } },
-  { file: "dist/assets/pipeline-6-layer-data-cleaning.png", key: "assets/pipeline-6-layer-data-cleaning.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-02-6LAYER-CLEANING", modules: "report.js,help-report.js,bet-ticker.js,ip-tracker.js" } },
+  { file: "dist/assets/pipeline-6-layer-data-cleaning.png", key: "assets/pipeline-6-layer-data-cleaning.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-02-6LAYER-CLEANING", modules: "report.js,help-report.js,bet-ticker.js,ip-tracker.js", metadata: "tEXt+iTXt+XMP+JSON-LD" } },
+  { file: "dist/assets/pipeline-6-layer-data-cleaning.webp", key: "assets/pipeline-6-layer-data-cleaning.webp", type: "image/webp", meta: { artifact: "SD-ARTIFACT-02-6LAYER-CLEANING", modules: "report.js,help-report.js,bet-ticker.js,ip-tracker.js", metadata: "none (raster sibling)" } },
   { file: "dist/assets/pipeline-per-office-ip-and-reconciliation.svg", key: "assets/pipeline-per-office-ip-and-reconciliation.svg", type: "image/svg+xml; charset=utf-8", meta: { artifact: "SD-ARTIFACT-03-IP-AND-RECONCILIATION", modes: "1,2,3,4,5,6,8,9,10", cli: "./bin/dx iptracker" } },
-  { file: "dist/assets/pipeline-per-office-ip-and-reconciliation.png", key: "assets/pipeline-per-office-ip-and-reconciliation.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-03-IP-AND-RECONCILIATION", modes: "1,2,3,4,5,6,8,9,10", cli: "./bin/dx iptracker" } },
-  { file: "dist/assets/ARCH-Guide.png", key: "assets/ARCH-Guide.png", type: "image/png", meta: { artifact: "ARCH-GUIDE-BASELINE", modes: "1,2,3,4,5,6,7,8,9,10" } },
+  { file: "dist/assets/pipeline-per-office-ip-and-reconciliation.png", key: "assets/pipeline-per-office-ip-and-reconciliation.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-03-IP-AND-RECONCILIATION", modes: "1,2,3,4,5,6,8,9,10", cli: "./bin/dx iptracker", metadata: "tEXt+iTXt+XMP+JSON-LD" } },
+  { file: "dist/assets/pipeline-per-office-ip-and-reconciliation.webp", key: "assets/pipeline-per-office-ip-and-reconciliation.webp", type: "image/webp", meta: { artifact: "SD-ARTIFACT-03-IP-AND-RECONCILIATION", modes: "1,2,3,4,5,6,8,9,10", metadata: "none (raster sibling)" } },
+  { file: "dist/assets/pipeline-dual-surface-gslive-model.svg", key: "assets/pipeline-dual-surface-gslive-model.svg", type: "image/svg+xml; charset=utf-8", meta: { artifact: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE", surfaces: "#/reports/users,#/events/bet-history", deskDay: "America/Chicago" } },
+  { file: "dist/assets/pipeline-dual-surface-gslive-model.png", key: "assets/pipeline-dual-surface-gslive-model.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE", surfaces: "#/reports/users,#/events/bet-history", metadata: "tEXt+iTXt+XMP+JSON-LD" } },
+  { file: "dist/assets/pipeline-dual-surface-gslive-model.webp", key: "assets/pipeline-dual-surface-gslive-model.webp", type: "image/webp", meta: { artifact: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE", surfaces: "#/reports/users,#/events/bet-history", metadata: "none (raster sibling)" } },
+  { file: "dist/assets/ARCH-Guide.jpg", key: "assets/ARCH-Guide.jpg", type: "image/jpeg", meta: { artifact: "ARCH-GUIDE-BASELINE", modes: "1,2,3,4,5,6,7,8,9,10" } },
 ];
 
 console.log("================================================================================");

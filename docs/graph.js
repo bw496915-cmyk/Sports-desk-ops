@@ -6,6 +6,9 @@
  * and Live Auto-Poller (`./graph-live-feed.json` / `/api/graph-feed`).
  * Externalized to comply with strict Cloudflare Pages CSP (`script-src 'self'`).
  */
+
+import { planGsLiveLinks } from "./gslive-links.js";
+
 (function () {
   // 1. Tab Switching (Topology vs. Pending Bets vs. 39-Wallet Profile Registry vs. 4-Week Parlay Backtest)
   const tabBtns = document.querySelectorAll("[data-tab-target]");
@@ -60,7 +63,8 @@
         verdict = sign + val + " hundredths (F402 Internal Better Line)";
         color = "#22c55e";
       } else if (val > 0) {
-        verdict = sign + val + " hundredths (Polymarket Better Line — Layoff Risk!)";
+        verdict =
+          sign + val + " hundredths (Polymarket Better Line — Layoff Risk!)";
         color = "#ef4444";
       }
       deltaReadout.textContent = verdict;
@@ -93,7 +97,8 @@
       btn.classList.add("active");
       betRows.forEach(function (row) {
         const rowCat = row.getAttribute("data-category") || "";
-        row.style.display = category === "ALL" || rowCat === category ? "" : "none";
+        row.style.display =
+          category === "ALL" || rowCat === category ? "" : "none";
       });
     });
   });
@@ -105,11 +110,14 @@
   let activePendingVenue = "ALL";
 
   function filterPendingRows() {
-    const q = pendingSearchInput ? pendingSearchInput.value.trim().toLowerCase() : "";
+    const q = pendingSearchInput
+      ? pendingSearchInput.value.trim().toLowerCase()
+      : "";
     pendingRows.forEach(function (row) {
       const venue = row.getAttribute("data-venue") || "";
       const text = (row.textContent || "").toLowerCase();
-      const matchesVenue = activePendingVenue === "ALL" || venue === activePendingVenue;
+      const matchesVenue =
+        activePendingVenue === "ALL" || venue === activePendingVenue;
       const matchesQuery = !q || text.includes(q);
       row.style.display = matchesVenue && matchesQuery ? "" : "none";
     });
@@ -180,7 +188,6 @@
     btSearchInput.addEventListener("input", filterBacktestRows);
   }
 
-  
   // 7b. Watchlist Bet-Ticker by ROT Filter & Search
   const rotFilterBtns = document.querySelectorAll("[data-rot-filter]");
   const rotChannelBtns = document.querySelectorAll("[data-rot-channel]");
@@ -195,8 +202,12 @@
       const rot = row.getAttribute("data-rot") || "";
       const ch = row.getAttribute("data-channel") || "";
       const text = (row.textContent || "").toLowerCase();
-      const matchRot = activeRotFilter === "ALL" || rot === activeRotFilter || (activeRotFilter === "501" && (rot === "501" || rot === "5501"));
-      const matchCh = activeRotChannel === "ALL" || ch.includes(activeRotChannel);
+      const matchRot =
+        activeRotFilter === "ALL" ||
+        rot === activeRotFilter ||
+        (activeRotFilter === "501" && (rot === "501" || rot === "5501"));
+      const matchCh =
+        activeRotChannel === "ALL" || ch.includes(activeRotChannel);
       const matchQ = !q || text.includes(q);
       row.style.display = matchRot && matchCh && matchQ ? "" : "none";
     });
@@ -205,7 +216,9 @@
   rotFilterBtns.forEach(function (btn) {
     btn.addEventListener("click", function () {
       activeRotFilter = btn.getAttribute("data-rot-filter") || "ALL";
-      rotFilterBtns.forEach(function (b) { b.classList.remove("active"); });
+      rotFilterBtns.forEach(function (b) {
+        b.classList.remove("active");
+      });
       btn.classList.add("active");
       filterRotTickerRows();
     });
@@ -214,7 +227,9 @@
   rotChannelBtns.forEach(function (btn) {
     btn.addEventListener("click", function () {
       activeRotChannel = btn.getAttribute("data-rot-channel") || "ALL";
-      rotChannelBtns.forEach(function (b) { b.classList.remove("active"); });
+      rotChannelBtns.forEach(function (b) {
+        b.classList.remove("active");
+      });
       btn.classList.add("active");
       filterRotTickerRows();
     });
@@ -224,21 +239,24 @@
     rotSearchInput.addEventListener("input", filterRotTickerRows);
   }
 
-  
   // 7c. Per-Office IP-Tracker Cluster Filter in Tab 5
   const officeFilterBtns = document.querySelectorAll("[data-office-filter]");
   const officeRows = document.querySelectorAll("#office-ip-tbody tr");
   officeFilterBtns.forEach(function (btn) {
     btn.addEventListener("click", function () {
       const f = btn.getAttribute("data-office-filter") || "ALL";
-      officeFilterBtns.forEach(function (b) { b.classList.remove("active"); });
+      officeFilterBtns.forEach(function (b) {
+        b.classList.remove("active");
+      });
       btn.classList.add("active");
       officeRows.forEach(function (row) {
         const cls = row.getAttribute("data-office-class") || "";
         const ag = row.getAttribute("data-office-agent") || "";
         if (f === "ALL") row.style.display = "";
-        else if (f === "PER_OFFICE") row.style.display = cls.includes("PER_OFFICE") ? "" : "none";
-        else if (f === "CROSS_OFFICE") row.style.display = cls.includes("CROSS_OFFICE") ? "" : "none";
+        else if (f === "PER_OFFICE")
+          row.style.display = cls.includes("PER_OFFICE") ? "" : "none";
+        else if (f === "CROSS_OFFICE")
+          row.style.display = cls.includes("CROSS_OFFICE") ? "" : "none";
         else row.style.display = ag === f ? "" : "none";
       });
     });
@@ -246,11 +264,15 @@
 
   // 7d. 10-Mode Forensic, Risk, Cross-Market & Reconciliation Domain Filter in Tab 6
   const modeDomainBtns = document.querySelectorAll("[data-mode-domain-filter]");
-  const modeCatalogRows = document.querySelectorAll("#forensic-modes-catalog-tbody tr");
+  const modeCatalogRows = document.querySelectorAll(
+    "#forensic-modes-catalog-tbody tr",
+  );
   modeDomainBtns.forEach(function (btn) {
     btn.addEventListener("click", function () {
       const dom = btn.getAttribute("data-mode-domain-filter") || "ALL";
-      modeDomainBtns.forEach(function (b) { b.classList.remove("active"); });
+      modeDomainBtns.forEach(function (b) {
+        b.classList.remove("active");
+      });
       btn.classList.add("active");
       modeCatalogRows.forEach(function (row) {
         const rowDom = row.getAttribute("data-mode-domain") || "";
@@ -269,6 +291,49 @@
   let lastPollEpochMs = Date.now();
   let localPollCount = 1;
 
+  // 8b. GSLive link hydration: every [data-gslive] anchor is rebuilt from the live feed so the
+  // desk-day window and `t` cache-buster roll forward without redeploying the portal.
+  let lastFeed = null;
+  let activeReportWindow = "14";
+
+  function hydrateGsLiveLinks(data) {
+    if (data) lastFeed = data;
+    if (!lastFeed) return;
+
+    const updates = planGsLiveLinks(
+      Array.from(document.querySelectorAll("[data-gslive]")),
+      {
+        feed: lastFeed,
+        activeReportWindow: activeReportWindow,
+        tickEpochMs: Date.now(),
+      },
+    );
+
+    updates.forEach(function (update) {
+      update.element.setAttribute("href", update.url);
+      update.element.setAttribute("data-gslive-hydrated", "1");
+    });
+
+    document
+      .querySelectorAll("[data-gslive-window-choice]")
+      .forEach(function (btn) {
+        const active =
+          btn.getAttribute("data-gslive-window-choice") === activeReportWindow;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+  }
+
+  document
+    .querySelectorAll("[data-gslive-window-choice]")
+    .forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        activeReportWindow =
+          btn.getAttribute("data-gslive-window-choice") || "14";
+        hydrateGsLiveLinks(null);
+      });
+    });
+
   function updateRelativeAge() {
     if (!lastUpdatedAgeEl) return;
     const sec = Math.max(0, Math.floor((Date.now() - lastPollEpochMs) / 1000));
@@ -284,9 +349,13 @@
       const data = await res.json();
       if (data && data.lastUpdatedCdt) {
         lastPollEpochMs = data.pollEpochMs || Date.now();
-        localPollCount = Math.max(localPollCount + 1, data.pollSequence || 1);
+        localPollCount = data.pollSequence || localPollCount;
         if (lastUpdatedEl) {
-          lastUpdatedEl.textContent = data.lastUpdatedCdt + " (" + data.lastUpdatedIso.slice(11, 19) + " UTC)";
+          lastUpdatedEl.textContent =
+            data.lastUpdatedCdt +
+            " (" +
+            data.lastUpdatedIso.slice(11, 19) +
+            " UTC)";
         }
         if (pollSeqEl) {
           pollSeqEl.textContent = "Poll #" + localPollCount;
@@ -294,13 +363,15 @@
         cellSyncStamps.forEach(function (el) {
           el.textContent = data.lastUpdatedCdt;
         });
+        hydrateGsLiveLinks(data);
         updateRelativeAge();
       }
     } catch (_err) {
       const now = new Date();
       lastPollEpochMs = now.getTime();
       if (lastUpdatedEl) {
-        lastUpdatedEl.textContent = now.toISOString().replace("T", " ").slice(0, 19) + " UTC";
+        lastUpdatedEl.textContent =
+          now.toISOString().replace("T", " ").slice(0, 19) + " UTC";
       }
       updateRelativeAge();
     }

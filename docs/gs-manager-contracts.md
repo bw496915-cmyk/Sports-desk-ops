@@ -57,7 +57,7 @@ Source: `zip:contracts/get-bet-report.observed.json:1-22`; typed reading in
 | #   | Field               | Observed JSON type | Observed value   | Notes                                                            |
 | --- | ------------------- | ------------------ | ---------------- | ---------------------------------------------------------------- |
 | 1   | `action`            | string             | `"getBetReport"` | Only constant; the spec key is `action`, not `operation`         |
-| 2   | `partnerUserId`     | string             | `""`             | Empty; semantics unknown                                         |
+| 2   | `partnerUserId`     | string             | `""`             | Empty; hash URL passes raw login (`AF12`) — see §2.1             |
 | 3   | `agent`             | string             | `""`             | Empty; scope semantics unknown                                   |
 | 4   | `eventId`           | string             | `""`             | Empty                                                            |
 | 5   | `freeBetId`         | string             | `""`             | Empty                                                            |
@@ -73,7 +73,7 @@ Source: `zip:contracts/get-bet-report.observed.json:1-22`; typed reading in
 | 15  | `betId`             | string             | `""`             | Empty                                                            |
 | 16  | `betGroupId`        | string             | `""`             | Empty — the earlier fabricated example used `908412`             |
 | 17  | `group`             | null               | `null`           | Only `null` observed; do not broaden without evidence            |
-| 18  | `dateFilterBy`      | string             | `"calcTime"`     | Opaque source code; other accepted values unverified             |
+| 18  | `dateFilterBy`      | string             | `"calcTime"`     | Opaque code; hash URL also shows `betTime` (§2.1)                |
 | 19  | `partnerIds`        | string             | `""`             | Empty; **does not prove tenant 118**                             |
 | 20  | `period`            | string             | `"s3"`           | Opaque source code                                               |
 
@@ -83,6 +83,45 @@ Unknown semantics that must be resolved by capture (`zip:contracts/contract-map.
 partner scope. Do not insert partner `118` into `partnerIds` without capture evidence; do not treat
 UI route parameters (`bot`, `partnerId`, `searchBy`, ISO date strings) as the API query encoding
 (`zip:contracts/report-surfaces.md:39`).
+
+### 2.1 Observed hash URLs — browser route state, not the request body
+
+Two live Manager URLs have been observed for Partner 118. Both are **SPA hash state**: they do not
+change the `blocked_contract` status of §1, and they are not the encoding of the `getBetReport` body
+in the table above. Evidence is separated per surface below.
+
+**`#/reports/users` — account report (7 parameters).** Observed hash URL shape:
+
+```text
+https://plive.sportswidgets.pro/manager-tools/#/reports/users?bot=true&eventId=&from=<ISO>&partnerId=118&searchBy=player&text=player_AF12&to=<ISO>
+```
+
+- `bot=true` — the SPA defaults the Bot switch off, which hides bot/syndicate accounts.
+- `from` / `to` — explicit ISO-8601 UTC desk-day bounds (`00:00:00`–`23:59:59` in
+  `America/Chicago`), not epoch seconds.
+- `text=player_<LOGIN>` — the `player_` prefix belongs to **this** filter only.
+- Evidence level: **hash URL observed**; the server-side effect of each parameter is **unverified**.
+
+**`#/events/bet-history` — live sidecar.** Observed hash URL shape:
+
+```text
+https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=<epoch s>&to=<epoch s>&toTime=86399&dateFilterBy=calcTime&t=<epoch ms>&partnerUserId=AF12
+```
+
+- `dateFilterBy` — observed as `calcTime` (settling/populating) and `betTime` (placement). Whether
+  other values are accepted is unverified.
+- `partnerUserId` — the **raw login** (`AF12`), *not* `player_AF12`. This does not imply the wire body
+  carries the login: the captured body leaves the field empty (§2, row 2).
+- `from` / `to` — epoch **seconds**; `toTime` is an offset within the desk day, so it is `86399` on a
+  normal day and `89999` / `82799` on US DST transition days (derive it, never hardcode it).
+- `t` — epoch-millisecond cache-buster that must be fresh on every open.
+- Evidence level: **hash URL observed**; per-parameter server-side filtering is **unverified**; the
+  request that populates the grid was **not captured**, so transport (URL, method, content type,
+  auth) remains **blocked / unverified**.
+
+Restating the caveat above: hash URL parameters are **not** the API query encoding
+(`zip:contracts/report-surfaces.md:39`). Nothing in this section establishes an endpoint, a method,
+a content type, an auth scheme or a response shape.
 
 ## 3. CLI interfaces — local orchestration, not HTTP endpoints
 
