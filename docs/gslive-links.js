@@ -151,6 +151,29 @@ export function indexWallets(feed) {
 }
 
 /**
+ * Extracts the registry-row values the portal renders: cost basis, open legs, top-position summary,
+ * and the provenance of those numbers. Rows without a feed entry are simply absent.
+ *
+ * @param {{ walletProfiles?: Array<any> } | null} feed
+ * @returns {Record<string, { volumeUsd: number, legs: number, summary: string, dataSource: string, lastError: string | null }>}
+ */
+export function buildWalletStats(feed) {
+  const stats = {};
+  for (const wallet of (feed && feed.walletProfiles) || []) {
+    const id = String((wallet && wallet.f402CustomerId) || "").toUpperCase();
+    if (id === "") continue;
+    stats[id] = {
+      volumeUsd: Number(wallet.openVolumeUsd) || 0,
+      legs: Number(wallet.openLegsCount) || 0,
+      summary: String(wallet.openBetsSummary || ""),
+      dataSource: String(wallet.dataSource || "FIXTURE"),
+      lastError: wallet.lastError ? String(wallet.lastError) : null,
+    };
+  }
+  return stats;
+}
+
+/**
  * Computes `{ element, url }` updates for every `[data-gslive]` node. DOM-agnostic: any object
  * exposing `getAttribute` works, which keeps the portal's hydration path unit-testable.
  *

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   buildReportUrl,
+  buildWalletStats,
   buildSidecarUrl,
   deskDayBounds,
   dropUrlParam,
@@ -408,6 +409,36 @@ describe("Portal GSLive link hydration", () => {
     );
     expect(graphJs).toContain("hydrateGsLiveLinks(data)");
     expect(graphJs).toContain('from "./gslive-links.js"');
+  });
+
+  test("buildWalletStats maps feed wallets for registry-row hydration", () => {
+    const stats = buildWalletStats({
+      walletProfiles: [
+        {
+          f402CustomerId: "mj102",
+          openVolumeUsd: 8629,
+          openLegsCount: 71,
+          openBetsSummary: "Top market (Yes) $625",
+          dataSource: "LIVE",
+        },
+        {
+          f402CustomerId: "BAD",
+          openVolumeUsd: 1,
+          dataSource: "FIXTURE",
+          lastError: "invalid address",
+        },
+      ],
+    });
+    expect(stats.MJ102).toEqual({
+      volumeUsd: 8629,
+      legs: 71,
+      summary: "Top market (Yes) $625",
+      dataSource: "LIVE",
+      lastError: null,
+    });
+    expect(stats.BAD.dataSource).toBe("FIXTURE");
+    expect(stats.BAD.lastError).toBe("invalid address");
+    expect(buildWalletStats(null)).toEqual({});
   });
 
   test("graph.js hydrates anchors end-to-end with a stubbed DOM", async () => {

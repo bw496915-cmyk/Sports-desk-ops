@@ -7,7 +7,7 @@
  * Externalized to comply with strict Cloudflare Pages CSP (`script-src 'self'`).
  */
 
-import { planGsLiveLinks } from "./gslive-links.js";
+import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
 
 (function () {
   // 1. Tab Switching (Topology vs. Pending Bets vs. 39-Wallet Profile Registry vs. 4-Week Parlay Backtest)
@@ -285,6 +285,7 @@ import { planGsLiveLinks } from "./gslive-links.js";
   const lastUpdatedEl = document.getElementById("live-last-updated-ts");
   const lastUpdatedAgeEl = document.getElementById("live-last-updated-age");
   const pollSeqEl = document.getElementById("live-poll-seq");
+  const dataModeEl = document.getElementById("live-data-mode");
   const pollNowBtn = document.getElementById("poll-now-btn");
   const cellSyncStamps = document.querySelectorAll(".live-sync-ts");
 
@@ -322,6 +323,55 @@ import { planGsLiveLinks } from "./gslive-links.js";
         btn.classList.toggle("active", active);
         btn.setAttribute("aria-pressed", active ? "true" : "false");
       });
+  }
+
+  // 8c. Wallet registry hydration: replace the static per-wallet numbers with the feed's live
+  // aggregates and label the provenance (LIVE / STALE / FIXTURE) on each row.
+  function hydrateWalletRows(data) {
+    const stats = buildWalletStats(data);
+
+    document.querySelectorAll("[data-f402-id]").forEach(function (row) {
+      const id = (row.getAttribute("data-f402-id") || "").toUpperCase();
+      const wallet = stats[id];
+      if (!wallet) return;
+      const cell = row.querySelector("[data-wallet-stats]");
+      if (!cell) return;
+
+      const volume = document.createElement("strong");
+      volume.textContent = "$" + Math.round(wallet.volumeUsd).toLocaleString("en-US");
+
+      const mode = document.createElement("span");
+      mode.className =
+        "pill " +
+        (wallet.dataSource === "LIVE"
+          ? "pill-emerald"
+          : wallet.dataSource === "STALE"
+            ? "pill-amber"
+            : "pill-rose");
+      mode.style.marginLeft = "0.3rem";
+      mode.textContent = wallet.dataSource;
+      if (wallet.lastError) mode.title = wallet.lastError;
+
+      const summary = document.createElement("span");
+      summary.style.fontSize = "0.72rem";
+      summary.style.color = "#cbd5e1";
+      summary.textContent = wallet.summary;
+
+      cell.replaceChildren(
+        volume,
+        document.createTextNode(" (" + wallet.legs + " legs) "),
+        mode,
+        document.createElement("br"),
+        summary,
+      );
+    });
+
+    if (dataModeEl) {
+      const mode = data.dataMode || "FIXTURE";
+      dataModeEl.textContent = "data: " + mode;
+      dataModeEl.className =
+        "pill " + (mode === "LIVE" ? "pill-emerald" : mode === "PARTIAL" ? "pill-amber" : "pill-rose");
+    }
   }
 
   document
@@ -364,6 +414,7 @@ import { planGsLiveLinks } from "./gslive-links.js";
           el.textContent = data.lastUpdatedCdt;
         });
         hydrateGsLiveLinks(data);
+        hydrateWalletRows(data);
         updateRelativeAge();
       }
     } catch (_err) {
