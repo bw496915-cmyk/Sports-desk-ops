@@ -185,6 +185,17 @@ cfbTouchRatePct: 2.98% of observed combos
 in the denominator. A leaderboard-seeded set will always look low; trade-seeded wallets are the
 high-yield ones.
 
+Seeder mix on the same index (2 combo pages per wallet):
+
+| Seeder | Wallets | Permissive combos | CFB touch | Combos / wallet |
+| :--- | ---: | ---: | ---: | ---: |
+| `--seed-trades --no-leaderboard` (20 markets) | 95 | 356 | 5.51% | 3.75 |
+| leaderboard only (100 rows × 3 periods) | 233 | 129 | 1.30% | 0.55 |
+
+Trades seeding is ~6.8× more efficient per wallet and ~4.2× higher touch rate. The leaderboard
+path is a supplement, not the primary discovery route: it costs ~2.5× the wallet fetches for ~27% of
+the CFB combos. Use `--seed-trades --no-leaderboard` when API budget matters.
+
 ### Live result (2026-10-31)
 
 With 322 seeded wallets, whole-series index, 3 combo pages per wallet:

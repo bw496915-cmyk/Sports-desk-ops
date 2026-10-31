@@ -59,7 +59,9 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
    not exist" finding was an artifact of the narrow window; do not repeat it without the full
    index. `--open-only` and `--since` are the opt-outs. `combosWithoutAttribution` is mostly
    non-CFB noise, not resolver failure; `suspectedComboOfComboLegKeys` counts zero-padded ids that
-   CLOB answers 404 for.
+   CLOB answers 404 for. Seeder yield: trades-seeded wallets are ~6.8x more CFB-productive per
+   wallet than leaderboard-seeded ones (3.75 vs 0.55 combos/wallet), so prefer
+   `--seed-trades --no-leaderboard` when API budget matters.
 10. Verify, don't inspect: `--dump-wallets` then `--emit-ids` in both modes, and
    `comm -23 <(sort strict) <(sort any)` must print nothing. Empty sets write empty files.
    Check `diagnostics.legsWithoutSide` and `duplicatesCollapsedByLegSet`: if sides are empty the
