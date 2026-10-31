@@ -7,7 +7,14 @@
  * when F402_LIVE_LOGIN=1 (plus credentials) is set.
  */
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -30,7 +37,9 @@ export interface F402SessionFileOptions {
 
 const DEFAULT_TTL_MINUTES = 30;
 
-export function resolveF402SessionPath(env: NodeJS.ProcessEnv = process.env): string {
+export function resolveF402SessionPath(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
   const explicit = env["F402_SESSION_FILE"]?.trim();
   if (explicit) return explicit;
   return join(homedir(), ".cache", "sportsdesk", "f402-session.json");
@@ -56,22 +65,31 @@ function modeIsPrivate(path: string): boolean {
 }
 
 /** Reads a cached session; returns null when missing, expired, malformed, or group/world-readable. */
-export function readF402Session(options?: F402SessionFileOptions): F402Session | null {
+export function readF402Session(
+  options?: F402SessionFileOptions,
+): F402Session | null {
   const path = options?.path ?? resolveF402SessionPath();
   if (!existsSync(path) || !modeIsPrivate(path)) return null;
   try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as Partial<F402Session>;
-    if (typeof parsed.cookieHeader !== "string" || parsed.cookieHeader === "") return null;
+    const parsed = JSON.parse(
+      readFileSync(path, "utf8"),
+    ) as Partial<F402Session>;
+    if (typeof parsed.cookieHeader !== "string" || parsed.cookieHeader === "")
+      return null;
     const session: F402Session = {
       cookieHeader: parsed.cookieHeader,
       cookieNames: Array.isArray(parsed.cookieNames)
-        ? parsed.cookieNames.filter((name): name is string => typeof name === "string")
+        ? parsed.cookieNames.filter(
+            (name): name is string => typeof name === "string",
+          )
         : [],
       ...(typeof parsed.authorizationHeader === "string"
         ? { authorizationHeader: parsed.authorizationHeader }
         : {}),
-      obtainedAtIso: typeof parsed.obtainedAtIso === "string" ? parsed.obtainedAtIso : "",
-      expiresAtIso: typeof parsed.expiresAtIso === "string" ? parsed.expiresAtIso : "",
+      obtainedAtIso:
+        typeof parsed.obtainedAtIso === "string" ? parsed.obtainedAtIso : "",
+      expiresAtIso:
+        typeof parsed.expiresAtIso === "string" ? parsed.expiresAtIso : "",
     };
     return isExpired(session, options?.now ?? Date.now()) ? null : session;
   } catch {
@@ -80,7 +98,10 @@ export function readF402Session(options?: F402SessionFileOptions): F402Session |
 }
 
 /** Writes the session with directory 0700 and file 0600. */
-export function writeF402Session(session: F402Session, options?: F402SessionFileOptions): string {
+export function writeF402Session(
+  session: F402Session,
+  options?: F402SessionFileOptions,
+): string {
   const path = options?.path ?? resolveF402SessionPath();
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   writeFileSync(path, `${JSON.stringify(session, null, 2)}\n`, { mode: 0o600 });
@@ -119,18 +140,27 @@ export interface RefreshF402SessionOptions {
  * Logs in through the evidence-capture WebView. Requires F402_LIVE_LOGIN=1 and credentials;
  * returns a TTL-bounded session. The caller owns persistence.
  */
-export async function refreshF402Session(options?: RefreshF402SessionOptions): Promise<F402Session> {
+export async function refreshF402Session(
+  options?: RefreshF402SessionOptions,
+): Promise<F402Session> {
   const env = options?.env ?? process.env;
   if (env["F402_LIVE_LOGIN"]?.trim() !== "1") {
-    throw new Error("F402 live login disabled (set F402_LIVE_LOGIN=1 to allow one WebView login)");
+    throw new Error(
+      "F402 live login disabled (set F402_LIVE_LOGIN=1 to allow one WebView login)",
+    );
   }
   const agentId = env["F402_AGENT_ID"]?.trim() ?? "";
   const password = env["F402_PASSWORD"]?.trim() ?? "";
   if (agentId === "" || password === "") {
-    throw new Error("F402 live login requires F402_AGENT_ID and F402_PASSWORD (values not logged)");
+    throw new Error(
+      "F402 live login requires F402_AGENT_ID and F402_PASSWORD (values not logged)",
+    );
   }
-  const baseUrl = (env["F402_BASE_URL"]?.trim() || "https://www.fantasy402.com").replace(/\/$/, "");
-  const { authenticateWithWebView } = await import("../scripts/evidence_capture.ts");
+  const baseUrl = (
+    env["F402_BASE_URL"]?.trim() || "https://www.fantasy402.com"
+  ).replace(/\/$/, "");
+  const { authenticateWithWebView } =
+    await import("../scripts/evidence_capture.ts");
   const { resolveLoginConfig } = await import("../scripts/capture/ops.ts");
   const auth = await authenticateWithWebView({
     env,

@@ -594,6 +594,7 @@ const res = await fetch("http://localhost/health", {
 #### Node.js / libuv Lifecycle Alignment
 
 Bun matches Node.js / libuv Unix domain socket lifecycle semantics:
+
 1. **Binding Collisions (`EADDRINUSE`)**: Binding to an existing `.sock` file on disk throws `EADDRINUSE` rather than silently unlinking and stealing the socket from another live daemon.
 2. **Automatic Socket Cleanup**: Calling `server.stop()` or `listener.stop()` automatically unlinks and removes the `.sock` file from disk (`existsSync(path) === false`), preventing orphaned socket files from blocking subsequent process launches.
 
@@ -619,7 +620,7 @@ await using view = new Bun.WebView({
   width: 1280,
   height: 800,
   backend: "webkit", // "webkit" | "chrome" | { type: "chrome", path: string, argv: string[] }
-  console: true,     // Captures page console logs to terminal
+  console: true, // Captures page console logs to terminal
 });
 
 await view.navigate("https://fantasy402.com/manager");
@@ -630,19 +631,19 @@ const jpeg = await view.screenshot({ format: "jpeg", quality: 90 });
 await Bun.write("reports/audit_viewport.jpg", jpeg);
 ```
 
-| Method / Property | Description | SportsDesk Surveillance Application |
-| :--- | :--- | :--- |
-| `navigate(url)` | Navigates to target HTTP/HTTPS URL | Direct navigation to Fantasy402 Manager / Desk routes |
-| `evaluate(expr)` | Evaluates JavaScript expression in page context | DOM extraction of `data-language="L-1029"` headers and KPI cards |
-| `screenshot({format, quality, encoding})` | Captures JPEG, PNG, or WebP viewport | Automated forensic proof capture for whale ticket anomalies |
-| `click(x, y)` / `click(selector)` | Native OS mouse click with auto-wait | Interactive navigation across Manager tab bars |
-| `type(text)` | Types text into currently focused element | Automated credentials dispatch in testing environments |
-| `press(key, {modifiers})` | Presses key with optional modifier flags | Keyboard navigation and shortcut verification |
-| `scroll(dx, dy)` / `scrollTo(selector)` | Native wheel scroll or scroll-to-element | Infinite scroll pagination of pending ticket tickers |
-| `goBack()` / `goForward()` / `reload()` | Viewport navigation controls | Session revalidation after token expiration |
-| `resize(w, h)` | Dynamically resizes viewport dimensions | Telegram Mini App mobile (390x844) vs desktop testing |
-| `cdp(method, params)` | Dispatches raw Chrome DevTools Protocol calls | Low-level network interception and cookie extraction |
-| `view.url` / `view.title` / `view.loading` | Synchronous page state properties | Polling state assertions during navigation sequences |
+| Method / Property                          | Description                                     | SportsDesk Surveillance Application                              |
+| :----------------------------------------- | :---------------------------------------------- | :--------------------------------------------------------------- |
+| `navigate(url)`                            | Navigates to target HTTP/HTTPS URL              | Direct navigation to Fantasy402 Manager / Desk routes            |
+| `evaluate(expr)`                           | Evaluates JavaScript expression in page context | DOM extraction of `data-language="L-1029"` headers and KPI cards |
+| `screenshot({format, quality, encoding})`  | Captures JPEG, PNG, or WebP viewport            | Automated forensic proof capture for whale ticket anomalies      |
+| `click(x, y)` / `click(selector)`          | Native OS mouse click with auto-wait            | Interactive navigation across Manager tab bars                   |
+| `type(text)`                               | Types text into currently focused element       | Automated credentials dispatch in testing environments           |
+| `press(key, {modifiers})`                  | Presses key with optional modifier flags        | Keyboard navigation and shortcut verification                    |
+| `scroll(dx, dy)` / `scrollTo(selector)`    | Native wheel scroll or scroll-to-element        | Infinite scroll pagination of pending ticket tickers             |
+| `goBack()` / `goForward()` / `reload()`    | Viewport navigation controls                    | Session revalidation after token expiration                      |
+| `resize(w, h)`                             | Dynamically resizes viewport dimensions         | Telegram Mini App mobile (390x844) vs desktop testing            |
+| `cdp(method, params)`                      | Dispatches raw Chrome DevTools Protocol calls   | Low-level network interception and cookie extraction             |
+| `view.url` / `view.title` / `view.loading` | Synchronous page state properties               | Polling state assertions during navigation sequences             |
 
 ---
 
@@ -679,6 +680,7 @@ async function auditPortal() {
 ## 11. Outbound Proxy CONNECT Tunnel Pooling
 
 When routing outbound traffic through enterprise HTTP/HTTPS proxies, Bun's HTTP engine maintains a keep-alive pool of established TLS `CONNECT` tunnels:
+
 - Subsequent HTTPS requests to the same remote host reuse existing proxy tunnels rather than re-negotiating TCP + TLS handshakes through the proxy for every request.
 - Dramatically cuts latency on high-frequency external polling (e.g., Telegram Bot API and Cloudflare API calls).
 
@@ -687,7 +689,7 @@ When routing outbound traffic through enterprise HTTP/HTTPS proxies, Bun's HTTP 
 ## 12. Terminal Markdown Rendering (`Bun.markdown.ansi`) & OSC 8 Integration
 
 Bun provides zero-startup native Markdown rendering directly to the terminal:
+
 - **CLI Rendering**: Executing `bun ./file.md` renders formatted ANSI output directly to `stdout`.
 - **Programmatic API**: `Bun.markdown.ansi(markdownString, options)` generates styled ANSI strings with support for OSC 8 clickable terminal hyperlinks (`{ hyperlinks: true }`), terminal column wrapping (`{ columns: 80 }`), and inline Kitty Graphics Protocol imagery (`{ kittyGraphics: true }`).
 - SportsDesk standardizes on `Bun.markdown.ansi` in `lib/canonical_osc8_links.ts` and `sportsdesk_cli.ts` for rendering interactive operational briefs directly inside developer and operator terminals.
-

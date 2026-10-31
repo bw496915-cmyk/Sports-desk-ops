@@ -58,7 +58,9 @@ export interface CorrelationEngineSummary {
 export const SPREAD_KEY_NUMBERS: readonly number[] = [300, 700, 1000, 1400];
 
 /** NBA spread key numbers in hundredths (3, 4, 5, 6, 7, 8) */
-export const NBA_SPREAD_KEY_NUMBERS: readonly number[] = [300, 400, 500, 600, 700, 800];
+export const NBA_SPREAD_KEY_NUMBERS: readonly number[] = [
+  300, 400, 500, 600, 700, 800,
+];
 
 /** Checks if two spread lines span across a key number (e.g. -650 and -750 spans -700) */
 export function detectKeyNumberCrossing(
@@ -72,7 +74,9 @@ export function detectKeyNumberCrossing(
   const min = Math.min(absA, absB);
   const max = Math.max(absA, absB);
 
-  const keys = sportPrefix.startsWith("NBA") ? NBA_SPREAD_KEY_NUMBERS : SPREAD_KEY_NUMBERS;
+  const keys = sportPrefix.startsWith("NBA")
+    ? NBA_SPREAD_KEY_NUMBERS
+    : SPREAD_KEY_NUMBERS;
 
   for (const key of keys) {
     if (min < key && max > key) {
@@ -98,7 +102,10 @@ export function evaluateBetterVenue(
     return "equal";
   }
 
-  if ((marketKind === "total" || marketKind === "team_total") && side === "OVER") {
+  if (
+    (marketKind === "total" || marketKind === "team_total") &&
+    side === "OVER"
+  ) {
     return polyLine < f402Line ? "polymarket" : "internal";
   }
 
@@ -147,21 +154,21 @@ export class LayoffRiskEngine {
         ORDER BY delta_hundredths ASC, pm.placed_at DESC`,
       )
       .all(maxDeltaHundredths) as Array<{
-        game_id: string;
-        period: string;
-        subject: string;
-        market_kind: string;
-        side: string;
-        poly_ticket: string;
-        poly_wallet: string;
-        poly_line: number | bigint | null;
-        f402_ticket: string;
-        customer_id: string;
-        agent_id: string;
-        f402_line: number | bigint | null;
-        delta_hundredths: number | bigint;
-        agent_owner: string | null;
-      }>;
+      game_id: string;
+      period: string;
+      subject: string;
+      market_kind: string;
+      side: string;
+      poly_ticket: string;
+      poly_wallet: string;
+      poly_line: number | bigint | null;
+      f402_ticket: string;
+      customer_id: string;
+      agent_id: string;
+      f402_line: number | bigint | null;
+      delta_hundredths: number | bigint;
+      agent_owner: string | null;
+    }>;
 
     return rows.map((r) => {
       const polyLine = sqlIntOrNull(r.poly_line);
@@ -184,7 +191,9 @@ export class LayoffRiskEngine {
       if (isLayoffRisk) {
         const polyStr = formatLineHundredths(polyLine as LineHundredths);
         const f402Str = formatLineHundredths(f402Line as LineHundredths);
-        const keyTag = keyNumberCrossed ? ` (Crosses Key ${keyNumberCrossed})` : "";
+        const keyTag = keyNumberCrossed
+          ? ` (Crosses Key ${keyNumberCrossed})`
+          : "";
         alertReason = `SHARP_STILL_BETTER: PM ${polyStr} beats F402 ${f402Str}${keyTag}`;
       }
 
@@ -217,11 +226,15 @@ export class LayoffRiskEngine {
     const alerts: string[] = [];
     for (const m of matches) {
       if (m.isLayoffRisk) {
-        const shortWallet = m.polyWallet.length > 10 ? `${m.polyWallet.slice(0, 6)}...` : m.polyWallet;
+        const shortWallet =
+          m.polyWallet.length > 10
+            ? `${m.polyWallet.slice(0, 6)}...`
+            : m.polyWallet;
         const polyLineStr = formatLineHundredths(m.polyLineHundredths);
         const f402LineStr = formatLineHundredths(m.f402LineHundredths);
         const keyTag = m.keyNumberCrossed ? ` [KEY ${m.keyNumberCrossed}]` : "";
-        const perTag = m.period !== "game" ? ` (${m.period.toUpperCase()})` : "";
+        const perTag =
+          m.period !== "game" ? ` (${m.period.toUpperCase()})` : "";
         alerts.push(
           `[ALERT] Layoff Risk: Wallet ${shortWallet} (PM ${polyLineStr}) beats pending TKT-${m.f402Ticket} (F402 ${f402LineStr}) on ${m.subject}${perTag} ${m.side}${keyTag} [Downline: ${m.agentId}/${m.customerId}]`,
         );
@@ -293,7 +306,10 @@ export class LayoffRiskEngine {
         (m) => m.gameId.startsWith(`${r.sport}:`) && m.period === r.period,
       ).length;
       const lrCount = matches.filter(
-        (m) => m.gameId.startsWith(`${r.sport}:`) && m.period === r.period && m.isLayoffRisk,
+        (m) =>
+          m.gameId.startsWith(`${r.sport}:`) &&
+          m.period === r.period &&
+          m.isLayoffRisk,
       ).length;
       return {
         sport: r.sport,

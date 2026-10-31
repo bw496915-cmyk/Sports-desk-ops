@@ -25,7 +25,11 @@ import {
   type CustomerPolyBridgeReport,
 } from "../lib/customer_poly_bridge.ts";
 
-function flag(args: readonly string[], names: readonly string[], fallback: string): string {
+function flag(
+  args: readonly string[],
+  names: readonly string[],
+  fallback: string,
+): string {
   for (const name of names) {
     const index = args.indexOf(name);
     if (index !== -1 && index + 1 < args.length) return args[index + 1]!;
@@ -39,7 +43,10 @@ const walletFile = flag(args, ["--wallet-file"], process.env.WALLET_FILE ?? "");
 const bridgeJsonPath = flag(args, ["--bridge-json"], "");
 const gates: readonly ComboGate[] = ["permissive", "all-legs-cfb", "full-game"];
 
-const reports = new Map<ComboGate, Awaited<ReturnType<typeof buildComboUniquenessReport>>>();
+const reports = new Map<
+  ComboGate,
+  Awaited<ReturnType<typeof buildComboUniquenessReport>>
+>();
 for (const gate of gates) {
   reports.set(
     gate,
@@ -129,21 +136,34 @@ function compactBridge(report: CustomerPolyBridgeReport) {
 
 let bridgeArtifact: ReturnType<typeof compactBridge>;
 if (bridgeJsonPath !== "") {
-  const parsed = (await Bun.file(bridgeJsonPath).json()) as CustomerPolyBridgeReport;
+  const parsed = (await Bun.file(
+    bridgeJsonPath,
+  ).json()) as CustomerPolyBridgeReport;
   const rows = Array.isArray(parsed.customers) ? parsed.customers : [];
   bridgeArtifact = compactBridge({ ...parsed, customers: rows });
 } else {
   const book = await loadCustomerBook();
   bridgeArtifact = compactBridge(
-    buildCustomerPolyBridge({ customers: book, registry: buildAttributionRegistry() }),
+    buildCustomerPolyBridge({
+      customers: book,
+      registry: buildAttributionRegistry(),
+    }),
   );
 }
 
 await mkdir(outDir, { recursive: true });
-await Bun.write(`${outDir}/combo-uniqueness.json`, `${JSON.stringify(comboArtifact, null, 2)}\n`);
-await Bun.write(`${outDir}/cross-domain-bridge.json`, `${JSON.stringify(bridgeArtifact, null, 2)}\n`);
+await Bun.write(
+  `${outDir}/combo-uniqueness.json`,
+  `${JSON.stringify(comboArtifact, null, 2)}\n`,
+);
+await Bun.write(
+  `${outDir}/cross-domain-bridge.json`,
+  `${JSON.stringify(bridgeArtifact, null, 2)}\n`,
+);
 
 console.log(
   `value artifacts: gates ${gates.map((gate) => `${gate}=${reports.get(gate)!.comboRecords}`).join(" ")} | index ${permissive.index.games} games | chain leaks ${comboArtifact.chain.leaks}${comboArtifact.chain.vacuous ? " (vacuous)" : ""}`,
 );
-console.log(`bridge artifact: ${bridgeArtifact.evidence} | linked ${bridgeArtifact.coverage.linkedCustomers} | gross ${bridgeArtifact.value.polyGrossPnlUsd}`);
+console.log(
+  `bridge artifact: ${bridgeArtifact.evidence} | linked ${bridgeArtifact.coverage.linkedCustomers} | gross ${bridgeArtifact.value.polyGrossPnlUsd}`,
+);

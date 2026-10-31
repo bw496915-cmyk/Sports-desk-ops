@@ -53,7 +53,11 @@ interface Options {
   f402Page: string;
 }
 
-function flag(args: readonly string[], names: readonly string[], fallback: string): string {
+function flag(
+  args: readonly string[],
+  names: readonly string[],
+  fallback: string,
+): string {
   for (const name of names) {
     const index = args.indexOf(name);
     if (index !== -1 && index + 1 < args.length) return args[index + 1]!;
@@ -89,7 +93,11 @@ function parseArgs(args: readonly string[]): Options {
   const formatRaw = flag(args, ["--format"], "png").toLowerCase();
   const format: Options["format"] =
     formatRaw === "jpeg" || formatRaw === "webp" ? formatRaw : "png";
-  const backendRaw = flag(args, ["--backend"], process.platform === "darwin" ? "webkit" : "chrome");
+  const backendRaw = flag(
+    args,
+    ["--backend"],
+    process.platform === "darwin" ? "webkit" : "chrome",
+  );
   const backend: Options["backend"] =
     backendRaw === "chrome" || format === "webp" ? "chrome" : "webkit";
 
@@ -102,11 +110,17 @@ function parseArgs(args: readonly string[]): Options {
   return {
     url,
     out: flag(args, ["--out"], "") || null,
-    width: Number.isFinite(width) ? Math.min(Math.max(width, 320), 16384) : 1440,
-    height: Number.isFinite(height) ? Math.min(Math.max(height, 240), 16384) : 900,
+    width: Number.isFinite(width)
+      ? Math.min(Math.max(width, 320), 16384)
+      : 1440,
+    height: Number.isFinite(height)
+      ? Math.min(Math.max(height, 240), 16384)
+      : 900,
     backend,
     format,
-    quality: Number.isFinite(quality) ? Math.min(Math.max(quality, 1), 100) : 82,
+    quality: Number.isFinite(quality)
+      ? Math.min(Math.max(quality, 1), 100)
+      : 82,
     waitSelector: flag(args, ["--wait-selector"], "") || null,
     waitMs: Number.isFinite(waitMs) ? Math.max(0, waitMs) : 250,
     timeoutMs: Number.isFinite(timeoutMs) ? Math.max(1000, timeoutMs) : 20_000,
@@ -115,22 +129,32 @@ function parseArgs(args: readonly string[]): Options {
   };
 }
 
-async function loginF402(view: ManagedWebView, timeoutMs: number): Promise<void> {
-  const baseUrl = (process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com").replace(/\/$/, "");
+async function loginF402(
+  view: ManagedWebView,
+  timeoutMs: number,
+): Promise<void> {
+  const baseUrl = (
+    process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
+  ).replace(/\/$/, "");
   const agentId = process.env.F402_AGENT_ID?.trim() ?? "";
   const password = process.env.F402_PASSWORD?.trim() ?? "";
   if (agentId === "" || password === "") {
-    throw new Error("F402 login requires F402_AGENT_ID and F402_PASSWORD (values are not printed)");
+    throw new Error(
+      "F402 login requires F402_AGENT_ID and F402_PASSWORD (values are not printed)",
+    );
   }
   const login = resolveLoginConfig(process.env, baseUrl);
   await view.navigate(login.loginUrl, { allowOpaqueUrl: true, timeoutMs });
   await view.waitForSelector(login.userSelector, { timeoutMs });
   const hydrationMs = Number(process.env.F402_LOGIN_HYDRATION_MS ?? "1500");
-  await Bun.sleep(Number.isFinite(hydrationMs) ? Math.max(0, hydrationMs) : 1500);
+  await Bun.sleep(
+    Number.isFinite(hydrationMs) ? Math.max(0, hydrationMs) : 1500,
+  );
 
-  const hasSubmit = (await view.evaluate(
-    `(() => document.querySelector(${JSON.stringify(login.submitSelector)}) !== null)()`,
-  )) === true;
+  const hasSubmit =
+    (await view.evaluate(
+      `(() => document.querySelector(${JSON.stringify(login.submitSelector)}) !== null)()`,
+    )) === true;
   await view.fill(login.userSelector, agentId);
   await view.fill(login.passSelector, password);
   if (hasSubmit) await view.click(login.submitSelector);
@@ -139,10 +163,14 @@ async function loginF402(view: ManagedWebView, timeoutMs: number): Promise<void>
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const passwordGone =
-      (await view.evaluate('(() => document.querySelector("input[type=password]") === null)()')) ===
-      true;
+      (await view.evaluate(
+        '(() => document.querySelector("input[type=password]") === null)()',
+      )) === true;
     if (passwordGone) return;
-    if (Date.now() >= deadline) throw new Error("F402 login did not complete: password field still present");
+    if (Date.now() >= deadline)
+      throw new Error(
+        "F402 login did not complete: password field still present",
+      );
     await Bun.sleep(250);
   }
 }
@@ -156,7 +184,10 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
     return;
   }
   const options = parseArgs(args);
-  if (!options.f402Login && (options.url === null || !/^https?:\/\//.test(options.url))) {
+  if (
+    !options.f402Login &&
+    (options.url === null || !/^https?:\/\//.test(options.url))
+  ) {
     console.error("webview-shot: provide an http(s) URL or --f402-login\n");
     console.error(HELP);
     process.exitCode = 1;
@@ -165,8 +196,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
 
   const extension = options.format === "jpeg" ? "jpg" : options.format;
   const out =
-    options.out ??
-    join(DEFAULT_SHOT_DIR, `webview-${Date.now()}.${extension}`);
+    options.out ?? join(DEFAULT_SHOT_DIR, `webview-${Date.now()}.${extension}`);
 
   const view = ManagedWebView.launch({
     backend: options.backend,
@@ -181,15 +211,23 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
         throw new Error("F402 login is opt-in: set F402_LIVE_LOGIN=1");
       }
       await loginF402(view, options.timeoutMs);
-      const baseUrl = (process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com").replace(/\/$/, "");
-      const suffix = options.f402Page.startsWith("/") ? options.f402Page : `/${options.f402Page}`;
-      await view.navigate(`${baseUrl}${suffix}`, { timeoutMs: options.timeoutMs });
+      const baseUrl = (
+        process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
+      ).replace(/\/$/, "");
+      const suffix = options.f402Page.startsWith("/")
+        ? options.f402Page
+        : `/${options.f402Page}`;
+      await view.navigate(`${baseUrl}${suffix}`, {
+        timeoutMs: options.timeoutMs,
+      });
     } else {
       await view.navigate(options.url!, { timeoutMs: options.timeoutMs });
     }
 
     if (options.waitSelector !== null) {
-      await view.waitForSelector(options.waitSelector, { timeoutMs: options.timeoutMs });
+      await view.waitForSelector(options.waitSelector, {
+        timeoutMs: options.timeoutMs,
+      });
     }
     if (options.waitMs > 0) await Bun.sleep(options.waitMs);
 
@@ -223,7 +261,9 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
 
 if (import.meta.main) {
   runWebviewShot(process.argv.slice(2)).catch((error: unknown) => {
-    console.error(`webview-shot: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `webview-shot: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exitCode = 1;
   });
 }

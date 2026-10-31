@@ -11,7 +11,10 @@ export const GAMMA_API = "https://gamma-api.polymarket.com";
 export const COMBO_DATA_API = "https://data-api.polymarket.com";
 export const CFB_SERIES_ID = 12756;
 
-export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+export type FetchLike = (
+  input: string,
+  init?: RequestInit,
+) => Promise<Response>;
 
 export interface ComboLeg {
   readonly eventSlug: string;
@@ -88,7 +91,9 @@ export interface ComboWalletSummary {
   readonly activity: readonly ComboActivityRow[];
   readonly openPositions: number;
   readonly openCostUsd: number;
-  readonly activityByType: Readonly<Record<string, { count: number; amountUsd: number }>>;
+  readonly activityByType: Readonly<
+    Record<string, { count: number; amountUsd: number }>
+  >;
   readonly pages: number;
   readonly truncated: boolean;
 }
@@ -113,7 +118,11 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 const text = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
+  typeof value === "string"
+    ? value.trim()
+    : typeof value === "number"
+      ? String(value)
+      : "";
 
 function numberOrNull(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -136,7 +145,10 @@ export function parseStringArray(value: unknown): readonly string[] {
   }
 }
 
-async function getJson(url: string, options?: ComboFetchOptions): Promise<unknown> {
+async function getJson(
+  url: string,
+  options?: ComboFetchOptions,
+): Promise<unknown> {
   const response = await (options?.fetchImpl ?? fetch)(url, {
     proxy: false,
     signal: AbortSignal.timeout(options?.timeoutMs ?? 15_000),
@@ -146,7 +158,9 @@ async function getJson(url: string, options?: ComboFetchOptions): Promise<unknow
 }
 
 const sleep = (ms: number): Promise<void> =>
-  ms <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
+  ms <= 0
+    ? Promise.resolve()
+    : new Promise((resolve) => setTimeout(resolve, ms));
 
 const ELIGIBLE_TYPES = new Set(["moneyline", "spreads", "totals"]);
 
@@ -161,12 +175,23 @@ export function extractComboLegs(event: Record<string, unknown>): ComboLeg[] {
     if (!ELIGIBLE_TYPES.has(marketType)) continue;
     if (market.closed === true) continue;
     if (market.acceptingOrders === false) continue;
-    if (market.comboStatus !== undefined && text(market.comboStatus) !== "enabled") continue;
+    if (
+      market.comboStatus !== undefined &&
+      text(market.comboStatus) !== "enabled"
+    )
+      continue;
     const outcomes = parseStringArray(market.outcomes);
     const prices = parseStringArray(market.outcomePrices);
     if (outcomes.length === 0 || prices.length === 0) continue;
-    const line = numberOrNull(market.line) ?? numberOrNull(market.spread) ?? numberOrNull(market.total);
-    for (let index = 0; index < Math.min(outcomes.length, prices.length); index += 1) {
+    const line =
+      numberOrNull(market.line) ??
+      numberOrNull(market.spread) ??
+      numberOrNull(market.total);
+    for (
+      let index = 0;
+      index < Math.min(outcomes.length, prices.length);
+      index += 1
+    ) {
       const price = Number(prices[index]);
       if (!Number.isFinite(price) || price <= 0 || price >= 1) continue;
       legs.push({
@@ -185,7 +210,9 @@ export function extractComboLegs(event: Record<string, unknown>): ComboLeg[] {
 }
 
 /** Fetches active CFB events (series 12756) with their priced legs. */
-export async function fetchCfbComboEvents(options?: ComboFetchOptions): Promise<ComboEvent[]> {
+export async function fetchCfbComboEvents(
+  options?: ComboFetchOptions,
+): Promise<ComboEvent[]> {
   const base = (options?.gammaBase ?? GAMMA_API).replace(/\/$/, "");
   const limit = Math.min(Math.max(options?.limit ?? 5, 1), 50);
   const body = await getJson(
@@ -201,7 +228,11 @@ export async function fetchCfbComboEvents(options?: ComboFetchOptions): Promise<
       const slug = text(event.slug);
       if (slug === "") return null;
       const startTime = text(event.startTime) || null;
-      if (options?.pregameOnly === true && startTime !== null && Date.parse(startTime) <= now) {
+      if (
+        options?.pregameOnly === true &&
+        startTime !== null &&
+        Date.parse(startTime) <= now
+      ) {
         return null;
       }
       return {
@@ -218,7 +249,10 @@ export async function fetchCfbComboEvents(options?: ComboFetchOptions): Promise<
 /** Product-of-legs fair price with stake/payout and optional quote margin. */
 export function priceCombo(
   legPrices: readonly number[],
-  options?: { readonly stakeUsd?: number; readonly quotedPrice?: number | null },
+  options?: {
+    readonly stakeUsd?: number;
+    readonly quotedPrice?: number | null;
+  },
 ): ComboPrice {
   if (legPrices.length < 2) throw new Error("a combo needs at least two legs");
   for (const price of legPrices) {
@@ -272,11 +306,17 @@ export function resolveLegSpecs(
       continue;
     }
     const marketSlug = spec.slice(0, separator).trim().toLowerCase();
-    const outcome = spec.slice(separator + 1).trim().toLowerCase();
+    const outcome = spec
+      .slice(separator + 1)
+      .trim()
+      .toLowerCase();
     let found: ComboLeg | null = null;
     for (const event of events) {
       for (const leg of event.legs) {
-        if (leg.marketSlug.toLowerCase() === marketSlug && leg.outcome.toLowerCase() === outcome) {
+        if (
+          leg.marketSlug.toLowerCase() === marketSlug &&
+          leg.outcome.toLowerCase() === outcome
+        ) {
           found = leg;
           break;
         }
@@ -289,12 +329,17 @@ export function resolveLegSpecs(
   return { legs, missing };
 }
 
-function parseLeg(raw: unknown, fallbackIndex: number): ComboPositionLeg | null {
+function parseLeg(
+  raw: unknown,
+  fallbackIndex: number,
+): ComboPositionLeg | null {
   const leg = asRecord(raw);
   if (leg === null) return null;
   const market = asRecord(leg.market);
   return {
-    index: Number.isFinite(Number(leg.leg_index)) ? Number(leg.leg_index) : fallbackIndex,
+    index: Number.isFinite(Number(leg.leg_index))
+      ? Number(leg.leg_index)
+      : fallbackIndex,
     conditionId: text(leg.leg_condition_id),
     outcome: text(leg.leg_outcome_label) || text(market?.outcome),
     status: text(leg.leg_status).toUpperCase(),
@@ -312,7 +357,9 @@ export function normalizeComboPosition(raw: unknown): ComboPosition | null {
   const positionId = text(row.combo_position_id);
   if (conditionId === "" || positionId === "") return null;
   const legs = Array.isArray(row.legs)
-    ? row.legs.map((leg, index) => parseLeg(leg, index)).filter((leg): leg is ComboPositionLeg => leg !== null)
+    ? row.legs
+        .map((leg, index) => parseLeg(leg, index))
+        .filter((leg): leg is ComboPositionLeg => leg !== null)
     : [];
   return {
     comboConditionId: conditionId,
@@ -338,7 +385,9 @@ export function normalizeComboActivity(raw: unknown): ComboActivityRow | null {
   const id = text(row.id);
   if (id === "") return null;
   const legs = Array.isArray(row.legs)
-    ? row.legs.map((leg, index) => parseLeg(leg, index)).filter((leg): leg is ComboPositionLeg => leg !== null)
+    ? row.legs
+        .map((leg, index) => parseLeg(leg, index))
+        .filter((leg): leg is ComboPositionLeg => leg !== null)
     : [];
   return {
     id,
@@ -363,8 +412,12 @@ async function fetchCursorPages(
   let pages = 0;
   for (let page = 0; page < maxPages; page += 1) {
     const separator = url.includes("?") ? "&" : "?";
-    const suffix = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
-    const body = await getJson(`${url}${separator}limit=${limit}${suffix}`, options);
+    const suffix =
+      cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+    const body = await getJson(
+      `${url}${separator}limit=${limit}${suffix}`,
+      options,
+    );
     const record = asRecord(body);
     const data = Array.isArray(record?.data) ? (record.data as unknown[]) : [];
     pages += 1;
@@ -383,7 +436,10 @@ export async function fetchComboPositions(
   options?: ComboFetchOptions,
 ): Promise<{ positions: ComboPosition[]; pages: number; truncated: boolean }> {
   const base = (options?.dataBase ?? COMBO_DATA_API).replace(/\/$/, "");
-  const result = await fetchCursorPages(`${base}/v2/positions/combos?user=${encodeURIComponent(wallet)}`, options);
+  const result = await fetchCursorPages(
+    `${base}/v2/positions/combos?user=${encodeURIComponent(wallet)}`,
+    options,
+  );
   return {
     positions: result.rows
       .map(normalizeComboPosition)
@@ -396,9 +452,16 @@ export async function fetchComboPositions(
 export async function fetchComboActivity(
   wallet: string,
   options?: ComboFetchOptions,
-): Promise<{ activity: ComboActivityRow[]; pages: number; truncated: boolean }> {
+): Promise<{
+  activity: ComboActivityRow[];
+  pages: number;
+  truncated: boolean;
+}> {
   const base = (options?.dataBase ?? COMBO_DATA_API).replace(/\/$/, "");
-  const result = await fetchCursorPages(`${base}/v2/activity/combos?user=${encodeURIComponent(wallet)}`, options);
+  const result = await fetchCursorPages(
+    `${base}/v2/activity/combos?user=${encodeURIComponent(wallet)}`,
+    options,
+  );
   return {
     activity: result.rows
       .map(normalizeComboActivity)
@@ -418,9 +481,12 @@ export async function summarizeComboWallet(
     fetchComboActivity(wallet, options),
   ]);
   const open = positionsResult.positions.filter(
-    (position) => position.status === "OPEN" || (!position.redeemable && position.legsResolved < position.legsTotal),
+    (position) =>
+      position.status === "OPEN" ||
+      (!position.redeemable && position.legsResolved < position.legsTotal),
   );
-  const activityByType: Record<string, { count: number; amountUsd: number }> = {};
+  const activityByType: Record<string, { count: number; amountUsd: number }> =
+    {};
   for (const row of activityResult.activity) {
     const bucket = activityByType[row.type] ?? { count: 0, amountUsd: 0 };
     bucket.count += 1;
@@ -432,7 +498,10 @@ export async function summarizeComboWallet(
     positions: positionsResult.positions,
     activity: activityResult.activity,
     openPositions: open.length,
-    openCostUsd: Math.round(open.reduce((sum, position) => sum + position.entryCostUsd, 0) * 100) / 100,
+    openCostUsd:
+      Math.round(
+        open.reduce((sum, position) => sum + position.entryCostUsd, 0) * 100,
+      ) / 100,
     activityByType,
     pages: positionsResult.pages + activityResult.pages,
     truncated: positionsResult.truncated || activityResult.truncated,

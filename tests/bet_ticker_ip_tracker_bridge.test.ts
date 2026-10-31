@@ -59,7 +59,13 @@ describe("bet_ticker_ip_tracker_bridge (ip-tracker.js & bet-ticker.js)", () => {
     assert.equal(mjMatch.mfcsCompositeScore, 98);
 
     const cubMatch = lookupIpTrackerMatchForBetTicker("CB112_2");
-    assert.equal(cubMatch?.matchClassification, "BOTH_PER_OFFICE_AND_CROSS_OFFICE");
-    assert.equal(cubMatch?.crossOfficeLogins.some((x) => x.officeAgentId === "MAX92"), true);
+    assert.equal(
+      cubMatch?.matchClassification,
+      "BOTH_PER_OFFICE_AND_CROSS_OFFICE",
+    );
+    assert.equal(
+      cubMatch?.crossOfficeLogins.some((x) => x.officeAgentId === "MAX92"),
+      true,
+    );
   });
 });

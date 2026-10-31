@@ -60,9 +60,20 @@ describe("10-Mode Forensic, Risk, Cross-Market & Data Integrity Engine", () => {
       hasWebLogCoverage: false,
     });
     assert.equal(stale.isAccessFresh, false);
-    assert.equal(stale.missingDataWarnings.includes("MISSING_ACCESS_TIMESTAMP_IN_WEBLOG"), true);
-    assert.equal(stale.missingDataWarnings.includes("INCOMPLETE_LEDGER_TRANSACTION_WINDOW"), true);
-    assert.equal(stale.missingDataWarnings.includes("WEBLOG_MODE_A_COLLECTION_GAP"), true);
+    assert.equal(
+      stale.missingDataWarnings.includes("MISSING_ACCESS_TIMESTAMP_IN_WEBLOG"),
+      true,
+    );
+    assert.equal(
+      stale.missingDataWarnings.includes(
+        "INCOMPLETE_LEDGER_TRANSACTION_WINDOW",
+      ),
+      true,
+    );
+    assert.equal(
+      stale.missingDataWarnings.includes("WEBLOG_MODE_A_COLLECTION_GAP"),
+      true,
+    );
   });
 
   test("test_mode_2_access_logs_distinguishes_self_player_actor_from_office_agent_override", () => {
@@ -189,10 +200,13 @@ describe("10-Mode Forensic, Risk, Cross-Market & Data Integrity Engine", () => {
         endUtc: "2026-10-31T14:46:00Z",
         ipAddress: "104.28.34.12",
         actionSummary: "Session B",
-      }
+      },
     );
     assert.equal(sessionOverlap.overlapDurationSeconds, 180);
-    assert.equal(sessionOverlap.distinctionVerdict, "CONFIRMED_CONCURRENT_SESSION_OVERLAP");
+    assert.equal(
+      sessionOverlap.distinctionVerdict,
+      "CONFIRMED_CONCURRENT_SESSION_OVERLAP",
+    );
 
     const nearbyPointEvents = evaluateMode6ActivityOverlap(
       {
@@ -212,11 +226,14 @@ describe("10-Mode Forensic, Risk, Cross-Market & Data Integrity Engine", () => {
         endUtc: "2026-10-31T15:23:12Z",
         ipAddress: "192.168.9.42",
         actionSummary: "Point Event B",
-      }
+      },
     );
     assert.equal(nearbyPointEvents.overlapDurationSeconds, 0);
     assert.equal(nearbyPointEvents.gapBetweenWindowsSeconds, 24);
-    assert.equal(nearbyPointEvents.distinctionVerdict, "NEARBY_POINT_EVENTS_WITHOUT_SESSION_OVERLAP");
+    assert.equal(
+      nearbyPointEvents.distinctionVerdict,
+      "NEARBY_POINT_EVENTS_WITHOUT_SESSION_OVERLAP",
+    );
   });
 
   test("test_mode_7_wager_comparison_handles_teaser_math_and_dgs_5000_alt_rotations", () => {
@@ -227,7 +244,7 @@ describe("10-Mode Forensic, Risk, Cross-Market & Data Integrity Engine", () => {
         adjLinePoints: 48.5,
         teaserPoints: 6,
       }),
-      4250
+      4250,
     );
     assert.equal(
       computeEffectiveLineHundredths({
@@ -236,7 +253,7 @@ describe("10-Mode Forensic, Risk, Cross-Market & Data Integrity Engine", () => {
         adjLinePoints: 48.5,
         teaserPoints: 6,
       }),
-      5450
+      5450,
     );
 
     const cmp = evaluateMode7WagerComparison(
@@ -267,12 +284,15 @@ describe("10-Mode Forensic, Risk, Cross-Market & Data Integrity Engine", () => {
         oddsAmerican: 172,
         stakeCents: 2400000,
         placedAtUtc: "2026-10-31T15:21:06Z",
-      }
+      },
     );
     assert.equal(cmp.isComparableMatch, true);
     assert.equal(cmp.parentRotationNumber, 501);
     assert.equal(cmp.lineDeltaHundredths, 0);
-    assert.equal(cmp.matchReasons.includes("NORMALIZED_DGS_ALT_ROT_5501_TO_501"), true);
+    assert.equal(
+      cmp.matchReasons.includes("NORMALIZED_DGS_ALT_ROT_5501_TO_501"),
+      true,
+    );
   });
 
   test("test_mode_8_settled_net_applies_free_play_zero_loss_principal_and_adjustments", () => {
@@ -386,7 +406,10 @@ describe("10-Mode Forensic, Risk, Cross-Market & Data Integrity Engine", () => {
       ],
     });
     assert.equal(exactWithDiff.unresolvedGapCents, 0);
-    assert.equal(exactWithDiff.reconciliationStatus, "RECONCILED_WITH_EXPLAINED_DIFFS");
+    assert.equal(
+      exactWithDiff.reconciliationStatus,
+      "RECONCILED_WITH_EXPLAINED_DIFFS",
+    );
 
     const gapAlert = evaluateMode10Reconciliation({
       customerId: "MJ102",

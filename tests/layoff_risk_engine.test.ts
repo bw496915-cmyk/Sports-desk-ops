@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   parseLineHundredths,
-  formatLineHundredths,
   computeComboIdentityHashes,
-  mapPolyLeg,
-  mapF402Leg,
-  mapF402ReportLeg,
   extractF402RotationNumber,
   computeF402EffectiveLine,
   groupF402PendingRowsByTicket,
@@ -152,7 +148,9 @@ describe("combo_identity & Rosetta Stone (customer/report/report.js)", () => {
     expect(grouped[0]!.legs[1]!.marketKind).toBe("total");
     expect(grouped[0]!.legs[1]!.side).toBe("OVER");
     expect(grouped[0]!.legs[1]!.lineHundredths).toBe(4750 as LineHundredths);
-    expect(F402_CUSTOMER_REPORT_ENDPOINTS.gradingByFigureDate).toBe("api/Report/getGrading");
+    expect(F402_CUSTOMER_REPORT_ENDPOINTS.gradingByFigureDate).toBe(
+      "api/Report/getGrading",
+    );
     expect(F402_WAGER_TYPE_MAP.E.name).toBe("Team Total");
   });
 
@@ -216,8 +214,12 @@ describe("layoff_risk_engine", () => {
   });
 
   test("better venue evaluation distinguishes favorite vs underdog vs totals", () => {
-    expect(evaluateBetterVenue("spread", "FAVORITE", -650, -750)).toBe("polymarket");
-    expect(evaluateBetterVenue("spread", "FAVORITE", -750, -650)).toBe("internal");
+    expect(evaluateBetterVenue("spread", "FAVORITE", -650, -750)).toBe(
+      "polymarket",
+    );
+    expect(evaluateBetterVenue("spread", "FAVORITE", -750, -650)).toBe(
+      "internal",
+    );
 
     expect(evaluateBetterVenue("total", "OVER", 4750, 4800)).toBe("polymarket");
     expect(evaluateBetterVenue("total", "OVER", 4800, 4750)).toBe("internal");
@@ -265,6 +267,8 @@ describe("layoff_risk_engine", () => {
     expect(matches.length).toBe(1);
 
     const m = matches[0];
+    expect(m).toBeDefined();
+    if (!m) throw new Error("expected one match");
     expect(m.isLayoffRisk).toBe(true);
     expect(m.betterVenue).toBe("polymarket");
     expect(m.keyNumberCrossed).toBe(7);

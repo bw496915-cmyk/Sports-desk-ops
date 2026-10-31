@@ -7,7 +7,10 @@
  * CLOB price history is a separate step.
  */
 
-import { fetchComboActivity, type ComboActivityRow } from "./polymarket_combo.ts";
+import {
+  fetchComboActivity,
+  type ComboActivityRow,
+} from "./polymarket_combo.ts";
 import type { ComboUniquenessOptions } from "./combo_uniqueness.ts";
 
 const COST_TYPES = new Set(["SPLIT", "TRADE", "BUY"]);
@@ -107,28 +110,39 @@ export function buildComboBacktestReport(
 
   const groups = new Map<
     string,
-    { wallet: string; comboId: string; cost: number; payout: number; entry: number; exit: number | null; legs: number; games: string[] }
+    {
+      wallet: string;
+      comboId: string;
+      cost: number;
+      payout: number;
+      entry: number;
+      exit: number | null;
+      legs: number;
+      games: string[];
+    }
   >();
   for (const row of activity) {
     if (row.timestamp * 1000 < from) continue;
     const key = `${row.comboConditionId}|${row.wallet}`;
-    const group =
-      groups.get(key) ??
-      {
-        wallet: row.wallet,
-        comboId: row.comboConditionId,
-        cost: 0,
-        payout: 0,
-        entry: row.timestamp,
-        exit: null,
-        legs: row.legs.length,
-        games: gamesOfCombo(row.legs, options),
-      };
+    const group = groups.get(key) ?? {
+      wallet: row.wallet,
+      comboId: row.comboConditionId,
+      cost: 0,
+      payout: 0,
+      entry: row.timestamp,
+      exit: null,
+      legs: row.legs.length,
+      games: gamesOfCombo(row.legs, options),
+    };
     group.entry = Math.min(group.entry, row.timestamp);
     if (COST_TYPES.has(row.type)) group.cost += row.amountUsd;
     if (PAYOUT_TYPES.has(row.type)) {
-      group.payout += row.type === "REDEEM" ? (row.payoutUsd ?? 0) : row.amountUsd;
-      group.exit = group.exit === null ? row.timestamp : Math.max(group.exit, row.timestamp);
+      group.payout +=
+        row.type === "REDEEM" ? (row.payoutUsd ?? 0) : row.amountUsd;
+      group.exit =
+        group.exit === null
+          ? row.timestamp
+          : Math.max(group.exit, row.timestamp);
     }
     group.legs = Math.max(group.legs, row.legs.length);
     groups.set(key, group);
@@ -143,7 +157,8 @@ export function buildComboBacktestReport(
       comboId: group.comboId,
       wallet: group.wallet,
       entryIso: new Date(group.entry * 1000).toISOString(),
-      exitIso: group.exit === null ? null : new Date(group.exit * 1000).toISOString(),
+      exitIso:
+        group.exit === null ? null : new Date(group.exit * 1000).toISOString(),
       costUsd: round2(group.cost),
       payoutUsd: round2(group.payout),
       pnlUsd: round2(group.payout - group.cost),
@@ -163,7 +178,10 @@ export function buildComboBacktestReport(
     options.gameIndex !== undefined || options.gameBySlug !== undefined;
   const crossGame = settled.filter((trade) => trade.games.length > 1).length;
 
-  const dayBuckets = new Map<string, { combos: number; cost: number; payout: number }>();
+  const dayBuckets = new Map<
+    string,
+    { combos: number; cost: number; payout: number }
+  >();
   for (const trade of settled) {
     const date = dayOf(Date.parse(trade.entryIso) / 1000);
     const bucket = dayBuckets.get(date) ?? { combos: 0, cost: 0, payout: 0 };
@@ -179,11 +197,17 @@ export function buildComboBacktestReport(
       costUsd: round2(bucket.cost),
       payoutUsd: round2(bucket.payout),
       pnlUsd: round2(bucket.payout - bucket.cost),
-      roiPct: bucket.cost > 0 ? round2(((bucket.payout - bucket.cost) / bucket.cost) * 100) : null,
+      roiPct:
+        bucket.cost > 0
+          ? round2(((bucket.payout - bucket.cost) / bucket.cost) * 100)
+          : null,
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const gameBuckets = new Map<string, { combos: number; cost: number; pnl: number }>();
+  const gameBuckets = new Map<
+    string,
+    { combos: number; cost: number; pnl: number }
+  >();
   for (const trade of settled) {
     for (const game of trade.games) {
       const bucket = gameBuckets.get(game) ?? { combos: 0, cost: 0, pnl: 0 };
@@ -215,10 +239,14 @@ export function buildComboBacktestReport(
       payoutUsd: round2(payout),
       pnlUsd: round2(pnl),
       roiPct: cost > 0 ? round2((pnl / cost) * 100) : null,
-      winRatePct: settled.length > 0 ? round2((wins / settled.length) * 100) : null,
+      winRatePct:
+        settled.length > 0 ? round2((wins / settled.length) * 100) : null,
       avgLegs:
         trades.length > 0
-          ? round2(trades.reduce((sum, trade) => sum + trade.legs, 0) / trades.length)
+          ? round2(
+              trades.reduce((sum, trade) => sum + trade.legs, 0) /
+                trades.length,
+            )
           : 0,
       crossGamePct:
         hasGameIndex && settled.length > 0
@@ -238,11 +266,15 @@ export async function runComboBacktest(
   const activity: ComboActivityRow[] = [];
   for (const wallet of options.wallets) {
     const result = await fetchComboActivity(wallet, {
-      ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+      ...(options.fetchImpl === undefined
+        ? {}
+        : { fetchImpl: options.fetchImpl }),
       ...(options.dataBase === undefined ? {} : { dataBase: options.dataBase }),
       limit: 500,
       maxPages: options.maxPages ?? 5,
-      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      ...(options.timeoutMs === undefined
+        ? {}
+        : { timeoutMs: options.timeoutMs }),
     });
     activity.push(...result.activity);
   }

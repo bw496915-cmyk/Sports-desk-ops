@@ -1,6 +1,7 @@
 # 📊 Cross-Market Parlay Matching & Phase 6C Real-Time Surveillance Architecture
 
 ## 1. Canonicalization & Identity Engine (`lib/combo_identity.ts`)
+
 - [x] **Pure Identity Hashing**
   - [x] Order-independent sorting on all 6 fields (`[A, B]` = `[B, A]`).
   - [x] `identity_sha256` created via `Bun.CryptoHasher("sha256")`.
@@ -13,6 +14,7 @@
   - [x] Indexes the In-Memory Board Cache by composite line-inclusive key `${canonicalGameId}:${periodLabel}:${subType}:${lineHundredths}` so main lines (`-350`) never overwrite alternate rungs (`-750`, `-1050`).
 
 ## 2. NBA 3-Bucket Routing, `1H/2H/1Q–4Q` Dynamic Period Pricer & Alt-Spread Ring
+
 - [x] **`FULL_GAME_CLOB` (`57.3%` / `$1,103,500`)**: Routed to Polymarket CLOB via 4-slice 45s TWAP (`<= 2.0c` slippage cap), 6-wallet ephemeral HD burner rotation (`0xB1..0xB6`), and Polygon FastLane `bor_sendRawBundle` MEV Shield (`0%` mempool exposure, saving `$695.74` per `$42K` TWAP).
 - [x] **`PERIOD_SYNTHETIC` (`26.4%` / `$509,000`) + `ALT_SPREADS` (`$148,500` — `$657,500` Combined)**:
   - `1H` (`$218,000` / `412` tix): Pace Multiplier (`1.028x` on fast transition matchups like `IND/SAC` → `126.5` fair total).
@@ -25,6 +27,7 @@
 - [x] **`LIVE_0G_RFQ` (`16.2%` / `$312,000`)**: Joined via `M.G<id>` to GS Partner 118 with a `3,000ms` Volatility Circuit Breaker and Halt-State IOC Delta-Drift catch-up.
 
 ## 3. Phase 6C Sub-500ms WebSocket Shadow Portfolio Syncer & 180s Quarantine Auto-Resolver
+
 - [x] **Sub-500ms Dual-Path WebSocket Stream (Replaces 60s Cron Polling)**
   - Path A: Polymarket CLOB WebSocket (`wss://ws-subscriptions-clob.polymarket.com/ws/market`, `~112ms–118ms` ingest).
   - Path B: Polygon FastLane `eth_subscribe("logs")` on CTF Exchange `OrderFilled` (`~164ms` ingest).
@@ -35,11 +38,13 @@
   - **Branch 3 (`ISOLATED_ILLIQUID_SHADE` `@ 180s`)**: Un-quarantined `SAC/NOP 1H U116.5` with Asymmetric Vig Shade (`-125/+105`) and `$2,500` half-limit.
 
 ## 4. Ring-Fenced `Siloed_Capital_Allocator` ($250,000 Total Desk Treasury)
+
 - [x] **Silo 1 — Core Matched-Book Hedge Vault (`60%` = `$150,000`)**: NBA Full-Game CLOB (`$82.5K`) + NFL/CFB Middles (`$67.5K`). Exclusive access to the `$70,000` Wintermute/GSR `640ms` JIT Credit Revolver.
 - [x] **Silo 2 — Period Synthetic & Live 0G-RFQ Reserve (`25%` = `$62,500`)**: Ring-fenced for `1H/2H/1Q–4Q`, `ALT_SPREADS`, and cross-book SOR overflow (`JITRevolverAccess = STRICTLY_FORBIDDEN`).
 - [x] **Silo 3 — Shadow Portfolio Mirror Sub-Wallet (`15% Hard Cap` = `$37,500`, `0xShadowSub..99A1`)**: Non-JIT sub-wallet (`JITRevolverAccess = STRICTLY_FORBIDDEN`) with per-sport sub-caps: NBA `50%` (`$18,750`), NFL/CFB `40%` (`$15,000`), and Tennis/MLB/NHL `10%` (`$3,750` hard clamp).
 
 ## 5. Dedicated Domain Routes & Zero-Friction DX (`./bin/dx`)
+
 - **Cloudflare R2 Public Edge:** `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html` (published via `scripts/publish_r2_graph.mjs` & `./bin/dx deploy`)
 - **Cloudflare Pages Portal:** `https://fantasy402-docs-4ay.pages.dev/graph.html` (`docs/graph.html` + `docs/graph.js`)
 - **SportsDesk Bun Webview Server:** `https://desk.bookdeskops.com/graph` (and `/surveillance-graph` in `sportsdesk_webview_server.ts`)

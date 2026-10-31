@@ -9,13 +9,18 @@ import {
   type CustomerBookRow,
   type PolyObservation,
 } from "../lib/customer_poly_bridge.ts";
-import { auditActivityPnl, type PolymarketActivity } from "../lib/polymarket_profile.ts";
+import {
+  auditActivityPnl,
+  type PolymarketActivity,
+} from "../lib/polymarket_profile.ts";
 import { createComboObservationsLegsStore } from "../lib/combo_observations_legs_store.ts";
 
 const W1 = `0x${"1".repeat(40)}`;
 const W2 = `0x${"2".repeat(40)}`;
 
-function customer(overrides: Partial<CustomerBookRow> & { customerId: string }): CustomerBookRow {
+function customer(
+  overrides: Partial<CustomerBookRow> & { customerId: string },
+): CustomerBookRow {
   return {
     agentId: "AGENT",
     contextType: "TEST",
@@ -31,7 +36,10 @@ function customer(overrides: Partial<CustomerBookRow> & { customerId: string }):
   };
 }
 
-function observation(address: string, overrides: Partial<PolyObservation> = {}): PolyObservation {
+function observation(
+  address: string,
+  overrides: Partial<PolyObservation> = {},
+): PolyObservation {
   return {
     address,
     name: null,
@@ -87,13 +95,24 @@ describe("wallet validation", () => {
 describe("attribution registry", () => {
   test("dedupes, uppercases customer ids and counts shared wallets", () => {
     const typed: AttributionInput[] = [
-      { proxyWallet: W1, customerId: "c1", attributionType: "WHALE_CTF_BRIDGE", confidenceBps: 10_000 },
-      { proxyWallet: W1.toUpperCase().replace("0X", "0x"), customerId: "C1", attributionType: "WHALE_CTF_BRIDGE" },
+      {
+        proxyWallet: W1,
+        customerId: "c1",
+        attributionType: "WHALE_CTF_BRIDGE",
+        confidenceBps: 10_000,
+      },
+      {
+        proxyWallet: W1.toUpperCase().replace("0X", "0x"),
+        customerId: "C1",
+        attributionType: "WHALE_CTF_BRIDGE",
+      },
       { proxyWallet: W2, customerId: "c1", attributionType: "IP_CLUSTER" },
       { proxyWallet: W2, customerId: "c2", attributionType: "IP_CLUSTER" },
       { proxyWallet: "0xshort", customerId: "c3" },
     ];
-    const registry = buildAttributionRegistry(typed, { includeEngineMap: false });
+    const registry = buildAttributionRegistry(typed, {
+      includeEngineMap: false,
+    });
     expect(registry.links).toHaveLength(3);
     expect(registry.quarantined).toHaveLength(1);
     expect(registry.stats.customers).toBe(2);
@@ -108,7 +127,9 @@ describe("attribution registry", () => {
   test("default registry quarantines the 10 placeholder attributions", () => {
     const registry = buildAttributionRegistry();
     expect(registry.stats.invalid).toBe(10);
-    expect(registry.links.every((link) => validateWalletAddress(link.wallet).valid)).toBe(true);
+    expect(
+      registry.links.every((link) => validateWalletAddress(link.wallet).valid),
+    ).toBe(true);
   });
 });
 
@@ -131,9 +152,20 @@ describe("cross-venue value", () => {
     ];
     const observations = new Map<string, PolyObservation>([
       [W1, observation(W1)],
-      [W2, observation(W2, { pnlAllUsd: 300, cashflowPnlUsd: null, pnlComplete: false })],
+      [
+        W2,
+        observation(W2, {
+          pnlAllUsd: 300,
+          cashflowPnlUsd: null,
+          pnlComplete: false,
+        }),
+      ],
     ]);
-    const report = buildCustomerPolyBridge({ customers, registry, observations });
+    const report = buildCustomerPolyBridge({
+      customers,
+      registry,
+      observations,
+    });
 
     const c1 = report.customers.find((row) => row.customerId === "C1");
     const c2 = report.customers.find((row) => row.customerId === "C2");
@@ -190,8 +222,12 @@ describe("cross-venue value", () => {
     expect(report.value.polyAdvantageUsd).toBe(0);
     expect(report.value.priorityUsd).toBe(0);
     // Per-row math is still reported for audit.
-    expect(report.customers.find((row) => row.customerId === "C1")?.polyAdvantageUsd).toBe(500);
-    expect(report.customers.find((row) => row.customerId === "C2")?.polyAdvantageUsd).toBe(2_000);
+    expect(
+      report.customers.find((row) => row.customerId === "C1")?.polyAdvantageUsd,
+    ).toBe(500);
+    expect(
+      report.customers.find((row) => row.customerId === "C2")?.polyAdvantageUsd,
+    ).toBe(2_000);
   });
 
   test("reports fixture evidence when nothing was fetched", () => {
@@ -207,10 +243,44 @@ describe("cross-venue value", () => {
 
 describe("fee-aware activity audit", () => {
   const rows: PolymarketActivity[] = [
-    { type: "TRADE", slug: "a", usdcSize: 100.1, side: "BUY", size: 200, price: 0.5, timestamp: 1, title: "A", outcome: "Yes" },
-    { type: "SELL", slug: "a", usdcSize: 150, side: "SELL", timestamp: 2, title: "A", outcome: "Yes" },
-    { type: "REDEEM", slug: "b", usdcSize: 25, side: "", timestamp: 3, title: "B", outcome: "Yes" },
-    { type: "SPLIT", slug: "c", usdcSize: 10, side: "", timestamp: 4, title: "C", outcome: "Yes" },
+    {
+      type: "TRADE",
+      slug: "a",
+      usdcSize: 100.1,
+      side: "BUY",
+      size: 200,
+      price: 0.5,
+      timestamp: 1,
+      title: "A",
+      outcome: "Yes",
+    },
+    {
+      type: "SELL",
+      slug: "a",
+      usdcSize: 150,
+      side: "SELL",
+      timestamp: 2,
+      title: "A",
+      outcome: "Yes",
+    },
+    {
+      type: "REDEEM",
+      slug: "b",
+      usdcSize: 25,
+      side: "",
+      timestamp: 3,
+      title: "B",
+      outcome: "Yes",
+    },
+    {
+      type: "SPLIT",
+      slug: "c",
+      usdcSize: 10,
+      side: "",
+      timestamp: 4,
+      title: "C",
+      outcome: "Yes",
+    },
   ];
 
   test("reconstructs cashflow, gap and the fee residual", () => {
@@ -227,7 +297,10 @@ describe("fee-aware activity audit", () => {
   });
 
   test("withholds cashflow when pagination was truncated", () => {
-    const audit = auditActivityPnl(rows, 30, { lbApiPnlUsd: 120, activityTruncated: true });
+    const audit = auditActivityPnl(rows, 30, {
+      lbApiPnlUsd: 120,
+      activityTruncated: true,
+    });
     expect(audit.complete).toBe(false);
     expect(audit.cashflowPnlUsd).toBeNull();
     expect(audit.gapUsd).toBeNull();
@@ -262,7 +335,9 @@ describe("leg-level cross-domain matching", () => {
     expect(da?.opposite).toBe(1);
     expect(da?.mirror).toBe(0);
 
-    const filtered = matchCustomerLegsAcrossVenues(store.db, { customerId: "gp300" });
+    const filtered = matchCustomerLegsAcrossVenues(store.db, {
+      customerId: "gp300",
+    });
     expect(filtered.matchedLegs).toBe(1);
     expect(filtered.customers[0]?.customerId).toBe("GP300");
     expect(filtered.layoffRiskLegs).toBe(1);
@@ -273,7 +348,9 @@ describe("leg-level cross-domain matching", () => {
   test("excludes pairs whose line delta exceeds the window", () => {
     const store = createComboObservationsLegsStore();
     seedCrossDomainScenario(store, buildAttributionRegistry());
-    const report = matchCustomerLegsAcrossVenues(store.db, { maxLineDeltaHundredths: 0 });
+    const report = matchCustomerLegsAcrossVenues(store.db, {
+      maxLineDeltaHundredths: 0,
+    });
     expect(report.matchedLegs).toBe(0);
     store.db.close();
   });

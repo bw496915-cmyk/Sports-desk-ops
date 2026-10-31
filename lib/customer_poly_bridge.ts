@@ -37,9 +37,11 @@ const WALLET_PATTERN = /^0x[0-9a-fA-F]{40}$/;
 
 export type EvidenceTier = "LIVE" | "FIXTURE" | "MIXED";
 
-export type WalletQuarantineReason = "EMPTY" | "BAD_PREFIX" | "BAD_LENGTH" | "NON_HEX";
+export type WalletQuarantineReason =
+  "EMPTY" | "BAD_PREFIX" | "BAD_LENGTH" | "NON_HEX";
 
-export type CrossVenueVerdict = "BOTH_UP" | "POLY_ONLY_UP" | "DESK_ONLY_UP" | "BOTH_DOWN" | "FLAT";
+export type CrossVenueVerdict =
+  "BOTH_UP" | "POLY_ONLY_UP" | "DESK_ONLY_UP" | "BOTH_DOWN" | "FLAT";
 
 // ============================================================================
 // 1. WALLET VALIDATION
@@ -47,12 +49,17 @@ export type CrossVenueVerdict = "BOTH_UP" | "POLY_ONLY_UP" | "DESK_ONLY_UP" | "B
 
 export type WalletValidation =
   | { readonly valid: true; readonly address: string }
-  | { readonly valid: false; readonly address: string; readonly reason: WalletQuarantineReason };
+  | {
+      readonly valid: false;
+      readonly address: string;
+      readonly reason: WalletQuarantineReason;
+    };
 
 /** Validates and lowercases a 42-char `0x` address. Placeholders never reach the network. */
 export function validateWalletAddress(raw: string): WalletValidation {
   const trimmed = raw.trim();
-  if (trimmed === "") return { valid: false, address: trimmed, reason: "EMPTY" };
+  if (trimmed === "")
+    return { valid: false, address: trimmed, reason: "EMPTY" };
   if (!trimmed.toLowerCase().startsWith("0x")) {
     return { valid: false, address: trimmed, reason: "BAD_PREFIX" };
   }
@@ -97,16 +104,76 @@ export interface QuarantinedWallet {
  * bridge can demonstrate quarantine instead of silently dropping them.
  */
 export const TYPED_WALLET_ATTRIBUTIONS: readonly AttributionInput[] = [
-  { proxyWallet: "0x3af8392189d021cfa82", customerId: "CB112_1", agentOwner: "CUB22HR", attributionType: "IP_CLUSTER_OR_SYNDICATE", confidenceBps: 9000 },
-  { proxyWallet: "0x3af8771189d099bf71", customerId: "RF2003", agentOwner: "BILLY666", attributionType: "TOUT_BURST_CLUSTER", confidenceBps: 6000 },
-  { proxyWallet: "0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612", customerId: "BGD101", agentOwner: "BIGDAD", attributionType: "WHALE_CTF_BRIDGE", confidenceBps: 10000 },
-  { proxyWallet: "0x07db5765beba17be154cbfbd6324a15f3c81fa4f", customerId: "MJ102", agentOwner: "MJ2026", attributionType: "WHALE_CTF_BRIDGE", confidenceBps: 10000 },
-  { proxyWallet: "0x120640a1deffe6b53e291eba74acf1dbe8274528", customerId: "GP300", agentOwner: "GPRO50RSK", attributionType: "STEAM_ORIGINATOR_CTF", confidenceBps: 10000 },
-  { proxyWallet: "0x53224176b413f20ac63d61f1a0e19002ffb38acb", customerId: "AT10359", agentOwner: "ATEAM", attributionType: "STEAM_ORIGINATOR_CTF", confidenceBps: 10000 },
-  { proxyWallet: "0x22e29a644a9d14564967b3f9f50346b7ad425c32", customerId: "ABC700", agentOwner: "JUICEPLUS", attributionType: "NBA_SGP_SHARP", confidenceBps: 10000 },
-  { proxyWallet: "0x231699490d08919d8f1d3f0b90fd2a677e3e9819", customerId: "DAN245", agentOwner: "DAN318", attributionType: "NBA_SGP_SHARP", confidenceBps: 10000 },
-  { proxyWallet: "0x50cc8708aff3791f2d6125645c82bda532baa534", customerId: "EJ8834", agentOwner: "MJ2026", attributionType: "SUBNET_104_28_34_CLUSTER", confidenceBps: 9000 },
-  { proxyWallet: "0xaa7789219c17e180dcb5933099c90d885f1d15a5", customerId: "DA4401", agentOwner: "JUICEPLUS", attributionType: "NBA_TOTAL_MIDDLE", confidenceBps: 9000 },
+  {
+    proxyWallet: "0x3af8392189d021cfa82",
+    customerId: "CB112_1",
+    agentOwner: "CUB22HR",
+    attributionType: "IP_CLUSTER_OR_SYNDICATE",
+    confidenceBps: 9000,
+  },
+  {
+    proxyWallet: "0x3af8771189d099bf71",
+    customerId: "RF2003",
+    agentOwner: "BILLY666",
+    attributionType: "TOUT_BURST_CLUSTER",
+    confidenceBps: 6000,
+  },
+  {
+    proxyWallet: "0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612",
+    customerId: "BGD101",
+    agentOwner: "BIGDAD",
+    attributionType: "WHALE_CTF_BRIDGE",
+    confidenceBps: 10000,
+  },
+  {
+    proxyWallet: "0x07db5765beba17be154cbfbd6324a15f3c81fa4f",
+    customerId: "MJ102",
+    agentOwner: "MJ2026",
+    attributionType: "WHALE_CTF_BRIDGE",
+    confidenceBps: 10000,
+  },
+  {
+    proxyWallet: "0x120640a1deffe6b53e291eba74acf1dbe8274528",
+    customerId: "GP300",
+    agentOwner: "GPRO50RSK",
+    attributionType: "STEAM_ORIGINATOR_CTF",
+    confidenceBps: 10000,
+  },
+  {
+    proxyWallet: "0x53224176b413f20ac63d61f1a0e19002ffb38acb",
+    customerId: "AT10359",
+    agentOwner: "ATEAM",
+    attributionType: "STEAM_ORIGINATOR_CTF",
+    confidenceBps: 10000,
+  },
+  {
+    proxyWallet: "0x22e29a644a9d14564967b3f9f50346b7ad425c32",
+    customerId: "ABC700",
+    agentOwner: "JUICEPLUS",
+    attributionType: "NBA_SGP_SHARP",
+    confidenceBps: 10000,
+  },
+  {
+    proxyWallet: "0x231699490d08919d8f1d3f0b90fd2a677e3e9819",
+    customerId: "DAN245",
+    agentOwner: "DAN318",
+    attributionType: "NBA_SGP_SHARP",
+    confidenceBps: 10000,
+  },
+  {
+    proxyWallet: "0x50cc8708aff3791f2d6125645c82bda532baa534",
+    customerId: "EJ8834",
+    agentOwner: "MJ2026",
+    attributionType: "SUBNET_104_28_34_CLUSTER",
+    confidenceBps: 9000,
+  },
+  {
+    proxyWallet: "0xaa7789219c17e180dcb5933099c90d885f1d15a5",
+    customerId: "DA4401",
+    agentOwner: "JUICEPLUS",
+    attributionType: "NBA_TOTAL_MIDDLE",
+    confidenceBps: 9000,
+  },
 ];
 
 export interface AttributionRegistry {
@@ -155,7 +222,9 @@ export function buildAttributionRegistry(
     `${input.customerId.trim().toUpperCase()}|${input.proxyWallet.trim().toLowerCase()}`;
 
   if (options?.includeEngineMap !== false) {
-    for (const [customerId, wallet] of Object.entries(CUSTOMER_TO_POLY_WALLET)) {
+    for (const [customerId, wallet] of Object.entries(
+      CUSTOMER_TO_POLY_WALLET,
+    )) {
       const base: AttributionInput = {
         proxyWallet: wallet,
         customerId,
@@ -178,7 +247,11 @@ export function buildAttributionRegistry(
     if (customerId === "") continue;
     const validation = validateWalletAddress(input.proxyWallet);
     if (!validation.valid) {
-      quarantined.push({ customerId, wallet: validation.address, reason: validation.reason });
+      quarantined.push({
+        customerId,
+        wallet: validation.address,
+        reason: validation.reason,
+      });
       continue;
     }
     links.push({
@@ -209,8 +282,11 @@ export function buildAttributionRegistry(
       invalid: quarantined.length,
       customers: byCustomer.size,
       wallets: byWallet.size,
-      multiWalletCustomers: [...byCustomer.values()].filter((list) => list.length > 1).length,
-      sharedWallets: [...byWallet.values()].filter((list) => list.length > 1).length,
+      multiWalletCustomers: [...byCustomer.values()].filter(
+        (list) => list.length > 1,
+      ).length,
+      sharedWallets: [...byWallet.values()].filter((list) => list.length > 1)
+        .length,
     },
   };
 }
@@ -260,7 +336,11 @@ function num(value: unknown): number {
 }
 
 function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
+  return typeof value === "string"
+    ? value.trim()
+    : typeof value === "number"
+      ? String(value)
+      : "";
 }
 
 /** Normalizes one `enriched_customers_full.json` row; returns `null` for unusable rows. */
@@ -335,14 +415,17 @@ export interface PolyObservationOptions extends ProfileFetchOptions {
 }
 
 /** Projects a full `AddressProfile` down to the fields the bridge scores on. */
-export function observationFromProfile(profile: AddressProfile): PolyObservation {
+export function observationFromProfile(
+  profile: AddressProfile,
+): PolyObservation {
   const activity = profile.activity;
   const liquidityShare =
     activity.tradeVolume > 0
       ? (activity.splitVolume + activity.mergeVolume) / activity.tradeVolume
       : 0;
   const isLiquidity =
-    profile.strategy.name === "SPLIT Arbitrage" || profile.strategy.name === "Market Maker";
+    profile.strategy.name === "SPLIT Arbitrage" ||
+    profile.strategy.name === "Market Maker";
   const valueKind: PolyValueKind =
     isLiquidity || liquidityShare > 0.5
       ? "LIQUIDITY"
@@ -375,7 +458,9 @@ export function observationFromProfile(profile: AddressProfile): PolyObservation
       activity.tradeVolume > 0
         ? round2((activity.comboTradeVolume / activity.tradeVolume) * 100)
         : null,
-    topCategories: profile.categories.slice(0, 3).map((bucket) => bucket.category),
+    topCategories: profile.categories
+      .slice(0, 3)
+      .map((bucket) => bucket.category),
     pagesFetched: profile.pagesFetched,
     activityTruncated: profile.activityTruncated,
   };
@@ -389,11 +474,17 @@ export async function observePolymarketWallet(
   const validation = validateWalletAddress(address);
   if (!validation.valid) return null;
   const profile = await profilePolymarketAddress(validation.address, {
-    ...(options?.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
-    ...(options?.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+    ...(options?.fetchImpl === undefined
+      ? {}
+      : { fetchImpl: options.fetchImpl }),
+    ...(options?.timeoutMs === undefined
+      ? {}
+      : { timeoutMs: options.timeoutMs }),
     ...(options?.lbBase === undefined ? {} : { lbBase: options.lbBase }),
     ...(options?.dataBase === undefined ? {} : { dataBase: options.dataBase }),
-    ...(options?.gammaBase === undefined ? {} : { gammaBase: options.gammaBase }),
+    ...(options?.gammaBase === undefined
+      ? {}
+      : { gammaBase: options.gammaBase }),
     maxActivityPages: options?.maxActivityPages ?? 2,
     maxCategoryLookups: options?.maxCategoryLookups ?? 10,
   });
@@ -485,7 +576,10 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function verdictOf(customerDeskPnl: number, polyPnl: number): CrossVenueVerdict {
+function verdictOf(
+  customerDeskPnl: number,
+  polyPnl: number,
+): CrossVenueVerdict {
   const flat = 1;
   const deskUp = customerDeskPnl > flat;
   const deskDown = customerDeskPnl < -flat;
@@ -506,7 +600,9 @@ export function buildCustomerPolyBridge(
   input: BuildCustomerPolyBridgeInput,
 ): CustomerPolyBridgeReport {
   const observations = input.observations ?? new Map<string, PolyObservation>();
-  const customers = new Map(input.customers.map((row) => [row.customerId, row] as const));
+  const customers = new Map(
+    input.customers.map((row) => [row.customerId, row] as const),
+  );
   const rows: CustomerPolyValueRow[] = [];
 
   for (const link of input.registry.links) {
@@ -523,7 +619,8 @@ export function buildCustomerPolyBridge(
     const basisPnl = net ?? gross;
     const polyAdvantageUsd =
       basisPnl === null ? null : round2(basisPnl - customerDeskPnlUsd);
-    const verdict = basisPnl === null ? null : verdictOf(customerDeskPnlUsd, basisPnl);
+    const verdict =
+      basisPnl === null ? null : verdictOf(customerDeskPnlUsd, basisPnl);
     rows.push({
       customerId: customer.customerId,
       agentId: customer.agentId,
@@ -550,7 +647,10 @@ export function buildCustomerPolyBridge(
           : 0,
     });
   }
-  rows.sort((a, b) => b.priorityUsd - a.priorityUsd || a.customerId.localeCompare(b.customerId));
+  rows.sort(
+    (a, b) =>
+      b.priorityUsd - a.priorityUsd || a.customerId.localeCompare(b.customerId),
+  );
 
   const linkedCustomers = new Set(rows.map((row) => row.customerId));
   const withPoly = rows.filter((row) => row.poly !== null);
@@ -559,10 +659,12 @@ export function buildCustomerPolyBridge(
     rows.filter((row) => row.verdict === verdict).length;
   const attributionTypes: Record<string, number> = {};
   for (const link of input.registry.links) {
-    attributionTypes[link.attributionType] = (attributionTypes[link.attributionType] ?? 0) + 1;
+    attributionTypes[link.attributionType] =
+      (attributionTypes[link.attributionType] ?? 0) + 1;
   }
 
-  const sum = (values: readonly number[]): number => round2(values.reduce((a, b) => a + b, 0));
+  const sum = (values: readonly number[]): number =>
+    round2(values.reduce((a, b) => a + b, 0));
   const deskVolumeUsd = sum(rows.map((row) => row.deskVolumeUsd));
   const customerDeskPnlUsd = sum(rows.map((row) => row.customerDeskPnlUsd));
 
@@ -582,9 +684,13 @@ export function buildCustomerPolyBridge(
   const basisOf = (poly: PolyObservation): number | null =>
     poly.cashflowPnlUsd ?? poly.pnlAllUsd;
   const polyPnlUsd = sum(
-    observedWalletRows.map((poly) => basisOf(poly)).filter((value): value is number => value !== null),
+    observedWalletRows
+      .map((poly) => basisOf(poly))
+      .filter((value): value is number => value !== null),
   );
-  const polyGrossPnlUsd = sum(observedWalletRows.map((poly) => poly.pnlAllUsd ?? 0));
+  const polyGrossPnlUsd = sum(
+    observedWalletRows.map((poly) => poly.pnlAllUsd ?? 0),
+  );
   const polyNetPnlUsd = sum(
     observedWalletRows
       .map((poly) => poly.cashflowPnlUsd)
@@ -595,8 +701,12 @@ export function buildCustomerPolyBridge(
       .map((poly) => poly.feeResidualUsd)
       .filter((value): value is number => value !== null),
   );
-  const netCovered = observedWalletRows.filter((poly) => poly.cashflowPnlUsd !== null).length;
-  const polyVolumeUsd = sum(observedWalletRows.map((poly) => poly.tradeVolumeUsd));
+  const netCovered = observedWalletRows.filter(
+    (poly) => poly.cashflowPnlUsd !== null,
+  ).length;
+  const polyVolumeUsd = sum(
+    observedWalletRows.map((poly) => poly.tradeVolumeUsd),
+  );
   const unambiguous = rows.filter((row) => !isShared(row.wallet));
 
   return {
@@ -624,7 +734,8 @@ export function buildCustomerPolyBridge(
     },
     value: {
       customersWithPoly: withPoly.length,
-      customersWithPnl: rows.filter((row) => row.polyBasisPnlUsd !== null).length,
+      customersWithPnl: rows.filter((row) => row.polyBasisPnlUsd !== null)
+        .length,
       bothUp: count("BOTH_UP"),
       polyOnlyUp: count("POLY_ONLY_UP"),
       deskOnlyUp: count("DESK_ONLY_UP"),
@@ -632,7 +743,10 @@ export function buildCustomerPolyBridge(
       flat: count("FLAT"),
       deskVolumeUsd,
       customerDeskPnlUsd,
-      deskHoldPct: deskVolumeUsd > 0 ? round2((customerDeskPnlUsd / deskVolumeUsd) * 100) : null,
+      deskHoldPct:
+        deskVolumeUsd > 0
+          ? round2((customerDeskPnlUsd / deskVolumeUsd) * 100)
+          : null,
       polyPnlUsd,
       polyGrossPnlUsd,
       polyNetPnlUsd,
@@ -742,7 +856,10 @@ export function matchCustomerLegsAcrossVenues(
 ): CrossDomainMatchReport {
   const maxDelta = options.maxLineDeltaHundredths ?? 100;
   const limit = Math.max(1, options.limit ?? 500);
-  const customerFilter = options.customerId === undefined ? null : options.customerId.trim().toUpperCase();
+  const customerFilter =
+    options.customerId === undefined
+      ? null
+      : options.customerId.trim().toUpperCase();
 
   const sql = `
     SELECT
@@ -777,12 +894,15 @@ export function matchCustomerLegsAcrossVenues(
     LIMIT ?3
   `;
 
-  const rows = db.query(sql).all(customerFilter, maxDelta, limit) as MatchQueryRow[];
+  const rows = db
+    .query(sql)
+    .all(customerFilter, maxDelta, limit) as MatchQueryRow[];
 
   const matches: CrossDomainLegMatch[] = rows.map((row) => {
     const polyLine = sqlIntOrNull(row.poly_line);
     const f402Line = sqlIntOrNull(row.f402_line);
-    const sameSide = row.poly_side.toUpperCase() === row.f402_side.toUpperCase();
+    const sameSide =
+      row.poly_side.toUpperCase() === row.f402_side.toUpperCase();
     return {
       polyTicket: row.poly_ticket,
       polyWallet: row.poly_wallet,
@@ -800,11 +920,18 @@ export function matchCustomerLegsAcrossVenues(
       polyLineHundredths: polyLine,
       f402LineHundredths: f402Line,
       lineDeltaHundredths:
-        polyLine === null || f402Line === null ? null : Math.abs(polyLine - f402Line),
+        polyLine === null || f402Line === null
+          ? null
+          : Math.abs(polyLine - f402Line),
       betterVenue:
         polyLine === null || f402Line === null
           ? "equal"
-          : evaluateBetterVenue(row.market_kind, row.poly_side, polyLine, f402Line),
+          : evaluateBetterVenue(
+              row.market_kind,
+              row.poly_side,
+              polyLine,
+              f402Line,
+            ),
     };
   });
 
@@ -823,22 +950,35 @@ export function matchCustomerLegsAcrossVenues(
         matches: list.length,
         mirror: list.filter((match) => match.relation === "MIRROR").length,
         opposite: list.filter((match) => match.relation === "OPPOSITE").length,
-        layoffRiskLegs: list.filter((match) => match.betterVenue === "polymarket").length,
+        layoffRiskLegs: list.filter(
+          (match) => match.betterVenue === "polymarket",
+        ).length,
         avgDeltaHundredths:
           deltas.length === 0
             ? null
-            : Math.round((deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length) * 100) / 100,
+            : Math.round(
+                (deltas.reduce((sum, delta) => sum + delta, 0) /
+                  deltas.length) *
+                  100,
+              ) / 100,
       };
     })
-    .sort((a, b) => b.matches - a.matches || a.customerId.localeCompare(b.customerId));
+    .sort(
+      (a, b) =>
+        b.matches - a.matches || a.customerId.localeCompare(b.customerId),
+    );
 
   return {
     database: options.databasePath ?? ":memory:",
     matchedLegs: matches.length,
     mirrorLegs: matches.filter((match) => match.relation === "MIRROR").length,
-    oppositeLegs: matches.filter((match) => match.relation === "OPPOSITE").length,
-    sameLineLegs: matches.filter((match) => match.lineDeltaHundredths === 0).length,
-    layoffRiskLegs: matches.filter((match) => match.betterVenue === "polymarket").length,
+    oppositeLegs: matches.filter((match) => match.relation === "OPPOSITE")
+      .length,
+    sameLineLegs: matches.filter((match) => match.lineDeltaHundredths === 0)
+      .length,
+    layoffRiskLegs: matches.filter(
+      (match) => match.betterVenue === "polymarket",
+    ).length,
     customers,
     matches,
     notes: [
@@ -857,50 +997,53 @@ export function matchCustomerLegsAcrossVenues(
  * Seeds the observation store with the cross-market scenario used by the layoff-risk CLI.
  * Kept here as a callable so `dx bridge match --seed` works without a live capture.
  */
-export function seedCrossDomainScenario(store: {
-  insertAttribution: (attr: {
-    proxyWallet: string;
-    customerId: string;
-    agentOwner: string;
-    attributionType?: string;
-    confidenceBps?: number;
-  }) => void;
-  ingestPolymarketCombo: (
-    orderHash: string,
-    proxyWallet: string,
-    legs: readonly {
-      competitionFamily?: string;
-      period?: string | number;
-      team?: string;
-      participantCode?: string;
-      marketKind?: string;
-      side?: string;
-      line?: number | string | null;
-      productClass?: string;
-    }[],
-    stakeCents?: number,
-    placedAt?: string,
-  ) => void;
-  ingestF402Ticket: (
-    ticketNumber: string | number,
-    wagerNumber: string | number,
-    customerId: string,
-    agentId: string,
-    legs: readonly {
-      ticketNumber: string | number;
-      wagerNumber: string | number;
+export function seedCrossDomainScenario(
+  store: {
+    insertAttribution: (attr: {
+      proxyWallet: string;
       customerId: string;
-      agentId?: string;
-      sportType?: string;
-      period?: string | number;
-      team?: string;
-      shortDesc?: string;
-      line?: number | string | null;
-    }[],
-    stakeCents?: number,
-    placedAt?: string,
-  ) => void;
-}, registry: AttributionRegistry): void {
+      agentOwner: string;
+      attributionType?: string;
+      confidenceBps?: number;
+    }) => void;
+    ingestPolymarketCombo: (
+      orderHash: string,
+      proxyWallet: string,
+      legs: readonly {
+        competitionFamily?: string;
+        period?: string | number;
+        team?: string;
+        participantCode?: string;
+        marketKind?: string;
+        side?: string;
+        line?: number | string | null;
+        productClass?: string;
+      }[],
+      stakeCents?: number,
+      placedAt?: string,
+    ) => void;
+    ingestF402Ticket: (
+      ticketNumber: string | number,
+      wagerNumber: string | number,
+      customerId: string,
+      agentId: string,
+      legs: readonly {
+        ticketNumber: string | number;
+        wagerNumber: string | number;
+        customerId: string;
+        agentId?: string;
+        sportType?: string;
+        period?: string | number;
+        team?: string;
+        shortDesc?: string;
+        line?: number | string | null;
+      }[],
+      stakeCents?: number,
+      placedAt?: string,
+    ) => void;
+  },
+  registry: AttributionRegistry,
+): void {
   for (const link of registry.links) {
     store.insertAttribution({
       proxyWallet: link.wallet,
@@ -918,34 +1061,106 @@ export function seedCrossDomainScenario(store: {
 
   if (bgd !== undefined) {
     store.ingestPolymarketCombo("0xbridge_sacst_1", bgd, [
-      { competitionFamily: "CFB", period: "game", team: "SAC_ST", marketKind: "spread", side: "UNDERDOG", line: 9.5, productClass: "parlay" },
+      {
+        competitionFamily: "CFB",
+        period: "game",
+        team: "SAC_ST",
+        marketKind: "spread",
+        side: "UNDERDOG",
+        line: 9.5,
+        productClass: "parlay",
+      },
     ]);
     store.ingestF402Ticket("7741", "1", "BGD101", "BIGDAD", [
-      { ticketNumber: "7741", wagerNumber: "1", customerId: "BGD101", agentId: "BIGDAD", sportType: "CFB", period: 0, team: "SAC_ST", shortDesc: "P SAC_ST +10.0 -110", line: 10.0 },
+      {
+        ticketNumber: "7741",
+        wagerNumber: "1",
+        customerId: "BGD101",
+        agentId: "BIGDAD",
+        sportType: "CFB",
+        period: 0,
+        team: "SAC_ST",
+        shortDesc: "P SAC_ST +10.0 -110",
+        line: 10.0,
+      },
     ]);
   }
   if (mj !== undefined) {
     store.ingestPolymarketCombo("0xbridge_nba_lal_1", mj, [
-      { competitionFamily: "NBA", period: "game", team: "LAL", marketKind: "spread", side: "FAVORITE", line: -2.5, productClass: "sgp" },
+      {
+        competitionFamily: "NBA",
+        period: "game",
+        team: "LAL",
+        marketKind: "spread",
+        side: "FAVORITE",
+        line: -2.5,
+        productClass: "sgp",
+      },
     ]);
     store.ingestF402Ticket("9101", "1", "MJ102", "MJ2026", [
-      { ticketNumber: "9101", wagerNumber: "1", customerId: "MJ102", agentId: "MJ2026", sportType: "NBA", period: 0, team: "LAL", shortDesc: "C LAKERS -3.5 -110", line: -3.5 },
+      {
+        ticketNumber: "9101",
+        wagerNumber: "1",
+        customerId: "MJ102",
+        agentId: "MJ2026",
+        sportType: "NBA",
+        period: 0,
+        team: "LAL",
+        shortDesc: "C LAKERS -3.5 -110",
+        line: -3.5,
+      },
     ]);
   }
   if (gp !== undefined) {
     store.ingestPolymarketCombo("0xbridge_nba_bos_1", gp, [
-      { competitionFamily: "NBA", period: "game", team: "BOS", marketKind: "spread", side: "FAVORITE", line: -5.5, productClass: "parlay" },
+      {
+        competitionFamily: "NBA",
+        period: "game",
+        team: "BOS",
+        marketKind: "spread",
+        side: "FAVORITE",
+        line: -5.5,
+        productClass: "parlay",
+      },
     ]);
     store.ingestF402Ticket("9201", "1", "GP300", "GPRO50RSK", [
-      { ticketNumber: "9201", wagerNumber: "1", customerId: "GP300", agentId: "GPRO50RSK", sportType: "NBA", period: 0, team: "BOS", shortDesc: "P CELTICS -6.5 -110", line: -6.5 },
+      {
+        ticketNumber: "9201",
+        wagerNumber: "1",
+        customerId: "GP300",
+        agentId: "GPRO50RSK",
+        sportType: "NBA",
+        period: 0,
+        team: "BOS",
+        shortDesc: "P CELTICS -6.5 -110",
+        line: -6.5,
+      },
     ]);
   }
   if (at !== undefined) {
     store.ingestPolymarketCombo("0xbridge_nba_den_1", at, [
-      { competitionFamily: "NBA", period: "game", team: "DEN", marketKind: "total", side: "OVER", line: 224.5, productClass: "parlay" },
+      {
+        competitionFamily: "NBA",
+        period: "game",
+        team: "DEN",
+        marketKind: "total",
+        side: "OVER",
+        line: 224.5,
+        productClass: "parlay",
+      },
     ]);
     store.ingestF402Ticket("9301", "1", "AT10359", "ATEAM", [
-      { ticketNumber: "9301", wagerNumber: "1", customerId: "AT10359", agentId: "ATEAM", sportType: "NBA", period: 0, team: "DEN", shortDesc: "P NUGGETS OVER 225.0 -110", line: 225.0 },
+      {
+        ticketNumber: "9301",
+        wagerNumber: "1",
+        customerId: "AT10359",
+        agentId: "ATEAM",
+        sportType: "NBA",
+        period: 0,
+        team: "DEN",
+        shortDesc: "P NUGGETS OVER 225.0 -110",
+        line: 225.0,
+      },
     ]);
   }
 
@@ -953,10 +1168,28 @@ export function seedCrossDomainScenario(store: {
   const da = registry.byCustomer.get("DA4401")?.[0]?.wallet;
   if (da !== undefined) {
     store.ingestPolymarketCombo("0xbridge_nba_den_under_1", da, [
-      { competitionFamily: "NBA", period: "game", team: "DEN", marketKind: "total", side: "UNDER", line: 224.5, productClass: "parlay" },
+      {
+        competitionFamily: "NBA",
+        period: "game",
+        team: "DEN",
+        marketKind: "total",
+        side: "UNDER",
+        line: 224.5,
+        productClass: "parlay",
+      },
     ]);
     store.ingestF402Ticket("9302", "1", "DA4401", "JUICEPLUS", [
-      { ticketNumber: "9302", wagerNumber: "1", customerId: "DA4401", agentId: "JUICEPLUS", sportType: "NBA", period: 0, team: "DEN", shortDesc: "P NUGGETS OVER 225.0 -110", line: 225.0 },
+      {
+        ticketNumber: "9302",
+        wagerNumber: "1",
+        customerId: "DA4401",
+        agentId: "JUICEPLUS",
+        sportType: "NBA",
+        period: 0,
+        team: "DEN",
+        shortDesc: "P NUGGETS OVER 225.0 -110",
+        line: 225.0,
+      },
     ]);
   }
 }

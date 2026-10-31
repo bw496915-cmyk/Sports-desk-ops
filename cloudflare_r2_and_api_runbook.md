@@ -4,16 +4,16 @@ This guide details the integration of your Cloudflare Account, Scoped API Token,
 
 ## 1. Credentials & Configuration Matrix
 
-| Variable                    | Configured Value                                                    | Operational Purpose                                    |
-| :-------------------------- | :------------------------------------------------------------------ | :----------------------------------------------------- |
-| **`CLOUDFLARE_ACCOUNT_ID`** | `7a470541a704caaf91e71efccc78fd36`                                  | Scopes Cloudflare API requests & R2 namespace          |
-| **`CLOUDFLARE_API_TOKEN`**  | `<CLOUDFLARE_API_TOKEN>` _(configured in `.env`)_                   | Pages deploy, DNS & account API verification            |
-| **`CLOUDFLARE_R2_API_TOKEN`** | `<CLOUDFLARE_R2_API_TOKEN>` _(configured in `.env`)_             | R2-scoped token; kept separate so Wrangler does not shadow it |
-| **`R2_ACCESS_KEY_ID`**      | `<R2_ACCESS_KEY_ID>` _(configured in `.env`)_                       | S3-compatible client access key                        |
-| **`R2_SECRET_ACCESS_KEY`**  | `<R2_SECRET_ACCESS_KEY>` _(configured in `.env`)_                   | S3-compatible secret signing key (SigV4)               |
-| **`R2_ENDPOINT`**           | `https://7a470541a704caaf91e71efccc78fd36.r2.cloudflarestorage.com` | Global S3 REST endpoint                                |
-| **`R2_BUCKET_NAME`**        | `sportsdesk-ops-reports`                                            | Dedicated bucket for report archives and audit bundles |
-| **`R2_PUBLIC_URL`**         | `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev`               | Public HTTPS gateway for zero-egress report downloads  |
+| Variable                      | Configured Value                                                    | Operational Purpose                                           |
+| :---------------------------- | :------------------------------------------------------------------ | :------------------------------------------------------------ |
+| **`CLOUDFLARE_ACCOUNT_ID`**   | `7a470541a704caaf91e71efccc78fd36`                                  | Scopes Cloudflare API requests & R2 namespace                 |
+| **`CLOUDFLARE_API_TOKEN`**    | `<CLOUDFLARE_API_TOKEN>` _(configured in `.env`)_                   | Pages deploy, DNS & account API verification                  |
+| **`CLOUDFLARE_R2_API_TOKEN`** | `<CLOUDFLARE_R2_API_TOKEN>` _(configured in `.env`)_                | R2-scoped token; kept separate so Wrangler does not shadow it |
+| **`R2_ACCESS_KEY_ID`**        | `<R2_ACCESS_KEY_ID>` _(configured in `.env`)_                       | S3-compatible client access key                               |
+| **`R2_SECRET_ACCESS_KEY`**    | `<R2_SECRET_ACCESS_KEY>` _(configured in `.env`)_                   | S3-compatible secret signing key (SigV4)                      |
+| **`R2_ENDPOINT`**             | `https://7a470541a704caaf91e71efccc78fd36.r2.cloudflarestorage.com` | Global S3 REST endpoint                                       |
+| **`R2_BUCKET_NAME`**          | `sportsdesk-ops-reports`                                            | Dedicated bucket for report archives and audit bundles        |
+| **`R2_PUBLIC_URL`**           | `https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev`               | Public HTTPS gateway for zero-egress report downloads         |
 
 ## 2. Token Verification & Cloudflare Edge Services
 

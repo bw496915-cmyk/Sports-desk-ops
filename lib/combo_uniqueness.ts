@@ -68,9 +68,7 @@ export interface ComboGameStats {
 export type ComboGate = "permissive" | "all-legs-cfb" | "full-game";
 
 export type StrictDropReason =
-  | "UNRESOLVED_LEGS"
-  | "CROSS_GAME"
-  | "INELIGIBLE_LEG_TYPE";
+  "UNRESOLVED_LEGS" | "CROSS_GAME" | "INELIGIBLE_LEG_TYPE";
 
 export interface ComboAuditRow {
   readonly comboId: string;
@@ -131,7 +129,10 @@ export interface ComboUniquenessReport {
       readonly oneOffLegKeys: number;
       /** Leg keys seen in two or more combos (systemic). */
       readonly systemicLegKeys: number;
-      readonly top: readonly { readonly legKey: string; readonly combos: number }[];
+      readonly top: readonly {
+        readonly legKey: string;
+        readonly combos: number;
+      }[];
     };
     /** Combos with legs that resolved to **zero** indexed games; they never reach the report. */
     readonly combosWithoutAttribution: number;
@@ -145,7 +146,11 @@ export interface ComboUniquenessReport {
   readonly wallets: readonly string[];
   /** Per-combo audit trail; empty under `--json` only if `includeAudit: false`. */
   readonly combos: readonly ComboAuditRow[];
-  readonly cache: { readonly hits: number; readonly misses: number; readonly ttlHours: number };
+  readonly cache: {
+    readonly hits: number;
+    readonly misses: number;
+    readonly ttlHours: number;
+  };
 }
 
 interface CfbGame {
@@ -183,20 +188,30 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 const text = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
+  typeof value === "string"
+    ? value.trim()
+    : typeof value === "number"
+      ? String(value)
+      : "";
 
 function jsonArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map((entry) => text(entry)).filter(Boolean);
+  if (Array.isArray(value))
+    return value.map((entry) => text(entry)).filter(Boolean);
   if (typeof value !== "string" || value.trim() === "") return [];
   try {
     const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.map((entry) => text(entry)).filter(Boolean) : [];
+    return Array.isArray(parsed)
+      ? parsed.map((entry) => text(entry)).filter(Boolean)
+      : [];
   } catch {
     return [];
   }
 }
 
-async function getJson(url: string, options?: ComboUniquenessOptions): Promise<unknown> {
+async function getJson(
+  url: string,
+  options?: ComboUniquenessOptions,
+): Promise<unknown> {
   const response = await (options?.fetchImpl ?? fetch)(url, {
     proxy: false,
     signal: AbortSignal.timeout(options?.timeoutMs ?? 15_000),
@@ -210,22 +225,28 @@ async function mapLimit<T, R>(
   limit: number,
   fn: (item: T, index: number) => Promise<R>,
 ): Promise<R[]> {
+  // eslint-disable-next-line unicorn/no-new-array -- dense preallocation filled by index
   const out: R[] = new Array(items.length);
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(Math.max(limit, 1), items.length || 1) }, async () => {
-    for (;;) {
-      const index = cursor;
-      cursor += 1;
-      if (index >= items.length) return;
-      out[index] = await fn(items[index]!, index);
-    }
-  });
+  const workers = Array.from(
+    { length: Math.min(Math.max(limit, 1), items.length || 1) },
+    async () => {
+      for (;;) {
+        const index = cursor;
+        cursor += 1;
+        if (index >= items.length) return;
+        out[index] = await fn(items[index]!, index);
+      }
+    },
+  );
   await Promise.all(workers);
   return out;
 }
 
 /** Loads CFB events and indexes their condition IDs, slugs and CLOB token IDs. */
-export async function loadCfbGames(options?: ComboUniquenessOptions): Promise<CfbGame[]> {
+export async function loadCfbGames(
+  options?: ComboUniquenessOptions,
+): Promise<CfbGame[]> {
   const gamma = (options?.gammaBase ?? GAMMA_API).replace(/\/$/, "");
   const since = options?.since ?? null;
   const sources: Array<"active" | "closed"> =
@@ -245,7 +266,11 @@ export async function loadCfbGames(options?: ComboUniquenessOptions): Promise<Cf
       const body = await getJson(url, options);
       if (!Array.isArray(body) || body.length === 0) break;
       for (const game of mapCfbEvents(body)) {
-        if (since !== null && (game.endIso === null || game.endIso.slice(0, 10) < since)) continue;
+        if (
+          since !== null &&
+          (game.endIso === null || game.endIso.slice(0, 10) < since)
+        )
+          continue;
         if (seen.has(game.slug)) continue;
         seen.add(game.slug);
         games.push(game);
@@ -423,9 +448,15 @@ function normalizeCombo(
 ): NormalizeResult {
   const record = asRecord(raw);
   if (record === null) return { ok: false, reason: "NO_LEGS" };
-  const legsRaw = Array.isArray(record.legs) ? record.legs : Array.isArray(record.components) ? record.components : [];
+  const legsRaw = Array.isArray(record.legs)
+    ? record.legs
+    : Array.isArray(record.components)
+      ? record.components
+      : [];
   if (legsRaw.length === 0) return { ok: false, reason: "NO_LEGS" };
-  const legs = legsRaw.map(asRecord).filter((leg): leg is Record<string, unknown> => leg !== null);
+  const legs = legsRaw
+    .map(asRecord)
+    .filter((leg): leg is Record<string, unknown> => leg !== null);
   if (legs.length === 0) return { ok: false, reason: "NO_LEGS" };
 
   const games = new Set<string>();
@@ -447,8 +478,14 @@ function normalizeCombo(
   const legKeys = legs.map(legKey).sort();
   const legSignatures = legs.map(legSignature).sort();
   const comboId =
-    text(record.comboId) || text(record.id) || `sha256:${hashKeys(legSignatures)}`;
-  const wallet = (text(record.user) || text(record.wallet) || fallbackWallet).toLowerCase();
+    text(record.comboId) ||
+    text(record.id) ||
+    `sha256:${hashKeys(legSignatures)}`;
+  const wallet = (
+    text(record.user) ||
+    text(record.wallet) ||
+    fallbackWallet
+  ).toLowerCase();
   return {
     ok: true,
     combo: {
@@ -483,8 +520,14 @@ export async function seedWalletsFromTrades(
 ): Promise<Set<string>> {
   const maxMarkets = options?.maxSeedMarkets ?? 60;
   const perMarket = options?.perMarket ?? 100;
-  const data = (options?.dataBase ?? "https://data-api.polymarket.com").replace(/\/$/, "");
-  const ids = [...new Set(games.flatMap((game) => game.conditionIds))].slice(0, maxMarkets);
+  const data = (options?.dataBase ?? "https://data-api.polymarket.com").replace(
+    /\/$/,
+    "",
+  );
+  const ids = [...new Set(games.flatMap((game) => game.conditionIds))].slice(
+    0,
+    maxMarkets,
+  );
   const wallets = new Set<string>();
   await mapLimit(ids, options?.concurrency ?? 6, async (conditionId) => {
     try {
@@ -497,8 +540,13 @@ export async function seedWalletsFromTrades(
         const row = asRecord(raw);
         if (row === null) continue;
         const wallet =
-          text(row.proxyWallet) || text(row.wallet) || text(row.maker) || text(row.taker) || text(row.user);
-        if (/^0x[0-9a-fA-F]{40}$/.test(wallet)) wallets.add(wallet.toLowerCase());
+          text(row.proxyWallet) ||
+          text(row.wallet) ||
+          text(row.maker) ||
+          text(row.taker) ||
+          text(row.user);
+        if (/^0x[0-9a-fA-F]{40}$/.test(wallet))
+          wallets.add(wallet.toLowerCase());
       }
     } catch {
       // a market with no trades is normal
@@ -513,17 +561,23 @@ export async function seedWalletsFromLeaderboard(
 ): Promise<Set<string>> {
   const wallets = new Set<string>();
   const limit = options?.leaderboardLimit ?? 100;
-  const data = (options?.dataBase ?? "https://data-api.polymarket.com").replace(/\/$/, "");
+  const data = (options?.dataBase ?? "https://data-api.polymarket.com").replace(
+    /\/$/,
+    "",
+  );
   for (const period of ["week", "month", "all"] as const) {
     try {
       const body = await getJson(
         `${data}/v2/leaderboard?time_period=${period}&sort_by=PNL&limit=${limit}`,
         options,
       );
-      const rows = Array.isArray(asRecord(body)?.data) ? (asRecord(body)!.data as unknown[]) : [];
+      const rows = Array.isArray(asRecord(body)?.data)
+        ? (asRecord(body)!.data as unknown[])
+        : [];
       for (const raw of rows) {
         const wallet = text(asRecord(raw)?.user_id);
-        if (/^0x[0-9a-fA-F]{40}$/.test(wallet)) wallets.add(wallet.toLowerCase());
+        if (/^0x[0-9a-fA-F]{40}$/.test(wallet))
+          wallets.add(wallet.toLowerCase());
       }
     } catch {
       // leaderboard is a best-effort seed
@@ -543,8 +597,11 @@ async function readCache(
 ): Promise<readonly unknown[] | null> {
   if (options?.fresh === true) return null;
   try {
-    const parsed = JSON.parse(await readFile(path, "utf8")) as Partial<CacheFile>;
-    if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.records)) return null;
+    const parsed = JSON.parse(
+      await readFile(path, "utf8"),
+    ) as Partial<CacheFile>;
+    if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.records))
+      return null;
     const fetchedAt = Date.parse(parsed.fetchedAtIso ?? "");
     if (!Number.isFinite(fetchedAt)) return null;
     const ttl = cacheTtlMs(options);
@@ -561,19 +618,25 @@ async function fetchCombosUncached(
   options?: ComboUniquenessOptions,
 ): Promise<unknown[]> {
   const maxPages = Math.max(1, options?.maxComboPages ?? 3);
-  const data = (options?.dataBase ?? "https://data-api.polymarket.com").replace(/\/$/, "");
+  const data = (options?.dataBase ?? "https://data-api.polymarket.com").replace(
+    /\/$/,
+    "",
+  );
   const records: unknown[] = [];
   for (const path of ["/v2/activity/combos", "/v2/positions/combos"]) {
     let cursor: string | null = null;
     for (let page = 0; page < maxPages; page += 1) {
-      const suffix = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+      const suffix =
+        cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
       try {
         const body = await getJson(
           `${data}${path}?user=${wallet}&limit=500${suffix}`,
           options,
         );
         const record = asRecord(body);
-        const pageRows = Array.isArray(record?.data) ? (record.data as unknown[]) : [];
+        const pageRows = Array.isArray(record?.data)
+          ? (record.data as unknown[])
+          : [];
         records.push(...pageRows);
         const next = text(asRecord(record?.pagination)?.next_cursor);
         if (pageRows.length === 0 || next === "") break;
@@ -618,16 +681,19 @@ export async function buildComboUniquenessReport(
 
   const wallets = new Set<string>();
   if (options?.leaderboard !== false) {
-    for (const wallet of await seedWalletsFromLeaderboard(options)) wallets.add(wallet);
+    for (const wallet of await seedWalletsFromLeaderboard(options))
+      wallets.add(wallet);
   }
   if (options?.seedTrades === true) {
-    for (const wallet of await seedWalletsFromTrades(games, options)) wallets.add(wallet);
+    for (const wallet of await seedWalletsFromTrades(games, options))
+      wallets.add(wallet);
   }
   if (options?.walletFile !== undefined) {
     try {
       const file = await readFile(options.walletFile, "utf8");
       for (const candidate of file.split(/\s+/)) {
-        if (/^0x[0-9a-fA-F]{40}$/.test(candidate)) wallets.add(candidate.toLowerCase());
+        if (/^0x[0-9a-fA-F]{40}$/.test(candidate))
+          wallets.add(candidate.toLowerCase());
       }
     } catch {
       // missing wallet file is not fatal
@@ -637,24 +703,29 @@ export async function buildComboUniquenessReport(
   const stats = { hits: 0, misses: 0 };
   let recordsWithoutLegs = 0;
   let combosWithoutAttribution = 0;
-  const perWallet = await mapLimit([...wallets], options?.concurrency ?? 6, async (wallet) => {
-    const records = await cachedCombos(wallet, options, stats);
-    const combos: NormalizedCombo[] = [];
-    for (const record of records) {
-      const result = normalizeCombo(record, wallet, index);
-      if (result.ok) {
-        combos.push(result.combo);
-      } else if (result.reason === "NO_ATTRIBUTION") {
-        combosWithoutAttribution += 1;
-      } else {
-        recordsWithoutLegs += 1;
+  const perWallet = await mapLimit(
+    [...wallets],
+    options?.concurrency ?? 6,
+    async (wallet) => {
+      const records = await cachedCombos(wallet, options, stats);
+      const combos: NormalizedCombo[] = [];
+      for (const record of records) {
+        const result = normalizeCombo(record, wallet, index);
+        if (result.ok) {
+          combos.push(result.combo);
+        } else if (result.reason === "NO_ATTRIBUTION") {
+          combosWithoutAttribution += 1;
+        } else {
+          recordsWithoutLegs += 1;
+        }
       }
-    }
-    return combos;
-  });
+      return combos;
+    },
+  );
 
   const gate: ComboGate =
-    options?.gate ?? (options?.strictFullGame === true ? "full-game" : "permissive");
+    options?.gate ??
+    (options?.strictFullGame === true ? "full-game" : "permissive");
   const strict = gate === "full-game";
 
   // Two dedupe passes, in order of certainty:
@@ -681,7 +752,8 @@ export async function buildComboUniquenessReport(
     seenLegSets.add(legKey);
     dedupedAll.push(combo);
   }
-  const duplicatesCollapsed = duplicatesCollapsedById + duplicatesCollapsedByLegSet;
+  const duplicatesCollapsed =
+    duplicatesCollapsedById + duplicatesCollapsedByLegSet;
   const unresolvedByKey = new Map<string, number>();
   let unresolvedCombos = 0;
   let unresolvedLegs = 0;
@@ -698,15 +770,27 @@ export async function buildComboUniquenessReport(
     .sort((a, b) => b.combos - a.combos || a.legKey.localeCompare(b.legKey))
     .slice(0, 10);
   const diagnostics = {
-    legsWithoutSide: dedupedAll.reduce((sum, combo) => sum + combo.legsWithoutSide, 0),
-    legsWithoutStableId: dedupedAll.reduce((sum, combo) => sum + combo.unstableLegs, 0),
-    combosWithUnstableIdentity: dedupedAll.filter((combo) => combo.unstableLegs > 0).length,
+    legsWithoutSide: dedupedAll.reduce(
+      (sum, combo) => sum + combo.legsWithoutSide,
+      0,
+    ),
+    legsWithoutStableId: dedupedAll.reduce(
+      (sum, combo) => sum + combo.unstableLegs,
+      0,
+    ),
+    combosWithUnstableIdentity: dedupedAll.filter(
+      (combo) => combo.unstableLegs > 0,
+    ).length,
     unresolved: {
       combos: unresolvedCombos,
       legs: unresolvedLegs,
       distinctLegKeys: unresolvedByKey.size,
-      oneOffLegKeys: [...unresolvedByKey.values()].filter((count) => count === 1).length,
-      systemicLegKeys: [...unresolvedByKey.values()].filter((count) => count >= 2).length,
+      oneOffLegKeys: [...unresolvedByKey.values()].filter(
+        (count) => count === 1,
+      ).length,
+      systemicLegKeys: [...unresolvedByKey.values()].filter(
+        (count) => count >= 2,
+      ).length,
       top: unresolvedTop,
     },
     combosWithoutAttribution,
@@ -714,11 +798,14 @@ export async function buildComboUniquenessReport(
     cfbTouchRatePct:
       dedupedAll.length + combosWithoutAttribution > 0
         ? Math.round(
-            (dedupedAll.length / (dedupedAll.length + combosWithoutAttribution)) * 10_000,
+            (dedupedAll.length /
+              (dedupedAll.length + combosWithoutAttribution)) *
+              10_000,
           ) / 100
         : 0,
-    suspectedComboOfComboLegKeys: [...unresolvedByKey.keys()].filter(looksLikeComboCondition)
-      .length,
+    suspectedComboOfComboLegKeys: [...unresolvedByKey.keys()].filter(
+      looksLikeComboCondition,
+    ).length,
   };
 
   // Attribution above is mode-independent. Each gate is a pure filter applied afterwards, so a
@@ -760,11 +847,26 @@ export async function buildComboUniquenessReport(
   }
   const normalized = kept;
   const deduped = normalized;
-  const includedCrossGame = normalized.filter((combo) => !combo.fullyWithinGame).length;
+  const includedCrossGame = normalized.filter(
+    (combo) => !combo.fullyWithinGame,
+  ).length;
 
-  const byGame = new Map<string, { combos: Set<string>; wallets: Set<string>; full: number; samples: NormalizedCombo[] }>();
+  const byGame = new Map<
+    string,
+    {
+      combos: Set<string>;
+      wallets: Set<string>;
+      full: number;
+      samples: NormalizedCombo[];
+    }
+  >();
   for (const game of games) {
-    byGame.set(game.slug, { combos: new Set(), wallets: new Set(), full: 0, samples: [] });
+    byGame.set(game.slug, {
+      combos: new Set(),
+      wallets: new Set(),
+      full: 0,
+      samples: [],
+    });
   }
   for (const combo of deduped) {
     for (const slug of combo.gameSlugs) {
@@ -795,12 +897,21 @@ export async function buildComboUniquenessReport(
         })),
       };
     })
-    .sort((a, b) => b.volume24hr - a.volume24hr || a.gameSlug.localeCompare(b.gameSlug));
+    .sort(
+      (a, b) =>
+        b.volume24hr - a.volume24hr || a.gameSlug.localeCompare(b.gameSlug),
+    );
 
   const globalCombos = new Set(deduped.map((combo) => combo.comboId));
   const globalWallets = new Set(deduped.map((combo) => combo.wallet));
-  const sumCombos = gamesReport.reduce((sum, game) => sum + game.uniqueCombos, 0);
-  const sumWallets = gamesReport.reduce((sum, game) => sum + game.uniqueWallets, 0);
+  const sumCombos = gamesReport.reduce(
+    (sum, game) => sum + game.uniqueCombos,
+    0,
+  );
+  const sumWallets = gamesReport.reduce(
+    (sum, game) => sum + game.uniqueWallets,
+    0,
+  );
 
   return {
     gate,
@@ -812,7 +923,8 @@ export async function buildComboUniquenessReport(
     },
     games: gamesReport,
     global: {
-      gamesWithActivity: gamesReport.filter((game) => game.uniqueCombos > 0).length,
+      gamesWithActivity: gamesReport.filter((game) => game.uniqueCombos > 0)
+        .length,
       sumPerGameCombos: sumCombos,
       sumPerGameWallets: sumWallets,
       distinctCombos: globalCombos.size,
@@ -829,7 +941,10 @@ export async function buildComboUniquenessReport(
     diagnostics,
     wallets: [...wallets].sort(),
     combos: audit,
-    cache: { ...stats, ttlHours: options?.cacheTtlHours ?? DEFAULT_CACHE_TTL_HOURS },
+    cache: {
+      ...stats,
+      ttlHours: options?.cacheTtlHours ?? DEFAULT_CACHE_TTL_HOURS,
+    },
   };
 }
 

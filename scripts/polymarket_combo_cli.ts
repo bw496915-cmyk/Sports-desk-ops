@@ -77,7 +77,11 @@ Notes:
     excluded from realized totals, and --all-venues skips CFB game attribution.
   • Public APIs only; no key.`;
 
-function flag(args: readonly string[], names: readonly string[], fallback: string): string {
+function flag(
+  args: readonly string[],
+  names: readonly string[],
+  fallback: string,
+): string {
   for (const name of names) {
     const index = args.indexOf(name);
     if (index !== -1 && index + 1 < args.length) return args[index + 1]!;
@@ -100,15 +104,28 @@ function comboUniquenessOptions(
     seedTrades: args.includes("--seed-trades") || envFlag("SEED_TRADES"),
     ...(walletFile !== "" ? { walletFile } : {}),
     limitGames: Number(flag(args, ["--limit-games"], "0")),
-    includeClosedGames: !args.includes("--open-only") && env.INCLUDE_CLOSED_GAMES !== "0",
-    ...(flag(args, ["--since"], "") === "" ? {} : { since: flag(args, ["--since"], "") }),
+    includeClosedGames:
+      !args.includes("--open-only") && env.INCLUDE_CLOSED_GAMES !== "0",
+    ...(flag(args, ["--since"], "") === ""
+      ? {}
+      : { since: flag(args, ["--since"], "") }),
     maxGamePages: Number(flag(args, ["--max-game-pages"], "30")),
     concurrency: Number(flag(args, ["--concurrency"], env.CONCURRENCY ?? "6")),
-    leaderboardLimit: Number(flag(args, ["--leaderboard-limit"], env.LEADERBOARD_LIMIT ?? "100")),
-    maxSeedMarkets: Number(flag(args, ["--max-seed-markets"], env.MAX_SEED_MARKETS ?? "60")),
+    leaderboardLimit: Number(
+      flag(args, ["--leaderboard-limit"], env.LEADERBOARD_LIMIT ?? "100"),
+    ),
+    maxSeedMarkets: Number(
+      flag(args, ["--max-seed-markets"], env.MAX_SEED_MARKETS ?? "60"),
+    ),
     maxComboPages: Number(flag(args, ["--max-combo-pages"], "3")),
-    cacheDir: flag(args, ["--cache-dir"], env.CACHE_DIR ?? "scratch/cfb-combo-cache"),
-    cacheTtlHours: Number(flag(args, ["--cache-ttl-hours"], env.CACHE_TTL_HOURS ?? "24")),
+    cacheDir: flag(
+      args,
+      ["--cache-dir"],
+      env.CACHE_DIR ?? "scratch/cfb-combo-cache",
+    ),
+    cacheTtlHours: Number(
+      flag(args, ["--cache-ttl-hours"], env.CACHE_TTL_HOURS ?? "24"),
+    ),
     includeAudit: !args.includes("--no-audit"),
   };
 }
@@ -120,7 +137,9 @@ const usd = (value: number): string =>
 function printLegs(events: readonly ComboEvent[], maxLegs = 12): void {
   const withLegs = events.filter((event) => event.legs.length > 0);
   if (withLegs.length === 0) {
-    console.log("No active CFB events with priced legs (in-progress games show 0/1 prices).");
+    console.log(
+      "No active CFB events with priced legs (in-progress games show 0/1 prices).",
+    );
     return;
   }
   for (const event of withLegs) {
@@ -132,11 +151,14 @@ function printLegs(events: readonly ComboEvent[], maxLegs = 12): void {
       );
     }
     if (event.legs.length > maxLegs) {
-      console.log(`   … +${event.legs.length - maxLegs} more legs (use --json for all)`);
+      console.log(
+        `   … +${event.legs.length - maxLegs} more legs (use --json for all)`,
+      );
     }
   }
   const skipped = events.length - withLegs.length;
-  if (skipped > 0) console.log(`\n(${skipped} event(s) had no priced legs and were skipped)`);
+  if (skipped > 0)
+    console.log(`\n(${skipped} event(s) had no priced legs and were skipped)`);
 }
 
 function printPrice(price: ComboPrice): void {
@@ -146,14 +168,20 @@ function printPrice(price: ComboPrice): void {
   console.log(
     `Stake ${usd(price.stakeUsd)} → ${usd(price.payoutUsd)} if all legs win (${price.payoutMultiple.toFixed(2)}x)`,
   );
-  if (price.quotedPrice !== null && price.quotedPayoutUsd !== null && price.makerMarginPct !== null) {
+  if (
+    price.quotedPrice !== null &&
+    price.quotedPayoutUsd !== null &&
+    price.makerMarginPct !== null
+  ) {
     console.log(
       `Quoted ${cents(price.quotedPrice)} → ${usd(price.quotedPayoutUsd)} | maker margin ${price.makerMarginPct.toFixed(1)}% over fair`,
     );
   }
 }
 
-export async function runPolymarketCombo(argv: readonly string[]): Promise<void> {
+export async function runPolymarketCombo(
+  argv: readonly string[],
+): Promise<void> {
   const args = [...argv];
   if (args.includes("-h") || args.includes("--help") || args.length === 0) {
     console.log(HELP);
@@ -162,7 +190,6 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
   const sub = args[0]!;
   const json = args.includes("--json");
   const limit = Number(flag(args, ["--limit"], "5"));
-  const sleepless = { limit: Number.isFinite(limit) ? limit : 5 };
 
   if (sub === "legs") {
     const legsLimit = Number(flag(args, ["--limit"], "10"));
@@ -193,17 +220,26 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     } else {
       const specsRaw = flag(args, ["--legs"], "");
       if (specsRaw === "") {
-        console.error("price: provide --prices 0.38,0.80 or --legs \"<slug>=<Outcome>,...\"");
+        console.error(
+          'price: provide --prices 0.38,0.80 or --legs "<slug>=<Outcome>,..."',
+        );
         process.exitCode = 1;
         return;
       }
-      const events = await fetchCfbComboEvents({ limit: Number(flag(args, ["--limit"], "10")) });
+      const events = await fetchCfbComboEvents({
+        limit: Number(flag(args, ["--limit"], "10")),
+      });
       const resolved = resolveLegSpecs(
-        specsRaw.split(",").map((spec) => spec.trim()).filter((spec) => spec !== ""),
+        specsRaw
+          .split(",")
+          .map((spec) => spec.trim())
+          .filter((spec) => spec !== ""),
         events,
       );
       if (resolved.missing.length > 0) {
-        console.error(`price: could not resolve: ${resolved.missing.join(" | ")}`);
+        console.error(
+          `price: could not resolve: ${resolved.missing.join(" | ")}`,
+        );
         process.exitCode = 1;
         return;
       }
@@ -225,7 +261,8 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     const gate: ComboGate =
       args.includes("--all-legs-cfb") || process.env.ALL_LEGS_CFB === "1"
         ? "all-legs-cfb"
-        : args.includes("--strict-full-game") || process.env.STRICT_FULL_GAME === "1"
+        : args.includes("--strict-full-game") ||
+            process.env.STRICT_FULL_GAME === "1"
           ? "full-game"
           : "permissive";
 
@@ -235,7 +272,11 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
       const treatmentGate: ComboGate = args.includes("--all-legs-cfb")
         ? "all-legs-cfb"
         : "full-game";
-      const referenceArg = flag(args, ["--against"], "permissive").toLowerCase();
+      const referenceArg = flag(
+        args,
+        ["--against"],
+        "permissive",
+      ).toLowerCase();
       const referenceGate: ComboGate =
         referenceArg === "all-legs-cfb" || referenceArg === "cfb"
           ? "all-legs-cfb"
@@ -278,7 +319,13 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
       const leaks = checks.reduce((sum, check) => sum + check.leaks.length, 0);
       const vacuous = checks.some((check) => check.vacuous);
       if (json) {
-        console.log(JSON.stringify({ chain, checks, leaks, vacuous, strictExit }, null, 2));
+        console.log(
+          JSON.stringify(
+            { chain, checks, leaks, vacuous, strictExit },
+            null,
+            2,
+          ),
+        );
       } else {
         for (const check of checks) {
           console.log(
@@ -289,16 +336,20 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
               `WARNING: ${check.treatmentGate} set empty — this edge is VACUOUS`,
             );
           }
-          for (const leak of check.leaks.slice(0, 20)) console.log(`  LEAK ${leak}`);
+          for (const leak of check.leaks.slice(0, 20))
+            console.log(`  LEAK ${leak}`);
         }
-        if (vacuous && strictExit) console.log("--strict-exit: failing on vacuous edge");
+        if (vacuous && strictExit)
+          console.log("--strict-exit: failing on vacuous edge");
       }
       if (leaks > 0) process.exitCode = 1;
       else if (vacuous && strictExit) process.exitCode = 2;
       return;
     }
 
-    const report = await buildComboUniquenessReport(comboUniquenessOptions(args, gate));
+    const report = await buildComboUniquenessReport(
+      comboUniquenessOptions(args, gate),
+    );
     const emitPath = flag(args, ["--emit-ids"], "");
     const dumpPath = flag(args, ["--dump-wallets"], "");
     if (emitPath !== "") {
@@ -339,12 +390,18 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     console.log(`   distinct combos     : ${report.global.distinctCombos}`);
     console.log(`   distinct wallets    : ${report.global.distinctWallets}`);
     console.log(`   sum per-game combos : ${report.global.sumPerGameCombos}`);
-    console.log(`   permissive combos   : ${report.permissiveCombos} (before the gate)`);
-    console.log(`   duplicates collapsed: ${report.duplicatesCollapsed} (comboId or leg-set)`);
+    console.log(
+      `   permissive combos   : ${report.permissiveCombos} (before the gate)`,
+    );
+    console.log(
+      `   duplicates collapsed: ${report.duplicatesCollapsed} (comboId or leg-set)`,
+    );
     console.log(
       `   dedupe by id / leg-set: ${report.duplicatesCollapsedById} / ${report.duplicatesCollapsedByLegSet}`,
     );
-    console.log(`   legs without side   : ${report.diagnostics.legsWithoutSide}`);
+    console.log(
+      `   legs without side   : ${report.diagnostics.legsWithoutSide}`,
+    );
     if (report.diagnostics.legsWithoutSide > 0) {
       console.log(
         "   note                : unsided legs cannot match a sided source; cross-indexer dedupe is inert for them",
@@ -352,17 +409,25 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     }
     if (report.gate !== "permissive") {
       const e = report.exclusions;
-      const crossGame = report.gate === "full-game" ? `cross-game ${e.CROSS_GAME}` : "cross-game included";
+      const crossGame =
+        report.gate === "full-game"
+          ? `cross-game ${e.CROSS_GAME}`
+          : "cross-game included";
       console.log(
         `   gate drops          : unresolved legs ${e.UNRESOLVED_LEGS} | ${crossGame} | ineligible type ${e.INELIGIBLE_LEG_TYPE}`,
       );
       console.log(`   included cross-game : ${report.includedCrossGame}`);
       if (e.UNRESOLVED_LEGS > 0) {
-        console.log("   note                : count is a FLOOR (unresolved legs are dropped)");
+        console.log(
+          "   note                : count is a FLOOR (unresolved legs are dropped)",
+        );
       }
     }
     const unresolved = report.diagnostics.unresolved;
-    if (unresolved.combos > 0 || report.diagnostics.combosWithoutAttribution > 0) {
+    if (
+      unresolved.combos > 0 ||
+      report.diagnostics.combosWithoutAttribution > 0
+    ) {
       console.log(
         `   unresolved legs     : ${unresolved.combos} partial, ${report.diagnostics.combosWithoutAttribution} fully unresolved, ` +
           `${unresolved.legs} legs, ${unresolved.distinctLegKeys} distinct (${unresolved.oneOffLegKeys} one-off / ${unresolved.systemicLegKeys} systemic)`,
@@ -374,7 +439,9 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
         `   combo-of-combo keys : ${report.diagnostics.suspectedComboOfComboLegKeys} (zero-padded, 404 on CLOB)`,
       );
       for (const entry of unresolved.top.slice(0, 3)) {
-        console.log(`     • ${entry.legKey.slice(0, 46)} in ${entry.combos} combo${entry.combos === 1 ? "" : "s"}`);
+        console.log(
+          `     • ${entry.legKey.slice(0, 46)} in ${entry.combos} combo${entry.combos === 1 ? "" : "s"}`,
+        );
       }
     }
     console.log(
@@ -412,7 +479,9 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
       wallets = [...seeded];
     }
     if (wallets.length === 0) {
-      console.error("backtest: no wallets (pass --wallets/--wallet-file or seed the leaderboard)");
+      console.error(
+        "backtest: no wallets (pass --wallets/--wallet-file or seed the leaderboard)",
+      );
       process.exitCode = 1;
       return;
     }
@@ -420,7 +489,9 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     let gameIndex: ReadonlyMap<string, string> | undefined;
     let gameBySlug: ReadonlyMap<string, string> | undefined;
     if (cfbOnly) {
-      const games = await loadCfbGames({ limitGames: Number(flag(args, ["--limit-games"], "50")) });
+      const games = await loadCfbGames({
+        limitGames: Number(flag(args, ["--limit-games"], "50")),
+      });
       const index = buildGameIndex(games);
       gameIndex = index.byConditionId;
       gameBySlug = index.byMarketSlug;
@@ -437,7 +508,8 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
       console.log(JSON.stringify(report, null, 2));
       return;
     }
-    const roi = (value: number | null): string => (value === null ? "n/a" : `${value.toFixed(1)}%`);
+    const roi = (value: number | null): string =>
+      value === null ? "n/a" : `${value.toFixed(1)}%`;
     console.log(
       `Combo backtest ${report.fromIso.slice(0, 10)}..${report.toIso.slice(0, 10)} | wallets ${report.wallets} | ${report.cfbOnly ? "CFB only" : "all venues"}`,
     );
@@ -486,8 +558,12 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     console.log(
       `  open ${summary.openPositions}  |  open cost ${usd(summary.openCostUsd)}  |  pages ${summary.pages}${summary.truncated ? " (truncated)" : ""}`,
     );
-    for (const [type, bucket] of Object.entries(summary.activityByType).sort()) {
-      console.log(`  ${type.padEnd(10)} ${String(bucket.count).padStart(4)}  ${usd(bucket.amountUsd)}`);
+    for (const [type, bucket] of Object.entries(
+      summary.activityByType,
+    ).sort()) {
+      console.log(
+        `  ${type.padEnd(10)} ${String(bucket.count).padStart(4)}  ${usd(bucket.amountUsd)}`,
+      );
     }
     console.log("");
     for (const position of summary.positions.slice(0, 10)) {
@@ -510,7 +586,9 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
 
 if (import.meta.main) {
   runPolymarketCombo(process.argv.slice(2)).catch((error: unknown) => {
-    console.error(`combo: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `combo: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exitCode = 1;
   });
 }

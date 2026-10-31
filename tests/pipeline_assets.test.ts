@@ -77,13 +77,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function requireRecord(value: unknown, context: string): Record<string, unknown> {
+function requireRecord(
+  value: unknown,
+  context: string,
+): Record<string, unknown> {
   if (!isRecord(value)) throw new Error(`${context} must be an object`);
   return value;
 }
 
 function requireString(value: unknown, context: string): string {
-  if (typeof value !== "string" || value.length === 0) throw new Error(`${context} must be a non-empty string`);
+  if (typeof value !== "string" || value.length === 0)
+    throw new Error(`${context} must be a non-empty string`);
   return value;
 }
 
@@ -95,18 +99,23 @@ function requireInteger(value: unknown, context: string): number {
 }
 
 function requireNumber(value: unknown, context: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${context} must be a finite number`);
+  if (typeof value !== "number" || !Number.isFinite(value))
+    throw new Error(`${context} must be a finite number`);
   return value;
 }
 
 function requireBoolean(value: unknown, context: string): boolean {
-  if (typeof value !== "boolean") throw new Error(`${context} must be a boolean`);
+  if (typeof value !== "boolean")
+    throw new Error(`${context} must be a boolean`);
   return value;
 }
 
 function requireStringArray(value: unknown, context: string): string[] {
-  if (!Array.isArray(value)) throw new Error(`${context} must be an array of strings`);
-  return value.map((item, index) => requireString(item, `${context}[${index}]`));
+  if (!Array.isArray(value))
+    throw new Error(`${context} must be an array of strings`);
+  return value.map((item, index) =>
+    requireString(item, `${context}[${index}]`),
+  );
 }
 
 function parseFiles(value: unknown, context: string): ArtifactFiles {
@@ -114,17 +123,29 @@ function parseFiles(value: unknown, context: string): ArtifactFiles {
   return {
     svgRepoPath: requireString(files["svgRepoPath"], `${context}.svgRepoPath`),
     pngRepoPath: requireString(files["pngRepoPath"], `${context}.pngRepoPath`),
-    webpRepoPath: requireString(files["webpRepoPath"], `${context}.webpRepoPath`),
+    webpRepoPath: requireString(
+      files["webpRepoPath"],
+      `${context}.webpRepoPath`,
+    ),
     svgBytes: requireInteger(files["svgBytes"], `${context}.svgBytes`),
     pngBytes: requireInteger(files["pngBytes"], `${context}.pngBytes`),
     webpBytes: requireInteger(files["webpBytes"], `${context}.webpBytes`),
     svgSha256: requireString(files["svgSha256"], `${context}.svgSha256`),
     pngSha256: requireString(files["pngSha256"], `${context}.pngSha256`),
     webpSha256: requireString(files["webpSha256"], `${context}.webpSha256`),
-    pngMetadataBearing: requireBoolean(files["pngMetadataBearing"], `${context}.pngMetadataBearing`),
-    webpMetadataBearing: requireBoolean(files["webpMetadataBearing"], `${context}.webpMetadataBearing`),
+    pngMetadataBearing: requireBoolean(
+      files["pngMetadataBearing"],
+      `${context}.pngMetadataBearing`,
+    ),
+    webpMetadataBearing: requireBoolean(
+      files["webpMetadataBearing"],
+      `${context}.webpMetadataBearing`,
+    ),
     pngMimeType: requireString(files["pngMimeType"], `${context}.pngMimeType`),
-    webpMimeType: requireString(files["webpMimeType"], `${context}.webpMimeType`),
+    webpMimeType: requireString(
+      files["webpMimeType"],
+      `${context}.webpMimeType`,
+    ),
   };
 }
 
@@ -134,9 +155,15 @@ function parseRender(value: unknown, context: string): ArtifactRender {
     rasterizer: requireString(render["rasterizer"], `${context}.rasterizer`),
     width: requireInteger(render["width"], `${context}.width`),
     height: requireInteger(render["height"], `${context}.height`),
-    uniqueColors: requireInteger(render["uniqueColors"], `${context}.uniqueColors`),
+    uniqueColors: requireInteger(
+      render["uniqueColors"],
+      `${context}.uniqueColors`,
+    ),
     inkCoverage: requireNumber(render["inkCoverage"], `${context}.inkCoverage`),
-    brightCoverage: requireNumber(render["brightCoverage"], `${context}.brightCoverage`),
+    brightCoverage: requireNumber(
+      render["brightCoverage"],
+      `${context}.brightCoverage`,
+    ),
   };
 }
 
@@ -147,7 +174,10 @@ function parseArtifact(value: unknown, index: number): Artifact {
     id: requireString(artifact["id"], `${context}.id`),
     slug: requireString(artifact["slug"], `${context}.slug`),
     title: requireString(artifact["title"], `${context}.title`),
-    operatorCliCommands: requireStringArray(artifact["operatorCliCommands"], `${context}.operatorCliCommands`),
+    operatorCliCommands: requireStringArray(
+      artifact["operatorCliCommands"],
+      `${context}.operatorCliCommands`,
+    ),
     files: parseFiles(artifact["files"], `${context}.files`),
     render: parseRender(artifact["render"], `${context}.render`),
   };
@@ -157,7 +187,8 @@ function loadCatalog(): Catalog {
   const parsed: unknown = JSON.parse(readFileSync(METADATA_PATH, "utf8"));
   const root = requireRecord(parsed, METADATA_PATH);
   const rawArtifacts = root["artifacts"];
-  if (!Array.isArray(rawArtifacts)) throw new Error(`${METADATA_PATH}.artifacts must be an array`);
+  if (!Array.isArray(rawArtifacts))
+    throw new Error(`${METADATA_PATH}.artifacts must be an array`);
   return {
     totalArtifacts: requireInteger(root["totalArtifacts"], "totalArtifacts"),
     artifacts: rawArtifacts.map((entry, index) => parseArtifact(entry, index)),
@@ -189,7 +220,9 @@ interface InkStats {
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 function isPng(buf: Buffer): boolean {
-  return buf.length >= 8 && PNG_SIGNATURE.every((byte, index) => buf[index] === byte);
+  return (
+    buf.length >= 8 && PNG_SIGNATURE.every((byte, index) => buf[index] === byte)
+  );
 }
 
 interface PngChunk {
@@ -225,13 +258,28 @@ function decodePng(png: Buffer): DecodedPng {
   if (bitDepth !== 8) throw new Error(`unsupported PNG bit depth ${bitDepth}`);
   if (interlace !== 0) throw new Error("interlaced PNG is unsupported");
 
-  const sourceChannels = colorType === 0 ? 1 : colorType === 2 ? 3 : colorType === 3 ? 1 : colorType === 4 ? 2 : colorType === 6 ? 4 : 0;
-  if (sourceChannels === 0) throw new Error(`unsupported PNG color type ${colorType}`);
+  const sourceChannels =
+    colorType === 0
+      ? 1
+      : colorType === 2
+        ? 3
+        : colorType === 3
+          ? 1
+          : colorType === 4
+            ? 2
+            : colorType === 6
+              ? 4
+              : 0;
+  if (sourceChannels === 0)
+    throw new Error(`unsupported PNG color type ${colorType}`);
 
-  const idat = chunks.filter((chunk) => chunk.type === "IDAT").map((chunk) => chunk.data);
+  const idat = chunks
+    .filter((chunk) => chunk.type === "IDAT")
+    .map((chunk) => chunk.data);
   const inflated = new Uint8Array(zlib.inflateSync(Buffer.concat(idat)));
   const stride = width * sourceChannels;
-  if (inflated.length < (stride + 1) * height) throw new Error("PNG IDAT is truncated");
+  if (inflated.length < (stride + 1) * height)
+    throw new Error("PNG IDAT is truncated");
 
   const scanlines = new Uint8Array(stride * height);
   let previous = new Uint8Array(stride);
@@ -439,15 +487,21 @@ describe("pipeline artifact catalog", () => {
         `docs/assets/${artifact.slug}.svg`,
         `docs/assets/${artifact.slug}.png`,
         `docs/assets/${artifact.slug}.webp`,
-      ])
+      ]),
     );
     const onDisk = readdirSync(ASSETS_DIR)
-      .filter((name) => name.startsWith("pipeline-") && /\.(svg|png|webp)$/.test(name))
+      .filter(
+        (name) =>
+          name.startsWith("pipeline-") && /\.(svg|png|webp)$/.test(name),
+      )
       .map((name) => `docs/assets/${name}`)
       .filter((name) => !name.endsWith("pipeline-artifacts-metadata.json"));
 
     for (const fileName of onDisk) {
-      expect({ fileName, listed: listed.has(fileName) }).toEqual({ fileName, listed: true });
+      expect({ fileName, listed: listed.has(fileName) }).toEqual({
+        fileName,
+        listed: true,
+      });
       listed.delete(fileName);
     }
     expect([...listed]).toEqual([]);
@@ -473,7 +527,9 @@ describe("pipeline artifact catalog", () => {
   test("operator commands are Bun-only (no node/npm invocations)", () => {
     for (const artifact of CATALOG.artifacts) {
       for (const command of artifact.operatorCliCommands) {
-        expect(command.startsWith("./bin/dx") || command.startsWith("bun ")).toBe(true);
+        expect(
+          command.startsWith("./bin/dx") || command.startsWith("bun "),
+        ).toBe(true);
         expect(command).not.toContain("node --test");
         expect(command).not.toContain("npm ");
       }
@@ -502,14 +558,24 @@ describe("pipeline PNGs contain real rasters, not the blank banner", () => {
       // A blank banner has 3 unique colors, ~6% ink, and zero bright pixels.
       expect({
         slug: artifact.slug,
-        ok: stats.uniqueColors >= MIN_UNIQUE_COLORS && stats.inkCoverage >= MIN_INK_COVERAGE && stats.brightCoverage >= MIN_BRIGHT_COVERAGE,
+        ok:
+          stats.uniqueColors >= MIN_UNIQUE_COLORS &&
+          stats.inkCoverage >= MIN_INK_COVERAGE &&
+          stats.brightCoverage >= MIN_BRIGHT_COVERAGE,
         evidence: describeStats(artifact.slug, stats),
-      }).toEqual({ slug: artifact.slug, ok: true, evidence: describeStats(artifact.slug, stats) });
+      }).toEqual({
+        slug: artifact.slug,
+        ok: true,
+        evidence: describeStats(artifact.slug, stats),
+      });
 
       // The catalog's recorded evidence must agree with a fresh decode (drift guard).
       expect(stats.uniqueColors).toBe(artifact.render.uniqueColors);
       expect(stats.inkCoverage).toBeCloseTo(artifact.render.inkCoverage, 3);
-      expect(stats.brightCoverage).toBeCloseTo(artifact.render.brightCoverage, 3);
+      expect(stats.brightCoverage).toBeCloseTo(
+        artifact.render.brightCoverage,
+        3,
+      );
     });
 
     test(`${artifact.slug}.png survives a Blob round-trip with metadata intact`, async () => {
@@ -522,12 +588,18 @@ describe("pipeline PNGs contain real rasters, not the blank banner", () => {
 
       // Metadata is injected after the last Bun.Image encode, so the Blob bytes still carry it.
       const text = pngTextChunks(roundTripped);
-      for (const keyword of ["Title", "XML:com.adobe.xmp", "SportsDesk:PipelineSpecJson"]) {
+      for (const keyword of [
+        "Title",
+        "XML:com.adobe.xmp",
+        "SportsDesk:PipelineSpecJson",
+      ]) {
         expect(text.has(keyword)).toBe(true);
       }
       // iTXt header is keyword\0 + 4 bytes, so the value must start at the XMP/JSON-LD payload.
       expect(text.get("XML:com.adobe.xmp")?.value.startsWith("<")).toBe(true);
-      expect(text.get("SportsDesk:PipelineSpecJson")?.value.startsWith("{")).toBe(true);
+      expect(
+        text.get("SportsDesk:PipelineSpecJson")?.value.startsWith("{"),
+      ).toBe(true);
 
       const metadata = await new Bun.Image(blob).metadata();
       expect(metadata.format).toBe("png");
@@ -573,7 +645,10 @@ describe("pipeline PNGs contain real rasters, not the blank banner", () => {
 
   test("the committed SVGs are well-formed XML and keep their metadata", () => {
     for (const artifact of CATALOG.artifacts) {
-      const svgText = readFileSync(repoPath(artifact.files.svgRepoPath), "utf8");
+      const svgText = readFileSync(
+        repoPath(artifact.files.svgRepoPath),
+        "utf8",
+      );
       expect(() => Bun.XML.parse(svgText)).not.toThrow();
       expect(svgText).toContain("<metadata>");
       expect(svgText).toContain('type="application/ld+json"');
@@ -583,7 +658,11 @@ describe("pipeline PNGs contain real rasters, not the blank banner", () => {
       const withoutCdataAndComments = svgText
         .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, "")
         .replace(/<!--[\s\S]*?-->/g, "");
-      expect(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/.test(withoutCdataAndComments)).toBe(false);
+      expect(
+        /&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/.test(
+          withoutCdataAndComments,
+        ),
+      ).toBe(false);
     }
   });
 });
@@ -609,7 +688,11 @@ describe("pipeline WebP siblings", () => {
       expect(webp.length).toBeLessThan(png.length);
       // WebP carries no XMP/tEXt: the PNG remains the metadata-bearing download.
       expect(webp.includes("XML:com.adobe.xmp")).toBe(false);
-      expect(riffChunkTypes(webp).filter((type) => type === "tEXt" || type === "iTXt" || type === "XMP ")).toEqual([]);
+      expect(
+        riffChunkTypes(webp).filter(
+          (type) => type === "tEXt" || type === "iTXt" || type === "XMP ",
+        ),
+      ).toEqual([]);
 
       // `.webp().blob()` is an output path: correct MIME and the same dimensions, still metadata-free.
       const webpBlob = await new Bun.Image(webp).webp({ quality: 82 }).blob();
@@ -619,7 +702,11 @@ describe("pipeline WebP siblings", () => {
       expect(blobMetadata.width).toBe(artifact.render.width);
       expect(blobMetadata.height).toBe(artifact.render.height);
       const blobBytes = Buffer.from(await webpBlob.arrayBuffer());
-      expect(riffChunkTypes(blobBytes).filter((type) => type === "tEXt" || type === "iTXt" || type === "XMP ")).toEqual([]);
+      expect(
+        riffChunkTypes(blobBytes).filter(
+          (type) => type === "tEXt" || type === "iTXt" || type === "XMP ",
+        ),
+      ).toEqual([]);
     });
   }
 });

@@ -7,7 +7,10 @@
  * skill's `end=<last timestamp>` rule, not offsets.
  */
 
-import { parsePolymarketPosition, type PolymarketPosition } from "./polymarket_ingest.ts";
+import {
+  parsePolymarketPosition,
+  type PolymarketPosition,
+} from "./polymarket_ingest.ts";
 
 /** Retired (HTTP 410). Kept only so callers can recognise stale references. */
 export const LB_API = "https://lb-api.polymarket.com";
@@ -125,7 +128,10 @@ function str(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-async function requestJson(url: string, options?: ProfileFetchOptions): Promise<unknown> {
+async function requestJson(
+  url: string,
+  options?: ProfileFetchOptions,
+): Promise<unknown> {
   const fetchImpl = options?.fetchImpl ?? fetch;
   const response = await fetchImpl(url, {
     proxy: false,
@@ -136,7 +142,9 @@ async function requestJson(url: string, options?: ProfileFetchOptions): Promise<
 }
 
 const sleep = (ms: number): Promise<void> =>
-  ms <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
+  ms <= 0
+    ? Promise.resolve()
+    : new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Resolves a 0x address, or a leaderboard username → wallet (3 cursor pages, 1500 users).
@@ -153,7 +161,8 @@ export async function resolvePolymarketAddress(
   const base = (options?.dataBase ?? DATA_API).replace(/\/$/, "");
   let cursor: string | null = null;
   for (let page = 0; page < 3; page += 1) {
-    const suffix = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+    const suffix =
+      cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
     const body: unknown = await requestJson(
       `${base}/v2/leaderboard?window=all&limit=500${suffix}`,
       options,
@@ -164,7 +173,11 @@ export async function resolvePolymarketAddress(
     for (const row of rows) {
       const entry = asRecord(row);
       if (entry === null) continue;
-      const name = (str(entry.user_name) || str(entry.name) || str(entry.pseudonym)).toLowerCase();
+      const name = (
+        str(entry.user_name) ||
+        str(entry.name) ||
+        str(entry.pseudonym)
+      ).toLowerCase();
       const wallet = str(entry.user_id) || str(entry.proxyWallet);
       if (wallet !== "" && name === needle) return wallet.toLowerCase();
     }
@@ -213,7 +226,12 @@ export async function fetchPnlSnapshot(
     fetchPnlWindow(address, "7d", options),
     fetchPnlWindow(address, "30d", options),
   ]);
-  return { all: all.amount, d7: d7.amount, d30: d30.amount, name: all.name ?? d7.name ?? d30.name };
+  return {
+    all: all.amount,
+    d7: d7.amount,
+    d30: d30.amount,
+    name: all.name ?? d7.name ?? d30.name,
+  };
 }
 
 /** Positions paginated by offset; 500/page, 3 pages max. */
@@ -242,7 +260,8 @@ function parseActivity(row: unknown): PolymarketActivity | null {
   const record = asRecord(row);
   if (record === null) return null;
   const type = str(record.type).toUpperCase();
-  const slug = str(record.slug) || str(record.eventSlug) || str(record.conditionId);
+  const slug =
+    str(record.slug) || str(record.eventSlug) || str(record.conditionId);
   if (type === "" || slug === "") return null;
   return {
     type,
@@ -281,7 +300,8 @@ export async function fetchProfileActivity(
       const parsed = parseActivity(raw);
       if (parsed !== null) rows.push(parsed);
       const record = asRecord(raw);
-      if (record !== null) lastTimestamp = num(record.timestamp) || lastTimestamp;
+      if (record !== null)
+        lastTimestamp = num(record.timestamp) || lastTimestamp;
     }
     if (body.length < 500) break;
     if (lastTimestamp === null || (end !== null && lastTimestamp >= end)) break;
@@ -297,10 +317,16 @@ const CATEGORY_RULES: ReadonlyArray<readonly [RegExp, string]> = [
   [/ukraine|russia|iran|war|military|invasion|geopolit/i, "Geopolitics"],
   [/business|gdp|\boil\b|fed\b|rate|inflation|finance|stock/i, "Finance"],
   [/pop.culture|art\b|coronavirus|culture|movie|music/i, "Culture"],
-  [/temperature|weather|celsius|fahrenheit|rain|snow|storm|hurricane/i, "Weather"],
+  [
+    /temperature|weather|celsius|fahrenheit|rain|snow|storm|hurricane/i,
+    "Weather",
+  ],
   [/\bai\b|tech|spacex|openai|nvidia/i, "Tech"],
   [/musk|tweet/i, "Musk/Tweets"],
-  [/nba|nfl|mlb|nhl|soccer|football|basketball|tennis|ufc|sports|fifa|olympic/i, "Sports"],
+  [
+    /nba|nfl|mlb|nhl|soccer|football|basketball|tennis|ufc|sports|fifa|olympic/i,
+    "Sports",
+  ],
 ];
 
 /** Maps a Gamma category/tag/title to a display category. */
@@ -323,8 +349,15 @@ export async function fetchCategories(
 ): Promise<Map<string, string>> {
   const base = (options?.gammaBase ?? GAMMA_API).replace(/\/$/, "");
   const bySlug = new Map<string, string>();
-  const slugs = [...new Set(positions.map((position) => position.slug).filter((slug) => slug !== ""))];
-  const cap = Math.min(slugs.length, Math.max(0, options?.maxCategoryLookups ?? 60));
+  const slugs = [
+    ...new Set(
+      positions.map((position) => position.slug).filter((slug) => slug !== ""),
+    ),
+  ];
+  const cap = Math.min(
+    slugs.length,
+    Math.max(0, options?.maxCategoryLookups ?? 60),
+  );
   for (const slug of slugs.slice(cap)) {
     const sample = positions.find((position) => position.slug === slug);
     bySlug.set(slug, inferCategory("", [], sample?.title ?? ""));
@@ -357,7 +390,9 @@ export async function fetchCategories(
   return bySlug;
 }
 
-export function summarizeActivity(rows: readonly PolymarketActivity[]): ActivitySummary {
+export function summarizeActivity(
+  rows: readonly PolymarketActivity[],
+): ActivitySummary {
   let tradeBuys = 0;
   let tradeSells = 0;
   let tradeVolume = 0;
@@ -438,7 +473,10 @@ const OUTFLOW_TYPES = new Set(["BUY", "SPLIT"]);
 export function auditActivityPnl(
   rows: readonly PolymarketActivity[],
   openValueUsd: number,
-  options?: { readonly lbApiPnlUsd?: number | null; readonly activityTruncated?: boolean },
+  options?: {
+    readonly lbApiPnlUsd?: number | null;
+    readonly activityTruncated?: boolean;
+  },
 ): PnlAudit {
   const truncated = options?.activityTruncated === true;
   const lbApiPnlUsd = options?.lbApiPnlUsd ?? null;
@@ -453,12 +491,18 @@ export function auditActivityPnl(
     if (INFLOW_TYPES.has(directional)) grossIn += row.usdcSize;
     else if (OUTFLOW_TYPES.has(directional)) grossOut += row.usdcSize;
 
-    if (row.type === "TRADE" && row.size !== undefined && row.price !== undefined) {
+    if (
+      row.type === "TRADE" &&
+      row.size !== undefined &&
+      row.price !== undefined
+    ) {
       tradeRows += 1;
       const notional = row.size * row.price;
       if (notional > 0) {
         const residual =
-          row.side === "SELL" ? notional - row.usdcSize : row.usdcSize - notional;
+          row.side === "SELL"
+            ? notional - row.usdcSize
+            : row.usdcSize - notional;
         if (residual > 0.005) {
           feeResidual += residual;
           feeRows += 1;
@@ -468,9 +512,13 @@ export function auditActivityPnl(
   }
 
   const complete = !truncated && rows.length > 0;
-  const cashflowPnlUsd = complete ? round2(grossIn - grossOut + openValueUsd) : null;
+  const cashflowPnlUsd = complete
+    ? round2(grossIn - grossOut + openValueUsd)
+    : null;
   const gapUsd =
-    cashflowPnlUsd === null || lbApiPnlUsd === null ? null : round2(cashflowPnlUsd - lbApiPnlUsd);
+    cashflowPnlUsd === null || lbApiPnlUsd === null
+      ? null
+      : round2(cashflowPnlUsd - lbApiPnlUsd);
   const gapPct =
     gapUsd === null || lbApiPnlUsd === null || lbApiPnlUsd === 0
       ? null
@@ -508,14 +556,20 @@ function chooseStrategy(
 ): StrategyPattern {
   const tradeCount = activity.tradeBuys + activity.tradeSells;
   const avgTrade = tradeCount > 0 ? activity.tradeVolume / tradeCount : 0;
-  const invested = positions.reduce((sum, position) => sum + position.initialValue, 0);
+  const invested = positions.reduce(
+    (sum, position) => sum + position.initialValue,
+    0,
+  );
   const top3 = [...open]
     .sort((a, b) => b.currentValue - a.currentValue)
     .slice(0, 3)
     .reduce((sum, position) => sum + position.currentValue, 0);
   const concentration = portfolioValue > 0 ? (top3 / portfolioValue) * 100 : 0;
 
-  if (activity.splitVolume > activity.tradeVolume * 0.2 && activity.mergeVolume > 0) {
+  if (
+    activity.splitVolume > activity.tradeVolume * 0.2 &&
+    activity.mergeVolume > 0
+  ) {
     return {
       name: "SPLIT Arbitrage",
       explanation:
@@ -551,7 +605,8 @@ function chooseStrategy(
   }
   return {
     name: "Mixed",
-    explanation: "No single dominant pattern across trades, markets and concentration.",
+    explanation:
+      "No single dominant pattern across trades, markets and concentration.",
   };
 }
 
@@ -565,27 +620,43 @@ export function buildAddressProfile(input: {
   readonly activityTruncated: boolean;
 }): AddressProfile {
   const { positions, activity } = input;
-  const open = positions.filter((position) => !position.redeemable && position.currentValue > 0);
-  const won = positions.filter((position) => position.redeemable && position.currentValue > 0);
-  const lost = positions.filter((position) => position.redeemable && position.currentValue === 0);
-  const portfolioValue = open.reduce((sum, position) => sum + position.currentValue, 0);
+  const open = positions.filter(
+    (position) => !position.redeemable && position.currentValue > 0,
+  );
+  const won = positions.filter(
+    (position) => position.redeemable && position.currentValue > 0,
+  );
+  const lost = positions.filter(
+    (position) => position.redeemable && position.currentValue === 0,
+  );
+  const portfolioValue = open.reduce(
+    (sum, position) => sum + position.currentValue,
+    0,
+  );
 
   let wins = won.length;
   let losses = lost.length;
   let estimated = false;
   if (wins + losses < 3) {
     const redeemed = new Set(
-      activity.filter((row) => row.type === "REDEEM" && row.usdcSize > 0).map((row) => row.slug),
+      activity
+        .filter((row) => row.type === "REDEEM" && row.usdcSize > 0)
+        .map((row) => row.slug),
     );
     const traded = new Set(
-      activity.filter((row) => row.type === "TRADE" && row.side !== "SELL").map((row) => row.slug),
+      activity
+        .filter((row) => row.type === "TRADE" && row.side !== "SELL")
+        .map((row) => row.slug),
     );
     wins = redeemed.size;
     losses = [...traded].filter((slug) => !redeemed.has(slug)).length;
     estimated = wins + losses > 0;
   }
 
-  const categoryMap = new Map<string, { positions: number; valueUsd: number }>();
+  const categoryMap = new Map<
+    string,
+    { positions: number; valueUsd: number }
+  >();
   for (const position of open) {
     const category = input.categories.get(position.slug) ?? "Other";
     const bucket = categoryMap.get(category) ?? { positions: 0, valueUsd: 0 };
@@ -599,15 +670,24 @@ export function buildAddressProfile(input: {
       positions: bucket.positions,
       valueUsd: Math.round(bucket.valueUsd * 100) / 100,
       sharePct:
-        portfolioValue > 0 ? Math.round((bucket.valueUsd / portfolioValue) * 1000) / 10 : 0,
+        portfolioValue > 0
+          ? Math.round((bucket.valueUsd / portfolioValue) * 1000) / 10
+          : 0,
     }))
     .sort((a, b) => b.valueUsd - a.valueUsd);
 
   const settled = positions.filter((position) => position.redeemable);
-  const topWins = [...settled].sort((a, b) => b.cashPnl - a.cashPnl).slice(0, 5);
-  const topLosses = [...settled].sort((a, b) => a.cashPnl - b.cashPnl).slice(0, 5);
+  const topWins = [...settled]
+    .sort((a, b) => b.cashPnl - a.cashPnl)
+    .slice(0, 5);
+  const topLosses = [...settled]
+    .sort((a, b) => a.cashPnl - b.cashPnl)
+    .slice(0, 5);
   const activitySummary = summarizeActivity(activity);
-  const invested = positions.reduce((sum, position) => sum + position.initialValue, 0);
+  const invested = positions.reduce(
+    (sum, position) => sum + position.initialValue,
+    0,
+  );
 
   return {
     address: input.address.toLowerCase(),
@@ -619,11 +699,17 @@ export function buildAddressProfile(input: {
     wins,
     losses,
     openCount: open.length,
-    winRate: wins + losses > 0 ? Math.round((wins / (wins + losses)) * 1000) / 10 : null,
+    winRate:
+      wins + losses > 0
+        ? Math.round((wins / (wins + losses)) * 1000) / 10
+        : null,
     winRateEstimated: estimated,
     portfolioValueUsd: Math.round(portfolioValue * 100) / 100,
     investedUsd: Math.round(invested * 100) / 100,
-    positionsPnlUsd: Math.round(positions.reduce((sum, position) => sum + position.cashPnl, 0) * 100) / 100,
+    positionsPnlUsd:
+      Math.round(
+        positions.reduce((sum, position) => sum + position.cashPnl, 0) * 100,
+      ) / 100,
     categories,
     topWins,
     topLosses,

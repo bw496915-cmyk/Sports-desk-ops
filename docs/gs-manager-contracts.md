@@ -110,7 +110,7 @@ https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&m
 
 - `dateFilterBy` — observed as `calcTime` (settling/populating) and `betTime` (placement). Whether
   other values are accepted is unverified.
-- `partnerUserId` — the **raw login** (`AF12`), *not* `player_AF12`. This does not imply the wire body
+- `partnerUserId` — the **raw login** (`AF12`), _not_ `player_AF12`. This does not imply the wire body
   carries the login: the captured body leaves the field empty (§2, row 2).
 - `from` / `to` — epoch **seconds**; `toTime` is an offset within the desk day, so it is `86399` on a
   normal day and `89999` / `82799` on US DST transition days (derive it, never hardcode it).

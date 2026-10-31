@@ -5,6 +5,7 @@ interface PtyResult {
   readonly out: string;
 }
 
+// eslint-disable-next-line no-control-regex -- stripping ANSI escapes is the point
 const ANSI_PATTERN = /\x1b\[[0-9;]*m/g;
 
 async function runInPty(cmd: string[]): Promise<PtyResult> {
@@ -20,13 +21,17 @@ async function runInPty(cmd: string[]): Promise<PtyResult> {
     },
   });
   const code = await proc.exited;
-  proc.terminal.close();
+  proc.terminal?.close();
   return { code, out: out.replace(/\r/g, "").replace(ANSI_PATTERN, "") };
 }
 
 describe("Bun PTY terminal automation", () => {
   test("the child sees a real TTY", async () => {
-    const result = await runInPty([process.execPath, "-e", "console.log(process.stdout.isTTY)"]);
+    const result = await runInPty([
+      process.execPath,
+      "-e",
+      "console.log(process.stdout.isTTY)",
+    ]);
     expect(result.code).toBe(0);
     expect(result.out.trim()).toBe("true");
   });
@@ -46,7 +51,8 @@ describe("Bun PTY terminal automation", () => {
     expect(result.out).toContain("--f402-login");
   });
 
-  test("dx docs --json parses from PTY output", async () => {    const result = await runInPty(["./bin/dx", "docs", "--json"]);
+  test("dx docs --json parses from PTY output", async () => {
+    const result = await runInPty(["./bin/dx", "docs", "--json"]);
     expect(result.code).toBe(0);
     const extension = JSON.parse(result.out.trim()) as {
       provider?: string;

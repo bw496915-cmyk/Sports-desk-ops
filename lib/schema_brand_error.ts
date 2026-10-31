@@ -9,11 +9,7 @@ export class SchemaBrandError extends TypeError {
   readonly kind: SchemaBrandKind;
   readonly identifier: string;
 
-  constructor(
-    message: string,
-    kind: SchemaBrandKind,
-    identifier: string,
-  ) {
+  constructor(message: string, kind: SchemaBrandKind, identifier: string) {
     super(message);
     this.kind = kind;
     this.identifier = identifier;

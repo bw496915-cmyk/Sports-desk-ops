@@ -17,7 +17,9 @@ const W_RETRY = ADDRESS("03");
 const W_SLOW = ADDRESS("04");
 const W_BAD = ADDRESS("0a");
 
-function position(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function position(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     proxyWallet: W1,
     asset: "asset-1",
@@ -70,9 +72,21 @@ beforeAll(() => {
             ? [
                 position({ asset: "a1", title: "Paged one", currentValue: 10 }),
                 position({ asset: "a2", title: "Paged two", currentValue: 20 }),
-                position({ asset: "a3", title: "Paged three", currentValue: 30 }),
+                position({
+                  asset: "a3",
+                  title: "Paged three",
+                  currentValue: 30,
+                }),
               ]
-            : [position(), position({ asset: "asset-2", redeemable: true, title: "Redeemable", currentValue: 30 })];
+            : [
+                position(),
+                position({
+                  asset: "asset-2",
+                  redeemable: true,
+                  title: "Redeemable",
+                  currentValue: 30,
+                }),
+              ];
         return Response.json(rows.slice(offset, offset + limit));
       } finally {
         inFlight -= 1;
@@ -89,8 +103,12 @@ afterAll(() => {
 describe("Polymarket positions ingestion", () => {
   test("validates 20-byte addresses", () => {
     expect(isValidWalletAddress(`0x${"0".repeat(40)}`)).toBe(true);
-    expect(isValidWalletAddress("0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612")).toBe(true);
-    expect(isValidWalletAddress("0x9cD44e12A8b7F30192c44d8E11a08B3e7")).toBe(false);
+    expect(
+      isValidWalletAddress("0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612"),
+    ).toBe(true);
+    expect(isValidWalletAddress("0x9cD44e12A8b7F30192c44d8E11a08B3e7")).toBe(
+      false,
+    );
     expect(isValidWalletAddress("")).toBe(false);
   });
 
@@ -104,10 +122,22 @@ describe("Polymarket positions ingestion", () => {
   test("aggregate excludes redeemable positions from open legs", () => {
     const openA = parsePolymarketPosition(position())!;
     const openB = parsePolymarketPosition(
-      position({ asset: "b", initialValue: 2, currentValue: 1, cashPnl: -1, title: "Small" }),
+      position({
+        asset: "b",
+        initialValue: 2,
+        currentValue: 1,
+        cashPnl: -1,
+        title: "Small",
+      }),
     )!;
     const redeemed = parsePolymarketPosition(
-      position({ asset: "c", redeemable: true, initialValue: 30, currentValue: 30, title: "Redeemed" }),
+      position({
+        asset: "c",
+        redeemable: true,
+        initialValue: 30,
+        currentValue: 30,
+        title: "Redeemed",
+      }),
     )!;
 
     const aggregate = aggregatePositions([openA, openB, redeemed]);
@@ -152,14 +182,21 @@ describe("Polymarket positions ingestion", () => {
   });
 
   test("retries once on 5xx", async () => {
-    const result = await fetchWalletPositions(W_RETRY, { baseUrl, retryDelayMs: 0 });
+    const result = await fetchWalletPositions(W_RETRY, {
+      baseUrl,
+      retryDelayMs: 0,
+    });
     expect(result.status).toBe("ok");
     expect(attempts.get(W_RETRY)).toBe(2);
     expect(result.positions.length).toBeGreaterThan(0);
   });
 
   test("classifies timeouts and non-array bodies as errors", async () => {
-    const slow = await fetchWalletPositions(W_SLOW, { baseUrl, timeoutMs: 20, retryDelayMs: 0 });
+    const slow = await fetchWalletPositions(W_SLOW, {
+      baseUrl,
+      timeoutMs: 20,
+      retryDelayMs: 0,
+    });
     expect(slow.status).toBe("error");
     expect(slow.error).toBe("timeout");
 
@@ -187,7 +224,10 @@ describe("Polymarket positions ingestion", () => {
 
   test("reconciles LIVE, STALE and FIXTURE", async () => {
     const ok = await fetchWalletPositions(W1, { baseUrl, retryDelayMs: 0 });
-    const failed = await fetchWalletPositions(W_BAD, { baseUrl, retryDelayMs: 0 });
+    const failed = await fetchWalletPositions(W_BAD, {
+      baseUrl,
+      retryDelayMs: 0,
+    });
     const snapshot = {
       source: baseUrl,
       fetchedAtIso: "2026-10-31T18:00:00.000Z",
@@ -196,26 +236,29 @@ describe("Polymarket positions ingestion", () => {
       ok: 1,
       failed: 1,
       truncatedWallets: [],
-      wallets: [
-        ok,
-        failed,
-        { ...failed, address: ADDRESS("0b") },
-      ],
+      wallets: [ok, failed, { ...failed, address: ADDRESS("0b") }],
     };
     const cache: PositionCache = {
       schemaVersion: 1,
       wallets: {
-        [W_BAD]: { aggregate: aggregatePositions([parsePolymarketPosition(position())!]), fetchedAtIso: "2026-10-31T17:00:00.000Z" },
+        [W_BAD]: {
+          aggregate: aggregatePositions([parsePolymarketPosition(position())!]),
+          fetchedAtIso: "2026-10-31T17:00:00.000Z",
+        },
       },
     };
 
     const states = reconcileSnapshot(snapshot, cache);
-    expect(states.find((state) => state.address === W1)?.dataSource).toBe("LIVE");
+    expect(states.find((state) => state.address === W1)?.dataSource).toBe(
+      "LIVE",
+    );
     const stale = states.find((state) => state.address === W_BAD);
     expect(stale?.dataSource).toBe("STALE");
     expect(stale?.staleSinceIso).toBe("2026-10-31T17:00:00.000Z");
     expect(stale?.lastError).toContain("unexpected body");
-    expect(states.find((state) => state.address === ADDRESS("0b"))?.dataSource).toBe("FIXTURE");
+    expect(
+      states.find((state) => state.address === ADDRESS("0b"))?.dataSource,
+    ).toBe("FIXTURE");
 
     const saved = cacheFromSnapshot(snapshot);
     expect(Object.keys(saved.wallets)).toEqual([W1]);

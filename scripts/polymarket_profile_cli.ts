@@ -9,7 +9,10 @@
  *   ./bin/dx profile 0x... --json
  */
 
-import { profilePolymarketAddress, type AddressProfile } from "../lib/polymarket_profile.ts";
+import {
+  profilePolymarketAddress,
+  type AddressProfile,
+} from "../lib/polymarket_profile.ts";
 
 const HELP = `Polymarket address profiler
 
@@ -25,7 +28,11 @@ Options:
 Data: lb-api (PnL), data-api (positions, activity), gamma-api (categories). No API key.
 Activity is paginated by the last timestamp (\`end=\`), not offsets.`;
 
-function flag(args: readonly string[], names: readonly string[], fallback: string): string {
+function flag(
+  args: readonly string[],
+  names: readonly string[],
+  fallback: string,
+): string {
   for (const name of names) {
     const index = args.indexOf(name);
     if (index !== -1 && index + 1 < args.length) return args[index + 1]!;
@@ -34,27 +41,39 @@ function flag(args: readonly string[], names: readonly string[], fallback: strin
 }
 
 const usd = (value: number | null): string =>
-  value === null ? "N/A" : `${value < 0 ? "-" : ""}$${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  value === null
+    ? "N/A"
+    : `${value < 0 ? "-" : ""}$${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 
 const short = (address: string): string =>
-  address.length > 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
+  address.length > 12
+    ? `${address.slice(0, 6)}...${address.slice(-4)}`
+    : address;
 
 function printProfile(profile: AddressProfile): void {
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log(`  Polymarket Profile: ${short(profile.address)}${profile.name ? ` (${profile.name})` : ""}`);
+  console.log(
+    `  Polymarket Profile: ${short(profile.address)}${profile.name ? ` (${profile.name})` : ""}`,
+  );
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log(`  Address:    ${profile.address}`);
   if (profile.pnl.all === null) {
-    console.log(`  PnL:        ${usd(profile.positionsPnlUsd)} (sum of position cashPnl; lb-api retired)`);
+    console.log(
+      `  PnL:        ${usd(profile.positionsPnlUsd)} (sum of position cashPnl; lb-api retired)`,
+    );
   } else {
-    console.log(`  Total PnL:  ${usd(profile.pnl.all)}  |  7d ${usd(profile.pnl.d7)}  |  30d ${usd(profile.pnl.d30)}`);
+    console.log(
+      `  Total PnL:  ${usd(profile.pnl.all)}  |  7d ${usd(profile.pnl.d7)}  |  30d ${usd(profile.pnl.d30)}`,
+    );
   }
   console.log(
     `  Win Rate:   ${profile.wins}/${profile.wins + profile.losses}` +
       (profile.winRate === null ? " (N/A)" : ` (${profile.winRate}%)`) +
       (profile.winRateEstimated ? " — estimated from activity" : ""),
   );
-  console.log(`  Positions:  ${profile.openCount} open  |  book value ${usd(profile.portfolioValueUsd)}  |  cost ${usd(profile.investedUsd)}`);
+  console.log(
+    `  Positions:  ${profile.openCount} open  |  book value ${usd(profile.portfolioValueUsd)}  |  cost ${usd(profile.investedUsd)}`,
+  );
   console.log("");
   console.log(`🎯 Strategy: ${profile.strategy.name}`);
   console.log(`   ${profile.strategy.explanation}`);
@@ -65,7 +84,9 @@ function printProfile(profile: AddressProfile): void {
   if (profile.open.length > 0) {
     console.log("");
     console.log(`📈 Open Positions (${profile.open.length})`);
-    const top = [...profile.open].sort((a, b) => b.currentValue - a.currentValue).slice(0, 10);
+    const top = [...profile.open]
+      .sort((a, b) => b.currentValue - a.currentValue)
+      .slice(0, 10);
     for (const position of top) {
       console.log(
         `   • ${position.title.slice(0, 64)} ${position.outcome ? `(${position.outcome})` : ""}` +
@@ -86,28 +107,40 @@ function printProfile(profile: AddressProfile): void {
 
   console.log("");
   console.log("📋 Activity Summary");
-  console.log(`   • TRADE BUY   ${String(profile.activity.tradeBuys).padStart(6)}  ${usd(profile.activity.tradeVolume)} volume`);
-  console.log(`   • TRADE SELL  ${String(profile.activity.tradeSells).padStart(6)}`);
+  console.log(
+    `   • TRADE BUY   ${String(profile.activity.tradeBuys).padStart(6)}  ${usd(profile.activity.tradeVolume)} volume`,
+  );
+  console.log(
+    `   • TRADE SELL  ${String(profile.activity.tradeSells).padStart(6)}`,
+  );
   console.log(`   • SPLIT       ${usd(profile.activity.splitVolume)}`);
   console.log(`   • MERGE       ${usd(profile.activity.mergeVolume)}`);
   console.log(`   • REDEEM      ${usd(profile.activity.redeemVolume)}`);
-  console.log(`   • pages ${profile.pagesFetched}${profile.activityTruncated ? " (truncated)" : ""}`);
+  console.log(
+    `   • pages ${profile.pagesFetched}${profile.activityTruncated ? " (truncated)" : ""}`,
+  );
 
   if (profile.topWins.length > 0 || profile.topLosses.length > 0) {
     console.log("");
     console.log("🏆 Top Settled Winners");
     for (const position of profile.topWins.filter((row) => row.cashPnl > 0)) {
-      console.log(`   • ${position.title.slice(0, 60)} ${position.outcome} — ${usd(position.cashPnl)}`);
+      console.log(
+        `   • ${position.title.slice(0, 60)} ${position.outcome} — ${usd(position.cashPnl)}`,
+      );
     }
     console.log("💀 Top Settled Losers");
     for (const position of profile.topLosses.filter((row) => row.cashPnl < 0)) {
-      console.log(`   • ${position.title.slice(0, 60)} ${position.outcome} — ${usd(position.cashPnl)}`);
+      console.log(
+        `   • ${position.title.slice(0, 60)} ${position.outcome} — ${usd(position.cashPnl)}`,
+      );
     }
   }
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 }
 
-export async function runPolymarketProfile(argv: readonly string[]): Promise<void> {
+export async function runPolymarketProfile(
+  argv: readonly string[],
+): Promise<void> {
   const args = [...argv];
   if (args.includes("-h") || args.includes("--help")) {
     console.log(HELP);
@@ -140,7 +173,9 @@ export async function runPolymarketProfile(argv: readonly string[]): Promise<voi
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 15_000,
   });
   if (profile === null) {
-    console.error(`profile: could not resolve "${input}" to a Polymarket address`);
+    console.error(
+      `profile: could not resolve "${input}" to a Polymarket address`,
+    );
     process.exitCode = 1;
     return;
   }
@@ -153,7 +188,9 @@ export async function runPolymarketProfile(argv: readonly string[]): Promise<voi
 
 if (import.meta.main) {
   runPolymarketProfile(process.argv.slice(2)).catch((error: unknown) => {
-    console.error(`profile: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `profile: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exitCode = 1;
   });
 }

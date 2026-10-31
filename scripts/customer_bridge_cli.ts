@@ -20,16 +20,13 @@ import {
   buildCustomerPolyBridge,
   loadCustomerBook,
   matchCustomerLegsAcrossVenues,
-  observationFromProfile,
   observePolymarketWallet,
   seedCrossDomainScenario,
-  validateWalletAddress,
   type AttributionRegistry,
   type CustomerBookRow,
   type CustomerPolyBridgeReport,
   type PolyObservation,
 } from "../lib/customer_poly_bridge.ts";
-import { profilePolymarketAddress } from "../lib/polymarket_profile.ts";
 import { createComboObservationsLegsStore } from "../lib/combo_observations_legs_store.ts";
 import { openSportsdeskSqlite } from "../lib/sportsdesk_sqlite.ts";
 
@@ -67,7 +64,11 @@ Notes:
   • polyAdvantageUsd is observational. It is a lead for leg-level review, not proof of a hedge.
   • Wallets that are not 42-char hex are quarantined and never queried.`;
 
-function flag(args: readonly string[], names: readonly string[], fallback: string): string {
+function flag(
+  args: readonly string[],
+  names: readonly string[],
+  fallback: string,
+): string {
   for (const name of names) {
     const index = args.indexOf(name);
     if (index !== -1 && index + 1 < args.length) return args[index + 1]!;
@@ -78,7 +79,8 @@ function flag(args: readonly string[], names: readonly string[], fallback: strin
 function flagAll(args: readonly string[], name: string): string[] {
   const out: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
-    if (args[index] === name && index + 1 < args.length) out.push(args[index + 1]!);
+    if (args[index] === name && index + 1 < args.length)
+      out.push(args[index + 1]!);
   }
   return out;
 }
@@ -89,12 +91,17 @@ const usd = (value: number | null): string => {
   return `${sign}$${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 };
 
-const pct = (value: number | null): string => (value === null ? "n/a" : `${value.toFixed(1)}%`);
+const pct = (value: number | null): string =>
+  value === null ? "n/a" : `${value.toFixed(1)}%`;
 
 function rule(label: string): void {
-  console.log(`\n──────────────────────────────────────────────────────────────────────────────`);
+  console.log(
+    `\n──────────────────────────────────────────────────────────────────────────────`,
+  );
   console.log(`  ${label}`);
-  console.log(`──────────────────────────────────────────────────────────────────────────────`);
+  console.log(
+    `──────────────────────────────────────────────────────────────────────────────`,
+  );
 }
 
 // ============================================================================
@@ -112,11 +119,17 @@ function ttlMs(): number {
   return Math.max(0, Number.isFinite(hours) ? hours : 24) * 3_600_000;
 }
 
-async function readCache(path: string, fresh: boolean): Promise<PolyObservation | null> {
+async function readCache(
+  path: string,
+  fresh: boolean,
+): Promise<PolyObservation | null> {
   if (fresh) return null;
   try {
-    const parsed = JSON.parse(await readFile(path, "utf8")) as Partial<BridgeCacheFile>;
-    if (parsed.schemaVersion !== 1 || parsed.observation === undefined) return null;
+    const parsed = JSON.parse(
+      await readFile(path, "utf8"),
+    ) as Partial<BridgeCacheFile>;
+    if (parsed.schemaVersion !== 1 || parsed.observation === undefined)
+      return null;
     const fetchedAt = Date.parse(parsed.fetchedAtIso ?? "");
     if (!Number.isFinite(fetchedAt)) return null;
     const ttl = ttlMs();
@@ -129,8 +142,17 @@ async function readCache(path: string, fresh: boolean): Promise<PolyObservation 
 
 async function fetchObservations(
   wallets: readonly string[],
-  options: { readonly cacheDir: string; readonly fresh: boolean; readonly concurrency: number },
-): Promise<{ observations: Map<string, PolyObservation>; hits: number; misses: number; failures: string[] }> {
+  options: {
+    readonly cacheDir: string;
+    readonly fresh: boolean;
+    readonly concurrency: number;
+  },
+): Promise<{
+  observations: Map<string, PolyObservation>;
+  hits: number;
+  misses: number;
+  failures: string[];
+}> {
   const observations = new Map<string, PolyObservation>();
   const failures: string[] = [];
   let hits = 0;
@@ -138,38 +160,44 @@ async function fetchObservations(
   await mkdir(options.cacheDir, { recursive: true });
 
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(options.concurrency, wallets.length || 1) }, async () => {
-    for (;;) {
-      const index = cursor;
-      cursor += 1;
-      const wallet = wallets[index];
-      if (wallet === undefined) return;
-      const cachePath = join(options.cacheDir, `${wallet}.json`);
-      const cached = await readCache(cachePath, options.fresh);
-      if (cached !== null) {
-        hits += 1;
-        observations.set(wallet, cached);
-        continue;
-      }
-      misses += 1;
-      try {
-        const observation = await observePolymarketWallet(wallet, { maxActivityPages: 6, sleepMs: 250 });
-        if (observation === null) {
-          failures.push(`${wallet} (resolver returned null)`);
+  const workers = Array.from(
+    { length: Math.min(options.concurrency, wallets.length || 1) },
+    async () => {
+      for (;;) {
+        const index = cursor;
+        cursor += 1;
+        const wallet = wallets[index];
+        if (wallet === undefined) return;
+        const cachePath = join(options.cacheDir, `${wallet}.json`);
+        const cached = await readCache(cachePath, options.fresh);
+        if (cached !== null) {
+          hits += 1;
+          observations.set(wallet, cached);
           continue;
         }
-        observations.set(wallet, observation);
-        const payload: BridgeCacheFile = {
-          schemaVersion: 1,
-          fetchedAtIso: new Date().toISOString(),
-          observation,
-        };
-        await writeFile(cachePath, `${JSON.stringify(payload)}\n`, "utf8");
-      } catch (error) {
-        failures.push(`${wallet} (${(error as Error).message})`);
+        misses += 1;
+        try {
+          const observation = await observePolymarketWallet(wallet, {
+            maxActivityPages: 6,
+            sleepMs: 250,
+          });
+          if (observation === null) {
+            failures.push(`${wallet} (resolver returned null)`);
+            continue;
+          }
+          observations.set(wallet, observation);
+          const payload: BridgeCacheFile = {
+            schemaVersion: 1,
+            fetchedAtIso: new Date().toISOString(),
+            observation,
+          };
+          await writeFile(cachePath, `${JSON.stringify(payload)}\n`, "utf8");
+        } catch (error) {
+          failures.push(`${wallet} (${(error as Error).message})`);
+        }
       }
-    }
-  });
+    },
+  );
   await Promise.all(workers);
   return { observations, hits, misses, failures };
 }
@@ -183,62 +211,118 @@ function printCoverage(
   registry: AttributionRegistry,
   book: readonly CustomerBookRow[],
 ): void {
-  console.log("══════════════════════════════════════════════════════════════════════════════");
-  console.log("  🕸️  CROSS-DOMAIN COVERAGE — SportsDesk customers ↔ Polymarket wallets");
-  console.log("══════════════════════════════════════════════════════════════════════════════");
+  console.log(
+    "══════════════════════════════════════════════════════════════════════════════",
+  );
+  console.log(
+    "  🕸️  CROSS-DOMAIN COVERAGE — SportsDesk customers ↔ Polymarket wallets",
+  );
+  console.log(
+    "══════════════════════════════════════════════════════════════════════════════",
+  );
   console.log(`  customers in book    : ${report.coverage.customersInBook}`);
-  console.log(`  customers with wallet: ${report.coverage.linkedCustomers} (${pct(report.coverage.linkYieldPct)} of book)`);
+  console.log(
+    `  customers with wallet: ${report.coverage.linkedCustomers} (${pct(report.coverage.linkYieldPct)} of book)`,
+  );
   console.log(`  distinct wallets     : ${report.coverage.wallets}`);
-  console.log(`  multi-wallet customers: ${report.coverage.multiWalletCustomers}`);
-  console.log(`  wallets shared by >1 customer: ${report.coverage.sharedWallets}`);
+  console.log(
+    `  multi-wallet customers: ${report.coverage.multiWalletCustomers}`,
+  );
+  console.log(
+    `  wallets shared by >1 customer: ${report.coverage.sharedWallets}`,
+  );
   console.log(`  quarantined wallets  : ${report.coverage.invalidWallets}`);
 
   rule("Attribution types");
-  for (const [type, count] of Object.entries(report.coverage.attributionTypes).sort((a, b) => b[1] - a[1])) {
+  for (const [type, count] of Object.entries(
+    report.coverage.attributionTypes,
+  ).sort((a, b) => b[1] - a[1])) {
     console.log(`  ${type.padEnd(30)} ${String(count).padStart(3)}`);
   }
 
   if (report.quarantined.length > 0) {
     rule("Quarantined (never queried)");
     for (const item of report.quarantined) {
-      console.log(`  ${item.customerId.padEnd(12)} ${item.wallet.padEnd(44)} ${item.reason}`);
+      console.log(
+        `  ${item.customerId.padEnd(12)} ${item.wallet.padEnd(44)} ${item.reason}`,
+      );
     }
   }
 
-  const unlinked = book.filter((row) => !registry.byCustomer.has(row.customerId));
-  console.log(`\n  Book rows without any wallet attribution: ${unlinked.length}`);
-  const topUnlinked = [...unlinked].sort((a, b) => Math.abs(b.lifetimeVolumeUsd) - Math.abs(a.lifetimeVolumeUsd)).slice(0, 5);
+  const unlinked = book.filter(
+    (row) => !registry.byCustomer.has(row.customerId),
+  );
+  console.log(
+    `\n  Book rows without any wallet attribution: ${unlinked.length}`,
+  );
+  const topUnlinked = [...unlinked]
+    .sort(
+      (a, b) => Math.abs(b.lifetimeVolumeUsd) - Math.abs(a.lifetimeVolumeUsd),
+    )
+    .slice(0, 5);
   for (const row of topUnlinked) {
-    console.log(`    • ${row.customerId.padEnd(12)} vol ${usd(row.lifetimeVolumeUsd).padStart(14)}  net ${usd(row.lifetimeNetUsd).padStart(14)}`);
+    console.log(
+      `    • ${row.customerId.padEnd(12)} vol ${usd(row.lifetimeVolumeUsd).padStart(14)}  net ${usd(row.lifetimeNetUsd).padStart(14)}`,
+    );
   }
-  console.log("══════════════════════════════════════════════════════════════════════════════");
+  console.log(
+    "══════════════════════════════════════════════════════════════════════════════",
+  );
 }
 
 function printValue(report: CustomerPolyBridgeReport, top: number): void {
-  console.log("══════════════════════════════════════════════════════════════════════════════");
+  console.log(
+    "══════════════════════════════════════════════════════════════════════════════",
+  );
   console.log(`  💰 CROSS-DOMAIN VALUE — evidence: ${report.evidence}`);
-  console.log("══════════════════════════════════════════════════════════════════════════════");
+  console.log(
+    "══════════════════════════════════════════════════════════════════════════════",
+  );
   console.log(`  linked rows          : ${report.customers.length}`);
-  console.log(`  observed on Polymarket: ${report.value.customersWithPoly} (${report.value.customersWithPnl} with PnL)`);
+  console.log(
+    `  observed on Polymarket: ${report.value.customersWithPoly} (${report.value.customersWithPnl} with PnL)`,
+  );
   console.log(`  desk volume          : ${usd(report.value.deskVolumeUsd)}`);
-  console.log(`  customer desk P/L    : ${usd(report.value.customerDeskPnlUsd)} (desk hold ${pct(report.value.deskHoldPct)})`);
-  console.log(`  poly P/L (gross)     : ${usd(report.value.polyGrossPnlUsd)}  [pre-fee, unique wallets]`);
-  console.log(`  poly P/L (net)       : ${usd(report.value.polyNetPnlUsd)}  [${pct(report.value.netCoveragePct)} of wallets replayed to completion]`);
-  console.log(`  poly P/L (row basis) : ${usd(report.value.polyPnlUsd)}  [NET where complete, GROSS otherwise]`);
-  console.log(`  fee residual         : ${usd(report.value.polyFeeResidualUsd)} (lower bound on taker fees)`);
-  console.log(`  poly advantage (signed): ${usd(report.value.polyAdvantageUsd)}`);
-  console.log(`  review priority (positive, confidence-weighted): ${usd(report.value.priorityUsd)}`);
-  console.log(`  shared-wallet rows   : ${report.value.sharedWalletRows} (excluded from advantage totals)`);
+  console.log(
+    `  customer desk P/L    : ${usd(report.value.customerDeskPnlUsd)} (desk hold ${pct(report.value.deskHoldPct)})`,
+  );
+  console.log(
+    `  poly P/L (gross)     : ${usd(report.value.polyGrossPnlUsd)}  [pre-fee, unique wallets]`,
+  );
+  console.log(
+    `  poly P/L (net)       : ${usd(report.value.polyNetPnlUsd)}  [${pct(report.value.netCoveragePct)} of wallets replayed to completion]`,
+  );
+  console.log(
+    `  poly P/L (row basis) : ${usd(report.value.polyPnlUsd)}  [NET where complete, GROSS otherwise]`,
+  );
+  console.log(
+    `  fee residual         : ${usd(report.value.polyFeeResidualUsd)} (lower bound on taker fees)`,
+  );
+  console.log(
+    `  poly advantage (signed): ${usd(report.value.polyAdvantageUsd)}`,
+  );
+  console.log(
+    `  review priority (positive, confidence-weighted): ${usd(report.value.priorityUsd)}`,
+  );
+  console.log(
+    `  shared-wallet rows   : ${report.value.sharedWalletRows} (excluded from advantage totals)`,
+  );
 
   rule("Verdict counts (customer perspective)");
   console.log(`  both up        : ${report.value.bothUp}`);
-  console.log(`  poly only up   : ${report.value.polyOnlyUp}   ← customer wins on Polymarket, loses at the desk`);
+  console.log(
+    `  poly only up   : ${report.value.polyOnlyUp}   ← customer wins on Polymarket, loses at the desk`,
+  );
   console.log(`  desk only up   : ${report.value.deskOnlyUp}`);
   console.log(`  both down      : ${report.value.bothDown}`);
   console.log(`  flat           : ${report.value.flat}`);
 
-  rule(`Top ${Math.min(top, report.customers.length)} by confidence-weighted poly advantage`);
-  console.log("  customer     agent      desk P/L      poly P/L  basis  kind       verdict        priority");
+  rule(
+    `Top ${Math.min(top, report.customers.length)} by confidence-weighted poly advantage`,
+  );
+  console.log(
+    "  customer     agent      desk P/L      poly P/L  basis  kind       verdict        priority",
+  );
   for (const row of report.customers.slice(0, top)) {
     console.log(
       `  ${row.customerId.padEnd(12)} ${row.agentId.slice(0, 10).padEnd(10)} ` +
@@ -247,14 +331,18 @@ function printValue(report: CustomerPolyBridgeReport, top: number): void {
         `${(row.verdict ?? "-").padEnd(14)} ${usd(row.priorityUsd).padStart(11)}`,
     );
   }
-  console.log("══════════════════════════════════════════════════════════════════════════════");
+  console.log(
+    "══════════════════════════════════════════════════════════════════════════════",
+  );
 }
 
 // ============================================================================
 // Main
 // ============================================================================
 
-export async function runCustomerBridge(args: readonly string[]): Promise<void> {
+export async function runCustomerBridge(
+  args: readonly string[],
+): Promise<void> {
   const [sub = "coverage", ...rest] = args;
   if (sub === "help" || sub === "--help" || sub === "-h") {
     console.log(HELP);
@@ -265,7 +353,9 @@ export async function runCustomerBridge(args: readonly string[]): Promise<void> 
 
   if (sub === "match") {
     const dbPath = flag(rest, ["--db"], "scratch/cross-domain.sqlite");
-    await mkdir(dbPath.slice(0, dbPath.lastIndexOf("/")) || ".", { recursive: true });
+    await mkdir(dbPath.slice(0, dbPath.lastIndexOf("/")) || ".", {
+      recursive: true,
+    });
     const db = openSportsdeskSqlite(dbPath);
     const store = createComboObservationsLegsStore(db);
     const registry = buildAttributionRegistry();
@@ -278,14 +368,20 @@ export async function runCustomerBridge(args: readonly string[]): Promise<void> 
     const empty = legCount === 0;
     if (empty) seedCrossDomainScenario(store, registry);
     else if (rest.includes("--seed") && !json) {
-      console.error(`match: ${dbPath} already holds ${legCount} leg rows; re-run with --reset to rebuild`);
+      console.error(
+        `match: ${dbPath} already holds ${legCount} leg rows; re-run with --reset to rebuild`,
+      );
     }
     const seeded = empty;
 
-    const customerFilters = flagAll(rest, "--customer").map((value) => value.trim().toUpperCase());
+    const customerFilters = flagAll(rest, "--customer").map((value) =>
+      value.trim().toUpperCase(),
+    );
     const report = matchCustomerLegsAcrossVenues(db, {
       databasePath: dbPath,
-      ...(customerFilters[0] === undefined ? {} : { customerId: customerFilters[0] }),
+      ...(customerFilters[0] === undefined
+        ? {}
+        : { customerId: customerFilters[0] }),
       maxLineDeltaHundredths: Number(flag(rest, ["--max-delta"], "100")),
       limit: Number(flag(rest, ["--limit"], "500")),
     });
@@ -295,14 +391,24 @@ export async function runCustomerBridge(args: readonly string[]): Promise<void> 
       console.log(JSON.stringify({ seeded, ...report }, null, 2));
       return;
     }
-    console.log("══════════════════════════════════════════════════════════════════════════════");
-    console.log(`  🔗 CROSS-DOMAIN LEG MATCHING — ${report.database}${seeded ? " (seeded)" : ""}`);
-    console.log("══════════════════════════════════════════════════════════════════════════════");
+    console.log(
+      "══════════════════════════════════════════════════════════════════════════════",
+    );
+    console.log(
+      `  🔗 CROSS-DOMAIN LEG MATCHING — ${report.database}${seeded ? " (seeded)" : ""}`,
+    );
+    console.log(
+      "══════════════════════════════════════════════════════════════════════════════",
+    );
     console.log(`  matched legs   : ${report.matchedLegs}`);
     console.log(`  mirror picks   : ${report.mirrorLegs}`);
-    console.log(`  opposite picks : ${report.oppositeLegs}   ← hedge shape, not proof`);
+    console.log(
+      `  opposite picks : ${report.oppositeLegs}   ← hedge shape, not proof`,
+    );
     console.log(`  same line      : ${report.sameLineLegs}`);
-    console.log(`  layoff-risk legs (PM line better): ${report.layoffRiskLegs}`);
+    console.log(
+      `  layoff-risk legs (PM line better): ${report.layoffRiskLegs}`,
+    );
     rule("Per customer");
     for (const customer of report.customers) {
       console.log(
@@ -312,7 +418,9 @@ export async function runCustomerBridge(args: readonly string[]): Promise<void> 
           `| avg Δ ${customer.avgDeltaHundredths ?? "n/a"}`,
       );
     }
-    console.log("══════════════════════════════════════════════════════════════════════════════");
+    console.log(
+      "══════════════════════════════════════════════════════════════════════════════",
+    );
     return;
   }
 
@@ -327,7 +435,13 @@ export async function runCustomerBridge(args: readonly string[]): Promise<void> 
   if (sub === "coverage") {
     const report = buildCustomerPolyBridge({ customers: book, registry });
     if (json) {
-      console.log(JSON.stringify({ coverage: report.coverage, quarantined: report.quarantined }, null, 2));
+      console.log(
+        JSON.stringify(
+          { coverage: report.coverage, quarantined: report.quarantined },
+          null,
+          2,
+        ),
+      );
       return;
     }
     printCoverage(report, registry, book);
@@ -335,14 +449,19 @@ export async function runCustomerBridge(args: readonly string[]): Promise<void> 
   }
 
   if (sub !== "value") {
-    console.error(`bridge: unknown subcommand "${sub}". Try: coverage | value | match`);
+    console.error(
+      `bridge: unknown subcommand "${sub}". Try: coverage | value | match`,
+    );
     process.exitCode = 1;
     return;
   }
 
-  const customerFilters = new Set(flagAll(rest, "--customer").map((value) => value.trim().toUpperCase()));
+  const customerFilters = new Set(
+    flagAll(rest, "--customer").map((value) => value.trim().toUpperCase()),
+  );
   const links = registry.links.filter(
-    (link) => customerFilters.size === 0 || customerFilters.has(link.customerId),
+    (link) =>
+      customerFilters.size === 0 || customerFilters.has(link.customerId),
   );
   const wallets = [...new Set(links.map((link) => link.wallet))];
   const live = rest.includes("--live");
@@ -358,14 +477,19 @@ export async function runCustomerBridge(args: readonly string[]): Promise<void> 
     if (!json) {
       console.error(
         `live: ${observations.size} wallets observed (${result.hits} cache hit / ${result.misses} miss)` +
-          (result.failures.length > 0 ? `, ${result.failures.length} failed` : ""),
+          (result.failures.length > 0
+            ? `, ${result.failures.length} failed`
+            : ""),
       );
       for (const failure of result.failures) console.error(`  ! ${failure}`);
     }
   }
 
   const report = buildCustomerPolyBridge({
-    customers: book.filter((row) => customerFilters.size === 0 || customerFilters.has(row.customerId)),
+    customers: book.filter(
+      (row) =>
+        customerFilters.size === 0 || customerFilters.has(row.customerId),
+    ),
     registry,
     observations,
   });

@@ -36,7 +36,10 @@ interface GsLiveExtension {
   readonly surfaces?: readonly GsLiveSurface[];
 }
 
-const spec = JSON.parse(readFileSync(specPath, "utf8")) as Record<string, unknown>;
+const spec = JSON.parse(readFileSync(specPath, "utf8")) as Record<
+  string,
+  unknown
+>;
 const extension = spec["x-sportsdesk-gslive"] as GsLiveExtension | undefined;
 const args = process.argv.slice(2);
 
@@ -58,22 +61,36 @@ if (args.includes("--open")) {
   Bun.spawn([opener, scalarUrl], { stdout: "inherit", stderr: "inherit" });
 }
 
-console.log("================================================================================");
+console.log(
+  "================================================================================",
+);
 console.log("  📚 DEPLOYED API DOCS (Scalar · Cloudflare R2 · local dist)");
-console.log("================================================================================");
+console.log(
+  "================================================================================",
+);
 console.log(`  • Scalar portal        : ${scalarUrl}`);
-console.log(`  • Custom docs domain   : ${CANONICAL_DOMAINS.CUSTOM_DOCS_DOMAIN}/`);
+console.log(
+  `  • Custom docs domain   : ${CANONICAL_DOMAINS.CUSTOM_DOCS_DOMAIN}/`,
+);
 console.log(`  • R2 OpenAPI 3.1 spec  : ${r2}/openapi.json`);
 console.log(`  • R2 surveillance graph: ${r2}/graph.html`);
 console.log(`  • Local spec           : docs/openapi.json`);
 console.log(`  • Local markdown       : docs/api-reference.md`);
-console.log("--------------------------------------------------------------------------------");
+console.log(
+  "--------------------------------------------------------------------------------",
+);
 if (extension === undefined) {
-  console.error("  ✗ docs/openapi.json has no x-sportsdesk-gslive extension (run `bun run docs:openapi`).");
+  console.error(
+    "  ✗ docs/openapi.json has no x-sportsdesk-gslive extension (run `bun run docs:openapi`).",
+  );
   process.exit(1);
 }
-console.log(`  🎯 GSLive              : ${extension.provider} (${extension.kind})`);
-console.log(`     • Console           : ${extension.origin}${extension.managerPath}`);
+console.log(
+  `  🎯 GSLive              : ${extension.provider} (${extension.kind})`,
+);
+console.log(
+  `     • Console           : ${extension.origin}${extension.managerPath}`,
+);
 console.log(`     • Partner ID        : ${extension.partnerId}`);
 console.log(`     • Contract doc      : ${extension.contractDoc}`);
 console.log(`     • CLI               : ${extension.cli}`);
@@ -82,6 +99,12 @@ for (const surface of extension.surfaces ?? []) {
     `     • ${String(surface.id).padEnd(20)} ${String(surface.route).padEnd(20)} ${surface.purpose ?? ""}`,
   );
 }
-console.log("--------------------------------------------------------------------------------");
-console.log("  Next: `./bin/dx docs gslive` for the full section, `./bin/dx gslive <LOGIN>` for links.");
-console.log("================================================================================");
+console.log(
+  "--------------------------------------------------------------------------------",
+);
+console.log(
+  "  Next: `./bin/dx docs gslive` for the full section, `./bin/dx gslive <LOGIN>` for links.",
+);
+console.log(
+  "================================================================================",
+);
