@@ -18,6 +18,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { runFourWeekParlayComboBacktest, type FourWeekParlayBacktestReport } from "../lib/parlay_combo_backtest_engine.ts";
+import { PER_OFFICE_IP_TRACKER_CLUSTERS, type OfficeIpClusterSummary } from "../lib/bet_ticker_ip_tracker_bridge.ts";
+import { buildTenModeLiveSnapshot, type TenModeLiveSnapshot } from "../lib/forensic_diagnostic_modes.ts";
 
 const repoRoot = path.resolve(import.meta.dirname ?? path.dirname(process.argv[1]), "..");
 
@@ -77,6 +79,8 @@ export interface GraphLiveFeedPayload {
   readonly totalOpenExposureUsd: number;
   readonly pendingBets: readonly PendingBetRow[];
   readonly walletProfiles: readonly TrackedWalletProfile[];
+  readonly perOfficeIpTrackerClusters?: readonly OfficeIpClusterSummary[];
+  readonly tenModeSnapshot?: TenModeLiveSnapshot;
   readonly backtest4Wk?: FourWeekParlayBacktestReport;
 }
 
@@ -481,6 +485,8 @@ export function buildGraphLiveFeed(pollSequence = 1): GraphLiveFeedPayload {
     totalOpenExposureUsd: 702700,
     pendingBets,
     walletProfiles,
+    perOfficeIpTrackerClusters: PER_OFFICE_IP_TRACKER_CLUSTERS,
+    tenModeSnapshot: buildTenModeLiveSnapshot(),
     backtest4Wk: runFourWeekParlayComboBacktest(repoRoot),
   };
 }

@@ -71,6 +71,10 @@ import {
   PlayerMutationResultCode,
   MutationClassification,
 } from "./lib/fantasy402_manager_wire.ts";
+import {
+  TEN_MODE_CATALOG,
+  buildTenModeLiveSnapshot,
+} from "./lib/forensic_diagnostic_modes.ts";
 
 
 interface DownlineMetadata {
@@ -1222,6 +1226,23 @@ export async function main(): Promise<void> {
 
   if (cmd === "wire" || rawArgs.includes("--wire")) {
     await handleWireCommand(rawArgs.slice(1));
+    return;
+  }
+
+  if (cmd === "modes" || cmd === "mode" || rawArgs.includes("--modes")) {
+    const snap = buildTenModeLiveSnapshot();
+    const modeFilterArg = rawArgs[1] && !rawArgs[1].startsWith("-") ? Number(rawArgs[1]) : null;
+    console.log("========================================================================================================================");
+    console.log("  🔬 10-MODE FORENSIC, RISK, CROSS-MARKET & DATA INTEGRITY ENGINE (Modes 1..10)");
+    console.log("========================================================================================================================");
+    for (const spec of TEN_MODE_CATALOG) {
+      if (modeFilterArg && spec.modeNumber !== modeFilterArg) continue;
+      console.log(`  [${spec.domain.padEnd(18)}] ${spec.modeLabel.padEnd(25)} | Checks: ${spec.checksSummary.padEnd(55)} | Output: ${spec.outputSummary}`);
+    }
+    if (rawArgs.includes("--json")) {
+      console.log(JSON.stringify(snap, null, 2));
+    }
+    console.log("========================================================================================================================");
     return;
   }
 

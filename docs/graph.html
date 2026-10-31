@@ -465,6 +465,24 @@
         >
           📈 4. 4-Week CFB &amp; NBA Parlay/Combo Backtest (57,755 Customers • +$1.17M Saved)
         </button>
+        <button
+          type="button"
+          class="tab-btn"
+          role="tab"
+          aria-selected="false"
+          data-tab-target="TAB_ROT_TICKER"
+        >
+          ⚡ 5. Watchlist Bet-Ticker by ROT &amp; Per-Office IP-Tracker (13 Clusters)
+        </button>
+        <button
+          type="button"
+          class="tab-btn"
+          role="tab"
+          aria-selected="false"
+          data-tab-target="TAB_FORENSIC_MODES"
+        >
+          🔬 6. 10-Mode Forensic, Risk, Cross-Market &amp; Reconciliation Matrix
+        </button>
       </nav>
 
       <!-- ================================================================== -->
@@ -4066,6 +4084,152 @@
     </td>
     <td><code>ROT 511</code><br/><span style="font-size:0.71rem;color:#cbd5e1">Cross-Office Beard Bridge (KOBE24/CHURN_060 ↔ SHELBY101/CHURN_050): Clamp Silo 3 Tennis & Props</span></td>
   </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- TAB 6: 10-MODE FORENSIC, RISK, CROSS-MARKET & RECONCILIATION       -->
+      <!-- ================================================================== -->
+      <div data-tab-panel="TAB_FORENSIC_MODES" hidden>
+        <section class="section-panel" aria-label="10-Mode Forensic, Risk, Cross-Market and Data Integrity Matrix">
+          <div class="section-header">
+            <div>
+              <h2>🔬 10-Mode Forensic, Risk, Cross-Market &amp; Data Integrity Workbench (Modes 1–10)</h2>
+              <div style="font-size:0.77rem;color:var(--text-muted);margin-top:0.2rem">
+                Unified diagnostic matrix across <strong>Identity &amp; Network (Modes 2–6)</strong>, <strong>Risk &amp; Exposure (Modes 1, 8, 9)</strong>, <strong>Cross-Market (Mode 7)</strong>, and <strong>Data Integrity (Mode 10)</strong>.
+              </div>
+            </div>
+            <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
+              <button type="button" class="btn active" data-mode-domain-filter="ALL">All 10 Modes</button>
+              <button type="button" class="btn" data-mode-domain-filter="Identity &amp; Network">Identity &amp; Network (2–6)</button>
+              <button type="button" class="btn" data-mode-domain-filter="Risk &amp; Exposure">Risk &amp; Exposure (1, 8, 9)</button>
+              <button type="button" class="btn" data-mode-domain-filter="Cross-Market">Cross-Market (7)</button>
+              <button type="button" class="btn" data-mode-domain-filter="Data Integrity">Data Integrity (10)</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Domain</th>
+                  <th>Mode</th>
+                  <th>Checks Performed</th>
+                  <th>Contracted Output</th>
+                  <th>Upstream Endpoints &amp; Wire Rules</th>
+                  <th>Live Telemetry Snapshot &amp; Drill-Down</th>
+                </tr>
+              </thead>
+              <tbody id="forensic-modes-catalog-tbody">
+                <tr data-mode-domain="Risk &amp; Exposure" data-mode-num="1">
+                  <td><span class="pill pill-amber">Risk &amp; Exposure</span></td>
+                  <td><strong>1 · Customer overview</strong></td>
+                  <td>Validated net, pending exposure, access freshness</td>
+                  <td>Summary with drill-downs and missing-data warnings</td>
+                  <td><code>api/Report/getDailyFiguresByCustomer</code><br/><code>api/Report/Pending</code> + <code>getWebLog (A)</code></td>
+                  <td>
+                    <a class="link-badge f402" href="https://desk.bookdeskops.com/dashboard?customer=MJ102&amp;agent=MJ2026" target="_blank" rel="noopener">MJ102 ↗</a>
+                    <a class="link-badge" href="https://plive.sportswidgets.pro/manager-tools/#/reports/users?partnerId=118&amp;searchBy=player&amp;text=player_MJ102&amp;agent=MJ2026" target="_blank" rel="noopener">player_MJ102 ↗</a><br/>
+                    Net <strong>+$42,850</strong> | Pending Stake <strong>$60,600</strong> (Liab <strong>$64,120</strong>) | Fresh <code>310s ago</code> | <code>CHURN_059</code> warns: <code>WEBLOG_MODE_A_COLLECTION_GAP</code>
+                  </td>
+                </tr>
+                <tr data-mode-domain="Identity &amp; Network" data-mode-num="2">
+                  <td><span class="pill pill-cyan">Identity &amp; Network</span></td>
+                  <td><strong>2 · Access logs</strong></td>
+                  <td>Customer ID, actor vs target, event time</td>
+                  <td>Searchable access timeline</td>
+                  <td><code>POST /cloud/api/Manager/getWebLog</code><br/><code>type="A"</code> (<code>MM/DD/YYYY</code>)</td>
+                  <td>
+                    <code>MJ102</code> timeline: <code>14:42:07Z</code> <code>SELF_PLAYER</code> Login → <code>14:42:11Z</code> Wager (<code>4.2s</code> dwell) → <code>14:42:18Z</code> <code>OFFICE_AGENT</code> (<code>Actor=MJ2026 → Target=MJ102</code> Ban-Hammer clamp)
+                  </td>
+                </tr>
+                <tr data-mode-domain="Identity &amp; Network" data-mode-num="3">
+                  <td><span class="pill pill-cyan">Identity &amp; Network</span></td>
+                  <td><strong>3 · Shared-IP overview</strong></td>
+                  <td>Normalized IPs, distinct customers, same date window</td>
+                  <td>Account groups with supporting observations</td>
+                  <td><code>Manager/getWebLog</code> <code>type="B"</code><br/>Per-Office <code>customerID=&lt;Office&gt;</code> &amp; Global <code>customerID="0"</code></td>
+                  <td>
+                    <strong>13 Account Groups</strong> across <code>10/25/2026..10/31/2026</code>: <code>MJ2026</code> (5 accounts on <code>104.28.34.12</code>), <code>CUB22HR</code> (8 accounts across <code>CUB22HR/MAX92/BILLY666</code> on <code>104.28.55.19</code>)
+                  </td>
+                </tr>
+                <tr data-mode-domain="Identity &amp; Network" data-mode-num="4">
+                  <td><span class="pill pill-cyan">Identity &amp; Network</span></td>
+                  <td><strong>4 · Customer IP history</strong></td>
+                  <td>First/last seen, changes, collection gaps</td>
+                  <td>One customer’s IP timeline</td>
+                  <td><code>Manager/getWebLog</code> <code>type="C"</code><br/>Strict <code>YYYY-MM-DD</code> start/end rewrite</td>
+                  <td>
+                    <code>MJ102</code> (<code>2026-10-25..2026-10-31</code>): 3 IP spans (<code>104.28.34.12</code> → <code>172.56.21.89</code> → <code>104.28.34.12</code>), <strong>2 IP/ASN switches</strong>, <strong>1 collection gap</strong> (<code>32.75h &gt; 24h</code>)
+                  </td>
+                </tr>
+                <tr data-mode-domain="Identity &amp; Network" data-mode-num="5">
+                  <td><span class="pill pill-cyan">Identity &amp; Network</span></td>
+                  <td><strong>5 · Accounts by IP</strong></td>
+                  <td>Selected IP, account IDs, timestamps</td>
+                  <td>Accounts observed using that IP</td>
+                  <td><code>Manager/getWebLog</code> <code>type="I"</code><br/><code>customerID="0" &amp; ip=&lt;SelectedIP&gt;</code></td>
+                  <td>
+                    IP <code>104.28.34.12</code> (<code>104.28.34.0/24</code>): <strong>5 observed accounts</strong> (<code>MJ102</code>, <code>MJ103</code>, <code>EJ8834</code>, <code>EJ8835</code>, <code>MJ101</code>) with 90 combined auth/wager hits
+                  </td>
+                </tr>
+                <tr data-mode-domain="Identity &amp; Network" data-mode-num="6">
+                  <td><span class="pill pill-cyan">Identity &amp; Network</span></td>
+                  <td><strong>6 · Activity overlap</strong></td>
+                  <td>Session intervals or clearly labeled activity windows</td>
+                  <td>Overlap duration; distinguishes sessions from nearby events</td>
+                  <td><code>getWebLog (A/I)</code> × <code>getBetTicker (InsertDateTime)</code></td>
+                  <td>
+                    • <code>MJ102 ↔ MJ103</code>: <span class="pill pill-rose">CONFIRMED_CONCURRENT_SESSION_OVERLAP</span> (<strong>270s</strong> active session intersection)<br/>
+                    • <code>CHURN_059 ↔ CHURN_049</code>: <span class="pill pill-amber">NEARBY_POINT_EVENTS_WITHOUT_SESSION_OVERLAP</span> (<strong>24s</strong> point-event gap, <code>0s</code> session overlap)
+                  </td>
+                </tr>
+                <tr data-mode-domain="Cross-Market" data-mode-num="7">
+                  <td><span class="pill pill-emerald">Cross-Market</span></td>
+                  <td><strong>7 · Wager comparison</strong></td>
+                  <td>Event, market, period, side, line units and timestamps</td>
+                  <td>Comparable wagers with match reasons and uncertainty</td>
+                  <td><code>api/Report/Pending (getLineGame)</code> ↔<br/><code>data-api.polymarket.com/positions</code></td>
+                  <td>
+                    • <code>2026-10-31:ROT-451 NE FG SPREAD</code>: F402 <code>-750</code> vs PM <code>-650</code> (<code>Δ=+100</code> hundredths Key-7 crossing, <code>Δt=4s</code>)<br/>
+                    • <code>2026-10-31:ROT-501 LAL FG SPREAD</code>: DGS Child <code>ROT 5501 → 501</code> normalized, identical <code>-750</code> hundredths (<code>Δt=4s</code>)
+                  </td>
+                </tr>
+                <tr data-mode-domain="Risk &amp; Exposure" data-mode-num="8">
+                  <td><span class="pill pill-amber">Risk &amp; Exposure</span></td>
+                  <td><strong>8 · Settled net</strong></td>
+                  <td>Settled tickets, adjustments, free-play, payout/sign conventions</td>
+                  <td>Customer P/L by period and currency</td>
+                  <td><code>api/Report/getGradedWagerByCustomer</code><br/><code>api/Report/getTransactions</code></td>
+                  <td>
+                    <code>MJ102</code> (Sign: <code>+PlayerWin</code>): 7D USD Settled <strong>+$24,545</strong> (incl. <code>+$4,545</code> FreePlay win &amp; <code>$3,000</code> FreePlay loss with <code>$0</code> principal debit) + Adj <strong>-$1,500</strong> = <strong>+$23,045 USD</strong> | Shadow: <strong>+$19,805 USDC</strong>
+                  </td>
+                </tr>
+                <tr data-mode-domain="Risk &amp; Exposure" data-mode-num="9">
+                  <td><span class="pill pill-amber">Risk &amp; Exposure</span></td>
+                  <td><strong>9 · Pending exposure</strong></td>
+                  <td>Unique tickets, stakes, payout terms, current status</td>
+                  <td>Stake, potential payout and defined liability separately</td>
+                  <td><code>api/Report/Pending</code><br/>Grouped by <code>TicketNumber-WagerNumber</code></td>
+                  <td>
+                    <code>MJ102</code> (4 raw rows → <strong>2 unique tickets</strong>; 1 <code>ALERT</code> twin dropped):<br/>
+                    • <strong>Stake:</strong> <code>$16,200</code> (FreePlay stake=<code>$0</code>) | <strong>Potential Payout:</strong> <code>$67,820</code> | <strong>Defined Liability:</strong> <code>$51,620</code>
+                  </td>
+                </tr>
+                <tr data-mode-domain="Data Integrity" data-mode-num="10">
+                  <td><span class="pill pill-rose">Data Integrity</span></td>
+                  <td><strong>10 · Reconciliation</strong></td>
+                  <td>Report totals vs tickets/ledger with identical scope</td>
+                  <td>Matched totals, explained differences, unresolved gaps</td>
+                  <td><code>getDailyFiguresByCustomer</code> vs<br/><code>getGradedWagerByCustomer</code> vs <code>getTransactions</code></td>
+                  <td>
+                    • <code>MJ102</code> (<code>2026-10-25..2026-10-31 CDT</code>): Report <code>+$24,545</code> == Tickets <code>+$24,545</code> | Ledger <code>+$23,045</code> | Explained Diff: <code>-$1,500</code> (<code>TXN-ADJ-901</code>) | <strong>Unresolved Gap: <code>$0.00</code></strong><br/>
+                    • <code>BGD101</code>: Report == Tickets == Ledger <code>+$89,400</code> | <strong>Unresolved Gap: <code>$0.00</code></strong>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>

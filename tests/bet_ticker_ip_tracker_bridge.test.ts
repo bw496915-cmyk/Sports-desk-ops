@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "node:test";
+import assert from "node:assert/strict";
 import {
   formatWebLogDateForMode,
   buildPerOfficeIpMatcherPayload,
@@ -16,22 +17,22 @@ describe("bet_ticker_ip_tracker_bridge (ip-tracker.js & bet-ticker.js)", () => {
       startDateMdy: "10/31/2026",
       endDateMdy: "10/31/2026",
     });
-    expect(perOffice.type).toBe("B");
-    expect(perOffice.agentID).toBe("BILLY666");
-    expect(perOffice.customerID).toBe("MJ2026");
-    expect(perOffice.start).toBe("10/31/2026");
-    expect(perOffice.operation).toBe("getWebLog");
+    assert.equal(perOffice.type, "B");
+    assert.equal(perOffice.agentID, "BILLY666");
+    assert.equal(perOffice.customerID, "MJ2026");
+    assert.equal(perOffice.start, "10/31/2026");
+    assert.equal(perOffice.operation, "getWebLog");
 
     const globalMaster = buildPerOfficeIpMatcherPayload({
       masterAgentId: "BILLY666",
       officeAgentId: null,
     });
-    expect(globalMaster.customerID).toBe("0");
+    assert.equal(globalMaster.customerID, "0");
   });
 
   test("Mode C Player IP Matcher converts MM/DD/YYYY to YYYY-MM-DD per ip-tracker.js line 77", () => {
-    expect(formatWebLogDateForMode("10/31/2026", "C")).toBe("2026-10-31");
-    expect(formatWebLogDateForMode("2026-10-31", "B")).toBe("10/31/2026");
+    assert.equal(formatWebLogDateForMode("10/31/2026", "C"), "2026-10-31");
+    assert.equal(formatWebLogDateForMode("2026-10-31", "B"), "10/31/2026");
 
     const modeC = buildPlayerIpMatcherPayload({
       masterAgentId: "BILLY666",
@@ -39,26 +40,26 @@ describe("bet_ticker_ip_tracker_bridge (ip-tracker.js & bet-ticker.js)", () => {
       startDate: "10/28/2026",
       endDate: "10/31/2026",
     });
-    expect(modeC.type).toBe("C");
-    expect(modeC.customerID).toBe("CB112_1");
-    expect(modeC.start).toBe("2026-10-28");
-    expect(modeC.end).toBe("2026-10-31");
+    assert.equal(modeC.type, "C");
+    assert.equal(modeC.customerID, "CB112_1");
+    assert.equal(modeC.start, "2026-10-28");
+    assert.equal(modeC.end, "2026-10-31");
   });
 
   test("normalizes LoginID strings and resolves Per-Office & Cross-Office IP matches for Bet-Ticker rows", () => {
-    expect(normalizeWebLogLoginId(" .mj102. ")).toBe("MJ102");
-    expect(PER_OFFICE_IP_TRACKER_CLUSTERS.length).toBe(13);
+    assert.equal(normalizeWebLogLoginId(" .mj102. "), "MJ102");
+    assert.equal(PER_OFFICE_IP_TRACKER_CLUSTERS.length, 13);
 
     const mjMatch = lookupIpTrackerMatchForBetTicker("EJ8834");
-    expect(mjMatch).toBeDefined();
-    expect(mjMatch?.officeAgentId).toBe("MJ2026");
-    expect(mjMatch?.matchClassification).toBe("PER_OFFICE_IP_MATCH");
-    expect(mjMatch?.matchedLoginsInOffice).toContain("MJ102");
-    expect(mjMatch?.matchedLoginsInOffice).toContain("MJ103");
-    expect(mjMatch?.mfcsCompositeScore).toBe(98);
+    assert.ok(mjMatch);
+    assert.equal(mjMatch.officeAgentId, "MJ2026");
+    assert.equal(mjMatch.matchClassification, "PER_OFFICE_IP_MATCH");
+    assert.equal(mjMatch.matchedLoginsInOffice.includes("MJ102"), true);
+    assert.equal(mjMatch.matchedLoginsInOffice.includes("MJ103"), true);
+    assert.equal(mjMatch.mfcsCompositeScore, 98);
 
     const cubMatch = lookupIpTrackerMatchForBetTicker("CB112_2");
-    expect(cubMatch?.matchClassification).toBe("BOTH_PER_OFFICE_AND_CROSS_OFFICE");
-    expect(cubMatch?.crossOfficeLogins.some((x) => x.officeAgentId === "MAX92")).toBe(true);
+    assert.equal(cubMatch?.matchClassification, "BOTH_PER_OFFICE_AND_CROSS_OFFICE");
+    assert.equal(cubMatch?.crossOfficeLogins.some((x) => x.officeAgentId === "MAX92"), true);
   });
 });

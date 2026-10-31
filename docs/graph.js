@@ -244,6 +244,21 @@
     });
   });
 
+  // 7d. 10-Mode Forensic, Risk, Cross-Market & Reconciliation Domain Filter in Tab 6
+  const modeDomainBtns = document.querySelectorAll("[data-mode-domain-filter]");
+  const modeCatalogRows = document.querySelectorAll("#forensic-modes-catalog-tbody tr");
+  modeDomainBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      const dom = btn.getAttribute("data-mode-domain-filter") || "ALL";
+      modeDomainBtns.forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      modeCatalogRows.forEach(function (row) {
+        const rowDom = row.getAttribute("data-mode-domain") || "";
+        row.style.display = dom === "ALL" || rowDom === dom ? "" : "none";
+      });
+    });
+  });
+
   // 8. Live Poller Sync (`./graph-live-feed.json` / `/api/graph-feed`) + Relative Age Counter
   const lastUpdatedEl = document.getElementById("live-last-updated-ts");
   const lastUpdatedAgeEl = document.getElementById("live-last-updated-age");
