@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 920" width="1600" height="920" role="img" aria-labelledby="pipeline-per-office-ip-and-reconciliation-title pipeline-per-office-ip-and-reconciliation-desc">
+  <title id="pipeline-per-office-ip-and-reconciliation-title">PER-OFFICE IP-TRACKER (MODES 2–6) & SCOPE-LOCKED RECONCILIATION (MODES 1, 8, 9, 10)</title>
+  <desc id="pipeline-per-office-ip-and-reconciliation-desc">Reference diagram combining the 13 Per-Office & Cross-Office IP-Tracker clusters (getWebLog Mode B customerID=<OfficeAgentID> vs customerID=0, Mode C YYYY-MM-DD history, Mode I reverse IP, and Mode 6 concurrent session overlap) with the Risk & Data Integrity reconciliation pipeline (Mode 1 Overview, Mode 8 Settled Net, Mode 9 Pending Exposure, and Mode 10 Scope-Locked Reconciliation proving Unresolved Gap = $0.00).</desc>
+  <metadata>
+    <?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+           xmlns:dc="http://purl.org/dc/elements/1.1/"
+           xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+           xmlns:sportsdesk="https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/ns/1.0/">
+    <rdf:Description rdf:about="https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.svg">
+      <dc:identifier>SD-ARTIFACT-03-IP-AND-RECONCILIATION</dc:identifier>
+      <dc:title><rdf:Alt><rdf:li xml:lang="x-default">PER-OFFICE IP-TRACKER (MODES 2–6) & SCOPE-LOCKED RECONCILIATION (MODES 1, 8, 9, 10)</rdf:li></rdf:Alt></dc:title>
+      <dc:description><rdf:Alt><rdf:li xml:lang="x-default">Reference diagram combining the 13 Per-Office & Cross-Office IP-Tracker clusters (getWebLog Mode B customerID=<OfficeAgentID> vs customerID=0, Mode C YYYY-MM-DD history, Mode I reverse IP, and Mode 6 concurrent session overlap) with the Risk & Data Integrity reconciliation pipeline (Mode 1 Overview, Mode 8 Settled Net, Mode 9 Pending Exposure, and Mode 10 Scope-Locked Reconciliation proving Unresolved Gap = $0.00).</rdf:li></rdf:Alt></dc:description>
+      <dc:creator><rdf:Seq><rdf:li>SportsDesk &amp; Fantasy402 Risk Engineering</rdf:li></rdf:Seq></dc:creator>
+      <dc:subject><rdf:Bag><rdf:li>Identity & Network</rdf:li><rdf:li>Risk & Exposure</rdf:li><rdf:li>Data Integrity</rdf:li><rdf:li>app/manager/module/ip-tracker.js</rdf:li><rdf:li>app/manager/module/bet-ticker.js</rdf:li><rdf:li>app/manager/report/help-report.js</rdf:li></rdf:Bag></dc:subject>
+      <xmp:CreatorTool>SportsDesk 10-Mode Pipeline Generator (Bun v1.4.4)</xmp:CreatorTool>
+      <sportsdesk:modesCovered>1,2,3,4,5,6,8,9,10</sportsdesk:modesCovered>
+      <sportsdesk:cliEntrypoint>./bin/dx iptracker | ./bin/dx modes 3 | ./bin/dx modes 6 | ./bin/dx modes 10</sportsdesk:cliEntrypoint>
+      <sportsdesk:portalUrl>https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</sportsdesk:portalUrl>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"ImageObject","@id":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.svg","identifier":"SD-ARTIFACT-03-IP-AND-RECONCILIATION","name":"PER-OFFICE IP-TRACKER (MODES 2–6) & SCOPE-LOCKED RECONCILIATION (MODES 1, 8, 9, 10)","alternateName":"13 Office & Cross-Office IP Clusters (MJ2026, BIGDAD, CUB22HR, ATEAM...) + Zero-Gap Financial Reconciliation","description":"Reference diagram combining the 13 Per-Office & Cross-Office IP-Tracker clusters (getWebLog Mode B customerID=<OfficeAgentID> vs customerID=0, Mode C YYYY-MM-DD history, Mode I reverse IP, and Mode 6 concurrent session overlap) with the Risk & Data Integrity reconciliation pipeline (Mode 1 Overview, Mode 8 Settled Net, Mode 9 Pending Exposure, and Mode 10 Scope-Locked Reconciliation proving Unresolved Gap = $0.00).","contentUrl":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.svg","thumbnailUrl":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.png","encodingFormat":["image/svg+xml","image/png"],"creator":{"@type":"Organization","name":"SportsDesk & Fantasy402 Risk Engineering"},"keywords":["Identity & Network","Risk & Exposure","Data Integrity","app/manager/module/ip-tracker.js","app/manager/module/bet-ticker.js","app/manager/report/help-report.js","Per-Office Mode B (customerID=<OfficeAgentID>) vs Global Master (customerID='0')","Mode 6 Concurrent Session Overlap (270s) vs Nearby Point Events (24s)","Mode 10 Identical-Scope Verification (Report DailyFigures vs Settled Tickets vs Ledger)"],"potentialAction":["./bin/dx iptracker","./bin/dx modes 3","./bin/dx modes 6","./bin/dx modes 10"]}</script>
+  </metadata>
+  <defs>
+    <style>
+      .bg { fill: #070b14; }
+      .panel { fill: #0b1329; stroke-width: 2; rx: 12px; }
+      .card { fill: #101c38; stroke-width: 1.5; rx: 8px; }
+      .title { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 24px; font-weight: 800; fill: #f8fafc; letter-spacing: 0.03em; }
+      .subtitle { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; fill: #38bdf8; }
+      .col-hdr { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.05em; }
+      .card-title { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13.5px; font-weight: 700; fill: #f8fafc; }
+      .card-body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; fill: #cbd5e1; }
+      .card-accent { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 700; }
+      .footer { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; fill: #6ee7b7; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1600" height="920" />
+  <!-- Header Banner -->
+  <rect x="24" y="18" width="1552" height="68" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1.5" />
+  <text x="48" y="48" class="title">PER-OFFICE IP-TRACKER (MODES 2–6) & SCOPE-LOCKED RECONCILIATION (MODES 1, 8, 9, 10)</text>
+  <text x="48" y="70" class="subtitle">13 Office & Cross-Office IP Clusters (MJ2026, BIGDAD, CUB22HR, ATEAM...) + Zero-Gap Financial Reconciliation • ID: SD-ARTIFACT-03-IP-AND-RECONCILIATION • Live R2 Portal: https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</text>
+  
+      <!-- LEFT HALF: PER-OFFICE & CROSS-OFFICE IP-TRACKER PIPELINE (MODES 2-6) -->
+      <rect class="panel" x="24" y="102" width="764" height="736" stroke="#06b6d4" />
+      <text x="44" y="132" class="col-hdr" fill="#38bdf8">LEFT: PER-OFFICE &amp; CROSS-OFFICE IP-TRACKER (MODES 2, 3, 4, 5, 6)</text>
+
+      <rect class="card" x="44" y="150" width="724" height="150" stroke="#06b6d4" />
+      <text x="60" y="175" class="card-title" fill="#67e8f9">Mode 3 · Per-Office vs. Global Shared-IP Matcher (ip-tracker.js line 78)</text>
+      <text x="60" y="198" class="card-body">• Per-Office Query: POST /cloud/api/Manager/getWebLog { type: "B", agentID: "BILLY666", customerID: "MJ2026" }</text>
+      <text x="60" y="216" class="card-body">  -&gt; Returns 5 accounts in MJ2026 on 104.28.34.12 (MJ102, EJ8834, MJ103, EJ8835, MJ101) | Dwell: 4.2s | MFCS: 98/100</text>
+      <text x="60" y="238" class="card-body">• Global Cross-Office Query: POST /cloud/api/Manager/getWebLog { type: "B", agentID: "BILLY666", customerID: "0" }</text>
+      <text x="60" y="256" class="card-body">  -&gt; Catches CUB22HR (5x) &lt;-&gt; MAX92/MX920_1 &lt;-&gt; BILLY666/CUST_BAY_1..2 on 104.28.55.19 &amp; LAKERS &lt;-&gt; SOUTHSHORE</text>
+      <text x="60" y="278" class="card-accent" fill="#6ee7b7">All 13 Clusters Active: MJ2026, BIGDAD, CUB22HR, ATEAM, GPRO50RSK, JUICEPLUS, DAN318, MACHR, GOLD22, TEXANS, SPEN, LAKERS, KOBE24</text>
+
+      <rect class="card" x="44" y="316" width="724" height="155" stroke="#38bdf8" />
+      <text x="60" y="341" class="card-title" fill="#7dd3fc">Modes 2, 4 &amp; 5 · Actor/Target Timeline, YYYY-MM-DD IP History &amp; Reverse IP</text>
+      <text x="60" y="364" class="card-body">• Mode 2 (Access Logs): Distinguishes SELF_PLAYER (MJ102 Login @ 14:42:07Z -&gt; Wager @ 14:42:11Z, 4.2s dwell)</text>
+      <text x="60" y="382" class="card-body">  from OFFICE_AGENT override (Actor=MJ2026 -&gt; Target=MJ102 @ 14:42:18Z executing Ban-Hammer clamp)</text>
+      <text x="60" y="404" class="card-body">• Mode 4 (Customer IP History, type="C" YYYY-MM-DD): Tracks MJ102 across 3 IP spans, 2 ASN transitions,</text>
+      <text x="60" y="422" class="card-body">  and flags 1 collection gap (32.75h &gt; 24h threshold)</text>
+      <text x="60" y="444" class="card-accent" fill="#67e8f9">• Mode 5 (Accounts by IP, type="I"): 104.28.34.12 -&gt; 5 observed accounts (90 total auth/wager hits)</text>
+
+      <rect class="card" x="44" y="488" width="724" height="165" stroke="#a855f7" />
+      <text x="60" y="513" class="card-title" fill="#e9d5ff">Mode 6 · Activity Overlap: Concurrent Session Intervals vs. Nearby Point Events</text>
+      <text x="60" y="538" class="card-accent" fill="#fda4af">1. CONFIRMED_CONCURRENT_SESSION_OVERLAP (MJ102 [14:40:00Z..14:46:30Z] &lt;-&gt; MJ103 [14:41:10Z..14:45:40Z]):</text>
+      <text x="60" y="558" class="card-body">   Bounded session intervals intersect for 270 seconds on 104.28.34.12 -&gt; Clamp entire office ring</text>
+      <text x="60" y="586" class="card-accent" fill="#fcd34d">2. NEARBY_POINT_EVENTS_WITHOUT_SESSION_OVERLAP (CHURN_059 @ 15:22:48Z &lt;-&gt; CHURN_049 @ 15:23:12Z):</text>
+      <text x="60" y="606" class="card-body">   Single bet-ticker point timestamps separated by 24s (0s session overlap) -&gt; Flagged as nearby point window</text>
+      <text x="60" y="632" class="card-accent" fill="#6ee7b7">Prevents false session-overlap accusations when only point-in-time bet timestamps are available</text>
+
+      <rect class="card" x="44" y="670" width="724" height="148" stroke="#10b981" />
+      <text x="60" y="695" class="card-title" fill="#6ee7b7">4-Surface Identity Join (F402 + Office + GSLive Partner 118 + Polymarket 0x)</text>
+      <text x="60" y="720" class="card-body">• F402 Customer &amp; Office : https://desk.bookdeskops.com/dashboard?customer=MJ102&amp;agent=MJ2026</text>
+      <text x="60" y="742" class="card-body">• GSLive Partner 118     : https://plive.sportswidgets.pro/manager-tools/#/reports/users?partnerId=118&amp;text=player_MJ102</text>
+      <text x="60" y="764" class="card-body">• Polymarket On-Chain 0x : https://polymarket.com/profile/0x07db5765beba17be154cbfbd6324a15f3c81fa4f</text>
+      <text x="60" y="790" class="card-accent" fill="#6ee7b7">• Write Mutation Wire ID : customerID="MJ102      " (11-char padded) + agentOwner="MJ2026"</text>
+
+      <!-- RIGHT HALF: RISK & DATA INTEGRITY RECONCILIATION PIPELINE (MODES 1, 8, 9, 10) -->
+      <rect class="panel" x="812" y="102" width="764" height="736" stroke="#f59e0b" />
+      <text x="832" y="132" class="col-hdr" fill="#fcd34d">RIGHT: RISK EXPOSURE &amp; SCOPE-LOCKED RECONCILIATION (MODES 1, 8, 9, 10)</text>
+
+      <rect class="card" x="832" y="150" width="724" height="150" stroke="#f59e0b" />
+      <text x="848" y="175" class="card-title" fill="#fcd34d">Mode 1 · Customer Overview &amp; Missing-Data Guardrails</text>
+      <text x="848" y="198" class="card-body">• MJ102 (MJ2026)  : Validated Net +$42,850 | Pending Stake $60,600 | Liability $64,120 | Fresh 310s ago (OK)</text>
+      <text x="848" y="218" class="card-body">• BGD101 (BIGDAD) : Validated Net +$89,400 | Pending Stake $73,300 | Liability $85,411 | Fresh 455s ago (OK)</text>
+      <text x="848" y="238" class="card-body">• CB112_1 (CUB22HR): Validated Net +$31,200 | Pending Stake $63,000 | Liability $57,272 | Fresh 368s ago (OK)</text>
+      <text x="848" y="262" class="card-accent" fill="#fda4af">• CHURN_059 (LAKERS): Emits STALE_ACCESS_TELEMETRY_54H + WEBLOG_MODE_A_COLLECTION_GAP warnings</text>
+
+      <rect class="card" x="832" y="316" width="724" height="155" stroke="#10b981" />
+      <text x="848" y="341" class="card-title" fill="#6ee7b7">Mode 8 · Settled Net (Period &amp; Currency P/L + Free-Play Principal Convention)</text>
+      <text x="848" y="364" class="card-body">Sign Convention: CUSTOMER_PERSPECTIVE_POSITIVE_IS_PLAYER_WIN (Book Hold = -SettledSportsNet)</text>
+      <text x="848" y="386" class="card-body">• Ticket 899101-1 (7D USD, Standard Win, FreePlay="N"): Stake $22,000 -&gt; Won +$20,000</text>
+      <text x="848" y="406" class="card-body">• Ticket 899145-1 (7D USD, FreePlay Win, FreePlay="Y"): Stake $5,000  -&gt; Won +$4,545 (principal excluded)</text>
+      <text x="848" y="426" class="card-body">• Ticket 899210-1 (7D USD, FreePlay Loss, FreePlay="Y"): Stake $3,000 -&gt; Lost $0 cash (Saved $3,000 principal)</text>
+      <text x="848" y="448" class="card-accent" fill="#6ee7b7">• Net 7D USD: +$24,545 Settled - $1,500 Adj (TXN-ADJ-901) = +$23,045 USD + $19,805 USDC = +$42,850</text>
+
+      <rect class="card" x="832" y="488" width="724" height="150" stroke="#38bdf8" />
+      <text x="848" y="513" class="card-title" fill="#7dd3fc">Mode 9 · Pending Exposure (Unique Tickets: Stake vs. Potential Payout vs. Liability)</text>
+      <text x="848" y="536" class="card-body">Ingests 4 raw pending rows for MJ102 -&gt; Drops 1 ALERT twin -&gt; Collapses 2 parlay leg rows into 901104-1:</text>
+      <text x="848" y="558" class="card-body">• Ticket 901104-1 (2-Leg Parlay, FreePlay="N"): Stake = $16,200 | Liability = $42,120 | Payout = $58,320</text>
+      <text x="848" y="578" class="card-body">• Ticket 901188-1 (Straight Bet, FreePlay="Y"): Stake = $0      | Liability = $9,500  | Payout = $9,500</text>
+      <text x="848" y="604" class="card-accent" fill="#fcd34d">SEPARATED TOTALS: Cash Stake = $16,200  |  Potential Payout = $67,820  |  Defined Liability = $51,620</text>
+
+      <rect class="card" x="832" y="654" width="724" height="164" stroke="#f43f5e" />
+      <text x="848" y="679" class="card-title" fill="#fda4af">Mode 10 · Scope-Locked Reconciliation (DailyFigures vs. GradedTickets vs. Ledger)</text>
+      <text x="848" y="702" class="card-body">Identical Scope Lock: 2026-10-25..2026-10-31 (America/Chicago FigureDate Window)</text>
+      <text x="848" y="724" class="card-body">• MJ102 : Report DailyFigures (+$24,545) == Settled Tickets (+$24,545) | Ledger Delta (+$23,045)</text>
+      <text x="848" y="744" class="card-body">          Explained Difference: -$1,500 (MANUAL_LEDGER_ADJUSTMENT TXN-ADJ-901 wire settlement fee)</text>
+      <text x="848" y="766" class="card-body">• BGD101: Report DailyFigures (+$89,400) == Settled Tickets (+$89,400) == Ledger Delta (+$89,400)</text>
+      <text x="848" y="792" class="card-accent" fill="#6ee7b7">✅ VERDICT: Unresolved Gap = $0.00 across both accounts (RECONCILED_WITH_EXPLAINED_DIFFS &amp; RECONCILED_EXACT)</text>
+    
+  <!-- Footer Command Bar -->
+  <rect x="24" y="856" width="1552" height="46" rx="8" fill="#06281e" stroke="#10b981" stroke-width="1.8" />
+  <text x="48" y="884" class="footer">⚡ OPERATOR CLI &amp; LIVE LINKS: ./bin/dx iptracker   |   ./bin/dx modes 3   |   ./bin/dx modes 6   |   ./bin/dx modes 10   →   https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</text>
+</svg>

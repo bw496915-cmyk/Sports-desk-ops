@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 920" width="1600" height="920" role="img" aria-labelledby="pipeline-10-mode-architecture-title pipeline-10-mode-architecture-desc">
+  <title id="pipeline-10-mode-architecture-title">SPORTSDESK & FANTASY402 — DATA CLEANING, 10-MODE ENGINE & OPERATOR ACTION PIPELINE</title>
+  <desc id="pipeline-10-mode-architecture-desc">End-to-end architectural diagram showing how report.js, help-report.js, bet-ticker.js, ip-tracker.js, GSLive Partner 118 (player_[login]), and Polymarket CLOB/Data APIs are cleaned into canonical primitives, evaluated across Modes 1..10 (Risk & Exposure, Identity & Network, Cross-Market, Data Integrity), and converted into sub-320ms Ban-Hammer clamps, Stepped Line dispatches, +15c/+20c vig shading, and $0-gap ledger reconciliations.</desc>
+  <metadata>
+    <?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+           xmlns:dc="http://purl.org/dc/elements/1.1/"
+           xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+           xmlns:sportsdesk="https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/ns/1.0/">
+    <rdf:Description rdf:about="https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.svg">
+      <dc:identifier>SD-ARTIFACT-01-10MODE-PIPELINE</dc:identifier>
+      <dc:title><rdf:Alt><rdf:li xml:lang="x-default">SPORTSDESK & FANTASY402 — DATA CLEANING, 10-MODE ENGINE & OPERATOR ACTION PIPELINE</rdf:li></rdf:Alt></dc:title>
+      <dc:description><rdf:Alt><rdf:li xml:lang="x-default">End-to-end architectural diagram showing how report.js, help-report.js, bet-ticker.js, ip-tracker.js, GSLive Partner 118 (player_[login]), and Polymarket CLOB/Data APIs are cleaned into canonical primitives, evaluated across Modes 1..10 (Risk & Exposure, Identity & Network, Cross-Market, Data Integrity), and converted into sub-320ms Ban-Hammer clamps, Stepped Line dispatches, +15c/+20c vig shading, and $0-gap ledger reconciliations.</rdf:li></rdf:Alt></dc:description>
+      <dc:creator><rdf:Seq><rdf:li>SportsDesk &amp; Fantasy402 Risk Engineering</rdf:li></rdf:Seq></dc:creator>
+      <dc:subject><rdf:Bag><rdf:li>Risk & Exposure</rdf:li><rdf:li>Identity & Network</rdf:li><rdf:li>Cross-Market</rdf:li><rdf:li>Data Integrity</rdf:li><rdf:li>customer/report/report.js</rdf:li><rdf:li>app/manager/report/help-report.js</rdf:li><rdf:li>app/manager/module/bet-ticker.js</rdf:li><rdf:li>app/manager/module/ip-tracker.js</rdf:li><rdf:li>Polymarket Gamma/CLOB/Data API</rdf:li><rdf:li>GSLive Manager Partner 118 (player_[login])</rdf:li></rdf:Bag></dc:subject>
+      <xmp:CreatorTool>SportsDesk 10-Mode Pipeline Generator (Bun v1.4.4)</xmp:CreatorTool>
+      <sportsdesk:modesCovered>1,2,3,4,5,6,7,8,9,10</sportsdesk:modesCovered>
+      <sportsdesk:cliEntrypoint>./bin/dx status | ./bin/dx modes [1..10] | ./bin/dx iptracker | ./bin/dx deploy</sportsdesk:cliEntrypoint>
+      <sportsdesk:portalUrl>https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</sportsdesk:portalUrl>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"ImageObject","@id":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.svg","identifier":"SD-ARTIFACT-01-10MODE-PIPELINE","name":"SPORTSDESK & FANTASY402 — DATA CLEANING, 10-MODE ENGINE & OPERATOR ACTION PIPELINE","alternateName":"End-to-End Flow: 4 Upstream Feeds -> 6-Layer Canonical Cleaner -> 10-Mode Diagnostic Matrix -> Automated Desk Actions","description":"End-to-end architectural diagram showing how report.js, help-report.js, bet-ticker.js, ip-tracker.js, GSLive Partner 118 (player_[login]), and Polymarket CLOB/Data APIs are cleaned into canonical primitives, evaluated across Modes 1..10 (Risk & Exposure, Identity & Network, Cross-Market, Data Integrity), and converted into sub-320ms Ban-Hammer clamps, Stepped Line dispatches, +15c/+20c vig shading, and $0-gap ledger reconciliations.","contentUrl":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.svg","thumbnailUrl":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.png","encodingFormat":["image/svg+xml","image/png"],"creator":{"@type":"Organization","name":"SportsDesk & Fantasy402 Risk Engineering"},"keywords":["Risk & Exposure","Identity & Network","Cross-Market","Data Integrity","customer/report/report.js","app/manager/report/help-report.js","app/manager/module/bet-ticker.js","app/manager/module/ip-tracker.js","Polymarket Gamma/CLOB/Data API","GSLive Manager Partner 118 (player_[login])","TicketNumber-WagerNumber Parent Grouping","BLOCKED Drop & ALERT Mirror Zeroing","FreePlayFlag='Y' Zero-Principal Loss & Stake/Payout/Liability Split","Teaser Effective Line & DGS ROT+5000 Normalization","Mode B Per-Office customerID=<Office> vs Global 0 & Mode C YYYY-MM-DD","4-Surface Identity Join & 11-Char PaddedCustomerId Write Guard"],"potentialAction":["./bin/dx status","./bin/dx modes [1..10]","./bin/dx iptracker","./bin/dx deploy"]}</script>
+  </metadata>
+  <defs>
+    <style>
+      .bg { fill: #070b14; }
+      .panel { fill: #0b1329; stroke-width: 2; rx: 12px; }
+      .card { fill: #101c38; stroke-width: 1.5; rx: 8px; }
+      .title { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 24px; font-weight: 800; fill: #f8fafc; letter-spacing: 0.03em; }
+      .subtitle { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; fill: #38bdf8; }
+      .col-hdr { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.05em; }
+      .card-title { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13.5px; font-weight: 700; fill: #f8fafc; }
+      .card-body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; fill: #cbd5e1; }
+      .card-accent { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 700; }
+      .footer { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; fill: #6ee7b7; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1600" height="920" />
+  <!-- Header Banner -->
+  <rect x="24" y="18" width="1552" height="68" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1.5" />
+  <text x="48" y="48" class="title">SPORTSDESK & FANTASY402 — DATA CLEANING, 10-MODE ENGINE & OPERATOR ACTION PIPELINE</text>
+  <text x="48" y="70" class="subtitle">End-to-End Flow: 4 Upstream Feeds -> 6-Layer Canonical Cleaner -> 10-Mode Diagnostic Matrix -> Automated Desk Actions • ID: SD-ARTIFACT-01-10MODE-PIPELINE • Live R2 Portal: https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</text>
+  
+      <!-- COLUMN 1: UPSTREAM FEEDS -->
+      <rect class="panel" x="24" y="102" width="368" height="736" stroke="#06b6d4" />
+      <text x="44" y="132" class="col-hdr" fill="#38bdf8">1. UPSTREAM FEEDS &amp; MODULES</text>
+
+      <rect class="card" x="42" y="150" width="332" height="155" stroke="#06b6d4" />
+      <text x="58" y="175" class="card-title">📄 report.js &amp; help-report.js</text>
+      <text x="58" y="198" class="card-body">• api/Report/Pending &amp; getPendingByTicket</text>
+      <text x="58" y="216" class="card-body">• api/Report/getDailyFiguresByCustomer</text>
+      <text x="58" y="234" class="card-body">• api/Report/getGradedWagerByCustomer</text>
+      <text x="58" y="252" class="card-body">• api/Report/getTransactions &amp; getGrading</text>
+      <text x="58" y="274" class="card-accent" fill="#67e8f9">getTypeInfo(10) • getRotationNumber • getLineGame</text>
+
+      <rect class="card" x="42" y="322" width="332" height="150" stroke="#06b6d4" />
+      <text x="58" y="347" class="card-title">⚡ bet-ticker.js (Manager/getBetTicker)</text>
+      <text x="58" y="370" class="card-body">• 5,000ms watermark poll (lastWagerNumber)</text>
+      <text x="58" y="388" class="card-body">• Dual ID: l.Login (Player) + l.AgentLogin (Office)</text>
+      <text x="58" y="406" class="card-body">• Channels: Internet, ALERT, GSLIVE, GSBUILDER</text>
+      <text x="58" y="428" class="card-accent" fill="#67e8f9">getListVip • vipListInsert • #D90000 Alert Flag</text>
+
+      <rect class="card" x="42" y="488" width="332" height="155" stroke="#06b6d4" />
+      <text x="58" y="513" class="card-title">🌐 ip-tracker.js (Manager/getWebLog)</text>
+      <text x="58" y="536" class="card-body">• Mode A: WEB_ACCESS (MM/DD/YYYY)</text>
+      <text x="58" y="554" class="card-body">• Mode B: Per-Office (customerID=&lt;Office&gt;) vs 0</text>
+      <text x="58" y="572" class="card-body">• Mode C: PLAYER_IP_MATCHER (YYYY-MM-DD)</text>
+      <text x="58" y="590" class="card-body">• Mode I: Reverse IP Lookup (ip=&lt;IP&gt;)</text>
+      <text x="58" y="612" class="card-accent" fill="#67e8f9">Pivots: go-ip (Mode I) • go-customer (Mode A)</text>
+
+      <rect class="card" x="42" y="660" width="332" height="158" stroke="#06b6d4" />
+      <text x="58" y="685" class="card-title">🔗 Polymarket APIs &amp; GSLive Partner 118</text>
+      <text x="58" y="708" class="card-body">• CLOB WSS (&lt;500ms SLA: 345ms E2E)</text>
+      <text x="58" y="726" class="card-body">• data-api.polymarket.com/positions?user=0x</text>
+      <text x="58" y="744" class="card-body">• plive.sportswidgets.pro/manager-tools/</text>
+      <text x="58" y="766" class="card-accent" fill="#6ee7b7">39 0x Wallets ↔ 49 F402 Logins ↔ player_[login]</text>
+
+      <!-- COLUMN 2: CANONICAL DATA CLEANING -->
+      <rect class="panel" x="418" y="102" width="368" height="736" stroke="#10b981" />
+      <text x="438" y="132" class="col-hdr" fill="#6ee7b7">2. 6-LAYER CANONICAL DATA CLEANING</text>
+
+      <rect class="card" x="436" y="150" width="332" height="105" stroke="#10b981" />
+      <text x="452" y="173" class="card-title">1. Parent Ticket Grouping</text>
+      <text x="452" y="194" class="card-body">Composite key: TicketNumber + "-" + WagerNumber</text>
+      <text x="452" y="212" class="card-body">Collapses multi-leg parlay rows so Stake &amp; ToWin</text>
+      <text x="452" y="230" class="card-accent" fill="#6ee7b7">are counted 1x per ticket (never multiplied by legs)</text>
+
+      <rect class="card" x="436" y="268" width="332" height="105" stroke="#10b981" />
+      <text x="452" y="291" class="card-title">2. Channel &amp; Twin Deduplication</text>
+      <text x="452" y="312" class="card-body">Drops BLOCKED sentinel rows pre-grouping;</text>
+      <text x="452" y="330" class="card-body">Zeroes ALERT syndicate mirror slips (&lt;=6s twin)</text>
+      <text x="452" y="348" class="card-accent" fill="#6ee7b7">canonicalVolumeCents = 0 on ALERT twin rows</text>
+
+      <rect class="card" x="436" y="386" width="332" height="105" stroke="#10b981" />
+      <text x="452" y="409" class="card-title">3. Free-Play &amp; Liability Separation</text>
+      <text x="452" y="430" class="card-body">FreePlayFlag="Y": Loss = $0 principal debit;</text>
+      <text x="452" y="448" class="card-body">Separates Stake ($16.2K), Payout ($67.82K),</text>
+      <text x="452" y="466" class="card-accent" fill="#6ee7b7">&amp; Defined Liability ($51.62K) for MJ102</text>
+
+      <rect class="card" x="436" y="504" width="332" height="105" stroke="#10b981" />
+      <text x="452" y="527" class="card-title">4. Effective Line &amp; DGS ROT+5000 Math</text>
+      <text x="452" y="548" class="card-body">Spread: AdjSpread+Teaser | Total O/U: -/+Teaser</text>
+      <text x="452" y="566" class="card-body">Integer LineHundredths (-7.5 -&gt; -750);</text>
+      <text x="452" y="584" class="card-accent" fill="#6ee7b7">DGS Child ROT 5501 normalized -&gt; Parent ROT 501</text>
+
+      <rect class="card" x="436" y="622" width="332" height="95" stroke="#10b981" />
+      <text x="452" y="645" class="card-title">5. IP-Tracker Mode B &amp; Mode C Hygiene</text>
+      <text x="452" y="666" class="card-body">Mode B customerID=&lt;Office&gt; vs "0" (MM/DD/YYYY)</text>
+      <text x="452" y="684" class="card-accent" fill="#6ee7b7">Mode C auto-rewrites dates to YYYY-MM-DD</text>
+
+      <rect class="card" x="436" y="728" width="332" height="92" stroke="#10b981" />
+      <text x="452" y="751" class="card-title">6. 11-Char Write Padding &amp; Scope Guard</text>
+      <text x="452" y="772" class="card-body">padEnd(11, " ") on customerID; direct office</text>
+      <text x="452" y="790" class="card-accent" fill="#6ee7b7">agentID (blocks BILLY666 &amp; poisoned path 500s)</text>
+
+      <!-- COLUMN 3: 10-MODE DIAGNOSTIC MATRIX -->
+      <rect class="panel" x="812" y="102" width="368" height="736" stroke="#f59e0b" />
+      <text x="832" y="132" class="col-hdr" fill="#fcd34d">3. 10-MODE DIAGNOSTIC MATRIX</text>
+
+      <rect class="card" x="830" y="150" width="332" height="175" stroke="#f59e0b" />
+      <text x="846" y="175" class="card-title" fill="#fcd34d">DOMAIN A: RISK &amp; EXPOSURE (MODES 1, 8, 9)</text>
+      <text x="846" y="198" class="card-body">• Mode 1 · Customer Overview: Validated net,</text>
+      <text x="846" y="215" class="card-body">  pending exposure, freshness &amp; gap warnings</text>
+      <text x="846" y="236" class="card-body">• Mode 8 · Settled Net: 24H/7D/4WK USD &amp; USDC</text>
+      <text x="846" y="253" class="card-body">  P/L + FreePlay saved + ledger adjustments</text>
+      <text x="846" y="274" class="card-body">• Mode 9 · Pending Exposure: Unique tickets,</text>
+      <text x="846" y="291" class="card-accent" fill="#fcd34d">  Stake vs Potential Payout vs Defined Liability</text>
+
+      <rect class="card" x="830" y="340" width="332" height="225" stroke="#38bdf8" />
+      <text x="846" y="365" class="card-title" fill="#7dd3fc">DOMAIN B: IDENTITY &amp; NETWORK (MODES 2–6)</text>
+      <text x="846" y="388" class="card-body">• Mode 2 · Access Logs: SELF_PLAYER vs</text>
+      <text x="846" y="405" class="card-body">  OFFICE_AGENT Actor/Target &amp; 4.2s wager dwell</text>
+      <text x="846" y="426" class="card-body">• Mode 3 · Shared-IP Overview: 13 Office &amp;</text>
+      <text x="846" y="443" class="card-body">  Cross-Office /24 subnet groups</text>
+      <text x="846" y="464" class="card-body">• Mode 4 · Customer IP History: ASN switches</text>
+      <text x="846" y="481" class="card-body">  &amp; &gt;24h collection gap warnings (32.75h)</text>
+      <text x="846" y="502" class="card-body">• Mode 5 · Accounts by IP: 104.28.34.12 (5 accts)</text>
+      <text x="846" y="523" class="card-accent" fill="#7dd3fc">• Mode 6 · Activity Overlap: 270s Session Overlap</text>
+      <text x="846" y="540" class="card-accent" fill="#7dd3fc">  vs 24s Nearby Point Events</text>
+
+      <rect class="card" x="830" y="580" width="332" height="115" stroke="#10b981" />
+      <text x="846" y="605" class="card-title" fill="#6ee7b7">DOMAIN C: CROSS-MARKET (MODE 7)</text>
+      <text x="846" y="628" class="card-body">• Mode 7 · Wager Comparison: F402 vs Polymarket</text>
+      <text x="846" y="646" class="card-body">  by ROT, Period, Side, LineHundredths (Δ=+100)</text>
+      <text x="846" y="666" class="card-accent" fill="#6ee7b7">  &amp; Δt=4s with matchReasons &amp; uncertaintyFlags</text>
+
+      <rect class="card" x="830" y="710" width="332" height="110" stroke="#f43f5e" />
+      <text x="846" y="735" class="card-title" fill="#fda4af">DOMAIN D: DATA INTEGRITY (MODE 10)</text>
+      <text x="846" y="758" class="card-body">• Mode 10 · Reconciliation: DailyFigures vs</text>
+      <text x="846" y="776" class="card-body">  GradedTickets vs Ledger (Identical Scope)</text>
+      <text x="846" y="796" class="card-accent" fill="#6ee7b7">  Explained Diff -$1,500 • Unresolved Gap = $0.00</text>
+
+      <!-- COLUMN 4: OPERATOR & AUTOMATED DESK ACTIONS -->
+      <rect class="panel" x="1206" y="102" width="370" height="736" stroke="#f43f5e" />
+      <text x="1226" y="132" class="col-hdr" fill="#fda4af">4. OPERATOR &amp; AUTOMATED ACTIONS</text>
+
+      <rect class="card" x="1224" y="150" width="334" height="155" stroke="#f43f5e" />
+      <text x="1240" y="175" class="card-title">🔨 Ban-Hammer Profile Clamp (&lt;320ms)</text>
+      <text x="1240" y="198" class="card-body">Triggered by Mode 2 (Dwell &lt;=6s), Mode 3/5</text>
+      <text x="1240" y="216" class="card-body">(Shared Office IP), or Mode 6 (Session Overlap):</text>
+      <text x="1240" y="238" class="card-accent" fill="#fda4af">• MaxBet = $1,000   • ParlayMaxBet = $0</text>
+      <text x="1240" y="256" class="card-accent" fill="#fda4af">• Delay = 6s        • Allow1H2HQtr = 0 (FG-Only)</text>
+      <text x="1240" y="278" class="card-body">Verified via getInfoPlayer read-back</text>
+
+      <rect class="card" x="1224" y="322" width="334" height="155" stroke="#f59e0b" />
+      <text x="1240" y="347" class="card-title">📉 Stepped Line Dispatcher &amp; Vig Curtain</text>
+      <text x="1240" y="370" class="card-body">Triggered by Mode 7 Cross-Market LineDelta</text>
+      <text x="1240" y="388" class="card-body">or &lt;500ms CLOB WSS Steam (TXST +14.5 -&gt; +13.0,</text>
+      <text x="1240" y="406" class="card-body">KC -1.5 -&gt; -2.5, Patriots Key-7 crossing):</text>
+      <text x="1240" y="428" class="card-accent" fill="#fcd34d">• Step half-point at -125/-125 Vig Curtain</text>
+      <text x="1240" y="446" class="card-accent" fill="#fcd34d">• Route $312K Key-7 layoff to Wintermute RFQ</text>
+
+      <rect class="card" x="1224" y="494" width="334" height="155" stroke="#a855f7" />
+      <text x="1240" y="519" class="card-title">🛡️ +15c/+20c Vig Shading &amp; Probit Guard</text>
+      <text x="1240" y="542" class="card-body">Triggered by Mode 8 High-CLV Extractor or</text>
+      <text x="1240" y="560" class="card-body">Mode 7 DGS ROT+5000 Same-Game Alt+ML Parlay:</text>
+      <text x="1240" y="582" class="card-accent" fill="#e9d5ff">• vigSetupInsert (+15c Spread / +20c Derivative)</text>
+      <text x="1240" y="600" class="card-accent" fill="#e9d5ff">• Block Alt+ML Subset when Probit ρ &gt;= 0.65</text>
+      <text x="1240" y="620" class="card-body">• Reprice 6pt Key-3/7 Teasers to -135</text>
+
+      <rect class="card" x="1224" y="666" width="334" height="154" stroke="#10b981" />
+      <text x="1240" y="691" class="card-title">✅ 180s Quarantine &amp; Mode 10 Settlement</text>
+      <text x="1240" y="714" class="card-body">• 180s Quarantine Auto-Resolver reverts</text>
+      <text x="1240" y="732" class="card-body">  DEN/PHX U223.5 scalp trap @ T+112s</text>
+      <text x="1240" y="754" class="card-body">• Mode 9 sizes hedges on Defined Liability</text>
+      <text x="1240" y="776" class="card-accent" fill="#6ee7b7">• Mode 10 confirms Unresolved Gap == $0.00</text>
+      <text x="1240" y="794" class="card-accent" fill="#6ee7b7">  before weekly agent balance settlement</text>
+    
+  <!-- Footer Command Bar -->
+  <rect x="24" y="856" width="1552" height="46" rx="8" fill="#06281e" stroke="#10b981" stroke-width="1.8" />
+  <text x="48" y="884" class="footer">⚡ OPERATOR CLI &amp; LIVE LINKS: ./bin/dx status   |   ./bin/dx modes [1..10]   |   ./bin/dx iptracker   |   ./bin/dx deploy   →   https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</text>
+</svg>

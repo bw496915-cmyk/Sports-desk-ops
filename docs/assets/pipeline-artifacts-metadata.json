@@ -1,0 +1,191 @@
+{
+  "schemaVersion": "2026.10.31",
+  "generatedAtIso": "2026-10-31T17:59:36.792Z",
+  "portalPublicUrl": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html",
+  "metadataCatalogPublicUrl": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-artifacts-metadata.json",
+  "totalArtifacts": 3,
+  "artifacts": [
+    {
+      "id": "SD-ARTIFACT-01-10MODE-PIPELINE",
+      "slug": "pipeline-10-mode-architecture",
+      "title": "SPORTSDESK & FANTASY402 — DATA CLEANING, 10-MODE ENGINE & OPERATOR ACTION PIPELINE",
+      "subtitle": "End-to-End Flow: 4 Upstream Feeds -> 6-Layer Canonical Cleaner -> 10-Mode Diagnostic Matrix -> Automated Desk Actions",
+      "description": "End-to-end architectural diagram showing how report.js, help-report.js, bet-ticker.js, ip-tracker.js, GSLive Partner 118 (player_[login]), and Polymarket CLOB/Data APIs are cleaned into canonical primitives, evaluated across Modes 1..10 (Risk & Exposure, Identity & Network, Cross-Market, Data Integrity), and converted into sub-320ms Ban-Hammer clamps, Stepped Line dispatches, +15c/+20c vig shading, and $0-gap ledger reconciliations.",
+      "domainsCovered": [
+        "Risk & Exposure",
+        "Identity & Network",
+        "Cross-Market",
+        "Data Integrity"
+      ],
+      "modesCovered": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "upstreamModules": [
+        "customer/report/report.js",
+        "app/manager/report/help-report.js",
+        "app/manager/module/bet-ticker.js",
+        "app/manager/module/ip-tracker.js",
+        "Polymarket Gamma/CLOB/Data API",
+        "GSLive Manager Partner 118 (player_[login])"
+      ],
+      "cleaningLayers": [
+        "TicketNumber-WagerNumber Parent Grouping",
+        "BLOCKED Drop & ALERT Mirror Zeroing",
+        "FreePlayFlag='Y' Zero-Principal Loss & Stake/Payout/Liability Split",
+        "Teaser Effective Line & DGS ROT+5000 Normalization",
+        "Mode B Per-Office customerID=<Office> vs Global 0 & Mode C YYYY-MM-DD",
+        "4-Surface Identity Join & 11-Char PaddedCustomerId Write Guard"
+      ],
+      "operatorCliCommands": [
+        "./bin/dx status",
+        "./bin/dx modes [1..10]",
+        "./bin/dx iptracker",
+        "./bin/dx deploy"
+      ],
+      "files": {
+        "svgRepoPath": "docs/assets/pipeline-10-mode-architecture.svg",
+        "pngRepoPath": "docs/assets/pipeline-10-mode-architecture.png",
+        "svgPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.svg",
+        "pngPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.png",
+        "svgBytes": 19476,
+        "pngBytes": 32346,
+        "svgSha256": "9afcd15552d2e201ad9b65767570fd5020a101898be4eeaddf2b62df751dce1e",
+        "pngSha256": "c90824f170a7bfb2cec295419b61596adb295a3ba76d8122d7bc90ecc7ec07b8"
+      },
+      "embeddedMetadataStandards": [
+        "W3C RDF / Dublin Core (dc:title, dc:description, dc:creator, dc:subject, dc:identifier)",
+        "Adobe XMP Packet (XML:com.adobe.xmp)",
+        "Schema.org ImageObject JSON-LD (SportsDesk:PipelineSpecJson)",
+        "PNG RFC-2083 tEXt & iTXt Chunks with CRC-32 Verification",
+        "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers"
+      ]
+    },
+    {
+      "id": "SD-ARTIFACT-02-6LAYER-CLEANING",
+      "slug": "pipeline-6-layer-data-cleaning",
+      "title": "ROSETTA STONE 6-LAYER DATA CLEANING & CANONICAL FIELD MAPPING REFERENCE",
+      "subtitle": "De-obfuscated report.js • help-report.js • bet-ticker.js • ip-tracker.js -> Canonical TypeScript Primitives",
+      "description": "Detailed engineering reference diagram illustrating the 6 canonical data-cleaning transformations applied to Fantasy402, GSLive Partner 118, and Polymarket feeds: (1) TicketNumber-WagerNumber composite parent grouping, (2) BLOCKED drop & ALERT mirror zeroing, (3) FreePlayFlag='Y' zero-principal loss & Stake/Payout/Liability separation, (4) Teaser effective line & DGS GameNum+5000 parent rotation normalization, (5) IP-Tracker Mode B Per-Office vs Global & Mode C YYYY-MM-DD date rewrite, and (6) 4-Surface Identity Join with 11-char space-padded PaddedCustomerId write enforcement.",
+      "domainsCovered": [
+        "Risk & Exposure",
+        "Identity & Network",
+        "Cross-Market",
+        "Data Integrity"
+      ],
+      "modesCovered": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "upstreamModules": [
+        "customer/report/report.js",
+        "app/manager/report/help-report.js",
+        "app/manager/module/bet-ticker.js",
+        "app/manager/module/ip-tracker.js"
+      ],
+      "cleaningLayers": [
+        "Layer 1: Composite TicketNumber-WagerNumber Grouping",
+        "Layer 2: TicketWriter BLOCKED Drop & ALERT Twin Zeroing",
+        "Layer 3: Effective Line Math (LineHundredths & DGS ROT+5000)",
+        "Layer 4: FreePlayFlag='Y' Zero-Principal Loss & Liability Split",
+        "Layer 5: IP-Tracker Mode B Scope & Mode C YYYY-MM-DD Rewrite",
+        "Layer 6: 4-Surface Identity & 11-Char PaddedCustomerId"
+      ],
+      "operatorCliCommands": [
+        "./bin/dx modes 7",
+        "./bin/dx modes 9",
+        "./bin/dx modes 10",
+        "node --test tests/forensic_diagnostic_modes.test.ts"
+      ],
+      "files": {
+        "svgRepoPath": "docs/assets/pipeline-6-layer-data-cleaning.svg",
+        "pngRepoPath": "docs/assets/pipeline-6-layer-data-cleaning.png",
+        "svgPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.svg",
+        "pngPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.png",
+        "svgBytes": 16048,
+        "pngBytes": 32650,
+        "svgSha256": "65c332d982f798e84cd3b1d0d9d7712b185f84b1ce33121236c4987ba16aaacf",
+        "pngSha256": "ea21eeb09165d3268f5f7de6a6e623ad3906ad176779fd18e177cd6002169541"
+      },
+      "embeddedMetadataStandards": [
+        "W3C RDF / Dublin Core (dc:title, dc:description, dc:creator, dc:subject, dc:identifier)",
+        "Adobe XMP Packet (XML:com.adobe.xmp)",
+        "Schema.org ImageObject JSON-LD (SportsDesk:PipelineSpecJson)",
+        "PNG RFC-2083 tEXt & iTXt Chunks with CRC-32 Verification",
+        "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers"
+      ]
+    },
+    {
+      "id": "SD-ARTIFACT-03-IP-AND-RECONCILIATION",
+      "slug": "pipeline-per-office-ip-and-reconciliation",
+      "title": "PER-OFFICE IP-TRACKER (MODES 2–6) & SCOPE-LOCKED RECONCILIATION (MODES 1, 8, 9, 10)",
+      "subtitle": "13 Office & Cross-Office IP Clusters (MJ2026, BIGDAD, CUB22HR, ATEAM...) + Zero-Gap Financial Reconciliation",
+      "description": "Reference diagram combining the 13 Per-Office & Cross-Office IP-Tracker clusters (getWebLog Mode B customerID=<OfficeAgentID> vs customerID=0, Mode C YYYY-MM-DD history, Mode I reverse IP, and Mode 6 concurrent session overlap) with the Risk & Data Integrity reconciliation pipeline (Mode 1 Overview, Mode 8 Settled Net, Mode 9 Pending Exposure, and Mode 10 Scope-Locked Reconciliation proving Unresolved Gap = $0.00).",
+      "domainsCovered": [
+        "Identity & Network",
+        "Risk & Exposure",
+        "Data Integrity"
+      ],
+      "modesCovered": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10
+      ],
+      "upstreamModules": [
+        "app/manager/module/ip-tracker.js",
+        "app/manager/module/bet-ticker.js",
+        "app/manager/report/help-report.js"
+      ],
+      "cleaningLayers": [
+        "Per-Office Mode B (customerID=<OfficeAgentID>) vs Global Master (customerID='0')",
+        "Mode 6 Concurrent Session Overlap (270s) vs Nearby Point Events (24s)",
+        "Mode 10 Identical-Scope Verification (Report DailyFigures vs Settled Tickets vs Ledger)"
+      ],
+      "operatorCliCommands": [
+        "./bin/dx iptracker",
+        "./bin/dx modes 3",
+        "./bin/dx modes 6",
+        "./bin/dx modes 10"
+      ],
+      "files": {
+        "svgRepoPath": "docs/assets/pipeline-per-office-ip-and-reconciliation.svg",
+        "pngRepoPath": "docs/assets/pipeline-per-office-ip-and-reconciliation.png",
+        "svgPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.svg",
+        "pngPublicR2Url": "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.png",
+        "svgBytes": 15495,
+        "pngBytes": 31953,
+        "svgSha256": "010f98e14d07b43bdeb6a8b0d0313de9f0348e6383e810b0b7bc61362e325972",
+        "pngSha256": "955d594e9340c81d0a72ed0e9bc36c89ad2d0b68a652d1f84eb0ecc17a25dc36"
+      },
+      "embeddedMetadataStandards": [
+        "W3C RDF / Dublin Core (dc:title, dc:description, dc:creator, dc:subject, dc:identifier)",
+        "Adobe XMP Packet (XML:com.adobe.xmp)",
+        "Schema.org ImageObject JSON-LD (SportsDesk:PipelineSpecJson)",
+        "PNG RFC-2083 tEXt & iTXt Chunks with CRC-32 Verification",
+        "Cloudflare R2 x-amz-meta-* Custom Object Metadata Headers"
+      ]
+    }
+  ]
+}

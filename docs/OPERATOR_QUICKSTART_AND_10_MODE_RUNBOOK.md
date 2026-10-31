@@ -98,6 +98,20 @@ bun sportsdesk_cli.ts wire mutate -c MJ102 -a MJ2026 --col Allow1H2HQtr --val 0
 # 6. Apply +15c Spread / +20c Derivative Vig Shading (20-char padded sportType)
 bun sportsdesk_cli.ts wire vig -c ABC700 -s Basketball --spread 15 --derivative 20
 
-# 7. Poll live feeds and publish updated 6-Tab Portal to Cloudflare R2
+# 7. Poll live feeds and publish updated 6-Tab Portal & rich-metadata images to Cloudflare R2
 ./bin/dx deploy
 ```
+
+---
+
+## 5. Rich-Metadata Visual Pipeline Artifacts (Public Cloudflare R2 & Repository Catalog)
+
+Every visual reference diagram is generated deterministically by [`scripts/generate_pipeline_reference_images.ts`](../scripts/generate_pipeline_reference_images.ts) with **5 embedded metadata layers** (W3C RDF / Dublin Core `<dc:*>`, Adobe XMP `XML:com.adobe.xmp`, Schema.org `ImageObject` JSON-LD, RFC-2083 PNG `tEXt` & `iTXt` chunks with CRC-32 verification, and Cloudflare R2 `x-amz-meta-*` object headers):
+
+| Artifact ID | Pipeline Reference Diagram | Public Cloudflare R2 Edge URLs (`HTTP 200`) | Local Repository Paths | Embedded Metadata Standards |
+| :--- | :--- | :--- | :--- | :--- |
+| **`SD-ARTIFACT-01-10MODE-PIPELINE`** | **End-to-End 10-Mode Engine & Operator Action Pipeline** | • [Vector SVG (`19,476 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.svg)<br/>• [Rich-Chunk PNG (`32,346 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-10-mode-architecture.png) | `docs/assets/pipeline-10-mode-architecture.{svg,png}` | XMP + Dublin Core + Schema.org JSON-LD + PNG `iTXt`/`tEXt` + R2 `x-amz-meta-*` |
+| **`SD-ARTIFACT-02-6LAYER-CLEANING`** | **Rosetta Stone 6-Layer Data Cleaning & Field Mapping Pipeline** | • [Vector SVG (`16,048 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.svg)<br/>• [Rich-Chunk PNG (`32,650 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.png) | `docs/assets/pipeline-6-layer-data-cleaning.{svg,png}` | XMP + Dublin Core + Schema.org JSON-LD + PNG `iTXt`/`tEXt` + R2 `x-amz-meta-*` |
+| **`SD-ARTIFACT-03-IP-AND-RECONCILIATION`** | **Per-Office IP-Tracker (`Modes 2–6`) & Scope-Locked Reconciliation (`Modes 1, 8, 9, 10`)** | • [Vector SVG (`15,495 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.svg)<br/>• [Rich-Chunk PNG (`31,953 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-per-office-ip-and-reconciliation.png) | `docs/assets/pipeline-per-office-ip-and-reconciliation.{svg,png}` | XMP + Dublin Core + Schema.org JSON-LD + PNG `iTXt`/`tEXt` + R2 `x-amz-meta-*` |
+| **`MANIFEST-JSON`** | **Machine-Readable Artifact & SHA-256 Metadata Catalog** | • [Catalog JSON (`9,253 B`)](https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-artifacts-metadata.json) | `docs/assets/pipeline-artifacts-metadata.json` | Full SHA-256 digests, upstream module map, and CLI command bindings |
+

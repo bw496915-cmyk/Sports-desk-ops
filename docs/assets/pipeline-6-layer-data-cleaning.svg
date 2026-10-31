@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 920" width="1600" height="920" role="img" aria-labelledby="pipeline-6-layer-data-cleaning-title pipeline-6-layer-data-cleaning-desc">
+  <title id="pipeline-6-layer-data-cleaning-title">ROSETTA STONE 6-LAYER DATA CLEANING & CANONICAL FIELD MAPPING REFERENCE</title>
+  <desc id="pipeline-6-layer-data-cleaning-desc">Detailed engineering reference diagram illustrating the 6 canonical data-cleaning transformations applied to Fantasy402, GSLive Partner 118, and Polymarket feeds: (1) TicketNumber-WagerNumber composite parent grouping, (2) BLOCKED drop & ALERT mirror zeroing, (3) FreePlayFlag='Y' zero-principal loss & Stake/Payout/Liability separation, (4) Teaser effective line & DGS GameNum+5000 parent rotation normalization, (5) IP-Tracker Mode B Per-Office vs Global & Mode C YYYY-MM-DD date rewrite, and (6) 4-Surface Identity Join with 11-char space-padded PaddedCustomerId write enforcement.</desc>
+  <metadata>
+    <?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+           xmlns:dc="http://purl.org/dc/elements/1.1/"
+           xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+           xmlns:sportsdesk="https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/ns/1.0/">
+    <rdf:Description rdf:about="https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.svg">
+      <dc:identifier>SD-ARTIFACT-02-6LAYER-CLEANING</dc:identifier>
+      <dc:title><rdf:Alt><rdf:li xml:lang="x-default">ROSETTA STONE 6-LAYER DATA CLEANING & CANONICAL FIELD MAPPING REFERENCE</rdf:li></rdf:Alt></dc:title>
+      <dc:description><rdf:Alt><rdf:li xml:lang="x-default">Detailed engineering reference diagram illustrating the 6 canonical data-cleaning transformations applied to Fantasy402, GSLive Partner 118, and Polymarket feeds: (1) TicketNumber-WagerNumber composite parent grouping, (2) BLOCKED drop & ALERT mirror zeroing, (3) FreePlayFlag='Y' zero-principal loss & Stake/Payout/Liability separation, (4) Teaser effective line & DGS GameNum+5000 parent rotation normalization, (5) IP-Tracker Mode B Per-Office vs Global & Mode C YYYY-MM-DD date rewrite, and (6) 4-Surface Identity Join with 11-char space-padded PaddedCustomerId write enforcement.</rdf:li></rdf:Alt></dc:description>
+      <dc:creator><rdf:Seq><rdf:li>SportsDesk &amp; Fantasy402 Risk Engineering</rdf:li></rdf:Seq></dc:creator>
+      <dc:subject><rdf:Bag><rdf:li>Risk & Exposure</rdf:li><rdf:li>Identity & Network</rdf:li><rdf:li>Cross-Market</rdf:li><rdf:li>Data Integrity</rdf:li><rdf:li>customer/report/report.js</rdf:li><rdf:li>app/manager/report/help-report.js</rdf:li><rdf:li>app/manager/module/bet-ticker.js</rdf:li><rdf:li>app/manager/module/ip-tracker.js</rdf:li></rdf:Bag></dc:subject>
+      <xmp:CreatorTool>SportsDesk 10-Mode Pipeline Generator (Bun v1.4.4)</xmp:CreatorTool>
+      <sportsdesk:modesCovered>1,2,3,4,5,6,7,8,9,10</sportsdesk:modesCovered>
+      <sportsdesk:cliEntrypoint>./bin/dx modes 7 | ./bin/dx modes 9 | ./bin/dx modes 10 | node --test tests/forensic_diagnostic_modes.test.ts</sportsdesk:cliEntrypoint>
+      <sportsdesk:portalUrl>https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</sportsdesk:portalUrl>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"ImageObject","@id":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.svg","identifier":"SD-ARTIFACT-02-6LAYER-CLEANING","name":"ROSETTA STONE 6-LAYER DATA CLEANING & CANONICAL FIELD MAPPING REFERENCE","alternateName":"De-obfuscated report.js • help-report.js • bet-ticker.js • ip-tracker.js -> Canonical TypeScript Primitives","description":"Detailed engineering reference diagram illustrating the 6 canonical data-cleaning transformations applied to Fantasy402, GSLive Partner 118, and Polymarket feeds: (1) TicketNumber-WagerNumber composite parent grouping, (2) BLOCKED drop & ALERT mirror zeroing, (3) FreePlayFlag='Y' zero-principal loss & Stake/Payout/Liability separation, (4) Teaser effective line & DGS GameNum+5000 parent rotation normalization, (5) IP-Tracker Mode B Per-Office vs Global & Mode C YYYY-MM-DD date rewrite, and (6) 4-Surface Identity Join with 11-char space-padded PaddedCustomerId write enforcement.","contentUrl":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.svg","thumbnailUrl":"https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/pipeline-6-layer-data-cleaning.png","encodingFormat":["image/svg+xml","image/png"],"creator":{"@type":"Organization","name":"SportsDesk & Fantasy402 Risk Engineering"},"keywords":["Risk & Exposure","Identity & Network","Cross-Market","Data Integrity","customer/report/report.js","app/manager/report/help-report.js","app/manager/module/bet-ticker.js","app/manager/module/ip-tracker.js","Layer 1: Composite TicketNumber-WagerNumber Grouping","Layer 2: TicketWriter BLOCKED Drop & ALERT Twin Zeroing","Layer 3: Effective Line Math (LineHundredths & DGS ROT+5000)","Layer 4: FreePlayFlag='Y' Zero-Principal Loss & Liability Split","Layer 5: IP-Tracker Mode B Scope & Mode C YYYY-MM-DD Rewrite","Layer 6: 4-Surface Identity & 11-Char PaddedCustomerId"],"potentialAction":["./bin/dx modes 7","./bin/dx modes 9","./bin/dx modes 10","node --test tests/forensic_diagnostic_modes.test.ts"]}</script>
+  </metadata>
+  <defs>
+    <style>
+      .bg { fill: #070b14; }
+      .panel { fill: #0b1329; stroke-width: 2; rx: 12px; }
+      .card { fill: #101c38; stroke-width: 1.5; rx: 8px; }
+      .title { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 24px; font-weight: 800; fill: #f8fafc; letter-spacing: 0.03em; }
+      .subtitle { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; fill: #38bdf8; }
+      .col-hdr { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.05em; }
+      .card-title { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13.5px; font-weight: 700; fill: #f8fafc; }
+      .card-body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; fill: #cbd5e1; }
+      .card-accent { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 700; }
+      .footer { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 700; fill: #6ee7b7; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1600" height="920" />
+  <!-- Header Banner -->
+  <rect x="24" y="18" width="1552" height="68" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1.5" />
+  <text x="48" y="48" class="title">ROSETTA STONE 6-LAYER DATA CLEANING & CANONICAL FIELD MAPPING REFERENCE</text>
+  <text x="48" y="70" class="subtitle">De-obfuscated report.js • help-report.js • bet-ticker.js • ip-tracker.js -> Canonical TypeScript Primitives • ID: SD-ARTIFACT-02-6LAYER-CLEANING • Live R2 Portal: https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</text>
+  
+      <!-- ROW 1: LAYERS 1, 2, 3 -->
+      <rect class="panel" x="24" y="102" width="504" height="356" stroke="#06b6d4" />
+      <text x="44" y="132" class="col-hdr" fill="#38bdf8">LAYER 1: PARENT TICKET DEDUPLICATION</text>
+      <text x="44" y="160" class="card-body">Upstream Source: report.js / help-report.js (api/Report/Pending)</text>
+      <rect class="card" x="44" y="176" width="464" height="125" stroke="#1e293b" />
+      <text x="60" y="200" class="card-accent" fill="#fda4af">❌ RAW FEED QUIRK (1 Row Per Leg Repeats Full Ticket Risk):</text>
+      <text x="60" y="220" class="card-body">Row 1: Ticket 901104-1 (Leg 1 LAL 1Q) -&gt; AmountWagered: 1620000</text>
+      <text x="60" y="238" class="card-body">Row 2: Ticket 901104-1 (Leg 2 LAL -3) -&gt; AmountWagered: 1620000</text>
+      <text x="60" y="264" class="card-accent" fill="#6ee7b7">✅ CLEANED RULE (evaluateMode9PendingExposure):</text>
+      <text x="60" y="284" class="card-body">Group by composite key: d.TicketNumber + "-" + d.WagerNumber</text>
+      <text x="44" y="330" class="card-body">• Counts Stake ($16,200) &amp; ToWin ($42,120) strictly 1x per parent ticket</text>
+      <text x="44" y="352" class="card-body">• Prevents 2x–6x exposure inflation on multi-leg parlays &amp; teasers</text>
+      <text x="44" y="378" class="card-accent" fill="#38bdf8">Used by: Mode 9 (Pending Exposure) &amp; Mode 7 (Combo Hash)</text>
+
+      <rect class="panel" x="548" y="102" width="504" height="356" stroke="#10b981" />
+      <text x="568" y="132" class="col-hdr" fill="#6ee7b7">LAYER 2: CHANNEL &amp; TWIN DEDUPLICATION</text>
+      <text x="568" y="160" class="card-body">Upstream Source: bet-ticker.js (POST /cloud/api/Manager/getBetTicker)</text>
+      <rect class="card" x="568" y="176" width="464" height="125" stroke="#1e293b" />
+      <text x="584" y="200" class="card-accent" fill="#fda4af">❌ RAW FEED QUIRK (Sentinel &amp; Syndicate Mirror Duplication):</text>
+      <text x="584" y="220" class="card-body">TicketWriter="BLOCKED" noise rows + "ALERT" mirror twin slips</text>
+      <text x="584" y="238" class="card-body">emitted within &lt;=6s of primary Internet / GSLIVE / GSBUILDER bet</text>
+      <text x="584" y="264" class="card-accent" fill="#6ee7b7">✅ CLEANED RULE (L19.N0518 &amp; L21.N0884):</text>
+      <text x="584" y="284" class="card-body">Drop BLOCKED pre-grouping; set ALERT canonicalVolumeCents = 0</text>
+      <text x="568" y="330" class="card-body">• Preserves ALERT row for sub-250ms syndicate velocity telemetry</text>
+      <text x="568" y="352" class="card-body">• Eliminates 100% of twin double-counting in Mode 9 liability</text>
+      <text x="568" y="378" class="card-accent" fill="#6ee7b7">Used by: Mode 9 (Pending Exposure) &amp; Tab 5 ROT Bet-Ticker</text>
+
+      <rect class="panel" x="1072" y="102" width="504" height="356" stroke="#f59e0b" />
+      <text x="1092" y="132" class="col-hdr" fill="#fcd34d">LAYER 3: EFFECTIVE LINE &amp; DGS ROT+5000 MATH</text>
+      <text x="1092" y="160" class="card-body">Upstream Source: report.js getLineGame() &amp; getRotationNumber()</text>
+      <rect class="card" x="1092" y="176" width="464" height="125" stroke="#1e293b" />
+      <text x="1108" y="200" class="card-accent" fill="#fda4af">❌ RAW FEED QUIRK (Split Teaser Fields &amp; Child Rotation IDs):</text>
+      <text x="1108" y="220" class="card-body">Teasers split across AdjSpread/AdjTotalPoints + TeaserPoints;</text>
+      <text x="1108" y="238" class="card-body">DGS Alt-Spreads book on GameNum + 5000 (ROT 5501 vs 501)</text>
+      <text x="1108" y="264" class="card-accent" fill="#6ee7b7">✅ CLEANED RULE (computeEffectiveLineHundredths):</text>
+      <text x="1108" y="284" class="card-body">Spread: Adj+Teaser | Over: Adj-Teaser | Under: Adj+Teaser</text>
+      <text x="1092" y="330" class="card-body">• Stores exact integer LineHundredths (-7.5 -&gt; -750, 48.5 -&gt; 4850)</text>
+      <text x="1092" y="352" class="card-body">• Normalizes ROT 5501 -&gt; Parent ROT 501 for Polymarket matching</text>
+      <text x="1092" y="378" class="card-accent" fill="#fcd34d">Used by: Mode 7 (Wager Comparison) &amp; Probit Corr Guard</text>
+
+      <!-- ROW 2: LAYERS 4, 5, 6 -->
+      <rect class="panel" x="24" y="480" width="504" height="356" stroke="#a855f7" />
+      <text x="44" y="510" class="col-hdr" fill="#e9d5ff">LAYER 4: FREE-PLAY &amp; SIGN NORMALIZATION</text>
+      <text x="44" y="538" class="card-body">Upstream Source: help-report.js (FreePlayFlag &amp; getTransactions)</text>
+      <rect class="card" x="44" y="554" width="464" height="125" stroke="#1e293b" />
+      <text x="60" y="578" class="card-accent" fill="#fda4af">❌ RAW FEED QUIRK (Free-Play Asymmetric Cash Accounting):</text>
+      <text x="60" y="598" class="card-body">FreePlayFlag="Y" Loss (WagerStatus="L") debits $0 cash principal;</text>
+      <text x="60" y="616" class="card-body">FreePlay Win credits only ToWinAmount (stake is never returned)</text>
+      <text x="60" y="642" class="card-accent" fill="#6ee7b7">✅ CLEANED RULE (Modes 8, 9 &amp; 10):</text>
+      <text x="60" y="662" class="card-body">FreePlay Stake = $0 | Payout = Stake+ToWin | Liability = ToWin</text>
+      <text x="44" y="708" class="card-body">• Tracks freePlayLostPrincipalSavedCents ($3,000 on MJ102)</text>
+      <text x="44" y="730" class="card-body">• Enforces CUSTOMER_PERSPECTIVE_POSITIVE_IS_PLAYER_WIN</text>
+      <text x="44" y="756" class="card-accent" fill="#e9d5ff">Used by: Mode 8 (Settled Net), Mode 9, Mode 10 (Reconciliation)</text>
+
+      <rect class="panel" x="548" y="480" width="504" height="356" stroke="#38bdf8" />
+      <text x="568" y="510" class="col-hdr" fill="#7dd3fc">LAYER 5: IP-TRACKER MODE &amp; OVERLAP HYGIENE</text>
+      <text x="568" y="538" class="card-body">Upstream Source: ip-tracker.js lines 76–89 (Manager/getWebLog)</text>
+      <rect class="card" x="568" y="554" width="464" height="125" stroke="#1e293b" />
+      <text x="584" y="578" class="card-accent" fill="#fda4af">❌ RAW FEED QUIRK (Overloaded customerID &amp; Date Inversion):</text>
+      <text x="584" y="598" class="card-body">Mode B uses customerID=&lt;OfficeAgentID&gt; for Per-Office match vs "0"</text>
+      <text x="584" y="616" class="card-body">for Global; Mode C requires YYYY-MM-DD while A/B/I require MM/DD/YYYY</text>
+      <text x="584" y="642" class="card-accent" fill="#6ee7b7">✅ CLEANED RULE (formatWebLogDateForMode &amp; Mode 6):</text>
+      <text x="584" y="662" class="card-body">Auto-formats dates per mode &amp; separates Session vs Point Overlap</text>
+      <text x="568" y="708" class="card-body">• Distinguishes 270s Concurrent Session Overlap (MJ102 &lt;-&gt; MJ103)</text>
+      <text x="568" y="730" class="card-body">• From 24s Nearby Point Events without session overlap (CHURN_059)</text>
+      <text x="568" y="756" class="card-accent" fill="#7dd3fc">Used by: Modes 2, 3, 4, 5, 6 (Identity &amp; Network)</text>
+
+      <rect class="panel" x="1072" y="480" width="504" height="356" stroke="#f43f5e" />
+      <text x="1092" y="510" class="col-hdr" fill="#fda4af">LAYER 6: 4-SURFACE ID &amp; 11-CHAR WRITE GUARD</text>
+      <text x="1092" y="538" class="card-body">Upstream Source: Manager/updateByColumn &amp; GSLive Partner 118</text>
+      <rect class="card" x="1092" y="554" width="464" height="125" stroke="#1e293b" />
+      <text x="1108" y="578" class="card-accent" fill="#fda4af">❌ RAW FEED QUIRK (Silent Write No-Ops &amp; Scope Rejection):</text>
+      <text x="1108" y="598" class="card-body">Unpadded customerID returns Result: 0 (SILENT_NO_OP); passing</text>
+      <text x="1108" y="616" class="card-body">master BILLY666 returns Result: -1; passing path causes HTTP 500</text>
+      <text x="1108" y="642" class="card-accent" fill="#6ee7b7">✅ CLEANED RULE (padCustomerIdCanonical &amp; Scope Guard):</text>
+      <text x="1108" y="662" class="card-body">"MJ102" -&gt; "MJ102      " (11 chars) + direct office agentID="MJ2026"</text>
+      <text x="1092" y="708" class="card-body">• Unifies F402 LoginID + Office AgentLogin + GSLive player_[login] + 0x</text>
+      <text x="1092" y="730" class="card-body">• Verifies every write via POST /cloud/api/Manager/getInfoPlayer</text>
+      <text x="1092" y="756" class="card-accent" fill="#fda4af">Used by: Mode 1 Drill-Downs &amp; Ban-Hammer Mutation Engine</text>
+    
+  <!-- Footer Command Bar -->
+  <rect x="24" y="856" width="1552" height="46" rx="8" fill="#06281e" stroke="#10b981" stroke-width="1.8" />
+  <text x="48" y="884" class="footer">⚡ OPERATOR CLI &amp; LIVE LINKS: ./bin/dx modes 7   |   ./bin/dx modes 9   |   ./bin/dx modes 10   |   node --test tests/forensic_diagnostic_modes.test.ts   →   https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/graph.html</text>
+</svg>
