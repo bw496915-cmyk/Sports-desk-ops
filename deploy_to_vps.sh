@@ -65,7 +65,12 @@ fi
 # Step 2: Install Bun Runtime
 echo -e "${GREEN}[2/7] Installing Bun runtime...${NC}"
 if ! command -v bun &>/dev/null; then
-  curl -fsSL https://bun.sh/install | bash
+  # Download to a file first: no network-to-shell pipe. Pin the version so CI and the VPS agree.
+  BUN_VERSION="${BUN_VERSION:-1.4.4}"
+  BUN_INSTALLER="$(mktemp)"
+  curl -fsSL https://bun.sh/install -o "$BUN_INSTALLER"
+  sh "$BUN_INSTALLER" "bun-v${BUN_VERSION}"
+  rm -f "$BUN_INSTALLER"
   export BUN_INSTALL="$HOME/.bun"
   export PATH="$BUN_INSTALL/bin:$PATH"
 fi
@@ -248,12 +253,20 @@ fi
 
 # Step 7: Register Telegram Webhook
 echo -e "${GREEN}[7/7] Registering Telegram Bot Webhook with Telegram API...${NC}"
-WEBHOOK_REG_URL="https://api.telegram.org/bot${BOT_TOKEN}/setWebhook"
 WEBHOOK_ENDPOINT="https://${DOMAIN}/telegram/webhook"
 
-SET_RES=$(curl -s -X POST "$WEBHOOK_REG_URL" \
-  -H "Content-Type: application/json" \
-  -d "{\"url\": \"${WEBHOOK_ENDPOINT}\", \"secret_token\": \"${WEBHOOK_SECRET}\", \"drop_pending_updates\": true}")
+SET_RES=$(TELEGRAM_BOT_TOKEN="$BOT_TOKEN" TELEGRAM_WEBHOOK_SECRET="$WEBHOOK_SECRET" TELEGRAM_WEBHOOK_ENDPOINT="$WEBHOOK_ENDPOINT" "$BUN_BIN" -e '
+const res = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    url: process.env.TELEGRAM_WEBHOOK_ENDPOINT,
+    secret_token: process.env.TELEGRAM_WEBHOOK_SECRET,
+    drop_pending_updates: true,
+  }),
+});
+console.log(JSON.stringify(await res.json()));
+')
 
 echo -e "      Telegram Response: ${BOLD}${SET_RES}${NC}"
 

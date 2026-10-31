@@ -67,7 +67,9 @@ reachable yet. `FIXTURE` means live ingest is off.
 
 `openVolumeUsd` is **cost basis** (sum `initialValue`), `positionsValueUsd` is current mark
 (sum `currentValue`), and `openPnlUsd` is `cashPnl`. `totalOpenExposureUsd` is the sum of current
-position value, **not** defined liability.
+position value, **not** defined liability. `wssIngestion: "not_ingested"` and
+`wsStreamSlaMsFixture: 345` make the unmeasured WSS claim explicit; `activeSyndicateWalletsCount`
+is the live-wallet count and `configuredWalletsCount` stays 39.
 
 ## 3.1 Wire → feed mapping
 

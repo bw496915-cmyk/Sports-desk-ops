@@ -128,8 +128,10 @@ export interface GraphLiveFeedPayload {
   readonly dataMode: "LIVE" | "PARTIAL" | "FIXTURE";
   readonly provenance: FeedProvenance;
   readonly schedulerEngine: string;
-  readonly wsStreamSlaMs: number;
+  readonly wsStreamSlaMsFixture: number;
+  readonly wssIngestion: "not_ingested";
   readonly activeSyndicateWalletsCount: number;
+  readonly configuredWalletsCount: number;
   readonly totalOpenLegsCount: number;
   readonly totalOpenExposureUsd: number;
   readonly pendingBets: readonly PendingBetRow[];
@@ -631,9 +633,11 @@ export function buildGraphLiveFeed(
     pollSequence,
     dataMode: liveSnapshot === null && f402Probe === null ? "FIXTURE" : "PARTIAL",
     provenance,
-    schedulerEngine: "Bun.cron('* * * * *') + bun --watch + <500ms CLOB WSS",
-    wsStreamSlaMs: 345,
-    activeSyndicateWalletsCount: 39,
+    schedulerEngine: "Bun.cron('* * * * *') + bun --watch",
+    wsStreamSlaMsFixture: 345,
+    wssIngestion: "not_ingested",
+    activeSyndicateWalletsCount: liveSnapshot === null ? 39 : liveWallets.length,
+    configuredWalletsCount: 39,
     totalOpenLegsCount,
     totalOpenExposureUsd,
     pendingBets,

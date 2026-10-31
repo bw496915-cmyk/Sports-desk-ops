@@ -43,6 +43,7 @@ Follow one feature file under `features/`. Capture stdout/stderr to `$SPORTSDESK
 | gen-tokens-mutant-harness  | `bash verification/gen-tokens-zero-drift-gate/replay-mutant.sh` |
 | formal-gen-tokens-model    | `bun run verify:gen-tokens-gate --no-render`                    |
 | token-design-assertions    | `bun test tests/verify_tokens.test.ts`                          |
+| operator-surfaces          | `./bin/dx help` (see `features/operator-surfaces.md`)           |
 
 Formal properties: use project skill **verify-gen-tokens-zero-drift** and pstack **/statechart**.
 

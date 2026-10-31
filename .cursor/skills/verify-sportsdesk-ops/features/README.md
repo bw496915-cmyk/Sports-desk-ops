@@ -27,3 +27,4 @@ User-facing and CI-facing behavior for the Bun CLI gates and token SSOT path. Re
 - [gen:tokens strict-failure harness](./gen-tokens-mutant-harness.md) — replay-mutant proves skip fails closed.
 - [Formal gen:tokens TLC check](./formal-gen-tokens-model.md) — `verify:gen-tokens-gate` / statechart.
 - [Token design assertions](./token-design-assertions.md) — `tests/verify_tokens.test.ts` user-visible invariants.
+- [Operator surfaces](./operator-surfaces.md) — `dx gslive/docs/stale/poll`, live ingest provenance, wire→feed mapping.
