@@ -1152,7 +1152,7 @@ export function runFourWeekParlayComboBacktest(
       return {
         rank: idx + 1,
         customerId: c.customerId,
-        f402CustomerProfileUrl: `https://desk.bookdeskops.com/dashboard?customer=${encodeURIComponent(c.customerId)}`,
+        f402CustomerProfileUrl: `https://fantasy402.com/manager.html?customer=${encodeURIComponent(c.customerId)}`,
         agentId: c.agentId,
         masterAgent: c.masterAgent,
         contextType: c.contextType,

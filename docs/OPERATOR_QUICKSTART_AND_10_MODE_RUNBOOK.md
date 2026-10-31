@@ -49,7 +49,7 @@ Raw payloads from Fantasy402 (`customer/report/report.js`, `manager/report/help-
    - *Cleaning Rule (Modes 2, 3, 4, 5, 6)*: `formatWebLogDateForMode()` and `buildPerOfficeIpMatcherPayload()` automatically format dates and `customerID` per mode, and `normalizeWebLogLoginId()` strips leading/trailing dots and whitespace.
 6. **Dual-Identity Cross-Surface Linking (`LoginID` + `AgentLogin` + `player_[login]` + `0x` Wallet)**:
    - Every watchlist record links four surfaces simultaneously:
-     1. **Fantasy402 Customer & Office**: `https://desk.bookdeskops.com/dashboard?customer=<LoginID>&agent=<OfficeAgentID>`
+     1. **Fantasy402 Customer & Office**: `https://fantasy402.com/manager.html?customer=<LoginID>&agent=<OfficeAgentID>`
      2. **GSLive Partner 118 Profile**: `https://plive.sportswidgets.pro/manager-tools/#/reports/users?bot=true&eventId=&from=<desk-day start ISO>&partnerId=118&searchBy=player&text=player_<LoginID>&to=<desk-day end ISO>` (the `player_` token belongs to this report surface only; `#/events/bet-history` uses the raw login, e.g. `partnerUserId=AF12`). Generate with `./bin/dx gslive <LoginID>`.
      3. **Polymarket On-Chain Profile**: `https://polymarket.com/profile/<0xProxyWallet>`
      4. **Write Mutation Identity (`PaddedCustomerId`)**: Right-space-padded to exactly 11 characters (`padEnd(11, " ")`) with direct owning `agentID` (never `BILLY666`) on `POST /cloud/api/Manager/updateByColumn`.

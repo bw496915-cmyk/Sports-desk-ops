@@ -29,7 +29,7 @@ describe("4-Week Full-Customer CFB & NBA Parlay & Combo Backtest Engine", () => 
     expect(report.customerLeaderboard.length).toBeGreaterThanOrEqual(30);
     const bgd = report.customerLeaderboard.find((c) => c.customerId === "BGD101");
     expect(bgd).toBeDefined();
-    expect(bgd?.f402CustomerProfileUrl).toBe("https://desk.bookdeskops.com/dashboard?customer=BGD101");
+    expect(bgd?.f402CustomerProfileUrl).toBe("https://fantasy402.com/manager.html?customer=BGD101");
     expect(bgd?.polymarketProfileUrl).toBe("https://polymarket.com/profile/0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612");
     expect(bgd?.polymarketPositionsApiUrl).toBe(
       "https://data-api.polymarket.com/positions?user=0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612"

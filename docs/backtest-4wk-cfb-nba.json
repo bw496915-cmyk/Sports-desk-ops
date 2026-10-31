@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAtIso": "2026-10-31T21:09:07.108Z",
-  "generatedAtCdt": "10/31/2026, 16:09:07 CDT",
+  "generatedAtIso": "2026-10-31T21:26:22.530Z",
+  "generatedAtCdt": "10/31/2026, 16:26:22 CDT",
   "windowStartIso": "2026-10-03T00:00:00.000Z",
   "windowEndIso": "2026-10-31T16:40:00.000Z",
   "totalProvisionedCustomers": 57755,
@@ -329,7 +329,7 @@
     {
       "rank": 1,
       "customerId": "BGD101",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=BGD101",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=BGD101",
       "agentId": "BIGDAD",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -364,7 +364,7 @@
     {
       "rank": 2,
       "customerId": "MJ102",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=MJ102",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=MJ102",
       "agentId": "MJ2026",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -399,7 +399,7 @@
     {
       "rank": 3,
       "customerId": "EJ8834",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=EJ8834",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=EJ8834",
       "agentId": "MJ2026",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -434,7 +434,7 @@
     {
       "rank": 4,
       "customerId": "CHURN_059",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_059",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_059",
       "agentId": "LAKERS",
       "masterAgent": "BILLY666",
       "contextType": "PARLAY_EXTRACTOR",
@@ -469,7 +469,7 @@
     {
       "rank": 5,
       "customerId": "AT10359",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=AT10359",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=AT10359",
       "agentId": "ATEAM",
       "masterAgent": "BILLY666",
       "contextType": "STEAM_CHASER",
@@ -504,7 +504,7 @@
     {
       "rank": 6,
       "customerId": "CUB22_T1",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CUB22_T1",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CUB22_T1",
       "agentId": "CUB22HR",
       "masterAgent": "BILLY666",
       "contextType": "STEAM_CHASER",
@@ -539,7 +539,7 @@
     {
       "rank": 7,
       "customerId": "BL4402",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=BL4402",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=BL4402",
       "agentId": "ATEAM",
       "masterAgent": "BILLY666",
       "contextType": "STEAM_CHASER",
@@ -574,7 +574,7 @@
     {
       "rank": 8,
       "customerId": "BB5127",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=BB5127",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=BB5127",
       "agentId": "BIGDAD",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -609,7 +609,7 @@
     {
       "rank": 9,
       "customerId": "DA4401",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=DA4401",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=DA4401",
       "agentId": "JUICEPLUS",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -644,7 +644,7 @@
     {
       "rank": 10,
       "customerId": "DN2019",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=DN2019",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=DN2019",
       "agentId": "SHARP66",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -679,7 +679,7 @@
     {
       "rank": 11,
       "customerId": "BR7711",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=BR7711",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=BR7711",
       "agentId": "MACHR",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -714,7 +714,7 @@
     {
       "rank": 12,
       "customerId": "AC9901",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=AC9901",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=AC9901",
       "agentId": "ATEAM",
       "masterAgent": "BILLY666",
       "contextType": "PARLAY_EXTRACTOR",
@@ -749,7 +749,7 @@
     {
       "rank": 13,
       "customerId": "GP300",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=GP300",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=GP300",
       "agentId": "GPRO50RSK",
       "masterAgent": "BILLY666",
       "contextType": "STEAM_CHASER",
@@ -784,7 +784,7 @@
     {
       "rank": 14,
       "customerId": "CW9012",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CW9012",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CW9012",
       "agentId": "GOLD22",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -819,7 +819,7 @@
     {
       "rank": 15,
       "customerId": "AK1092",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=AK1092",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=AK1092",
       "agentId": "GPRO50RSK",
       "masterAgent": "BILLY666",
       "contextType": "STEAM_CHASER",
@@ -854,7 +854,7 @@
     {
       "rank": 16,
       "customerId": "HB7720",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=HB7720",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=HB7720",
       "agentId": "APEX99",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -889,7 +889,7 @@
     {
       "rank": 17,
       "customerId": "CM5510",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CM5510",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CM5510",
       "agentId": "SPEN",
       "masterAgent": "BILLY666",
       "contextType": "STEAM_CHASER",
@@ -924,7 +924,7 @@
     {
       "rank": 18,
       "customerId": "FL3301",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=FL3301",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=FL3301",
       "agentId": "DAN318",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -959,7 +959,7 @@
     {
       "rank": 19,
       "customerId": "MJ103",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=MJ103",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=MJ103",
       "agentId": "MJ2026",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -994,7 +994,7 @@
     {
       "rank": 20,
       "customerId": "DF8821",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=DF8821",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=DF8821",
       "agentId": "TEXANS",
       "masterAgent": "BILLY666",
       "contextType": "STEAM_CHASER",
@@ -1029,7 +1029,7 @@
     {
       "rank": 21,
       "customerId": "EJ8835",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=EJ8835",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=EJ8835",
       "agentId": "MJ2026",
       "masterAgent": "BILLY666",
       "contextType": "EXECUTION_SNIPER",
@@ -1064,7 +1064,7 @@
     {
       "rank": 22,
       "customerId": "NOISE_BOT_77",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=NOISE_BOT_77",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=NOISE_BOT_77",
       "agentId": "ATEAM",
       "masterAgent": "BILLY666",
       "contextType": "STEAM_CHASER",
@@ -1099,7 +1099,7 @@
     {
       "rank": 23,
       "customerId": "PEY101",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=PEY101",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=PEY101",
       "agentId": "MACHR",
       "masterAgent": "BILLY666",
       "contextType": "CHRONIC_EXTRACTOR",
@@ -1134,7 +1134,7 @@
     {
       "rank": 24,
       "customerId": "GX195",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=GX195",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=GX195",
       "agentId": "GOLD22",
       "masterAgent": "BILLY666",
       "contextType": "CHRONIC_EXTRACTOR",
@@ -1169,7 +1169,7 @@
     {
       "rank": 25,
       "customerId": "AL1279",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=AL1279",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=AL1279",
       "agentId": "AA2300C",
       "masterAgent": "BILLY666",
       "contextType": "CHRONIC_EXTRACTOR",
@@ -1204,7 +1204,7 @@
     {
       "rank": 26,
       "customerId": "TEX500",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=TEX500",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=TEX500",
       "agentId": "TEXANS",
       "masterAgent": "BILLY666",
       "contextType": "CHRONIC_EXTRACTOR",
@@ -1239,7 +1239,7 @@
     {
       "rank": 27,
       "customerId": "DAN245",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=DAN245",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=DAN245",
       "agentId": "DAN318",
       "masterAgent": "BILLY666",
       "contextType": "CHRONIC_EXTRACTOR",
@@ -1274,7 +1274,7 @@
     {
       "rank": 28,
       "customerId": "RF2003",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=RF2003",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=RF2003",
       "agentId": "FAKEMONEY",
       "masterAgent": "BILLY666",
       "contextType": "WHALE_VOLATILITY",
@@ -1309,7 +1309,7 @@
     {
       "rank": 29,
       "customerId": "CHURN_044",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_044",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_044",
       "agentId": "METRO1",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1344,7 +1344,7 @@
     {
       "rank": 30,
       "customerId": "CHURN_042",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_042",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_042",
       "agentId": "VEGAS88",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1379,7 +1379,7 @@
     {
       "rank": 31,
       "customerId": "CHURN_008",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_008",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_008",
       "agentId": "STEIN421",
       "masterAgent": "BILLY666",
       "contextType": "RECREATIONAL_CASUAL",
@@ -1414,7 +1414,7 @@
     {
       "rank": 32,
       "customerId": "CHURN_001",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_001",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_001",
       "agentId": "FATSSIDE",
       "masterAgent": "BILLY666",
       "contextType": "RECREATIONAL_CASUAL",
@@ -1449,7 +1449,7 @@
     {
       "rank": 33,
       "customerId": "CHURN_005",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_005",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_005",
       "agentId": "LAKERS",
       "masterAgent": "BILLY666",
       "contextType": "RECREATIONAL_CASUAL",
@@ -1484,7 +1484,7 @@
     {
       "rank": 34,
       "customerId": "CHURN_043",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_043",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_043",
       "agentId": "KOBE24",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1519,7 +1519,7 @@
     {
       "rank": 35,
       "customerId": "CHURN_007",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_007",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_007",
       "agentId": "KOBE24",
       "masterAgent": "BILLY666",
       "contextType": "RECREATIONAL_CASUAL",
@@ -1554,7 +1554,7 @@
     {
       "rank": 36,
       "customerId": "CHURN_047",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_047",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_047",
       "agentId": "ADAM",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1589,7 +1589,7 @@
     {
       "rank": 37,
       "customerId": "CHURN_039",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_039",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_039",
       "agentId": "TITAN",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1624,7 +1624,7 @@
     {
       "rank": 38,
       "customerId": "CHURN_036",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_036",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_036",
       "agentId": "FATSSIDE",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1659,7 +1659,7 @@
     {
       "rank": 39,
       "customerId": "CHURN_041",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_041",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_041",
       "agentId": "ADAM",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1694,7 +1694,7 @@
     {
       "rank": 40,
       "customerId": "CHURN_048",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_048",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_048",
       "agentId": "A-SCHAEFER",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1729,7 +1729,7 @@
     {
       "rank": 41,
       "customerId": "CHURN_006",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_006",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_006",
       "agentId": "SOUTHSHORE",
       "masterAgent": "BILLY666",
       "contextType": "RECREATIONAL_CASUAL",
@@ -1764,7 +1764,7 @@
     {
       "rank": 42,
       "customerId": "CHURN_004",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_004",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_004",
       "agentId": "SOUTHSHORE",
       "masterAgent": "BILLY666",
       "contextType": "RECREATIONAL_CASUAL",
@@ -1799,7 +1799,7 @@
     {
       "rank": 43,
       "customerId": "CHURN_037",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_037",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_037",
       "agentId": "A-SCHAEFER",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1834,7 +1834,7 @@
     {
       "rank": 44,
       "customerId": "CHURN_046",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_046",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_046",
       "agentId": "STEIN421",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1869,7 +1869,7 @@
     {
       "rank": 45,
       "customerId": "CHURN_002",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_002",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_002",
       "agentId": "VIP777",
       "masterAgent": "BILLY666",
       "contextType": "RECREATIONAL_CASUAL",
@@ -1904,7 +1904,7 @@
     {
       "rank": 46,
       "customerId": "CHURN_003",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_003",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_003",
       "agentId": "TITAN",
       "masterAgent": "BILLY666",
       "contextType": "RECREATIONAL_CASUAL",
@@ -1939,7 +1939,7 @@
     {
       "rank": 47,
       "customerId": "CHURN_040",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_040",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_040",
       "agentId": "FATSSIDE",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -1974,7 +1974,7 @@
     {
       "rank": 48,
       "customerId": "CHURN_045",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_045",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_045",
       "agentId": "LAKERS",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",
@@ -2009,7 +2009,7 @@
     {
       "rank": 49,
       "customerId": "CHURN_038",
-      "f402CustomerProfileUrl": "https://desk.bookdeskops.com/dashboard?customer=CHURN_038",
+      "f402CustomerProfileUrl": "https://fantasy402.com/manager.html?customer=CHURN_038",
       "agentId": "CUB22A",
       "masterAgent": "BILLY666",
       "contextType": "STALE_NUMBERS_BETTOR",

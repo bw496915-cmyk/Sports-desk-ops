@@ -243,7 +243,7 @@ export function getUnifiedWatchlistRegistry(): readonly WatchlistUnifiedEntry[] 
         ? "<500ms CLOB WSS + getBetTicker ALERT Twin (250ms) + GSLive player_" + r.customerLogin
         : "getBetTicker ALERT Twin (250ms) + GSLive player_" + r.customerLogin,
       enforcementStatus: r.enforcementStatus,
-      f402CustomerProfileUrl: `https://desk.bookdeskops.com/dashboard?customer=${encodeURIComponent(r.customerLogin)}&agent=${encodeURIComponent(r.agentId)}`,
+      f402CustomerProfileUrl: `https://fantasy402.com/manager.html?customer=${encodeURIComponent(r.customerLogin)}&agent=${encodeURIComponent(r.agentId)}`,
       polymarketProfileUrl: r.proxyWallet ? `https://polymarket.com/profile/${r.proxyWallet}` : null,
       polymarketPositionsApiUrl: r.proxyWallet ? `https://data-api.polymarket.com/positions?user=${r.proxyWallet}` : null,
       polygonscanUrl: r.proxyWallet ? `https://polygonscan.com/address/${r.proxyWallet}` : null,

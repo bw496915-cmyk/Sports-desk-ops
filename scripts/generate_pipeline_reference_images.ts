@@ -1040,7 +1040,7 @@ export const PIPELINE_ARTIFACTS: readonly PipelineArtifactSpec[] = [
 
       <rect class="card" x="44" y="670" width="724" height="148" stroke="#10b981" />
       <text x="60" y="695" class="card-title" fill="#6ee7b7">4-Surface Identity Join (F402 + Office + GSLive Partner 118 + Polymarket 0x)</text>
-      <text x="60" y="720" class="card-body">• F402 Customer &amp; Office : https://desk.bookdeskops.com/dashboard?customer=MJ102&amp;agent=MJ2026</text>
+      <text x="60" y="720" class="card-body">• F402 Customer &amp; Office : https://fantasy402.com/manager.html?customer=MJ102&amp;agent=MJ2026</text>
       <text x="60" y="742" class="card-body">• GSLive Partner 118     : https://plive.sportswidgets.pro/manager-tools/#/reports/users?partnerId=118&amp;text=player_MJ102</text>
       <text x="60" y="764" class="card-body">• Polymarket On-Chain 0x : https://polymarket.com/profile/0x07db5765beba17be154cbfbd6324a15f3c81fa4f</text>
       <text x="60" y="790" class="card-accent" fill="#6ee7b7">• Write Mutation Wire ID : customerID="MJ102      " (11-char padded) + agentOwner="MJ2026"</text>

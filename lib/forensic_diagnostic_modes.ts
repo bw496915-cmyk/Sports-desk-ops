@@ -252,7 +252,7 @@ export function evaluateMode1CustomerOverview(input: {
     accessFreshnessSeconds: freshnessSec,
     isAccessFresh: isFresh,
     drillDownLinks: {
-      f402CustomerUrl: `https://desk.bookdeskops.com/dashboard?customer=${encodeURIComponent(cleanCust)}&agent=${encodeURIComponent(cleanOffice)}`,
+      f402CustomerUrl: `https://fantasy402.com/manager.html?customer=${encodeURIComponent(cleanCust)}&agent=${encodeURIComponent(cleanOffice)}`,
       gsLiveProfileUrl: buildGsLiveUsersReportDeepLink({ customerLogin: cleanCust }),
       polymarketProfileUrl: input.polymarketWallet
         ? `https://polymarket.com/profile/${input.polymarketWallet}`
