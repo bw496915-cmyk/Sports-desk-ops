@@ -39,11 +39,15 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
 7. Dedupe twice: `comboId|wallet`, then `legSignatures|wallet` (`legKey|outcome|marketType`) to
    collapse cross-indexer duplicates without merging distinct same-condition markets.
    `UNRESOLVED_LEGS > 0` means the strict count is a floor.
-8. Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h (`--cache-ttl-hours`), `--fresh` bypasses.
-9. Env aliases: `CACHE_TTL_HOURS`, `CACHE_DIR`, `FRESH=1`, `STRICT_FULL_GAME=1`, `SEED_TRADES=1`,
+8. Verify, don't inspect: `--dump-wallets` then `--emit-ids` in both modes, and
+   `comm -23 <(sort strict) <(sort any)` must print nothing. Empty sets write empty files.
+   Check `diagnostics.legsWithoutSide` and `duplicatesCollapsedByLegSet`: if sides are empty the
+   cross-indexer pass is inert; if leg-set collapses are zero it may be doing nothing.
+9. Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h (`--cache-ttl-hours`), `--fresh` bypasses.
+10. Env aliases: `CACHE_TTL_HOURS`, `CACHE_DIR`, `FRESH=1`, `STRICT_FULL_GAME=1`, `SEED_TRADES=1`,
    `CONCURRENCY`, `LEADERBOARD=0`, `LEADERBOARD_LIMIT`, `MAX_SEED_MARKETS`, `WALLET_FILE`.
    CLI flags win over env.
-8. `lb-api.polymarket.com` is retired (410); use `data-api/v2/leaderboard`.
+11. `lb-api.polymarket.com` is retired (410); use `data-api/v2/leaderboard`.
 
 ## Backtest
 

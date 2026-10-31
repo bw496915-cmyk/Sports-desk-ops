@@ -13,8 +13,11 @@
 import {
   buildComboUniquenessReport,
   buildGameIndex,
+  comboIdLines,
+  linesToText,
   loadCfbGames,
   seedWalletsFromLeaderboard,
+  walletLines,
 } from "../lib/combo_uniqueness.ts";
 import { runComboBacktest } from "../lib/combo_backtest.ts";
 import {
@@ -45,9 +48,12 @@ Notes:
     caches combo responses under scratch/cfb-combo-cache (CACHE_TTL_HOURS=24 by default,
     --cache-ttl-hours overrides, --fresh bypasses).
   • uniqueness flags: --strict-full-game (STRICT_FULL_GAME=1), --cache-dir, --cache-ttl-hours,
-    --seed-trades, --max-seed-markets, --wallet-file, --no-leaderboard, --no-audit.
+    --seed-trades, --max-seed-markets, --wallet-file, --no-leaderboard, --no-audit,
+    --emit-ids <path>, --dump-wallets <path>.
   • attribution is mode-independent; --strict-full-game is a pure gate, so strict results are a
     subset of permissive ones. --json returns per-combo dropReason plus exclusion counts.
+  • empirical check: dump seed wallets, emit ids in both modes, then run
+    comm -23 strict.txt any.txt — the output must be empty.
   • backtest computes realized PnL from SPLIT cost vs REDEEM/MERGE/SELL payout; open combos are
     excluded from realized totals, and --all-venues skips CFB game attribution.
   • Public APIs only; no key.`;
@@ -187,6 +193,14 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
       cacheTtlHours: Number(flag(args, ["--cache-ttl-hours"], env.CACHE_TTL_HOURS ?? "24")),
       includeAudit: !args.includes("--no-audit"),
     });
+    const emitPath = flag(args, ["--emit-ids"], "");
+    const dumpPath = flag(args, ["--dump-wallets"], "");
+    if (emitPath !== "") {
+      await Bun.write(emitPath, linesToText(comboIdLines(report)));
+    }
+    if (dumpPath !== "") {
+      await Bun.write(dumpPath, linesToText(walletLines(report)));
+    }
     if (json) {
       console.log(JSON.stringify(report, null, 2));
       return;
@@ -212,6 +226,15 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
     console.log(`   sum per-game combos : ${report.global.sumPerGameCombos}`);
     console.log(`   permissive combos   : ${report.permissiveCombos} (before the strict gate)`);
     console.log(`   duplicates collapsed: ${report.duplicatesCollapsed} (comboId or leg-set)`);
+    console.log(
+      `   dedupe by id / leg-set: ${report.duplicatesCollapsedById} / ${report.duplicatesCollapsedByLegSet}`,
+    );
+    console.log(`   legs without side   : ${report.diagnostics.legsWithoutSide}`);
+    if (report.diagnostics.legsWithoutSide > 0) {
+      console.log(
+        "   note                : unsided legs cannot match a sided source; cross-indexer dedupe is inert for them",
+      );
+    }
     if (report.strictFullGame) {
       const e = report.strictExclusions;
       console.log(

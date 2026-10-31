@@ -91,8 +91,19 @@ export interface ComboUniquenessReport {
   readonly permissiveCombos: number;
   /** Records collapsed by the `comboId|wallet` or `legKeys|wallet` dedupe passes. */
   readonly duplicatesCollapsed: number;
+  readonly duplicatesCollapsedById: number;
+  /** Non-zero proves the cross-indexer leg-set pass is doing work. */
+  readonly duplicatesCollapsedByLegSet: number;
   /** Why strict mode dropped a combo. Sum equals `permissiveCombos - comboRecords`. */
   readonly strictExclusions: Readonly<Record<StrictDropReason, number>>;
+  readonly diagnostics: {
+    /** Legs with no outcome/side; such rows cannot match a sided source. */
+    readonly legsWithoutSide: number;
+    readonly legsWithoutStableId: number;
+    readonly combosWithUnstableIdentity: number;
+  };
+  /** Sorted, unique wallets scanned — the input for `--dump-wallets`. */
+  readonly wallets: readonly string[];
   /** Per-combo audit trail; empty under `--json` only if `includeAudit: false`. */
   readonly combos: readonly ComboAuditRow[];
   readonly cache: { readonly hits: number; readonly misses: number; readonly ttlHours: number };
@@ -114,6 +125,10 @@ interface NormalizedCombo {
   readonly legKeys: readonly string[];
   /** `legKey|outcome|marketType` — distinguishes legs that share a condition id. */
   readonly legSignatures: readonly string[];
+  /** Legs with no outcome/side token; those rows cannot dedupe against a sided source. */
+  readonly legsWithoutSide: number;
+  /** Legs whose identity fell back to `JSON.stringify(leg)`. */
+  readonly unstableLegs: number;
   readonly allLegsCfb: boolean;
   readonly allCfbLegsEligible: boolean;
   readonly fullyWithinGame: boolean;
@@ -291,12 +306,21 @@ function legKey(leg: Record<string, unknown>): string {
  * same condition id on different outcomes or market types (moneyline vs player_props).
  */
 function legSignature(leg: Record<string, unknown>): string {
-  const outcome = (
+  const outcome = legOutcome(leg);
+  return `${legKey(leg)}|${outcome}|${legMarketType(leg)}`;
+}
+
+function legOutcome(leg: Record<string, unknown>): string {
+  return (
     text(leg.leg_outcome_label) ||
     text(leg.outcome) ||
     text(leg.leg_outcome)
   ).toUpperCase();
-  return `${legKey(leg)}|${outcome}|${legMarketType(leg)}`;
+}
+
+/** A stable id is anything but the `JSON.stringify` fallback in `legKey`. */
+function hasStableLegId(leg: Record<string, unknown>): boolean {
+  return !legKey(leg).startsWith("{");
 }
 
 function attributeLeg(
@@ -352,6 +376,8 @@ function normalizeCombo(
     gameSlugs: games,
     legKeys,
     legSignatures,
+    legsWithoutSide: legs.filter((leg) => legOutcome(leg) === "").length,
+    unstableLegs: legs.filter((leg) => !hasStableLegId(leg)).length,
     allLegsCfb: attributed === legs.length,
     allCfbLegsEligible: eligible,
     fullyWithinGame: games.size === 1,
@@ -537,18 +563,29 @@ export async function buildComboUniquenessReport(
   const seenIds = new Set<string>();
   const seenLegSets = new Set<string>();
   const dedupedAll: NormalizedCombo[] = [];
-  let duplicatesCollapsed = 0;
+  let duplicatesCollapsedById = 0;
+  let duplicatesCollapsedByLegSet = 0;
   for (const combo of perWallet.flat()) {
     const idKey = `${combo.comboId}|${combo.wallet}`;
     const legKey = `${combo.legSignatures.join(";")}|${combo.wallet}`;
-    if (seenIds.has(idKey) || seenLegSets.has(legKey)) {
-      duplicatesCollapsed += 1;
+    if (seenIds.has(idKey)) {
+      duplicatesCollapsedById += 1;
+      continue;
+    }
+    if (seenLegSets.has(legKey)) {
+      duplicatesCollapsedByLegSet += 1;
       continue;
     }
     seenIds.add(idKey);
     seenLegSets.add(legKey);
     dedupedAll.push(combo);
   }
+  const duplicatesCollapsed = duplicatesCollapsedById + duplicatesCollapsedByLegSet;
+  const diagnostics = {
+    legsWithoutSide: dedupedAll.reduce((sum, combo) => sum + combo.legsWithoutSide, 0),
+    legsWithoutStableId: dedupedAll.reduce((sum, combo) => sum + combo.unstableLegs, 0),
+    combosWithUnstableIdentity: dedupedAll.filter((combo) => combo.unstableLegs > 0).length,
+  };
 
   // Attribution above is mode-independent. The strict gate is pure and runs afterwards, so the
   // strict result is always a subset of the permissive one and `fullyWithinGame` is monotonic.
@@ -641,8 +678,34 @@ export async function buildComboUniquenessReport(
     comboRecords: normalized.length,
     permissiveCombos: dedupedAll.length,
     duplicatesCollapsed,
+    duplicatesCollapsedById,
+    duplicatesCollapsedByLegSet,
     strictExclusions,
+    diagnostics,
+    wallets: [...wallets].sort(),
     combos: audit,
     cache: { ...stats, ttlHours: options?.cacheTtlHours ?? DEFAULT_CACHE_TTL_HOURS },
   };
+}
+
+/** Sorted `comboId|wallet` lines. Kept-only by default, matching the strict gate. */
+export function comboIdLines(
+  report: ComboUniquenessReport,
+  options?: { readonly keptOnly?: boolean },
+): string[] {
+  const keptOnly = options?.keptOnly ?? true;
+  return report.combos
+    .filter((row) => !keptOnly || row.kept)
+    .map((row) => `${row.comboId}|${row.wallet}`)
+    .sort();
+}
+
+/** Sorted unique wallets, one per line — the `--dump-wallets` input. */
+export function walletLines(report: ComboUniquenessReport): string[] {
+  return [...report.wallets].sort();
+}
+
+/** Join lines for file emission; an empty set writes an empty file, never a blank line. */
+export function linesToText(lines: readonly string[]): string {
+  return lines.length === 0 ? "" : `${lines.join("\n")}\n`;
 }

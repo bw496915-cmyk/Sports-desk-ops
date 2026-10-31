@@ -65,7 +65,17 @@ Caveats:
 # per-game unique combos and wallets
 ./bin/dx combo uniqueness --seed-trades --max-seed-markets 20 --limit-games 20
 ./bin/dx combo uniqueness --strict-full-game --json
+
+# empirical strict-subset check (comm must print nothing)
+./bin/dx combo uniqueness --seed-trades --max-seed-markets 20 --limit-games 20 --dump-wallets scratch/seed.txt
+LEADERBOARD=0 WALLET_FILE=scratch/seed.txt ./bin/dx combo uniqueness --limit-games 20 --emit-ids scratch/any.txt
+LEADERBOARD=0 WALLET_FILE=scratch/seed.txt ./bin/dx combo uniqueness --limit-games 20 --strict-full-game --emit-ids scratch/strict.txt
+comm -23 <(LC_ALL=C sort scratch/strict.txt) <(LC_ALL=C sort scratch/any.txt)
 ```
+
+`--emit-ids` writes sorted `comboId|wallet` lines for kept combos; `--dump-wallets` writes the
+sorted unique wallet set. An empty result set produces an **empty file**, not a blank line (a blank
+line would make `comm` report a phantom leak).
 
 `uniqueness` options: `--fresh` (ignore cache), `--cache-dir`, `--cache-ttl-hours` (default 24),
 `--no-leaderboard`, `--leaderboard-limit`, `--seed-trades`, `--max-seed-markets`, `--wallet-file`,
@@ -107,6 +117,26 @@ CLI flags win over environment, which wins over defaults.
   any CFB game), `CROSS_GAME`, `INELIGIBLE_LEG_TYPE`. If `UNRESOLVED_LEGS > 0`, the strict count
   is a **floor**, not a point estimate — unresolved legs correlate with low-volume or delisted
   markets, so the exclusion is not random.
+- Dedupe diagnostics: `duplicatesCollapsedById` and `duplicatesCollapsedByLegSet` are reported
+  separately. A non-zero leg-set count proves the cross-indexer pass is doing work;
+  `diagnostics.legsWithoutSide` shows whether any source lacks a side (which would make that pass
+  inert against a sided source).
+
+### Live result (2026-10-31)
+
+With 322 seeded wallets, `--limit-games 100`:
+
+```
+permissive 82 | strict 0
+exclusions { UNRESOLVED_LEGS: 46, CROSS_GAME: 36, INELIGIBLE_LEG_TYPE: 0 }
+duplicatesCollapsedByLegSet 10 | legsWithoutSide 0
+comm -23 strict any → empty (0 bytes)
+```
+
+The check passes, but it is **vacuous**: strict is 0 because all 36 fully-CFB combos span more
+than one game (`games == legs` for most). This wallet set trades cross-game CFB parlays, so
+single-game strict is the wrong gate for it. `--all-legs-cfb` (CFB-only, any number of games) would
+separate "index gap" from "style", and is the next mode worth adding.
 - Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h by default; corrupted files are refetched.
 
 ## 5. Backtesting (realized PnL)

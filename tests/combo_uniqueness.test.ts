@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildComboUniquenessReport } from "../lib/combo_uniqueness.ts";
+import {
+  buildComboUniquenessReport,
+  comboIdLines,
+  linesToText,
+  walletLines,
+} from "../lib/combo_uniqueness.ts";
 
 const W1 = `0x${"1".repeat(40)}`;
 const W2 = `0x${"2".repeat(40)}`;
@@ -103,7 +108,14 @@ describe("CFB combo uniqueness", () => {
     expect(report.comboRecords).toBe(5); // c1 appears in both endpoints, plus a c1-alt id
     expect(report.permissiveCombos).toBe(5);
     expect(report.duplicatesCollapsed).toBe(2); // same id, then same leg set with a different id
+    expect(report.duplicatesCollapsedById).toBe(1);
+    expect(report.duplicatesCollapsedByLegSet).toBe(1);
     expect(report.global.distinctCombos).toBe(5);
+    expect(report.global.distinctWallets).toBe(1);
+    // Fixture legs carry no outcome label, so the unsided diagnostic must see them.
+    expect(report.diagnostics.legsWithoutSide).toBe(6);
+    expect(report.diagnostics.combosWithUnstableIdentity).toBe(0);
+    expect(report.wallets).toEqual([W1, W2].sort());
     expect(report.global.distinctWallets).toBe(1);
 
     const g1 = report.games.find((game) => game.gameSlug === "cfb-g1");
@@ -146,6 +158,20 @@ describe("CFB combo uniqueness", () => {
       expect(game.uniqueCombos).toBeLessThanOrEqual(before?.uniqueCombos ?? 0);
       expect(game.fullyWithinGame).toBeLessThanOrEqual(before?.fullyWithinGame ?? 0);
     }
+  });
+
+  test("emit-ids lines: strict output is a subset of permissive output", async () => {
+    const permissive = await buildComboUniquenessReport(options());
+    const strict = await buildComboUniquenessReport(options({ strictFullGame: true }));
+    const any = comboIdLines(permissive, { keptOnly: false });
+    const strictIds = comboIdLines(strict);
+    expect(any).toHaveLength(permissive.comboRecords);
+    expect(strictIds).toHaveLength(strict.comboRecords);
+    const anySet = new Set(any);
+    expect(strictIds.filter((line) => !anySet.has(line))).toEqual([]);
+    expect(walletLines(permissive)).toEqual([W1, W2].sort());
+    expect(linesToText([])).toBe("");
+    expect(linesToText(["a", "b"])).toBe("a\nb\n");
   });
 
   test("a combo whose legs cannot be attributed is reported as unresolved", async () => {
