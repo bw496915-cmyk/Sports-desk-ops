@@ -318,3 +318,4 @@ The test suite consists of 10 test suites across 34 tests and 813 total assertio
 - [OS Bun Cron Integration Guide](os_bun_cron_integration_guide.md) — OS crontab and systemd timer integration guide.
 - [VPS Domain Setup Runbook](vps_domain_setup_runbook.md) — Production VPS deployment guide.
 - [GSLive report surfaces](docs/report-surfaces.md) — Operator map of the `#/reports/users` deep link and the `#/events/bet-history` sidecar, with an evidence level per surface.
+- [Real ingestion](docs/REAL_INGESTION.md) — Phase 4: live Polymarket positions (`--live`), provenance and stale-cache rules, and the F402 session plan.
