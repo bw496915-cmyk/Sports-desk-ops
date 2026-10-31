@@ -232,12 +232,14 @@ EOF
     cp docs/gslive-links.js dist/gslive-links.js
     cp docs/graph-live-feed.json dist/graph-live-feed.json
     cp docs/backtest-4wk-cfb-nba.json dist/backtest-4wk-cfb-nba.json
+    cp docs/combo-uniqueness.json dist/combo-uniqueness.json
+    cp docs/cross-domain-bridge.json dist/cross-domain-bridge.json
     cp docs/openapi.json dist/openapi.json
     cp docs/api-reference.md dist/api-reference.md
     cp -f docs/assets/* dist/assets/ 2>/dev/null || true
     cp functions/_headers dist/_headers
-    echo "✓ Staged dist/index.html, dist/graph.html, dist/graph.js, dist/gslive-links.js, dist/graph-live-feed.json, dist/openapi.json, dist/api-reference.md, dist/assets/*, dist/_headers"
-    shasum -a 256 dist/index.html dist/graph.html dist/graph.js dist/gslive-links.js dist/graph-live-feed.json dist/openapi.json dist/api-reference.md dist/assets/pipeline-artifacts-metadata.json dist/_headers
+    echo "✓ Staged dist/index.html, dist/graph.html, dist/graph.js, dist/gslive-links.js, dist/graph-live-feed.json, dist/combo-uniqueness.json, dist/cross-domain-bridge.json, dist/openapi.json, dist/api-reference.md, dist/assets/*, dist/_headers"
+    shasum -a 256 dist/index.html dist/graph.html dist/graph.js dist/gslive-links.js dist/graph-live-feed.json dist/combo-uniqueness.json dist/cross-domain-bridge.json dist/openapi.json dist/api-reference.md dist/assets/pipeline-artifacts-metadata.json dist/_headers
     ;;
   deploy)
     "$0" stage
