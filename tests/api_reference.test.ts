@@ -199,7 +199,9 @@ describe("openapi.json honesty invariants", () => {
     ]);
     for (const surface of surfaces) {
       if (!isRecord(surface)) continue;
-      expect(String(surface.route)).toMatch(/^#\/(reports\/users|events\/bet-history)$/);
+      expect(String(surface.route)).toMatch(
+        /^#\/(reports\/users|events\/bet-history)$/,
+      );
       expect(String(surface.example)).toContain(
         "https://plive.sportswidgets.pro/manager-tools/#/",
       );
@@ -207,7 +209,9 @@ describe("openapi.json honesty invariants", () => {
 
     // No GSLive operation may leak into paths.
     const operationPaths = operationsOf(spec).map((entry) => entry.path);
-    expect(operationPaths.filter((entry) => entry.includes("manager-tools"))).toEqual([]);
+    expect(
+      operationPaths.filter((entry) => entry.includes("manager-tools")),
+    ).toEqual([]);
   });
 
   test("getWebLog is tier A with a valid live x-capture response schema", () => {
@@ -347,7 +351,9 @@ describe("generated markdown + portal artifacts", () => {
       throw new Error("docs/api-reference.md missing");
     }
     const markdown = readText(MARKDOWN_PATH);
-    expect(markdown).toContain("## GSLive Manager (Partner 118): operator deep links");
+    expect(markdown).toContain(
+      "## GSLive Manager (Partner 118): operator deep links",
+    );
     expect(markdown).toContain("#/reports/users");
     expect(markdown).toContain("dateFilterBy=calcTime");
     expect(markdown).toContain("dateFilterBy=betTime");

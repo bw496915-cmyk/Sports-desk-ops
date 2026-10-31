@@ -157,27 +157,21 @@ export function startServer(options?: ServerOptions) {
         pathname === "/graph.html" ||
         pathname === "/surveillance-graph"
       ) {
-        return new Response(
-          Bun.file(resolve(currentDir, "docs/graph.html")),
-          {
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "text/html; charset=utf-8",
-            },
+        return new Response(Bun.file(resolve(currentDir, "docs/graph.html")), {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "text/html; charset=utf-8",
           },
-        );
+        });
       }
 
       if (pathname === "/graph.js") {
-        return new Response(
-          Bun.file(resolve(currentDir, "docs/graph.js")),
-          {
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/javascript; charset=utf-8",
-            },
+        return new Response(Bun.file(resolve(currentDir, "docs/graph.js")), {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/javascript; charset=utf-8",
           },
-        );
+        });
       }
 
       // Telegram webhook: Telegram echoes the secret registered by setWebhook in this header

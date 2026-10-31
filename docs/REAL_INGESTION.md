@@ -14,12 +14,12 @@ provenance is per wallet and a failure never silently looks live.
 
 ## 2. Sources and evidence level
 
-| Source | Endpoint | Auth | Evidence |
-| :--- | :--- | :--- | :--- |
-| Polymarket positions | `GET https://data-api.polymarket.com/positions?user=<0x>&limit=500&offset=0` | none | **Live-verified** 2026-10-31: HTTP 200, 214 positions for `0x26cf…c612`, ~0.6 s |
-| Polymarket CLOB WSS | `wss://ws-subscriptions-clob.polymarket.com/ws/...` | none | Not implemented here; see the shadow-stream runbooks |
-| F402 `getPending` | `POST /cloud/api/Manager/getPending` | session cookie / JWT | **Tier C** — request and response uncaptured; content type disputed |
-| F402 `getBetTicker` | `POST /cloud/api/Manager/getBetTicker` | session cookie / JWT | **Tier A** capture exists (2026-10-31) |
+| Source               | Endpoint                                                                     | Auth                 | Evidence                                                                        |
+| :------------------- | :--------------------------------------------------------------------------- | :------------------- | :------------------------------------------------------------------------------ |
+| Polymarket positions | `GET https://data-api.polymarket.com/positions?user=<0x>&limit=500&offset=0` | none                 | **Live-verified** 2026-10-31: HTTP 200, 214 positions for `0x26cf…c612`, ~0.6 s |
+| Polymarket CLOB WSS  | `wss://ws-subscriptions-clob.polymarket.com/ws/...`                          | none                 | Not implemented here; see the shadow-stream runbooks                            |
+| F402 `getPending`    | `POST /cloud/api/Manager/getPending`                                         | session cookie / JWT | **Tier C** — request and response uncaptured; content type disputed             |
+| F402 `getBetTicker`  | `POST /cloud/api/Manager/getBetTicker`                                       | session cookie / JWT | **Tier A** capture exists (2026-10-31)                                          |
 
 F402 auth is not a password grant. `scripts/evidence_capture.ts` logs in through a headless
 `Bun.WebView`, reads HttpOnly cookies via CDP, and replays them in-process. A 60 s daemon cannot
@@ -73,14 +73,14 @@ is the live-wallet count and `configuredWalletsCount` stays 39.
 
 ## 3.1 Wire → feed mapping
 
-| Source shape | Canonical mapper | Feed / UI output | Status |
-| :--- | :--- | :--- | :--- |
-| F402 `RawPendingLegRow` (cents, UTC-5, per-leg) | `reconstructParentPendingTickets` (`simulate_bettor_churn_suite.ts`) → `ReconstructedTicket` (`ticketId`, `riskCents`, `winCents`, padded id, `is_live_wager`) | `pendingBets[].ticketId/riskUsd/toWinUsd` | **Gap** — no adapter; feed rows are hand-authored |
-| F402 report leg (`AdjSpread`/`AdjTotalPoints`) | `mapF402ReportLeg` + `computeEffectiveLineHundredths` (`combo_identity.ts`) | Mode 7 `lineHundredths` | Implemented |
-| F402 `RawBetTickerTick` (cents, UTC-5) | `parseF402TickerRow` (`lib/f402_ingest.ts`) | `liveTicks[]` identity/timing preview (no money) | Implemented preview; full money mapping needs units proof |
-| Polymarket position | `parsePolymarketPosition` → `aggregatePositions` (`lib/polymarket_ingest.ts`) | `walletProfiles[].openVolumeUsd/openLegsCount/positionsValueUsd/openPnlUsd/openBetsSummary` | Implemented |
-| GSLive account | `formatGsLivePlayerToken` / `formatGsLivePartnerUserId` | report `text=player_<LOGIN>`; bet-history `partnerUserId=<LOGIN>` | Implemented, documented in `report-surfaces.md` |
-| 4-part identity | `gslive_manager_watchlist.ts` tuple | `customerLogin + agentId + gsLivePlayerId + proxyWallet` | Implemented, runbook §2.6 |
+| Source shape                                    | Canonical mapper                                                                                                                                               | Feed / UI output                                                                            | Status                                                    |
+| :---------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------ | :-------------------------------------------------------- |
+| F402 `RawPendingLegRow` (cents, UTC-5, per-leg) | `reconstructParentPendingTickets` (`simulate_bettor_churn_suite.ts`) → `ReconstructedTicket` (`ticketId`, `riskCents`, `winCents`, padded id, `is_live_wager`) | `pendingBets[].ticketId/riskUsd/toWinUsd`                                                   | **Gap** — no adapter; feed rows are hand-authored         |
+| F402 report leg (`AdjSpread`/`AdjTotalPoints`)  | `mapF402ReportLeg` + `computeEffectiveLineHundredths` (`combo_identity.ts`)                                                                                    | Mode 7 `lineHundredths`                                                                     | Implemented                                               |
+| F402 `RawBetTickerTick` (cents, UTC-5)          | `parseF402TickerRow` (`lib/f402_ingest.ts`)                                                                                                                    | `liveTicks[]` identity/timing preview (no money)                                            | Implemented preview; full money mapping needs units proof |
+| Polymarket position                             | `parsePolymarketPosition` → `aggregatePositions` (`lib/polymarket_ingest.ts`)                                                                                  | `walletProfiles[].openVolumeUsd/openLegsCount/positionsValueUsd/openPnlUsd/openBetsSummary` | Implemented                                               |
+| GSLive account                                  | `formatGsLivePlayerToken` / `formatGsLivePartnerUserId`                                                                                                        | report `text=player_<LOGIN>`; bet-history `partnerUserId=<LOGIN>`                           | Implemented, documented in `report-surfaces.md`           |
+| 4-part identity                                 | `gslive_manager_watchlist.ts` tuple                                                                                                                            | `customerLogin + agentId + gsLivePlayerId + proxyWallet`                                    | Implemented, runbook §2.6                                 |
 
 Timestamps: wire rows are UTC-5 (`InsertDateTime`), the feed uses UTC ISO, and desk-day windows use
 `America/Chicago` via `resolveDeskDateYmd` / `computeDeskDayStartEpochSeconds`. Money: wire `Risk` /
@@ -98,13 +98,13 @@ Timestamps: wire rows are UTC-5 (`InsertDateTime`), the feed uses UTC ISO, and d
 
 ## 5. Failure semantics
 
-| Condition | Feed result |
-| :--- | :--- |
-| HTTP 200, valid array | `dataSource: "LIVE"` |
-| Timeout / network / 5xx after retry | cached row → `STALE`; no cache → `FIXTURE` + `lastError` |
-| 429 | retry once, then same as above |
-| Non-array body | treated as failure; `lastError` includes the content type |
-| Malformed position rows | row skipped, wallet counts only what parsed |
+| Condition                           | Feed result                                               |
+| :---------------------------------- | :-------------------------------------------------------- |
+| HTTP 200, valid array               | `dataSource: "LIVE"`                                      |
+| Timeout / network / 5xx after retry | cached row → `STALE`; no cache → `FIXTURE` + `lastError`  |
+| 429                                 | retry once, then same as above                            |
+| Non-array body                      | treated as failure; `lastError` includes the content type |
+| Malformed position rows             | row skipped, wallet counts only what parsed               |
 
 The poller exits 0 on partial failure (a single wallet outage must not stop the feed) but logs a
 one-line summary: `ok=38 failed=1 stale=1`.

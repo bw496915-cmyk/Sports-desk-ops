@@ -14,11 +14,11 @@ in [gs-manager-contracts.md](./gs-manager-contracts.md).
 
 ## Surfaces at a glance
 
-| Surface | Route | Answers | Evidence level |
-| :--- | :--- | :--- | :--- |
-| Account report | `#/reports/users` | Profit, bets, hold %, wager and leg counts for one player over a day window | **Hash URL observed**; server-side filter behaviour **unverified** |
-| Live settling stream | `#/events/bet-history` (`dateFilterBy=calcTime`) | Tickets as they settle/populate for the current desk day | **Hash URL observed**; per-parameter filtering **unverified**; **transport blocked/unverified** |
-| Live placement stream | `#/events/bet-history` (`dateFilterBy=betTime`) | Tickets as they are placed | **Hash URL observed**; per-parameter filtering **unverified**; **transport blocked/unverified** |
+| Surface               | Route                                            | Answers                                                                     | Evidence level                                                                                  |
+| :-------------------- | :----------------------------------------------- | :-------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------- |
+| Account report        | `#/reports/users`                                | Profit, bets, hold %, wager and leg counts for one player over a day window | **Hash URL observed**; server-side filter behaviour **unverified**                              |
+| Live settling stream  | `#/events/bet-history` (`dateFilterBy=calcTime`) | Tickets as they settle/populate for the current desk day                    | **Hash URL observed**; per-parameter filtering **unverified**; **transport blocked/unverified** |
+| Live placement stream | `#/events/bet-history` (`dateFilterBy=betTime`)  | Tickets as they are placed                                                  | **Hash URL observed**; per-parameter filtering **unverified**; **transport blocked/unverified** |
 
 “Hash URL observed” means an operator URL was seen in the browser. It does **not** mean the request
 that fills the grid was captured, and it says nothing about URL, method, content type, auth or

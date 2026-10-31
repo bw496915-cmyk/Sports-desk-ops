@@ -262,7 +262,7 @@ function formatCdt(date: Date): string {
 }
 
 export function runFourWeekParlayComboBacktest(
-  repoRoot: string = path.resolve(import.meta.dirname, "..")
+  repoRoot: string = path.resolve(import.meta.dirname, ".."),
 ): FourWeekParlayBacktestReport {
   const now = new Date();
   const enrichedPath = path.join(repoRoot, "enriched_customers_full.json");
@@ -293,7 +293,8 @@ export function runFourWeekParlayComboBacktest(
       combinedProtectedDeskNetUsd: 106000,
       combinedProtectedHoldPct: 15.57,
       deskSavingsUsd: 158600,
-      keyCatalyst: "CFB Wk 6 Big 12 Tout Combos + NBA Preseason 1Q/1H Pace Overs",
+      keyCatalyst:
+        "CFB Wk 6 Big 12 Tout Combos + NBA Preseason 1Q/1H Pace Overs",
     },
     {
       weekCode: "W2",
@@ -317,7 +318,8 @@ export function runFourWeekParlayComboBacktest(
       combinedProtectedDeskNetUsd: 132800,
       combinedProtectedHoldPct: 15.79,
       deskSavingsUsd: 212200,
-      keyCatalyst: "CFB Wk 7 Key-7 Teaser Middles + Troy/Sun Belt Steam + Early GameNum+5000 Probes",
+      keyCatalyst:
+        "CFB Wk 7 Key-7 Teaser Middles + Troy/Sun Belt Steam + Early GameNum+5000 Probes",
     },
     {
       weekCode: "W3",
@@ -341,7 +343,8 @@ export function runFourWeekParlayComboBacktest(
       combinedProtectedDeskNetUsd: 231000,
       combinedProtectedHoldPct: 16.12,
       deskSavingsUsd: 374600,
-      keyCatalyst: "NBA Regular Season Tip-Off Surge (Alt-Spread + ML Subset Traps & 3Q Starter Surge)",
+      keyCatalyst:
+        "NBA Regular Season Tip-Off Surge (Alt-Spread + ML Subset Traps & 3Q Starter Surge)",
     },
     {
       weekCode: "W4",
@@ -365,7 +368,8 @@ export function runFourWeekParlayComboBacktest(
       combinedProtectedDeskNetUsd: 292480,
       combinedProtectedHoldPct: 16.61,
       deskSavingsUsd: 429260,
-      keyCatalyst: "CFB Baylor/TXST 7-Wallet Burst + NBA 1Q-4Q Derivative Combos & Type D Trap Quarantine",
+      keyCatalyst:
+        "CFB Baylor/TXST 7-Wallet Burst + NBA 1Q-4Q Derivative Combos & Type D Trap Quarantine",
     },
   ];
 
@@ -373,7 +377,8 @@ export function runFourWeekParlayComboBacktest(
     {
       familyCode: "NBA_ALT_SPREAD_5000_SUBSET",
       sport: "NBA",
-      familyName: "NBA Alt-Spread (GameNum+5000) + ML / Main-Spread Subset Combos",
+      familyName:
+        "NBA Alt-Spread (GameNum+5000) + ML / Main-Spread Subset Combos",
       ticketsCount: 184,
       legsCount: 386,
       handleUsd: 412000,
@@ -385,12 +390,14 @@ export function runFourWeekParlayComboBacktest(
       protectedHoldPct: 17.39,
       deskSavingsUsd: 318450,
       primaryGuard: "GUARD_1_PROBIT_ALT_SUBSET_BLOCK",
-      guardMechanism: "Dynamic Probit Tail Correlation (ρ=0.756 >= 0.35) blocks subset payout inflation (4.36x -> 2.65x)",
+      guardMechanism:
+        "Dynamic Probit Tail Correlation (ρ=0.756 >= 0.35) blocks subset payout inflation (4.36x -> 2.65x)",
     },
     {
       familyCode: "CFB_TOUT_SPREAD_TOTAL_2LEG",
       sport: "CFB",
-      familyName: "CFB Syndicate Tout Burst 2-Leg Spread + Over Combos (Baylor/TXST/Big 12)",
+      familyName:
+        "CFB Syndicate Tout Burst 2-Leg Spread + Over Combos (Baylor/TXST/Big 12)",
       ticketsCount: 412,
       legsCount: 864,
       handleUsd: 684500,
@@ -402,12 +409,14 @@ export function runFourWeekParlayComboBacktest(
       protectedHoldPct: 15.44,
       deskSavingsUsd: 284120,
       primaryGuard: "GUARD_2_WSS_500MS_STEPPED_LINE",
-      guardMechanism: "<500ms CLOB WSS + DEDUP_THEN_LEAD 3rd-Wallet Trigger steps F402 0.5pt behind -125/-125 Vig Curtain",
+      guardMechanism:
+        "<500ms CLOB WSS + DEDUP_THEN_LEAD 3rd-Wallet Trigger steps F402 0.5pt behind -125/-125 Vig Curtain",
     },
     {
       familyCode: "NBA_PERIOD_1Q_4Q_DERIVATIVE_COMBO",
       sport: "NBA",
-      familyName: "NBA 1Q–4Q & 1H/2H Derivative Parlays (1Q Pace, 2Q Bench Drag, 3Q Surge, 4Q Clutch)",
+      familyName:
+        "NBA 1Q–4Q & 1H/2H Derivative Parlays (1Q Pace, 2Q Bench Drag, 3Q Surge, 4Q Clutch)",
       ticketsCount: 628,
       legsCount: 1340,
       handleUsd: 598000,
@@ -419,7 +428,8 @@ export function runFourWeekParlayComboBacktest(
       protectedHoldPct: 14.11,
       deskSavingsUsd: 196800,
       primaryGuard: "GUARD_3_DYNAMIC_1Q_4Q_PERIOD_PRICER",
-      guardMechanism: "Dynamic_Period_Pricer (1Q=25.8%, 2Q Drag=0.232, 3Q Surge=+1.15pt, 4Q σ=5.4) + FG-Only Clamp",
+      guardMechanism:
+        "Dynamic_Period_Pricer (1Q=25.8%, 2Q Drag=0.232, 3Q Surge=+1.15pt, 4Q σ=5.4) + FG-Only Clamp",
     },
     {
       familyCode: "NBA_GSBUILDER_SGP_CORRELATED",
@@ -436,12 +446,14 @@ export function runFourWeekParlayComboBacktest(
       protectedHoldPct: 14.97,
       deskSavingsUsd: 164290,
       primaryGuard: "GUARD_4_CORRELATED_SGP_VIG_TAX",
-      guardMechanism: "vigSetupInsert +15c (2-Leg), +20c (3-Leg), and +25c Correlated Tempo Stack Tax",
+      guardMechanism:
+        "vigSetupInsert +15c (2-Leg), +20c (3-Leg), and +25c Correlated Tempo Stack Tax",
     },
     {
       familyCode: "CFB_KEY_3_7_10_14_TEASER_MIDDLE",
       sport: "CFB",
-      familyName: "CFB Key-Number (3, 7, 10, 14) Teasers & Cross-Venue Middle Parlays",
+      familyName:
+        "CFB Key-Number (3, 7, 10, 14) Teasers & Cross-Venue Middle Parlays",
       ticketsCount: 518,
       legsCount: 1120,
       handleUsd: 548000,
@@ -453,12 +465,14 @@ export function runFourWeekParlayComboBacktest(
       protectedHoldPct: 8.77,
       deskSavingsUsd: 142600,
       primaryGuard: "GUARD_5_6GATE_BET1_CLAMP",
-      guardMechanism: "Key 3/7/10/14 Crossing Guard + Wong Teaser -135 Pricing + 6-Gate Bet #1 Clamp (<320ms)",
+      guardMechanism:
+        "Key 3/7/10/14 Crossing Guard + Wong Teaser -135 Pricing + 6-Gate Bet #1 Clamp (<320ms)",
     },
     {
       familyCode: "NBA_KEY_3_4_6_7_CROSS_MIDDLE",
       sport: "NBA",
-      familyName: "NBA Key-Number (3, 4, 6, 7) Cross-Book Middles & Type D Layoff Traps",
+      familyName:
+        "NBA Key-Number (3, 4, 6, 7) Cross-Book Middles & Type D Layoff Traps",
       ticketsCount: 295,
       legsCount: 618,
       handleUsd: 389300,
@@ -470,12 +484,14 @@ export function runFourWeekParlayComboBacktest(
       protectedHoldPct: 5.6,
       deskSavingsUsd: 68400,
       primaryGuard: "GUARD_6_180S_TRAP_QUARANTINE",
-      guardMechanism: "Type B Middle Pin (-4.0/+4.0) + 180s Type D Panic Layoff Trap Quarantine Auto-Resolver",
+      guardMechanism:
+        "Type B Middle Pin (-4.0/+4.0) + 180s Type D Panic Layoff Trap Quarantine Auto-Resolver",
     },
     {
       familyCode: "CFB_CONF_STEAM_PARLAY",
       sport: "CFB",
-      familyName: "CFB Conference Total Steam & Polymarket CTF 2-Leg Shadow Combos",
+      familyName:
+        "CFB Conference Total Steam & Polymarket CTF 2-Leg Shadow Combos",
       ticketsCount: 646,
       legsCount: 1412,
       handleUsd: 492400,
@@ -487,12 +503,14 @@ export function runFourWeekParlayComboBacktest(
       protectedHoldPct: 11.86,
       deskSavingsUsd: 78400,
       primaryGuard: "GUARD_2_WSS_500MS_STEPPED_LINE",
-      guardMechanism: "6s Dynamic Delay Gate + +15c Combo Vig + Sub-500ms Shadow Portfolio Anchor",
+      guardMechanism:
+        "6s Dynamic Delay Gate + +15c Combo Vig + Sub-500ms Shadow Portfolio Anchor",
     },
     {
       familyCode: "REC_MULTI_LEG_PARLAY",
       sport: "CFB+NBA",
-      familyName: "Recreational 3-to-6 Leg CFB & NBA Parlays (VIP Negative-Control Protected)",
+      familyName:
+        "Recreational 3-to-6 Leg CFB & NBA Parlays (VIP Negative-Control Protected)",
       ticketsCount: 4090,
       legsCount: 9470,
       handleUsd: 950000,
@@ -504,40 +522,47 @@ export function runFourWeekParlayComboBacktest(
       protectedHoldPct: 29.07,
       deskSavingsUsd: -78400,
       primaryGuard: "RECREATIONAL_RETAINED_FLOW",
-      guardMechanism: "VIP Negative-Control Exemption (RF2003,HOLD_PILLAR branches untouched; 99.4% retention)",
+      guardMechanism:
+        "VIP Negative-Control Exemption (RF2003,HOLD_PILLAR branches untouched; 99.4% retention)",
     },
   ];
 
   const guardAttribution: GuardAttributionRow[] = [
     {
       guardCode: "GUARD_1_PROBIT_ALT_SUBSET_BLOCK",
-      guardTitle: "Dynamic Probit Alt-Spread + ML Subset Blocker (GameNum + 5000)",
+      guardTitle:
+        "Dynamic Probit Alt-Spread + ML Subset Blocker (GameNum + 5000)",
       targetSports: "NBA & CFB Alt Spreads",
       interceptedTickets: 184,
       interceptedHandleUsd: 412000,
       deskSavingsUsd: 318450,
       holdImprovementBps: 675,
-      latencyOrThresholdSpec: "ρ_tail >= 0.35 (LAL -7.5 + ML ρ=0.756 blocked at pre-commit)",
+      latencyOrThresholdSpec:
+        "ρ_tail >= 0.35 (LAL -7.5 + ML ρ=0.756 blocked at pre-commit)",
     },
     {
       guardCode: "GUARD_2_WSS_500MS_STEPPED_LINE",
-      guardTitle: "Sub-500ms CLOB WebSocket + Stepped Line Dispatcher (-125/-125 Curtain)",
+      guardTitle:
+        "Sub-500ms CLOB WebSocket + Stepped Line Dispatcher (-125/-125 Curtain)",
       targetSports: "CFB Tout Bursts & NBA Steam",
       interceptedTickets: 758,
       interceptedHandleUsd: 976900,
       deskSavingsUsd: 362520,
       holdImprovementBps: 769,
-      latencyOrThresholdSpec: "345ms E2E WSS -> DEDUP_THEN_LEAD 3rd-Wallet Trigger -> 0.5pt Step",
+      latencyOrThresholdSpec:
+        "345ms E2E WSS -> DEDUP_THEN_LEAD 3rd-Wallet Trigger -> 0.5pt Step",
     },
     {
       guardCode: "GUARD_3_DYNAMIC_1Q_4Q_PERIOD_PRICER",
-      guardTitle: "1Q–4Q & 1H/2H Dynamic Period Pricer + FG-Only Player Clamping",
+      guardTitle:
+        "1Q–4Q & 1H/2H Dynamic Period Pricer + FG-Only Player Clamping",
       targetSports: "NBA 1Q–4Q / 1H / 2H Combos",
       interceptedTickets: 628,
       interceptedHandleUsd: 598000,
       deskSavingsUsd: 196800,
       holdImprovementBps: 417,
-      latencyOrThresholdSpec: "1Q=25.8%, 2Q Drag=0.232, 3Q Surge=+1.15pt, 4Q σ=5.4 + Allow1H2HQtr=N",
+      latencyOrThresholdSpec:
+        "1Q=25.8%, 2Q Drag=0.232, 3Q Surge=+1.15pt, 4Q σ=5.4 + Allow1H2HQtr=N",
     },
     {
       guardCode: "GUARD_4_CORRELATED_SGP_VIG_TAX",
@@ -547,27 +572,32 @@ export function runFourWeekParlayComboBacktest(
       interceptedHandleUsd: 642000,
       deskSavingsUsd: 164290,
       holdImprovementBps: 348,
-      latencyOrThresholdSpec: "+15c (2-Leg), +20c (3-Leg), +25c (Tempo Stack) via vigSetupInsert",
+      latencyOrThresholdSpec:
+        "+15c (2-Leg), +20c (3-Leg), +25c (Tempo Stack) via vigSetupInsert",
     },
     {
       guardCode: "GUARD_5_6GATE_BET1_CLAMP",
-      guardTitle: "Zero-Trust 6-Gate Unlisted Account Discovery & Key-Number Guard",
+      guardTitle:
+        "Zero-Trust 6-Gate Unlisted Account Discovery & Key-Number Guard",
       targetSports: "CFB Key 3/7/10/14 & NBA Smurfs",
       interceptedTickets: 518,
       interceptedHandleUsd: 548000,
       deskSavingsUsd: 142600,
       holdImprovementBps: 302,
-      latencyOrThresholdSpec: "Cosine >= 96.5% / DTW >= 90% / 1-Hop USDC -> Clamped on Bet #1 (<320ms)",
+      latencyOrThresholdSpec:
+        "Cosine >= 96.5% / DTW >= 90% / 1-Hop USDC -> Clamped on Bet #1 (<320ms)",
     },
     {
       guardCode: "GUARD_6_180S_TRAP_QUARANTINE",
-      guardTitle: "180-Second Type D Panic Layoff Trap Quarantine Auto-Resolver",
+      guardTitle:
+        "180-Second Type D Panic Layoff Trap Quarantine Auto-Resolver",
       targetSports: "NBA & CFB Cross-Venue Layoffs",
       interceptedTickets: 295,
       interceptedHandleUsd: 389300,
       deskSavingsUsd: 68400,
       holdImprovementBps: 145,
-      latencyOrThresholdSpec: "3-Branch State Machine (T < 180s Revert / T = 180s Pinnacle Check)",
+      latencyOrThresholdSpec:
+        "3-Branch State Machine (T < 180s Revert / T = 180s Pinnacle Check)",
     },
   ];
 
@@ -613,7 +643,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 91.4,
       dominantFamily: "NBA_ALT_SPREAD_5000_SUBSET",
       primaryGuard: "GUARD_1_PROBIT_ALT_SUBSET_BLOCK",
-      sampleCombo: "NBA LAL Alt -7.5 (GameNum 5501) + LAL ML / CFB Big 12 2-Leg Spread+Over",
+      sampleCombo:
+        "NBA LAL Alt -7.5 (GameNum 5501) + LAL ML / CFB Big 12 2-Leg Spread+Over",
       lastActiveAt: "2026-10-31T15:21:10Z",
     },
     {
@@ -657,7 +688,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 89.2,
       dominantFamily: "NBA_PERIOD_1Q_4Q_DERIVATIVE_COMBO",
       primaryGuard: "GUARD_3_DYNAMIC_1Q_4Q_PERIOD_PRICER",
-      sampleCombo: "NBA GSW 3Q -1.5 (Period 5) + SAC +4.5 Key-4 Cross-Book Middle",
+      sampleCombo:
+        "NBA GSW 3Q -1.5 (Period 5) + SAC +4.5 Key-4 Cross-Book Middle",
       lastActiveAt: "2026-10-31T15:25:19Z",
     },
     {
@@ -679,7 +711,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 88.7,
       dominantFamily: "NBA_ALT_SPREAD_5000_SUBSET",
       primaryGuard: "GUARD_1_PROBIT_ALT_SUBSET_BLOCK",
-      sampleCombo: "NBA LAL Alt -10.5 (5501) + LAL ML Subset Trap (Blocked ρ=0.756)",
+      sampleCombo:
+        "NBA LAL Alt -10.5 (5501) + LAL ML Subset Trap (Blocked ρ=0.756)",
       lastActiveAt: "2026-10-31T15:22:48Z",
     },
     {
@@ -701,7 +734,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 86.4,
       dominantFamily: "NBA_KEY_3_4_6_7_CROSS_MIDDLE",
       primaryGuard: "GUARD_6_180S_TRAP_QUARANTINE",
-      sampleCombo: "NBA IND/SAC 1H O123.5 + DEN 2Q U54.5 + DEN/PHX U223.5 Trap Quarantine",
+      sampleCombo:
+        "NBA IND/SAC 1H O123.5 + DEN 2Q U54.5 + DEN/PHX U223.5 Trap Quarantine",
       lastActiveAt: "2026-10-31T15:27:05Z",
     },
     {
@@ -723,7 +757,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 85.9,
       dominantFamily: "CFB_TOUT_SPREAD_TOTAL_2LEG",
       primaryGuard: "GUARD_2_WSS_500MS_STEPPED_LINE",
-      sampleCombo: "CFB TXST +14.5 + Baylor +3.5 / Over 47.5 2-Leg Tout Burst (7 Wallets)",
+      sampleCombo:
+        "CFB TXST +14.5 + Baylor +3.5 / Over 47.5 2-Leg Tout Burst (7 Wallets)",
       lastActiveAt: "2026-10-31T15:02:19Z",
     },
     {
@@ -745,7 +780,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 88.5,
       dominantFamily: "NBA_GSBUILDER_SGP_CORRELATED",
       primaryGuard: "GUARD_4_CORRELATED_SGP_VIG_TAX",
-      sampleCombo: "NBA GSBUILDER ML + Total Over SGP & CFB Key-7 Spread Parlay",
+      sampleCombo:
+        "NBA GSBUILDER ML + Total Over SGP & CFB Key-7 Spread Parlay",
       lastActiveAt: "2026-10-27T20:00:00Z",
     },
     {
@@ -767,7 +803,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 87.1,
       dominantFamily: "NBA_KEY_3_4_6_7_CROSS_MIDDLE",
       primaryGuard: "GUARD_4_CORRELATED_SGP_VIG_TAX",
-      sampleCombo: "NBA SAC +4.5 Key-4 Middle + BOS Team Total Over 118.5 Combo",
+      sampleCombo:
+        "NBA SAC +4.5 Key-4 Middle + BOS Team Total Over 118.5 Combo",
       lastActiveAt: "2026-10-31T15:18:55Z",
     },
     {
@@ -811,7 +848,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 84.8,
       dominantFamily: "NBA_PERIOD_1Q_4Q_DERIVATIVE_COMBO",
       primaryGuard: "GUARD_3_DYNAMIC_1Q_4Q_PERIOD_PRICER",
-      sampleCombo: "NBA IND/SAC 1H O123.5 + SAC/NOP 1H U116.5 Derivative Arb Combo",
+      sampleCombo:
+        "NBA IND/SAC 1H O123.5 + SAC/NOP 1H U116.5 Derivative Arb Combo",
       lastActiveAt: "2026-10-31T14:50:04Z",
     },
     {
@@ -833,7 +871,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 86.0,
       dominantFamily: "CFB_KEY_3_7_10_14_TEASER_MIDDLE",
       primaryGuard: "GUARD_5_6GATE_BET1_CLAMP",
-      sampleCombo: "CFB Key-3/7 2-Leg Spread Parlay & NBA GSBUILDER Spread+ML Combo",
+      sampleCombo:
+        "CFB Key-3/7 2-Leg Spread Parlay & NBA GSBUILDER Spread+ML Combo",
       lastActiveAt: "2026-10-27T20:00:00Z",
     },
     {
@@ -899,7 +938,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 82.4,
       dominantFamily: "CFB_KEY_3_7_10_14_TEASER_MIDDLE",
       primaryGuard: "GUARD_5_6GATE_BET1_CLAMP",
-      sampleCombo: "CFB 6pt Wong Teaser (Crosses 3 & 7) + NBA GSBUILDER Total Combo",
+      sampleCombo:
+        "CFB 6pt Wong Teaser (Crosses 3 & 7) + NBA GSBUILDER Total Combo",
       lastActiveAt: "2026-10-27T20:00:00Z",
     },
     {
@@ -943,7 +983,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 78.4,
       dominantFamily: "NBA_GSBUILDER_SGP_CORRELATED",
       primaryGuard: "GUARD_4_CORRELATED_SGP_VIG_TAX",
-      sampleCombo: "NBA & CFB Correlated Tempo Stack Parlay (+25c Stack Tax Applied)",
+      sampleCombo:
+        "NBA & CFB Correlated Tempo Stack Parlay (+25c Stack Tax Applied)",
       lastActiveAt: "2026-10-27T20:00:00Z",
     },
     {
@@ -965,7 +1006,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 75.0,
       dominantFamily: "CFB_CONF_STEAM_PARLAY",
       primaryGuard: "GUARD_2_WSS_500MS_STEPPED_LINE",
-      sampleCombo: "NBA IND/SAC 1H O123.5 + CFB Sun Belt Conference Total Steam Parlay",
+      sampleCombo:
+        "NBA IND/SAC 1H O123.5 + CFB Sun Belt Conference Total Steam Parlay",
       lastActiveAt: "2026-10-27T20:00:00Z",
     },
     {
@@ -987,7 +1029,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 77.2,
       dominantFamily: "CFB_CONF_STEAM_PARLAY",
       primaryGuard: "GUARD_2_WSS_500MS_STEPPED_LINE",
-      sampleCombo: "CFB Big 12 / SEC Totals Steam Parlay & NBA Spread+Total Combo",
+      sampleCombo:
+        "CFB Big 12 / SEC Totals Steam Parlay & NBA Spread+Total Combo",
       lastActiveAt: "2026-10-27T20:00:00Z",
     },
     {
@@ -1009,7 +1052,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 72.1,
       dominantFamily: "NBA_GSBUILDER_SGP_CORRELATED",
       primaryGuard: "GUARD_4_CORRELATED_SGP_VIG_TAX",
-      sampleCombo: "CFB Total + NBA Moneyline GSBUILDER 2-Leg Correlated Parlays",
+      sampleCombo:
+        "CFB Total + NBA Moneyline GSBUILDER 2-Leg Correlated Parlays",
       lastActiveAt: "2026-10-27T20:00:00Z",
     },
     {
@@ -1031,7 +1075,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 89.6,
       dominantFamily: "NBA_PERIOD_1Q_4Q_DERIVATIVE_COMBO",
       primaryGuard: "GUARD_5_6GATE_BET1_CLAMP",
-      sampleCombo: "6-Gate Discovery #1 (99.3% Cosine to MJ102): NBA 1Q Over 55.5 + Key-3 Combo",
+      sampleCombo:
+        "6-Gate Discovery #1 (99.3% Cosine to MJ102): NBA 1Q Over 55.5 + Key-3 Combo",
       lastActiveAt: "2026-10-31T14:42:13Z",
     },
     {
@@ -1053,7 +1098,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 88.9,
       dominantFamily: "NBA_PERIOD_1Q_4Q_DERIVATIVE_COMBO",
       primaryGuard: "GUARD_5_6GATE_BET1_CLAMP",
-      sampleCombo: "6-Gate Discovery #2 (98.8% Cosine to EJ8834): NBA 1Q O55.5 + GSW 3Q -1.5",
+      sampleCombo:
+        "6-Gate Discovery #2 (98.8% Cosine to EJ8834): NBA 1Q O55.5 + GSW 3Q -1.5",
       lastActiveAt: "2026-10-31T15:25:21Z",
     },
     {
@@ -1075,7 +1121,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 84.1,
       dominantFamily: "NBA_PERIOD_1Q_4Q_DERIVATIVE_COMBO",
       primaryGuard: "GUARD_5_6GATE_BET1_CLAMP",
-      sampleCombo: "6-Gate Discovery #3 (Sakoe-Chiba DTW 95.0%): Decoy Noise + $10K NBA 1H Parlay",
+      sampleCombo:
+        "6-Gate Discovery #3 (Sakoe-Chiba DTW 95.0%): Decoy Noise + $10K NBA 1H Parlay",
       lastActiveAt: "2026-10-31T15:10:00Z",
     },
     {
@@ -1097,7 +1144,8 @@ export function runFourWeekParlayComboBacktest(
       sharpScore: 24.5,
       dominantFamily: "REC_MULTI_LEG_PARLAY",
       primaryGuard: "RECREATIONAL_RETAINED_FLOW",
-      sampleCombo: "VIP Negative-Control Whale: CFB Texas -7 + NBA High-Variance Parlays (Protected)",
+      sampleCombo:
+        "VIP Negative-Control Whale: CFB Texas -7 + NBA High-Variance Parlays (Protected)",
       lastActiveAt: "2026-10-27T21:15:00Z",
     },
   ];
@@ -1106,18 +1154,33 @@ export function runFourWeekParlayComboBacktest(
   const seenIds = new Set(featuredCustomers.map((c) => c.customerId));
   for (const raw of rawCustomers) {
     if (seenIds.has(raw.customer_id)) continue;
-    if (raw.context_type === "RECREATIONAL_CASUAL" && featuredCustomers.length >= 36) continue;
+    if (
+      raw.context_type === "RECREATIONAL_CASUAL" &&
+      featuredCustomers.length >= 36
+    )
+      continue;
 
-    const cfbTix = (raw.recent_tickets || []).filter((t) => t.league === "CFB").length * 4 + 4;
-    const nbaTix = (raw.recent_tickets || []).filter((t) => t.league === "NBA").length * 4 + 4;
-    const avgRisk = Math.max(500, Math.round((raw.sports_7d_volume_usd || 5000) / 5));
+    const cfbTix =
+      (raw.recent_tickets || []).filter((t) => t.league === "CFB").length * 4 +
+      4;
+    const nbaTix =
+      (raw.recent_tickets || []).filter((t) => t.league === "NBA").length * 4 +
+      4;
+    const avgRisk = Math.max(
+      500,
+      Math.round((raw.sports_7d_volume_usd || 5000) / 5),
+    );
     const cfbHandle = cfbTix * avgRisk;
     const nbaHandle = nbaTix * avgRisk;
     const isSharp = raw.clv_bps > 50 || raw.hold_pct < -10;
 
-    const cfbBase = isSharp ? -Math.round(cfbHandle * 0.22) : Math.round(cfbHandle * 0.24);
+    const cfbBase = isSharp
+      ? -Math.round(cfbHandle * 0.22)
+      : Math.round(cfbHandle * 0.24);
     const cfbProt = isSharp ? Math.round(cfbHandle * 0.12) : cfbBase;
-    const nbaBase = isSharp ? -Math.round(nbaHandle * 0.24) : Math.round(nbaHandle * 0.26);
+    const nbaBase = isSharp
+      ? -Math.round(nbaHandle * 0.24)
+      : Math.round(nbaHandle * 0.26);
     const nbaProt = isSharp ? Math.round(nbaHandle * 0.14) : nbaBase;
 
     featuredCustomers.push({
@@ -1137,12 +1200,17 @@ export function runFourWeekParlayComboBacktest(
       nbaProtectedNet: nbaProt,
       clvBps: raw.clv_bps,
       sharpScore: raw.sharp_score,
-      dominantFamily: isSharp ? "CFB_KEY_3_7_10_14_TEASER_MIDDLE" : "REC_MULTI_LEG_PARLAY",
-      primaryGuard: isSharp ? "GUARD_4_CORRELATED_SGP_VIG_TAX" : "RECREATIONAL_RETAINED_FLOW",
+      dominantFamily: isSharp
+        ? "CFB_KEY_3_7_10_14_TEASER_MIDDLE"
+        : "REC_MULTI_LEG_PARLAY",
+      primaryGuard: isSharp
+        ? "GUARD_4_CORRELATED_SGP_VIG_TAX"
+        : "RECREATIONAL_RETAINED_FLOW",
       sampleCombo: isSharp
         ? `CFB/NBA Sharp 2-Leg Parlay (${raw.context_type})`
         : `Recreational CFB/NBA Multi-Leg Parlay (${raw.agent_id} Pool)`,
-      lastActiveAt: raw.recent_tickets?.[0]?.placed_at ?? "2026-10-27T20:00:00Z",
+      lastActiveAt:
+        raw.recent_tickets?.[0]?.placed_at ?? "2026-10-27T20:00:00Z",
     });
     seenIds.add(raw.customer_id);
   }
@@ -1154,8 +1222,12 @@ export function runFourWeekParlayComboBacktest(
       const totalHandle = c.cfbHandleUsd + c.nbaHandleUsd;
       const baseNet = c.cfbBaselineNet + c.nbaBaselineNet;
       const protNet = c.cfbProtectedNet + c.nbaProtectedNet;
-      const baseHold = Number(((baseNet / Math.max(1, totalHandle)) * 100).toFixed(2));
-      const protHold = Number(((protNet / Math.max(1, totalHandle)) * 100).toFixed(2));
+      const baseHold = Number(
+        ((baseNet / Math.max(1, totalHandle)) * 100).toFixed(2),
+      );
+      const protHold = Number(
+        ((protNet / Math.max(1, totalHandle)) * 100).toFixed(2),
+      );
       const savings = protNet - baseNet;
       const wallet = c.proxyWallet;
 
@@ -1168,9 +1240,15 @@ export function runFourWeekParlayComboBacktest(
         contextType: c.contextType,
         ipSubnet: c.ipSubnet,
         proxyWallet: wallet,
-        shortWallet: wallet ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}` : null,
-        polymarketProfileUrl: wallet ? `https://polymarket.com/profile/${wallet}` : null,
-        polymarketPositionsApiUrl: wallet ? `https://data-api.polymarket.com/positions?user=${wallet}` : null,
+        shortWallet: wallet
+          ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}`
+          : null,
+        polymarketProfileUrl: wallet
+          ? `https://polymarket.com/profile/${wallet}`
+          : null,
+        polymarketPositionsApiUrl: wallet
+          ? `https://data-api.polymarket.com/positions?user=${wallet}`
+          : null,
         cfbParlayTickets: c.cfbTickets,
         cfbParlayHandleUsd: c.cfbHandleUsd,
         cfbBaselineDeskNetUsd: c.cfbBaselineNet,
@@ -1195,27 +1273,58 @@ export function runFourWeekParlayComboBacktest(
         lastActiveAt: c.lastActiveAt,
       };
     })
-    .sort((a, b) => b.deskSavingsUsd - a.deskSavingsUsd || b.totalParlayHandleUsd - a.totalParlayHandleUsd)
+    .sort(
+      (a, b) =>
+        b.deskSavingsUsd - a.deskSavingsUsd ||
+        b.totalParlayHandleUsd - a.totalParlayHandleUsd,
+    )
     .map((row, i) => ({ ...row, rank: i + 1 }));
 
-  const cfbTotalTickets4Wk = weeklyBreakdown.reduce((s, w) => s + w.cfbTickets, 0);
+  const cfbTotalTickets4Wk = weeklyBreakdown.reduce(
+    (s, w) => s + w.cfbTickets,
+    0,
+  );
   const cfbTotalLegs4Wk = weeklyBreakdown.reduce((s, w) => s + w.cfbLegs, 0);
-  const cfbTotalHandleUsd4Wk = weeklyBreakdown.reduce((s, w) => s + w.cfbHandleUsd, 0);
-  const cfbBaselineDeskNetUsd4Wk = weeklyBreakdown.reduce((s, w) => s + w.cfbBaselineDeskNetUsd, 0);
-  const cfbProtectedDeskNetUsd4Wk = weeklyBreakdown.reduce((s, w) => s + w.cfbProtectedDeskNetUsd, 0);
+  const cfbTotalHandleUsd4Wk = weeklyBreakdown.reduce(
+    (s, w) => s + w.cfbHandleUsd,
+    0,
+  );
+  const cfbBaselineDeskNetUsd4Wk = weeklyBreakdown.reduce(
+    (s, w) => s + w.cfbBaselineDeskNetUsd,
+    0,
+  );
+  const cfbProtectedDeskNetUsd4Wk = weeklyBreakdown.reduce(
+    (s, w) => s + w.cfbProtectedDeskNetUsd,
+    0,
+  );
 
-  const nbaTotalTickets4Wk = weeklyBreakdown.reduce((s, w) => s + w.nbaTickets, 0);
+  const nbaTotalTickets4Wk = weeklyBreakdown.reduce(
+    (s, w) => s + w.nbaTickets,
+    0,
+  );
   const nbaTotalLegs4Wk = weeklyBreakdown.reduce((s, w) => s + w.nbaLegs, 0);
-  const nbaTotalHandleUsd4Wk = weeklyBreakdown.reduce((s, w) => s + w.nbaHandleUsd, 0);
-  const nbaBaselineDeskNetUsd4Wk = weeklyBreakdown.reduce((s, w) => s + w.nbaBaselineDeskNetUsd, 0);
-  const nbaProtectedDeskNetUsd4Wk = weeklyBreakdown.reduce((s, w) => s + w.nbaProtectedDeskNetUsd, 0);
+  const nbaTotalHandleUsd4Wk = weeklyBreakdown.reduce(
+    (s, w) => s + w.nbaHandleUsd,
+    0,
+  );
+  const nbaBaselineDeskNetUsd4Wk = weeklyBreakdown.reduce(
+    (s, w) => s + w.nbaBaselineDeskNetUsd,
+    0,
+  );
+  const nbaProtectedDeskNetUsd4Wk = weeklyBreakdown.reduce(
+    (s, w) => s + w.nbaProtectedDeskNetUsd,
+    0,
+  );
 
   const totalParlayTickets4Wk = cfbTotalTickets4Wk + nbaTotalTickets4Wk;
   const totalParlayLegs4Wk = cfbTotalLegs4Wk + nbaTotalLegs4Wk;
   const totalParlayHandleUsd4Wk = cfbTotalHandleUsd4Wk + nbaTotalHandleUsd4Wk;
-  const baselineTotalDeskNetUsd4Wk = cfbBaselineDeskNetUsd4Wk + nbaBaselineDeskNetUsd4Wk;
-  const protectedTotalDeskNetUsd4Wk = cfbProtectedDeskNetUsd4Wk + nbaProtectedDeskNetUsd4Wk;
-  const totalCounterfactualSavingsUsd4Wk = protectedTotalDeskNetUsd4Wk - baselineTotalDeskNetUsd4Wk;
+  const baselineTotalDeskNetUsd4Wk =
+    cfbBaselineDeskNetUsd4Wk + nbaBaselineDeskNetUsd4Wk;
+  const protectedTotalDeskNetUsd4Wk =
+    cfbProtectedDeskNetUsd4Wk + nbaProtectedDeskNetUsd4Wk;
+  const totalCounterfactualSavingsUsd4Wk =
+    protectedTotalDeskNetUsd4Wk - baselineTotalDeskNetUsd4Wk;
 
   return {
     schemaVersion: 1,
@@ -1241,9 +1350,15 @@ export function runFourWeekParlayComboBacktest(
     nbaBaselineDeskNetUsd4Wk,
     nbaProtectedDeskNetUsd4Wk,
     baselineTotalDeskNetUsd4Wk,
-    baselineTotalHoldPct4Wk: Number(((baselineTotalDeskNetUsd4Wk / totalParlayHandleUsd4Wk) * 100).toFixed(2)),
+    baselineTotalHoldPct4Wk: Number(
+      ((baselineTotalDeskNetUsd4Wk / totalParlayHandleUsd4Wk) * 100).toFixed(2),
+    ),
     protectedTotalDeskNetUsd4Wk,
-    protectedTotalHoldPct4Wk: Number(((protectedTotalDeskNetUsd4Wk / totalParlayHandleUsd4Wk) * 100).toFixed(2)),
+    protectedTotalHoldPct4Wk: Number(
+      ((protectedTotalDeskNetUsd4Wk / totalParlayHandleUsd4Wk) * 100).toFixed(
+        2,
+      ),
+    ),
     totalCounterfactualSavingsUsd4Wk,
     recreationalRetentionPct: 99.4,
     weeklyBreakdown,

@@ -30,7 +30,8 @@ export interface StressWaveSummary {
 export function runPhase6EndToEndStressTest(): StressWaveSummary[] {
   return [
     {
-      waveName: "WAVE_1_NBA_TIPOFF_SURGE (LAL/BOS + GSW/SAC + IND/SAC 1Q-4Q & Alt Spreads)",
+      waveName:
+        "WAVE_1_NBA_TIPOFF_SURGE (LAL/BOS + GSW/SAC + IND/SAC 1Q-4Q & Alt Spreads)",
       concurrentEvents: 140,
       p50LatencyMs: 318,
       p99LatencyMs: 442,
@@ -46,7 +47,8 @@ export function runPhase6EndToEndStressTest(): StressWaveSummary[] {
       estimatedDeskEvSavedUsd: 48250,
     },
     {
-      waveName: "WAVE_2_BAYLOR_TOUT_7WALLET_SWARM (CFB TXST +14.5 + NFL KC -1.5 + 50 GNN Micro-Accts)",
+      waveName:
+        "WAVE_2_BAYLOR_TOUT_7WALLET_SWARM (CFB TXST +14.5 + NFL KC -1.5 + 50 GNN Micro-Accts)",
       concurrentEvents: 78,
       p50LatencyMs: 334,
       p99LatencyMs: 461,
@@ -57,12 +59,13 @@ export function runPhase6EndToEndStressTest(): StressWaveSummary[] {
       probitSubsetsBlocked: 6,
       quarantinesTriggered: 1,
       quarantinesAutoResolved: 1, // Branch 3 Asymmetric Vig Shade (-125/+105)
-      siloClampsTriggered: 1,     // 50 GNN micro-accounts clamped to $50k aggregate cap
+      siloClampsTriggered: 1, // 50 GNN micro-accounts clamped to $50k aggregate cap
       jitRevolverBleedFromShadowUsd: 0,
       estimatedDeskEvSavedUsd: 61400,
     },
     {
-      waveName: "WAVE_3_ADVERSARIAL_OFFTRACKER_CASCADE (Tennis/MLB Shadow Flood + AT10359 Panic Dump)",
+      waveName:
+        "WAVE_3_ADVERSARIAL_OFFTRACKER_CASCADE (Tennis/MLB Shadow Flood + AT10359 Panic Dump)",
       concurrentEvents: 62,
       p50LatencyMs: 295,
       p99LatencyMs: 410,
@@ -81,9 +84,15 @@ export function runPhase6EndToEndStressTest(): StressWaveSummary[] {
 }
 
 if (import.meta.main) {
-  console.log("========================================================================================================================");
-  console.log("  🚀 PHASE 6C END-TO-END CONCURRENT STRESS TEST (280 SIMULTANEOUS EVENTS: NBA TIP-OFF + TOUT SWARM + SHADOW FLOOD)");
-  console.log("========================================================================================================================");
+  console.log(
+    "========================================================================================================================",
+  );
+  console.log(
+    "  🚀 PHASE 6C END-TO-END CONCURRENT STRESS TEST (280 SIMULTANEOUS EVENTS: NBA TIP-OFF + TOUT SWARM + SHADOW FLOOD)",
+  );
+  console.log(
+    "========================================================================================================================",
+  );
   const waves = runPhase6EndToEndStressTest();
   let totalEvents = 0;
   let totalSaved = 0;
@@ -92,21 +101,25 @@ if (import.meta.main) {
     totalSaved += w.estimatedDeskEvSavedUsd;
     console.log(`\n  [${w.waveName}]`);
     console.log(
-      `    • Latency SLA (<500ms) : Events=${w.concurrentEvents} | p50=${w.p50LatencyMs}ms | p99=${w.p99LatencyMs}ms | Max=${w.maxLatencyMs}ms | PassRate=${w.sla500msPassRatePct.toFixed(1)}%`
+      `    • Latency SLA (<500ms) : Events=${w.concurrentEvents} | p50=${w.p50LatencyMs}ms | p99=${w.p99LatencyMs}ms | Max=${w.maxLatencyMs}ms | PassRate=${w.sla500msPassRatePct.toFixed(1)}%`,
     );
     console.log(
-      `    • Execution & Guards   : SteppedMoves=${w.f402SteppedMovesDispatched} | AltNormalized(GameNum+5000)=${w.altSpreadsNormalized} | ProbitSubsetsBlocked=${w.probitSubsetsBlocked}`
+      `    • Execution & Guards   : SteppedMoves=${w.f402SteppedMovesDispatched} | AltNormalized(GameNum+5000)=${w.altSpreadsNormalized} | ProbitSubsetsBlocked=${w.probitSubsetsBlocked}`,
     );
     console.log(
-      `    • Quarantine & Silos   : Quarantined=${w.quarantinesTriggered}/${w.quarantinesAutoResolved} Auto-Resolved | SiloClamps=${w.siloClampsTriggered} | Shadow->JIT Bleed=$${w.jitRevolverBleedFromShadowUsd}`
+      `    • Quarantine & Silos   : Quarantined=${w.quarantinesTriggered}/${w.quarantinesAutoResolved} Auto-Resolved | SiloClamps=${w.siloClampsTriggered} | Shadow->JIT Bleed=$${w.jitRevolverBleedFromShadowUsd}`,
     );
     console.log(
-      `    ↳ Net Desk EV Saved    : +$${w.estimatedDeskEvSavedUsd.toLocaleString()}`
+      `    ↳ Net Desk EV Saved    : +$${w.estimatedDeskEvSavedUsd.toLocaleString()}`,
     );
   }
-  console.log("\n========================================================================================================================");
   console.log(
-    `  ✅ STRESS TEST VERDICT: 280/280 EVENTS PROCESSED < 500ms (p99=461ms) | $0 JIT BLEED | +$${totalSaved.toLocaleString()} TOTAL EV SAVED`
+    "\n========================================================================================================================",
   );
-  console.log("========================================================================================================================\n");
+  console.log(
+    `  ✅ STRESS TEST VERDICT: 280/280 EVENTS PROCESSED < 500ms (p99=461ms) | $0 JIT BLEED | +$${totalSaved.toLocaleString()} TOTAL EV SAVED`,
+  );
+  console.log(
+    "========================================================================================================================\n",
+  );
 }

@@ -22,14 +22,17 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-const accessKeyId = process.env.R2_ACCESS_KEY_ID || "6811c91e1bbb1542f44889a3ef74af7e";
+const accessKeyId =
+  process.env.R2_ACCESS_KEY_ID || "6811c91e1bbb1542f44889a3ef74af7e";
 const secretAccessKey =
   process.env.R2_SECRET_ACCESS_KEY ||
   "776264a6ab9e4ee81e933481fd77a7a21599256fe7252c2708efb8296dce0974";
-const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || "7a470541a704caaf91e71efccc78fd36";
+const accountId =
+  process.env.CLOUDFLARE_ACCOUNT_ID || "7a470541a704caaf91e71efccc78fd36";
 const bucket = process.env.R2_BUCKET_NAME || "sportsdesk-ops-reports";
 const publicBase =
-  process.env.R2_PUBLIC_URL || "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev";
+  process.env.R2_PUBLIC_URL ||
+  "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev";
 const host = `${accountId}.r2.cloudflarestorage.com`;
 const region = "auto";
 const service = "s3";
@@ -64,12 +67,16 @@ async function putObject(key, bodyBuf, contentType, customMeta = {}) {
   };
   for (const [k, v] of Object.entries(customMeta)) {
     if (v) {
-      headerMap[`x-amz-meta-${k.toLowerCase()}`] = String(v).replace(/[\r\n]+/g, " ").trim();
+      headerMap[`x-amz-meta-${k.toLowerCase()}`] = String(v)
+        .replace(/[\r\n]+/g, " ")
+        .trim();
     }
   }
 
   const sortedHeaderKeys = Object.keys(headerMap).sort();
-  const canonicalHeaders = sortedHeaderKeys.map((k) => `${k}:${headerMap[k]}\n`).join("");
+  const canonicalHeaders = sortedHeaderKeys
+    .map((k) => `${k}:${headerMap[k]}\n`)
+    .join("");
   const signedHeaders = sortedHeaderKeys.join(";");
 
   const canonicalRequest = [
@@ -90,7 +97,12 @@ async function putObject(key, bodyBuf, contentType, customMeta = {}) {
     sha256Hex(canonicalRequest),
   ].join("\n");
 
-  const signingKey = getSignatureKey(secretAccessKey, dateStamp, region, service);
+  const signingKey = getSignatureKey(
+    secretAccessKey,
+    dateStamp,
+    region,
+    service,
+  );
   const signature = crypto
     .createHmac("sha256", signingKey)
     .update(stringToSign)
@@ -118,42 +130,234 @@ async function putObject(key, bodyBuf, contentType, customMeta = {}) {
 }
 
 const filesToPublish = [
-  { file: "dist/graph.html", key: "graph.html", type: "text/html; charset=utf-8", meta: { surface: "6-tab-surveillance-and-10-mode-portal", modes: "1-2-3-4-5-6-7-8-9-10" } },
-  { file: "dist/graph.js", key: "graph.js", type: "application/javascript; charset=utf-8", meta: { surface: "graph-controller" } },
-  { file: "dist/gslive-links.js", key: "gslive-links.js", type: "application/javascript; charset=utf-8", meta: { surface: "gslive-link-hydration" } },
-  { file: "dist/graph-live-feed.json", key: "graph-live-feed.json", type: "application/json; charset=utf-8", meta: { surface: "live-feed-and-10-mode-snapshot" } },
-  { file: "dist/backtest-4wk-cfb-nba.json", key: "backtest-4wk-cfb-nba.json", type: "application/json; charset=utf-8", meta: { surface: "4wk-cfb-nba-parlay-backtest" } },
-  { file: "dist/combo-uniqueness.json", key: "combo-uniqueness.json", type: "application/json; charset=utf-8", meta: { surface: "cfb-combo-gate-artifact", gates: "permissive,all-legs-cfb,full-game" } },
-  { file: "dist/cross-domain-bridge.json", key: "cross-domain-bridge.json", type: "application/json; charset=utf-8", meta: { surface: "customer-polymarket-bridge-artifact", evidence: "live-or-fixture" } },
-  { file: "dist/index.html", key: "index.html", type: "text/html; charset=utf-8", meta: { surface: "scalar-openapi-portal" } },
-  { file: "dist/openapi.json", key: "openapi.json", type: "application/json; charset=utf-8", meta: { surface: "openapi-3-1-spec" } },
-  { file: "dist/api-reference.md", key: "api-reference.md", type: "text/markdown; charset=utf-8", meta: { surface: "generated-api-reference", includes: "gslive-operator-deep-links" } },
-  { file: "dist/assets/pipeline-artifacts-metadata.json", key: "assets/pipeline-artifacts-metadata.json", type: "application/json; charset=utf-8", meta: { artifact: "pipeline-metadata-catalog", standards: "XMP-RDF-DublinCore-SchemaOrg-PNG-iTXt" } },
-  { file: "dist/assets/pipeline-10-mode-architecture.svg", key: "assets/pipeline-10-mode-architecture.svg", type: "image/svg+xml; charset=utf-8", meta: { artifact: "SD-ARTIFACT-01-10MODE-PIPELINE", modes: "1,2,3,4,5,6,7,8,9,10", cli: "./bin/dx modes" } },
-  { file: "dist/assets/pipeline-10-mode-architecture.png", key: "assets/pipeline-10-mode-architecture.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-01-10MODE-PIPELINE", modes: "1,2,3,4,5,6,7,8,9,10", cli: "./bin/dx modes", metadata: "tEXt+iTXt+XMP+JSON-LD" } },
-  { file: "dist/assets/pipeline-10-mode-architecture.webp", key: "assets/pipeline-10-mode-architecture.webp", type: "image/webp", meta: { artifact: "SD-ARTIFACT-01-10MODE-PIPELINE", modes: "1,2,3,4,5,6,7,8,9,10", metadata: "none (raster sibling)" } },
-  { file: "dist/assets/pipeline-6-layer-data-cleaning.svg", key: "assets/pipeline-6-layer-data-cleaning.svg", type: "image/svg+xml; charset=utf-8", meta: { artifact: "SD-ARTIFACT-02-6LAYER-CLEANING", modules: "report.js,help-report.js,bet-ticker.js,ip-tracker.js" } },
-  { file: "dist/assets/pipeline-6-layer-data-cleaning.png", key: "assets/pipeline-6-layer-data-cleaning.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-02-6LAYER-CLEANING", modules: "report.js,help-report.js,bet-ticker.js,ip-tracker.js", metadata: "tEXt+iTXt+XMP+JSON-LD" } },
-  { file: "dist/assets/pipeline-6-layer-data-cleaning.webp", key: "assets/pipeline-6-layer-data-cleaning.webp", type: "image/webp", meta: { artifact: "SD-ARTIFACT-02-6LAYER-CLEANING", modules: "report.js,help-report.js,bet-ticker.js,ip-tracker.js", metadata: "none (raster sibling)" } },
-  { file: "dist/assets/pipeline-per-office-ip-and-reconciliation.svg", key: "assets/pipeline-per-office-ip-and-reconciliation.svg", type: "image/svg+xml; charset=utf-8", meta: { artifact: "SD-ARTIFACT-03-IP-AND-RECONCILIATION", modes: "1,2,3,4,5,6,8,9,10", cli: "./bin/dx iptracker" } },
-  { file: "dist/assets/pipeline-per-office-ip-and-reconciliation.png", key: "assets/pipeline-per-office-ip-and-reconciliation.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-03-IP-AND-RECONCILIATION", modes: "1,2,3,4,5,6,8,9,10", cli: "./bin/dx iptracker", metadata: "tEXt+iTXt+XMP+JSON-LD" } },
-  { file: "dist/assets/pipeline-per-office-ip-and-reconciliation.webp", key: "assets/pipeline-per-office-ip-and-reconciliation.webp", type: "image/webp", meta: { artifact: "SD-ARTIFACT-03-IP-AND-RECONCILIATION", modes: "1,2,3,4,5,6,8,9,10", metadata: "none (raster sibling)" } },
-  { file: "dist/assets/pipeline-dual-surface-gslive-model.svg", key: "assets/pipeline-dual-surface-gslive-model.svg", type: "image/svg+xml; charset=utf-8", meta: { artifact: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE", surfaces: "#/reports/users,#/events/bet-history", deskDay: "America/Chicago" } },
-  { file: "dist/assets/pipeline-dual-surface-gslive-model.png", key: "assets/pipeline-dual-surface-gslive-model.png", type: "image/png", meta: { artifact: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE", surfaces: "#/reports/users,#/events/bet-history", metadata: "tEXt+iTXt+XMP+JSON-LD" } },
-  { file: "dist/assets/pipeline-dual-surface-gslive-model.webp", key: "assets/pipeline-dual-surface-gslive-model.webp", type: "image/webp", meta: { artifact: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE", surfaces: "#/reports/users,#/events/bet-history", metadata: "none (raster sibling)" } },
-  { file: "dist/assets/ARCH-Guide.jpg", key: "assets/ARCH-Guide.jpg", type: "image/jpeg", meta: { artifact: "ARCH-GUIDE-BASELINE", modes: "1,2,3,4,5,6,7,8,9,10" } },
+  {
+    file: "dist/graph.html",
+    key: "graph.html",
+    type: "text/html; charset=utf-8",
+    meta: {
+      surface: "6-tab-surveillance-and-10-mode-portal",
+      modes: "1-2-3-4-5-6-7-8-9-10",
+    },
+  },
+  {
+    file: "dist/graph.js",
+    key: "graph.js",
+    type: "application/javascript; charset=utf-8",
+    meta: { surface: "graph-controller" },
+  },
+  {
+    file: "dist/gslive-links.js",
+    key: "gslive-links.js",
+    type: "application/javascript; charset=utf-8",
+    meta: { surface: "gslive-link-hydration" },
+  },
+  {
+    file: "dist/graph-live-feed.json",
+    key: "graph-live-feed.json",
+    type: "application/json; charset=utf-8",
+    meta: { surface: "live-feed-and-10-mode-snapshot" },
+  },
+  {
+    file: "dist/backtest-4wk-cfb-nba.json",
+    key: "backtest-4wk-cfb-nba.json",
+    type: "application/json; charset=utf-8",
+    meta: { surface: "4wk-cfb-nba-parlay-backtest" },
+  },
+  {
+    file: "dist/combo-uniqueness.json",
+    key: "combo-uniqueness.json",
+    type: "application/json; charset=utf-8",
+    meta: {
+      surface: "cfb-combo-gate-artifact",
+      gates: "permissive,all-legs-cfb,full-game",
+    },
+  },
+  {
+    file: "dist/cross-domain-bridge.json",
+    key: "cross-domain-bridge.json",
+    type: "application/json; charset=utf-8",
+    meta: {
+      surface: "customer-polymarket-bridge-artifact",
+      evidence: "live-or-fixture",
+    },
+  },
+  {
+    file: "dist/index.html",
+    key: "index.html",
+    type: "text/html; charset=utf-8",
+    meta: { surface: "scalar-openapi-portal" },
+  },
+  {
+    file: "dist/openapi.json",
+    key: "openapi.json",
+    type: "application/json; charset=utf-8",
+    meta: { surface: "openapi-3-1-spec" },
+  },
+  {
+    file: "dist/api-reference.md",
+    key: "api-reference.md",
+    type: "text/markdown; charset=utf-8",
+    meta: {
+      surface: "generated-api-reference",
+      includes: "gslive-operator-deep-links",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-artifacts-metadata.json",
+    key: "assets/pipeline-artifacts-metadata.json",
+    type: "application/json; charset=utf-8",
+    meta: {
+      artifact: "pipeline-metadata-catalog",
+      standards: "XMP-RDF-DublinCore-SchemaOrg-PNG-iTXt",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-10-mode-architecture.svg",
+    key: "assets/pipeline-10-mode-architecture.svg",
+    type: "image/svg+xml; charset=utf-8",
+    meta: {
+      artifact: "SD-ARTIFACT-01-10MODE-PIPELINE",
+      modes: "1,2,3,4,5,6,7,8,9,10",
+      cli: "./bin/dx modes",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-10-mode-architecture.png",
+    key: "assets/pipeline-10-mode-architecture.png",
+    type: "image/png",
+    meta: {
+      artifact: "SD-ARTIFACT-01-10MODE-PIPELINE",
+      modes: "1,2,3,4,5,6,7,8,9,10",
+      cli: "./bin/dx modes",
+      metadata: "tEXt+iTXt+XMP+JSON-LD",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-10-mode-architecture.webp",
+    key: "assets/pipeline-10-mode-architecture.webp",
+    type: "image/webp",
+    meta: {
+      artifact: "SD-ARTIFACT-01-10MODE-PIPELINE",
+      modes: "1,2,3,4,5,6,7,8,9,10",
+      metadata: "none (raster sibling)",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-6-layer-data-cleaning.svg",
+    key: "assets/pipeline-6-layer-data-cleaning.svg",
+    type: "image/svg+xml; charset=utf-8",
+    meta: {
+      artifact: "SD-ARTIFACT-02-6LAYER-CLEANING",
+      modules: "report.js,help-report.js,bet-ticker.js,ip-tracker.js",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-6-layer-data-cleaning.png",
+    key: "assets/pipeline-6-layer-data-cleaning.png",
+    type: "image/png",
+    meta: {
+      artifact: "SD-ARTIFACT-02-6LAYER-CLEANING",
+      modules: "report.js,help-report.js,bet-ticker.js,ip-tracker.js",
+      metadata: "tEXt+iTXt+XMP+JSON-LD",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-6-layer-data-cleaning.webp",
+    key: "assets/pipeline-6-layer-data-cleaning.webp",
+    type: "image/webp",
+    meta: {
+      artifact: "SD-ARTIFACT-02-6LAYER-CLEANING",
+      modules: "report.js,help-report.js,bet-ticker.js,ip-tracker.js",
+      metadata: "none (raster sibling)",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-per-office-ip-and-reconciliation.svg",
+    key: "assets/pipeline-per-office-ip-and-reconciliation.svg",
+    type: "image/svg+xml; charset=utf-8",
+    meta: {
+      artifact: "SD-ARTIFACT-03-IP-AND-RECONCILIATION",
+      modes: "1,2,3,4,5,6,8,9,10",
+      cli: "./bin/dx iptracker",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-per-office-ip-and-reconciliation.png",
+    key: "assets/pipeline-per-office-ip-and-reconciliation.png",
+    type: "image/png",
+    meta: {
+      artifact: "SD-ARTIFACT-03-IP-AND-RECONCILIATION",
+      modes: "1,2,3,4,5,6,8,9,10",
+      cli: "./bin/dx iptracker",
+      metadata: "tEXt+iTXt+XMP+JSON-LD",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-per-office-ip-and-reconciliation.webp",
+    key: "assets/pipeline-per-office-ip-and-reconciliation.webp",
+    type: "image/webp",
+    meta: {
+      artifact: "SD-ARTIFACT-03-IP-AND-RECONCILIATION",
+      modes: "1,2,3,4,5,6,8,9,10",
+      metadata: "none (raster sibling)",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-dual-surface-gslive-model.svg",
+    key: "assets/pipeline-dual-surface-gslive-model.svg",
+    type: "image/svg+xml; charset=utf-8",
+    meta: {
+      artifact: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE",
+      surfaces: "#/reports/users,#/events/bet-history",
+      deskDay: "America/Chicago",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-dual-surface-gslive-model.png",
+    key: "assets/pipeline-dual-surface-gslive-model.png",
+    type: "image/png",
+    meta: {
+      artifact: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE",
+      surfaces: "#/reports/users,#/events/bet-history",
+      metadata: "tEXt+iTXt+XMP+JSON-LD",
+    },
+  },
+  {
+    file: "dist/assets/pipeline-dual-surface-gslive-model.webp",
+    key: "assets/pipeline-dual-surface-gslive-model.webp",
+    type: "image/webp",
+    meta: {
+      artifact: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE",
+      surfaces: "#/reports/users,#/events/bet-history",
+      metadata: "none (raster sibling)",
+    },
+  },
+  {
+    file: "dist/assets/ARCH-Guide.jpg",
+    key: "assets/ARCH-Guide.jpg",
+    type: "image/jpeg",
+    meta: { artifact: "ARCH-GUIDE-BASELINE", modes: "1,2,3,4,5,6,7,8,9,10" },
+  },
 ];
 
-console.log("================================================================================");
-console.log("  ☁️  PUBLISHING SURVEILLANCE GRAPH, LIVE FEED & RICH-METADATA IMAGES TO R2 EDGE");
-console.log("================================================================================");
+console.log(
+  "================================================================================",
+);
+console.log(
+  "  ☁️  PUBLISHING SURVEILLANCE GRAPH, LIVE FEED & RICH-METADATA IMAGES TO R2 EDGE",
+);
+console.log(
+  "================================================================================",
+);
 
 for (const item of filesToPublish) {
   const fullPath = path.join(repoRoot, item.file);
   if (!fs.existsSync(fullPath)) continue;
   const buf = fs.readFileSync(fullPath);
   const url = await putObject(item.key, buf, item.type, item.meta || {});
-  console.log(`  ✓ Published ${item.key.padEnd(46)} (${String(buf.length).padStart(7)} B | sha256 ${sha256Hex(buf).slice(0, 12)}…) -> ${url}`);
+  console.log(
+    `  ✓ Published ${item.key.padEnd(46)} (${String(buf.length).padStart(7)} B | sha256 ${sha256Hex(buf).slice(0, 12)}…) -> ${url}`,
+  );
 }
 
 // Verify live HTTP 200 on the public R2 edge URL
@@ -161,12 +365,18 @@ const verifyRes = await fetch(`${publicBase}/graph.html`);
 const verifyBytes = Buffer.from(await verifyRes.arrayBuffer());
 const feedRes = await fetch(`${publicBase}/graph-live-feed.json`);
 const feedJson = await feedRes.json();
-const metaRes = await fetch(`${publicBase}/assets/pipeline-artifacts-metadata.json`);
-console.log("--------------------------------------------------------------------------------");
+const metaRes = await fetch(
+  `${publicBase}/assets/pipeline-artifacts-metadata.json`,
+);
+console.log(
+  "--------------------------------------------------------------------------------",
+);
 console.log(
   `  🌐 LIVE EDGE VERIFICATION:\n` +
-  `    • GET ${publicBase}/graph.html                                -> HTTP ${verifyRes.status} (${verifyBytes.length} B)\n` +
-  `    • GET ${publicBase}/graph-live-feed.json                      -> HTTP ${feedRes.status} (Last Updated: ${feedJson.lastUpdatedCdt})\n` +
-  `    • GET ${publicBase}/assets/pipeline-artifacts-metadata.json   -> HTTP ${metaRes.status}`
+    `    • GET ${publicBase}/graph.html                                -> HTTP ${verifyRes.status} (${verifyBytes.length} B)\n` +
+    `    • GET ${publicBase}/graph-live-feed.json                      -> HTTP ${feedRes.status} (Last Updated: ${feedJson.lastUpdatedCdt})\n` +
+    `    • GET ${publicBase}/assets/pipeline-artifacts-metadata.json   -> HTTP ${metaRes.status}`,
 );
-console.log("================================================================================");
+console.log(
+  "================================================================================",
+);

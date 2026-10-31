@@ -32,8 +32,8 @@ The script automatically:
 
 ## 2. Verification & Diagnostics
 
-| Component           | Command / URL                                | Expected Result                        |
-| :------------------ | :------------------------------------------- | :------------------------------------- |
-| **Systemd Service** | `systemctl status sportsdesk-ops`            | `Active: active (running)`             |
-| **Public Health**   | `bun -e 'const r = await fetch("https://desk.yourdomain.com/health"); console.log(r.status)'` | `200`                       |
-| **Telegram Bot**    | `https://t.me/demodevdeskbot`                | Interactive `/start` menu and Mini App |
+| Component           | Command / URL                                                                                 | Expected Result                        |
+| :------------------ | :-------------------------------------------------------------------------------------------- | :------------------------------------- |
+| **Systemd Service** | `systemctl status sportsdesk-ops`                                                             | `Active: active (running)`             |
+| **Public Health**   | `bun -e 'const r = await fetch("https://desk.yourdomain.com/health"); console.log(r.status)'` | `200`                                  |
+| **Telegram Bot**    | `https://t.me/demodevdeskbot`                                                                 | Interactive `/start` menu and Mini App |

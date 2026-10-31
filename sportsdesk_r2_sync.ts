@@ -27,7 +27,10 @@ export function getR2Config(): R2Config {
   return {
     accountId:
       process.env.CLOUDFLARE_ACCOUNT_ID || "7a470541a704caaf91e71efccc78fd36",
-    apiToken: process.env.CLOUDFLARE_R2_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN || "",
+    apiToken:
+      process.env.CLOUDFLARE_R2_API_TOKEN ||
+      process.env.CLOUDFLARE_API_TOKEN ||
+      "",
     accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
     endpoint:

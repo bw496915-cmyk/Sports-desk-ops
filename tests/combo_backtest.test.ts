@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { buildComboBacktestReport } from "../lib/combo_backtest.ts";
-import type { ComboActivityRow, ComboPositionLeg } from "../lib/polymarket_combo.ts";
+import type {
+  ComboActivityRow,
+  ComboPositionLeg,
+} from "../lib/polymarket_combo.ts";
 
 const WALLET = "0x26cf4a41eb49f0c560d32a2d2e4f45715e47c612";
 const NOW = Date.parse("2026-10-31T12:00:00Z");
@@ -73,10 +76,29 @@ describe("combo realized-PnL backtest", () => {
     expect(report.totals.crossGamePct).toBe(0);
 
     expect(report.byDay).toEqual([
-      { date: "2026-10-29", combos: 1, costUsd: 10, payoutUsd: 30, pnlUsd: 20, roiPct: 200 },
-      { date: "2026-10-30", combos: 1, costUsd: 4, payoutUsd: 0, pnlUsd: -4, roiPct: -100 },
+      {
+        date: "2026-10-29",
+        combos: 1,
+        costUsd: 10,
+        payoutUsd: 30,
+        pnlUsd: 20,
+        roiPct: 200,
+      },
+      {
+        date: "2026-10-30",
+        combos: 1,
+        costUsd: 4,
+        payoutUsd: 0,
+        pnlUsd: -4,
+        roiPct: -100,
+      },
     ]);
-    expect(report.byGame[0]).toEqual({ game: "cfb-g1", combos: 2, costUsd: 14, pnlUsd: 16 });
+    expect(report.byGame[0]).toEqual({
+      game: "cfb-g1",
+      combos: 2,
+      costUsd: 14,
+      pnlUsd: 16,
+    });
   });
 
   test("all-venues mode includes combos without a CFB game", () => {

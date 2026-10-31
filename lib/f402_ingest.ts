@@ -53,10 +53,16 @@ function extractRows(body: unknown): readonly unknown[] | null {
 }
 
 const text = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
+  typeof value === "string"
+    ? value.trim()
+    : typeof value === "number"
+      ? String(value)
+      : "";
 
 const cleanText = (value: unknown): string =>
-  text(value).replace(/[^\x20-\x7E\u00BD]/g, "").trim();
+  text(value)
+    .replace(/[^\x20-\x7E\u00BD]/g, "")
+    .trim();
 
 /** Normalizes the captured identity/timing fields; money fields are omitted on purpose. */
 export function parseF402TickerRow(value: unknown): F402TickerRow | null {
@@ -88,7 +94,10 @@ export async function probeF402BetTicker(
 ): Promise<F402Probe> {
   const startedAt = Date.now();
   const fetchedAtIso = new Date(startedAt).toISOString();
-  const baseUrl = (options.baseUrl ?? "https://fantasy402.com").replace(/\/$/, "");
+  const baseUrl = (options.baseUrl ?? "https://fantasy402.com").replace(
+    /\/$/,
+    "",
+  );
   const endpoint = `${baseUrl}/cloud/api/Manager/getBetTicker`;
   const fetchImpl = options.fetchImpl ?? fetch;
   const agentId = options.agentId.trim();
@@ -129,7 +138,10 @@ export async function probeF402BetTicker(
         ticks: [],
         durationMs,
         fetchedAtIso,
-        error: response.status === 401 || response.status === 403 ? "unauthorized" : `HTTP ${response.status}`,
+        error:
+          response.status === 401 || response.status === 403
+            ? "unauthorized"
+            : `HTTP ${response.status}`,
       };
     }
     const parsed: unknown = await response.json();
@@ -155,7 +167,8 @@ export async function probeF402BetTicker(
     };
   } catch (error) {
     const message =
-      error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError")
         ? "timeout"
         : error instanceof Error
           ? error.message

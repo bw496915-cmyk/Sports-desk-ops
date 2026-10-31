@@ -4,13 +4,13 @@ Operator and engineering notes for CFB combo work. Public APIs only; no key.
 
 ## 1. What is verified
 
-| Surface | Endpoint | Evidence |
-| :--- | :--- | :--- |
-| CFB events / legs | `GET gamma-api.polymarket.com/events?series_id=12756&active=true&closed=false&order=volume24hr&ascending=false&limit=50` | Live 2026-10-31: 50 events, ML/spread/total markets with `outcomes`/`outcomePrices` JSON strings |
-| Combo positions | `GET data-api.polymarket.com/v2/positions/combos?user=<0x>` | Live 2026-10-31: `{data, pagination}`, nested `legs[].market` |
-| Combo activity | `GET data-api.polymarket.com/v2/activity/combos?user=<0x>` | Live 2026-10-31: `{data, pagination}` |
-| Wallet seed (trades) | `GET data-api.polymarket.com/trades?market=<conditionId>&limit=100` | Live 2026-10-31: array with `proxyWallet` |
-| Wallet seed (leaderboard) | `GET data-api.polymarket.com/v2/leaderboard?time_period=week|month|all&sort_by=PNL&limit=100` | Live 2026-10-31: `{data:[{user_id,...}], pagination}` |
+| Surface                   | Endpoint                                                                                                                 | Evidence                                                                                         |
+| :------------------------ | :----------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------- |
+| CFB events / legs         | `GET gamma-api.polymarket.com/events?series_id=12756&active=true&closed=false&order=volume24hr&ascending=false&limit=50` | Live 2026-10-31: 50 events, ML/spread/total markets with `outcomes`/`outcomePrices` JSON strings |
+| Combo positions           | `GET data-api.polymarket.com/v2/positions/combos?user=<0x>`                                                              | Live 2026-10-31: `{data, pagination}`, nested `legs[].market`                                    |
+| Combo activity            | `GET data-api.polymarket.com/v2/activity/combos?user=<0x>`                                                               | Live 2026-10-31: `{data, pagination}`                                                            |
+| Wallet seed (trades)      | `GET data-api.polymarket.com/trades?market=<conditionId>&limit=100`                                                      | Live 2026-10-31: array with `proxyWallet`                                                        |
+| Wallet seed (leaderboard) | `GET data-api.polymarket.com/v2/leaderboard?time_period=week                                                             | month                                                                                            | all&sort_by=PNL&limit=100` | Live 2026-10-31: `{data:[{user_id,...}], pagination}` |
 
 `lb-api.polymarket.com` is **retired** (HTTP 410). Do not use it.
 
@@ -27,10 +27,10 @@ shares    = stake / fairPrice
 payout    = shares × $1                (binary share)
 ```
 
-| Example | Fair price | $10 payout | Multiple |
-| :--- | :--- | :--- | :--- |
-| 2-leg 38¢ + 80¢ | 30.4¢ | $32.89 | 3.29× |
-| 3-leg 60¢ + 55¢ + 50¢ | 16.5¢ | $60.61 | 6.06× |
+| Example               | Fair price | $10 payout | Multiple |
+| :-------------------- | :--------- | :--------- | :------- |
+| 2-leg 38¢ + 80¢       | 30.4¢      | $32.89     | 3.29×    |
+| 3-leg 60¢ + 55¢ + 50¢ | 16.5¢      | $60.61     | 6.06×    |
 
 A quote above fair is the maker's margin:
 
@@ -93,20 +93,20 @@ line would make `comm` report a phantom leak).
 
 CLI flags win over environment, which wins over defaults.
 
-| Variable | Default | Effect |
-| :--- | :--- | :--- |
-| `CACHE_TTL_HOURS` | `24` | Cache age before a wallet is refetched; `0` disables reuse |
-| `CACHE_DIR` | `scratch/cfb-combo-cache` | Cache location |
-| `FRESH` | unset | `1` ignores the cache for this run |
-| `STRICT_FULL_GAME` | unset | `1` enables the `full-game` gate (all-legs-CFB **and** single game) |
-| `INCLUDE_CLOSED_GAMES` | enabled | `0` = open-only index (`--open-only`); default indexes active+closed |
-| `ALL_LEGS_CFB` | unset | `1` enables the `all-legs-cfb` gate (CFB-only, cross-game allowed) |
-| `SEED_TRADES` | unset | `1` seeds wallets from sampled CFB trades |
-| `CONCURRENCY` | `6` | Wallet fetch parallelism |
-| `LEADERBOARD` | enabled | `0` skips leaderboard seeding |
-| `LEADERBOARD_LIMIT` | `100` | Rows per leaderboard period |
-| `MAX_SEED_MARKETS` | `60` | Condition IDs sampled by the trade seeder |
-| `WALLET_FILE` | unset | Extra wallet addresses (whitespace-separated) |
+| Variable               | Default                   | Effect                                                               |
+| :--------------------- | :------------------------ | :------------------------------------------------------------------- |
+| `CACHE_TTL_HOURS`      | `24`                      | Cache age before a wallet is refetched; `0` disables reuse           |
+| `CACHE_DIR`            | `scratch/cfb-combo-cache` | Cache location                                                       |
+| `FRESH`                | unset                     | `1` ignores the cache for this run                                   |
+| `STRICT_FULL_GAME`     | unset                     | `1` enables the `full-game` gate (all-legs-CFB **and** single game)  |
+| `INCLUDE_CLOSED_GAMES` | enabled                   | `0` = open-only index (`--open-only`); default indexes active+closed |
+| `ALL_LEGS_CFB`         | unset                     | `1` enables the `all-legs-cfb` gate (CFB-only, cross-game allowed)   |
+| `SEED_TRADES`          | unset                     | `1` seeds wallets from sampled CFB trades                            |
+| `CONCURRENCY`          | `6`                       | Wallet fetch parallelism                                             |
+| `LEADERBOARD`          | enabled                   | `0` skips leaderboard seeding                                        |
+| `LEADERBOARD_LIMIT`    | `100`                     | Rows per leaderboard period                                          |
+| `MAX_SEED_MARKETS`     | `60`                      | Condition IDs sampled by the trade seeder                            |
+| `WALLET_FILE`          | unset                     | Extra wallet addresses (whitespace-separated)                        |
 
 ## 4. Uniqueness semantics
 
@@ -162,11 +162,11 @@ The index now:
 
 Effect on the same 322-wallet set:
 
-| Index | permissive | all-legs-cfb | full-game |
-| :--- | ---: | ---: | ---: |
-| open-only, top 100 | 80 | 32 | 0 |
-| active+closed, top 100 | 201 | 72 | 0 |
-| **active+closed, whole series** | **485** | **308** | **26** |
+| Index                           | permissive | all-legs-cfb | full-game |
+| :------------------------------ | ---------: | -----------: | --------: |
+| open-only, top 100              |         80 |           32 |         0 |
+| active+closed, top 100          |        201 |           72 |         0 |
+| **active+closed, whole series** |    **485** |      **308** |    **26** |
 
 The earlier product claim — "single-game CFB combos are not a style this book uses" — is **retired**.
 It was an artifact of the open-only, top-100 window. With the whole season indexed, 26 single-game
@@ -187,10 +187,10 @@ high-yield ones.
 
 Seeder mix on the same index (2 combo pages per wallet):
 
-| Seeder | Wallets | Permissive combos | CFB touch | Combos / wallet |
-| :--- | ---: | ---: | ---: | ---: |
-| `--seed-trades --no-leaderboard` (20 markets) | 95 | 356 | 5.51% | 3.75 |
-| leaderboard only (100 rows × 3 periods) | 233 | 129 | 1.30% | 0.55 |
+| Seeder                                        | Wallets | Permissive combos | CFB touch | Combos / wallet |
+| :-------------------------------------------- | ------: | ----------------: | --------: | --------------: |
+| `--seed-trades --no-leaderboard` (20 markets) |      95 |               356 |     5.51% |            3.75 |
+| leaderboard only (100 rows × 3 periods)       |     233 |               129 |     1.30% |            0.55 |
 
 Trades seeding is ~6.8× more efficient per wallet and ~4.2× higher touch rate. The leaderboard
 path is a supplement, not the primary discovery route: it costs ~2.5× the wallet fetches for ~27% of
@@ -200,11 +200,11 @@ the CFB combos. Use `--seed-trades --no-leaderboard` when API budget matters.
 
 With 322 seeded wallets, whole-series index, 3 combo pages per wallet:
 
-| Gate | Kept | Exclusions |
-| :--- | ---: | :--- |
-| `permissive` | 485 | — (317 span >1 game) |
-| `all-legs-cfb` | **308** | 174 partial-unresolved, 3 ineligible |
-| `full-game` | **26** | 174 unresolved, 284 cross-game, 1 ineligible |
+| Gate           |    Kept | Exclusions                                   |
+| :------------- | ------: | :------------------------------------------- |
+| `permissive`   |     485 | — (317 span >1 game)                         |
+| `all-legs-cfb` | **308** | 174 partial-unresolved, 3 ineligible         |
+| `full-game`    |  **26** | 174 unresolved, 284 cross-game, 1 ineligible |
 
 ```
 verify-subset --chain :
@@ -219,6 +219,7 @@ collapsed 277 duplicates by leg-set and 1 by id on this run.
 
 Exit codes: `1` = leak always; `2` = vacuous **only** with `--strict-exit`. Default vacuous is a
 warning plus exit 0, so a structurally-zero gate does not fail unattended runs.
+
 - Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h by default; corrupted files are refetched.
 
 ## 5. Backtesting (realized PnL)

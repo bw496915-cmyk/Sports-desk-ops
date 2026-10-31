@@ -271,7 +271,9 @@ export class ComboObservationsLegsStore {
   }
 
   countLegs(): number {
-    const row = this.db.query(`SELECT COUNT(*) as c FROM combo_observations_legs`).get() as { c: number };
+    const row = this.db
+      .query(`SELECT COUNT(*) as c FROM combo_observations_legs`)
+      .get() as { c: number };
     return row.c;
   }
 }

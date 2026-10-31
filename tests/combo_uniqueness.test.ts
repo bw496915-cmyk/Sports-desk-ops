@@ -23,7 +23,12 @@ const GAMES = [
     volume24hr: 1000,
     endDate: "2026-10-31",
     markets: [
-      { conditionId: "0x1", slug: "g1-ml", clobTokenIds: '["t1","t2"]', sportsMarketType: "moneyline" },
+      {
+        conditionId: "0x1",
+        slug: "g1-ml",
+        clobTokenIds: '["t1","t2"]',
+        sportsMarketType: "moneyline",
+      },
     ],
   },
   {
@@ -33,15 +38,28 @@ const GAMES = [
     volume24hr: 500,
     endDate: "2026-10-30",
     markets: [
-      { conditionId: "0x2", slug: "g2-ml", clobTokenIds: '["t3","t4"]', sportsMarketType: "moneyline" },
+      {
+        conditionId: "0x2",
+        slug: "g2-ml",
+        clobTokenIds: '["t3","t4"]',
+        sportsMarketType: "moneyline",
+      },
     ],
   },
 ];
 
-function leg(conditionId: string, type = "moneyline", extra: Record<string, unknown> = {}) {
+function leg(
+  conditionId: string,
+  type = "moneyline",
+  extra: Record<string, unknown> = {},
+) {
   return {
     leg_condition_id: conditionId,
-    market: { condition_id: conditionId, sports_market_type: type, slug: `${conditionId}-slug` },
+    market: {
+      condition_id: conditionId,
+      sports_market_type: type,
+      slug: `${conditionId}-slug`,
+    },
     ...extra,
   };
 }
@@ -52,8 +70,16 @@ const COMBOS = [
   { id: "c2", legs: [leg("0x1"), leg("0x2")] },
   { id: "c3", legs: [leg("0x9")] },
   { id: "c4", legs: [leg("0x1", "player_props")] },
-  { id: "c5", legs: [{ marketSlug: "g1-ml", market: { sports_market_type: "moneyline" } }] },
-  { id: "c6", legs: [{ clobTokenId: "t3", market: { sports_market_type: "moneyline" } }] },
+  {
+    id: "c5",
+    legs: [
+      { marketSlug: "g1-ml", market: { sports_market_type: "moneyline" } },
+    ],
+  },
+  {
+    id: "c6",
+    legs: [{ clobTokenId: "t3", market: { sports_market_type: "moneyline" } }],
+  },
 ];
 
 const CLOSED_GAMES = [
@@ -64,7 +90,12 @@ const CLOSED_GAMES = [
     volume24hr: 0,
     endDate: "2026-09-26",
     markets: [
-      { conditionId: "0x0", slug: "g0-ml", clobTokenIds: '["t0"]', sportsMarketType: "moneyline" },
+      {
+        conditionId: "0x0",
+        slug: "g0-ml",
+        clobTokenIds: '["t0"]',
+        sportsMarketType: "moneyline",
+      },
     ],
   },
 ];
@@ -80,7 +111,9 @@ beforeAll(() => {
     async fetch(request) {
       const url = new URL(request.url);
       if (url.pathname.endsWith("/events")) {
-        return Response.json(url.searchParams.get("closed") === "true" ? CLOSED_GAMES : GAMES);
+        return Response.json(
+          url.searchParams.get("closed") === "true" ? CLOSED_GAMES : GAMES,
+        );
       }
       if (url.pathname.endsWith("/v2/leaderboard")) {
         return Response.json({ data: [{ user_id: W1 }, { user_id: W2 }] });
@@ -208,7 +241,9 @@ describe("CFB combo uniqueness", () => {
   });
 
   test("full-game gate keeps only single-game ML/spread/total combos", async () => {
-    const report = await buildComboUniquenessReport(options({ gate: "full-game" }));
+    const report = await buildComboUniquenessReport(
+      options({ gate: "full-game" }),
+    );
     expect(report.gate).toBe("full-game");
     expect(report.strictFullGame).toBe(true);
     expect(report.global.distinctCombos).toBe(4); // c0, c1, c5, c6
@@ -226,7 +261,9 @@ describe("CFB combo uniqueness", () => {
   });
 
   test("all-legs-cfb admits cross-game combos and reports them as included", async () => {
-    const report = await buildComboUniquenessReport(options({ gate: "all-legs-cfb" }));
+    const report = await buildComboUniquenessReport(
+      options({ gate: "all-legs-cfb" }),
+    );
     expect(report.gate).toBe("all-legs-cfb");
     expect(report.strictFullGame).toBe(false);
     expect(report.global.distinctCombos).toBe(5); // c0, c1, c2, c5, c6
@@ -244,7 +281,9 @@ describe("CFB combo uniqueness", () => {
   });
 
   test("permissive reports no exclusions and counts included cross-game", async () => {
-    const report = await buildComboUniquenessReport(options({ gate: "permissive" }));
+    const report = await buildComboUniquenessReport(
+      options({ gate: "permissive" }),
+    );
     expect(report.gate).toBe("permissive");
     expect(report.exclusions).toEqual({
       UNRESOLVED_LEGS: 0,
@@ -255,14 +294,17 @@ describe("CFB combo uniqueness", () => {
   });
 
   test("each stricter gate is a subset of the looser one", async () => {
-    const permissive = await buildComboUniquenessReport(options({ includeAudit: true }));
+    const permissive = await buildComboUniquenessReport(
+      options({ includeAudit: true }),
+    );
     const cfbOnly = await buildComboUniquenessReport(
       options({ gate: "all-legs-cfb", includeAudit: true }),
     );
     const strict = await buildComboUniquenessReport(
       options({ gate: "full-game", includeAudit: true }),
     );
-    const key = (row: { comboId: string; wallet: string }): string => `${row.comboId}|${row.wallet}`;
+    const key = (row: { comboId: string; wallet: string }): string =>
+      `${row.comboId}|${row.wallet}`;
     const permissiveIds = new Set(permissive.combos.map(key));
     const cfbOnlyIds = cfbOnly.combos.filter((row) => row.kept).map(key);
     const strictIds = strict.combos.filter((row) => row.kept).map(key);
@@ -272,9 +314,13 @@ describe("CFB combo uniqueness", () => {
     const cfbOnlySet = new Set(cfbOnlyIds);
     for (const id of strictIds) expect(cfbOnlySet.has(id)).toBe(true);
     for (const game of strict.games) {
-      const before = permissive.games.find((entry) => entry.gameSlug === game.gameSlug);
+      const before = permissive.games.find(
+        (entry) => entry.gameSlug === game.gameSlug,
+      );
       expect(game.uniqueCombos).toBeLessThanOrEqual(before?.uniqueCombos ?? 0);
-      expect(game.fullyWithinGame).toBeLessThanOrEqual(before?.fullyWithinGame ?? 0);
+      expect(game.fullyWithinGame).toBeLessThanOrEqual(
+        before?.fullyWithinGame ?? 0,
+      );
     }
   });
 
@@ -284,7 +330,9 @@ describe("CFB combo uniqueness", () => {
     expect(byDefault.permissiveCombos).toBe(6);
     expect(byDefault.index.activeOnly).toBe(false);
 
-    const openOnly = await buildComboUniquenessReport(options({ includeClosedGames: false }));
+    const openOnly = await buildComboUniquenessReport(
+      options({ includeClosedGames: false }),
+    );
     expect(openOnly.combos.some((row) => row.comboId === "c0")).toBe(false);
     expect(openOnly.permissiveCombos).toBe(5);
     expect(openOnly.index.activeOnly).toBe(true);
@@ -293,9 +341,13 @@ describe("CFB combo uniqueness", () => {
   test("--since bounds the index by game date", async () => {
     const all = await buildComboUniquenessReport(options());
     expect(all.permissiveCombos).toBe(6);
-    const recent = await buildComboUniquenessReport(options({ since: "2026-10-01" }));
+    const recent = await buildComboUniquenessReport(
+      options({ since: "2026-10-01" }),
+    );
     expect(recent.permissiveCombos).toBe(5); // c0 (2026-09-26) is filtered out
-    const none = await buildComboUniquenessReport(options({ since: "2026-12-01" }));
+    const none = await buildComboUniquenessReport(
+      options({ since: "2026-12-01" }),
+    );
     expect(none.permissiveCombos).toBe(0);
   });
 
@@ -324,8 +376,12 @@ describe("CFB combo uniqueness", () => {
 
   test("verifier: the chain full-game ⊆ all-legs-cfb ⊆ permissive holds", async () => {
     const permissive = await buildComboUniquenessReport(options());
-    const cfbOnly = await buildComboUniquenessReport(options({ gate: "all-legs-cfb" }));
-    const strict = await buildComboUniquenessReport(options({ gate: "full-game" }));
+    const cfbOnly = await buildComboUniquenessReport(
+      options({ gate: "all-legs-cfb" }),
+    );
+    const strict = await buildComboUniquenessReport(
+      options({ gate: "full-game" }),
+    );
 
     const outer = checkComboSubset(permissive, cfbOnly);
     expect(outer.referenceGate).toBe("permissive");
@@ -342,7 +398,12 @@ describe("CFB combo uniqueness", () => {
     expect(inner.treatment).toBe(strict.comboRecords);
 
     const empty = await buildComboUniquenessReport(
-      options({ gate: "full-game", walletFile: "/nonexistent/wallets.txt", leaderboard: false, seedTrades: false }),
+      options({
+        gate: "full-game",
+        walletFile: "/nonexistent/wallets.txt",
+        leaderboard: false,
+        seedTrades: false,
+      }),
     );
     const vacuous = checkComboSubset(permissive, empty);
     expect(vacuous.treatment).toBe(0);
@@ -352,14 +413,19 @@ describe("CFB combo uniqueness", () => {
   test("every gate conserves permissive = kept + Σ(exclusions)", async () => {
     for (const gate of ["permissive", "all-legs-cfb", "full-game"] as const) {
       const report = await buildComboUniquenessReport(options({ gate }));
-      const dropped = report.exclusions.UNRESOLVED_LEGS + report.exclusions.CROSS_GAME + report.exclusions.INELIGIBLE_LEG_TYPE;
+      const dropped =
+        report.exclusions.UNRESOLVED_LEGS +
+        report.exclusions.CROSS_GAME +
+        report.exclusions.INELIGIBLE_LEG_TYPE;
       expect(report.permissiveCombos).toBe(report.comboRecords + dropped);
     }
   });
 
   test("emit-ids lines: treatment output is a subset of permissive output", async () => {
     const permissive = await buildComboUniquenessReport(options());
-    const strict = await buildComboUniquenessReport(options({ gate: "full-game" }));
+    const strict = await buildComboUniquenessReport(
+      options({ gate: "full-game" }),
+    );
     const any = comboIdLines(permissive);
     const strictIds = comboIdLines(strict);
     expect(any).toHaveLength(permissive.comboRecords);
@@ -388,7 +454,9 @@ describe("CFB combo uniqueness", () => {
     expect(second.cache.hits).toBe(2);
     expect(second.cache.misses).toBe(0);
 
-    const expired = await buildComboUniquenessReport(options({ cacheTtlHours: 0 }));
+    const expired = await buildComboUniquenessReport(
+      options({ cacheTtlHours: 0 }),
+    );
     expect(expired.cache.misses).toBe(2);
     expect(expired.cache.hits).toBe(0);
   });

@@ -78,7 +78,12 @@ const POSITION = {
       leg_outcome_label: "LOS",
       leg_status: "OPEN",
       leg_current_price: 0.695,
-      market: { slug: "lol-los-ly", sports_market_type: "moneyline", line: null, outcome: "LOS" },
+      market: {
+        slug: "lol-los-ly",
+        sports_market_type: "moneyline",
+        line: null,
+        outcome: "LOS",
+      },
     },
   ],
 };
@@ -104,10 +109,16 @@ beforeAll(() => {
       const url = new URL(request.url);
       if (url.pathname.endsWith("/events")) return Response.json([EVENT]);
       if (url.pathname.endsWith("/v2/positions/combos")) {
-        return Response.json({ data: [POSITION], pagination: { next_cursor: "" } });
+        return Response.json({
+          data: [POSITION],
+          pagination: { next_cursor: "" },
+        });
       }
       if (url.pathname.endsWith("/v2/activity/combos")) {
-        return Response.json({ data: [ACTIVITY], pagination: { next_cursor: "" } });
+        return Response.json({
+          data: [ACTIVITY],
+          pagination: { next_cursor: "" },
+        });
       }
       return new Response("not found", { status: 404 });
     },
@@ -179,7 +190,10 @@ describe("Polymarket CFB combos", () => {
   });
 
   test("summarizes a wallet's combo positions and activity", async () => {
-    const summary = await summarizeComboWallet(WALLET, { dataBase: base, limit: 100 });
+    const summary = await summarizeComboWallet(WALLET, {
+      dataBase: base,
+      limit: 100,
+    });
     expect(summary.openPositions).toBe(1);
     expect(summary.openCostUsd).toBe(30);
     expect(summary.activityByType.SPLIT).toEqual({ count: 1, amountUsd: 30 });

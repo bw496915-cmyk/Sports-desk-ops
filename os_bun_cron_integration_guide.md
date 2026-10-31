@@ -47,15 +47,15 @@ SportsDesk categorizes automated workloads across three distinct scheduling para
 
 ### 2.1 Architectural Comparison Matrix
 
-| Property | Linux OS Cron (`/etc/cron.d`) | OS-Level `Bun.cron(path, ...)` | In-Process `Bun.cron(schedule, fn)` |
-| :--- | :--- | :--- | :--- |
-| **Execution Context** | Standalone OS Subprocess | Standalone OS Subprocess | In-Process Event Loop Callback |
-| **State Sharing** | None (Disk / SQLite IPC) | None (Disk / SQLite IPC) | **Full In-Memory Object Sharing** |
-| **Timezone Reference** | System Local (`America/New_York`) | System Local (`America/New_York`) | **Local by default; pass `{ tz }` to pin** |
-| **Concurrent Overlap** | Possible (Requires `flock(1)`) | Possible (Requires external locks) | **Guaranteed Zero-Overlap** (waits for Promise) |
-| **Hot Reloading (`--hot`)** | Unaffected | Unaffected | **Hot-Safe** (cleared & re-bound on save) |
-| **Resource Disposal** | `crontab -r` / File deletion | `Bun.cron.remove(title)` | **Explicit Resource Management (`using`)** |
-| **Process Control** | External init (`systemd`) | External init (`launchd`/`cron`) | **`.ref()` and `.unref()` controls** |
+| Property                    | Linux OS Cron (`/etc/cron.d`)     | OS-Level `Bun.cron(path, ...)`     | In-Process `Bun.cron(schedule, fn)`             |
+| :-------------------------- | :-------------------------------- | :--------------------------------- | :---------------------------------------------- |
+| **Execution Context**       | Standalone OS Subprocess          | Standalone OS Subprocess           | In-Process Event Loop Callback                  |
+| **State Sharing**           | None (Disk / SQLite IPC)          | None (Disk / SQLite IPC)           | **Full In-Memory Object Sharing**               |
+| **Timezone Reference**      | System Local (`America/New_York`) | System Local (`America/New_York`)  | **Local by default; pass `{ tz }` to pin**      |
+| **Concurrent Overlap**      | Possible (Requires `flock(1)`)    | Possible (Requires external locks) | **Guaranteed Zero-Overlap** (waits for Promise) |
+| **Hot Reloading (`--hot`)** | Unaffected                        | Unaffected                         | **Hot-Safe** (cleared & re-bound on save)       |
+| **Resource Disposal**       | `crontab -r` / File deletion      | `Bun.cron.remove(title)`           | **Explicit Resource Management (`using`)**      |
+| **Process Control**         | External init (`systemd`)         | External init (`launchd`/`cron`)   | **`.ref()` and `.unref()` controls**            |
 
 ---
 
@@ -77,6 +77,7 @@ The in-process callback overload of `Bun.cron` provides lightweight, shared-memo
 3. **Fault-Tolerant Error Handling**:
    - Error semantics mirror `setTimeout`: synchronous throws emit `uncaughtException`, and rejected promises emit `unhandledRejection`.
    - Registering a standard error handler ensures the job automatically reschedules itself for its next scheduled window without crashing the parent process:
+
    ```typescript
    process.on("unhandledRejection", (err) => {
      console.error("[Cron Error] In-process task rejected:", err);
@@ -89,6 +90,7 @@ The in-process callback overload of `Bun.cron` provides lightweight, shared-memo
 
 5. **Deterministic Scope Disposal (`Disposable`)**:
    - `Bun.cron` implements `[Symbol.dispose]()`. When wrapped with TypeScript / ECMAScript `using`, the job automatically stops when the enclosing block exits:
+
    ```typescript
    {
      using sweepJob = Bun.cron("*/5 * * * *", async () => {
@@ -124,8 +126,10 @@ process.on("unhandledRejection", (err) => {
 // Implements Explicit Resource Management via Disposable
 export function startSurveillanceDaemon(): Disposable {
   const job = Bun.cron("0 * * * *", async () => {
-    console.log(`[Surveillance] Starting intra-day sniper audit at ${new Date().toISOString()}...`);
-    
+    console.log(
+      `[Surveillance] Starting intra-day sniper audit at ${new Date().toISOString()}...`,
+    );
+
     // In-memory query sharing connection pool with web server
     const query = db.query(`
       SELECT account_id, agent_id, SUM(risk_amount) as total_volume
@@ -134,10 +138,12 @@ export function startSurveillanceDaemon(): Disposable {
       GROUP BY account_id
       HAVING total_volume > 10000
     `);
-    
+
     const snipers = query.all();
     for (const sniper of snipers) {
-      console.warn(`[High Sizing Anomaly] Account ${sniper.account_id} placed $${sniper.total_volume} in last 60m`);
+      console.warn(
+        `[High Sizing Anomaly] Account ${sniper.account_id} placed $${sniper.total_volume} in last 60m`,
+      );
     }
   });
 
@@ -151,11 +157,16 @@ export function startSurveillanceDaemon(): Disposable {
 // Midday steam pulse (17:00 UTC = 13:00 EDT)
 // Uses .unref() so script can exit if invoked as a batch worker
 const steamJob = Bun.cron("0 17 * * *", async () => {
-  console.log("[Midday Pulse] Calculating steam originations and line moves...");
-  const proc = Bun.spawn(["./run_reports.sh", "--format", "json", "--sync-r2"], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
+  console.log(
+    "[Midday Pulse] Calculating steam originations and line moves...",
+  );
+  const proc = Bun.spawn(
+    ["./run_reports.sh", "--format", "json", "--sync-r2"],
+    {
+      stdout: "inherit",
+      stderr: "inherit",
+    },
+  );
   await proc.exited;
 });
 
@@ -168,16 +179,23 @@ steamJob.ref();
 The documentation error finding daemon (`scripts/audit_docs_webview_cron.ts`) combines an in-process `Bun.cron` UTC hourly schedule with native `Bun.WebView` DOM navigation and `Bun.FetchSession` connection pooling to continuously audit the live documentation portal (`https://fantasy402-docs-4ay.pages.dev`):
 
 ```typescript
-import { startDocsAuditCronDaemon, runDocumentationWebviewAudit } from "./scripts/audit_docs_webview_cron.ts";
+import {
+  startDocsAuditCronDaemon,
+  runDocumentationWebviewAudit,
+} from "./scripts/audit_docs_webview_cron.ts";
 
 // Launch continuous hourly in-process documentation auditor (0 * * * * UTC)
 // Uses Explicit Resource Management to unregister cleanly on teardown
 {
   using docsAuditDaemon = Bun.cron("0 * * * *", async () => {
-    console.log(`[Doc Auditor] Starting scheduled audit sweep at ${new Date().toISOString()}...`);
+    console.log(
+      `[Doc Auditor] Starting scheduled audit sweep at ${new Date().toISOString()}...`,
+    );
     const summary = await runDocumentationWebviewAudit();
     if (summary.status === "FAIL") {
-      console.warn(`[Doc Auditor] Flagged ${summary.issuesFound} documentation issues!`);
+      console.warn(
+        `[Doc Auditor] Flagged ${summary.issuesFound} documentation issues!`,
+      );
     }
   });
 

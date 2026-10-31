@@ -22,7 +22,11 @@ const SESSION: F402Session = {
 let dir = "";
 let server: ReturnType<typeof Bun.serve>;
 let baseUrl = "";
-let lastRequest: { body: string; cookie: string | null; authorization: string | null } | null = null;
+let lastRequest: {
+  body: string;
+  cookie: string | null;
+  authorization: string | null;
+} | null = null;
 
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), "f402-session-"));
@@ -60,7 +64,10 @@ describe("F402 session cache", () => {
     if (process.platform !== "win32") {
       expect(statSync(path).mode & 0o777).toBe(0o600);
     }
-    const loaded = readF402Session({ path, now: Date.parse("2026-10-31T18:10:00.000Z") });
+    const loaded = readF402Session({
+      path,
+      now: Date.parse("2026-10-31T18:10:00.000Z"),
+    });
     expect(loaded?.cookieHeader).toBe(SESSION.cookieHeader);
     expect(loaded?.cookieNames).toEqual(["session", "csrftoken"]);
   });
@@ -70,12 +77,19 @@ describe("F402 session cache", () => {
     writeF402Session(SESSION, { path });
     if (process.platform !== "win32") {
       chmodSync(path, 0o644);
-      expect(readF402Session({ path, now: Date.parse("2026-10-31T18:10:00.000Z") })).toBeNull();
+      expect(
+        readF402Session({ path, now: Date.parse("2026-10-31T18:10:00.000Z") }),
+      ).toBeNull();
     }
 
     const expired = join(dir, "expired.json");
     writeF402Session(SESSION, { path: expired });
-    expect(readF402Session({ path: expired, now: Date.parse("2026-10-31T19:00:00.000Z") })).toBeNull();
+    expect(
+      readF402Session({
+        path: expired,
+        now: Date.parse("2026-10-31T19:00:00.000Z"),
+      }),
+    ).toBeNull();
     expect(readF402Session({ path: join(dir, "missing.json") })).toBeNull();
   });
 
@@ -91,13 +105,18 @@ describe("F402 session cache", () => {
   });
 
   test("live login stays disabled without F402_LIVE_LOGIN=1", async () => {
-    await expect(refreshF402Session({ env: {} })).rejects.toThrow(/F402_LIVE_LOGIN=1/);
+    await expect(refreshF402Session({ env: {} })).rejects.toThrow(
+      /F402_LIVE_LOGIN=1/,
+    );
   });
 });
 
 describe("F402 getBetTicker probe", () => {
   test("posts the captured form shape and counts LIST rows", async () => {
-    const probe = await probeF402BetTicker(SESSION, { baseUrl, agentId: "BILLY666" });
+    const probe = await probeF402BetTicker(SESSION, {
+      baseUrl,
+      agentId: "BILLY666",
+    });
     expect(probe.endpoint).toBe(`${baseUrl}/cloud/api/Manager/getBetTicker`);
     expect(probe.httpStatus).toBe(200);
     expect(probe.rows).toBe(2);

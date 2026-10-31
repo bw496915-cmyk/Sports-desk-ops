@@ -40,11 +40,11 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
    - `--all-legs-cfb` — every leg is CFB and every leg's `market_sport_type` is
      `moneyline|spreads|totals`; **cross-game allowed**;
    - `--strict-full-game` — `all-legs-cfb` **and** single game.
-   Exclusions are mode-relative and precedence-ordered (`UNRESOLVED_LEGS` → `CROSS_GAME` under
-   full-game only → `INELIGIBLE_LEG_TYPE`); cross-game combos admitted by `--all-legs-cfb` appear
-   as `includedCrossGame`, never as a drop. Bucket counts are not comparable across gates.
-   `--json` reports `gate`, `permissiveCombos`, `duplicatesCollapsed*`, `exclusions`,
-   `includedCrossGame` and a per-combo `kept`/`dropReason` audit (`--no-audit` omits it).
+     Exclusions are mode-relative and precedence-ordered (`UNRESOLVED_LEGS` → `CROSS_GAME` under
+     full-game only → `INELIGIBLE_LEG_TYPE`); cross-game combos admitted by `--all-legs-cfb` appear
+     as `includedCrossGame`, never as a drop. Bucket counts are not comparable across gates.
+     `--json` reports `gate`, `permissiveCombos`, `duplicatesCollapsed*`, `exclusions`,
+     `includedCrossGame` and a per-combo `kept`/`dropReason` audit (`--no-audit` omits it).
 7. `verify-subset --chain` asserts both edges — `full-game ⊆ all-legs-cfb ⊆ permissive` — not
    just permissive-vs-treatment. `--against <gate>` checks one edge; a gated reference compares on
    its **kept** set. Exit 1 = leak; exit 2 = vacuous only with `--strict-exit` (default warns and
@@ -63,13 +63,13 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
    wallet than leaderboard-seeded ones (3.75 vs 0.55 combos/wallet), so prefer
    `--seed-trades --no-leaderboard` when API budget matters.
 10. Verify, don't inspect: `--dump-wallets` then `--emit-ids` in both modes, and
-   `comm -23 <(sort strict) <(sort any)` must print nothing. Empty sets write empty files.
-   Check `diagnostics.legsWithoutSide` and `duplicatesCollapsedByLegSet`: if sides are empty the
-   cross-indexer pass is inert; if leg-set collapses are zero it may be doing nothing.
+    `comm -23 <(sort strict) <(sort any)` must print nothing. Empty sets write empty files.
+    Check `diagnostics.legsWithoutSide` and `duplicatesCollapsedByLegSet`: if sides are empty the
+    cross-indexer pass is inert; if leg-set collapses are zero it may be doing nothing.
 11. Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h (`--cache-ttl-hours`), `--fresh` bypasses.
 12. Env aliases: `CACHE_TTL_HOURS`, `CACHE_DIR`, `FRESH=1`, `STRICT_FULL_GAME=1`, `ALL_LEGS_CFB=1`, `INCLUDE_CLOSED_GAMES=0`, `SEED_TRADES=1`,
-   `CONCURRENCY`, `LEADERBOARD=0`, `LEADERBOARD_LIMIT`, `MAX_SEED_MARKETS`, `WALLET_FILE`.
-   CLI flags win over env.
+    `CONCURRENCY`, `LEADERBOARD=0`, `LEADERBOARD_LIMIT`, `MAX_SEED_MARKETS`, `WALLET_FILE`.
+    CLI flags win over env.
 13. `lb-api.polymarket.com` is retired (410); use `data-api/v2/leaderboard`.
 
 ## Backtest

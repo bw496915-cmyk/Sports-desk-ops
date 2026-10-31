@@ -38,16 +38,7 @@ export const F402_CUSTOMER_REPORT_ENDPOINTS = {
 } as const;
 
 export type F402ReportWagerTypeCode =
-  | "S"
-  | "M"
-  | "C"
-  | "T"
-  | "L"
-  | "E"
-  | "I"
-  | "P"
-  | "G"
-  | "A";
+  "S" | "M" | "C" | "T" | "L" | "E" | "I" | "P" | "G" | "A";
 
 export interface F402WagerTypeMeta {
   readonly code: F402ReportWagerTypeCode;
@@ -60,17 +51,79 @@ export interface F402WagerTypeMeta {
 /**
  * Definitive `getTypeInfo` map from `customer/report/report.js`.
  */
-export const F402_WAGER_TYPE_MAP: Readonly<Record<F402ReportWagerTypeCode, F402WagerTypeMeta>> = {
-  S: { code: "S", labelKey: "L-142", name: "Straight", appendsTotalPicks: false, isSportsCanonicalEligible: true },
-  M: { code: "M", labelKey: "L-432", name: "Moneyline", appendsTotalPicks: false, isSportsCanonicalEligible: true },
-  C: { code: "C", labelKey: "L-203", name: "Casino", appendsTotalPicks: false, isSportsCanonicalEligible: false },
-  T: { code: "T", labelKey: "L-85", name: "Teaser", appendsTotalPicks: true, isSportsCanonicalEligible: true },
-  L: { code: "L", labelKey: "L-144", name: "Total", appendsTotalPicks: false, isSportsCanonicalEligible: true },
-  E: { code: "E", labelKey: "L-145", name: "Team Total", appendsTotalPicks: false, isSportsCanonicalEligible: true },
-  I: { code: "I", labelKey: "L-16", name: "If-Bet", appendsTotalPicks: false, isSportsCanonicalEligible: true },
-  P: { code: "P", labelKey: "L-15", name: "Parlay", appendsTotalPicks: true, isSportsCanonicalEligible: true },
-  G: { code: "G", labelKey: "LIVE", name: "Racebook / Live Wagers (LIVEBETTINGCWS / EZL - INTERNET)", appendsTotalPicks: false, isSportsCanonicalEligible: true },
-  A: { code: "A", labelKey: "L-202", name: "Action / Manual Play", appendsTotalPicks: false, isSportsCanonicalEligible: false },
+export const F402_WAGER_TYPE_MAP: Readonly<
+  Record<F402ReportWagerTypeCode, F402WagerTypeMeta>
+> = {
+  S: {
+    code: "S",
+    labelKey: "L-142",
+    name: "Straight",
+    appendsTotalPicks: false,
+    isSportsCanonicalEligible: true,
+  },
+  M: {
+    code: "M",
+    labelKey: "L-432",
+    name: "Moneyline",
+    appendsTotalPicks: false,
+    isSportsCanonicalEligible: true,
+  },
+  C: {
+    code: "C",
+    labelKey: "L-203",
+    name: "Casino",
+    appendsTotalPicks: false,
+    isSportsCanonicalEligible: false,
+  },
+  T: {
+    code: "T",
+    labelKey: "L-85",
+    name: "Teaser",
+    appendsTotalPicks: true,
+    isSportsCanonicalEligible: true,
+  },
+  L: {
+    code: "L",
+    labelKey: "L-144",
+    name: "Total",
+    appendsTotalPicks: false,
+    isSportsCanonicalEligible: true,
+  },
+  E: {
+    code: "E",
+    labelKey: "L-145",
+    name: "Team Total",
+    appendsTotalPicks: false,
+    isSportsCanonicalEligible: true,
+  },
+  I: {
+    code: "I",
+    labelKey: "L-16",
+    name: "If-Bet",
+    appendsTotalPicks: false,
+    isSportsCanonicalEligible: true,
+  },
+  P: {
+    code: "P",
+    labelKey: "L-15",
+    name: "Parlay",
+    appendsTotalPicks: true,
+    isSportsCanonicalEligible: true,
+  },
+  G: {
+    code: "G",
+    labelKey: "LIVE",
+    name: "Racebook / Live Wagers (LIVEBETTINGCWS / EZL - INTERNET)",
+    appendsTotalPicks: false,
+    isSportsCanonicalEligible: true,
+  },
+  A: {
+    code: "A",
+    labelKey: "L-202",
+    name: "Action / Manual Play",
+    appendsTotalPicks: false,
+    isSportsCanonicalEligible: false,
+  },
 };
 
 /**
@@ -113,7 +166,7 @@ export interface F402CustomerReportPendingRow {
  * `var m = d.TicketNumber + "-" + d.WagerNumber;`
  */
 export function getF402TicketGroupKey(
-  row: Pick<F402CustomerReportPendingRow, "TicketNumber" | "WagerNumber">
+  row: Pick<F402CustomerReportPendingRow, "TicketNumber" | "WagerNumber">,
 ): string {
   return `${String(row.TicketNumber).trim()}-${String(row.WagerNumber).trim()}`;
 }
@@ -122,7 +175,10 @@ export function getF402TicketGroupKey(
  * Exact `getRotationNumber` logic from `customer/report/report.js`, plus DGS `GameNum + 5000` Alt-Spread normalization.
  */
 export function extractF402RotationNumber(
-  row: Pick<F402CustomerReportPendingRow, "Team1ID" | "Team2ID" | "ChosenTeamID" | "Team1RotNum" | "Team2RotNum">
+  row: Pick<
+    F402CustomerReportPendingRow,
+    "Team1ID" | "Team2ID" | "ChosenTeamID" | "Team1RotNum" | "Team2RotNum"
+  >,
 ): {
   readonly rawRotNum: number | null;
   readonly canonicalRotNum: number | null;
@@ -133,14 +189,25 @@ export function extractF402RotationNumber(
   const rawSelected =
     chosen && team1 && team1 === chosen
       ? row.Team1RotNum
-      : row.Team2RotNum ?? row.Team1RotNum;
+      : (row.Team2RotNum ?? row.Team1RotNum);
 
   if (rawSelected === undefined || rawSelected === null || rawSelected === "") {
-    return { rawRotNum: null, canonicalRotNum: null, isAltSpreadRotation: false };
+    return {
+      rawRotNum: null,
+      canonicalRotNum: null,
+      isAltSpreadRotation: false,
+    };
   }
-  const parsed = typeof rawSelected === "number" ? rawSelected : parseInt(String(rawSelected).trim(), 10);
+  const parsed =
+    typeof rawSelected === "number"
+      ? rawSelected
+      : parseInt(String(rawSelected).trim(), 10);
   if (!Number.isFinite(parsed)) {
-    return { rawRotNum: null, canonicalRotNum: null, isAltSpreadRotation: false };
+    return {
+      rawRotNum: null,
+      canonicalRotNum: null,
+      isAltSpreadRotation: false,
+    };
   }
   const isAlt = parsed >= 5000 && parsed < 6000;
   const canonical = isAlt ? parsed - 5000 : parsed;
@@ -163,8 +230,12 @@ export function extractF402RotationNumber(
 export function computeF402EffectiveLine(
   row: Pick<
     F402CustomerReportPendingRow,
-    "WagerType" | "AdjSpread" | "AdjTotalPoints" | "TotalPointsOU" | "TeaserPoints"
-  >
+    | "WagerType"
+    | "AdjSpread"
+    | "AdjTotalPoints"
+    | "TotalPointsOU"
+    | "TeaserPoints"
+  >,
 ): {
   readonly marketKind: MarketKind;
   readonly side: MarketSide;
@@ -174,9 +245,12 @@ export function computeF402EffectiveLine(
   readonly effectiveLineHundredths: LineHundredths | null;
 } {
   const wt = (row.WagerType ?? "").trim().toUpperCase();
-  const teaserRaw = row.TeaserPoints !== null && row.TeaserPoints !== undefined && row.TeaserPoints !== ""
-    ? parseFloat(String(row.TeaserPoints))
-    : 0;
+  const teaserRaw =
+    row.TeaserPoints !== null &&
+    row.TeaserPoints !== undefined &&
+    row.TeaserPoints !== ""
+      ? parseFloat(String(row.TeaserPoints))
+      : 0;
   const teaserPoints = Number.isFinite(teaserRaw) ? teaserRaw : 0;
 
   const ouRaw = (row.TotalPointsOU ?? "").toString().trim().toLowerCase();
@@ -217,9 +291,14 @@ export function computeF402EffectiveLine(
     };
   }
 
-  if (row.AdjSpread !== null && row.AdjSpread !== undefined && row.AdjSpread !== "") {
+  if (
+    row.AdjSpread !== null &&
+    row.AdjSpread !== undefined &&
+    row.AdjSpread !== ""
+  ) {
     const baseSpread = parseFloat(String(row.AdjSpread));
-    const effective = teaserPoints !== 0 ? baseSpread + teaserPoints : baseSpread;
+    const effective =
+      teaserPoints !== 0 ? baseSpread + teaserPoints : baseSpread;
     const side: MarketSide = effective < 0 ? "FAVORITE" : "UNDERDOG";
     return {
       marketKind: "spread",
@@ -252,9 +331,12 @@ export type LineHundredths = Brand<number, "LineHundredths">;
  * Collapses float noise (e.g. 3.5000000000000004 -> 350, -6.5 -> -650).
  * Throws on invalid sub-hundredth precision (e.g. 3.245).
  */
-export function parseLineHundredths(raw: number | string | null | undefined): LineHundredths | null {
+export function parseLineHundredths(
+  raw: number | string | null | undefined,
+): LineHundredths | null {
   if (raw === null || raw === undefined || raw === "") return null;
-  const num = typeof raw === "string" ? parseFloat(raw.trim().replace("+", "")) : raw;
+  const num =
+    typeof raw === "string" ? parseFloat(raw.trim().replace("+", "")) : raw;
   if (!Number.isFinite(num)) {
     throw new TypeError(`Invalid line value: ${String(raw)}`);
   }
@@ -282,37 +364,63 @@ export function formatLineHundredths(line: LineHundredths | null): string {
 // ============================================================================
 
 export type CanonicalPeriod =
-  | "game"
-  | "1h"
-  | "2h"
-  | "1q"
-  | "2q"
-  | "3q"
-  | "4q"
-  | "live";
+  "game" | "1h" | "2h" | "1q" | "2q" | "3q" | "4q" | "live";
 
-export function normalizeCanonicalPeriod(raw: string | number | null | undefined): CanonicalPeriod {
+export function normalizeCanonicalPeriod(
+  raw: string | number | null | undefined,
+): CanonicalPeriod {
   if (raw === null || raw === undefined || raw === "") return "game";
   if (typeof raw === "number") {
     switch (raw) {
-      case 0: return "game";
-      case 1: return "1h";
-      case 2: return "2h";
-      case 3: return "1q";
-      case 4: return "2q";
-      case 5: return "3q";
-      case 6: return "4q";
-      default: return "game";
+      case 0:
+        return "game";
+      case 1:
+        return "1h";
+      case 2:
+        return "2h";
+      case 3:
+        return "1q";
+      case 4:
+        return "2q";
+      case 5:
+        return "3q";
+      case 6:
+        return "4q";
+      default:
+        return "game";
     }
   }
   const s = String(raw).trim().toLowerCase();
-  if (s === "0" || s === "game" || s === "full" || s === "fg" || s === "full_game") return "game";
-  if (s === "1" || s === "1h" || s.includes("1st half") || s.includes("first half")) return "1h";
-  if (s === "2" || s === "2h" || s.includes("2nd half") || s.includes("second half")) return "2h";
-  if (s === "3" || s === "1q" || s.includes("1st quarter") || s.includes("q1")) return "1q";
-  if (s === "4" || s === "2q" || s.includes("2nd quarter") || s.includes("q2")) return "2q";
-  if (s === "5" || s === "3q" || s.includes("3rd quarter") || s.includes("q3")) return "3q";
-  if (s === "6" || s === "4q" || s.includes("4th quarter") || s.includes("q4")) return "4q";
+  if (
+    s === "0" ||
+    s === "game" ||
+    s === "full" ||
+    s === "fg" ||
+    s === "full_game"
+  )
+    return "game";
+  if (
+    s === "1" ||
+    s === "1h" ||
+    s.includes("1st half") ||
+    s.includes("first half")
+  )
+    return "1h";
+  if (
+    s === "2" ||
+    s === "2h" ||
+    s.includes("2nd half") ||
+    s.includes("second half")
+  )
+    return "2h";
+  if (s === "3" || s === "1q" || s.includes("1st quarter") || s.includes("q1"))
+    return "1q";
+  if (s === "4" || s === "2q" || s.includes("2nd quarter") || s.includes("q2"))
+    return "2q";
+  if (s === "5" || s === "3q" || s.includes("3rd quarter") || s.includes("q3"))
+    return "3q";
+  if (s === "6" || s === "4q" || s.includes("4th quarter") || s.includes("q4"))
+    return "4q";
   if (s === "0g" || s.includes("live") || s.includes("in-play")) return "live";
   return "game";
 }
@@ -337,7 +445,8 @@ export type MarketSide =
   | "NO"
   | "UNKNOWN";
 
-export type ProductClass = "straight" | "parlay" | "teaser" | "sgp" | "live" | "if_bet" | "unknown";
+export type ProductClass =
+  "straight" | "parlay" | "teaser" | "sgp" | "live" | "if_bet" | "unknown";
 
 export interface CanonicalLeg {
   /** Canonical Game Identifier: e.g. "CFB:BAYLOR_VS_OPP", "2026-10-31:501", "NBA:BOS_VS_LAL" */
@@ -378,7 +487,8 @@ export interface CanonicalComboPayload {
 /** Formats a single leg into deterministic string for exact identity hashing */
 export function formatExactLegString(leg: CanonicalLeg): string {
   const periodStr = leg.period && leg.period !== "game" ? `:${leg.period}` : "";
-  const lineStr = leg.lineHundredths !== null ? String(leg.lineHundredths) : "NONE";
+  const lineStr =
+    leg.lineHundredths !== null ? String(leg.lineHundredths) : "NONE";
   return `${leg.gameId}${periodStr}|${leg.subject}|${leg.marketKind}|${leg.side}|${lineStr}|${leg.productClass}`;
 }
 
@@ -419,18 +529,26 @@ export interface ComboIdentityHashes {
  * - Deduplicates identical legs before hashing.
  * - Sorts order-independently so [A, B] === [B, A].
  */
-export function computeComboIdentityHashes(legs: readonly CanonicalLeg[]): ComboIdentityHashes {
+export function computeComboIdentityHashes(
+  legs: readonly CanonicalLeg[],
+): ComboIdentityHashes {
   if (legs.length === 0) {
     throw new Error("Cannot compute combo identity on empty leg list");
   }
 
-  const exactStrings = Array.from(new Set(legs.map(formatExactLegString))).sort();
+  const exactStrings = Array.from(
+    new Set(legs.map(formatExactLegString)),
+  ).sort();
   const identitySha256 = computeSha256(exactStrings.join(";"));
 
-  const shapeStrings = Array.from(new Set(legs.map(formatShapeLegString))).sort();
+  const shapeStrings = Array.from(
+    new Set(legs.map(formatShapeLegString)),
+  ).sort();
   const shapeSha256 = computeSha256(shapeStrings.join(";"));
 
-  const pickShapeStrings = Array.from(new Set(legs.map(formatPickShapeLegString))).sort();
+  const pickShapeStrings = Array.from(
+    new Set(legs.map(formatPickShapeLegString)),
+  ).sort();
   const pickShapeSha256 = computeSha256(pickShapeStrings.join(";"));
 
   return {
@@ -497,7 +615,8 @@ export function normalizeCanonicalSubject(raw: string | undefined): string {
   if (!raw) return "UNKNOWN";
   const s = raw.trim().toUpperCase();
   if (s.includes("BAYLOR")) return "BAYLOR";
-  if (s.includes("PATRIOTS") || s.includes("NEW ENGLAND") || s === "NE") return "NE";
+  if (s.includes("PATRIOTS") || s.includes("NEW ENGLAND") || s === "NE")
+    return "NE";
   if (s.includes("TROY")) return "TROY";
   if (s.includes("SAC ST") || s.includes("SACRAMENTO")) return "SAC_ST";
   if (s.includes("ALABAMA") || s === "ALA") return "ALA";
@@ -506,13 +625,18 @@ export function normalizeCanonicalSubject(raw: string | undefined): string {
   if (s.includes("C FLORIDA") || s.includes("UCF")) return "UCF";
   if (s.includes("JETS") || s.includes("NY JETS") || s === "NYJ") return "NYJ";
   if (s.includes("LAKERS") || s === "LAL") return "LAL";
-  if (s.includes("CELTICS") || s.includes("BOSTON") || s === "BOS") return "BOS";
-  if (s.includes("WARRIORS") || s.includes("GOLDEN STATE") || s === "GSW") return "GSW";
-  if (s.includes("NUGGETS") || s.includes("DENVER") || s === "DEN") return "DEN";
+  if (s.includes("CELTICS") || s.includes("BOSTON") || s === "BOS")
+    return "BOS";
+  if (s.includes("WARRIORS") || s.includes("GOLDEN STATE") || s === "GSW")
+    return "GSW";
+  if (s.includes("NUGGETS") || s.includes("DENVER") || s === "DEN")
+    return "DEN";
   if (s.includes("SUNS") || s.includes("PHOENIX") || s === "PHX") return "PHX";
-  if (s.includes("BUCKS") || s.includes("MILWAUKEE") || s === "MIL") return "MIL";
+  if (s.includes("BUCKS") || s.includes("MILWAUKEE") || s === "MIL")
+    return "MIL";
   if (s.includes("KNICKS") || s === "NYK") return "NYK";
-  if (s.includes("MAVERICKS") || s.includes("DALLAS MAVS") || s === "DAL_NBA") return "DAL_NBA";
+  if (s.includes("MAVERICKS") || s.includes("DALLAS MAVS") || s === "DAL_NBA")
+    return "DAL_NBA";
   if (s.includes("COWBOYS") || s === "DAL") return "DAL";
   if (s.includes("CHIEFS") || s === "KC") return "KC";
   return s.replace(/\s+/g, "_");
@@ -542,10 +666,17 @@ export function mapPolyLeg(raw: PolymarketRawOrderLeg): CanonicalLeg {
 
   let marketKind: MarketKind = "unknown";
   const rawMk = (raw.marketKind ?? "").toLowerCase();
-  if (rawMk === "team_total" || rawMk.includes("team total")) marketKind = "team_total";
+  if (rawMk === "team_total" || rawMk.includes("team total"))
+    marketKind = "team_total";
   else if (rawMk.includes("spread")) marketKind = "spread";
-  else if (rawMk.includes("total") || rawMk.includes("over") || rawMk.includes("under")) marketKind = "total";
-  else if (rawMk.includes("moneyline") || rawMk.includes("ml")) marketKind = "moneyline";
+  else if (
+    rawMk.includes("total") ||
+    rawMk.includes("over") ||
+    rawMk.includes("under")
+  )
+    marketKind = "total";
+  else if (rawMk.includes("moneyline") || rawMk.includes("ml"))
+    marketKind = "moneyline";
   else if (rawMk.includes("prop")) marketKind = "prop";
   else if (rawMk.includes("teaser")) marketKind = "teaser";
 
@@ -588,13 +719,16 @@ export function mapPolyLeg(raw: PolymarketRawOrderLeg): CanonicalLeg {
  *
  * Returns `null` for non-sports rows (`WagerType === "C"` Casino, `"A"` Manual Action).
  */
-export function mapF402ReportLeg(raw: F402CustomerReportPendingRow): CanonicalLeg | null {
+export function mapF402ReportLeg(
+  raw: F402CustomerReportPendingRow,
+): CanonicalLeg | null {
   const wt = (raw.WagerType ?? "S").trim().toUpperCase();
   if (wt === "C" || wt === "A") {
     return null; // Skip Casino & Manual Action rows per getTypeInfo
   }
 
-  const placedOrWriter = `${raw.PlacedOn ?? ""} ${raw.TicketWriter ?? ""}`.toUpperCase();
+  const placedOrWriter =
+    `${raw.PlacedOn ?? ""} ${raw.TicketWriter ?? ""}`.toUpperCase();
   const isLiveWager =
     wt === "G" ||
     placedOrWriter.includes("LIVEBETTINGCWS") ||
@@ -602,7 +736,9 @@ export function mapF402ReportLeg(raw: F402CustomerReportPendingRow): CanonicalLe
     placedOrWriter.includes("GSLIVE");
 
   const rotInfo = extractF402RotationNumber(raw);
-  const chosenSubject = normalizeCanonicalSubject(raw.ChosenTeamID ?? raw.Team1ID ?? "GAME");
+  const chosenSubject = normalizeCanonicalSubject(
+    raw.ChosenTeamID ?? raw.Team1ID ?? "GAME",
+  );
 
   const sportPrefix = (raw.SportType ?? "").trim().toUpperCase();
   let gameId: string;
@@ -666,7 +802,7 @@ export interface GroupedF402ParentTicket {
  * preventing multi-leg parlays and teasers from being hashed as isolated 1-leg tickets.
  */
 export function groupF402PendingRowsByTicket(
-  rows: readonly F402CustomerReportPendingRow[]
+  rows: readonly F402CustomerReportPendingRow[],
 ): GroupedF402ParentTicket[] {
   const buckets = new Map<
     string,
@@ -749,7 +885,8 @@ export function mapF402Leg(raw: F402RawTicketLeg): CanonicalLeg {
       Team1RotNum: raw.Team1RotNum,
       Team2RotNum: raw.Team2RotNum,
       AdjSpread: raw.AdjSpread ?? (raw.TotalPointsOU ? null : raw.line),
-      AdjTotalPoints: raw.AdjTotalPoints ?? (raw.TotalPointsOU ? raw.line : null),
+      AdjTotalPoints:
+        raw.AdjTotalPoints ?? (raw.TotalPointsOU ? raw.line : null),
       TotalPointsOU: raw.TotalPointsOU ?? null,
       TeaserPoints: raw.TeaserPoints ?? null,
       PlacedOn: raw.PlacedOn,
@@ -759,7 +896,9 @@ export function mapF402Leg(raw: F402RawTicketLeg): CanonicalLeg {
   }
 
   const sport = (raw.sportType ?? "SPORTS").trim().toUpperCase();
-  const subject = normalizeCanonicalSubject(raw.ChosenTeamID ?? raw.shortName ?? raw.team);
+  const subject = normalizeCanonicalSubject(
+    raw.ChosenTeamID ?? raw.shortName ?? raw.team,
+  );
   const gameId = deriveGameIdentifier(sport, subject);
   const period = normalizeCanonicalPeriod(raw.period);
 
@@ -782,11 +921,21 @@ export function mapF402Leg(raw: F402RawTicketLeg): CanonicalLeg {
 
   if (desc.includes("TEAM TOTAL") || desc.includes("TT ")) {
     marketKind = "team_total";
-  } else if (desc.includes("OVER") || desc.includes("UNDER") || desc.includes("TOT")) {
+  } else if (
+    desc.includes("OVER") ||
+    desc.includes("UNDER") ||
+    desc.includes("TOT")
+  ) {
     marketKind = "total";
   } else if (desc.includes("ML") || desc.includes("MONEYLINE")) {
     marketKind = "moneyline";
-  } else if (desc.includes("PROP") || desc.includes("PTS") || desc.includes("REB") || desc.includes("AST") || desc.includes("YDS")) {
+  } else if (
+    desc.includes("PROP") ||
+    desc.includes("PTS") ||
+    desc.includes("REB") ||
+    desc.includes("AST") ||
+    desc.includes("YDS")
+  ) {
     marketKind = "prop";
   }
 

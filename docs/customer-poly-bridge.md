@@ -4,11 +4,11 @@ Answers one question: **does our customer book show value on Polymarket, and whe
 
 Read-only. Public APIs only. `dx bridge` joins three layers, in increasing strength of evidence:
 
-| Layer | Join | Source | What it can prove |
-| :--- | :--- | :--- | :--- |
-| Attribution | `customerId ↔ 0x wallet` | `lib/parlay_combo_backtest_engine.ts` map + typed IP/CTF clusters | That a link exists, and how strong it is |
-| Value | customer desk P/L ↔ wallet P/L | `enriched_customers_full.json` + Polymarket profile | Whether outcomes diverge, observationally |
-| Leg | F402 ticket legs ↔ Polymarket combo legs | `combo_observations_legs` SQLite store | Whether the same market is played, on which side, at what line |
+| Layer       | Join                                     | Source                                                            | What it can prove                                              |
+| :---------- | :--------------------------------------- | :---------------------------------------------------------------- | :------------------------------------------------------------- |
+| Attribution | `customerId ↔ 0x wallet`                 | `lib/parlay_combo_backtest_engine.ts` map + typed IP/CTF clusters | That a link exists, and how strong it is                       |
+| Value       | customer desk P/L ↔ wallet P/L           | `enriched_customers_full.json` + Polymarket profile               | Whether outcomes diverge, observationally                      |
+| Leg         | F402 ticket legs ↔ Polymarket combo legs | `combo_observations_legs` SQLite store                            | Whether the same market is played, on which side, at what line |
 
 ## 1. Commands
 
@@ -76,13 +76,13 @@ Aggregate rules:
 
 Verdicts are from the **customer's** perspective:
 
-| Verdict | Meaning |
-| :--- | :--- |
-| `BOTH_UP` | Customer wins at the desk and on Polymarket |
+| Verdict        | Meaning                                                                   |
+| :------------- | :------------------------------------------------------------------------ |
+| `BOTH_UP`      | Customer wins at the desk and on Polymarket                               |
 | `POLY_ONLY_UP` | Customer wins on Polymarket, loses at the desk — the lead worth reviewing |
-| `DESK_ONLY_UP` | Customer loses on Polymarket, wins at the desk |
-| `BOTH_DOWN` | Customer loses on both |
-| `FLAT` | Within ±$1 on one side |
+| `DESK_ONLY_UP` | Customer loses on Polymarket, wins at the desk                            |
+| `BOTH_DOWN`    | Customer loses on both                                                    |
+| `FLAT`         | Within ±$1 on one side                                                    |
 
 `POLY_ONLY_UP` is a **lead, not proof**. Proving a hedge or a layoff needs the leg-level layer,
 because a customer can independently hold a directional view on each venue.
@@ -110,7 +110,7 @@ Two honesty rules:
 
 - If pagination was truncated (`pages >= maxActivityPages`), `cashflowPnl` is **null**, not a
   partial number that looks authoritative. The reason string says `ACTIVITY_TRUNCATED`.
-- `feeResidual` is a **lower bound** on taker fees. Zero means maker *or* fee-exempt, never
+- `feeResidual` is a **lower bound** on taker fees. Zero means maker _or_ fee-exempt, never
   "no fees".
 
 Active wallets commonly exceed the activity cap (one bridge wallet has 13k+ TRADE rows across 40
@@ -147,10 +147,10 @@ breaking side matching and `evaluateBetterVenue` for all underdog spreads.
 
 ## 6. Evidence tiers
 
-| Tier | Meaning |
-| :--- | :--- |
-| `LIVE` | Every linked wallet was observed live |
-| `MIXED` | Some linked wallets were observed, some were not |
+| Tier      | Meaning                                                            |
+| :-------- | :----------------------------------------------------------------- |
+| `LIVE`    | Every linked wallet was observed live                              |
+| `MIXED`   | Some linked wallets were observed, some were not                   |
 | `FIXTURE` | Nothing was fetched; the bundled book and static attributions only |
 
 The tier is printed at the top of `value` output so a fixture run is never mistaken for live data.
@@ -161,33 +161,33 @@ The tier is printed at the top of `value` output so a fixture run is never mista
 ./bin/dx bridge value --live --concurrency 6
 ```
 
-| Metric | Value |
-| :--- | :--- |
-| Customers in book | 220 (fixture sample) |
-| Customers linked to a wallet | 19 (8.6%) |
-| Valid wallets | 22 |
-| Quarantined placeholders | 10 |
-| Shared wallets (2 customers each) | 4 |
-| Wallets with a PnL figure | 15 of 22 |
-| Customers with a PnL figure | 8 of 19 |
-| Desk volume (linked rows) | $5,295,104 |
-| Customer desk P/L | −$1,213,830 (desk hold −22.9%) |
-| Polymarket gross P/L (unique wallets) | +$513,389 |
-| Polymarket net P/L (1 of 15 wallets replayed) | −$9,763 |
-| Fee residual (replayed subset) | $110,637 lower bound |
-| Signed poly advantage (unambiguous rows) | +$277,988 |
-| Review priority | $675,143 |
+| Metric                                        | Value                          |
+| :-------------------------------------------- | :----------------------------- |
+| Customers in book                             | 220 (fixture sample)           |
+| Customers linked to a wallet                  | 19 (8.6%)                      |
+| Valid wallets                                 | 22                             |
+| Quarantined placeholders                      | 10                             |
+| Shared wallets (2 customers each)             | 4                              |
+| Wallets with a PnL figure                     | 15 of 22                       |
+| Customers with a PnL figure                   | 8 of 19                        |
+| Desk volume (linked rows)                     | $5,295,104                     |
+| Customer desk P/L                             | −$1,213,830 (desk hold −22.9%) |
+| Polymarket gross P/L (unique wallets)         | +$513,389                      |
+| Polymarket net P/L (1 of 15 wallets replayed) | −$9,763                        |
+| Fee residual (replayed subset)                | $110,637 lower bound           |
+| Signed poly advantage (unambiguous rows)      | +$277,988                      |
+| Review priority                               | $675,143                       |
 
 Verdicts over the 8 rows with PnL: `POLY_ONLY_UP` 5, `BOTH_DOWN` 3, `BOTH_UP` 0, `DESK_ONLY_UP` 0.
 
 Top leads (customer won on Polymarket, lost at the desk, lifetime-to-lifetime):
 
-| Customer | Desk P/L | Polymarket gross |
-| :--- | ---: | ---: |
-| BGD101 / BB5127 (shared wallet) | −$137,400 | +$685,666 |
-| GP300 | −$33,858 | +$339,843 |
-| DN2019 | −$78,000 | +$78,321 |
-| DAN245 | −$42,000 | +$68,515 |
+| Customer                        |  Desk P/L | Polymarket gross |
+| :------------------------------ | --------: | ---------------: |
+| BGD101 / BB5127 (shared wallet) | −$137,400 |        +$685,666 |
+| GP300                           |  −$33,858 |        +$339,843 |
+| DN2019                          |  −$78,000 |         +$78,321 |
+| DAN245                          |  −$42,000 |         +$68,515 |
 
 Reading it honestly:
 

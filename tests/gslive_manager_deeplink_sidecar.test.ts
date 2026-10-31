@@ -86,9 +86,7 @@ describe("GSLive Manager 7-Param Deep-Link Builder & Live Bet-History Sidecar", 
     );
     expect(desc.getBetReportObservedPayload.from).toBe(1793422800);
     expect(desc.getBetReportObservedPayload.toTime).toBe(86399);
-    expect(desc.getBetReportObservedPayload.partnerUserId).toBe(
-      "CHURN_003",
-    );
+    expect(desc.getBetReportObservedPayload.partnerUserId).toBe("CHURN_003");
   });
 
   test("test_desk_day_windows_roll_and_follow_chicago_calendar", () => {
@@ -170,10 +168,13 @@ describe("GSLive Manager 7-Param Deep-Link Builder & Live Bet-History Sidecar", 
     });
     expect(url).toContain("partnerUserId=AF12");
     expect(url).not.toContain("partnerUserId=player_");
-    expect(buildGsLiveGetBetReportPayload({ customerLogin: "AF12" }).partnerUserId).toBe("AF12");
+    expect(
+      buildGsLiveGetBetReportPayload({ customerLogin: "AF12" }).partnerUserId,
+    ).toBe("AF12");
   });
 
-  test("test_sidecar_cache_buster_defaults_to_now_and_never_freezes", () => {    const before = Date.now();
+  test("test_sidecar_cache_buster_defaults_to_now_and_never_freezes", () => {
+    const before = Date.now();
     const url = buildGsLiveBetHistorySidecarUrl({ dateYmd: "2026-10-31" });
     const tick = Number(new URLSearchParams(url.split("?")[1]).get("t"));
     expect(tick).toBeGreaterThanOrEqual(before);

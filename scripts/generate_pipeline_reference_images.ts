@@ -98,7 +98,9 @@ function buildPngItxtChunk(keyword: string, utf8Value: string): Buffer {
 function buildPngTextChunkSmart(keyword: string, value: string): Buffer {
   // eslint-disable-next-line no-control-regex
   const isLatin1 = !/[^\u0000-\u00ff]/.test(value);
-  return isLatin1 ? buildPngTextChunk(keyword, value) : buildPngItxtChunk(keyword, value);
+  return isLatin1
+    ? buildPngTextChunk(keyword, value)
+    : buildPngItxtChunk(keyword, value);
 }
 
 function sha256Hex(buf: Buffer): string {
@@ -152,37 +154,51 @@ function decodeXmlEntities(text: string): string {
  * pins `textLength` + `lengthAdjust` so the renderer fits it exactly. Without it the raster
  * silently clips the right-hand characters, which is how the old diagrams looked "garbled".
  */
-export function fitSvgTextToWidth(svgBody: string, defaultRightEdge = 1576): string {
+export function fitSvgTextToWidth(
+  svgBody: string,
+  defaultRightEdge = 1576,
+): string {
   const EDGE_MARGIN = 14;
   let rightEdge = defaultRightEdge;
 
-  return svgBody.replace(/<rect\b([^>]*)>|<text\b([^>]*)>([^<]*)<\/text>/g, (whole, rectAttrs: string | undefined, textAttrs: string | undefined, content: string | undefined) => {
-    if (rectAttrs !== undefined) {
-      if (/\bclass="(panel|card)"/.test(rectAttrs)) {
-        const x = /\bx="([\d.]+)"/.exec(rectAttrs);
-        const width = /\bwidth="([\d.]+)"/.exec(rectAttrs);
-        if (x && width) rightEdge = Number(x[1]) + Number(width[1]);
+  return svgBody.replace(
+    /<rect\b([^>]*)>|<text\b([^>]*)>([^<]*)<\/text>/g,
+    (
+      whole,
+      rectAttrs: string | undefined,
+      textAttrs: string | undefined,
+      content: string | undefined,
+    ) => {
+      if (rectAttrs !== undefined) {
+        if (/\bclass="(panel|card)"/.test(rectAttrs)) {
+          const x = /\bx="([\d.]+)"/.exec(rectAttrs);
+          const width = /\bwidth="([\d.]+)"/.exec(rectAttrs);
+          if (x && width) rightEdge = Number(x[1]) + Number(width[1]);
+        }
+        return whole;
       }
-      return whole;
-    }
 
-    if (textAttrs === undefined || content === undefined) return whole;
-    const classMatch = /\bclass="([^"]+)"/.exec(textAttrs);
-    const xMatch = /\bx="([\d.]+)"/.exec(textAttrs);
-    if (!classMatch || !xMatch) return whole;
-    const metrics = TEXT_CLASS_METRICS[classMatch[1]!];
-    if (!metrics) return whole;
+      if (textAttrs === undefined || content === undefined) return whole;
+      const classMatch = /\bclass="([^"]+)"/.exec(textAttrs);
+      const xMatch = /\bx="([\d.]+)"/.exec(textAttrs);
+      if (!classMatch || !xMatch) return whole;
+      const metrics = TEXT_CLASS_METRICS[classMatch[1]!];
+      if (!metrics) return whole;
 
-    const chars = [...decodeXmlEntities(content)].length;
-    if (chars === 0) return whole;
-    const available = rightEdge - Number(xMatch[1]) - EDGE_MARGIN;
-    const estimated = chars * metrics.size * metrics.advance;
-    if (estimated <= available) return whole;
+      const chars = [...decodeXmlEntities(content)].length;
+      if (chars === 0) return whole;
+      const available = rightEdge - Number(xMatch[1]) - EDGE_MARGIN;
+      const estimated = chars * metrics.size * metrics.advance;
+      if (estimated <= available) return whole;
 
-    const fittedSize = Math.max(8, Math.round(((metrics.size * available) / estimated) * 10) / 10);
-    const fittedAttrs = `${textAttrs} style="font-size:${fittedSize}px" textLength="${Math.max(1, Math.floor(available))}" lengthAdjust="spacingAndGlyphs"`;
-    return `<text${fittedAttrs}>${content}</text>`;
-  });
+      const fittedSize = Math.max(
+        8,
+        Math.round(((metrics.size * available) / estimated) * 10) / 10,
+      );
+      const fittedAttrs = `${textAttrs} style="font-size:${fittedSize}px" textLength="${Math.max(1, Math.floor(available))}" lengthAdjust="spacingAndGlyphs"`;
+      return `<text${fittedAttrs}>${content}</text>`;
+    },
+  );
 }
 
 // ============================================================================
@@ -209,7 +225,9 @@ export interface PngInkStats {
   readonly backgroundRgb: readonly [number, number, number];
 }
 
-const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const PNG_SIGNATURE = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
 
 function isPng(buf: Buffer): boolean {
   return buf.length >= 8 && buf.subarray(0, 8).equals(PNG_SIGNATURE);
@@ -217,7 +235,8 @@ function isPng(buf: Buffer): boolean {
 
 /** Decodes an 8-bit non-interlaced PNG (color types 0/2/4/6 and palette 3) without dependencies. */
 export function decodePngToRaster(png: Buffer): DecodedRaster {
-  if (!isPng(png)) throw new Error("decodePngToRaster: buffer is not a PNG (bad signature)");
+  if (!isPng(png))
+    throw new Error("decodePngToRaster: buffer is not a PNG (bad signature)");
 
   let offset = 8;
   let width = 0;
@@ -248,19 +267,39 @@ export function decodePngToRaster(png: Buffer): DecodedRaster {
     }
   }
 
-  if (width <= 0 || height <= 0) throw new Error("decodePngToRaster: missing or invalid IHDR");
-  if (bitDepth !== 8) throw new Error(`decodePngToRaster: unsupported bit depth ${bitDepth}`);
-  if (interlace !== 0) throw new Error("decodePngToRaster: interlaced PNG is not supported");
-  if (colorType !== 0 && colorType !== 2 && colorType !== 3 && colorType !== 4 && colorType !== 6) {
+  if (width <= 0 || height <= 0)
+    throw new Error("decodePngToRaster: missing or invalid IHDR");
+  if (bitDepth !== 8)
+    throw new Error(`decodePngToRaster: unsupported bit depth ${bitDepth}`);
+  if (interlace !== 0)
+    throw new Error("decodePngToRaster: interlaced PNG is not supported");
+  if (
+    colorType !== 0 &&
+    colorType !== 2 &&
+    colorType !== 3 &&
+    colorType !== 4 &&
+    colorType !== 6
+  ) {
     throw new Error(`decodePngToRaster: unsupported color type ${colorType}`);
   }
 
-  const sourceChannels = colorType === 0 ? 1 : colorType === 2 ? 3 : colorType === 4 ? 2 : colorType === 6 ? 4 : 1;
+  const sourceChannels =
+    colorType === 0
+      ? 1
+      : colorType === 2
+        ? 3
+        : colorType === 4
+          ? 2
+          : colorType === 6
+            ? 4
+            : 1;
   const stride = width * sourceChannels;
   // PNG IDAT is a zlib stream (RFC 1950): Bun.inflateSync only handles raw DEFLATE, so use node:zlib.
   const inflated = new Uint8Array(zlib.inflateSync(Buffer.concat(idat)));
   if (inflated.length < (stride + 1) * height) {
-    throw new Error(`decodePngToRaster: truncated IDAT (${inflated.length} < ${(stride + 1) * height})`);
+    throw new Error(
+      `decodePngToRaster: truncated IDAT (${inflated.length} < ${(stride + 1) * height})`,
+    );
   }
 
   const unfiltered = new Uint8Array(stride * height);
@@ -297,7 +336,9 @@ export function decodePngToRaster(png: Buffer): DecodedRaster {
           break;
         }
         default:
-          throw new Error(`decodePngToRaster: invalid scanline filter ${filter} on row ${y}`);
+          throw new Error(
+            `decodePngToRaster: invalid scanline filter ${filter} on row ${y}`,
+          );
       }
       cur[i] = value & 0xff;
     }
@@ -306,7 +347,8 @@ export function decodePngToRaster(png: Buffer): DecodedRaster {
 
   // Palette PNGs (color type 3) expand to RGB through PLTE.
   if (colorType === 3) {
-    if (!palette) throw new Error("decodePngToRaster: palette PNG without PLTE chunk");
+    if (!palette)
+      throw new Error("decodePngToRaster: palette PNG without PLTE chunk");
     const pixels = new Uint8Array(width * height * 3);
     for (let i = 0; i < width * height; i++) {
       const idx = unfiltered[i]!;
@@ -367,7 +409,8 @@ export function computePngInkStats(png: Buffer): PngInkStats {
   }
   let counted = 0;
   for (const count of histogram.values()) counted += count;
-  if (counted === 0) throw new Error("computePngInkStats: image has no opaque pixels");
+  if (counted === 0)
+    throw new Error("computePngInkStats: image has no opaque pixels");
 
   let backgroundKey = 0;
   let backgroundCount = -1;
@@ -389,7 +432,8 @@ export function computePngInkStats(png: Buffer): PngInkStats {
     const r = pixels[p]!;
     const g = pixels[p + 1]!;
     const b = pixels[p + 2]!;
-    if (Math.abs(r - br) > 24 || Math.abs(g - bg) > 24 || Math.abs(b - bb) > 24) ink++;
+    if (Math.abs(r - br) > 24 || Math.abs(g - bg) > 24 || Math.abs(b - bb) > 24)
+      ink++;
     if (0.2126 * r + 0.7152 * g + 0.0722 * b >= 200) bright++;
   }
 
@@ -422,7 +466,10 @@ export const RASTER_GATE: RasterGate = {
   minBrightCoverage: 0.008,
 };
 
-export function checkRasterGate(stats: PngInkStats, gate: RasterGate = RASTER_GATE): string | null {
+export function checkRasterGate(
+  stats: PngInkStats,
+  gate: RasterGate = RASTER_GATE,
+): string | null {
   if (!Number.isFinite(stats.inkCoverage)) return "raster stats unavailable";
   if (stats.width < 1200 || stats.height < 800) {
     return `raster ${stats.width}x${stats.height} is smaller than the 1200x800 minimum`;
@@ -454,7 +501,10 @@ interface RasterizedSvg {
   readonly stats: PngInkStats;
 }
 
-function validateRasterCandidate(png: Buffer): { stats: PngInkStats | null; reason: string | null } {
+function validateRasterCandidate(png: Buffer): {
+  stats: PngInkStats | null;
+  reason: string | null;
+} {
   if (!isPng(png)) return { stats: null, reason: "output is not a PNG" };
   try {
     const stats = computePngInkStats(png);
@@ -464,7 +514,10 @@ function validateRasterCandidate(png: Buffer): { stats: PngInkStats | null; reas
   }
 }
 
-function runRasterizer(command: readonly string[], timeoutMs = 30_000): { status: number; stderr: string } {
+function runRasterizer(
+  command: readonly string[],
+  timeoutMs = 30_000,
+): { status: number; stderr: string } {
   const result = Bun.spawnSync({
     cmd: [...command],
     stdout: "pipe",
@@ -473,22 +526,58 @@ function runRasterizer(command: readonly string[], timeoutMs = 30_000): { status
   });
   return {
     status: result.exitCode ?? 1,
-    stderr: result.stderr ? Buffer.from(result.stderr).toString("utf8").trim() : "",
+    stderr: result.stderr
+      ? Buffer.from(result.stderr).toString("utf8").trim()
+      : "",
   };
 }
 
-function attemptFromOutput(backend: string, command: readonly string[], produced: Buffer | null, status: number, stderr: string): RasterizerAttempt {
+function attemptFromOutput(
+  backend: string,
+  command: readonly string[],
+  produced: Buffer | null,
+  status: number,
+  stderr: string,
+): RasterizerAttempt {
   const rendered = command.join(" ");
-  if (status !== 0) return { backend, command: rendered, ok: false, detail: `exit ${status}: ${stderr || "no stderr"}` };
-  if (!produced || produced.length === 0) return { backend, command: rendered, ok: false, detail: "exited 0 but wrote no output" };
+  if (status !== 0)
+    return {
+      backend,
+      command: rendered,
+      ok: false,
+      detail: `exit ${status}: ${stderr || "no stderr"}`,
+    };
+  if (!produced || produced.length === 0)
+    return {
+      backend,
+      command: rendered,
+      ok: false,
+      detail: "exited 0 but wrote no output",
+    };
   const { stats, reason } = validateRasterCandidate(produced);
-  if (!stats) return { backend, command: rendered, ok: false, detail: reason ?? "unreadable output" };
+  if (!stats)
+    return {
+      backend,
+      command: rendered,
+      ok: false,
+      detail: reason ?? "unreadable output",
+    };
   if (reason) return { backend, command: rendered, ok: false, detail: reason };
-  return { backend, command: rendered, ok: true, detail: `${stats.width}x${stats.height}`, png: produced, stats };
+  return {
+    backend,
+    command: rendered,
+    ok: true,
+    detail: `${stats.width}x${stats.height}`,
+    png: produced,
+    stats,
+  };
 }
 
 /** `rsvg-convert` renders at the SVG's exact 1600x920 aspect ratio. */
-function rasterizeWithRsvgConvert(svgPath: string, tmpDir: string): RasterizerAttempt {
+function rasterizeWithRsvgConvert(
+  svgPath: string,
+  tmpDir: string,
+): RasterizerAttempt {
   const outPath = path.join(tmpDir, "rsvg.png");
   const command = [
     "rsvg-convert",
@@ -502,7 +591,8 @@ function rasterizeWithRsvgConvert(svgPath: string, tmpDir: string): RasterizerAt
   ];
   try {
     const { status, stderr } = runRasterizer(command);
-    const produced = status === 0 && fs.existsSync(outPath) ? fs.readFileSync(outPath) : null;
+    const produced =
+      status === 0 && fs.existsSync(outPath) ? fs.readFileSync(outPath) : null;
     return attemptFromOutput("rsvg-convert", command, produced, status, stderr);
   } catch (error) {
     return {
@@ -518,12 +608,26 @@ function rasterizeWithRsvgConvert(svgPath: string, tmpDir: string): RasterizerAt
  * `qlmanage` always renders a square thumbnail canvas, so it is only a fallback for hosts without
  * librsvg. It still produces real ink, which is what the gate checks.
  */
-function rasterizeWithQlmanage(svgPath: string, tmpDir: string): RasterizerAttempt {
-  const command = ["qlmanage", "-t", "-s", String(RASTER_WIDTH), "-o", tmpDir, svgPath];
+function rasterizeWithQlmanage(
+  svgPath: string,
+  tmpDir: string,
+): RasterizerAttempt {
+  const command = [
+    "qlmanage",
+    "-t",
+    "-s",
+    String(RASTER_WIDTH),
+    "-o",
+    tmpDir,
+    svgPath,
+  ];
   try {
     const { status, stderr } = runRasterizer(command);
     const producedPath = path.join(tmpDir, `${path.basename(svgPath)}.png`);
-    const produced = status === 0 && fs.existsSync(producedPath) ? fs.readFileSync(producedPath) : null;
+    const produced =
+      status === 0 && fs.existsSync(producedPath)
+        ? fs.readFileSync(producedPath)
+        : null;
     return attemptFromOutput("qlmanage", command, produced, status, stderr);
   } catch (error) {
     return {
@@ -540,12 +644,16 @@ function rasterizeWithQlmanage(svgPath: string, tmpDir: string): RasterizerAttem
  * output, so a fallback can never overwrite a better render. Throws when every backend fails —
  * a broken image must stop the build instead of committing a text-free dark grid.
  */
-export function rasterizeSvgToPng(svgPath: string, outPath: string): RasterizedSvg {
+export function rasterizeSvgToPng(
+  svgPath: string,
+  outPath: string,
+): RasterizedSvg {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sportsdesk-raster-"));
   const attempts: RasterizerAttempt[] = [];
   try {
     const backends = [rasterizeWithRsvgConvert, rasterizeWithQlmanage];
-    let winner: (RasterizerAttempt & { png: Buffer; stats: PngInkStats }) | null = null;
+    let winner:
+      (RasterizerAttempt & { png: Buffer; stats: PngInkStats }) | null = null;
 
     for (const backend of backends) {
       const attempt = backend(svgPath, tmpDir);
@@ -557,17 +665,21 @@ export function rasterizeSvgToPng(svgPath: string, outPath: string): RasterizedS
     }
 
     if (!winner) {
-      const report = attempts.map((a) => `  • ${a.backend}: ${a.detail}\n    $ ${a.command}`).join("\n");
+      const report = attempts
+        .map((a) => `  • ${a.backend}: ${a.detail}\n    $ ${a.command}`)
+        .join("\n");
       throw new Error(
         `SVG rasterization failed for ${path.relative(repoRoot, svgPath)} — refusing to write a blank fallback PNG.\n` +
-          `Install librsvg (\`brew install librsvg\`) or run on a host with a working QuickLook SVG renderer.\n${report}`
+          `Install librsvg (\`brew install librsvg\`) or run on a host with a working QuickLook SVG renderer.\n${report}`,
       );
     }
 
     // Gate re-check on the exact bytes that will be committed (metadata chunks are added later).
     const gateFailure = checkRasterGate(winner.stats);
     if (gateFailure) {
-      throw new Error(`Rasterizer ${winner.backend} produced an unusable PNG for ${svgPath}: ${gateFailure}`);
+      throw new Error(
+        `Rasterizer ${winner.backend} produced an unusable PNG for ${svgPath}: ${gateFailure}`,
+      );
     }
 
     fs.writeFileSync(outPath, winner.png);
@@ -577,13 +689,11 @@ export function rasterizeSvgToPng(svgPath: string, outPath: string): RasterizedS
   }
 }
 
-
-
 function injectRichMetadataIntoPng(
   pngBuf: Buffer,
   spec: PipelineArtifactSpec,
   xmpXml: string,
-  jsonLdString: string
+  jsonLdString: string,
 ): Buffer {
   // Strip any previously injected SportsDesk iTXt/tEXt chunks so operation is idempotent
   const signature = pngBuf.subarray(0, 8);
@@ -600,13 +710,35 @@ function injectRichMetadataIntoPng(
     if (type === "IHDR") {
       chunks.push(rawChunk);
       chunks.push(buildPngTextChunkSmart("Title", spec.title));
-      chunks.push(buildPngTextChunkSmart("Author", "SportsDesk & Fantasy402 Risk Engineering (BILLY666 Master)"));
+      chunks.push(
+        buildPngTextChunkSmart(
+          "Author",
+          "SportsDesk & Fantasy402 Risk Engineering (BILLY666 Master)",
+        ),
+      );
       chunks.push(buildPngTextChunkSmart("Description", spec.description));
-      chunks.push(buildPngTextChunkSmart("Software", "SportsDesk 10-Mode Forensic & Canonical Pipeline Generator (Bun v1.4.4)"));
-      chunks.push(buildPngTextChunkSmart("Source", `${publicR2Base}/assets/${spec.slug}.svg`));
-      chunks.push(buildPngTextChunkSmart("Copyright", "SportsDesk Ops Specification-Grade Reference Artifact"));
+      chunks.push(
+        buildPngTextChunkSmart(
+          "Software",
+          "SportsDesk 10-Mode Forensic & Canonical Pipeline Generator (Bun v1.4.4)",
+        ),
+      );
+      chunks.push(
+        buildPngTextChunkSmart(
+          "Source",
+          `${publicR2Base}/assets/${spec.slug}.svg`,
+        ),
+      );
+      chunks.push(
+        buildPngTextChunkSmart(
+          "Copyright",
+          "SportsDesk Ops Specification-Grade Reference Artifact",
+        ),
+      );
       chunks.push(buildPngItxtChunk("XML:com.adobe.xmp", xmpXml));
-      chunks.push(buildPngItxtChunk("SportsDesk:PipelineSpecJson", jsonLdString));
+      chunks.push(
+        buildPngItxtChunk("SportsDesk:PipelineSpecJson", jsonLdString),
+      );
       injected = true;
     } else if (type === "tEXt" || type === "iTXt") {
       // Skip old text chunks so we replace cleanly
@@ -617,13 +749,17 @@ function injectRichMetadataIntoPng(
   }
 
   if (!injected) {
-    throw new Error("injectRichMetadataIntoPng: no IHDR chunk found — refusing to write a PNG without metadata");
+    throw new Error(
+      "injectRichMetadataIntoPng: no IHDR chunk found — refusing to write a PNG without metadata",
+    );
   }
   return Buffer.concat(chunks);
 }
 
 function buildXmpPacket(spec: PipelineArtifactSpec): string {
-  const subject = [...spec.domainsCovered, ...spec.upstreamModules].map((tag) => `<rdf:li>${escapeXmlText(tag)}</rdf:li>`).join("");
+  const subject = [...spec.domainsCovered, ...spec.upstreamModules]
+    .map((tag) => `<rdf:li>${escapeXmlText(tag)}</rdf:li>`)
+    .join("");
   return `<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -654,7 +790,11 @@ function embedJsonLdInCdata(jsonLdString: string): string {
   return `<![CDATA[${jsonLdString.replace(/]]>/g, "]]]]><![CDATA[>")}]]>`;
 }
 
-function buildFullSvgDocument(spec: PipelineArtifactSpec, xmpXml: string, jsonLdObj: object): string {
+function buildFullSvgDocument(
+  spec: PipelineArtifactSpec,
+  xmpXml: string,
+  jsonLdObj: object,
+): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 920" width="1600" height="920" role="img" aria-labelledby="${spec.slug}-title ${spec.slug}-desc">
   <title id="${spec.slug}-title">${escapeXmlText(spec.title)}</title>
@@ -698,11 +838,18 @@ export const PIPELINE_ARTIFACTS: readonly PipelineArtifactSpec[] = [
   {
     id: "SD-ARTIFACT-01-10MODE-PIPELINE",
     slug: "pipeline-10-mode-architecture",
-    title: "SPORTSDESK & FANTASY402 — DATA CLEANING, 10-MODE ENGINE & OPERATOR ACTION PIPELINE",
-    subtitle: "End-to-End Flow: 4 Upstream Feeds -> 6-Layer Canonical Cleaner -> 10-Mode Diagnostic Matrix -> Automated Desk Actions",
+    title:
+      "SPORTSDESK & FANTASY402 — DATA CLEANING, 10-MODE ENGINE & OPERATOR ACTION PIPELINE",
+    subtitle:
+      "End-to-End Flow: 4 Upstream Feeds -> 6-Layer Canonical Cleaner -> 10-Mode Diagnostic Matrix -> Automated Desk Actions",
     description:
       "End-to-end architectural diagram showing how report.js, help-report.js, bet-ticker.js, ip-tracker.js, GSLive Partner 118 (player_[login]), and Polymarket CLOB/Data APIs are cleaned into canonical primitives, evaluated across Modes 1..10 (Risk & Exposure, Identity & Network, Cross-Market, Data Integrity), and converted into sub-320ms Ban-Hammer clamps, Stepped Line dispatches, +15c/+20c vig shading, and $0-gap ledger reconciliations.",
-    domainsCovered: ["Risk & Exposure", "Identity & Network", "Cross-Market", "Data Integrity"],
+    domainsCovered: [
+      "Risk & Exposure",
+      "Identity & Network",
+      "Cross-Market",
+      "Data Integrity",
+    ],
     modesCovered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     upstreamModules: [
       "customer/report/report.js",
@@ -876,11 +1023,18 @@ export const PIPELINE_ARTIFACTS: readonly PipelineArtifactSpec[] = [
   {
     id: "SD-ARTIFACT-02-6LAYER-CLEANING",
     slug: "pipeline-6-layer-data-cleaning",
-    title: "ROSETTA STONE 6-LAYER DATA CLEANING & CANONICAL FIELD MAPPING REFERENCE",
-    subtitle: "De-obfuscated report.js • help-report.js • bet-ticker.js • ip-tracker.js -> Canonical TypeScript Primitives",
+    title:
+      "ROSETTA STONE 6-LAYER DATA CLEANING & CANONICAL FIELD MAPPING REFERENCE",
+    subtitle:
+      "De-obfuscated report.js • help-report.js • bet-ticker.js • ip-tracker.js -> Canonical TypeScript Primitives",
     description:
       "Detailed engineering reference diagram illustrating the 6 canonical data-cleaning transformations applied to Fantasy402, GSLive Partner 118, and Polymarket feeds: (1) TicketNumber-WagerNumber composite parent grouping, (2) BLOCKED drop & ALERT mirror zeroing, (3) FreePlayFlag='Y' zero-principal loss & Stake/Payout/Liability separation, (4) Teaser effective line & DGS GameNum+5000 parent rotation normalization, (5) IP-Tracker Mode B Per-Office vs Global & Mode C YYYY-MM-DD date rewrite, and (6) 4-Surface Identity Join with 11-char space-padded PaddedCustomerId write enforcement.",
-    domainsCovered: ["Risk & Exposure", "Identity & Network", "Cross-Market", "Data Integrity"],
+    domainsCovered: [
+      "Risk & Exposure",
+      "Identity & Network",
+      "Cross-Market",
+      "Data Integrity",
+    ],
     modesCovered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     upstreamModules: [
       "customer/report/report.js",
@@ -987,8 +1141,10 @@ export const PIPELINE_ARTIFACTS: readonly PipelineArtifactSpec[] = [
   {
     id: "SD-ARTIFACT-03-IP-AND-RECONCILIATION",
     slug: "pipeline-per-office-ip-and-reconciliation",
-    title: "PER-OFFICE IP-TRACKER (MODES 2–6) & SCOPE-LOCKED RECONCILIATION (MODES 1, 8, 9, 10)",
-    subtitle: "13 Office & Cross-Office IP Clusters (MJ2026, BIGDAD, CUB22HR, ATEAM...) + Zero-Gap Financial Reconciliation",
+    title:
+      "PER-OFFICE IP-TRACKER (MODES 2–6) & SCOPE-LOCKED RECONCILIATION (MODES 1, 8, 9, 10)",
+    subtitle:
+      "13 Office & Cross-Office IP Clusters (MJ2026, BIGDAD, CUB22HR, ATEAM...) + Zero-Gap Financial Reconciliation",
     description:
       "Reference diagram combining the 13 Per-Office & Cross-Office IP-Tracker clusters (getWebLog Mode B customerID=<OfficeAgentID> vs customerID=0, Mode C YYYY-MM-DD history, Mode I reverse IP, and Mode 6 concurrent session overlap) with the Risk & Data Integrity reconciliation pipeline (Mode 1 Overview, Mode 8 Settled Net, Mode 9 Pending Exposure, and Mode 10 Scope-Locked Reconciliation proving Unresolved Gap = $0.00).",
     domainsCovered: ["Identity & Network", "Risk & Exposure", "Data Integrity"],
@@ -1083,8 +1239,10 @@ export const PIPELINE_ARTIFACTS: readonly PipelineArtifactSpec[] = [
   {
     id: "SD-ARTIFACT-04-DUAL-SURFACE-GSLIVE",
     slug: "pipeline-dual-surface-gslive-model",
-    title: "DUAL-SURFACE GSLIVE MODEL — BATCH ACCOUNT REPORT vs LIVE BET-HISTORY STREAM",
-    subtitle: "GSLive Manager Partner 118: #/reports/users (batch) • #/events/bet-history (live) • desk-day window • betTime vs calcTime • `t` cache-buster tick",
+    title:
+      "DUAL-SURFACE GSLIVE MODEL — BATCH ACCOUNT REPORT vs LIVE BET-HISTORY STREAM",
+    subtitle:
+      "GSLive Manager Partner 118: #/reports/users (batch) • #/events/bet-history (live) • desk-day window • betTime vs calcTime • `t` cache-buster tick",
     description:
       "Reference model for the two GSLive Partner 118 surfaces and the rule that keeps them from double-counting. The batch surface #/reports/users returns one settled account row per player_[login] per desk day (handle, win/loss, wager count) and is authoritative for booked volume. The live surface #/events/bet-history pushes one event per wager state change, where betTime is the placement wall clock and calcTime is the grade/settle clock, and is authoritative for in-flight exposure and placement velocity. Both are bucketed into the America/Chicago desk day (00:00:00.000-23:59:59.999 CT), joined on (partnerId, login, ticketNumber, betTime), and refreshed with a `t` cache-buster tick (Math.floor(Date.now()/60000)) so a batch re-fetch never serves a stale edge copy and never disturbs the stream.",
     domainsCovered: ["Risk & Exposure", "Cross-Market", "Data Integrity"],
@@ -1273,11 +1431,20 @@ export interface GeneratedArtifactCatalogEntry {
   readonly embeddedMetadataStandards: readonly string[];
 }
 
-async function encodeWebpFromPng(pngBuf: Buffer, slug: string): Promise<Buffer> {
+async function encodeWebpFromPng(
+  pngBuf: Buffer,
+  slug: string,
+): Promise<Buffer> {
   const encoded = await new Bun.Image(pngBuf).webp({ quality: 82 }).bytes();
   const webp = Buffer.from(encoded);
-  if (webp.length < 16 || webp.toString("ascii", 0, 4) !== "RIFF" || webp.toString("ascii", 8, 12) !== "WEBP") {
-    throw new Error(`WebP encode failed for ${slug}: output is not a RIFF/WEBP container`);
+  if (
+    webp.length < 16 ||
+    webp.toString("ascii", 0, 4) !== "RIFF" ||
+    webp.toString("ascii", 8, 12) !== "WEBP"
+  ) {
+    throw new Error(
+      `WebP encode failed for ${slug}: output is not a RIFF/WEBP container`,
+    );
   }
   return webp;
 }
@@ -1290,7 +1457,9 @@ function copyToDist(fileName: string): void {
   fs.copyFileSync(src, dest);
 }
 
-export async function generateAllPipelineReferenceImages(): Promise<readonly GeneratedArtifactCatalogEntry[]> {
+export async function generateAllPipelineReferenceImages(): Promise<
+  readonly GeneratedArtifactCatalogEntry[]
+> {
   const catalogEntries: GeneratedArtifactCatalogEntry[] = [];
 
   // ARCH-Guide is an upstream JPEG baseline: it carries no PNG tEXt/iTXt chunks, so it is copied
@@ -1298,7 +1467,9 @@ export async function generateAllPipelineReferenceImages(): Promise<readonly Gen
   const existingArch = path.join(docsAssetsDir, "ARCH-Guide.jpg");
   if (fs.existsSync(existingArch)) {
     copyToDist("ARCH-Guide.jpg");
-    console.log("  • docs/assets/ARCH-Guide.jpg is a JPEG baseline — copied unchanged (no PNG chunks)");
+    console.log(
+      "  • docs/assets/ARCH-Guide.jpg is a JPEG baseline — copied unchanged (no PNG chunks)",
+    );
   }
 
   for (const spec of PIPELINE_ARTIFACTS) {
@@ -1318,7 +1489,11 @@ export async function generateAllPipelineReferenceImages(): Promise<readonly Gen
         "@type": "Organization",
         name: "SportsDesk & Fantasy402 Risk Engineering",
       },
-      keywords: [...spec.domainsCovered, ...spec.upstreamModules, ...spec.cleaningLayers],
+      keywords: [
+        ...spec.domainsCovered,
+        ...spec.upstreamModules,
+        ...spec.cleaningLayers,
+      ],
       potentialAction: spec.operatorCliCommands,
     };
     const jsonLdString = JSON.stringify(jsonLdObj);
@@ -1335,7 +1510,12 @@ export async function generateAllPipelineReferenceImages(): Promise<readonly Gen
     const pngDistPath = path.join(distAssetsDir, `${spec.slug}.png`);
     const raster = rasterizeSvgToPng(svgDocsPath, pngDocsPath);
 
-    const richPngBuf = injectRichMetadataIntoPng(raster.png, spec, xmpXml, jsonLdString);
+    const richPngBuf = injectRichMetadataIntoPng(
+      raster.png,
+      spec,
+      xmpXml,
+      jsonLdString,
+    );
     fs.writeFileSync(pngDocsPath, richPngBuf);
     fs.writeFileSync(pngDistPath, richPngBuf);
 
@@ -1401,33 +1581,60 @@ export async function generateAllPipelineReferenceImages(): Promise<readonly Gen
     metadataCatalogPublicUrl: `${publicR2Base}/assets/pipeline-artifacts-metadata.json`,
     totalArtifacts: catalogEntries.length,
     formats: {
-      svg: { mimeType: "image/svg+xml", metadataBearing: true, role: "source of truth (RDF/XMP/JSON-LD in <metadata>)" },
-      png: { mimeType: "image/png", metadataBearing: true, role: "download + metadata-bearing raster (tEXt/iTXt/XMP/JSON-LD)" },
-      webp: { mimeType: "image/webp", metadataBearing: false, role: "lightweight raster sibling; Bun.Image re-encode drops XMP/tEXt" },
+      svg: {
+        mimeType: "image/svg+xml",
+        metadataBearing: true,
+        role: "source of truth (RDF/XMP/JSON-LD in <metadata>)",
+      },
+      png: {
+        mimeType: "image/png",
+        metadataBearing: true,
+        role: "download + metadata-bearing raster (tEXt/iTXt/XMP/JSON-LD)",
+      },
+      webp: {
+        mimeType: "image/webp",
+        metadataBearing: false,
+        role: "lightweight raster sibling; Bun.Image re-encode drops XMP/tEXt",
+      },
     },
     artifacts: catalogEntries,
   };
 
   const manifestJson = JSON.stringify(manifestPayload, null, 2) + "\n";
-  fs.writeFileSync(path.join(docsAssetsDir, "pipeline-artifacts-metadata.json"), manifestJson, "utf8");
-  fs.writeFileSync(path.join(distAssetsDir, "pipeline-artifacts-metadata.json"), manifestJson, "utf8");
+  fs.writeFileSync(
+    path.join(docsAssetsDir, "pipeline-artifacts-metadata.json"),
+    manifestJson,
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(distAssetsDir, "pipeline-artifacts-metadata.json"),
+    manifestJson,
+    "utf8",
+  );
 
   return catalogEntries;
 }
 
 if (import.meta.main) {
   const entries = await generateAllPipelineReferenceImages();
-  console.log("================================================================================================================================");
-  console.log("  🖼️  GENERATED RICH-METADATA PIPELINE REFERENCE IMAGES (SVG + PNG + WebP + XMP + JSON-LD)");
-  console.log("================================================================================================================================");
+  console.log(
+    "================================================================================================================================",
+  );
+  console.log(
+    "  🖼️  GENERATED RICH-METADATA PIPELINE REFERENCE IMAGES (SVG + PNG + WebP + XMP + JSON-LD)",
+  );
+  console.log(
+    "================================================================================================================================",
+  );
   for (const e of entries) {
     const { files } = e;
     console.log(
       `  • ${e.id.padEnd(34)} | SVG ${String(files.svgBytes).padStart(6)} B | PNG ${String(files.pngBytes).padStart(6)} B | WebP ${String(files.webpBytes).padStart(6)} B\n` +
         `      raster=${e.render.rasterizer} ${e.render.width}x${e.render.height} uniqueColors=${e.render.uniqueColors} ` +
-        `ink=${(e.render.inkCoverage * 100).toFixed(2)}% bright=${(e.render.brightCoverage * 100).toFixed(2)}%`
+        `ink=${(e.render.inkCoverage * 100).toFixed(2)}% bright=${(e.render.brightCoverage * 100).toFixed(2)}%`,
     );
   }
-  console.log("================================================================================================================================");
+  console.log(
+    "================================================================================================================================",
+  );
 }
-
