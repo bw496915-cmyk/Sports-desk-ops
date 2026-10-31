@@ -44,8 +44,11 @@ Public APIs only; no key. Implementation: `lib/polymarket_combo.ts`,
    as `includedCrossGame`, never as a drop. Bucket counts are not comparable across gates.
    `--json` reports `gate`, `permissiveCombos`, `duplicatesCollapsed*`, `exclusions`,
    `includedCrossGame` and a per-combo `kept`/`dropReason` audit (`--no-audit` omits it).
-7. `verify-subset` runs permissive and treatment in one process: exit 1 = leak, 2 = vacuous
-   (empty treatment). Prefer it over reading counts; a `0` treatment proves nothing.
+7. `verify-subset --chain` asserts both edges — `full-game ⊆ all-legs-cfb ⊆ permissive` — not
+   just permissive-vs-treatment. `--against <gate>` checks one edge; a gated reference compares on
+   its **kept** set. Exit 1 = leak; exit 2 = vacuous only with `--strict-exit` (default warns and
+   exits 0, so a structurally-zero gate does not fail unattended runs). A `0` treatment proves
+   nothing.
 8. Dedupe twice: `comboId|wallet`, then `legSignatures|wallet` (`legKey|outcome|marketType`) to
    collapse cross-indexer duplicates without merging distinct same-condition markets.
    `UNRESOLVED_LEGS > 0` means the gated count is a floor.

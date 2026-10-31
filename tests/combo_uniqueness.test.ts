@@ -198,13 +198,24 @@ describe("CFB combo uniqueness", () => {
     }
   });
 
-  test("verifier: strict is a subset, and an empty treatment is vacuous", async () => {
+  test("verifier: the chain full-game ⊆ all-legs-cfb ⊆ permissive holds", async () => {
     const permissive = await buildComboUniquenessReport(options());
+    const cfbOnly = await buildComboUniquenessReport(options({ gate: "all-legs-cfb" }));
     const strict = await buildComboUniquenessReport(options({ gate: "full-game" }));
-    const check = checkComboSubset(permissive, strict);
-    expect(check.leaks).toEqual([]);
-    expect(check.vacuous).toBe(false);
-    expect(check.treatment).toBe(strict.comboRecords);
+
+    const outer = checkComboSubset(permissive, cfbOnly);
+    expect(outer.referenceGate).toBe("permissive");
+    expect(outer.treatmentGate).toBe("all-legs-cfb");
+    expect(outer.leaks).toEqual([]);
+    expect(outer.vacuous).toBe(false);
+
+    const inner = checkComboSubset(cfbOnly, strict);
+    expect(inner.referenceGate).toBe("all-legs-cfb");
+    expect(inner.treatmentGate).toBe("full-game");
+    expect(inner.reference).toBe(cfbOnly.comboRecords); // 4, not the permissive 5
+    expect(inner.leaks).toEqual([]);
+    expect(inner.vacuous).toBe(false);
+    expect(inner.treatment).toBe(strict.comboRecords);
 
     const empty = await buildComboUniquenessReport(
       options({ gate: "full-game", walletFile: "/nonexistent/wallets.txt", leaderboard: false, seedTrades: false }),
@@ -212,6 +223,14 @@ describe("CFB combo uniqueness", () => {
     const vacuous = checkComboSubset(permissive, empty);
     expect(vacuous.treatment).toBe(0);
     expect(vacuous.vacuous).toBe(true);
+  });
+
+  test("every gate conserves permissive = kept + Σ(exclusions)", async () => {
+    for (const gate of ["permissive", "all-legs-cfb", "full-game"] as const) {
+      const report = await buildComboUniquenessReport(options({ gate }));
+      const dropped = report.exclusions.UNRESOLVED_LEGS + report.exclusions.CROSS_GAME + report.exclusions.INELIGIBLE_LEG_TYPE;
+      expect(report.permissiveCombos).toBe(report.comboRecords + dropped);
+    }
   });
 
   test("emit-ids lines: treatment output is a subset of permissive output", async () => {

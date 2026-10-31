@@ -726,7 +726,9 @@ export function linesToText(lines: readonly string[]): string {
 }
 
 export interface ComboSubsetCheck {
-  readonly permissive: number;
+  readonly referenceGate: ComboGate;
+  readonly treatmentGate: ComboGate;
+  readonly reference: number;
   readonly treatment: number;
   readonly leaks: readonly string[];
   /** True when the treatment set is empty: an empty diff proves nothing. */
@@ -734,18 +736,22 @@ export interface ComboSubsetCheck {
 }
 
 /**
- * Empirical subset proof: every treatment combo must exist in the permissive set.
+ * Empirical subset proof: every treatment combo must exist in the reference set.
  * An empty treatment set is reported as `vacuous` rather than as a pass.
  */
 export function checkComboSubset(
-  permissive: ComboUniquenessReport,
+  reference: ComboUniquenessReport,
   treatment: ComboUniquenessReport,
 ): ComboSubsetCheck {
-  const anyIds = new Set(comboIdLines(permissive, { keptOnly: false }));
+  // Kept-only on both sides. Using all audit rows for the reference would silently widen a
+  // gated reference (e.g. all-legs-cfb) back to the permissive population.
+  const referenceIds = new Set(comboIdLines(reference));
   const treatmentIds = comboIdLines(treatment);
-  const leaks = treatmentIds.filter((line) => !anyIds.has(line));
+  const leaks = treatmentIds.filter((line) => !referenceIds.has(line));
   return {
-    permissive: anyIds.size,
+    referenceGate: reference.gate,
+    treatmentGate: treatment.gate,
+    reference: referenceIds.size,
     treatment: treatmentIds.length,
     leaks,
     vacuous: treatmentIds.length === 0,

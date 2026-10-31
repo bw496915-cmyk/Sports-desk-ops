@@ -67,9 +67,10 @@ Caveats:
 ./bin/dx combo uniqueness --all-legs-cfb --json
 ./bin/dx combo uniqueness --strict-full-game --json
 
-# empirical subset check, in one process (exit 1 = leak, 2 = vacuous)
-./bin/dx combo verify-subset --wallet-file scratch/seed.txt --limit-games 100
-./bin/dx combo verify-subset --all-legs-cfb --wallet-file scratch/seed.txt --limit-games 100
+# empirical subset chain, in one process: full-game ⊆ all-legs-cfb ⊆ permissive
+./bin/dx combo verify-subset --chain --wallet-file scratch/seed.txt --limit-games 100
+./bin/dx combo verify-subset --against all-legs-cfb --wallet-file scratch/seed.txt
+./bin/dx combo verify-subset --chain --strict-exit   # exit 2 on a vacuous edge (CI)
 
 # file-based equivalent for comm
 ./bin/dx combo uniqueness --seed-trades --max-seed-markets 20 --limit-games 20 --dump-wallets scratch/seed.txt
@@ -150,17 +151,24 @@ With 322 seeded wallets and `--limit-games 100`:
 | `full-game` | **0** | 46 unresolved, 36 cross-game, 0 ineligible |
 
 ```
-verify-subset --all-legs-cfb : permissive 82, treatment 34, leaks 0, exit 0
-verify-subset               : permissive 82, treatment  0, leaks 0, VACUOUS, exit 2
+verify-subset --chain :
+  all-legs-cfb ⊆ permissive   reference 82, treatment 34, leaks 0
+  full-game    ⊆ all-legs-cfb reference 34, treatment  0, leaks 0, VACUOUS
+  exit 0 (exit 2 only with --strict-exit)
 ```
 
-So the three-mode layering answers the question the two-mode version could not: there are 34
-CFB-only combos, and single-game strict is empty because **every one of them is cross-game**. The
-`2 ineligible` under `all-legs-cfb` are cross-game combos that were counted as `CROSS_GAME` under
-`full-game` — precedence, not a new population.
+The chain asserts the definition `full-game = all-legs-cfb ∧ single-game` edge by edge, rather
+than inferring it from two independent permissive comparisons. A gated reference is compared on its
+**kept** set; using its audit rows would silently widen it back to permissive, which is exactly the
+bug the inner edge caught on the first run (`reference 82` instead of `34`).
 
-`--strict-full-game` is therefore not a useful gate for this wallet set. Use `--all-legs-cfb` to
-measure CFB combo activity, and treat `full-game` as a separate single-game view.
+Combined with `includedCrossGame == kept == 34`, this is definitive: **every** CFB combo in this
+book is cross-game, so single-game CFB combos are not a style this customer set uses. The 46
+`UNRESOLVED_LEGS` are the only gap between permissive and all-legs-cfb, and they are a floor, not a
+correctness issue.
+
+Exit codes: `1` = leak always; `2` = vacuous **only** with `--strict-exit`. Default vacuous is a
+warning plus exit 0, so a structurally-zero gate does not fail unattended runs.
 - Cache: `scratch/cfb-combo-cache/<wallet>.json`, TTL 24h by default; corrupted files are refetched.
 
 ## 5. Backtesting (realized PnL)

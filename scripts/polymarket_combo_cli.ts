@@ -20,6 +20,7 @@ import {
   seedWalletsFromLeaderboard,
   walletLines,
   type ComboGate,
+  type ComboSubsetCheck,
   type ComboUniquenessOptions,
 } from "../lib/combo_uniqueness.ts";
 import { runComboBacktest } from "../lib/combo_backtest.ts";
@@ -41,7 +42,8 @@ Usage:
   bun run scripts/polymarket_combo_cli.ts price --legs "<marketSlug>=<Outcome>,..." [--limit 10]
   bun run scripts/polymarket_combo_cli.ts wallet <0x> [--limit 100] [--max-pages 5] [--json]
   bun run scripts/polymarket_combo_cli.ts uniqueness [--strict-full-game|--all-legs-cfb] [--json]
-  bun run scripts/polymarket_combo_cli.ts verify-subset [--all-legs-cfb] [--wallet-file <path>]
+  bun run scripts/polymarket_combo_cli.ts verify-subset [--all-legs-cfb] [--against <gate>] [--chain]
+  bun run scripts/polymarket_combo_cli.ts verify-subset --wallet-file <path> [--strict-exit]
   bun run scripts/polymarket_combo_cli.ts backtest [--days 30] [--wallets 0x..] [--all-venues] [--json]
 
 Notes:
@@ -61,8 +63,13 @@ Notes:
       full-game     = all-legs-cfb AND single game
     A stricter gate is always a subset of a looser one. --json returns the active
     gate, mode-relative exclusions, includedCrossGame and a kept/dropReason audit.
-  • verify-subset runs the permissive and treatment reports in one process and
-    prints leaks; exit 1 = leak, exit 2 = vacuous (empty treatment set).
+  • verify-subset runs the reference and treatment reports in one process.
+    Default reference = permissive, treatment = full-game (or all-legs-cfb).
+      --against all-legs-cfb   assert full-game ⊆ all-legs-cfb
+      --chain                  assert both edges: full-game ⊆ all-legs-cfb ⊆ permissive
+    Exit 1 = leak. Exit 2 only with --strict-exit when an edge is vacuous
+    (empty treatment); otherwise a vacuous edge warns and exits 0, so a
+    structurally-zero gate does not fail unattended runs.
   • backtest computes realized PnL from SPLIT cost vs REDEEM/MERGE/SELL payout; open combos are
     excluded from realized totals, and --all-venues skips CFB game attribution.
   • Public APIs only; no key.`;
@@ -217,27 +224,71 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
           : "permissive";
 
     if (sub === "verify-subset") {
-      const treatmentGate: ComboGate = args.includes("--all-legs-cfb") ? "all-legs-cfb" : "full-game";
-      const permissive = await buildComboUniquenessReport(
-        comboUniquenessOptions(args, "permissive"),
-      );
-      const treatment = await buildComboUniquenessReport(
-        comboUniquenessOptions(args, treatmentGate),
-      );
-      const check = checkComboSubset(permissive, treatment);
-      if (json) {
-        console.log(JSON.stringify({ treatmentGate, ...check }, null, 2));
-      } else {
-        console.log(
-          `subset check (${treatmentGate}) — permissive ${check.permissive}, treatment ${check.treatment}, leaks ${check.leaks.length}`,
+      const strictExit = args.includes("--strict-exit");
+      const chain = args.includes("--chain");
+      const treatmentGate: ComboGate = args.includes("--all-legs-cfb")
+        ? "all-legs-cfb"
+        : "full-game";
+      const referenceArg = flag(args, ["--against"], "permissive").toLowerCase();
+      const referenceGate: ComboGate =
+        referenceArg === "all-legs-cfb" || referenceArg === "cfb"
+          ? "all-legs-cfb"
+          : referenceArg === "full-game"
+            ? "full-game"
+            : "permissive";
+
+      if (!chain && referenceGate === treatmentGate) {
+        console.error(
+          `verify-subset: treatment and reference are both "${treatmentGate}"; nothing to prove`,
         );
-        if (check.vacuous) {
-          console.log("WARNING: treatment set empty — subset check is VACUOUS");
-        }
-        for (const leak of check.leaks.slice(0, 20)) console.log(`  LEAK ${leak}`);
+        process.exitCode = 1;
+        return;
       }
-      if (check.leaks.length > 0) process.exitCode = 1;
-      else if (check.vacuous) process.exitCode = 2;
+
+      const checks: ComboSubsetCheck[] = [];
+      if (chain) {
+        // full-game ⊆ all-legs-cfb ⊆ permissive, asserted edge by edge.
+        const permissive = await buildComboUniquenessReport(
+          comboUniquenessOptions(args, "permissive"),
+        );
+        const cfbOnly = await buildComboUniquenessReport(
+          comboUniquenessOptions(args, "all-legs-cfb"),
+        );
+        const fullGame = await buildComboUniquenessReport(
+          comboUniquenessOptions(args, "full-game"),
+        );
+        checks.push(checkComboSubset(permissive, cfbOnly));
+        checks.push(checkComboSubset(cfbOnly, fullGame));
+      } else {
+        const reference = await buildComboUniquenessReport(
+          comboUniquenessOptions(args, referenceGate),
+        );
+        const treatment = await buildComboUniquenessReport(
+          comboUniquenessOptions(args, treatmentGate),
+        );
+        checks.push(checkComboSubset(reference, treatment));
+      }
+
+      const leaks = checks.reduce((sum, check) => sum + check.leaks.length, 0);
+      const vacuous = checks.some((check) => check.vacuous);
+      if (json) {
+        console.log(JSON.stringify({ chain, checks, leaks, vacuous, strictExit }, null, 2));
+      } else {
+        for (const check of checks) {
+          console.log(
+            `subset ${check.treatmentGate} ⊆ ${check.referenceGate} — reference ${check.reference}, treatment ${check.treatment}, leaks ${check.leaks.length}`,
+          );
+          if (check.vacuous) {
+            console.log(
+              `WARNING: ${check.treatmentGate} set empty — this edge is VACUOUS`,
+            );
+          }
+          for (const leak of check.leaks.slice(0, 20)) console.log(`  LEAK ${leak}`);
+        }
+        if (vacuous && strictExit) console.log("--strict-exit: failing on vacuous edge");
+      }
+      if (leaks > 0) process.exitCode = 1;
+      else if (vacuous && strictExit) process.exitCode = 2;
       return;
     }
 
