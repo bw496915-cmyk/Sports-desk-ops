@@ -77,6 +77,39 @@ export function formatOpenApiSpecOsc8Markdown(
   return `[${text}](${CANONICAL_DOMAINS.DOCS_PORTAL}/openapi.json)`;
 }
 
+/**
+ * Format OSC 8 markdown hyperlink for GSLive Partner 118 7-Parameter Player Report (`#/reports/users?bot=true...`).
+ */
+export function formatGsLiveUsersReportOsc8Markdown(
+  customerId: string,
+  fromIso: string = "2026-10-18T05:00:00.000Z",
+  toIso: string = "2026-11-01T04:59:59.000Z",
+): string {
+  const cleanId = customerId.trim().replace(/^player_/i, "").toUpperCase();
+  const playerToken = `player_${cleanId}`;
+  const url = `https://plive.sportswidgets.pro/manager-tools/#/reports/users?bot=true&eventId=&from=${encodeURIComponent(fromIso)}&partnerId=118&searchBy=player&text=${encodeURIComponent(playerToken)}&to=${encodeURIComponent(toIso)}`;
+  return `[GSLive:${playerToken}](${url})`;
+}
+
+/**
+ * Format OSC 8 markdown hyperlink for GSLive Partner 118 Live Bet-History Sidecar (`#/events/bet-history?minVolume=0...`).
+ */
+export function formatGsLiveSidecarOsc8Markdown(
+  dateFilterBy: "calcTime" | "betTime" = "calcTime",
+  customerId?: string,
+  fromEpochSec: number = 1793422800,
+  tickEpochMs: number = 1793469958152,
+): string {
+  const base = `https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&maxTimeUntilScore=0&from=${fromEpochSec}&to=${fromEpochSec}&toTime=86399&dateFilterBy=${dateFilterBy}&t=${tickEpochMs}`;
+  const url = customerId
+    ? `${base}&partnerUserId=${encodeURIComponent("player_" + customerId.trim().replace(/^player_/i, "").toUpperCase())}`
+    : base;
+  const label = customerId
+    ? `GSLiveSidecar:${customerId.trim().toUpperCase()}(${dateFilterBy})`
+    : `GSLiveSidecar(${dateFilterBy})`;
+  return `[${label}](${url})`;
+}
+
 export interface AnsiMarkdownOptions {
   readonly colors?: boolean;
   readonly hyperlinks?: boolean;

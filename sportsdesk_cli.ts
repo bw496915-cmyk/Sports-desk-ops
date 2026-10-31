@@ -75,6 +75,13 @@ import {
   TEN_MODE_CATALOG,
   buildTenModeLiveSnapshot,
 } from "./lib/forensic_diagnostic_modes.ts";
+import {
+  buildGsLiveDualSurfaceDescriptor,
+} from "./lib/gslive_manager_deeplink_sidecar.ts";
+import {
+  PER_OFFICE_IP_TRACKER_CLUSTERS,
+  buildPerOfficeIpMatcherPayload,
+} from "./lib/bet_ticker_ip_tracker_bridge.ts";
 
 
 interface DownlineMetadata {
@@ -1198,6 +1205,14 @@ export async function handleWireCommand(args: string[]): Promise<void> {
     return;
   }
 
+  if (sub === "gslive" || sub === "gs-live") {
+    const custId = getArgValue(args, ["-c", "--customer"], "CHURN_003");
+    const dateYmd = getArgValue(args, ["--date"], "2026-10-31");
+    const desc = buildGsLiveDualSurfaceDescriptor(custId, { dateYmd, tickEpochMs: Date.now() });
+    console.log(JSON.stringify(desc, null, 2));
+    return;
+  }
+
   console.log(`
 Usage: bun sportsdesk_cli.ts wire <subcommand> [options]
 
@@ -1206,6 +1221,7 @@ Subcommands:
   vig      Execute vigSetupInsert (+15c/+20c) (-c <CUST_ID> -s <SPORT> --spread 15 --derivative 20)
   weblog   Query getWebLog IP Tracker (-m A|B|C|I -c <CUST_ID> --ip <IP>)
   info     Fetch getInfoPlayer read-back (-c <CUST_ID>)
+  gslive   Emit GSLive 7-param deep-link & live sidecar JSON (-c <CUST_ID> --date YYYY-MM-DD)
 `);
 }
 
@@ -1232,6 +1248,10 @@ export async function main(): Promise<void> {
   if (cmd === "modes" || cmd === "mode" || rawArgs.includes("--modes")) {
     const snap = buildTenModeLiveSnapshot();
     const modeFilterArg = rawArgs[1] && !rawArgs[1].startsWith("-") ? Number(rawArgs[1]) : null;
+    if (rawArgs.includes("--json")) {
+      console.log(JSON.stringify(snap, null, 2));
+      return;
+    }
     console.log("========================================================================================================================");
     console.log("  🔬 10-MODE FORENSIC, RISK, CROSS-MARKET & DATA INTEGRITY ENGINE (Modes 1..10)");
     console.log("========================================================================================================================");
@@ -1239,10 +1259,49 @@ export async function main(): Promise<void> {
       if (modeFilterArg && spec.modeNumber !== modeFilterArg) continue;
       console.log(`  [${spec.domain.padEnd(18)}] ${spec.modeLabel.padEnd(25)} | Checks: ${spec.checksSummary.padEnd(55)} | Output: ${spec.outputSummary}`);
     }
+    console.log("========================================================================================================================");
+    return;
+  }
+
+  if (cmd === "gslive" || cmd === "gs-live" || rawArgs.includes("--gslive") || rawArgs.includes("-G")) {
+    const targetLogin = rawArgs.find((a, idx) => idx > 0 && !a.startsWith("-")) || getArgValue(rawArgs, ["-c", "--customer"], "CHURN_003");
+    const dateYmd = getArgValue(rawArgs, ["--date"], "2026-10-31");
+    const desc = buildGsLiveDualSurfaceDescriptor(targetLogin, { dateYmd, tickEpochMs: Date.now() });
     if (rawArgs.includes("--json")) {
-      console.log(JSON.stringify(snap, null, 2));
+      console.log(JSON.stringify(desc, null, 2));
+      return;
     }
     console.log("========================================================================================================================");
+    console.log(`  🎯 GSLIVE MANAGER (PARTNER 118) DUAL-SURFACE DEEP-LINK & LIVE SIDECAR (${desc.gsLivePlayerId})`);
+    console.log("========================================================================================================================");
+    console.log("  1. CANONICAL 7-PARAMETER #/reports/users DEEP LINKS (bot=true + UTC CDT 05:00:00.000Z..04:59:59.000Z):");
+    console.log(`     • 7-Day Window  : ${desc.usersReportDeepLink7Day}`);
+    console.log(`     • 14-Day Window : ${desc.usersReportDeepLink14Day}`);
+    console.log(`     • Churn Window  : ${desc.usersReportChurnWindowDeepLink}`);
+    console.log("  2. LIVE POPULATING #/events/bet-history SIDECAR STREAM (from=1793422800, toTime=86399, minVolume=0):");
+    console.log(`     • Live calcTime : ${desc.liveBetHistorySidecarCalcTimeUrl}`);
+    console.log(`     • Live betTime  : ${desc.liveBetHistorySidecarBetTimeUrl}`);
+    console.log(`     • Player Filter : ${desc.playerBetHistoryDeepLinkUrl}`);
+    console.log("========================================================================================================================");
+    return;
+  }
+
+  if (cmd === "iptracker" || cmd === "ip-tracker" || rawArgs.includes("--iptracker")) {
+    const officeFilter = getArgValue(rawArgs, ["--office", "-a"], "ALL").toUpperCase();
+    const clusters = PER_OFFICE_IP_TRACKER_CLUSTERS.filter(c => officeFilter === "ALL" || c.officeAgentId === officeFilter);
+    if (rawArgs.includes("--json")) {
+      console.log(JSON.stringify(clusters, null, 2));
+      return;
+    }
+    console.log("================================================================================================================");
+    console.log("  🌐 BET-TICKER <-> IP-TRACKER (getWebLog Modes A/B/C/I) PER-OFFICE & CROSS-OFFICE MATCH REPORT");
+    console.log("================================================================================================================");
+    for (const c of clusters) {
+      const payload = buildPerOfficeIpMatcherPayload({ officeAgentId: c.officeAgentId });
+      const cross = c.crossOfficeLogins.length ? " | Cross-Office: " + c.crossOfficeLogins.map(x => x.officeAgentId + "/" + x.loginId).join(", ") : "";
+      console.log(`  • Office: ${c.officeAgentId.padEnd(10)} [Mode B customerID="${payload.customerID}"] | ${c.matchClassification.padEnd(32)} | IP: ${c.sharedIpOrSubnet.padEnd(28)} | Dwell: ${c.modeASessionDwellSeconds}s | MFCS: ${c.mfcsCompositeScore}/100 | Logins: ${c.matchedLoginsInOffice.join(", ")}${cross}`);
+    }
+    console.log("================================================================================================================");
     return;
   }
 
