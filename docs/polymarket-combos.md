@@ -70,7 +70,7 @@ Caveats:
 ./bin/dx combo uniqueness --open-only --since 2026-10-01 --json     # narrow view
 
 # empirical subset chain, in one process: full-game ⊆ all-legs-cfb ⊆ permissive
-./bin/dx combo verify-subset --chain --wallet-file scratch/seed.txt --limit-games 100
+./bin/dx combo verify-subset --chain --wallet-file scratch/seed.txt
 ./bin/dx combo verify-subset --against all-legs-cfb --wallet-file scratch/seed.txt
 ./bin/dx combo verify-subset --chain --strict-exit   # exit 2 on a vacuous edge (CI)
 

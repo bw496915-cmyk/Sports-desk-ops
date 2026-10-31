@@ -368,7 +368,7 @@ export async function runPolymarketCombo(argv: readonly string[]): Promise<void>
           `${unresolved.legs} legs, ${unresolved.distinctLegKeys} distinct (${unresolved.oneOffLegKeys} one-off / ${unresolved.systemicLegKeys} systemic)`,
       );
       console.log(
-        `   resolution rate     : ${report.diagnostics.cfbTouchRatePct}% of observed combos (non-CFB combos count against it)`,
+        `   CFB touch rate      : ${report.diagnostics.cfbTouchRatePct}% of observed combos (non-CFB combos count against it)`,
       );
       console.log(
         `   combo-of-combo keys : ${report.diagnostics.suspectedComboOfComboLegKeys} (zero-padded, 404 on CLOB)`,
