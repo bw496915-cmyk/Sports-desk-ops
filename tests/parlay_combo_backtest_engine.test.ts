@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import { runFourWeekParlayComboBacktest } from "../lib/parlay_combo_backtest_engine.ts";
 
@@ -26,7 +27,12 @@ describe("4-Week Full-Customer CFB & NBA Parlay & Combo Backtest Engine", () => 
   });
 
   test("populates customer leaderboard with direct Polymarket profile, positions API, and Fantasy402 profile links", () => {
-    expect(report.customerLeaderboard.length).toBeGreaterThanOrEqual(30);
+    // enriched_customers_full.json is gitignored (customer data). CI falls back to the
+    // featured rows (23); a developer checkout with the book gets 30+.
+    const hasCustomerBook = existsSync("enriched_customers_full.json");
+    expect(report.customerLeaderboard.length).toBeGreaterThanOrEqual(
+      hasCustomerBook ? 30 : 23,
+    );
     const bgd = report.customerLeaderboard.find(
       (c) => c.customerId === "BGD101",
     );
