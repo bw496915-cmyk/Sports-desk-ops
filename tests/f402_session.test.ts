@@ -102,6 +102,8 @@ describe("F402 getBetTicker probe", () => {
     expect(probe.httpStatus).toBe(200);
     expect(probe.rows).toBe(2);
     expect(probe.error).toBeNull();
+    expect(probe.fields).toContain("Login");
+    expect(probe.ticks.map((tick) => tick.login)).toEqual(["AF12", "MJ102"]);
     expect(lastRequest?.body).toContain("agentID=BILLY666");
     expect(lastRequest?.body).toContain("operation=getBetTicker");
     expect(lastRequest?.cookie).toBe(SESSION.cookieHeader);

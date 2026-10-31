@@ -1005,10 +1005,47 @@
       <!-- TAB 2: PENDING BETS & LIVE SYNC FEED (WITH LAST UPDATED TIME)      -->
       <!-- ================================================================== -->
       <div data-tab-panel="TAB_PENDING_BETS" hidden>
+        <section
+          class="section-panel"
+          id="live-ticks-panel"
+          aria-label="F402 live tick preview"
+          style="margin-bottom: 1rem"
+        >
+          <div class="section-header">
+            <div>
+              <h2>📡 F402 Live Ticks — identity preview</h2>
+              <div style="font-size: 0.77rem; color: var(--text-muted); margin-top: 0.2rem">
+                Last 20 rows from <code>getBetTicker</code> over the cached session. Money fields are withheld until their units are captured; <code>pendingBets</code> stays fixture.
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time (raw)</th>
+                  <th>Login</th>
+                  <th>Agent</th>
+                  <th>Writer</th>
+                  <th>Wager #</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody id="live-ticks-tbody">
+                <tr>
+                  <td colspan="6">
+                    No live F402 ticks — run <code>./bin/dx poll --live-f402</code> with a cached session.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section class="section-panel" aria-label="Pending Bets and Live Sync Telemetry">
           <div class="section-header">
             <h2>
-              ⏳ Pending Bets Ledger &amp; Live Sync Feed (Polled via <code>Bun.cron</code> + <code>bun --watch</code> + <code>&lt;500ms WSS</code>)
+              ⏳ Pending Bets Ledger &amp; Live Sync Feed (Polled via <code>Bun.cron</code> + <code>bun --watch</code>)
             </h2>
             <div style="display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center">
               <button type="button" class="btn active" data-pending-filter="ALL">All Pending (222 Legs)</button>

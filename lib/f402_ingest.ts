@@ -3,8 +3,9 @@
  * @description Read-only F402 connectivity probe over a cached session.
  *
  * Uses `POST /cloud/api/Manager/getBetTicker` (tier A: live request+response captured) to prove the
- * session works and count returned tick rows. Mapping rows into the feed is intentionally not done
- * here: the pending-bet mapping needs its own captured contract.
+ * session works, count rows, and normalize the captured identity/timing fields into a tick preview.
+ * Money fields are deliberately not mapped: their units are unverified, so the preview carries no
+ * stake/payout values.
  */
 
 import type { F402Session } from "./f402_session.ts";
@@ -16,24 +17,65 @@ export interface F402ProbeOptions {
   readonly timeoutMs?: number;
 }
 
+export interface F402TickerRow {
+  readonly login: string;
+  readonly customerId: string;
+  readonly agentId: string;
+  readonly agentLogin: string;
+  readonly ticketWriter: string;
+  readonly wagerNumber: string;
+  readonly wagerType: string;
+  readonly shortDesc: string;
+  readonly insertedAt: string;
+  readonly vip: string;
+}
+
 export interface F402Probe {
   readonly endpoint: string;
   readonly httpStatus: number;
   readonly rows: number;
+  readonly fields: readonly string[];
+  readonly ticks: readonly F402TickerRow[];
   readonly durationMs: number;
   readonly fetchedAtIso: string;
   readonly error: string | null;
 }
 
-function countRows(body: unknown): number | null {
-  if (Array.isArray(body)) return body.length;
+function extractRows(body: unknown): readonly unknown[] | null {
+  if (Array.isArray(body)) return body;
   if (body === null || typeof body !== "object") return null;
   const record = body as Record<string, unknown>;
   for (const key of ["LIST", "data", "rows"]) {
     const value = record[key];
-    if (Array.isArray(value)) return value.length;
+    if (Array.isArray(value)) return value;
   }
   return null;
+}
+
+const text = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
+
+const cleanText = (value: unknown): string =>
+  text(value).replace(/[^\x20-\x7E\u00BD]/g, "").trim();
+
+/** Normalizes the captured identity/timing fields; money fields are omitted on purpose. */
+export function parseF402TickerRow(value: unknown): F402TickerRow | null {
+  if (value === null || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const login = text(row.Login) || text(row.CustomerID);
+  if (login === "") return null;
+  return {
+    login,
+    customerId: text(row.CustomerID),
+    agentId: text(row.AgentID),
+    agentLogin: text(row.AgentLogin),
+    ticketWriter: text(row.TicketWriter),
+    wagerNumber: text(row.WagerNumber),
+    wagerType: text(row.WagerType),
+    shortDesc: cleanText(row.ShortDesc),
+    insertedAt: text(row.InsertDateTime),
+    vip: text(row.VIP),
+  };
 }
 
 /**
@@ -83,17 +125,30 @@ export async function probeF402BetTicker(
         endpoint,
         httpStatus: response.status,
         rows: 0,
+        fields: [],
+        ticks: [],
         durationMs,
         fetchedAtIso,
         error: response.status === 401 || response.status === 403 ? "unauthorized" : `HTTP ${response.status}`,
       };
     }
     const parsed: unknown = await response.json();
-    const rows = countRows(parsed);
+    const rows = extractRows(parsed);
+    const ticks = (rows ?? [])
+      .map(parseF402TickerRow)
+      .filter((tick): tick is F402TickerRow => tick !== null)
+      .slice(0, 200);
+    const firstRow = rows?.[0];
+    const fields =
+      firstRow !== null && typeof firstRow === "object"
+        ? Object.keys(firstRow as Record<string, unknown>).sort()
+        : [];
     return {
       endpoint,
       httpStatus: response.status,
-      rows: rows ?? 0,
+      rows: rows?.length ?? 0,
+      fields,
+      ticks,
       durationMs,
       fetchedAtIso,
       error: rows === null ? "unexpected body" : null,
@@ -109,6 +164,8 @@ export async function probeF402BetTicker(
       endpoint,
       httpStatus: 0,
       rows: 0,
+      fields: [],
+      ticks: [],
       durationMs: Date.now() - startedAt,
       fetchedAtIso,
       error: message,

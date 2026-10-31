@@ -30,7 +30,7 @@ import {
   type PositionCache,
   type WalletIngestState,
 } from "../lib/polymarket_ingest.ts";
-import { probeF402BetTicker, type F402Probe } from "../lib/f402_ingest.ts";
+import { probeF402BetTicker, type F402Probe, type F402TickerRow } from "../lib/f402_ingest.ts";
 import {
   describeF402Session,
   readF402Session,
@@ -92,6 +92,8 @@ export interface FeedProvenance {
         readonly fetchedAtIso: string;
         readonly durationMs: number;
         readonly error: string | null;
+        readonly tickerFields: readonly string[];
+        readonly tickerRows: number;
         readonly mapped: false;
       }
     | { readonly source: "fixture"; readonly reason: string };
@@ -120,7 +122,7 @@ export interface PendingBetRow {
 }
 
 export interface GraphLiveFeedPayload {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly lastUpdatedIso: string;
   readonly lastUpdatedCdt: string;
   readonly pollEpochMs: number;
@@ -135,6 +137,7 @@ export interface GraphLiveFeedPayload {
   readonly totalOpenLegsCount: number;
   readonly totalOpenExposureUsd: number;
   readonly pendingBets: readonly PendingBetRow[];
+  readonly liveTicks: readonly F402TickerRow[];
   readonly walletProfiles: readonly TrackedWalletProfile[];
   readonly gsLiveSidecar?: GsLiveDualSurfaceDescriptor;
   readonly perOfficeIpTrackerClusters?: readonly OfficeIpClusterSummary[];
@@ -620,13 +623,15 @@ export function buildGraphLiveFeed(
           fetchedAtIso: f402Probe.fetchedAtIso,
           durationMs: f402Probe.durationMs,
           error: f402Probe.error,
+          tickerFields: f402Probe.fields,
+          tickerRows: f402Probe.ticks.length,
           mapped: false,
         }
       : { source: "fixture", reason: "no F402 session; pendingBets remain fixture rows" },
   };
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     lastUpdatedIso: nowIso,
     lastUpdatedCdt: nowCdt,
     pollEpochMs: now.getTime(),
@@ -641,6 +646,7 @@ export function buildGraphLiveFeed(
     totalOpenLegsCount,
     totalOpenExposureUsd,
     pendingBets,
+    liveTicks: f402Probe ? f402Probe.ticks.slice(0, 20) : [],
     walletProfiles,
     gsLiveSidecar: buildGsLiveDualSurfaceDescriptor("CHURN_003", { dateYmd: deskDateYmd, tickEpochMs: now.getTime() }),
     perOfficeIpTrackerClusters: PER_OFFICE_IP_TRACKER_CLUSTERS,

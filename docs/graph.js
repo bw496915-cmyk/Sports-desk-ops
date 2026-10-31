@@ -286,6 +286,7 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
   const lastUpdatedAgeEl = document.getElementById("live-last-updated-age");
   const pollSeqEl = document.getElementById("live-poll-seq");
   const dataModeEl = document.getElementById("live-data-mode");
+  const liveTicksBody = document.getElementById("live-ticks-tbody");
   const pollNowBtn = document.getElementById("poll-now-btn");
   const cellSyncStamps = document.querySelectorAll(".live-sync-ts");
 
@@ -374,6 +375,39 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
     }
   }
 
+  // 8d. F402 tick preview: identity/timing only, no money columns until units are captured.
+  function hydrateLiveTicks(data) {
+    if (!liveTicksBody) return;
+    const ticks = (data && data.liveTicks) || [];
+    if (ticks.length === 0) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 6;
+      cell.textContent =
+        "No live F402 ticks — run ./bin/dx poll --live-f402 with a cached session.";
+      row.appendChild(cell);
+      liveTicksBody.replaceChildren(row);
+      return;
+    }
+    const rows = ticks.slice(0, 20).map(function (tick) {
+      const row = document.createElement("tr");
+      [
+        tick.insertedAt,
+        tick.login,
+        tick.agentLogin || tick.agentId,
+        tick.ticketWriter,
+        tick.wagerNumber,
+        tick.shortDesc,
+      ].forEach(function (value) {
+        const cell = document.createElement("td");
+        cell.textContent = value || "—";
+        row.appendChild(cell);
+      });
+      return row;
+    });
+    liveTicksBody.replaceChildren.apply(liveTicksBody, rows);
+  }
+
   document
     .querySelectorAll("[data-gslive-window-choice]")
     .forEach(function (btn) {
@@ -415,6 +449,7 @@ import { buildWalletStats, planGsLiveLinks } from "./gslive-links.js";
         });
         hydrateGsLiveLinks(data);
         hydrateWalletRows(data);
+        hydrateLiveTicks(data);
         updateRelativeAge();
       }
     } catch (_err) {

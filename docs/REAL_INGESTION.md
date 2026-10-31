@@ -77,7 +77,7 @@ is the live-wallet count and `configuredWalletsCount` stays 39.
 | :--- | :--- | :--- | :--- |
 | F402 `RawPendingLegRow` (cents, UTC-5, per-leg) | `reconstructParentPendingTickets` (`simulate_bettor_churn_suite.ts`) → `ReconstructedTicket` (`ticketId`, `riskCents`, `winCents`, padded id, `is_live_wager`) | `pendingBets[].ticketId/riskUsd/toWinUsd` | **Gap** — no adapter; feed rows are hand-authored |
 | F402 report leg (`AdjSpread`/`AdjTotalPoints`) | `mapF402ReportLeg` + `computeEffectiveLineHundredths` (`combo_identity.ts`) | Mode 7 `lineHundredths` | Implemented |
-| F402 `RawBetTickerTick` (cents, UTC-5) | none yet | `provenance.f402.rows` only | Probe only; captured response exists (tier A) |
+| F402 `RawBetTickerTick` (cents, UTC-5) | `parseF402TickerRow` (`lib/f402_ingest.ts`) | `liveTicks[]` identity/timing preview (no money) | Implemented preview; full money mapping needs units proof |
 | Polymarket position | `parsePolymarketPosition` → `aggregatePositions` (`lib/polymarket_ingest.ts`) | `walletProfiles[].openVolumeUsd/openLegsCount/positionsValueUsd/openPnlUsd/openBetsSummary` | Implemented |
 | GSLive account | `formatGsLivePlayerToken` / `formatGsLivePartnerUserId` | report `text=player_<LOGIN>`; bet-history `partnerUserId=<LOGIN>` | Implemented, documented in `report-surfaces.md` |
 | 4-part identity | `gslive_manager_watchlist.ts` tuple | `customerLogin + agentId + gsLivePlayerId + proxyWallet` | Implemented, runbook §2.6 |
@@ -120,12 +120,13 @@ one-line summary: `ok=38 failed=1 stale=1`.
 
 1. **4a (shipped):** `--live` fetches Polymarket positions; wallet aggregates and summaries become
    observed; pending bets and F402 remain fixture and are labelled.
-2. **4b (shipped as a probe):** F402 session cache — one WebView login (`F402_LIVE_LOGIN=1`),
+2. **4b (shipped as a preview):** F402 session cache — one WebView login (`F402_LIVE_LOGIN=1`),
    cookie file `0600` at `~/.cache/sportsdesk/f402-session.json` (override `F402_SESSION_FILE`),
-   TTL 30 min (`F402_SESSION_TTL_MIN`), refresh once on 401. `getBetTicker` (tier A) is probed and
-   its row count recorded in `provenance.f402`; rows are **not** mapped yet, so `pendingBets`
-   remains fixture and `mapped: false` is explicit. `getPending` stays out until a response is
-   captured (tier C today).
+   TTL 30 min (`F402_SESSION_TTL_MIN`), refresh once on 401. `getBetTicker` (tier A) rows are
+   normalized into `liveTicks[]` (login, agent, writer, wager number, description, raw timestamp)
+   and shown in the portal's Pending Bets tab. Money columns are withheld until their units are
+   captured; `pendingBets` remains fixture and `mapped: false` is explicit. `getPending` stays out
+   until a response is captured (tier C today).
 3. **4c:** CLOB WSS stream replaces the 60 s positions poll for latency-sensitive rows.
 4. Canary: run `--live` for one poll, diff wallet counts against the fixture, confirm no `NaN`/`null`
    leaks, then enable `SPORTSDESK_LIVE_INGEST=1` in the daemon.
