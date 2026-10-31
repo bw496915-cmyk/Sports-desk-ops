@@ -29,6 +29,10 @@ import {
   formatWebLogDateForMode,
   PER_OFFICE_IP_TRACKER_CLUSTERS,
 } from "./bet_ticker_ip_tracker_bridge.ts";
+import {
+  buildGsLiveUsersReportDeepLink,
+  buildGsLiveBetHistorySidecarUrl,
+} from "./gslive_manager_deeplink_sidecar.ts";
 
 export type DiagnosticDomain =
   | "Identity & Network"
@@ -249,7 +253,7 @@ export function evaluateMode1CustomerOverview(input: {
     isAccessFresh: isFresh,
     drillDownLinks: {
       f402CustomerUrl: `https://desk.bookdeskops.com/dashboard?customer=${encodeURIComponent(cleanCust)}&agent=${encodeURIComponent(cleanOffice)}`,
-      gsLiveProfileUrl: `https://plive.sportswidgets.pro/manager-tools/#/reports/users?partnerId=118&searchBy=player&text=${encodeURIComponent("player_" + cleanCust)}&agent=${encodeURIComponent(cleanOffice)}`,
+      gsLiveProfileUrl: buildGsLiveUsersReportDeepLink({ customerLogin: cleanCust }),
       polymarketProfileUrl: input.polymarketWallet
         ? `https://polymarket.com/profile/${input.polymarketWallet}`
         : null,

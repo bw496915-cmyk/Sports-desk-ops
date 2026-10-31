@@ -154,6 +154,26 @@ case "$cmd" in
       console.log("========================================================================================================================");
     ' "$@"
     ;;
+  gslive)
+    cd "$REPO_ROOT"
+    node -e '
+      const { buildGsLiveDualSurfaceDescriptor } = require("./lib/gslive_manager_deeplink_sidecar.ts");
+      const target = process.argv[1] || "CHURN_003";
+      const d = buildGsLiveDualSurfaceDescriptor(target);
+      console.log("========================================================================================================================");
+      console.log(`  🎯 GSLIVE MANAGER (PARTNER 118) DUAL-SURFACE DEEP-LINK & LIVE SIDECAR REPORT (${d.gsLivePlayerId})`);
+      console.log("========================================================================================================================");
+      console.log("  1. CANONICAL 7-PARAMETER #/reports/users DEEP LINKS (bot=true + UTC CDT 05:00:00.000Z..04:59:59.000Z):");
+      console.log(`     • 7-Day Window  : ${d.usersReportDeepLink7Day}`);
+      console.log(`     • 14-Day Window : ${d.usersReportDeepLink14Day}`);
+      console.log(`     • Churn Window  : ${d.usersReportChurnWindowDeepLink}`);
+      console.log("  2. LIVE POPULATING #/events/bet-history SIDECAR STREAM (from=1793422800, toTime=86399, minVolume=0):");
+      console.log(`     • Live calcTime : ${d.liveBetHistorySidecarCalcTimeUrl}`);
+      console.log(`     • Live betTime  : ${d.liveBetHistorySidecarBetTimeUrl}`);
+      console.log(`     • Player Filter : ${d.playerBetHistoryDeepLinkUrl}`);
+      console.log("========================================================================================================================");
+    ' "$@"
+    ;;
   backtest)
     cd "$REPO_ROOT"
     if command -v bun >/dev/null 2>&1; then

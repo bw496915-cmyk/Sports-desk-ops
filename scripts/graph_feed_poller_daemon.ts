@@ -20,6 +20,7 @@ import { spawnSync } from "node:child_process";
 import { runFourWeekParlayComboBacktest, type FourWeekParlayBacktestReport } from "../lib/parlay_combo_backtest_engine.ts";
 import { PER_OFFICE_IP_TRACKER_CLUSTERS, type OfficeIpClusterSummary } from "../lib/bet_ticker_ip_tracker_bridge.ts";
 import { buildTenModeLiveSnapshot, type TenModeLiveSnapshot } from "../lib/forensic_diagnostic_modes.ts";
+import { buildGsLiveUsersReportDeepLink, buildGsLiveBetHistorySidecarUrl, buildGsLiveDualSurfaceDescriptor, type GsLiveDualSurfaceDescriptor } from "../lib/gslive_manager_deeplink_sidecar.ts";
 
 const repoRoot = path.resolve(import.meta.dirname ?? path.dirname(process.argv[1]), "..");
 
@@ -79,6 +80,7 @@ export interface GraphLiveFeedPayload {
   readonly totalOpenExposureUsd: number;
   readonly pendingBets: readonly PendingBetRow[];
   readonly walletProfiles: readonly TrackedWalletProfile[];
+  readonly gsLiveSidecar?: GsLiveDualSurfaceDescriptor;
   readonly perOfficeIpTrackerClusters?: readonly OfficeIpClusterSummary[];
   readonly tenModeSnapshot?: TenModeLiveSnapshot;
   readonly backtest4Wk?: FourWeekParlayBacktestReport;
@@ -165,8 +167,8 @@ export function buildGraphLiveFeed(pollSequence = 1): GraphLiveFeedPayload {
       polygonscanUrl: `https://polygonscan.com/address/${addr}`,
       f402CustomerProfileUrl: `https://desk.bookdeskops.com/dashboard?customer=${encodeURIComponent(f402Id)}&agent=${encodeURIComponent(agent)}`,
       gsLivePlayerId: `player_${f402Id}`,
-      gsLivePlayerReportUrl: `https://plive.sportswidgets.pro/manager-tools/#/reports/users?partnerId=118&searchBy=player&text=${encodeURIComponent("player_" + f402Id)}&agent=${encodeURIComponent(agent)}`,
-      gsLiveBetHistoryUrl: `https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?partnerId=118&partnerUserId=${encodeURIComponent("player_" + f402Id)}&agent=${encodeURIComponent(agent)}`,
+      gsLivePlayerReportUrl: buildGsLiveUsersReportDeepLink({ customerLogin: f402Id, bot: true }),
+      gsLiveBetHistoryUrl: buildGsLiveBetHistorySidecarUrl({ customerLogin: f402Id, tickEpochMs: now.getTime() }),
       openBetsSummary: summary,
       openVolumeUsd: vol,
       openLegsCount: legs,
@@ -485,6 +487,7 @@ export function buildGraphLiveFeed(pollSequence = 1): GraphLiveFeedPayload {
     totalOpenExposureUsd: 702700,
     pendingBets,
     walletProfiles,
+    gsLiveSidecar: buildGsLiveDualSurfaceDescriptor("CHURN_003", { dateYmd: "2026-10-31", tickEpochMs: now.getTime() }),
     perOfficeIpTrackerClusters: PER_OFFICE_IP_TRACKER_CLUSTERS,
     tenModeSnapshot: buildTenModeLiveSnapshot(),
     backtest4Wk: runFourWeekParlayComboBacktest(repoRoot),

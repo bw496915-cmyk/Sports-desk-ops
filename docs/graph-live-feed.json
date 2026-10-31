@@ -1,9 +1,9 @@
 {
   "schemaVersion": 2,
-  "lastUpdatedIso": "2026-10-31T18:00:39.075Z",
-  "lastUpdatedCdt": "10/31/2026, 13:00:39 CDT",
-  "pollEpochMs": 1793469639075,
-  "pollSequence": 88,
+  "lastUpdatedIso": "2026-10-31T18:12:39.077Z",
+  "lastUpdatedCdt": "10/31/2026, 13:12:39 CDT",
+  "pollEpochMs": 1793470359077,
+  "pollSequence": 101,
   "schedulerEngine": "Bun.cron('* * * * *') + bun --watch + <500ms CLOB WSS",
   "wsStreamSlaMs": 345,
   "activeSyndicateWalletsCount": 39,
@@ -28,7 +28,7 @@
       "toWinUsd": 18630,
       "pmEntryVsFair": "46.5c vs 48.8c Fair",
       "placedAtUtc": "2026-10-31 14:42:11 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "OPENED F402 56.5 (-115) @ T+334ms"
     },
     {
@@ -49,7 +49,7 @@
       "toWinUsd": 13225,
       "pmEntryVsFair": "46.5c vs 48.8c Fair",
       "placedAtUtc": "2026-10-31 14:42:13 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "6-GATE CAUGHT BET #1 (99.3% Cosine)"
     },
     {
@@ -70,7 +70,7 @@
       "toWinUsd": 13810,
       "pmEntryVsFair": "51.2c vs 56.5c (-130) Fair",
       "placedAtUtc": "2026-10-31 14:50:04 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "PACE MODEL VALIDATED (F402 @ 126.5)"
     },
     {
@@ -91,7 +91,7 @@
       "toWinUsd": 37272,
       "pmEntryVsFair": "52.4c vs 57.4c (-135) Fair",
       "placedAtUtc": "2026-10-31 15:02:19 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "WSS STEPPED F402 +14.5 -> +13.0 @ 345ms"
     },
     {
@@ -112,7 +112,7 @@
       "toWinUsd": 49811,
       "pmEntryVsFair": "51.5c vs 56.5c (-130) Fair",
       "placedAtUtc": "2026-10-31 15:08:44 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "WSS STEPPED F402 -1.5 -> -2.5 @ 394ms"
     },
     {
@@ -133,7 +133,7 @@
       "toWinUsd": 27315,
       "pmEntryVsFair": "PM +4.5 vs DK -3.5 (Key 4)",
       "placedAtUtc": "2026-10-31 15:11:30 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "PINNED F402 AT GSW -4.0 (+4.0)"
     },
     {
@@ -154,7 +154,7 @@
       "toWinUsd": 3435,
       "pmEntryVsFair": "56.8c (+3.8c slip) -> Reverted 51.4c",
       "placedAtUtc": "2026-10-31 15:14:02 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "AUTO-RESOLVED @ T+112s (Branch 1 Revert)"
     },
     {
@@ -175,7 +175,7 @@
       "toWinUsd": 12963,
       "pmEntryVsFair": "52.0c vs 55.5c (-125) Fair",
       "placedAtUtc": "2026-10-31 15:18:55 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "OPENED F402 BOS TT 119.5 (-115)"
     },
     {
@@ -196,7 +196,7 @@
       "toWinUsd": 39600,
       "pmEntryVsFair": "DGS Child Rot 5501 -> Parent 501",
       "placedAtUtc": "2026-10-31 15:21:10 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "NORMALIZED IN ALT RING ($42K)"
     },
     {
@@ -217,7 +217,7 @@
       "toWinUsd": 43200,
       "pmEntryVsFair": "Attempted Alt+ML Subset Parlay",
       "placedAtUtc": "2026-10-31 15:22:48 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "PROBIT SUBSET GUARD BLOCKED (ρ=0.756)"
     },
     {
@@ -238,7 +238,7 @@
       "toWinUsd": 46956,
       "pmEntryVsFair": "GSW +8.4 NetRtg 3Q Surge",
       "placedAtUtc": "2026-10-31 15:25:19 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "Q3_STARTER_SURGE_OFFSET (+1.15pt)"
     },
     {
@@ -259,7 +259,7 @@
       "toWinUsd": 25818,
       "pmEntryVsFair": "Non-Jokić 2Q Bench Drag (-14.2 OffRtg)",
       "placedAtUtc": "2026-10-31 15:27:05 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "Q2_BENCH_ROTATION_DRAG (0.232)"
     },
     {
@@ -280,7 +280,7 @@
       "toWinUsd": 17454,
       "pmEntryVsFair": "4Q Clutch Variance Compression (σ=5.4)",
       "placedAtUtc": "2026-10-31 15:29:40 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "Q4_CLUTCH_VARIANCE_COMPRESSION"
     },
     {
@@ -301,7 +301,7 @@
       "toWinUsd": 57272,
       "pmEntryVsFair": "PM -6.5 (-650) beats F402 -7.5 (-750)",
       "placedAtUtc": "2026-10-31 15:31:12 UTC",
-      "lastSyncedUtc": "2026-10-31T18:00:39.075Z",
+      "lastSyncedUtc": "2026-10-31T18:12:39.077Z",
       "deskVerdict": "SHARP_STILL_BETTER LAYOFF ALERT"
     }
   ],
@@ -321,7 +321,7 @@
       "openVolumeUsd": 73300,
       "openLegsCount": 14,
       "enforcementStatus": "Ban-Hammer $1K / 6s",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 2,
@@ -338,7 +338,7 @@
       "openVolumeUsd": 60600,
       "openLegsCount": 12,
       "enforcementStatus": "Ban-Hammer + FG-Only",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 3,
@@ -355,7 +355,7 @@
       "openVolumeUsd": 25500,
       "openLegsCount": 6,
       "enforcementStatus": "Caught Bet #1 (<320ms)",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 4,
@@ -372,7 +372,7 @@
       "openVolumeUsd": 40300,
       "openLegsCount": 9,
       "enforcementStatus": "Ban-Hammer $1K / 6s",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 5,
@@ -389,7 +389,7 @@
       "openVolumeUsd": 25700,
       "openLegsCount": 6,
       "enforcementStatus": "Caught Bet #1 (<320ms)",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 6,
@@ -406,7 +406,7 @@
       "openVolumeUsd": 31900,
       "openLegsCount": 9,
       "enforcementStatus": "6s Delay + 20c SGP Tax",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 7,
@@ -423,7 +423,7 @@
       "openVolumeUsd": 35400,
       "openLegsCount": 8,
       "enforcementStatus": "FG-Only + Trap Resolved",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 8,
@@ -440,7 +440,7 @@
       "openVolumeUsd": 22700,
       "openLegsCount": 7,
       "enforcementStatus": "+15c/+20c Vig Shaded",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 9,
@@ -457,7 +457,7 @@
       "openVolumeUsd": 24300,
       "openLegsCount": 7,
       "enforcementStatus": "Parlay Cap $5K + 15c",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 10,
@@ -474,7 +474,7 @@
       "openVolumeUsd": 21100,
       "openLegsCount": 6,
       "enforcementStatus": "Manual Approval >$2.5K",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 11,
@@ -491,7 +491,7 @@
       "openVolumeUsd": 16100,
       "openLegsCount": 6,
       "enforcementStatus": "6s Dynamic Delay Gate",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 12,
@@ -508,7 +508,7 @@
       "openVolumeUsd": 21000,
       "openLegsCount": 6,
       "enforcementStatus": "Branch 3 Vig Shaded",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 13,
@@ -525,7 +525,7 @@
       "openVolumeUsd": 11700,
       "openLegsCount": 5,
       "enforcementStatus": "WSS Stepped @ 345ms",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 14,
@@ -542,7 +542,7 @@
       "openVolumeUsd": 9600,
       "openLegsCount": 4,
       "enforcementStatus": "WSS Stepped @ 345ms",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 15,
@@ -559,7 +559,7 @@
       "openVolumeUsd": 8800,
       "openLegsCount": 4,
       "enforcementStatus": "DEDUP_THEN_LEAD Lock",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 16,
@@ -576,7 +576,7 @@
       "openVolumeUsd": 8000,
       "openLegsCount": 4,
       "enforcementStatus": "WSS Stepped @ 345ms",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 17,
@@ -593,7 +593,7 @@
       "openVolumeUsd": 7700,
       "openLegsCount": 4,
       "enforcementStatus": "WSS Stepped @ 345ms",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 18,
@@ -610,7 +610,7 @@
       "openVolumeUsd": 6900,
       "openLegsCount": 4,
       "enforcementStatus": "WSS Stepped @ 345ms",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 19,
@@ -627,7 +627,7 @@
       "openVolumeUsd": 6700,
       "openLegsCount": 3,
       "enforcementStatus": "WSS Stepped @ 345ms",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 20,
@@ -644,7 +644,7 @@
       "openVolumeUsd": 21000,
       "openLegsCount": 8,
       "enforcementStatus": "Key 3/7 Crossing Guard",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 21,
@@ -661,7 +661,7 @@
       "openVolumeUsd": 17500,
       "openLegsCount": 7,
       "enforcementStatus": "Key 3/7 Crossing Guard",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 22,
@@ -678,7 +678,7 @@
       "openVolumeUsd": 49500,
       "openLegsCount": 9,
       "enforcementStatus": "Branch 2 Moved -6.0",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 23,
@@ -695,7 +695,7 @@
       "openVolumeUsd": 10000,
       "openLegsCount": 5,
       "enforcementStatus": "6pt Teaser @ -135",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 24,
@@ -712,7 +712,7 @@
       "openVolumeUsd": 3500,
       "openLegsCount": 3,
       "enforcementStatus": "+25c Correlated Tax",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 25,
@@ -729,7 +729,7 @@
       "openVolumeUsd": 2750,
       "openLegsCount": 3,
       "enforcementStatus": "+25c Correlated Tax",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 26,
@@ -746,7 +746,7 @@
       "openVolumeUsd": 9000,
       "openLegsCount": 4,
       "enforcementStatus": "6s Delay + +15c Vig",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 27,
@@ -763,7 +763,7 @@
       "openVolumeUsd": 12500,
       "openLegsCount": 5,
       "enforcementStatus": "Single Bet Cap $5,000",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 28,
@@ -780,7 +780,7 @@
       "openVolumeUsd": 6500,
       "openLegsCount": 5,
       "enforcementStatus": "Layoff Alert Bridged",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 29,
@@ -797,7 +797,7 @@
       "openVolumeUsd": 18400,
       "openLegsCount": 6,
       "enforcementStatus": "Total 48 Window Frozen",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 30,
@@ -814,7 +814,7 @@
       "openVolumeUsd": 18000,
       "openLegsCount": 4,
       "enforcementStatus": "Blocked (Probit ρ=0.756)",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 31,
@@ -831,7 +831,7 @@
       "openVolumeUsd": 8200,
       "openLegsCount": 4,
       "enforcementStatus": "FG-Only Clamped",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 32,
@@ -848,7 +848,7 @@
       "openVolumeUsd": 6360,
       "openLegsCount": 4,
       "enforcementStatus": "Silo 3 Tennis Clamped",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 33,
@@ -865,7 +865,7 @@
       "openVolumeUsd": 20000,
       "openLegsCount": 4,
       "enforcementStatus": "Ban-Hammer $1K Cap",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 34,
@@ -882,7 +882,7 @@
       "openVolumeUsd": 20000,
       "openLegsCount": 4,
       "enforcementStatus": "Ban-Hammer $1K Cap",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 35,
@@ -899,7 +899,7 @@
       "openVolumeUsd": 19000,
       "openLegsCount": 5,
       "enforcementStatus": "6s Delay + 15c Vig",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 36,
@@ -916,7 +916,7 @@
       "openVolumeUsd": 12000,
       "openLegsCount": 5,
       "enforcementStatus": "6s Dynamic Delay Gate",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 37,
@@ -933,7 +933,7 @@
       "openVolumeUsd": 10015,
       "openLegsCount": 5,
       "enforcementStatus": "DTW Caught & Clamped",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 38,
@@ -950,7 +950,7 @@
       "openVolumeUsd": 14000,
       "openLegsCount": 5,
       "enforcementStatus": "6s Delay + +15c Vig",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     },
     {
       "rank": 39,
@@ -967,7 +967,7 @@
       "openVolumeUsd": 0,
       "openLegsCount": 0,
       "enforcementStatus": "Auto-Clamps 1-Hop Child",
-      "lastSyncedIso": "2026-10-31T18:00:39.075Z"
+      "lastSyncedIso": "2026-10-31T18:12:39.077Z"
     }
   ]
 }
