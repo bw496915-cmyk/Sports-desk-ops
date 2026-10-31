@@ -29,11 +29,18 @@ chmod 700 "$OP_CONFIG_DIR" "$XDG_STATE_HOME/1password" 2>/dev/null || true
 
 # 2. Configure $HOME/.gitconfig so Git has zero EPERM warnings on ignore/attributes/config
 if [[ -d "$DOTFILES_DIR/git" ]]; then
-  cp -f "$DOTFILES_DIR/git/config/ignore" "$XDG_CONFIG_HOME/git/ignore" 2>/dev/null || touch "$XDG_CONFIG_HOME/git/ignore"
-  touch "$XDG_CONFIG_HOME/git/attributes"
-  touch "$XDG_CONFIG_HOME/git/config"
-  ln -sfn "$DOTFILES_DIR/git/config/credential-gh-owner" "$XDG_CONFIG_HOME/git/credential-gh-owner" 2>/dev/null || true
-  ln -sfn "$DOTFILES_DIR/git/config/profiles" "$XDG_CONFIG_HOME/git/profiles" 2>/dev/null || true
+  # `links.ts` may already point ~/.config/git at the dotfiles config directory. Linking or
+  # copying a child into that path then writes the source onto itself, which is how
+  # `credential-gh-owner -> credential-gh-owner` (and `profiles/profiles`) kept reappearing.
+  if [[ "$(cd "$XDG_CONFIG_HOME/git" 2>/dev/null && pwd -P)" == "$(cd "$DOTFILES_DIR/git/config" && pwd -P)" ]]; then
+    :
+  else
+    cp -f "$DOTFILES_DIR/git/config/ignore" "$XDG_CONFIG_HOME/git/ignore" 2>/dev/null || touch "$XDG_CONFIG_HOME/git/ignore"
+    touch "$XDG_CONFIG_HOME/git/attributes"
+    touch "$XDG_CONFIG_HOME/git/config"
+    ln -sfn "$DOTFILES_DIR/git/config/credential-gh-owner" "$XDG_CONFIG_HOME/git/credential-gh-owner" 2>/dev/null || true
+    ln -sfn "$DOTFILES_DIR/git/config/profiles" "$XDG_CONFIG_HOME/git/profiles" 2>/dev/null || true
+  fi
 
   if [[ "$HOME" == *"/.gemini/users/"* ]]; then
     rm -f "$HOME/.gitconfig"
