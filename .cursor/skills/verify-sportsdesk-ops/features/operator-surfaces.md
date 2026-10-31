@@ -23,6 +23,8 @@ surface rules in [`docs/report-surfaces.md`](../../../../docs/report-surfaces.md
 | `gslive-docs` | `./bin/dx docs --json` | JSON has `provider: "GSLive Manager (Partner 118)"` and 3 surfaces |
 | `stale-cohort` | `./bin/dx stale -i <export.csv> --window-min 10` | seeded event cluster lists the seed `★` and other customers |
 | `webview-shot` | `./bin/dx shot <url> --out scratch/shots/page.png` | JSON with `screenshot`, `bytes`, `sha256`, `backend`; non-zero on failure |
+| `polymarket-profile` | `./bin/dx profile <0x\|username>` | PnL, win rate, positions, categories, strategy |
+| `cfb-combos` | `./bin/dx combo legs` / `price --prices …` / `uniqueness` | legs listed; fair price product; per-game unique counts |
 | `poll-fixture` | `./bin/dx poll --once` | feed `dataMode: "FIXTURE"`, 39 profiles |
 | `poll-live` | `./bin/dx poll --once --live` | feed `dataMode: "PARTIAL"`, `provenance.polymarket.walletsOk` 20–23, `walletsInvalid` 16 |
 | `poll-f402-off` | `./bin/dx poll --once --live-f402` without `F402_LIVE_LOGIN=1` | warns `F402 live login disabled`; exit 0; `provenance.f402.source: "fixture"` |

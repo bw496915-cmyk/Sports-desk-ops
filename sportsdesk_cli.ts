@@ -332,6 +332,8 @@ Usage: \`bun sportsdesk_cli.ts [command|option] [parameters...]\`
 
 ### 9. OPERATOR SURFACES (GSLive, stale lines, screenshots):
 * **gslive** [LOGIN] [\`--date\` YYYY-MM-DD] [\`--json\`]: GSLive 7-param report + bet-history sidecar links
+* **profile** <0x|username> [\`--json\`]: Polymarket PnL, win rate, positions, categories, strategy
+* **combo** legs|price|wallet: CFB combo legs, product-of-legs pricing, wallet combo positions
 * **stale** \`-i\` FILE [\`--window-min\` N] [\`--json\`]: Stale-line / post-move bet cohort
 * **shot** <URL> [\`--out\` PATH] [\`--f402-login\`] [\`--format\` png|jpeg|webp]: Bun.WebView screenshot (default \`scratch/shots/\`)
 `;
@@ -1271,6 +1273,18 @@ export async function main(): Promise<void> {
     return;
   }
 
+  if (cmd === "combo") {
+    const { runPolymarketCombo } = await import("./scripts/polymarket_combo_cli.ts");
+    await runPolymarketCombo(rawArgs.slice(1));
+    return;
+  }
+
+  if (cmd === "profile") {
+    const { runPolymarketProfile } = await import("./scripts/polymarket_profile_cli.ts");
+    await runPolymarketProfile(rawArgs.slice(1));
+    return;
+  }
+
   if (cmd === "shot" || cmd === "screenshot") {
     const { runWebviewShot } = await import("./scripts/webview_shot_cli.ts");
     await runWebviewShot(rawArgs.slice(1));
@@ -1548,8 +1562,9 @@ export async function main(): Promise<void> {
     if (rawArgs.includes("--dry-run") || rawArgs.includes("-d")) scriptArgs.push("--dry-run");
     if (rawArgs.includes("--project") || rawArgs.includes("-p")) {
       const idx = rawArgs.findIndex(function(a) { return a === "--project" || a === "-p"; });
-      if (idx !== -1 && rawArgs[idx + 1]) {
-        scriptArgs.push("--project", rawArgs[idx + 1]);
+      const project = idx === -1 ? undefined : rawArgs[idx + 1];
+      if (project !== undefined) {
+        scriptArgs.push("--project", project);
       }
     }
 

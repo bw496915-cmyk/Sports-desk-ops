@@ -88,6 +88,8 @@ SportsDesk DX — operator commands
   ./bin/dx gslive <LOGIN>         GSLive 7-param report + live bet-history links
   ./bin/dx docs [gslive|--json]   Deployed API docs (Scalar, R2, local artifacts)
   ./bin/dx stale -i <export>      Stale-line / post-move bet cohort
+  ./bin/dx profile <0x|user>      Polymarket PnL, win rate, positions, categories
+  ./bin/dx combo legs|price|wallet CFB combo legs and product-of-legs pricing
   ./bin/dx shot <url>             Bun.WebView screenshot → scratch/shots/ (--f402-login)
   ./bin/dx backtest               4-week CFB + NBA parlay/combo backtest
   ./bin/dx poll [--once] [--live] [--live-f402]
@@ -188,6 +190,14 @@ EOF
   stale)
     cd "$REPO_ROOT"
     exec bun run scripts/stale_line_cohort_cli.ts "$@"
+    ;;
+  profile)
+    cd "$REPO_ROOT"
+    exec bun run sportsdesk_cli.ts profile "$@"
+    ;;
+  combo)
+    cd "$REPO_ROOT"
+    exec bun run sportsdesk_cli.ts combo "$@"
     ;;
   shot|screenshot)
     cd "$REPO_ROOT"
