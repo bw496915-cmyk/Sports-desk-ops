@@ -26,6 +26,10 @@ ignorePatterns = [
   "data/agent-tree.json",
   # Same reason, same generator: 2,465 agents, 122 KB compact vs 228 KB pretty.
   "data/agent-index.json",
+  # Tool-owned: `statechart` writes this report verbatim (it puts no blank line under a
+  # heading), so formatting it only makes the next gate run dirty the tree again.
+  "verification/gen-tokens-zero-drift-gate/report.md",
+  "verification/gen-tokens-zero-drift-gate/out/**",
 ]
 
 # Install keys (linker, globalStore, cache.dir, frozenLockfile, minimumReleaseAge) are owned by the
