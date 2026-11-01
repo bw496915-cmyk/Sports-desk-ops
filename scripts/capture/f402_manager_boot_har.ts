@@ -84,7 +84,16 @@ await using view = ManagedWebView.launch({
   height: 900,
 });
 
-await view.cdp("Network.enable");
+if (values.login === true) {
+  console.error(
+    "capture:f402-har --login (keychain secrets:f402 or TTY; MFA/CAPTCHA → bootstrap profile manually)",
+  );
+  await loginF402(view, { baseUrl: base, timeoutMs: 120_000 });
+}
+
+async function enableManagerHarCapture(): Promise<void> {
+  await view.cdp("Network.enable");
+}
 
 view.onCdpEvent<{
   requestId: string;
@@ -140,12 +149,7 @@ view.onCdpEvent<{
   })();
 });
 
-if (values.login === true) {
-  console.error(
-    "capture:f402-har --login (keychain secrets:f402 or TTY; MFA/CAPTCHA → bootstrap profile manually)",
-  );
-  await loginF402(view, { baseUrl: base, timeoutMs: 120_000 });
-}
+await enableManagerHarCapture();
 
 console.error(`capture:f402-har navigate ${startUrl} profile=${profile}`);
 await view.navigate(startUrl);
