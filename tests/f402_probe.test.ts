@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  MANAGER_BOOT_OPS,
   PROBE_OPS,
   buildInstallRequestSnifferExpression,
+  buildJsonProbeBody,
   buildProbeExpression,
   buildProbeBody,
   buildReadRequestSnifferExpression,
@@ -14,11 +16,29 @@ import {
 } from "../lib/f402_probe.ts";
 
 describe("f402 probe plan", () => {
-  test("excludes the unconfirmed mutation by default", () => {
+  test("excludes the unconfirmed mutation by default and selects manager-boot / all suites", () => {
     const ops = selectProbeOps(false);
     expect(ops.map((op) => op.operation)).not.toContain("PendingDelete");
-    expect(ops).toHaveLength(PROBE_OPS.length - 1);
+    expect(ops).toHaveLength(PROBE_OPS.length - 2);
     expect(selectProbeOps(true)).toHaveLength(PROBE_OPS.length);
+
+    const bootOps = selectProbeOps(false, "manager-boot");
+    expect(bootOps).toHaveLength(9);
+    expect(bootOps.map((op) => op.operation)).toEqual([
+      "getAccountInfoOwner",
+      "getConfigWebReports",
+      "getConfigWebReportsPending",
+      "getSportsType",
+      "getAuthorizations",
+      "getMessage",
+      "getNewEmailsCount",
+      "getWeeklyFigureByAgentLite",
+      "getListAgenstByAgent",
+    ]);
+
+    const allReadOnly = selectProbeOps(false, "all");
+    // 7 read-only report ops + 8 unique manager-boot ops (getListAgenstByAgent is shared) = 15
+    expect(allReadOnly).toHaveLength(17);
   });
 
   test("builds URLs from the observed route prefix", () => {
@@ -38,7 +58,7 @@ describe("f402 probe plan", () => {
     );
   });
 
-  test("builds the client envelope from customer/report/report.js", () => {
+  test("builds the client envelope from customer/report/report.js and app/manager/manager.js", () => {
     const pending = new URLSearchParams(
       buildProbeBody(PROBE_OPS[0]!, "agent-118", "cust-9"),
     );
@@ -62,6 +82,38 @@ describe("f402 probe plan", () => {
     ]);
     expect(tx.get("customerID")).toBe("__CUSTOMER_ID__");
     expect(tx.get("date")).toBe("__DATE__");
+
+    // PendingDelete sends sentinel ticketNumber=-1 by default
+    const pendingDelete = new URLSearchParams(
+      buildProbeBody(
+        PROBE_OPS.find((op) => op.operation === "PendingDelete")!,
+        "agent-118",
+      ),
+    );
+    expect(pendingDelete.get("ticketNumber")).toBe("-1");
+
+    // JSON wire bodies for getAccountInfoOwner (manager.js:31200) & getDailyFiguresByCustomer (report.js:25633)
+    const acctOwnerOp = MANAGER_BOOT_OPS.find(
+      (op) => op.operation === "getAccountInfoOwner",
+    )!;
+    expect(acctOwnerOp.wireContentType).toBe("application/json");
+    expect(JSON.parse(buildJsonProbeBody(acctOwnerOp, "MILLER500"))).toEqual({
+      agentID: "MILLER500",
+      operation: "getAccountInfoOwner",
+    });
+
+    const dailyFigOp = PROBE_OPS.find(
+      (op) => op.operation === "getDailyFiguresByCustomer",
+    )!;
+    expect(dailyFigOp.wireContentType).toBe("application/json");
+    expect(
+      JSON.parse(buildJsonProbeBody(dailyFigOp, "MILLER500", "H1716")),
+    ).toEqual({
+      agentID: "MILLER500",
+      customerID: "H1716",
+      week: "__WEEK__",
+      operation: "getDailyFiguresByCustomer",
+    });
   });
 
   test("validates the page result before it is treated as evidence", () => {
@@ -120,7 +172,18 @@ describe("probe expression", () => {
     expect(expression).not.toContain("%7B");
   });
 
-  test("a supplied week value overrides the default yesterday date", () => {
+  test("supports contentType: application/json without URL-encoding JSON string values", () => {
+    const expression = buildProbeExpression({
+      operation: "getAccountInfoOwner",
+      url: "https://fantasy402.com/cloud/api/Manager/getAccountInfoOwner",
+      body: '{"agentID":"MILLER500","operation":"getAccountInfoOwner"}',
+      contentType: "application/json",
+    });
+    expect(expression).toContain('"content-type": "application/json"');
+    expect(expression).toContain('.replaceAll("__CUSTOMER_ID__", customerID)');
+  });
+
+  test("a supplied week value overrides the default week index", () => {
     const expression = buildProbeExpression(
       {
         operation: "getDailyFiguresByCustomer",
@@ -139,7 +202,7 @@ describe("probe expression", () => {
     expect(expression).toContain("const mdy =");
   });
 
-  test("an empty week value keeps the historical default", () => {
+  test("an empty week value keeps the default '0' index", () => {
     const expression = buildProbeExpression(
       {
         operation: "getDailyFiguresByCustomer",
