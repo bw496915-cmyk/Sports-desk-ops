@@ -49,7 +49,10 @@ if (!Bun.argv.includes("--watch")) {
 
 process.on("unhandledRejection", (reason) => {
   console.error(
-    JSON.stringify({ signal: "F402_PORTAL_DRIFT_CRON_REJECTED", reason: String(reason) }),
+    JSON.stringify({
+      signal: "F402_PORTAL_DRIFT_CRON_REJECTED",
+      reason: String(reason),
+    }),
   );
 });
 
