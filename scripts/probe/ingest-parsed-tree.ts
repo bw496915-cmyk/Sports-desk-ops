@@ -5,10 +5,8 @@
 import { join } from "node:path";
 
 import { generalProbeFromWireText } from "../../lib/f402_list_agents_general_probe.ts";
-import {
-  ingestGeneralToSqlite,
-  ingestNormalizedTreeToSqlite,
-} from "../../lib/f402_sqlite_agents_ingest.ts";
+import { ingestManagerHierarchyFile } from "../../lib/f402_manager_hierarchy_ingest.ts";
+import { ingestNormalizedTreeToSqlite } from "../../lib/f402_sqlite_agents_ingest.ts";
 const REPO = join(import.meta.dir, "../..");
 const SCRATCH = join(REPO, "scratch");
 
@@ -41,20 +39,30 @@ const result =
           masterId: Bun.env.F402_MASTER_ID?.trim() || "MASTER1",
           masterLogin: Bun.env.F402_MASTER_LOGIN?.trim() || "MASTER1",
         };
-        return ingestGeneralToSqlite(probe.general, master, dbPath);
+        return ingestManagerHierarchyFile(
+          dbPath,
+          { GENERAL: probe.general },
+          master,
+        );
       })()
     : ingestNormalizedTreeToSqlite(await Bun.file(treePath).json(), dbPath);
 
-console.error(
-  JSON.stringify({
-    signal: "F402_AGENTS_INGESTED",
-    dbPath: dbPath.replace(`${REPO}/`, ""),
-    treePath: treePath.replace(`${REPO}/`, ""),
-    rowCount: result.rowCount,
-    cteRowCount: result.cteRowCount,
-    ingestMs: result.ingestMs,
-  }),
-);
+const log: Record<string, unknown> = {
+  signal: "F402_AGENTS_INGESTED",
+  dbPath: dbPath.replace(`${REPO}/`, ""),
+  ingestFrom,
+  rowCount: result.rowCount,
+  cteRowCount: result.cteRowCount,
+  ingestMs: result.ingestMs,
+};
+if (ingestFrom === "general") {
+  log.envelopePath = rawEnvelopePath.replace(`${REPO}/`, "");
+}
+if ("skippedOverflow" in result) {
+  log.generalRowCount = result.generalRowCount;
+  log.skippedOverflowCount = result.skippedOverflow.length;
+}
+console.error(JSON.stringify(log));
 
 if (result.rowCount !== result.cteRowCount) {
   throw new Error(

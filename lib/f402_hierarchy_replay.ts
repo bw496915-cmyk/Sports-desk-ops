@@ -106,7 +106,7 @@ export function assertHierarchyHttpResponse(
 ): void {
   if (res.status === 401) {
     throw new Error(
-      "getListAgenstByAgent returned 401 — session expired or missing cookie (client would console.log and leave hierarchy empty)",
+      "getListAgenstByAgent returned 401 — session expired or missing cookie (client would console.log and leave hierarchy empty). Auth: F402_WEBVIEW_PROFILE + WebView login (bun run hierarchy:probe -- --login), F402_SESSION_FILE, or F402_REPLAY_PROXY_URL",
     );
   }
   if (res.redirected || res.status >= 300) {
