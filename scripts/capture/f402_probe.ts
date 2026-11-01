@@ -45,6 +45,28 @@ import {
   buildLoadCustomerAdminPartialExpression,
   customerAdminPartialUrl,
 } from "../../lib/f402_customer_admin_ui.ts";
+import { detectAgentLoginCollisions } from "../../lib/f402_hierarchy_agents.ts";
+import {
+  AUDIT_DB_PATH,
+  CAPTURE_LOG_PATH,
+  PLAYERS_MODE,
+  PROBE_HOST,
+} from "../../lib/f402_hierarchy_config.ts";
+import { applyPlayersModeToJsonText } from "../../lib/f402_hierarchy_envelope.ts";
+import { envelopeTreeHash } from "../../lib/f402_hierarchy_hash.ts";
+import {
+  flushCaptureLog,
+  logCaptureEvent,
+} from "../../lib/f402_hierarchy_redact_log.ts";
+import {
+  closeAuditDb,
+  recordProbeLog,
+  recordQuarantine,
+} from "../../lib/f402_hierarchy_audit.ts";
+import {
+  describeListAgentsByAgentProbeResponse,
+  parseListAgentsByAgentEnvelope,
+} from "../../lib/f402_list_agents_by_agent.ts";
 import {
   PROBE_PREFIXES,
   type ProbeSuite,
@@ -67,6 +89,7 @@ import { preflight, warmCaptureNetwork } from "../../lib/preflight.ts";
 import { buildDnsPrefetchExpression } from "../../lib/f402_report_context.ts";
 import {
   parseResize,
+  parseRotate,
   type ScreenshotFormat,
 } from "../../lib/screenshot_encode.ts";
 import { htmlToText } from "../../lib/ticket_html.ts";
@@ -91,6 +114,7 @@ const VALUE_FLAGS = [
   "--from-probes",
   "--screenshot-format",
   "--screenshot-resize",
+  "--screenshot-rotate",
   "--screenshot-quality",
   "--wait-for",
   "--body",
@@ -141,6 +165,7 @@ Options:
   --screenshot                  Save a Bun.Image-formatted proof screenshot (_page.<ext>) in the probe dir
   --screenshot-format <fmt>     png | jpeg | webp (default: webp; encoded via Bun.Image on webkit)
   --screenshot-resize <WxH|W>   Resize proof screenshot via Bun.Image (fit: "inside", withoutEnlargement)
+  --screenshot-rotate <deg>     Rotate proof screenshot (degrees; optional 90deg suffix)
   --screenshot-quality <1-100>  jpeg/webp quality for proof screenshot (default: 82)
   --wait-for <selector>         Unattended: wait for this selector instead of pressing Enter
   --login-wait-ms <ms>          Login timeout (default: 180000)
@@ -255,6 +280,7 @@ async function main(): Promise<number> {
     "",
   ).toLowerCase();
   const screenshotResizeRaw = flagValue(parsed, "--screenshot-resize", "");
+  const screenshotRotateRaw = flagValue(parsed, "--screenshot-rotate", "");
   const screenshotQualityRaw = flagValue(parsed, "--screenshot-quality", "82");
   const jsonl = hasFlag(parsed, "--jsonl");
   const allowNon2xx = hasFlag(parsed, "--allow-non-2xx");
@@ -264,7 +290,8 @@ async function main(): Promise<number> {
     autoScreenshot ||
     hasFlag(parsed, "--screenshot") ||
     screenshotFormatRaw !== "" ||
-    screenshotResizeRaw !== "";
+    screenshotResizeRaw !== "" ||
+    screenshotRotateRaw !== "";
   const screenshotFormat: ScreenshotFormat =
     screenshotFormatRaw === "png" || screenshotFormatRaw === "jpeg"
       ? screenshotFormatRaw
@@ -280,6 +307,10 @@ async function main(): Promise<number> {
           fit: "inside" as const,
           withoutEnlargement: true,
         };
+  const screenshotRotate =
+    screenshotRotateRaw === ""
+      ? undefined
+      : parseRotate(screenshotRotateRaw);
 
   const waitFor = flagValue(parsed, "--wait-for", "");
   const explicitBody = flagValue(parsed, "--body", "");
@@ -889,6 +920,74 @@ async function main(): Promise<number> {
           console.log(
             `${summary.operation.padEnd(30)} ${String(summary.status).padEnd(5)} ${summary.verdict.padEnd(8)} ${summary.bytes} B`,
           );
+          if (
+            op.operation === "getListAgenstByAgent" &&
+            result.status >= 200 &&
+            result.status <= 299 &&
+            !result.isBinary
+          ) {
+            const wireText = bodyText ?? result.preview;
+            const filtered = applyPlayersModeToJsonText(wireText, PLAYERS_MODE);
+            const filteredPath = join(
+              outDir,
+              `${op.operation}.players-${PLAYERS_MODE}.json`,
+            );
+            await Bun.write(filteredPath, filtered);
+            const hierarchyHint =
+              describeListAgentsByAgentProbeResponse(filtered);
+            if (hierarchyHint !== null) {
+              console.error(
+                `capture:f402: ${hierarchyHint} playersMode=${PLAYERS_MODE}`,
+              );
+            }
+            try {
+              const parsed = JSON.parse(filtered.trim()) as {
+                GENERAL?: unknown[];
+              };
+              const general = Array.isArray(parsed.GENERAL)
+                ? (parsed.GENERAL as Parameters<
+                    typeof detectAgentLoginCollisions
+                  >[0])
+                : [];
+              const collisions = detectAgentLoginCollisions(general);
+              if (collisions.length > 0) {
+                const detail = JSON.stringify(collisions);
+                console.error(`capture:f402: agent login collisions ${detail}`);
+                if (AUDIT_DB_PATH !== "") {
+                  recordQuarantine(
+                    AUDIT_DB_PATH,
+                    "agent_login_collision",
+                    detail,
+                    agentId,
+                  );
+                }
+              }
+            } catch {
+              /* shape check best-effort */
+            }
+            const hash = await envelopeTreeHash(
+              parseListAgentsByAgentEnvelope(JSON.parse(filtered.trim())),
+            );
+            logCaptureEvent(CAPTURE_LOG_PATH, {
+              kind: "hierarchy_probe",
+              operation: op.operation,
+              playersMode: PLAYERS_MODE,
+              hash,
+            });
+            if (AUDIT_DB_PATH !== "") {
+              recordProbeLog(AUDIT_DB_PATH, {
+                ts: Date.now(),
+                host: PROBE_HOST,
+                agentId,
+                agentType: result.sessionAgentType ?? "",
+                bust: result.domVersion ?? "",
+                status: result.status,
+                bytes: filtered.length,
+                playersMode: PLAYERS_MODE,
+                hash,
+              });
+            }
+          }
         } catch (error) {
           transportErrors += 1;
           console.error(
@@ -919,6 +1018,9 @@ async function main(): Promise<number> {
               ...(screenshotResize === undefined
                 ? {}
                 : { resize: screenshotResize }),
+              ...(screenshotRotate === undefined
+                ? {}
+                : { rotate: screenshotRotate }),
             }
           : {
               format: screenshotFormat,
@@ -926,6 +1028,9 @@ async function main(): Promise<number> {
               ...(screenshotResize === undefined
                 ? {}
                 : { resize: screenshotResize }),
+              ...(screenshotRotate === undefined
+                ? {}
+                : { rotate: screenshotRotate }),
             },
       );
       console.error(
@@ -1006,6 +1111,8 @@ async function main(): Promise<number> {
     throw error;
   } finally {
     unsubscribeSniffer?.();
+    flushCaptureLog();
+    closeAuditDb();
   }
 }
 

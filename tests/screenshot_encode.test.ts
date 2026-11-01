@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import {
   buildConfiguredImage,
   computeImagePlaceholder,
@@ -9,6 +11,7 @@ import {
   looksLike,
   mimeTypeForFormat,
   parseResize,
+  parseRotate,
   readImageMetadata,
   toScreenshotDataUri,
 } from "../lib/screenshot_encode.ts";
@@ -27,6 +30,13 @@ describe("screenshot encoding", () => {
     expect(parseResize("320x200")).toEqual({ width: 320, height: 200 });
     expect(() => parseResize("320px")).toThrow("WxH");
     expect(() => parseResize("x200")).toThrow("WxH");
+  });
+
+  test("parses rotate specs", () => {
+    expect(parseRotate("90")).toBe(90);
+    expect(parseRotate("90deg")).toBe(90);
+    expect(parseRotate("-180")).toBe(-180);
+    expect(() => parseRotate("ninety")).toThrow("degrees");
   });
 
   test("detects each format by magic bytes (including RIFF..WEBP signature)", () => {
@@ -132,6 +142,30 @@ describe("screenshot encoding", () => {
     const meta = await readImageMetadata(resized);
     expect(meta.format).toBe("png");
     expect(looksLike("png", resized)).toBe(true);
+  });
+
+  test("rotate changes encoded output after resize", async () => {
+    const asset = join(
+      import.meta.dir,
+      "../docs/assets/pipeline-6-layer-data-cleaning.png",
+    );
+    expect(existsSync(asset)).toBe(true);
+    const input = await Bun.file(asset).bytes();
+    const base = await encodeScreenshot(input, {
+      format: "png",
+      resize: { width: 400, height: 100 },
+    });
+    const rotated = await encodeScreenshot(input, {
+      format: "png",
+      resize: { width: 400, height: 100 },
+      rotate: 90,
+    });
+    expect(base.byteLength).toBeGreaterThan(0);
+    expect(rotated.byteLength).toBeGreaterThan(0);
+    const same =
+      base.byteLength === rotated.byteLength &&
+      base.every((byte, index) => byte === rotated[index]);
+    expect(same).toBe(false);
   });
 
   test("rejects empty input and out-of-range sizes", async () => {

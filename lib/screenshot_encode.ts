@@ -3,8 +3,8 @@
  * @description Re-encode WebView screenshots with Bun.Image and canonical Blob/Base64/Shmem/ThumbHash helpers.
  *
  * The WebKit backend can only produce png/jpeg, so webp/avif/heic and resizing are done after the fact
- * rather than by forcing the Chrome backend. `Bun.Image` is mutable: `resize()` and `webp()` return the
- * same instance, and all processing runs off the main thread (except `metadata()`).
+ * rather than by forcing the Chrome backend. `Bun.Image` is mutable: `resize()`, `rotate()`, and `webp()`
+ * return the same instance, and all processing runs off the main thread (except `metadata()`).
  *
  * Canonical Bun 1.4.4 `Bun.Image` & `Bun.WebView` contract:
  * - Off-thread terminal methods: `.bytes()`, `.buffer()`, `.blob()`, `.toBase64()`, `.dataurl()`,
@@ -44,6 +44,8 @@ export interface EncodeOptions {
   /** Quantize PNG to a <=256-color indexed palette (3-5x smaller for UI screenshots). */
   readonly palette?: boolean;
   readonly resize?: ResizeSpec;
+  /** Clockwise rotation in degrees (applied after resize, before encode). */
+  readonly rotate?: number;
   /** Maximum allowed source/target pixel count (`width * height`, default 16384 * 16384). */
   readonly maxPixels?: number;
 }
@@ -185,6 +187,14 @@ export function buildConfiguredImage(
     }
   }
 
+  if (options.rotate !== undefined) {
+    const angle = options.rotate;
+    if (!Number.isFinite(angle)) {
+      throw new Error(`rotate angle must be finite: ${angle}`);
+    }
+    image.rotate(angle);
+  }
+
   const quality = options.quality ?? 80;
   if (options.format === "png") {
     return options.palette === true
@@ -321,4 +331,14 @@ export function parseResize(spec: string): { width: number; height?: number } {
   const width = Number(match[1]);
   const height = match[2] === undefined ? undefined : Number(match[2]);
   return height === undefined ? { width } : { width, height };
+}
+
+/** Parse integer degrees from a CLI flag (`90`, `90deg`). */
+export function parseRotate(spec: string): number {
+  const trimmed = spec.trim().replace(/deg$/i, "").trim();
+  const angle = Number(trimmed);
+  if (!Number.isFinite(angle)) {
+    throw new Error(`--rotate expects degrees (got "${spec}")`);
+  }
+  return angle;
 }
