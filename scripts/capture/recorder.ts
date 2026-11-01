@@ -62,6 +62,10 @@ export interface RecordResponseInput {
   headers: Record<string, string>;
   contentType: string;
   bytes: Uint8Array;
+  /** Optional true wire byte length when `bytes` is a repaired preview slice. */
+  wireBytes?: number;
+  /** Optional true when the array in `bytes` was repaired from a preview slice. */
+  truncatedPreview?: boolean;
 }
 
 export interface BuildRecordInput {
@@ -130,15 +134,20 @@ export function buildCaptureRecord(input: BuildRecordInput): CaptureRecord {
 
   let responseCapture: CapturedResponse | null = null;
   if (input.response !== null) {
+    const inferred = inferSkeletonFromBytes(
+      input.response.bytes,
+      input.response.contentType,
+    );
+    const bodySkeleton: Skeleton =
+      input.response.truncatedPreview && inferred.type === "object"
+        ? { ...inferred, truncated: true }
+        : inferred;
     responseCapture = {
       status: input.response.status,
       contentType: input.response.contentType,
       bodySha256: sha256Hex(input.response.bytes),
-      bodySkeleton: inferSkeletonFromBytes(
-        input.response.bytes,
-        input.response.contentType,
-      ),
-      bytes: input.response.bytes.length,
+      bodySkeleton,
+      bytes: input.response.wireBytes ?? input.response.bytes.length,
     };
   }
 
