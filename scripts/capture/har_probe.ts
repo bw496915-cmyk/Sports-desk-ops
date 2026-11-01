@@ -147,6 +147,7 @@ if (dryRun) {
   process.exit(0);
 }
 
+let tls: Awaited<ReturnType<typeof preflight>>["tls"] = null;
 if (!hasFlag(parsed, "--no-preflight")) {
   const check = await preflight(host);
   if (!check.ok) {
@@ -154,6 +155,7 @@ if (!hasFlag(parsed, "--no-preflight")) {
     console.error("  bun run capture:preflight --host " + host);
     process.exit(1);
   }
+  tls = check.tls;
   console.error(
     `capture:har: preflight ok · ${check.dns.length} address(es) · ${check.tls?.tlsVersion ?? "?"}`,
   );
@@ -162,6 +164,23 @@ if (!hasFlag(parsed, "--no-preflight")) {
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const outDir = join(outRoot, stamp);
 await mkdir(outDir, { recursive: true });
+await Bun.write(
+  join(outDir, "run.json"),
+  `${JSON.stringify(
+    {
+      schemaVersion: 1,
+      kind: "probe-run",
+      startedAt: new Date().toISOString(),
+      base,
+      prefix,
+      authMode: "har-cookie",
+      tls,
+      ops: ops.map((op) => op.operation),
+    },
+    null,
+    2,
+  )}\n`,
+);
 
 let transportErrors = 0;
 for (const op of ops) {
