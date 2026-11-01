@@ -17,6 +17,7 @@
  *  - `period` is the catalog's number for that sport, so `1` means `1st Half` under Football and
  *    something else elsewhere; `-1` means all periods in the observed all-periods call.
  *  - `subsport`, `wagerType` and `betType` are **always present**, empty when unfiltered.
+ *  - `tipo` is **not** constant: CP sent `0` and CPS sent `-1`.
  *  - `wagerType`/`betType` values are passed through untouched. `M` has no documented meaning in
  *    this repo, so this module never maps a code to a name.
  *
@@ -35,11 +36,13 @@ import {
 /** The portal pads `sport` to this width with spaces; 20 is measured, not guessed. */
 export const SPORT_FIELD_WIDTH = 20;
 
-/** Fixed in both observed requests. */
+/** Fixed in every observed request. */
 const OPERATION = "getAgentPerformance";
 const RRO = "1";
-const TIPO = "0";
 const DEBUG = "0";
+
+/** `tipo` when the caller does not specify one: CP's observed value. */
+export const DEFAULT_TIPO = 0;
 
 /** `-1` is what the all-periods call sends. */
 export const ALL_PERIODS = -1;
@@ -68,6 +71,11 @@ export interface AgentPerformanceSelection {
   readonly wagerType?: string;
   /** Raw bet-type code, passed through. */
   readonly betType?: string;
+  /**
+   * Portal `tipo` value. Observed as `0` for CP and `-1` for CPS, so it is a field of the
+   * selection rather than a literal. Defaults to {@link DEFAULT_TIPO}.
+   */
+  readonly tipo?: number;
 }
 
 export interface BuiltAgentPerformanceRequest {
@@ -152,6 +160,11 @@ export function buildAgentPerformanceRequest(
     );
   }
 
+  const tipo = selection.tipo ?? DEFAULT_TIPO;
+  if (!Number.isInteger(tipo)) {
+    throw new Error(`tipo must be an integer, got ${String(selection.tipo)}`);
+  }
+
   const catalog = options?.catalog ?? null;
   let catalogChecked = false;
   if (catalog !== null) {
@@ -194,7 +207,7 @@ export function buildAgentPerformanceRequest(
     ["period", String(period)],
     ["wagerType", (selection.wagerType ?? "").trim()],
     ["betType", (selection.betType ?? "").trim()],
-    ["tipo", TIPO],
+    ["tipo", String(tipo)],
     ["debug", DEBUG],
     ["operation", OPERATION],
     ["RRO", RRO],

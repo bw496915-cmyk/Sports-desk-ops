@@ -29,6 +29,10 @@
       "description": "Routes served by sportsdesk_webview_server.ts, verified against the handler source rather than an HTTP capture."
     },
     {
+      "name": "Downline Accounting",
+      "description": "Downline accounting reports (weekly figure, agent performance). The agent-performance request was observed on 2026-11-01; no response body has been captured for any of them."
+    },
+    {
       "name": "Settlement History",
       "description": "Upstream settlement-history poll wired in code; the request contract and response rows are uncaptured."
     },
@@ -694,27 +698,125 @@
         }
       }
     },
-    "/cloud/api/Report/getAgentPerformance": {
+    "/cloud/api/Manager/getAgentPerformance": {
       "post": {
-        "tags": ["Inferred (Unverified)"],
-        "summary": "Agent performance report",
-        "description": "UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
-        "operationId": "postCloudApiReportGetAgentPerformance",
+        "tags": ["Downline Accounting"],
+        "summary": "Agent performance report (request observed; response not captured)",
+        "description": "Request observed 2026-11-01 on the agent-performance screen: a form-urlencoded POST whose fields are published below in wire order (tests/fixtures/f402-report-requests-observed-2026-11-01.json). Three calls were seen — CP and CPS report kinds — and two details matter: `sport` is padded to 20 characters, and `tipo` is not a constant (0 for CP, -1 for CPS). No response body was ever observed, so no response schema is published and nothing here describes the report's columns.",
+        "operationId": "postCloudApiManagerGetAgentPerformance",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "start",
+                  "end",
+                  "agentID",
+                  "type",
+                  "freePlay",
+                  "store",
+                  "sport",
+                  "subsport",
+                  "period",
+                  "wagerType",
+                  "betType",
+                  "tipo",
+                  "debug",
+                  "operation",
+                  "RRO",
+                  "agentOwner"
+                ],
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "description": "M/D/YYYY."
+                  },
+                  "end": {
+                    "type": "string",
+                    "description": "M/D/YYYY."
+                  },
+                  "agentID": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Report kind: CP (customer performance) or CPS (sport performance) observed."
+                  },
+                  "freePlay": {
+                    "type": "string",
+                    "enum": ["Y", "N"]
+                  },
+                  "store": {
+                    "type": "string",
+                    "description": "Equals agentID in every observed call."
+                  },
+                  "sport": {
+                    "type": "string",
+                    "description": "Sport name padded with spaces to exactly 20 characters (Football, Auto Racing, Tennis, LIVE).",
+                    "minLength": 20,
+                    "maxLength": 20
+                  },
+                  "subsport": {
+                    "type": "string",
+                    "description": "Catalog sub-sport code (NFL, NCAAF Live, …); empty string when unfiltered."
+                  },
+                  "period": {
+                    "type": "string",
+                    "description": "Portal period number for that sport, or -1 for all periods. LIVE's menu has only 0 (Game)."
+                  },
+                  "wagerType": {
+                    "type": "string",
+                    "description": "Raw portal code; empty when unfiltered."
+                  },
+                  "betType": {
+                    "type": "string",
+                    "description": "Raw portal code; empty when unfiltered."
+                  },
+                  "tipo": {
+                    "type": "string",
+                    "description": "Observed as 0 for CP and -1 for CPS; not a constant."
+                  },
+                  "debug": {
+                    "type": "string",
+                    "enum": ["0"]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": ["getAgentPerformance"]
+                  },
+                  "RRO": {
+                    "type": "string",
+                    "enum": ["1"]
+                  },
+                  "agentOwner": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "fantasy402Cookie": []
+          }
+        ],
         "responses": {
           "default": {
-            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+            "description": "Unknown — no response body was observed; no status code or body schema is documented."
           }
         },
         "x-evidence": {
-          "tier": "C",
+          "tier": "B",
           "sources": [
-            "operational_guardrails_runbook.md:164",
             "tests/fixtures/f402-report-requests-observed-2026-11-01.json",
-            "docs/openapi.json"
+            "app/manager/module/agent-performance.js?bust=1.0.280"
           ],
           "capturedResponse": false,
-          "requiredCapture": "The request body is now observed (type=CP, start/end, sport padded to 20 chars, period=-1, tipo=0, debug=0 — tests/fixtures/f402-report-requests-observed-2026-11-01.json), but the URL the body was POSTed to is not, and no response exists. Capture one call with its URL and rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.",
-          "candidateUrl": true
+          "requiredCapture": "The request is now observed in full, with its URL; only the response is missing. Capture one call and its rows, then confirm whether holdPct is computed server-side and how BranchGrade is applied. Upgrades B->A.",
+          "contradicted": true
         }
       }
     },
@@ -2984,7 +3086,7 @@
           "tier": "D",
           "sources": ["services/sportsdesk_webview_server.ts:878-1000"],
           "capturedResponse": false,
-          "requiredCapture": "One captured Analysis call per report kind and filter set, with its URL. The CP kind is the open question: an operator paste on 2026-11-01 shows a request with operation=getAgentPerformance and type=CP (tests/fixtures/f402-report-requests-observed-2026-11-01.json), which suggests the CP grid is served by getAgentPerformance rather than Report/getAnalysis; Manager/getReportPlayerAnalysis is the third candidate. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste."
+          "requiredCapture": "Only the response of POST /cloud/api/Manager/getAgentPerformance is missing. The request is observed (2026-11-01, type=CP and CPS) and lib/f402_agent_performance_request.ts reproduces it byte for byte; no response body has ever been seen, so no column set is documented. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste."
         },
         "x-surface-id": "surface.daemon-analysis"
       }

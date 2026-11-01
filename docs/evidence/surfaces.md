@@ -253,12 +253,17 @@ Asset names are validated (separators, control characters, `..`) and traversal i
   copy and a `discrepancies` array.
 - One result is transcribed: Customer Performance, Baseball, agent BILLY666, 2026-11-01 — 8 rows
   (one a flagged duplicate), net $26,994.99, hold −58.33%.
-- **The wire filter names are not the dropdown names.** An observed `getAgentPerformance` body
-  (`tests/fixtures/f402-report-requests-observed-2026-11-01.json`) carries
-  `sport`/`subsport`/`period`/`wagerType`/`betType` plus `start`/`end` and `type=CP`; this API's
+- **The report is `POST /cloud/api/Manager/getAgentPerformance`.** Observed 2026-11-01, which
+  corrects the repo's earlier inference of a `Report/` prefix. The ledger row moved to that path and
+  to tier B: the request is fully observed, the response never was.
+- **The wire filter names are not the dropdown names.** The observed bodies carry
+  `sport`/`subsport`/`period`/`wagerType`/`betType` plus `start`/`end` and `type`; this API's
   parameters are `report`/`activity`/`group`/`week`/`agent`. A future live adapter therefore has to
   translate, and `week` is not the same field as the wire's `period` (nor the same as `-1` meaning
   "today" in the week list versus "all periods" in the observed body).
+- **`tipo` is not a constant**: `0` for CP, `-1` for CPS. And `sport=LIVE` is valid — the captured
+  catalog lists LIVE as a sport with one period (`0` = Game) and 11 sub-sport codes including
+  `NCAAF Live`, which is why the CPS body can send `period=0`.
 - The observed values also check out against the captured catalog: `subsport=NFL` is one of
   Football's 28 sub-sport codes, and `period=1` under Football is `1st Half` — not "first period".
 - A browser stack trace from the same session places the sub-sport fetch on

@@ -4,11 +4,11 @@ Evidence-labelled reference generated from `docs/openapi.json` (version `2026.10
 
 ## What is verified vs inferred
 
-1. **Verified (tier B, 4 of 61 operations):** a captured request side or an implementation-verified route exists. **No response body was captured**, so no response shape here is a contract.
-2. **Inferred (tier C, 32 operations):** authored in the spec, a repo type or a UI/DOM observation. No request or response was observed; treat these as proposals.
+1. **Verified (tier B, 5 of 61 operations):** a captured request side or an implementation-verified route exists. **No response body was captured**, so no response shape here is a contract.
+2. **Inferred (tier C, 31 operations):** authored in the spec, a repo type or a UI/DOM observation. No request or response was observed; treat these as proposals.
 3. **Captured responses (tier A, 8) and recovered surfaces (tier D, 17):** tier A requires a captured response body and the count is above; tier D operations are real surfaces recovered from code or fixtures after being absent from the spec. No tier E operation remains in the spec — documented-but-unimplemented paths were removed.
 
-Ledger totals across every recorded row (including rows removed from the final spec): A 8 · B 5 · C 32 · E 10 · surfaces D 19 / E 1. Full model: [docs/EVIDENCE.md](./EVIDENCE.md).
+Ledger totals across every recorded row (including rows removed from the final spec): A 8 · B 6 · C 31 · E 10 · surfaces D 19 / E 1. Full model: [docs/EVIDENCE.md](./EVIDENCE.md).
 
 ## GSLive Manager (Partner 118): operator deep links
 
@@ -66,8 +66,9 @@ https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&m
 | Forensic Surveillance              | 1          | A 1            | Cloud Manager surveillance operations with first-party evidence; tier-A rows carry a live request+response capture.                                                            |
 | Customer State Mutations           | 1          | A 1            | Cloud Manager customer state operations with first-party evidence; tier-A rows carry a live request+response capture.                                                          |
 | Local Desk &amp; Telegram Gateway  | 20         | B 4 · D 16     | Routes served by sportsdesk_webview_server.ts, verified against the handler source rather than an HTTP capture.                                                                |
+| Downline Accounting                | 1          | B 1            | Downline accounting reports (weekly figure, agent performance). The agent-performance request was observed on 2026-11-01; no response body has been captured for any of them.  |
 | Settlement History                 | 1          | D 1            | Upstream settlement-history poll wired in code; the request contract and response rows are uncaptured.                                                                         |
-| Inferred (Unverified)              | 32         | C 32           | Tier C operations: inferred or authored only. No request or response was ever observed; path and method are candidates, not contracts.                                         |
+| Inferred (Unverified)              | 31         | C 31           | Tier C operations: inferred or authored only. No request or response was ever observed; path and method are candidates, not contracts.                                         |
 | Live-captured (request unverified) | 6          | A 6            | Tier-A operations whose path/method were previously inferred (tier C): the response is live-captured, while the request field template is not observed and remains unverified. |
 
 ## Headers matrix
@@ -251,7 +252,7 @@ Case-insensitive prefix-first search over data/agent-tree.json (sportsdesk_webvi
 Validates the portal's filter vocabulary (sportsdesk_webview_server.ts:878-1000) and answers 200 only when a transcribed report matches the selection; otherwise 501 with the required capture. A 200 carries the rows, the published totals, a recomputed copy and a discrepancies array, so a transcription slip is visible rather than served as fact. Surface: surface.daemon-analysis (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiAnalysis`
-- **Required capture:** One captured Analysis call per report kind and filter set, with its URL. The CP kind is the open question: an operator paste on 2026-11-01 shows a request with operation=getAgentPerformance and type=CP (tests/fixtures/f402-report-requests-observed-2026-11-01.json), which suggests the CP grid is served by getAgentPerformance rather than Report/getAnalysis; Manager/getReportPlayerAnalysis is the third candidate. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste.
+- **Required capture:** Only the response of POST /cloud/api/Manager/getAgentPerformance is missing. The request is observed (2026-11-01, type=CP and CPS) and lib/f402_agent_performance_request.ts reproduces it byte for byte; no response body has ever been seen, so no column set is documented. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste.
 
 **Responses**
 
@@ -763,6 +764,43 @@ Serves telegram-miniapp-dashboard.html as text/html (sportsdesk_webview_server.t
   - response header `Referrer-Policy`: value `strict-origin-when-cross-origin`
   - content `text/html`: **authored response schema — no response body was captured**
 
+### `POST /cloud/api/Manager/getAgentPerformance`
+
+> **Evidence — tier B** · sources: `tests/fixtures/f402-report-requests-observed-2026-11-01.json`, `app/manager/module/agent-performance.js?bust=1.0.280` · response not captured · **contradicted by a concrete artifact**
+
+**Agent performance report (request observed; response not captured)**
+
+Request observed 2026-11-01 on the agent-performance screen: a form-urlencoded POST whose fields are published below in wire order (tests/fixtures/f402-report-requests-observed-2026-11-01.json). Three calls were seen — CP and CPS report kinds — and two details matter: `sport` is padded to 20 characters, and `tipo` is not a constant (0 for CP, -1 for CPS). No response body was ever observed, so no response schema is published and nothing here describes the report's columns.
+
+- **Tag:** Downline Accounting · **operationId:** `postCloudApiManagerGetAgentPerformance`
+- **Required capture:** The request is now observed in full, with its URL; only the response is missing. Capture one call and its rows, then confirm whether holdPct is computed server-side and how BranchGrade is applied. Upgrades B->A.
+- **Contradiction:** A concrete artifact refutes a claim previously made for this operation; see docs/EVIDENCE.md for the evidence.
+
+**Request body — `application/x-www-form-urlencoded`**
+
+| Field        | Type                                 | Required | Description                                                                                   | Example               |
+| ------------ | ------------------------------------ | -------- | --------------------------------------------------------------------------------------------- | --------------------- |
+| `start`      | string                               | yes      | M/D/YYYY.                                                                                     | —                     |
+| `end`        | string                               | yes      | M/D/YYYY.                                                                                     | —                     |
+| `agentID`    | string                               | yes      | —                                                                                             | —                     |
+| `type`       | string                               | yes      | Report kind: CP (customer performance) or CPS (sport performance) observed.                   | —                     |
+| `freePlay`   | string — one of: Y, N                | yes      | —                                                                                             | `Y`, `N`              |
+| `store`      | string                               | yes      | Equals agentID in every observed call.                                                        | —                     |
+| `sport`      | string                               | yes      | Sport name padded with spaces to exactly 20 characters (Football, Auto Racing, Tennis, LIVE). | —                     |
+| `subsport`   | string                               | yes      | Catalog sub-sport code (NFL, NCAAF Live, …); empty string when unfiltered.                    | —                     |
+| `period`     | string                               | yes      | Portal period number for that sport, or -1 for all periods. LIVE's menu has only 0 (Game).    | —                     |
+| `wagerType`  | string                               | yes      | Raw portal code; empty when unfiltered.                                                       | —                     |
+| `betType`    | string                               | yes      | Raw portal code; empty when unfiltered.                                                       | —                     |
+| `tipo`       | string                               | yes      | Observed as 0 for CP and -1 for CPS; not a constant.                                          | —                     |
+| `debug`      | string — one of: 0                   | yes      | —                                                                                             | `0`                   |
+| `operation`  | string — one of: getAgentPerformance | yes      | —                                                                                             | `getAgentPerformance` |
+| `RRO`        | string — one of: 1                   | yes      | —                                                                                             | `1`                   |
+| `agentOwner` | string                               | yes      | —                                                                                             | —                     |
+
+**Responses**
+
+- **Default response (status code not captured)** — Unknown — no response body was observed; no status code or body schema is documented.
+
 ### `POST /cloud/api/Manager/getHistory`
 
 > **Evidence — tier D** · sources: `lib/fantasy402_settlement_ingest.ts:347-357`, `lib/fantasy402_wager_universe_scope.ts:22-31`, `fixture:tests/fixtures/fantasy402-history-poll.json:1-25` · response not captured
@@ -1078,21 +1116,6 @@ UNVERIFIED — no capture exists. The path and method are candidate values infer
 
 - **Tag:** Inferred (Unverified) · **operationId:** `postCloudApiReportDeleteWager`
 - **Required capture:** UI stage-5 Deleted Wagers action routes to POST /cloud/api/Manager/getReportDeletedTransactions in Blob 96EA5CDA (whereas PendingDelete in report.js:8578 is the read-only Ticket Detail modal lookup). Capture getReportDeletedTransactions and reconcile.
-
-**Responses**
-
-- **Default response (status code not captured)** — Unknown — no response was captured, so no status code or body schema is documented.
-
-### `POST /cloud/api/Report/getAgentPerformance`
-
-> **Evidence — tier C** · sources: `operational_guardrails_runbook.md:164`, `tests/fixtures/f402-report-requests-observed-2026-11-01.json` · response not captured · candidate URL+method (not observed on the wire)
-
-**Agent performance report**
-
-UNVERIFIED — no capture exists. The path and method are candidate values inferred from a UI/DOM observation; they were never observed on the wire. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.
-
-- **Tag:** Inferred (Unverified) · **operationId:** `postCloudApiReportGetAgentPerformance`
-- **Required capture:** The request body is now observed (type=CP, start/end, sport padded to 20 chars, period=-1, tipo=0, debug=0 — tests/fixtures/f402-report-requests-observed-2026-11-01.json), but the URL the body was POSTed to is not, and no response exists. Capture one call with its URL and rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.
 
 **Responses**
 
@@ -1486,7 +1509,6 @@ These rows are **tier C**. They are authored in the spec/generators, declared fr
 | POST   | `/cloud/api/Manager/updateCustomerNotes`      | Inferred only: generator-authored; no artifact.                                                                          | Capture an append + read-back; confirm the mutation Result envelope and whether notes are immutable. Upgrades C->A.                                                                                                                                                                                                                                                                                                       |
 | POST   | `/cloud/api/Manager/vigSetupInsert`           | No artifact exists; authored in the spec.                                                                                | Capture one vigSetupInsert (application/json claimed, 20-char padded sportType) plus getSportsVigSetup read-back; verify content type, padding widths and Result envelope. Upgrades C->A.                                                                                                                                                                                                                                 |
 | POST   | `/cloud/api/Report/delete-wager`              | Inferred only: a UI/DOM observation only.                                                                                | UI stage-5 Deleted Wagers action routes to POST /cloud/api/Manager/getReportDeletedTransactions in Blob 96EA5CDA (whereas PendingDelete in report.js:8578 is the read-only Ticket Detail modal lookup). Capture getReportDeletedTransactions and reconcile.                                                                                                                                                               |
-| POST   | `/cloud/api/Report/getAgentPerformance`       | Inferred only: a UI/DOM observation only; wire observation.                                                              | The request body is now observed (type=CP, start/end, sport padded to 20 chars, period=-1, tipo=0, debug=0 — tests/fixtures/f402-report-requests-observed-2026-11-01.json), but the URL the body was POSTed to is not, and no response exists. Capture one call with its URL and rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.                                 |
 | POST   | `/cloud/api/Report/getAnalysis`               | Inferred only: crawler behaviour, not a wire observation; a hand-authored UI/DOM declaration; a UI/DOM observation only. | In app/manager/manager.js:93668 (v1.0.280), the Analysis view calls POST /cloud/api/Manager/getReportPlayerAnalysis ({agentID, agentOwner, customerID, reportType, startDate, endDate, lineType, operation: "getReportPlayerAnalysis", RRO: 1}). Capture getReportPlayerAnalysis and reconcile.                                                                                                                           |
 | POST   | `/cloud/api/Report/getDailyFigure`            | Inferred only: generator-authored; no artifact.                                                                          | Capture a daily figure read; confirm the request (none is documented) and the row fields. Upgrades C->A.                                                                                                                                                                                                                                                                                                                  |
 | POST   | `/cloud/api/Report/getDailyFiguresByCustomer` | Inferred only: implementation context only; a repo TypeScript type only.                                                 | Prefix-identical 500 (0 B) on both /Manager and /Report on 2026-11-01 when sent form-urlencoded. Client JS (customer/report/report.js:25633) sends contentType: "application/json" with JSON.stringify({agentID, customerID, week: 0, operation: "getDailyFiguresByCustomer"}). 1. Retrieve upstream 500 error log; 2. Re-probe with application/json (wired in lib/f402_probe.ts).                                       |
@@ -1501,7 +1523,7 @@ These rows are **tier C**. They are authored in the spec/generators, declared fr
 | POST   | `/cloud/api/System/getMessages`               | Inferred only: crawler behaviour, not a wire observation; a hand-authored UI/DOM declaration.                            | On manager.html (v1.0.280) boot, messages are fetched via POST /cloud/api/Manager/getMessage ({acc, type: 0, operation: "getMessage", RRO: 1} at manager.js:55125) and POST /cloud/api/Manager/getNewEmailsCount (manager.js:31845). Capture Manager/getMessage and reconcile this candidate_url.                                                                                                                         |
 | POST   | `/cloud/api/System/verifySession`             | Inferred only: generator-authored.                                                                                       | Capture a verifySession call on a live and an expired token; confirm the response shape and the 401 re-mint behaviour. Upgrades C->A.                                                                                                                                                                                                                                                                                     |
 
-Appendix rows: **32** (tier C in the ledger). The capture plan that would upgrade them is [docs/evidence/capture-requests.md](./evidence/capture-requests.md).
+Appendix rows: **31** (tier C in the ledger). The capture plan that would upgrade them is [docs/evidence/capture-requests.md](./evidence/capture-requests.md).
 
 ## Missing surfaces
 
@@ -1511,7 +1533,7 @@ Real surfaces recorded by the ledger that the final spec does not (or cannot) pr
 | -------------------------------------- | ---- | -------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `surface.daemon-agent-search`          | D    | local-route                | Agent lookup for the Analysis form (GET /api/agents/search)                            | Case-insensitive prefix-first search over the committed agent tree; used to offer agent suggestions instead of a free-text field that silently accepts typos. Loopback-gated like the tree itself, because agent names are identity data.                                                                                                                                                                                        | yes (1/1 member path(s))                                                        |
 | `surface.daemon-agent-tree`            | D    | local-route                | Agent hierarchy with wager rollup (GET /api/agent-tree)                                | Serves data/agent-tree.json (2,276 agents, 4 roots) joined with per-agent exposure. Keys are canonical agentLoginKey values; a key owned by more than one AgentID is flagged and never given a level.                                                                                                                                                                                                                            | yes (1/1 member path(s))                                                        |
-| `surface.daemon-analysis`              | D    | local-route                | Analysis report (GET /api/analysis, /api/analysis/filters, /api/analysis/reports)      | The portal's Analysis report vocabulary and any transcribed result. The filter vocabulary is transcribed from report.js; a result is served only for the selection it was recorded under, and everything else answers 501 rather than zeroes.                                                                                                                                                                                    | yes (3/3 member path(s))                                                        |
+| `surface.daemon-analysis`              | D    | local-route                | Analysis report (GET /api/analysis, /api/analysis/filters, /api/analysis/reports)      | The portal's Analysis report vocabulary and any transcribed result. The filter vocabulary is transcribed from report.js; the report itself is POST /cloud/api/Manager/getAgentPerformance (request observed 2026-11-01, response never captured). A result is served only for the selection it was recorded under, and everything else answers 501 rather than zeroes.                                                           | yes (3/3 member path(s))                                                        |
 | `surface.daemon-contests`              | D    | local-route                | Contest / futures list (GET /api/contests)                                             | Every contest the sports nav links (data-action=get-games-prop), keyed by the portal's numeric contestNum with sport/market/subject parsed out of the padded type string.                                                                                                                                                                                                                                                        | yes (1/1 member path(s))                                                        |
 | `surface.daemon-dashboard`             | D    | local-route                | Daemon dashboard routes (GET / and GET /dashboard)                                     | GET / and GET /dashboard serve customer-churn-simulation-dashboard.html as text/html from the Bun daemon.                                                                                                                                                                                                                                                                                                                        | yes (1/2 member path(s))                                                        |
 | `surface.daemon-game-admin`            | D    | local-route                | Game Admin exposure (GET /api/game-admin)                                              | Exposure per fixture split by position (Straight/Parlay/Teaser), the report the portal manual v1.0.280 describes in F.A.Q. #4. preGame is computed from gameDateTime and is a fact about the fixture, not a claim about the operator's delete permission.                                                                                                                                                                        | yes (1/1 member path(s))                                                        |
@@ -1541,8 +1563,8 @@ Counts below are ledger totals (all recorded rows, including rows removed from t
 | Tier | Meaning                                                                                                                                                                                                             | Ledger surfaces | Spec operations |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------- |
 | A    | Captured wire contract: a real request AND a real response capture exist. Five operations qualify from the 2026-10-31 live session (getWebLog, getInfoPlayer, getBetTicker, getBetTickerConfig, getSportsVigSetup). |                 | 8               |
-| B    | Observed first-party evidence: captured request side, observed request payload, or a route verified against its handler source. The response may still be uncaptured.                                               |                 | 4               |
-| C    | Inferred only: authored in the spec/generators, a repo TypeScript type, or a UI/DOM observation. No request or response was observed.                                                                               |                 | 32              |
+| B    | Observed first-party evidence: captured request side, observed request payload, or a route verified against its handler source. The response may still be uncaptured.                                               |                 | 5               |
+| C    | Inferred only: authored in the spec/generators, a repo TypeScript type, or a UI/DOM observation. No request or response was observed.                                                                               |                 | 31              |
 | D    | Real surface recovered from code or fixtures after being absent from the earlier spec. No captured response; recorded in `surfaces[]` and, for three rows, as a spec operation.                                     | 19              | 17              |
 | E    | Documented operation with no implementation in this repository.                                                                                                                                                     | 1               | 0               |
 

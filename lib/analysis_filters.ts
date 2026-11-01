@@ -4,12 +4,10 @@
  * own filter bar: report kind (CP/CPS/CPV/G), activity code, group mode, and week window.
  *
  * Provenance: portal markup for `report.js` (`#btnPerformance`, `data-list="activity"`,
- * `"group"`, `"week"`). The codes are the portal's; the *data* behind them comes from the
- * Analysis report call, which this repo has never captured. Which operation serves it is
- * unsettled: `Report/getAnalysis` is the name on the launcher tile, an observed 2026-11-01 request
- * carries `operation=getAgentPerformance&type=CP` (body only, no URL), and the Analysis view in
- * `manager.js` calls `Manager/getReportPlayerAnalysis`. So this module can validate and describe a
- * selection, and cannot produce a figure.
+ * `"group"`, `"week"`). The codes are the portal's; the *data* behind them comes from
+ * `POST /cloud/api/Manager/getAgentPerformance`, whose request was observed on 2026-11-01
+ * (`operation=getAgentPerformance`, `type=CP`/`CPS`) but whose response never was. So this module
+ * can validate and describe a selection, and cannot produce a figure.
  */
 
 export interface AnalysisOption {
@@ -156,4 +154,4 @@ export function describeSelection(selection: AnalysisSelection): string {
 
 /** Why this endpoint cannot answer yet, stated once so responses and docs agree. */
 export const ANALYSIS_REQUIRED_CAPTURE =
-  "Capture one Analysis call (redacted) per report kind, with its URL and response. The CP kind is unsettled: an observed request on 2026-11-01 carries operation=getAgentPerformance with type=CP (tests/fixtures/f402-report-requests-observed-2026-11-01.json), so the CP grid may be getAgentPerformance rather than Report/getAnalysis, with Manager/getReportPlayerAnalysis a third candidate. No response exists for any of them in docs/evidence/captures.";
+  "Capture the response of POST /cloud/api/Manager/getAgentPerformance per report kind. The request is already observed (2026-11-01, type=CP and type=CPS — tests/fixtures/f402-report-requests-observed-2026-11-01.json) and lib/f402_agent_performance_request.ts reproduces it byte for byte; only the response is missing, so no column set is documented. Report/getAnalysis on the launcher tile and Manager/getReportPlayerAnalysis are different calls, not this report.";

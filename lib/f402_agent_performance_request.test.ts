@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   ALL_PERIODS,
+  DEFAULT_TIPO,
   SPORT_FIELD_WIDTH,
   buildAgentPerformanceRequest,
   padSportField,
@@ -245,5 +246,77 @@ describe("sport padding, from both observed calls", () => {
         expect(padSportField(entry.sport)).toHaveLength(SPORT_FIELD_WIDTH);
       }
     }
+  });
+});
+
+describe("the CPS call (sport performance)", () => {
+  const cpsFields = (() => {
+    const entry = observed as {
+      sportPerformanceFields?: Record<string, string>;
+    };
+    if (entry.sportPerformanceFields === undefined) {
+      throw new Error("fixture has no sportPerformanceFields");
+    }
+    return entry.sportPerformanceFields;
+  })();
+
+  const cps = {
+    start: "10/27/2026",
+    end: "11/02/2026",
+    agentId: agent,
+    report: "CPS" as const,
+    freePlay: "Y" as const,
+    sport: "LIVE",
+    subSport: "NCAAF Live",
+    period: -1,
+    tipo: -1,
+  };
+
+  test("reproduces the observed CPS body byte for byte", () => {
+    const built = buildAgentPerformanceRequest(cps, { catalog });
+    const expected = new URLSearchParams(
+      Object.entries(cpsFields) as [string, string][],
+    ).toString();
+
+    expect(built.body).toBe(expected);
+  });
+
+  test("tipo is sent, not hardcoded", () => {
+    // CP sent tipo=0, CPS sent tipo=-1. A constant would have been wrong for one of them.
+    expect(
+      Object.fromEntries(buildAgentPerformanceRequest(cps, { catalog }).fields)
+        .tipo,
+    ).toBe("-1");
+    expect(
+      Object.fromEntries(buildAgentPerformanceRequest(base, { catalog }).fields)
+        .tipo,
+    ).toBe("0");
+    expect(DEFAULT_TIPO).toBe(0);
+  });
+
+  test("the LIVE sport and its NCAAF Live sub-sport validate against the catalog", () => {
+    // LIVE is a sport in the captured catalog with one period (0 = Game) and 11 sub-sports.
+    const built = buildAgentPerformanceRequest(cps, { catalog });
+    expect(built.catalogChecked).toBe(true);
+    expect(built.sportPadded).toBe("LIVE".padEnd(20, " "));
+  });
+
+  test("period 0 means the whole game for LIVE, and both observed values are accepted", () => {
+    // The two observations differ only in period: -1 (unfiltered) and 0 (Game).
+    for (const period of [-1, 0]) {
+      expect(
+        buildAgentPerformanceRequest({ ...cps, period }, { catalog })
+          .catalogChecked,
+      ).toBe(true);
+    }
+    expect(() =>
+      buildAgentPerformanceRequest({ ...cps, period: 2 }, { catalog }),
+    ).toThrow(/not in LIVE's period menu/);
+  });
+
+  test("tipo must be an integer when given", () => {
+    expect(() =>
+      buildAgentPerformanceRequest({ ...cps, tipo: 0.5 }, { catalog }),
+    ).toThrow(/tipo must be an integer/);
   });
 });

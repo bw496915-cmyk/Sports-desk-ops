@@ -101,12 +101,14 @@ const TAG_FORENSIC = "Forensic Surveillance";
 const TAG_CUSTOMER = "Customer State Mutations";
 const TAG_DAEMON = "Local Desk & Telegram Gateway";
 const TAG_SETTLEMENT = "Settlement History";
+const TAG_DOWNLINE = "Downline Accounting";
 
 const USED_TAGS = [
   TAG_FORENSIC,
   TAG_CUSTOMER,
   TAG_DAEMON,
   TAG_SETTLEMENT,
+  TAG_DOWNLINE,
   TAG_INFERRED,
   TAG_CAPTURED,
 ] as const;
@@ -232,7 +234,8 @@ const SUMMARIES: Readonly<Record<string, string>> = {
   "/cloud/api/Manager/getSportsVigSetup": "Read sport vig setup",
   "/cloud/api/Manager/getInfoManager": "Manager dashboard header",
   "/cloud/api/Report/getWeeklyFigure": "Weekly figure report",
-  "/cloud/api/Report/getAgentPerformance": "Agent performance report",
+  "/cloud/api/Manager/getAgentPerformance":
+    "Agent performance report (request observed; response not captured)",
   "/cloud/api/Report/getSettledFigure": "Settled figure / collections",
   "/cloud/api/Report/delete-wager": "Deleted wagers report",
   "/health": "Daemon health and telemetry probe",
@@ -1294,6 +1297,102 @@ function getWebLogOperation(operation: LedgerOperation): JsonObject {
   };
 }
 
+function getAgentPerformanceOperation(operation: LedgerOperation): JsonObject {
+  return {
+    tags: [TAG_DOWNLINE],
+    summary:
+      "Agent performance report (request observed; response not captured)",
+    description:
+      "Request observed 2026-11-01 on the agent-performance screen: a form-urlencoded POST whose fields are published below in wire order (tests/fixtures/f402-report-requests-observed-2026-11-01.json). Three calls were seen — CP and CPS report kinds — and two details matter: `sport` is padded to 20 characters, and `tipo` is not a constant (0 for CP, -1 for CPS). No response body was ever observed, so no response schema is published and nothing here describes the report's columns.",
+    operationId: operationIdFor(operation.method, operation.path),
+    requestBody: {
+      required: true,
+      content: {
+        "application/x-www-form-urlencoded": {
+          schema: {
+            type: "object",
+            required: [
+              "start",
+              "end",
+              "agentID",
+              "type",
+              "freePlay",
+              "store",
+              "sport",
+              "subsport",
+              "period",
+              "wagerType",
+              "betType",
+              "tipo",
+              "debug",
+              "operation",
+              "RRO",
+              "agentOwner",
+            ],
+            properties: {
+              start: { type: "string", description: "M/D/YYYY." },
+              end: { type: "string", description: "M/D/YYYY." },
+              agentID: { type: "string" },
+              type: {
+                type: "string",
+                description:
+                  "Report kind: CP (customer performance) or CPS (sport performance) observed.",
+              },
+              freePlay: { type: "string", enum: ["Y", "N"] },
+              store: {
+                type: "string",
+                description: "Equals agentID in every observed call.",
+              },
+              sport: {
+                type: "string",
+                description:
+                  "Sport name padded with spaces to exactly 20 characters (Football, Auto Racing, Tennis, LIVE).",
+                minLength: 20,
+                maxLength: 20,
+              },
+              subsport: {
+                type: "string",
+                description:
+                  "Catalog sub-sport code (NFL, NCAAF Live, …); empty string when unfiltered.",
+              },
+              period: {
+                type: "string",
+                description:
+                  "Portal period number for that sport, or -1 for all periods. LIVE's menu has only 0 (Game).",
+              },
+              wagerType: {
+                type: "string",
+                description: "Raw portal code; empty when unfiltered.",
+              },
+              betType: {
+                type: "string",
+                description: "Raw portal code; empty when unfiltered.",
+              },
+              tipo: {
+                type: "string",
+                description:
+                  "Observed as 0 for CP and -1 for CPS; not a constant.",
+              },
+              debug: { type: "string", enum: ["0"] },
+              operation: { type: "string", enum: ["getAgentPerformance"] },
+              RRO: { type: "string", enum: ["1"] },
+              agentOwner: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    security: [{ fantasy402Cookie: [] }],
+    responses: {
+      default: {
+        description:
+          "Unknown — no response body was observed; no status code or body schema is documented.",
+      },
+    },
+    "x-evidence": evidenceOf(operation),
+  };
+}
+
 function getInfoPlayerOperation(operation: LedgerOperation): JsonObject {
   return {
     tags: [TAG_CUSTOMER],
@@ -1525,6 +1624,7 @@ function telegramReportOperation(operation: LedgerOperation): JsonObject {
 const B_OPERATION_BUILDERS: Readonly<
   Record<string, (operation: LedgerOperation) => JsonObject>
 > = {
+  "/cloud/api/Manager/getAgentPerformance": getAgentPerformanceOperation,
   "/cloud/api/Manager/getWebLog": getWebLogOperation,
   "/cloud/api/Manager/getInfoPlayer": getInfoPlayerOperation,
   "/health": healthOperation,
@@ -1838,7 +1938,7 @@ function surfaceOperationSpecs(
       description:
         "Validates the portal's filter vocabulary (sportsdesk_webview_server.ts:878-1000) and answers 200 only when a transcribed report matches the selection; otherwise 501 with the required capture. A 200 carries the rows, the published totals, a recomputed copy and a discrepancies array, so a transcription slip is visible rather than served as fact. Surface: surface.daemon-analysis (tier D).",
       requiredCapture:
-        "One captured Analysis call per report kind and filter set, with its URL. The CP kind is the open question: an operator paste on 2026-11-01 shows a request with operation=getAgentPerformance and type=CP (tests/fixtures/f402-report-requests-observed-2026-11-01.json), which suggests the CP grid is served by getAgentPerformance rather than Report/getAnalysis; Manager/getReportPlayerAnalysis is the third candidate. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste.",
+        "Only the response of POST /cloud/api/Manager/getAgentPerformance is missing. The request is observed (2026-11-01, type=CP and CPS) and lib/f402_agent_performance_request.ts reproduces it byte for byte; no response body has ever been seen, so no column set is documented. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste.",
       responses: {
         "200": jsonSurfaceResponse("A transcribed analysis report.", {
           success: { type: "boolean" },
@@ -2842,6 +2942,11 @@ function buildTags(ledger: Ledger): readonly JsonObject[] {
       name: TAG_DAEMON,
       description:
         "Routes served by sportsdesk_webview_server.ts, verified against the handler source rather than an HTTP capture.",
+    },
+    {
+      name: TAG_DOWNLINE,
+      description:
+        "Downline accounting reports (weekly figure, agent performance). The agent-performance request was observed on 2026-11-01; no response body has been captured for any of them.",
     },
     {
       name: TAG_SETTLEMENT,

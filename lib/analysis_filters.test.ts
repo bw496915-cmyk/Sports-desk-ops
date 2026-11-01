@@ -116,15 +116,16 @@ describe("describeSelection", () => {
 });
 
 describe("required capture", () => {
-  test("names the candidate operations and the missing artefacts", () => {
-    // Which operation serves the CP grid is unsettled, so all three candidates are named.
-    for (const operation of [
-      "getAgentPerformance",
-      "Report/getAnalysis",
-      "getReportPlayerAnalysis",
-    ]) {
-      expect(ANALYSIS_REQUIRED_CAPTURE).toContain(operation);
-    }
-    expect(ANALYSIS_REQUIRED_CAPTURE).toContain("No response exists");
+  test("names the operation that serves the report and what is still missing", () => {
+    // The URL is settled now: an observed request goes to Manager/getAgentPerformance.
+    expect(ANALYSIS_REQUIRED_CAPTURE).toContain(
+      "/cloud/api/Manager/getAgentPerformance",
+    );
+    // Only the response is missing, and the text must say so rather than imply a request gap.
+    expect(ANALYSIS_REQUIRED_CAPTURE).toContain("only the response is missing");
+    expect(ANALYSIS_REQUIRED_CAPTURE).toContain("no column set is documented");
+    // The two decoys are named so nobody re-conflates them with this report.
+    expect(ANALYSIS_REQUIRED_CAPTURE).toContain("Report/getAnalysis");
+    expect(ANALYSIS_REQUIRED_CAPTURE).toContain("getReportPlayerAnalysis");
   });
 });

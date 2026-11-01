@@ -47,8 +47,8 @@
   },
   "counts": {
     "A": 8,
-    "B": 5,
-    "C": 32,
+    "B": 6,
+    "C": 31,
     "D": 0,
     "E": 10,
     "total": 55
@@ -545,7 +545,7 @@
         {
           "source": "tests/fixtures/portal-left-menu-actions.html",
           "kind": "ui-observation",
-          "note": "Corrected 2026-11-01: data-action=\"get-weekly-figure\" IS real — an operator paste of the manager page's mobile left menu contains it (with data-type=\"heavy\"), beside go-home-menu, get-pending, get-game-admin and get-messaging. The earlier note that the string appeared in no artifact was wrong. What remains unproven is that this action posts to Report/getWeeklyFigure; the boot path calls Manager/getWeeklyFigureByAgentLite instead."
+          "note": "Corrected 2026-11-01: data-action=\"get-weekly-figure\" IS real \u2014 an operator paste of the manager page's mobile left menu contains it (with data-type=\"heavy\"), beside go-home-menu, get-pending, get-game-admin and get-messaging. The earlier note that the string appeared in no artifact was wrong. What remains unproven is that this action posts to Report/getWeeklyFigure; the boot path calls Manager/getWeeklyFigureByAgentLite instead."
         }
       ],
       "requiredCapture": "On manager.html (v1.0.280) boot, weekly figures are fetched via POST /cloud/api/Manager/getWeeklyFigureByAgentLite ({agentID, week: 0, type: \"A\", layout: \"byDay\", operation: \"getWeeklyFigureByAgentLite\", RRO: 1} at manager.js:52703) and POST /cloud/api/Manager/getMasterSheet (manager.js:43955). Capture getWeeklyFigureByAgentLite and reconcile.",
@@ -553,33 +553,28 @@
       "contradictedReason": null
     },
     {
-      "path": "/cloud/api/Report/getAgentPerformance",
+      "path": "/cloud/api/Manager/getAgentPerformance",
       "method": "post",
       "operationId": null,
       "tag": "Downline Accounting",
-      "tier": "C",
+      "tier": "B",
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "operational_guardrails_runbook.md:164",
-          "kind": "ui-observation",
-          "note": "Reporting action 'get-agent-performance' with data-type='C' is observed in the surveillance lifecycle table (stage 4, 8-tier BranchGrade)."
-        },
-        {
           "source": "tests/fixtures/f402-report-requests-observed-2026-11-01.json",
           "kind": "wire-observation",
-          "note": "2026-11-01: an operator paste carried a getAgentPerformance request body — start, end (M/D/YYYY), agentID, type=CP, freePlay=Y, store, sport (padded to 20 chars), subsport, period=-1, wagerType, betType, tipo=0, debug=0, operation, RRO=1, agentOwner. A second paste of the same operation fills the sport filter row: subsport=NFL, period=1, wagerType=M, betType=S, with those four fields the only difference; the URL is still absent and no response was observed. Both variants encode to the same form body byte for byte (pinned by tests/f402_observed_requests.test.ts). A browser stack trace from the same session shows the sub-sport fetch on app/manager/module/agent-performance.js?bust=1.0.280 via getSubsport() and jQuery ajax, which places both requests on the agent-performance screen."
+          "note": "Three requests observed 2026-11-01, all form-urlencoded to /cloud/api/Manager/getAgentPerformance: two CP calls (all-periods, then subsport=NFL period=1 wagerType=M betType=S) and one CPS call (sport=LIVE, subsport=NCAAF Live, tipo=-1). Fields in wire order: start, end, agentID, type, freePlay, store, sport, subsport, period, wagerType, betType, tipo, debug, operation, RRO, agentOwner. tipo is 0 for CP and -1 for CPS, so it is not a constant. No response was observed."
         },
         {
-          "source": "docs/openapi.json",
-          "kind": "spec-claim",
-          "note": "Spec asserts form-urlencoded {agentID, dataType:'C', period} and an array of {agentID, volume, netWon, holdPct}; holdPct/BranchGrade math is not captured."
+          "source": "app/manager/module/agent-performance.js?bust=1.0.280",
+          "kind": "ui-observation",
+          "note": "A browser stack trace shows the sibling sub-sport call (getSubsport) in this module, which is how the report screen was identified."
         }
       ],
-      "requiredCapture": "The request body is now observed (type=CP, start/end, sport padded to 20 chars, period=-1, tipo=0, debug=0 — tests/fixtures/f402-report-requests-observed-2026-11-01.json), but the URL the body was POSTed to is not, and no response exists. Capture one call with its URL and rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.",
-      "contradicted": false,
-      "contradictedReason": null,
-      "candidate_url": true,
+      "requiredCapture": "The request is now observed in full, with its URL; only the response is missing. Capture one call and its rows, then confirm whether holdPct is computed server-side and how BranchGrade is applied. Upgrades B->A.",
+      "contradicted": true,
+      "contradictedReason": "The repo listed /cloud/api/Report/getAgentPerformance, a path inferred from the get-agent-performance action name. An observed 2026-11-01 request goes to /cloud/api/Manager/getAgentPerformance, so the Report prefix was wrong.",
+      "candidate_url": false,
       "ui_observed": true
     },
     {
@@ -2107,7 +2102,7 @@
       "tier": "D",
       "category": "local-route",
       "missingFromSpec": false,
-      "what": "The portal's Analysis report vocabulary and any transcribed result. The filter vocabulary is transcribed from report.js; a result is served only for the selection it was recorded under, and everything else answers 501 rather than zeroes.",
+      "what": "The portal's Analysis report vocabulary and any transcribed result. The filter vocabulary is transcribed from report.js; the report itself is POST /cloud/api/Manager/getAgentPerformance (request observed 2026-11-01, response never captured). A result is served only for the selection it was recorded under, and everything else answers 501 rather than zeroes.",
       "members": [
         "GET /api/analysis",
         "GET /api/analysis/filters",
@@ -2120,7 +2115,7 @@
           "note": "parseAnalysisQuery validates the codes; matchesSelection gates the stored report; the 200 payload carries totals plus a recomputed copy and a discrepancies array."
         }
       ],
-      "requiredCapture": "One captured Analysis call per report kind and filter set, with its URL. The CP kind is the open question: an operator paste on 2026-11-01 shows a request with operation=getAgentPerformance and type=CP (tests/fixtures/f402-report-requests-observed-2026-11-01.json), which suggests the CP grid is served by getAgentPerformance rather than Report/getAnalysis; getReportPlayerAnalysis is the third candidate. Today one Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste."
+      "requiredCapture": "Only the response of POST /cloud/api/Manager/getAgentPerformance is missing. The request is observed (2026-11-01, type=CP and CPS) and lib/f402_agent_performance_request.ts reproduces it byte for byte; no response body has ever been seen, so no column set is documented. Today one Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste."
     },
     {
       "id": "surface.daemon-agent-search",

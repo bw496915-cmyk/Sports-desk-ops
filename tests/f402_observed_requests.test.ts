@@ -109,11 +109,15 @@ describe("observed manager requests (2026-11-01)", () => {
     ]);
   });
 
-  test("getAgentPerformance has a body but no URL", () => {
-    // The paste lost the URL, so the ledger's inferred Report/ path stays a claim, not a fact.
+  test("getAgentPerformance's URL is the Manager prefix, not Report/", () => {
+    // This is the correction: the repo inferred Report/getAgentPerformance from the action name,
+    // and an observed call goes to Manager/. The fixture records the path and why it matters.
     const request = byOperation("getAgentPerformance");
-    expect(request.pathObserved).toBeNull();
-    expect(request.pathStatus).toContain("without its URL");
+    expect(request.pathObserved).toBe(
+      "/cloud/api/Manager/getAgentPerformance",
+    );
+    expect(request.pathStatus).toContain("contradicts");
+    expect(request.pathObserved).not.toContain("/Report/");
     expect(Object.keys(request.fields)).toEqual([
       "start",
       "end",

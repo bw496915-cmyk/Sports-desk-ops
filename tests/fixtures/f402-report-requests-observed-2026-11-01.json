@@ -49,8 +49,8 @@
     },
     {
       "operation": "getAgentPerformance",
-      "pathObserved": null,
-      "pathStatus": "body only - the paste carried the form body without its URL; the ledger's inferred path /cloud/api/Report/getAgentPerformance remains unconfirmed",
+      "pathObserved": "/cloud/api/Manager/getAgentPerformance",
+      "pathStatus": "observed 2026-11-01, third call. This contradicts the repo's inferred /cloud/api/Report/getAgentPerformance: the report is served by the Manager prefix, not Report.",
       "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
       "fields": {
         "start": "10/21/2026",
@@ -88,7 +88,30 @@
         "RRO": "1",
         "agentOwner": "<agent>"
       },
-      "filteredFieldsNote": "second observation, same operation, with the sport filter row filled: subsport=NFL, period=1, wagerType=M, betType=S. Only those four fields differ."
+      "filteredFieldsNote": "second observation, same operation, with the sport filter row filled: subsport=NFL, period=1, wagerType=M, betType=S. Only those four fields differ.",
+      "sportPerformanceFields": {
+        "start": "10/27/2026",
+        "end": "11/02/2026",
+        "agentID": "<agent>",
+        "type": "CPS",
+        "freePlay": "Y",
+        "store": "<agent>",
+        "sport": "LIVE                ",
+        "subsport": "NCAAF Live",
+        "period": "-1",
+        "wagerType": "",
+        "betType": "",
+        "tipo": "-1",
+        "debug": "0",
+        "operation": "getAgentPerformance",
+        "RRO": "1",
+        "agentOwner": "<agent>"
+      },
+      "sportPerformanceNote": "third observation: type=CPS, sport=LIVE, subsport=NCAAF Live, and tipo=-1 rather than 0, so tipo is not a constant. wagerType/betType still present and empty; period is -1 with a sport filter.",
+      "sportPerformancePeriodsObserved": {
+        "values": ["-1", "0"],
+        "note": "the same CPS call was observed twice with everything else equal except period: -1 and 0. LIVE's catalog period menu has exactly one entry, number 0, named Game, so both are meaningful: -1 is unfiltered and 0 is the whole game."
+      }
     }
   ]
 }
