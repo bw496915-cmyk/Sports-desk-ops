@@ -14,6 +14,10 @@
 
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
+import {
+  encodeScreenshot,
+  type ResizeSpec,
+} from "../../lib/screenshot_encode.ts";
 import { parseCdpCookies, type CdpCookie } from "./cookies.ts";
 import { sha256Hex } from "./json.ts";
 import { redactError, redactString, redactUrlForLog } from "./redact.ts";
@@ -77,9 +81,23 @@ export interface ScreenshotResult {
 }
 
 export type ScreenshotOptions =
-  | { format: "png" }
-  | { format: "jpeg"; quality: number }
-  | { format: "webp"; quality: number };
+  | {
+      format: "png";
+      palette?: boolean;
+      resize?: ResizeSpec;
+    }
+  | {
+      format: "jpeg";
+      quality?: number;
+      progressive?: boolean;
+      resize?: ResizeSpec;
+    }
+  | {
+      format: "webp";
+      quality?: number;
+      lossless?: boolean;
+      resize?: ResizeSpec;
+    };
 
 /** Read-side contract used by the pure load-wait helper (fake in tests). */
 export interface LoadState {
@@ -242,16 +260,16 @@ export class ManagedWebView {
       view = new Bun.WebView({
         width: options.width ?? 1440,
         height: options.height ?? 900,
-        backend,
+        // For unattended Chrome automation, pass `url: false` so Bun always spawns a fresh
+        // headless instance instead of auto-connecting via DevToolsActivePort.
+        backend:
+          backend === "chrome" ? { type: "chrome", url: false } : "webkit",
         ...(options.dataStoreDir === undefined
           ? {}
           : { dataStore: { directory: options.dataStoreDir } }),
-        console: (...args: unknown[]) => {
+        console: (type: string, ...args: unknown[]) => {
           if (consoleLines.length >= consoleLimit) return;
-          consoleLines.push({
-            level: "log",
-            text: formatConsoleArgs(args),
-          });
+          consoleLines.push(formatConsoleEntry(type, args));
         },
       });
     } catch (error) {
@@ -435,11 +453,16 @@ export class ManagedWebView {
     return this.evaluate(`(() => { ${body} })()`);
   }
 
-  async click(selector: string): Promise<void> {
+  async click(
+    selector: string,
+    options?: Bun.WebView.ClickSelectorOptions,
+  ): Promise<void> {
     this.assertOpen();
     assertSelector(selector, "click");
     try {
-      await this.view.click(selector);
+      await (options === undefined
+        ? this.view.click(selector)
+        : this.view.click(selector, options));
     } catch (error) {
       throw new WebViewError(
         "click-failed",
@@ -448,13 +471,15 @@ export class ManagedWebView {
     }
   }
 
-  async press(key: string): Promise<void> {
+  async press(key: string, options?: Bun.WebView.PressOptions): Promise<void> {
     this.assertOpen();
     if (key.trim().length === 0) {
       throw new WebViewError("press-failed", "press requires a key name");
     }
     try {
-      await this.view.press(key);
+      await (options === undefined
+        ? this.view.press(key as Bun.WebView.VirtualKey)
+        : this.view.press(key as Bun.WebView.VirtualKey, options));
     } catch (error) {
       throw new WebViewError(
         "press-failed",
@@ -463,11 +488,16 @@ export class ManagedWebView {
     }
   }
 
-  async scrollTo(selector: string): Promise<void> {
+  async scrollTo(
+    selector: string,
+    options?: Bun.WebView.ScrollToOptions,
+  ): Promise<void> {
     this.assertOpen();
     assertSelector(selector, "scrollTo");
     try {
-      await this.view.scrollTo(selector);
+      await (options === undefined
+        ? this.view.scrollTo(selector)
+        : this.view.scrollTo(selector, options));
     } catch (error) {
       throw new WebViewError(
         "scroll-failed",
@@ -504,35 +534,96 @@ export class ManagedWebView {
     );
   }
 
-  /** Screenshot to a file: Blob -> bytes -> Bun.write. */
+  /**
+   * Screenshot to a file.
+   *
+   * On WebKit, `webp` is not natively supported by WKWebView (`view.screenshot({ format: "webp" })`
+   * throws), and neither backend resizes or quantizes in-place. Whenever `webp` is requested on
+   * WebKit — or when `resize`, `palette`, `lossless`, or `progressive` is specified — capture a
+   * lossless PNG buffer and transform/encode it in-memory with `Bun.Image` (`encodeScreenshot`).
+   */
   async screenshotToFile(
     path: string,
     options?: ScreenshotOptions,
   ): Promise<ScreenshotResult> {
     this.assertOpen();
-    let blob: Blob;
+    const needsBunImage =
+      options !== undefined &&
+      ((this.backend === "webkit" && options.format === "webp") ||
+        options.resize !== undefined ||
+        (options.format === "png" && options.palette === true) ||
+        (options.format === "jpeg" && options.progressive === true) ||
+        (options.format === "webp" && options.lossless === true));
+
+    let bytes: Uint8Array;
     try {
-      blob =
-        options === undefined
-          ? await this.view.screenshot()
-          : options.format === "jpeg"
-            ? await this.view.screenshot({
-                format: "jpeg",
-                quality: options.quality,
-              })
-            : options.format === "webp"
+      if (needsBunImage && options !== undefined) {
+        const rawPng: unknown = await this.view.screenshot({
+          encoding: "buffer",
+          format: "png",
+        });
+        const pngBytes =
+          rawPng instanceof Uint8Array
+            ? rawPng
+            : new Uint8Array(await (rawPng as Blob).arrayBuffer());
+        bytes = await encodeScreenshot(pngBytes, {
+          format: options.format,
+          ...(options.format === "png"
+            ? {
+                ...(options.palette === undefined
+                  ? {}
+                  : { palette: options.palette }),
+              }
+            : options.format === "jpeg"
+              ? {
+                  ...(options.quality === undefined
+                    ? {}
+                    : { quality: options.quality }),
+                  ...(options.progressive === undefined
+                    ? {}
+                    : { progressive: options.progressive }),
+                }
+              : {
+                  ...(options.quality === undefined
+                    ? {}
+                    : { quality: options.quality }),
+                  ...(options.lossless === undefined
+                    ? {}
+                    : { lossless: options.lossless }),
+                }),
+          ...(options.resize === undefined ? {} : { resize: options.resize }),
+        });
+      } else {
+        const raw: unknown =
+          options === undefined
+            ? await this.view.screenshot({ encoding: "buffer" })
+            : options.format === "jpeg"
               ? await this.view.screenshot({
-                  format: "webp",
-                  quality: options.quality,
+                  encoding: "buffer",
+                  format: "jpeg",
+                  quality: options.quality ?? 80,
                 })
-              : await this.view.screenshot({ format: "png" });
+              : options.format === "webp"
+                ? await this.view.screenshot({
+                    encoding: "buffer",
+                    format: "webp",
+                    quality: options.quality ?? 80,
+                  })
+                : await this.view.screenshot({
+                    encoding: "buffer",
+                    format: "png",
+                  });
+        bytes =
+          raw instanceof Uint8Array
+            ? raw
+            : new Uint8Array(await (raw as Blob).arrayBuffer());
+      }
     } catch (error) {
       throw new WebViewError(
         "screenshot-failed",
         `screenshot failed: ${redactError(error)}`,
       );
     }
-    const bytes = new Uint8Array(await blob.arrayBuffer());
     try {
       await mkdir(dirname(path), { recursive: true });
       await Bun.write(path, bytes);
@@ -545,7 +636,7 @@ export class ManagedWebView {
     return { path, bytes: bytes.length, sha256: sha256Hex(bytes) };
   }
 
-  /** Send one CDP command (Chrome backend only; no event subscription exists). */
+  /** Send one CDP command (Chrome backend only). */
   async cdp(
     method: string,
     params?: Record<string, unknown>,
@@ -572,6 +663,33 @@ export class ManagedWebView {
     }
   }
 
+  /**
+   * Subscribe to a CDP event via `EventTarget` (`Bun.WebView extends EventTarget`).
+   * Call `await view.cdp("<Domain>.enable")` first so Chrome emits the domain's events.
+   */
+  onCdpEvent<T = unknown>(
+    method: `${string}.${string}`,
+    listener: (params: T) => void,
+  ): () => void {
+    this.assertOpen();
+    if (this.backend !== "chrome") {
+      throw new WebViewError(
+        "unsupported-backend",
+        `onCdpEvent() requires backend "chrome" (current: ${this.backend})`,
+      );
+    }
+    const handler = (event: MessageEvent<T>): void => {
+      listener(event.data);
+    };
+    this.view.addEventListener(method, handler);
+    return () => {
+      this.view.removeEventListener(
+        method,
+        handler as unknown as EventListener,
+      );
+    };
+  }
+
   /** Read HttpOnly cookies via CDP (values are memory-only, never persisted). */
   async getAllCookies(): Promise<CdpCookie[]> {
     this.assertOpen();
@@ -587,14 +705,18 @@ export class ManagedWebView {
   }
 
   /**
-   * Close the WebView. Teardown failures are not actionable (the process is
-   * exiting), so this never throws; `Bun.WebView.closeAll()` is the backstop.
+   * Close the WebView. `Bun.WebView.prototype.close()` is synchronous and idempotent;
+   * `close()` stays async-compatible and aliases `[Symbol.dispose]` / `[Symbol.asyncDispose]`.
    */
   async close(): Promise<void> {
+    this.disposeSync();
+  }
+
+  private disposeSync(): void {
     if (this.closed) return;
     this.closed = true;
     try {
-      await this.view.close();
+      this.view.close();
     } catch {
       try {
         Bun.WebView.closeAll();
@@ -602,6 +724,14 @@ export class ManagedWebView {
         // Nothing else to do.
       }
     }
+  }
+
+  [Symbol.dispose](): void {
+    this.disposeSync();
+  }
+
+  async [Symbol.asyncDispose](): Promise<void> {
+    this.disposeSync();
   }
 }
 
@@ -619,6 +749,23 @@ function assertSelector(selector: string, action: string): void {
       `${action} expects a CSS selector, not a pixel count ("${trimmed}")`,
     );
   }
+}
+
+/**
+ * Normalize a `Bun.WebView` `console: (type, ...args) => void` callback into a
+ * redacted `ConsoleLine`. `type` is the first parameter (`"log" | "warn" | "error" | ...`).
+ */
+export function formatConsoleEntry(
+  type: string,
+  args: readonly unknown[],
+): ConsoleLine {
+  const normalized = type.trim().toLowerCase();
+  const level: ConsoleLine["level"] =
+    normalized === "error" ? "error" : normalized === "warn" ? "warn" : "log";
+  return {
+    level,
+    text: formatConsoleArgs(args),
+  };
 }
 
 function formatConsoleArgs(args: readonly unknown[]): string {
