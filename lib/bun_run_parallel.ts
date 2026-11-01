@@ -80,3 +80,16 @@ export const BUN_RUN_PARALLEL_COLORED_LABELS_SHIP_NOTE =
 export const BUN_RUN_PARALLEL_PREFIX_SCRIPT = "build | compiling..." as const;
 export const BUN_RUN_PARALLEL_PREFIX_PACKAGE =
   "pkg-a:build | compiling..." as const;
+
+/** True when argv indicates a parallel/sequential run. */
+export function isBunParallelRunInvocation(
+  argv: readonly string[] = process.argv,
+): boolean {
+  return argv.includes("--parallel") || argv.includes("--sequential");
+}
+
+/** Format a prefixed output label. */
+export function formatParallelLabel(script: string, pkg?: string): string {
+  const base = pkg !== undefined && pkg !== "" ? `${pkg}:${script}` : script;
+  return `${base} |`;
+}
