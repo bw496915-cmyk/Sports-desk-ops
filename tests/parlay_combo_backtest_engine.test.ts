@@ -54,4 +54,22 @@ describe("4-Week Full-Customer CFB & NBA Parlay & Combo Backtest Engine", () => 
     expect(rf?.primaryGuardTriggered).toBe("RECREATIONAL_RETAINED_FLOW");
     expect(rf?.deskSavingsUsd).toBe(0);
   });
+
+  test.if(existsSync("enriched_customers_full.json"))(
+    "committed backtest artifact matches the engine output",
+    async () => {
+      const artifact = (await Bun.file(
+        "docs/backtest-4wk-cfb-nba.json",
+      ).json()) as Record<string, unknown>;
+      const fresh = JSON.parse(JSON.stringify(report)) as Record<
+        string,
+        unknown
+      >;
+      delete artifact.generatedAtIso;
+      delete artifact.generatedAtCdt;
+      delete fresh.generatedAtIso;
+      delete fresh.generatedAtCdt;
+      expect(fresh).toEqual(artifact);
+    },
+  );
 });
