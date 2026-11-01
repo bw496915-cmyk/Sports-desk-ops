@@ -19,7 +19,7 @@ describe("f402 probe plan", () => {
   test("excludes the unconfirmed mutation by default and selects manager-boot / all suites", () => {
     const ops = selectProbeOps(false);
     expect(ops.map((op) => op.operation)).not.toContain("PendingDelete");
-    expect(ops).toHaveLength(PROBE_OPS.length - 3);
+    expect(ops).toHaveLength(PROBE_OPS.length - 4);
     expect(selectProbeOps(true)).toHaveLength(PROBE_OPS.length);
 
     const bootOps = selectProbeOps(false, "manager-boot");
