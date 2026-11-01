@@ -606,7 +606,7 @@ export function parseSniffedTemplates(raw: unknown): SniffedFormTemplate[] {
   return out;
 }
 
-export interface ProbePageResult {
+interface ProbePageResultBase {
   readonly status: number;
   readonly contentType: string;
   readonly bytes: number;
@@ -614,13 +614,26 @@ export interface ProbePageResult {
   readonly bodyText?: string;
   readonly dateUsed?: string;
   readonly weekUsed?: string;
-  /** True when the response is binary (image/pdf/octet-stream); preview/bodyText are empty. */
-  readonly isBinary?: boolean;
-  /** Blob MIME type when isBinary, from the response content-type. */
-  readonly blobType?: string;
-  /** Blob byte size when isBinary (equals bytes). */
-  readonly blobSize?: number;
 }
+
+export interface TextProbeResult extends ProbePageResultBase {
+  readonly isBinary: false;
+}
+
+export interface BinaryProbeResult extends ProbePageResultBase {
+  readonly isBinary: true;
+  /** Blob MIME type, from the response content-type. */
+  readonly blobType: string;
+  /** Blob byte size (equals bytes). */
+  readonly blobSize: number;
+}
+
+/**
+ * Text and binary payloads are distinct variants: a binary result always carries
+ * blobType/blobSize and an empty preview, so `isBinary: true` without them (or vice versa)
+ * does not compile.
+ */
+export type ProbePageResult = TextProbeResult | BinaryProbeResult;
 
 /** Validate what came back from the page before it is written as evidence. */
 export function parseProbePageResult(raw: unknown): ProbePageResult {
@@ -644,10 +657,7 @@ export function parseProbePageResult(raw: unknown): ProbePageResult {
     throw new Error("probe result has no body preview");
   const dateUsed = candidate["dateUsed"];
   const weekUsed = candidate["weekUsed"];
-  const isBinary = candidate["isBinary"];
-  const blobType = candidate["blobType"];
-  const blobSize = candidate["blobSize"];
-  return {
+  const base = {
     status,
     contentType,
     bytes,
@@ -655,12 +665,22 @@ export function parseProbePageResult(raw: unknown): ProbePageResult {
     ...(typeof bodyText === "string" ? { bodyText } : {}),
     ...(typeof dateUsed === "string" ? { dateUsed } : {}),
     ...(typeof weekUsed === "string" ? { weekUsed } : {}),
-    ...(typeof isBinary === "boolean" ? { isBinary } : {}),
-    ...(typeof blobType === "string" ? { blobType } : {}),
-    ...(typeof blobSize === "number" && Number.isInteger(blobSize)
-      ? { blobSize }
-      : {}),
   };
+  // Old scratch files predate blob metadata; missing means text.
+  if (candidate["isBinary"] === true) {
+    const blobType = candidate["blobType"];
+    const blobSize = candidate["blobSize"];
+    if (typeof blobType !== "string" || blobType === "")
+      throw new Error("binary probe result has no blob type");
+    if (
+      typeof blobSize !== "number" ||
+      !Number.isInteger(blobSize) ||
+      blobSize < 0
+    )
+      throw new Error("binary probe result has no blob size");
+    return { ...base, isBinary: true as const, blobType, blobSize };
+  }
+  return { ...base, isBinary: false as const };
 }
 
 export type ProbeVerdict = "exists" | "denied" | "missing" | "error";
@@ -790,6 +810,11 @@ function resolveParamMap(
       out[name] = "2";
     } else if (name === "positionBySport") {
       out[name] = "true";
+    } else {
+      // Compile-time exhaustiveness: adding a ProbeParam variant without a case
+      // fails the build here instead of silently dropping the field from every body.
+      const _exhaustive: never = name;
+      throw new Error(`unhandled probe param: ${_exhaustive}`);
     }
   }
   return out;

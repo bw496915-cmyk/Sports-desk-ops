@@ -124,7 +124,8 @@ describe("f402 probe plan", () => {
       bytes: 12,
       preview: "{}",
     };
-    expect(parseProbePageResult(ok)).toEqual(ok);
+    // The parser normalizes the payload kind: text results carry isBinary: false.
+    expect(parseProbePageResult(ok)).toEqual({ ...ok, isBinary: false });
     expect(() => parseProbePageResult(null)).toThrow("no object");
     expect(() => parseProbePageResult({ ...ok, status: 0 })).toThrow("status");
     expect(() => parseProbePageResult({ ...ok, bytes: -1 })).toThrow(
@@ -214,6 +215,29 @@ describe("probe expression", () => {
     expect(expression).toContain("isBinary: isBinaryResp");
     expect(expression).toContain("blobType: blobTypeOut");
     expect(expression).toContain("blobSize: blobSizeOut");
+  });
+
+  test("old results without blob metadata parse as text", () => {
+    const parsed = parseProbePageResult({
+      status: 200,
+      contentType: "application/json",
+      bytes: 12,
+      preview: "{}",
+    });
+    expect(parsed.isBinary).toBe(false);
+    expect("blobType" in parsed).toBe(false);
+  });
+
+  test("a binary result without blob fields is rejected", () => {
+    expect(() =>
+      parseProbePageResult({
+        status: 200,
+        contentType: "image/png",
+        bytes: 10,
+        preview: "",
+        isBinary: true,
+      }),
+    ).toThrow("blob type");
   });
 
   test("accepts blob metadata on the page result", () => {
