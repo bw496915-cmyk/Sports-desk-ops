@@ -22,6 +22,7 @@ export const BUN_TERMINAL_V14_BLOG_CAPABILITIES_SHIP_NOTE =
 export const BUN_TERMINAL_V14_BLOG_CAPABILITIES_URL =
   "https://bun.sh/blog/bun-v1.4#bun-terminal:~:text=Pass%20terminal%20to%20Bun.spawn%2C%20write%20input%2C%20resize%2C%20and%20read%20the%20colored%20output.%20It%20works%20on%20Linux%2C%20macOS%2C%20and%20Windows.%20%2325415%20%2329522" as const;
 
+/** Verbatim Bun v1.4 blog — {@link runBlogTerminalWriteHelloExample} implements the write line. */
 export const BUN_TERMINAL_SPAWN_PTY_EXAMPLE =
   `const proc = Bun.spawn(["bash"], {
   terminal: {
@@ -34,6 +35,10 @@ export const BUN_TERMINAL_SPAWN_PTY_EXAMPLE =
 });
 
 proc.terminal.write("echo Hello from PTY!\\n");` as const;
+
+/** `proc.terminal.write(...)` payload from {@link BUN_TERMINAL_SPAWN_PTY_EXAMPLE}. */
+export const BUN_TERMINAL_SPAWN_PTY_WRITE_PAYLOAD =
+  "echo Hello from PTY!\n" as const;
 
 export interface SpawnInPtyOptions {
   readonly cwd?: string;
@@ -62,6 +67,26 @@ export interface PtyRunUntilResult extends PtyRunResult {
 export function stripPtyCapture(raw: string): string {
   // eslint-disable-next-line no-control-regex -- PTY tests assert on plain text
   return raw.replace(/\r/g, "").replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+/** Runnable blog snippet — spawn bash PTY 80×24, write hello command, capture output. */
+export async function runBlogTerminalWriteHelloExample(): Promise<PtyRunResult> {
+  let raw = "";
+  const proc = Bun.spawn(["bash"], {
+    terminal: {
+      cols: 80,
+      rows: 24,
+      data(_term, data) {
+        raw += data;
+      },
+    },
+  });
+  proc.terminal.write(BUN_TERMINAL_SPAWN_PTY_WRITE_PAYLOAD);
+  // Blog leaves interactive bash at a prompt; tests send exit so proc.exited settles.
+  proc.terminal.write("exit\n");
+  const code = await proc.exited;
+  proc.terminal?.close();
+  return { code, out: stripPtyCapture(raw) };
 }
 
 /** Run a command under a PTY; strip CR and ANSI escapes from captured output. */

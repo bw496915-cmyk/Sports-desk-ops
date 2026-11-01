@@ -9,7 +9,9 @@
 export const BUN_TERMINAL_PTY_TEST_NAME = {
   meta: {
     v14BlogUrlAndSpawnSnippetPinned:
-      "terminal.meta · constants · BUN_TERMINAL_V14_BLOG_URL and spawn snippet · expects pinned bun.sh anchor and Hello from PTY in example",
+      "terminal.meta · constants · BUN_TERMINAL_SPAWN_PTY_EXAMPLE · expects single Bun.spawn block cols 80 rows 24 data(term,data) and proc.terminal.write echo Hello from PTY",
+    v14BlogSpawnExampleRunnable:
+      "terminal.pty · blog.example · runBlogTerminalWriteHelloExample · expects exit 0 and stdout contains Hello from PTY",
     v14BlogCapabilitiesShipNote:
       "terminal.meta · constants · BUN_TERMINAL_V14_BLOG_CAPABILITIES ship note · expects write resize colored output platforms and PR ids 25415 29522",
   },

@@ -4,8 +4,10 @@ import {
   BUN_TERMINAL_SPAWN_PTY_EXAMPLE,
   BUN_TERMINAL_V14_BLOG_CAPABILITIES_SHIP_NOTE,
   BUN_TERMINAL_V14_BLOG_CAPABILITIES_URL,
+  BUN_TERMINAL_SPAWN_PTY_WRITE_PAYLOAD,
   BUN_TERMINAL_V14_BLOG_URL,
   driveBashScript,
+  runBlogTerminalWriteHelloExample,
   spawnInPty,
   stripPtyCapture,
 } from "./bun_terminal.ts";
@@ -15,7 +17,15 @@ test(BUN_TERMINAL_PTY_TEST_NAME.meta.v14BlogUrlAndSpawnSnippetPinned, () => {
   expect(BUN_TERMINAL_V14_BLOG_URL).toBe(
     "https://bun.sh/blog/bun-v1.4#bun-terminal",
   );
-  expect(BUN_TERMINAL_SPAWN_PTY_EXAMPLE).toContain("Hello from PTY");
+  expect(BUN_TERMINAL_SPAWN_PTY_EXAMPLE).not.toContain("terminal:const proc");
+  expect(BUN_TERMINAL_SPAWN_PTY_EXAMPLE.match(/Bun\.spawn/g)?.length).toBe(1);
+  expect(BUN_TERMINAL_SPAWN_PTY_EXAMPLE).toContain("cols: 80");
+  expect(BUN_TERMINAL_SPAWN_PTY_EXAMPLE).toContain("rows: 24");
+  expect(BUN_TERMINAL_SPAWN_PTY_EXAMPLE).toContain("data(term, data)");
+  expect(BUN_TERMINAL_SPAWN_PTY_EXAMPLE).toContain(
+    'proc.terminal.write("echo Hello from PTY!\\n")',
+  );
+  expect(BUN_TERMINAL_SPAWN_PTY_WRITE_PAYLOAD).toBe("echo Hello from PTY!\n");
 });
 
 test(BUN_TERMINAL_PTY_TEST_NAME.meta.v14BlogCapabilitiesShipNote, () => {
@@ -29,6 +39,15 @@ test(BUN_TERMINAL_PTY_TEST_NAME.meta.v14BlogCapabilitiesShipNote, () => {
     "colored output",
   );
 });
+
+test.skipIf(Bun.which("bash") === null)(
+  BUN_TERMINAL_PTY_TEST_NAME.meta.v14BlogSpawnExampleRunnable,
+  async () => {
+    const result = await runBlogTerminalWriteHelloExample();
+    expect(result.code).toBe(0);
+    expect(result.out).toContain("Hello from PTY");
+  },
+);
 
 test(BUN_TERMINAL_PTY_TEST_NAME.spawn.childReportsIsTty, async () => {
   const result = await spawnInPty([
