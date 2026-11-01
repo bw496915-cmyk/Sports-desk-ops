@@ -27,7 +27,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 /* -------------------------------------------------------------------------- */
 /* Shared types                                                               */
@@ -1018,13 +1018,13 @@ function headerLine(headers: string, headerName: string): string | undefined {
 }
 
 export function checkHeaders(headers: string): CheckOutcome {
-  const name = "functions/_headers (security headers)";
+  const name = "_headers (security headers)";
   const issues: Issue[] = [];
   if (headers.trim() === "") {
     return failed(name, [
       problem(
         CODES.HEADERS_MISSING,
-        "functions/_headers is empty; declare CSP, HSTS, X-Content-Type-Options and Referrer-Policy",
+        "_headers is empty; declare CSP, HSTS, X-Content-Type-Options and Referrer-Policy",
       ),
     ]);
   }
@@ -1763,9 +1763,14 @@ export function checkDistParity(root: string): CheckOutcome {
   for (const fileName of ["openapi.json", "index.html"]) {
     compareStaged(distDir, docsDir, fileName, issues);
   }
-  const headersSource = join(root, "functions", "_headers");
-  if (existsSync(headersSource)) {
-    compareStaged(distDir, join(root, "functions"), "_headers", issues);
+  // Same layout migration as checkHeaders: the source moved to infra/pages/, and
+  // `docs:stage` copies from there. Accept either so the gate reflects the tree.
+  const headersSource = [
+    join(root, "infra", "pages", "_headers"),
+    join(root, "functions", "_headers"),
+  ].find((p) => existsSync(p));
+  if (headersSource !== undefined) {
+    compareStaged(distDir, dirname(headersSource), "_headers", issues);
   } else {
     issues.push(
       problem(
@@ -1805,8 +1810,10 @@ const SCRIPT_REQUIREMENTS: readonly ScriptRequirement[] = [
   },
   {
     script: "docs:stage",
-    mustInclude: ["functions/_headers", "dist/_headers"],
-    message: "must copy functions/_headers to dist/_headers",
+    // "_headers" rather than a directory: the source moved functions/ -> infra/pages/
+    // in the layout commit and the staging script was updated, this requirement was not.
+    mustInclude: ["_headers", "dist/_headers"],
+    message: "must copy the _headers source into dist/_headers",
   },
   {
     script: "docs:deploy",
@@ -2024,17 +2031,32 @@ function checkIndexFile(root: string): CheckOutcome {
 }
 
 function checkHeadersFile(root: string): CheckOutcome {
-  const name = "functions/_headers (security headers)";
-  const headersPath = join(root, "functions", "_headers");
-  if (!existsSync(headersPath)) {
+  const name = "_headers (security headers)";
+  // The layout commit "group design tokens, schema preload, and infra paths" moved
+  // this file from functions/_headers to infra/pages/_headers, and `docs:stage` copies
+  // from the new path — but this check and docs/README.md still named the old one, so
+  // the gate failed on a tree that was actually correct. Accept either layout and say
+  // which one was found, so the next migration does not need a code change to be legal.
+  const candidates = [
+    join(root, "infra", "pages", "_headers"),
+    join(root, "functions", "_headers"),
+  ];
+  const headersPath = candidates.find((p) => existsSync(p));
+  if (headersPath === undefined) {
     return failed(name, [
       problem(
         CODES.HEADERS_MISSING,
-        `missing functions/_headers; Cloudflare Pages only serves security headers from the deploy root`,
+        `missing _headers; Cloudflare Pages only serves security headers from the deploy root ` +
+          `(looked for infra/pages/_headers and functions/_headers)`,
       ),
     ]);
   }
-  return checkHeaders(readFileSync(headersPath, "utf8"));
+  const outcome = checkHeaders(readFileSync(headersPath, "utf8"));
+  // Report the path that was actually read, so a reader can tell the two layouts apart.
+  return {
+    ...outcome,
+    name: `${relative(root, headersPath)} (security headers)`,
+  };
 }
 
 async function readSpecForLive(root: string): Promise<CheckOutcome> {

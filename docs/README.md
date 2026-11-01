@@ -41,7 +41,7 @@ Read the full model in [EVIDENCE.md](./EVIDENCE.md). The machine-readable source
 
 ```bash
 ./bin/dx status                           # Verify sandbox $HOME, XDG re-anchoring, Git config, Wrangler 4.156.0 & dist/
-./bin/dx stage                            # Stage docs/{index.html,graph.html,graph.js,openapi.json} + functions/_headers -> dist/
+./bin/dx stage                            # Stage docs/{index.html,graph.html,graph.js,openapi.json} + infra/pages/_headers -> dist/
 ./bin/dx deploy                           # Stage + publish dist/ to Cloudflare R2 Edge (pub-d061f943df0e4477ba7ff200721eddb1.r2.dev) & Pages
 ./bin/dx ship                             # Stage + deploy to Cloudflare Edge + push main to origin
 ./bin/dx gslive <LOGIN>                   # Partner 118 links: 7-param #/reports/users + #/events/bet-history sidecar
@@ -62,7 +62,7 @@ bun run verify:docs                       # structural gate + markdown freshness
 or [evidence/ledger.json](./evidence/ledger.json), re-run the generator and commit the result.
 
 **Portal deploy staging:** `bun run docs:stage` (or `./bin/dx stage`) copies `docs/index.html`, `docs/graph.html`, `docs/graph.js`, `docs/openapi.json`, and
-`functions/_headers` into `dist/`. Do not unpin the Scalar version or remove the `integrity`/`crossorigin` attributes.
+`infra/pages/_headers` into `dist/`. Do not unpin the Scalar version or remove the `integrity`/`crossorigin` attributes.
 
 **Live Edge URLs:**
 
