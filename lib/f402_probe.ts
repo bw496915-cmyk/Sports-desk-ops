@@ -1,39 +1,55 @@
 /**
  * @file lib/f402_probe.ts
- * @description Probe plan for the F402 report reads, executed inside a signed-in WebView page.
+ * @description Probe plan for the F402 report and manager.html boot reads, executed inside a signed-in WebView page.
  *
- * The point is to observe what the portal returns for each named report, not to assert a contract.
- * Paths come from `lib/combo_identity.ts` (`[UNVERIFIED]` names); the method and body are a starting
- * hypothesis, so a 404/405/401 is a real finding and every result is labelled with what was sent.
+ * The point is to observe what the portal returns for each named report or boot call, not to assert a contract.
+ * Paths and payloads come from the cached RequireJS bundles:
+ * - `customer/report/report.js` (`Blob F5D0F39D9ABFE7F995C65F3152C690EFF1B0F9EF`)
+ * - `app/manager/manager.js?bust=1.0.280` (`Blob 610B48F7F455B4D77131D88AD56832DFBB66A519`)
  *
- * `PendingDelete` is excluded by default: the name reads like a mutation, and the capture allowlist
- * refuses mutations by construction.
+ * `PendingDelete` is confirmed read-only in `customer/report/report.js:8578` (`setDeleteWager` ->
+ * `getPendingWagers({ deleteWagers: true, ticketNumber })` -> renders `e.Pending[]` in the Ticket Detail modal),
+ * and remains gated behind `includeUnconfirmed` so the default 6-op report suite stays stable; when probed without
+ * `--ticket`, it sends sentinel `ticketNumber=-1`.
  */
 
 export type ProbeParam =
   | "agentID"
+  | "agentOwner"
+  | "agentType"
+  | "acc"
   | "customerID"
   | "week"
   | "date"
+  | "type"
+  | "layout"
+  | "RRO"
   | "token"
   | "operation"
   | "ticketNumber"
   | "wagerNumber"
-  | "flag"
-  | "agentType"
-  | "RRO"
-  | "agentOwner"
-  | "type"
-  | "layout";
+  | "flag";
+
+export type ProbeWireContentType =
+  "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
+
+export type ProbeSuite = "report" | "manager-boot" | "all";
 
 export interface ProbeOp {
   readonly operation: string;
   readonly method: "POST";
-  /** False for operations whose read-only nature has not been confirmed. */
+  /** False for operations gated behind `--include-unconfirmed`. */
   readonly readOnly: boolean;
   readonly note: string;
-  /** Form fields the client sends, read from `customer/report/report.js`. */
+  /** Fields the client sends, read from `customer/report/report.js` or `app/manager/manager.js`. */
   readonly params: readonly ProbeParam[];
+  /**
+   * Wire Content-Type observed in client JS (`report.js:25633` for `getDailyFiguresByCustomer` and
+   * `manager.js:31200` for `getAccountInfoOwner` use `application/json`; all others use form-urlencoded).
+   */
+  readonly wireContentType?: ProbeWireContentType;
+  /** Default route prefix observed in client JS. */
+  readonly defaultPrefix?: "/cloud/api/Manager" | "/cloud/api/Report";
 }
 
 export const PROBE_OPS: readonly ProbeOp[] = [
@@ -43,13 +59,16 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: true,
     note: "already in the capture allowlist as getPending",
     params: ["customerID", "token", "operation"],
+    defaultPrefix: "/cloud/api/Report",
   },
   {
     operation: "getDailyFiguresByCustomer",
     method: "POST",
     readOnly: true,
-    note: "daily figure report read",
+    note: "daily figure report read (report.js:25633 sends contentType: application/json)",
     params: ["agentID", "customerID", "week", "token", "operation"],
+    wireContentType: "application/json",
+    defaultPrefix: "/cloud/api/Report",
   },
   {
     operation: "getGradedWagerByCustomer",
@@ -57,6 +76,7 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: true,
     note: "graded wager report read",
     params: ["customerID", "week", "token", "operation"],
+    defaultPrefix: "/cloud/api/Report",
   },
   {
     operation: "getTransactions",
@@ -64,6 +84,7 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: true,
     note: "transaction report read; `date` is MM/DD/YYYY",
     params: ["customerID", "date", "token", "operation"],
+    defaultPrefix: "/cloud/api/Manager",
   },
   {
     operation: "getGrading",
@@ -71,6 +92,7 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: true,
     note: "grading report read; also settles the channel model",
     params: ["customerID", "token", "operation"],
+    defaultPrefix: "/cloud/api/Report",
   },
   {
     operation: "getTicketDetailPrint",
@@ -78,6 +100,7 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: true,
     note: "ticket detail read; needs a ticket/wager number (portal sends ticketNumber, wagerNumber, flag)",
     params: ["token", "ticketNumber", "wagerNumber", "flag", "operation"],
+    defaultPrefix: "/cloud/api/Report",
   },
   {
     operation: "getListAgenstByAgent",
@@ -85,41 +108,130 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: true,
     note: "agent list by agent (Manager envelope); form: agentID, agentType, operation, RRO, agentOwner",
     params: ["agentID", "agentType", "operation", "RRO", "agentOwner"],
+    defaultPrefix: "/cloud/api/Manager",
   },
   {
-    operation: "getWeeklyFigureByAgentLite",
+    operation: "getAuthorizations",
     method: "POST",
     readOnly: true,
-    note: "weekly figure by agent lite (Manager envelope); form: agentID, week, type, layout, operation, RRO, agentOwner",
-    params: [
-      "agentID",
-      "week",
-      "type",
-      "layout",
-      "operation",
-      "RRO",
-      "agentOwner",
-    ],
+    note: "authorizations (Manager envelope); form: agentID, agentOwner, operation, RRO",
+    params: ["agentID", "agentOwner", "operation", "RRO"],
   },
   {
     operation: "PendingDelete",
     method: "POST",
     readOnly: false,
-    note: "name reads like a mutation; confirm before probing",
-    params: ["customerID", "token", "operation"],
+    note: "confirmed read-only modal lookup in report.js:8578 ({ customerID, ticketNumber, operation: 'PendingDelete' }); sends sentinel ticketNumber=-1 unless overridden",
+    params: ["customerID", "ticketNumber", "token", "operation"],
+    defaultPrefix: "/cloud/api/Report",
+  },
+] as const;
+
+/**
+ * The 9 read-only `/cloud/api/Manager/*` operations fired on `manager.html?v=1793502037202` (`bust=1.0.280`) boot,
+ * extracted from `app/manager/manager.js?bust=1.0.280` (`Blob 610B48F7F455B4D77131D88AD56832DFBB66A519`).
+ */
+export const MANAGER_BOOT_OPS: readonly ProbeOp[] = [
+  {
+    operation: "getAccountInfoOwner",
+    method: "POST",
+    readOnly: true,
+    note: "manager.js:31200 boot account info read (application/json); replaces non-existent getInfoManager",
+    params: ["agentID", "operation"],
+    wireContentType: "application/json",
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getConfigWebReports",
+    method: "POST",
+    readOnly: true,
+    note: "manager.js:35023 boot report configuration read -> s.INFO",
+    params: ["agentID", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getConfigWebReportsPending",
+    method: "POST",
+    readOnly: true,
+    note: "manager.js:35534 boot pending report configuration read -> n.INFO",
+    params: ["agentID", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getSportsType",
+    method: "POST",
+    readOnly: true,
+    note: "manager.js:33998 boot sports catalog list -> n.LIST",
+    params: ["agentID", "agentOwner", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getAuthorizations",
+    method: "POST",
+    readOnly: true,
+    note: "manager.js:37628 boot agent permissions & distribution -> a.INFO, a.DISTRIBUTION",
+    params: ["agentID", "agentOwner", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getMessage",
+    method: "POST",
+    readOnly: true,
+    note: "manager.js:55125 boot popup messages read -> t.COMMENT[]; replaces speculative System/getMessages",
+    params: ["acc", "type", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getNewEmailsCount",
+    method: "POST",
+    readOnly: true,
+    note: "manager.js:31845 boot unread message counter -> e.INFO.LIST, e.INFO.COUNT.total",
+    params: ["acc", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getWeeklyFigureByAgentLite",
+    method: "POST",
+    readOnly: true,
+    note: "manager.js:52703 boot weekly figure summary (populates grand-total-weekly & grand-total-player)",
+    params: ["agentID", "week", "type", "layout", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getListAgenstByAgent",
+    method: "POST",
+    readOnly: true,
+    note: "manager.js:60492 boot downline agent hierarchy (misspelled Agenst on wire); replaces speculative Manager/getAgentTree",
+    params: ["agentID", "agentType", "operation", "RRO", "agentOwner"],
+    defaultPrefix: "/cloud/api/Manager",
   },
 ] as const;
 
 export function selectProbeOps(
   includeUnconfirmed: boolean,
+  suite: ProbeSuite = "report",
 ): readonly ProbeOp[] {
-  return includeUnconfirmed ? PROBE_OPS : PROBE_OPS.filter((op) => op.readOnly);
+  let pool: readonly ProbeOp[];
+  if (suite === "manager-boot") {
+    pool = MANAGER_BOOT_OPS;
+  } else if (suite === "all") {
+    const byName = new Map<string, ProbeOp>();
+    for (const op of PROBE_OPS) byName.set(op.operation, op);
+    for (const op of MANAGER_BOOT_OPS) {
+      if (!byName.has(op.operation)) byName.set(op.operation, op);
+    }
+    pool = [...byName.values()];
+  } else {
+    pool = PROBE_OPS;
+  }
+  return includeUnconfirmed ? pool : pool.filter((op) => op.readOnly);
 }
 
 export interface ProbeRequest {
   readonly operation: string;
   readonly url: string;
   readonly body: string;
+  readonly contentType?: ProbeWireContentType;
 }
 
 /**
@@ -127,6 +239,8 @@ export interface ProbeRequest {
  *
  * Runs in the page context on purpose: the session cookie is HttpOnly, so the browser must attach it.
  * `JSON.stringify` carries the URL/body into the expression so quotes and newlines cannot break it.
+ * Supports both `application/x-www-form-urlencoded; charset=UTF-8` (default) and `application/json`
+ * (used by `getDailyFiguresByCustomer` in `report.js:25633` and `getAccountInfoOwner` in `manager.js:31200`).
  */
 export function buildProbeExpression(
   request: ProbeRequest,
@@ -136,6 +250,19 @@ export function buildProbeExpression(
   const url = JSON.stringify(request.url);
   const body = JSON.stringify(request.body);
   const preview = Math.max(0, Math.trunc(previewChars));
+  const contentType =
+    request.contentType ?? "application/x-www-form-urlencoded; charset=UTF-8";
+  const isJson = contentType === "application/json";
+  const replaceExpr = isJson
+    ? `${body}
+    .replaceAll("__CUSTOMER_ID__", customerID)
+    .replaceAll("__DATE__", mdy)
+    .replaceAll("__WEEK__", weekValueResolved)`
+    : `${body}
+    .replaceAll("__CUSTOMER_ID__", encodeURIComponent(customerID))
+    .replaceAll("__DATE__", encodeURIComponent(mdy))
+    .replaceAll("__WEEK__", encodeURIComponent(weekValueResolved))`;
+
   return `(async () => {
   // The edge wants the token the app stored after login. Read it in-page: it never crosses into Bun.
   let token = "";
@@ -146,7 +273,7 @@ export function buildProbeExpression(
     customerID = credentials.customerID ?? "";
   } catch {}
   const headers = {
-    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "content-type": ${JSON.stringify(contentType)},
     "x-requested-with": "XMLHttpRequest",
   };
   if (token) headers.authorization = "Bearer " + token;
@@ -154,15 +281,11 @@ export function buildProbeExpression(
   const now = new Date(Date.now() - 86_400_000);
   const mdy = String(now.getMonth() + 1).padStart(2, "0") + "/" + String(now.getDate()).padStart(2, "0") + "/" + now.getFullYear();
   // Optional week override: an integer index, a date string, or any candidate the probe wants to try.
-  // Empty string keeps the historical default (yesterday's date) so existing captures stay comparable.
   // The portal's own client sends an integer week index (0 = current week, 1..N weeks ago),
   // not a date string. Default to "0"; a caller may override with --week.
   const weekOverride = ${JSON.stringify(weekValue ?? "")};
   const weekValueResolved = weekOverride !== "" ? weekOverride : "0";
-  const resolvedBody = ${body}
-    .replaceAll("__CUSTOMER_ID__", encodeURIComponent(customerID))
-    .replaceAll("__DATE__", encodeURIComponent(mdy))
-    .replaceAll("__WEEK__", encodeURIComponent(weekValueResolved));
+  const resolvedBody = ${replaceExpr};
   const response = await fetch(${url}, {
     method: "POST",
     credentials: "include",
@@ -196,7 +319,7 @@ export interface SniffedFormTemplate {
  *
  * Because `backend: "webkit"` (`WKWebView`) has no CDP bridge, this hook intercepts outbound
  * `/cloud/api/` calls directly inside the page and records **only** the URL pathname, HTTP method,
- * and sorted URL-encoded form parameter names (`formKeys`) — parameter values never leave the page.
+ * and sorted URL-encoded or JSON top-level parameter names (`formKeys`) — parameter values never leave the page.
  */
 export function buildInstallRequestSnifferExpression(): string {
   return `(() => {
@@ -205,6 +328,15 @@ export function buildInstallRequestSnifferExpression(): string {
   window.__f402SniffedRequests = window.__f402SniffedRequests || [];
   const parseKeys = (raw) => {
     if (typeof raw !== "string" || raw.trim() === "") return [];
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      try {
+        const obj = JSON.parse(trimmed);
+        if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+          return Object.keys(obj).map((k) => k.trim()).filter(Boolean).sort();
+        }
+      } catch {}
+    }
     const out = new Set();
     for (const [k] of new URLSearchParams(raw)) {
       if (k.trim() !== "") out.add(k.trim());
@@ -360,19 +492,70 @@ export const PROBE_PREFIXES = [
   "/cloud/api/Report",
 ] as const;
 
+export interface ProbeBodyOptions {
+  readonly ticketNumber?: string;
+  readonly wagerNumber?: string;
+  readonly flag?: string;
+  readonly type?: string;
+  readonly layout?: string;
+}
+
+function resolveParamMap(
+  op: ProbeOp,
+  agentId: string,
+  customerId?: string,
+  options: ProbeBodyOptions = {},
+): Record<string, string | number> {
+  const out: Record<string, string | number> = {};
+  for (const name of op.params) {
+    if (name === "operation") {
+      out[name] = op.operation;
+    } else if (name === "agentID") {
+      out[name] = agentId;
+    } else if (name === "agentOwner") {
+      out[name] = agentId;
+    } else if (name === "acc") {
+      out[name] = agentId;
+    } else if (name === "token") {
+      out[name] = "";
+    } else if (name === "customerID") {
+      out[name] =
+        customerId !== undefined && customerId !== ""
+          ? customerId
+          : "__CUSTOMER_ID__";
+    } else if (name === "date") {
+      out[name] = "__DATE__";
+    } else if (name === "week") {
+      out[name] = "__WEEK__";
+    } else if (name === "ticketNumber") {
+      out[name] =
+        options.ticketNumber ?? (op.operation === "PendingDelete" ? "-1" : "0");
+    } else if (name === "wagerNumber") {
+      out[name] = options.wagerNumber ?? "0";
+    } else if (name === "flag") {
+      out[name] = options.flag ?? "";
+    } else if (name === "agentType") {
+      out[name] = "M";
+    } else if (name === "type") {
+      out[name] =
+        options.type ??
+        (op.operation === "getWeeklyFigureByAgentLite" ? "A" : "0");
+    } else if (name === "layout") {
+      out[name] = options.layout ?? "byDay";
+    } else if (name === "RRO") {
+      out[name] = "1";
+    }
+  }
+  return out;
+}
+
 /**
- * Build the form body from the fields the client actually sends.
+ * Build the URL-encoded form body from the fields the client sends.
  *
  * `customerID`, `date` and `week` stay as placeholders: the page resolves them from sessionStorage and
  * the local date, so the value never has to cross into Bun. `token` is empty because `Security.token`
  * is empty in the browser session — the edge accepts the bearer instead.
  */
-export interface ProbeBodyOptions {
-  readonly ticketNumber?: string;
-  readonly wagerNumber?: string;
-  readonly flag?: string;
-}
-
 export function buildProbeBody(
   op: ProbeOp,
   agentId: string,
@@ -380,43 +563,29 @@ export function buildProbeBody(
   options: ProbeBodyOptions = {},
 ): string {
   const params = new URLSearchParams();
-  for (const name of op.params) {
-    if (name === "operation") {
-      params.set("operation", op.operation);
-    } else if (name === "agentID") {
-      params.set("agentID", agentId);
-    } else if (name === "token") {
-      params.set("token", "");
-    } else if (name === "customerID") {
-      params.set(
-        "customerID",
-        customerId !== undefined && customerId !== ""
-          ? customerId
-          : "__CUSTOMER_ID__",
-      );
-    } else if (name === "date") {
-      params.set("date", "__DATE__");
-    } else if (name === "week") {
-      params.set("week", "__WEEK__");
-    } else if (name === "ticketNumber") {
-      params.set("ticketNumber", options.ticketNumber ?? "0");
-    } else if (name === "wagerNumber") {
-      params.set("wagerNumber", options.wagerNumber ?? "0");
-    } else if (name === "flag") {
-      params.set("flag", options.flag ?? "");
-    } else if (name === "agentType") {
-      params.set("agentType", "M");
-    } else if (name === "RRO") {
-      params.set("RRO", "1");
-    } else if (name === "agentOwner") {
-      params.set("agentOwner", agentId);
-    } else if (name === "type") {
-      params.set("type", "A");
-    } else if (name === "layout") {
-      params.set("layout", "byDay");
-    }
+  const map = resolveParamMap(op, agentId, customerId, options);
+  for (const [key, val] of Object.entries(map)) {
+    params.set(key, String(val));
   }
   return params.toString();
+}
+
+/**
+ * Build the JSON body for operations that specify `contentType: "application/json"` in client JS
+ * (`getDailyFiguresByCustomer` in `report.js:25633` and `getAccountInfoOwner` in `manager.js:31200`).
+ */
+export function buildJsonProbeBody(
+  op: ProbeOp,
+  agentId: string,
+  customerId?: string,
+  options: ProbeBodyOptions = {},
+): string {
+  const map = resolveParamMap(op, agentId, customerId, options);
+  // In report.js:25633 (`getDailyFiguresByCustomer`), `token` is not part of the JSON object `d`.
+  if (op.operation === "getDailyFiguresByCustomer") {
+    delete map["token"];
+  }
+  return JSON.stringify(map);
 }
 
 /** Absolute probe URL from a portal base and a route prefix; rejects non-http(s) bases. */
