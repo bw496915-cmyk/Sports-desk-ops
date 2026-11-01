@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * @file scripts/capture/har_probe.ts
- * @description Probe the report reads with cookies from a HAR — no browser.
+ * @description Probe the report reads with cookies (and bearer token) from a HAR — no browser.
  *
  * The WebView path is the only way to read an HttpOnly session that was never exported, but a HAR
  * is enough to replay it, and unlike WebView this runs headless in CI.
@@ -16,7 +16,12 @@ import {
   printHelp,
   wantsHelp,
 } from "../../lib/cli_args.ts";
-import { cookiesFromHar, cookieHeaderFrom } from "../../lib/cookie_jar.ts";
+import {
+  bearerFromHar,
+  cookiesFromHar,
+  cookieHeaderFrom,
+} from "../../lib/cookie_jar.ts";
+import { preflight } from "../../lib/preflight.ts";
 import { htmlToText } from "../../lib/ticket_html.ts";
 import {
   PROBE_PREFIXES,
@@ -49,6 +54,7 @@ Options:
   --customer-id <id>      Customer id for the form body (default: F402_CUSTOMER_ID)
   --out <dir>             Probe output root (default: scratch/f402-probes)
   --dry-run               Print what would be sent; make no requests
+  --no-preflight          Skip the DNS/TLS preflight
   --include-unconfirmed   Include PendingDelete
   -h, --help              This text
 
@@ -58,8 +64,8 @@ Examples:
   bun run capture:har --har scratch/fantasy402.har --prefix /cloud/api/Report \\
     --agent-id 118 --customer-id 12345
 
-The HAR must contain a request to the target host with a Cookie header. Values are never printed;
-only cookie names are recorded.
+The HAR must contain a request to the target host with a Cookie header (or Set-Cookie response).
+Values are never printed; only cookie names are recorded.
 `.trim();
 
 const parsed = parseCliArgs(process.argv.slice(2), { valueFlags: VALUE_FLAGS });
@@ -101,6 +107,7 @@ if (harPath === "") {
 const host = new URL(base).host;
 const har: unknown = await Bun.file(harPath).json();
 const cookies = cookiesFromHar(har, host);
+const bearer = bearerFromHar(har, host);
 if (cookies.length === 0) {
   console.error(`capture:har: no Cookie header for ${host} in ${harPath}.`);
   console.error("  Export a HAR while signed in to the portal, then retry.");
@@ -129,7 +136,7 @@ const bodyFor = (op: (typeof ops)[number]): string =>
 
 if (dryRun) {
   console.error(
-    `capture:har: ${host} · ${cookies.length} cookie(s): ${cookies.map((cookie) => cookie.name).join(", ")}`,
+    `capture:har: ${host} · ${cookies.length} cookie(s): ${cookies.map((cookie) => cookie.name).join(", ")}${bearer ? " · bearer: present" : ""}`,
   );
   for (const op of ops) {
     console.log(
@@ -138,6 +145,18 @@ if (dryRun) {
   }
   console.error("capture:har: dry run; no requests made");
   process.exit(0);
+}
+
+if (!hasFlag(parsed, "--no-preflight")) {
+  const check = await preflight(host);
+  if (!check.ok) {
+    console.error(`capture:har: ${check.error ?? "preflight failed"}`);
+    console.error("  bun run capture:preflight --host " + host);
+    process.exit(1);
+  }
+  console.error(
+    `capture:har: preflight ok · ${check.dns.length} address(es) · ${check.tls?.tlsVersion ?? "?"}`,
+  );
 }
 
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -152,17 +171,19 @@ for (const op of ops) {
       method: "POST",
       headers: {
         cookie: cookieHeader,
+        ...(bearer === null ? {} : { authorization: bearer }),
         "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
         "x-requested-with": "XMLHttpRequest",
       },
       body: bodyFor(op),
       redirect: "manual",
     });
-    const text = await response.text();
+    const rawBytes = new Uint8Array(await response.arrayBuffer());
+    const text = new TextDecoder().decode(rawBytes);
     const result = parseProbePageResult({
       status: response.status,
       contentType: response.headers.get("content-type") ?? "",
-      bytes: text.length,
+      bytes: rawBytes.byteLength,
       preview: text.slice(0, 2_000),
     });
     const record = {
@@ -177,6 +198,7 @@ for (const op of ops) {
       readOnlyConfirmed: op.readOnly,
       headersObserved: false,
       cookieNames: cookies.map((cookie) => cookie.name),
+      bearerObserved: bearer !== null,
       result,
       extractedText: result.contentType.includes("text/html")
         ? htmlToText(result.preview).slice(0, 2_000)
