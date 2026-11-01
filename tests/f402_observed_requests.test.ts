@@ -458,3 +458,41 @@ describe("the vipListInsert write and its audit trail", () => {
     );
   });
 });
+
+describe("writeDetail encoding, confirmed by two independent pastes", () => {
+  /** The raw body exactly as the portal sent it (from the curl paste). */
+  const rawBody =
+    "customerID=BILLY666&data=%5B%7B%22agentID%22%3A%22BILLY666%22%2C%22player%22%3A%22G441%22%7D%5D" +
+    "&ticket=0&info=+%5BSITE+%3A+fantasy402.com+v1.0.280%5D+" +
+    "&operation=writeDetail&agentID=BILLY666&agentOwner=BILLY666";
+
+  test("rebuilding the body from the fixture reproduces the raw paste", () => {
+    // An operator later pasted the same call in decoded form, so this is a cross-check: encoded
+    // fixture → raw body, and decoded fixture → same fields. If the JSON inside `data` is ever
+    // pretty-printed or reordered, this fails.
+    const fields = byOperation("writeDetail").fields;
+    const encoded = new URLSearchParams(
+      Object.entries(fields).map(([key, value]) => [
+        key,
+        value.replaceAll("<agent>", "BILLY666").replaceAll("<player>", "G441"),
+      ]) as [string, string][],
+    ).toString();
+
+    expect(encoded).toBe(rawBody);
+  });
+
+  test("info keeps its leading and trailing space", () => {
+    // " [SITE : …] " — a trimmed version is a different value, so it is stored verbatim.
+    expect(byOperation("writeDetail").fields.info).toBe(
+      " [SITE : fantasy402.com v1.0.280] ",
+    );
+  });
+
+  test("data is JSON inside a form field, not a nested object", () => {
+    const data = byOperation("writeDetail").fields.data ?? "";
+    expect(data.startsWith("[{")).toBe(true);
+    expect(JSON.parse(data)).toEqual([
+      { agentID: "<agent>", player: "<player>" },
+    ]);
+  });
+});
