@@ -467,7 +467,7 @@ export function buildProbeExpression(
   // can inspect type/size without decoding garbage as text; preview/bodyText stay empty.
   const buffer = new Uint8Array(await response.arrayBuffer());
   const respContentType = response.headers.get("content-type") ?? "";
-  const isBinaryResp = /^(image\/|audio\/|video\/|application\/(pdf|octet-stream|zip|gzip))/i.test(respContentType);
+  const isBinaryResp = new RegExp("^(image/|audio/|video/|application/(pdf|octet-stream|zip|gzip))", "i").test(respContentType);
   let previewText = "";
   let bodyTextOut = "";
   let blobTypeOut = "";
