@@ -2,9 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  formatCronScheduleLine,
+  installOsCronJob,
   isBunOsCronInvocation,
   osCronWorkerPath,
   parseCronSchedule,
+  parseCronScheduleOrNull,
+  previewCronSchedule,
+  startInProcessCron,
 } from "./bun_cron.ts";
 
 describe("bun_cron", () => {
@@ -27,8 +32,54 @@ describe("bun_cron", () => {
     );
   });
 
-  test("parseCronSchedule accepts @daily", () => {
-    const next = parseCronSchedule("@daily");
-    expect(next instanceof Date).toBe(true);
+  test("parseCronSchedule accepts @daily and named weekdays", () => {
+    expect(parseCronSchedule("@daily") instanceof Date).toBe(true);
+    expect(parseCronSchedule("30 2 * * MON") instanceof Date).toBe(true);
+    expect(parseCronSchedule("0 9 * * MON-FRI") instanceof Date).toBe(true);
+  });
+
+  test("parseCronScheduleOrNull returns null for impossible calendar dates", () => {
+    expect(parseCronScheduleOrNull("0 0 30 2 *")).toBe(null);
+  });
+
+  test("parseCronSchedule honors { tz }", () => {
+    const from = Date.UTC(2026, 5, 1, 15, 30, 0);
+    const utcMidnight = parseCronSchedule("0 0 * * *", { from, tz: "UTC" });
+    const honoluluMidnight = parseCronSchedule("0 0 * * *", {
+      from,
+      tz: "Pacific/Honolulu",
+    });
+    expect(utcMidnight.getUTCHours()).toBe(0);
+    expect(honoluluMidnight.getTime()).not.toBe(utcMidnight.getTime());
+  });
+
+  test("parseCronSchedule rejects from outside ECMAScript Date range", () => {
+    expect(() =>
+      parseCronSchedule("* * * * *", { from: 8.64e15 + 1 }),
+    ).toThrow(TypeError);
+  });
+
+  test("previewCronSchedule and formatCronScheduleLine", () => {
+    const preview = previewCronSchedule("0 6 * * *", { tz: "UTC" });
+    expect(preview.tz).toBe("UTC");
+    expect(formatCronScheduleLine(preview)).toContain('"0 6 * * *" (UTC)');
+    expect(formatCronScheduleLine(preview)).toContain("next ");
+  });
+
+  test("startInProcessCron returns CronJob with schedule string", () => {
+    const job = startInProcessCron("0 0 1 1 *", () => {});
+    expect(job.cron).toBe("0 0 1 1 *");
+    job.stop();
+  });
+
+  test("installOsCronJob refuses tz", async () => {
+    await expect(
+      installOsCronJob({
+        workerImportMetaUrl: import.meta.url,
+        schedule: "0 6 * * *",
+        title: "test-should-not-install",
+        tz: "UTC",
+      }),
+    ).rejects.toThrow(/cannot pin timezone/i);
   });
 });

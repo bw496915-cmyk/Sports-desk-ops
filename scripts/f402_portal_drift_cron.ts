@@ -8,7 +8,11 @@
  */
 import { join } from "node:path";
 
-import { startInProcessCron } from "../lib/bun_cron.ts";
+import {
+  previewCronSchedule,
+  startInProcessCron,
+  wireInProcessCronLifecycle,
+} from "../lib/bun_cron.ts";
 import {
   collectLivePortalArtifactDrift,
   emitPortalArtifactDriftSignal,
@@ -52,7 +56,12 @@ process.on("unhandledRejection", (reason) => {
 const manifest = await loadManifestWithRuntime();
 const bunPath = manifest.runtime?.bunExecutablePath ?? process.execPath;
 
-let job = startInProcessCron(
+const preview = previewCronSchedule(
+  schedule,
+  tz !== undefined && tz !== "" ? { tz } : undefined,
+);
+
+const job = startInProcessCron(
   schedule,
   async () => {
     await runDriftCheck();
@@ -60,20 +69,18 @@ let job = startInProcessCron(
   tz !== undefined && tz !== "" ? { tz } : undefined,
 );
 
-const shutdown = (signal: string): void => {
-  console.error(`portal:drift:cron ${signal}; stopping cron job`);
-  job.stop();
-  process.exit(0);
-};
-process.once("SIGINT", () => shutdown("SIGINT"));
-process.once("SIGTERM", () => shutdown("SIGTERM"));
+wireInProcessCronLifecycle(job, {
+  onShutdown: (signal) => {
+    console.error(`portal:drift:cron ${signal}; stopping cron job`);
+  },
+});
 
-job.ref();
 console.error(
   JSON.stringify({
     signal: "F402_PORTAL_DRIFT_CRON_WATCH",
     schedule: job.cron,
-    tz: tz ?? "local",
+    tz: preview.tz ?? "local",
+    nextFire: preview.next.toISOString(),
     bunPath,
   }),
 );

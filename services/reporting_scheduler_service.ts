@@ -12,6 +12,7 @@
  *  3. Cron Runner with native Bun interval monitoring, trigger history, and on-demand dispatch.
  */
 
+import { startInProcessCron } from "../lib/bun_cron.ts";
 import { SportsDeskTelegramService } from "./sportsdesk_telegram_bot.ts";
 
 export type ReportType =
@@ -58,7 +59,7 @@ export class ReportingSchedulerService {
       .filter((s) => s.enabled)
       .map((s) => {
         const [hour, minute] = s.scheduleTime.split(":").map(Number);
-        return Bun.cron(
+        return startInProcessCron(
           `${minute} ${hour} * * *`,
           async () => {
             s.lastTriggeredAt = new Date().toISOString();

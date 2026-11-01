@@ -30,10 +30,13 @@ import {
   wantsHelp,
 } from "../lib/cli_args.ts";
 import {
+  formatCronScheduleLine,
+  installOsCronJob,
   isBunOsCronInvocation,
-  osCronWorkerPath,
-  parseCronSchedule,
+  previewCronSchedule,
+  removeOsCronJob,
   startInProcessCron,
+  wireInProcessCronLifecycle,
 } from "../lib/bun_cron.ts";
 import {
   formatRun,
@@ -177,7 +180,7 @@ if (import.meta.main && !isBunOsCronInvocation(process.argv)) {
   const title = flagValue(parsed, "--title", OS_CRON_TITLE);
 
   if (hasFlag(parsed, "--remove-os")) {
-    await Bun.cron.remove(title);
+    await removeOsCronJob(title);
     console.error(`artifacts:cron: removed OS-level job "${title}"`);
     process.exit(0);
   }
@@ -188,9 +191,9 @@ if (import.meta.main && !isBunOsCronInvocation(process.argv)) {
     process.exit(2);
   }
 
-  let nextFire: Date;
+  let preview: ReturnType<typeof previewCronSchedule>;
   try {
-    nextFire = parseCronSchedule(schedule, {
+    preview = previewCronSchedule(schedule, {
       tz: tz !== "" ? tz : undefined,
     });
   } catch {
@@ -200,6 +203,7 @@ if (import.meta.main && !isBunOsCronInvocation(process.argv)) {
     console.error('  bun run artifacts:cron --schedule "0 6 * * *"');
     process.exit(2);
   }
+  const nextFire = preview.next;
 
   if (hasFlag(parsed, "--install-os")) {
     // The typed OS-level overload `Bun.cron(path, schedule, title)` carries no timezone
@@ -215,9 +219,13 @@ if (import.meta.main && !isBunOsCronInvocation(process.argv)) {
       );
       process.exit(2);
     }
-    await Bun.cron(osCronWorkerPath(import.meta.url), schedule, title);
+    await installOsCronJob({
+      workerImportMetaUrl: import.meta.url,
+      schedule,
+      title,
+    });
     console.error(
-      `artifacts:cron: installed OS-level job "${title}" (${schedule}) · next ${nextFire.toISOString()}`,
+      `artifacts:cron: installed OS-level job "${title}" · ${formatCronScheduleLine(preview)}`,
     );
     process.exit(0);
   }
@@ -258,16 +266,9 @@ if (import.meta.main && !isBunOsCronInvocation(process.argv)) {
     },
     tz !== "" ? { tz } : undefined,
   );
-  job.ref();
-
-  const shutdown = (): void => {
-    job.stop();
-    process.exit(0);
-  };
-  process.once("SIGINT", shutdown);
-  process.once("SIGTERM", shutdown);
+  wireInProcessCronLifecycle(job);
 
   console.error(
-    `artifacts:cron: scheduled "${job.cron}"${tz ? ` (${tz})` : ""} · next ${nextFire.toISOString()} · journal ${journal}`,
+    `artifacts:cron: ${formatCronScheduleLine({ ...preview, schedule: job.cron })} · journal ${journal}`,
   );
 }

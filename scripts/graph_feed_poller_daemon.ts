@@ -18,6 +18,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import {
+  formatCronScheduleLine,
+  previewCronSchedule,
+  startInProcessCron,
+  wireInProcessCronLifecycle,
+} from "../lib/bun_cron.ts";
+import {
   runFourWeekParlayComboBacktest,
   type FourWeekParlayBacktestReport,
 } from "../lib/parlay_combo_backtest_engine.ts";
@@ -1357,9 +1363,12 @@ if (import.meta.main) {
     console.log(
       `[GraphPoller] Starting continuous 60s schedule (in-process Bun.cron, live=${live}, liveF402=${liveF402}, syncR2=${syncR2})...`,
     );
-    const job = Bun.cron("* * * * *", async () => {
+    const cronExpr = "* * * * *";
+    const preview = previewCronSchedule(cronExpr);
+    const job = startInProcessCron(cronExpr, async () => {
       await run();
     });
-    job.ref();
+    wireInProcessCronLifecycle(job);
+    console.log(`[GraphPoller] ${formatCronScheduleLine(preview)}`);
   }
 }
