@@ -99,6 +99,51 @@ describe("remaining-tasks markdown", () => {
     expect(seen).toEqual([undefined, false, true]);
   });
 
+  test("every open task carries a Ref that resolves in the references table", () => {
+    const lines = markdown.split("\n");
+    const taskRefs: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (!lines[i]!.startsWith("- [ ] ")) continue;
+      const refs: string[] = [];
+      for (
+        let j = i + 1;
+        j < lines.length && /^\s{2,}\S/.test(lines[j]!);
+        j++
+      ) {
+        const match = /^\s+- \*\*Ref:\*\* `(RT-[A-Z0-9-]+)`$/.exec(lines[j]!);
+        if (match) refs.push(match[1]!);
+      }
+      expect(refs.length).toBe(1);
+      taskRefs.push(refs[0]!);
+    }
+    expect(taskRefs.length).toBe((markdown.match(/^- \[ \]/gm) ?? []).length);
+
+    const tableRefs = [
+      ...markdown.matchAll(/^\|\s*`(RT-[A-Z0-9-]+)`\s*\|/gm),
+    ].map((m) => m[1]!);
+    expect(tableRefs.length).toBe(new Set(tableRefs).size);
+    const table = new Set(tableRefs);
+    for (const ref of taskRefs) expect(table.has(ref)).toBe(true);
+    for (const ref of table) {
+      if (ref.startsWith("RT-RENDER-")) continue;
+      expect(taskRefs).toContain(ref);
+    }
+  });
+
+  test("the references table cites resolved Bun records, not memory", () => {
+    const records = [
+      "doc:runtime/markdown",
+      "api:Bun.markdown.html",
+      "api:Bun.markdown.ansi",
+      "api:Bun.markdown.render",
+      "api:Bun.markdown.Options",
+      "api:Bun.markdown.ListItemMeta",
+    ];
+    for (const record of records) expect(markdown).toContain(record);
+    // ANSI takes a theme, not Options; the doc must not claim otherwise.
+    expect(markdown).toContain("ansi(input, theme?: AnsiTheme): string");
+  });
+
   test("the zero-code CLI loader renders the document", async () => {
     const proc = Bun.spawn(["bun", "docs/REMAINING_TASKS.md"], {
       stdout: "pipe",
