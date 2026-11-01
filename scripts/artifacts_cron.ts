@@ -193,9 +193,9 @@ if (import.meta.main && !isBunOsCronInvocation(process.argv)) {
 
   let preview: ReturnType<typeof previewCronSchedule>;
   try {
-    preview = previewCronSchedule(schedule, {
-      tz: tz !== "" ? tz : undefined,
-    });
+    const previewOpts: { tz?: string } = {};
+    if (tz !== "") previewOpts.tz = tz;
+    preview = previewCronSchedule(schedule, previewOpts);
   } catch {
     console.error(
       `artifacts:cron: invalid schedule "${schedule}"${tz ? ` (tz=${tz})` : ""}.`,

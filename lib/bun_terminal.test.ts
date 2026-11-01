@@ -106,8 +106,8 @@ test.skipIf(Bun.which("bash") === null)(
         },
       },
     });
-    proc.terminal.resize(100, 30);
-    proc.terminal.write("echo $COLUMNS $LINES\nexit\n");
+    proc.terminal!.resize(100, 30);
+    proc.terminal!.write("echo $COLUMNS $LINES\nexit\n");
     const code = await proc.exited;
     proc.terminal?.close();
     expect(code).toBe(0);
