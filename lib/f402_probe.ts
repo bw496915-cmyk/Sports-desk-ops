@@ -75,6 +75,13 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     params: ["token", "ticketNumber", "wagerNumber", "flag", "operation"],
   },
   {
+    operation: "getListAgenstByAgent",
+    method: "POST",
+    readOnly: true,
+    note: "agent list by agent (Manager envelope); form: agentID, agentType, operation, RRO, agentOwner",
+    params: ["agentID", "agentType", "operation", "RRO", "agentOwner"],
+  },
+  {
     operation: "PendingDelete",
     method: "POST",
     readOnly: false,
@@ -377,6 +384,12 @@ export function buildProbeBody(
       params.set("wagerNumber", options.wagerNumber ?? "0");
     } else if (name === "flag") {
       params.set("flag", options.flag ?? "");
+    } else if (name === "agentType") {
+      params.set("agentType", "M");
+    } else if (name === "RRO") {
+      params.set("RRO", "1");
+    } else if (name === "agentOwner") {
+      params.set("agentOwner", agentId);
     }
   }
   return params.toString();
