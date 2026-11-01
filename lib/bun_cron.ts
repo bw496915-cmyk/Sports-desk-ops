@@ -49,7 +49,13 @@ export function osCronWorkerPath(importMetaUrl: string): string {
   return fileURLToPath(importMetaUrl);
 }
 
-export type InProcessCronJob = ReturnType<typeof Bun.cron>;
+export type InProcessCronJob = {
+  readonly cron: string;
+  ref(): InProcessCronJob;
+  unref(): InProcessCronJob;
+  stop(): InProcessCronJob;
+  [Symbol.dispose](): void;
+};
 
 /** Workers Cron Triggers export shape for OS-level jobs. */
 export type CronScheduledWorker = {
@@ -114,10 +120,9 @@ export function startInProcessCron(
   options?: StartInProcessCronOptions,
 ): InProcessCronJob {
   const tz = options?.tz?.trim();
-  const job =
-    tz !== undefined && tz !== ""
-      ? Bun.cron(schedule, handler, { tz })
-      : Bun.cron(schedule, handler);
+  const job = (tz !== undefined && tz !== ""
+    ? Bun.cron(schedule, handler, { tz })
+    : Bun.cron(schedule, handler)) as unknown as InProcessCronJob;
   if (options?.keepAlive === false) {
     job.unref();
   }
@@ -153,7 +158,10 @@ export function previewCronSchedule(
 ): CronSchedulePreview {
   const tzRaw = options?.tz?.trim();
   const tz = tzRaw !== undefined && tzRaw !== "" ? tzRaw : undefined;
-  const next = parseCronSchedule(schedule, { tz, from: options?.from });
+  const opts: { tz?: string; from?: Date | number } = {};
+  if (tz !== undefined) opts.tz = tz;
+  if (options?.from !== undefined) opts.from = options.from;
+  const next = parseCronSchedule(schedule, opts);
   return { schedule, tz, next };
 }
 

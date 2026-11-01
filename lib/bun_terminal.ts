@@ -69,7 +69,7 @@ export type PtyRunUntilResult = PtyRunResult & {
 
 /** Narrow `proc.terminal` after `Bun.spawn({ terminal })` — boundary guard. */
 export function requireSubprocessTerminal(proc: {
-  readonly terminal?: { write: (input: string) => number; close: () => void } | null;
+  readonly terminal?: unknown;
 }): { write: (input: string) => number; close: () => void } {
   const terminal = proc.terminal;
   if (terminal === undefined || terminal === null) {
@@ -77,7 +77,7 @@ export function requireSubprocessTerminal(proc: {
       "Subprocess has no terminal handle; pass terminal to Bun.spawn",
     );
   }
-  return terminal;
+  return terminal as { write: (input: string) => number; close: () => void };
 }
 
 /** Strip CR and SGR escapes from PTY capture (assertions on plain text). */
