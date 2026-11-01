@@ -89,7 +89,7 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     operation: "getDailyFiguresByCustomer",
     method: "POST",
     readOnly: true,
-    note: "daily figure report read (report.js:25633 sends contentType: application/json)",
+    note: "daily figure report read; verified 200 with real customer (week is integer 0..N) (report.js:25633 sends contentType: application/json)",
     params: ["agentID", "customerID", "week", "token", "operation"],
     wireContentType: "application/json",
     defaultPrefix: "/cloud/api/Report",
