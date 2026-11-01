@@ -566,9 +566,9 @@
           "note": "Reporting action 'get-agent-performance' with data-type='C' is observed in the surveillance lifecycle table (stage 4, 8-tier BranchGrade)."
         },
         {
-          "source": "operational_guardrails_runbook.md:214",
-          "kind": "absence",
-          "note": "No getAgentPerformance request is quoted from the HAR; the URL /cloud/api/Report/getAgentPerformance is inferred from the action name."
+          "source": "tests/fixtures/f402-report-requests-observed-2026-11-01.json",
+          "kind": "wire-observation",
+          "note": "2026-11-01: an operator paste carried a getAgentPerformance request body — start, end (M/D/YYYY), agentID, type=CP, freePlay=Y, store, sport (padded to 20 chars), subsport, period=-1, wagerType, betType, tipo=0, debug=0, operation, RRO=1, agentOwner. The paste lost the URL, so the Report/ prefix is still the inferred part, and no response was observed."
         },
         {
           "source": "docs/openapi.json",
@@ -576,7 +576,7 @@
           "note": "Spec asserts form-urlencoded {agentID, dataType:'C', period} and an array of {agentID, volume, netWon, holdPct}; holdPct/BranchGrade math is not captured."
         }
       ],
-      "requiredCapture": "Capture one get-agent-performance call (agentID, data-type C, period) and its rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.",
+      "requiredCapture": "The request body is now observed (type=CP, start/end, sport padded to 20 chars, period=-1, tipo=0, debug=0 — tests/fixtures/f402-report-requests-observed-2026-11-01.json), but the URL the body was POSTed to is not, and no response exists. Capture one call with its URL and rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.",
       "contradicted": false,
       "contradictedReason": null,
       "candidate_url": true,
@@ -2120,7 +2120,7 @@
           "note": "parseAnalysisQuery validates the codes; matchesSelection gates the stored report; the 200 payload carries totals plus a recomputed copy and a discrepancies array."
         }
       ],
-      "requiredCapture": "One POST /cloud/api/Report/getAnalysis per report kind and filter set. Today one Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste."
+      "requiredCapture": "One captured Analysis call per report kind and filter set, with its URL. The CP kind is the open question: an operator paste on 2026-11-01 shows a request with operation=getAgentPerformance and type=CP (tests/fixtures/f402-report-requests-observed-2026-11-01.json), which suggests the CP grid is served by getAgentPerformance rather than Report/getAnalysis; getReportPlayerAnalysis is the third candidate. Today one Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste."
     },
     {
       "id": "surface.daemon-agent-search",

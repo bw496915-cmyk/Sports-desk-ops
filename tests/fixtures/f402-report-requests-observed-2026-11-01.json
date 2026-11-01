@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-01T23:07:24Z",
+  "source": "operator paste of two live manager requests, 2026-11-01. Credential headers were stripped before this file was written; agent identifiers are placeholders.",
+  "agentPlaceholder": "<agent>",
+  "responsesObserved": false,
+  "requests": [
+    {
+      "operation": "getSubSportByReport",
+      "pathObserved": "/cloud/api/Manager/getSubSportByReport",
+      "pathStatus": "observed",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "requestHeadersObserved": [
+        "x-requested-with: XMLHttpRequest",
+        "origin: https://fantasy402.com"
+      ],
+      "fields": {
+        "customerID": "<agent>",
+        "sport": "Football            ",
+        "operation": "getSubSportByReport",
+        "RRO": "1",
+        "agentID": "<agent>",
+        "agentOwner": "<agent>"
+      }
+    },
+    {
+      "operation": "getAgentPerformance",
+      "pathObserved": null,
+      "pathStatus": "body only - the paste carried the form body without its URL; the ledger's inferred path /cloud/api/Report/getAgentPerformance remains unconfirmed",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "fields": {
+        "start": "10/21/2026",
+        "end": "11/01/2026",
+        "agentID": "<agent>",
+        "type": "CP",
+        "freePlay": "Y",
+        "store": "<agent>",
+        "sport": "Football            ",
+        "subsport": "",
+        "period": "-1",
+        "wagerType": "",
+        "betType": "",
+        "tipo": "0",
+        "debug": "0",
+        "operation": "getAgentPerformance",
+        "RRO": "1",
+        "agentOwner": "<agent>"
+      }
+    }
+  ]
+}

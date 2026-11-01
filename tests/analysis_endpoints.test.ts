@@ -37,6 +37,7 @@ describe("analysis endpoints", () => {
     expect(body.activities.length).toBe(14);
     expect(body.groups.map((g) => g.value)).toEqual(["1", "2"]);
     expect(body.weeks.map((w) => w.value)).toContain("enter-dates");
+    expect(body.requiredCapture).toContain("getAgentPerformance");
     expect(body.requiredCapture).toContain("getAnalysis");
   });
 
@@ -57,6 +58,7 @@ describe("analysis endpoints", () => {
     expect(body.filter.activity).toBe("4");
     expect(body.filter.agent).toBe("MJ2026");
     expect(body.description).toContain("Customer Volume");
+    expect(body.requiredCapture).toContain("getAgentPerformance");
     expect(body.requiredCapture).toContain("getAnalysis");
   });
 

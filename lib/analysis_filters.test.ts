@@ -116,10 +116,15 @@ describe("describeSelection", () => {
 });
 
 describe("required capture", () => {
-  test("names the upstream report and the missing artefacts", () => {
-    expect(ANALYSIS_REQUIRED_CAPTURE).toContain(
-      "/cloud/api/Report/getAnalysis",
-    );
-    expect(ANALYSIS_REQUIRED_CAPTURE).toContain("No request or response");
+  test("names the candidate operations and the missing artefacts", () => {
+    // Which operation serves the CP grid is unsettled, so all three candidates are named.
+    for (const operation of [
+      "getAgentPerformance",
+      "Report/getAnalysis",
+      "getReportPlayerAnalysis",
+    ]) {
+      expect(ANALYSIS_REQUIRED_CAPTURE).toContain(operation);
+    }
+    expect(ANALYSIS_REQUIRED_CAPTURE).toContain("No response exists");
   });
 });

@@ -709,11 +709,11 @@
           "tier": "C",
           "sources": [
             "operational_guardrails_runbook.md:164",
-            "operational_guardrails_runbook.md:214",
+            "tests/fixtures/f402-report-requests-observed-2026-11-01.json",
             "docs/openapi.json"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Capture one get-agent-performance call (agentID, data-type C, period) and its rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.",
+          "requiredCapture": "The request body is now observed (type=CP, start/end, sport padded to 20 chars, period=-1, tipo=0, debug=0 — tests/fixtures/f402-report-requests-observed-2026-11-01.json), but the URL the body was POSTed to is not, and no response exists. Capture one call with its URL and rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.",
           "candidateUrl": true
         }
       }
@@ -2984,7 +2984,7 @@
           "tier": "D",
           "sources": ["services/sportsdesk_webview_server.ts:878-1000"],
           "capturedResponse": false,
-          "requiredCapture": "One POST /cloud/api/Report/getAnalysis per report kind and filter set. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste."
+          "requiredCapture": "One captured Analysis call per report kind and filter set, with its URL. The CP kind is the open question: an operator paste on 2026-11-01 shows a request with operation=getAgentPerformance and type=CP (tests/fixtures/f402-report-requests-observed-2026-11-01.json), which suggests the CP grid is served by getAgentPerformance rather than Report/getAnalysis; Manager/getReportPlayerAnalysis is the third candidate. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste."
         },
         "x-surface-id": "surface.daemon-analysis"
       }

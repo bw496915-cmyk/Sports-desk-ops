@@ -235,7 +235,18 @@ Expected auth: the Manager portal session cookie observed in the 2026-10-28 HAR 
 `authenticateCustomer` is deliberately not in this table — the whole auth model needs its own capture and
 is §P3. Two rows with partial observation are tracked elsewhere: `updateByColumn` (§P2) and
 `search`/`getAgentPerformance`/`getSettledFigure`/`delete-wager`/`getAnalysis`/`getFinancialReport`
-(§P6 — UI action names observed, URLs not).
+(§P6 — UI action names observed, URLs not). `getAgentPerformance` now has one step more: a request body
+was observed on 2026-11-01 (`start`/`end`/`type=CP`/`period=-1`/…), recorded in
+`tests/fixtures/f402-report-requests-observed-2026-11-01.json`, but the URL that body was POSTed to
+was not, and no response exists.
+
+**Observed request, still unledgered: `getSubSportByReport`.** A 2026-11-01 operator paste shows
+`POST /cloud/api/Manager/getSubSportByReport`, form-urlencoded, with
+`customerID`, `sport` (padded to 20 characters — `Football` plus 12 spaces), `operation`, `RRO=1`,
+`agentID`, `agentOwner`. It is the call that fills the report's sub-sport picker, so it is the wire
+counterpart of `lib/sport_catalog.ts`. It has **no ledger row and no spec path on purpose**: a tier-B
+row would need a response schema, and nobody has seen the response. Capture it (URL, body, rows) and it
+becomes a real operation with a real schema rather than an authored one.
 
 ## P6 — the 11 "Tracked Operational Domains" candidates
 

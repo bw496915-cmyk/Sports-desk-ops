@@ -1838,7 +1838,7 @@ function surfaceOperationSpecs(
       description:
         "Validates the portal's filter vocabulary (sportsdesk_webview_server.ts:878-1000) and answers 200 only when a transcribed report matches the selection; otherwise 501 with the required capture. A 200 carries the rows, the published totals, a recomputed copy and a discrepancies array, so a transcription slip is visible rather than served as fact. Surface: surface.daemon-analysis (tier D).",
       requiredCapture:
-        "One POST /cloud/api/Report/getAnalysis per report kind and filter set. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste.",
+        "One captured Analysis call per report kind and filter set, with its URL. The CP kind is the open question: an operator paste on 2026-11-01 shows a request with operation=getAgentPerformance and type=CP (tests/fixtures/f402-report-requests-observed-2026-11-01.json), which suggests the CP grid is served by getAgentPerformance rather than Report/getAnalysis; Manager/getReportPlayerAnalysis is the third candidate. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste.",
       responses: {
         "200": jsonSurfaceResponse("A transcribed analysis report.", {
           success: { type: "boolean" },

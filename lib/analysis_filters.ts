@@ -4,9 +4,12 @@
  * own filter bar: report kind (CP/CPS/CPV/G), activity code, group mode, and week window.
  *
  * Provenance: portal markup for `report.js` (`#btnPerformance`, `data-list="activity"`,
- * `"group"`, `"week"`). The codes are the portal's; the *data* behind them comes from
- * `/cloud/api/Report/getAnalysis`, which this repo has never captured. So this module can
- * validate and describe a selection, and cannot produce a figure.
+ * `"group"`, `"week"`). The codes are the portal's; the *data* behind them comes from the
+ * Analysis report call, which this repo has never captured. Which operation serves it is
+ * unsettled: `Report/getAnalysis` is the name on the launcher tile, an observed 2026-11-01 request
+ * carries `operation=getAgentPerformance&type=CP` (body only, no URL), and the Analysis view in
+ * `manager.js` calls `Manager/getReportPlayerAnalysis`. So this module can validate and describe a
+ * selection, and cannot produce a figure.
  */
 
 export interface AnalysisOption {
@@ -153,4 +156,4 @@ export function describeSelection(selection: AnalysisSelection): string {
 
 /** Why this endpoint cannot answer yet, stated once so responses and docs agree. */
 export const ANALYSIS_REQUIRED_CAPTURE =
-  "Capture one POST /cloud/api/Report/getAnalysis (redacted) per report kind: the request body carries the activity/group/week selection and the response defines the columns. No request or response for getAnalysis exists in docs/evidence/captures.";
+  "Capture one Analysis call (redacted) per report kind, with its URL and response. The CP kind is unsettled: an observed request on 2026-11-01 carries operation=getAgentPerformance with type=CP (tests/fixtures/f402-report-requests-observed-2026-11-01.json), so the CP grid may be getAgentPerformance rather than Report/getAnalysis, with Manager/getReportPlayerAnalysis a third candidate. No response exists for any of them in docs/evidence/captures.";
