@@ -33,8 +33,10 @@ import {
   type SportCatalogFile,
 } from "./sport_catalog.ts";
 
+import { SPORT_FIELD_WIDTH, padField } from "./f402_field_widths.ts";
+
 /** The portal pads `sport` to this width with spaces; 20 is measured, not guessed. */
-export const SPORT_FIELD_WIDTH = 20;
+export { SPORT_FIELD_WIDTH };
 
 /** Fixed in every observed request. */
 const OPERATION = "getAgentPerformance";
@@ -119,7 +121,7 @@ export function padSportField(sport: string): string {
       `sport "${trimmed}" is ${trimmed.length} characters; the portal's field holds ${SPORT_FIELD_WIDTH}`,
     );
   }
-  return trimmed.padEnd(SPORT_FIELD_WIDTH, " ");
+  return padField(trimmed, SPORT_FIELD_WIDTH);
 }
 
 /**
