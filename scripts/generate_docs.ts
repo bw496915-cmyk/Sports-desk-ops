@@ -1201,7 +1201,7 @@ function renderHeadersMatrix(context: RenderContext): string[] {
 
 const SCHEME_NOTES: Readonly<Record<string, string>> = {
   fantasy402cookie:
-    "Observed: the 2026-10-28 Manager HAR session is cookie-based and sent no Authorization header (`operational_guardrails_runbook.md:153`). No login/`Set-Cookie` exchange was captured, so the cookie name, lifetime, renewal window and scope are **unverified**. Do not assume a JWT lifetime — the earlier “~20–25 minute” claim had no source and was removed.",
+    "Observed: the 2026-10-28 Manager HAR session is cookie-based and sent no Authorization header (`operational_guardrails_runbook.md:153`). The 2026-10-31 captures record an `authorization` key with a **redacted** value, so whether the current session also sends a bearer token is **unverified — check this**. No login/`Set-Cookie` exchange was captured, so the cookie name, lifetime, renewal window and scope are **unverified**. Do not assume a JWT lifetime — the earlier “~20–25 minute” claim had no source and was removed.",
   daemonbearer:
     "Implementation-verified: the local daemon compares `Authorization: Bearer <token>` against `SPORTSDESK_ADMIN_TOKEN` in constant time (`sportsdesk_webview_server.ts:27-47`), protects `/api/watchlist` and `/api/telegram/*` (`:176-183`) and returns 503 when the token is not configured.",
   bearerAuth:
@@ -1335,7 +1335,7 @@ function renderErrorEnvelope(context: RenderContext): string[] {
 
 const CONTRADICTION_NOTES: Readonly<Record<string, string>> = {
   "/cloud/api/Manager/getWebLog":
-    "The earlier spec required an `Authorization: Bearer` header and published a four-field response row schema; the 2026-10-28 HAR shows a cookie-based session with no Authorization header and captured no response body (`operational_guardrails_runbook.md:153`). Only the mode-B request side is real.",
+    "The earlier spec required an `Authorization: Bearer` header and published a four-field response row schema; the 2026-10-28 HAR shows a cookie-based session with no Authorization header (the 2026-10-31 captures record a redacted `authorization` key, so a bearer token is unverified), and captured no response body (`operational_guardrails_runbook.md:153`). Only the mode-B request side is real.",
   "/cloud/api/Manager/getInfoPlayer":
     "The earlier spec's request example was an 11-character padded `customerID`; the observed read sent a 7-character trimmed ID (`operational_guardrails_runbook.md:213`) and the response remains uncaptured.",
 };
@@ -1556,7 +1556,7 @@ function extractLimitations(markdown: string): string | undefined {
 }
 
 const TIER_MEANINGS: Readonly<Record<Tier, string>> = {
-  A: "Captured wire contract: a real request AND a real response capture exist. Nothing in this release qualifies.",
+  A: "Captured wire contract: a real request AND a real response capture exist. Five operations qualify from the 2026-10-31 live session (getWebLog, getInfoPlayer, getBetTicker, getBetTickerConfig, getSportsVigSetup).",
   B: "Observed first-party evidence: captured request side, observed request payload, or a route verified against its handler source. The response may still be uncaptured.",
   C: "Inferred only: authored in the spec/generators, a repo TypeScript type, or a UI/DOM observation. No request or response was observed.",
   D: "Real surface recovered from code or fixtures after being absent from the earlier spec. No captured response; recorded in `surfaces[]` and, for three rows, as a spec operation.",

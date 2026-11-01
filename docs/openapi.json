@@ -58,7 +58,7 @@
           "sources": [
             "none",
             "operational_guardrails_runbook.md:153",
-            "docs/openapi.json:65-139"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Capture one authenticateCustomer POST (redacted credentials): status, Set-Cookie vs body token, response envelope/code field, lifetime, and whether Manager calls then send Authorization or the cookie. Upgrades C->A and validates the whole auth model."
@@ -320,10 +320,11 @@
           "sources": [
             "simulate_bettor_churn_suite.ts:91-104",
             "lib/fantasy402_wager_universe_scope.ts:13-21",
-            "docs/openapi.json:309-375"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Capture the request (form vs JSON content type is disputed by the spec's own application/json choice) and a non-empty response; verify BLOCKED sentinel rows (L19.N0518) and zero-stake rows actually appear. Upgrades C->A."
+          "requiredCapture": "Capture the request (form vs JSON content type is disputed by the spec's own application/json choice) and a non-empty response; verify BLOCKED sentinel rows (L19.N0518) and zero-stake rows actually appear. Upgrades C->A.",
+          "contradicted": true
         }
       }
     },
@@ -441,7 +442,7 @@
           "sources": [
             "operational_guardrails_runbook.md:205-209",
             "operational_guardrails_runbook.md:214",
-            "docs/openapi.json:523-607"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Capture one omnisearch request triggered from search-component (URL, method, content type, term/type/agentID fields) and its result rows. Upgrades C->A and confirms candidate_url.",
@@ -465,7 +466,7 @@
           "sources": [
             "operational_guardrails_runbook.md:215",
             "domain-branded-types.ts:9,140-158",
-            "docs/openapi.json:609-754"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Highest-value mutation capture: one updateByColumn with a safe column (confirmationDelaySeconds) plus the getInfoPlayer read-back. Record exact form fields, content type, padding width actually required (11 vs the observed 10), sub-agent vs master scope, and the Result envelope. Upgrades C->A and is the only way to validate the SILENT_NO_OP / REJECTED_SCOPE claims."
@@ -663,7 +664,10 @@
         },
         "x-evidence": {
           "tier": "C",
-          "sources": ["none", "docs/openapi.json"],
+          "sources": [
+            "docs/evidence/captures/2026-10-31/getInfoManager.post.json",
+            "docs/openapi.json"
+          ],
           "capturedResponse": false,
           "requiredCapture": "Capture the dashboard header request/response; confirm the exact JSON keys (the spec uses hyphenated names like 'grand-total-weekly', which is unusual enough to need proof). Upgrades C->A."
         }
@@ -682,7 +686,7 @@
         },
         "x-evidence": {
           "tier": "C",
-          "sources": ["none", "docs/openapi.json:1202-1284"],
+          "sources": ["none", "docs/openapi.json"],
           "capturedResponse": false,
           "requiredCapture": "Capture the Reporting weekly-figure request/response (the data-action is itself unverified). Upgrades C->A."
         }
@@ -704,7 +708,7 @@
           "sources": [
             "operational_guardrails_runbook.md:164",
             "operational_guardrails_runbook.md:214",
-            "docs/openapi.json:1286-1375"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Capture one get-agent-performance call (agentID, data-type C, period) and its rows; confirm whether holdPct is computed server-side and how the BranchGrade is applied. Upgrades C->A.",
@@ -727,7 +731,7 @@
           "tier": "C",
           "sources": [
             "operational_guardrails_runbook.md:168",
-            "docs/openapi.json:1377-1445"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Capture one Collections request/response; verify weekDate format and the 50% split fields. Upgrades C->A.",
@@ -750,7 +754,7 @@
           "tier": "C",
           "sources": [
             "operational_guardrails_runbook.md:165",
-            "docs/openapi.json:1447-1526"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Capture the Reporting Deleted Wagers view request/response; also determine whether delete-wager and getDeletedWagerReport are distinct wire actions. Upgrades C->A.",
@@ -839,7 +843,7 @@
           "tier": "B",
           "sources": [
             "sportsdesk_webview_server.ts:114-131",
-            "docs/openapi.json:1528-1581"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Not a capture gap: reconcile the spec to sportsdesk_webview_server.ts:114-131 (add url + timestamp). A curl capture would only confirm the handler."
@@ -965,7 +969,7 @@
           "sources": [
             "sportsdesk_webview_server.ts:236-246",
             "sportsdesk_webview_server.ts:27-47",
-            "docs/openapi.json:1583-1641"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "No wire capture needed; add the 401/503 responses to the spec from adminRejection (sportsdesk_webview_server.ts:33-46)."
@@ -1137,7 +1141,7 @@
           "tier": "B",
           "sources": [
             "sportsdesk_webview_server.ts:249-274",
-            "docs/openapi.json:1643-1692"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "No capture gap; document the Authorization requirement and the 401/503 paths."
@@ -1311,7 +1315,7 @@
           "sources": [
             "sportsdesk_webview_server.ts:277-297",
             "sportsdesk_telegram_bot.ts:77-81",
-            "docs/openapi.json:1694-1739"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "No capture gap; add the ?type= query parameter (enum REPORT_TYPES) and 'ok' to the spec."
@@ -1350,7 +1354,10 @@
         },
         "x-evidence": {
           "tier": "C",
-          "sources": ["scripts/enhance_docs.mjs:130", "none"],
+          "sources": [
+            "scripts/enhance_docs.mjs:130",
+            "docs/evidence/captures/2026-10-31/getCustomerNotes.post.json"
+          ],
           "capturedResponse": false,
           "requiredCapture": "Capture a customer notes read; confirm the notes row fields and whether notes are operator-annotations or wire-native. Upgrades C->A."
         }
@@ -1467,7 +1474,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:41",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:2688"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Open the 'Game Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
@@ -1501,7 +1508,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:52",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:2727"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Open the 'Messaging' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
@@ -1535,7 +1542,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:63",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:2763"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Open the 'Cashier' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
@@ -1569,7 +1576,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:74",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:2800",
+            "docs/openapi.json",
             "operational_guardrails_runbook.md:213"
           ],
           "capturedResponse": false,
@@ -1605,7 +1612,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:85",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:2838"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Open the '3rd Party Limits' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
@@ -1634,7 +1641,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:96",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:2873",
+            "docs/openapi.json",
             "operational_guardrails_runbook.md:166"
           ],
           "capturedResponse": false,
@@ -1664,7 +1671,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:107",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:2909"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Open the 'Scores' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
@@ -1699,7 +1706,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:118",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:2946"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Open the 'Agent Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
@@ -1732,7 +1739,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:129",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:2981"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Open the 'Billing' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
@@ -1765,7 +1772,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:140",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:3016"
+            "docs/openapi.json"
           ],
           "capturedResponse": false,
           "requiredCapture": "Open the 'Settings & Rules' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
@@ -1798,7 +1805,7 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:151",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "docs/openapi.json:3051",
+            "docs/openapi.json",
             "operational_guardrails_runbook.md:167"
           ],
           "capturedResponse": false,
@@ -2028,7 +2035,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "session",
-        "description": "Fantasy402 Manager portal session cookie. The 2026-10-28 capture carried no Authorization header and the session is cookie-based (operational_guardrails_runbook.md:153). The capture did not record the cookie name, so 'session' is a placeholder label, not a verified cookie name."
+        "description": "Fantasy402 Manager portal session cookie. [OBSERVED] The 2026-10-28 HAR carried no Authorization header and was cookie-based (operational_guardrails_runbook.md:153); the 2026-10-31 captures record an `authorization` key with a redacted value. [UNVERIFIED] Whether the current Manager session sends a bearer token — check an unredacted capture before relying on it. The cookie name is unrecorded, so 'session' is a placeholder label."
       },
       "daemonBearer": {
         "type": "http",

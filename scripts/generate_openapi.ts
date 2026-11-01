@@ -1198,7 +1198,7 @@ function getWebLogOperation(operation: LedgerOperation): JsonObject {
     summary:
       "Manager getWebLog (mode B request observed; response not captured)",
     description:
-      "The forensic IP-investigation endpoint (operational_guardrails_runbook.md §5.1.1). Request side: a 2026-10-28 Manager HAR (portal v1.0.279) captured one mode-B POST with a form-urlencoded body and no Authorization header, so the session is cookie-based. Only mode B was captured; modes A, C and I are inferred from the portal form and still need a capture. Response side: no response body was captured, so the row schema is undocumented and none is published here. The WeblogEntry component (simulate_bettor_churn_suite.ts:117-123) records the four fields the old spec published, but a consumer type is not a capture, so it is not used as a response schema.",
+      "The forensic IP-investigation endpoint (operational_guardrails_runbook.md §5.1.1). Request side: a 2026-10-28 Manager HAR (portal v1.0.279) captured one mode-B POST with a form-urlencoded body and no Authorization header, so the 2026-10-28 session was cookie-based. Only mode B was captured; modes A, C and I are inferred from the portal form and still need a capture. Response side: no response body was captured, so the row schema is undocumented and none is published here. The WeblogEntry component (simulate_bettor_churn_suite.ts:117-123) records the four fields the old spec published, but a consumer type is not a capture, so it is not used as a response schema.",
     operationId: operationIdFor(operation.method, operation.path),
     parameters: [{ $ref: "#/components/parameters/XRequestedWith" }],
     requestBody: {
@@ -2256,7 +2256,7 @@ function buildSecuritySchemes(): JsonObject {
       in: "cookie",
       name: "session",
       description:
-        "Fantasy402 Manager portal session cookie. The 2026-10-28 capture carried no Authorization header and the session is cookie-based (operational_guardrails_runbook.md:153). The capture did not record the cookie name, so 'session' is a placeholder label, not a verified cookie name.",
+        "Fantasy402 Manager portal session cookie. [OBSERVED] The 2026-10-28 HAR carried no Authorization header and was cookie-based (operational_guardrails_runbook.md:153); the 2026-10-31 captures record an `authorization` key with a redacted value. [UNVERIFIED] Whether the current Manager session sends a bearer token — check an unredacted capture before relying on it. The cookie name is unrecorded, so 'session' is a placeholder label.",
     },
     daemonBearer: {
       type: "http",

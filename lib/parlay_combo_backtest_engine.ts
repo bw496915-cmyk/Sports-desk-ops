@@ -5,10 +5,10 @@
  *
  * Scope & Data Sources:
  *   1. Full Enriched Customer List (`enriched_customers_full.json`: 220 profiled accounts + 1,100 sampled tickets)
- *      — a **demo fixture**, not captured customer behavior. Its ticket `result`/`net_usd` fields disagree
- *      on 338/1,100 rows and its `hold_pct` never equals net/volume; the engine derives holds from the
- *      money fields and never trusts `hold_pct`. Audit with `bun run audit:customer-book`; repair with
- *      `bun run normalize:customer-book --write`.
+ *      — a **demo fixture**, not captured customer behavior. It was normalized (ticket `result`/`net_usd`
+ *      now agree; `hold_pct` equals net/volume), but 48 duplicate wager-number warnings remain. The
+ *      engine still derives holds from the money fields and never trusts `hold_pct`. Audit with
+ *      `bun run audit:customer-book`; repair with `bun run normalize:customer-book --write`.
  *   2. Master Downline & Open Book (`sportsdesk_downline_data.json`: 9,435 provisioned accounts / 2,236 active sports bettors; the 4-week ticket/handle totals are scenario constants (see `dataBasis`))
  *   3. Bridged Polymarket `0x` proxy wallets: 34 mapped rows -> 26 valid links -> 22 distinct valid addresses
  *      (10 placeholders quarantined); `wallet_customer_attributions` + off-tracker CTF combo tokens
@@ -1227,8 +1227,8 @@ export function runFourWeekParlayComboBacktest(
     );
     const cfbHandle = cfbTix * avgRisk;
     const nbaHandle = nbaTix * avgRisk;
-    // `hold_pct` in the bundled book does not equal net/volume (0/220 rows) and carries
-    // sentinel values like -100. Derive the hold from the money fields instead.
+    // The book was repaired, but `hold_pct` was historically unrelated to net/volume (and carried
+    // sentinels like -100). Keep deriving the hold from the money fields.
     const computedHoldPct =
       raw.lifetime_volume_usd > 0
         ? (raw.lifetime_net_usd / raw.lifetime_volume_usd) * 100

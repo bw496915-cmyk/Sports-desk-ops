@@ -95,9 +95,9 @@ https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&m
 
 **Declared type:** apiKey in `cookie` named `session`.
 
-Fantasy402 Manager portal session cookie. The 2026-10-28 capture carried no Authorization header and the session is cookie-based (operational_guardrails_runbook.md:153). The capture did not record the cookie name, so 'session' is a placeholder label, not a verified cookie name.
+Fantasy402 Manager portal session cookie. [OBSERVED] The 2026-10-28 HAR carried no Authorization header and was cookie-based (operational_guardrails_runbook.md:153); the 2026-10-31 captures record an `authorization` key with a redacted value. [UNVERIFIED] Whether the current Manager session sends a bearer token — check an unredacted capture before relying on it. The cookie name is unrecorded, so 'session' is a placeholder label.
 
-Observed: the 2026-10-28 Manager HAR session is cookie-based and sent no Authorization header (`operational_guardrails_runbook.md:153`). No login/`Set-Cookie` exchange was captured, so the cookie name, lifetime, renewal window and scope are **unverified**. Do not assume a JWT lifetime — the earlier “~20–25 minute” claim had no source and was removed.
+Observed: the 2026-10-28 Manager HAR session is cookie-based and sent no Authorization header (`operational_guardrails_runbook.md:153`). The 2026-10-31 captures record an `authorization` key with a **redacted** value, so whether the current session also sends a bearer token is **unverified — check this**. No login/`Set-Cookie` exchange was captured, so the cookie name, lifetime, renewal window and scope are **unverified**. Do not assume a JWT lifetime — the earlier “~20–25 minute” claim had no source and was removed.
 
 ### `daemonBearer`
 
@@ -544,7 +544,7 @@ UNVERIFIED — no capture exists. The path and method are candidate values infer
 
 ### `POST /cloud/api/Manager/getCustomerNotes`
 
-> **Evidence — tier C** · sources: `scripts/enhance_docs.mjs:130` · response not captured
+> **Evidence — tier C** · sources: `scripts/enhance_docs.mjs:130`, `docs/evidence/captures/2026-10-31/getCustomerNotes.post.json` · response not captured
 
 **Read customer notes**
 
@@ -559,7 +559,7 @@ UNVERIFIED — no capture exists. The path, method and any previously published 
 
 ### `POST /cloud/api/Manager/getInfoManager`
 
-> **Evidence — tier C** · sources: none — authored only · response not captured
+> **Evidence — tier C** · sources: `docs/evidence/captures/2026-10-31/getInfoManager.post.json` · response not captured
 
 **Manager dashboard header**
 
@@ -574,7 +574,7 @@ UNVERIFIED — no capture exists. The path, method and any previously published 
 
 ### `POST /cloud/api/Manager/getPending`
 
-> **Evidence — tier C** · sources: `simulate_bettor_churn_suite.ts:91-104`, `lib/fantasy402_wager_universe_scope.ts:13-21` · response not captured
+> **Evidence — tier C** · sources: `simulate_bettor_churn_suite.ts:91-104`, `lib/fantasy402_wager_universe_scope.ts:13-21` · response not captured · **contradicted by a concrete artifact**
 
 **Pending wager legs snapshot**
 
@@ -582,6 +582,7 @@ UNVERIFIED — no capture exists. The path, method and any previously published 
 
 - **Tag:** Inferred (Unverified) · **operationId:** `postCloudApiManagerGetPending`
 - **Required capture:** Capture the request (form vs JSON content type is disputed by the spec's own application/json choice) and a non-empty response; verify BLOCKED sentinel rows (L19.N0518) and zero-stake rows actually appear. Upgrades C->A.
+- **Contradiction:** A concrete artifact refutes a claim previously made for this operation; see docs/EVIDENCE.md for the evidence.
 
 **Responses**
 
@@ -956,8 +957,8 @@ These rows are **tier C**. They are authored in the spec/generators, declared fr
 | POST   | `/cloud/api/Manager/get3rdPartyLimits`    | Inferred only: crawler behaviour, not a wire observation; a hand-authored UI/DOM declaration.                            | Open the '3rd Party Limits' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                             |
 | POST   | `/cloud/api/Manager/getAgentTree`         | Inferred only: crawler behaviour, not a wire observation; a hand-authored UI/DOM declaration.                            | Open the 'Agent Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                                  |
 | POST   | `/cloud/api/Manager/getBilling`           | Inferred only: crawler behaviour, not a wire observation; a hand-authored UI/DOM declaration.                            | Open the 'Billing' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                                      |
-| POST   | `/cloud/api/Manager/getCustomerNotes`     | Inferred only: generator-authored; no artifact.                                                                          | Capture a customer notes read; confirm the notes row fields and whether notes are operator-annotations or wire-native. Upgrades C->A.                                                                                                                                                                                                                                           |
-| POST   | `/cloud/api/Manager/getInfoManager`       | No artifact exists; authored in the spec.                                                                                | Capture the dashboard header request/response; confirm the exact JSON keys (the spec uses hyphenated names like 'grand-total-weekly', which is unusual enough to need proof). Upgrades C->A.                                                                                                                                                                                    |
+| POST   | `/cloud/api/Manager/getCustomerNotes`     | Inferred only: generator-authored; live capture.                                                                         | Capture a customer notes read; confirm the notes row fields and whether notes are operator-annotations or wire-native. Upgrades C->A.                                                                                                                                                                                                                                           |
+| POST   | `/cloud/api/Manager/getInfoManager`       | Inferred only: live capture.                                                                                             | Capture the dashboard header request/response; confirm the exact JSON keys (the spec uses hyphenated names like 'grand-total-weekly', which is unusual enough to need proof). Upgrades C->A.                                                                                                                                                                                    |
 | POST   | `/cloud/api/Manager/getPending`           | Inferred only: implementation context only; a repo TypeScript type only.                                                 | Capture the request (form vs JSON content type is disputed by the spec's own application/json choice) and a non-empty response; verify BLOCKED sentinel rows (L19.N0518) and zero-stake rows actually appear. Upgrades C->A.                                                                                                                                                    |
 | POST   | `/cloud/api/Manager/getRules`             | Inferred only: crawler behaviour, not a wire observation; a hand-authored UI/DOM declaration.                            | Open the 'Settings &amp; Rules' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                         |
 | POST   | `/cloud/api/Manager/getScores`            | Inferred only: crawler behaviour, not a wire observation; a hand-authored UI/DOM declaration.                            | Open the 'Scores' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.                                                                       |
@@ -1002,13 +1003,13 @@ Tier legend: **A** captured request _and_ response · **B** observed request or 
 
 Counts below are ledger totals (all recorded rows, including rows removed from the final spec). The last two columns show the release split: ledger surfaces and operations present in the final spec.
 
-| Tier | Meaning                                                                                                                                                                         | Ledger surfaces | Spec operations |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------- |
-| A    | Captured wire contract: a real request AND a real response capture exist. Nothing in this release qualifies.                                                                    |                 | 5               |
-| B    | Observed first-party evidence: captured request side, observed request payload, or a route verified against its handler source. The response may still be uncaptured.           |                 | 4               |
-| C    | Inferred only: authored in the spec/generators, a repo TypeScript type, or a UI/DOM observation. No request or response was observed.                                           |                 | 28              |
-| D    | Real surface recovered from code or fixtures after being absent from the earlier spec. No captured response; recorded in `surfaces[]` and, for three rows, as a spec operation. | 7               | 3               |
-| E    | Documented operation with no implementation in this repository.                                                                                                                 | 1               | 0               |
+| Tier | Meaning                                                                                                                                                                                                             | Ledger surfaces | Spec operations |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------- |
+| A    | Captured wire contract: a real request AND a real response capture exist. Five operations qualify from the 2026-10-31 live session (getWebLog, getInfoPlayer, getBetTicker, getBetTickerConfig, getSportsVigSetup). |                 | 5               |
+| B    | Observed first-party evidence: captured request side, observed request payload, or a route verified against its handler source. The response may still be uncaptured.                                               |                 | 4               |
+| C    | Inferred only: authored in the spec/generators, a repo TypeScript type, or a UI/DOM observation. No request or response was observed.                                                                               |                 | 28              |
+| D    | Real surface recovered from code or fixtures after being absent from the earlier spec. No captured response; recorded in `surfaces[]` and, for three rows, as a spec operation.                                     | 7               | 3               |
+| E    | Documented operation with no implementation in this repository.                                                                                                                                                     | 1               | 0               |
 
 > The ledger distinguishes captured wire evidence from observation and inference: five Manager operations (`getWebLog`, `getInfoPlayer`, `getBetTicker`, `getBetTickerConfig`, `getSportsVigSetup`) have live request+response captures from 2026-10-31 and publish capture-derived response schemas; every other response schema is authored unless its row says otherwise. Earlier wire artifacts are the 2026-10-28 Manager HAR (mode-B request only) and the 2026-10-31 live run, whose three remaining requests (`getPending`, `getInfoManager`, `getCustomerNotes`) returned HTTP 500 with the current request template. Sub-sport lanes and period menus are desk-navigation catalog data, not yet captured live; live pregame sports parity is verified separately (19/19 sports, `getSportsType`). GS Buckeye 2 Partner 118 live acquisition is blocked by design — no endpoint, method, authentication mechanism or response contract for any GS report has been verified, and the observed `getBetReport` payload does not establish a transport. The 11 "Tracked Operational Domains" entries are UI/DOM declarations with candidate URLs and methods, not wire contracts, and the `/api/desk/*` routes are documented without any implementation. Treat any schema or behaviour not marked tier B as a proposal to be confirmed by capture, not as a contract.
 

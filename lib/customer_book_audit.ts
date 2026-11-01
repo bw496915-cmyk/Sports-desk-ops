@@ -2,10 +2,10 @@
  * @file lib/customer_book_audit.ts
  * @description Data-quality audit for the customer book (`enriched_customers_full.json`).
  *
- * The bundled book is a demo fixture. Its ticket `result` and `net_usd` fields disagree on
- * ~31% of rows, and `hold_pct` never equals `net/volume` (it carries sentinels like -100).
- * Consumers must not trust those fields; this audit makes the damage visible instead of
- * letting it leak into reports.
+ * The bundled book is a demo fixture. Before `normalize:customer-book`, its ticket `result` and
+ * `net_usd` fields disagreed on 338/1,100 rows and `hold_pct` matched `net/volume` on 0/220 rows
+ * (sentinels like -100). The current book is coherent; duplicate wager numbers remain as warnings.
+ * Run this audit before quoting channel or hold figures from the book.
  */
 
 export type CustomerBookIssueKind =

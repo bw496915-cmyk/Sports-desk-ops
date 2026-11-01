@@ -242,7 +242,7 @@ is §P3. Two rows with partial observation are tracked elsewhere: `updateByColum
 Ledger rows: the 11 `POST /cloud/api/...` operations tagged `Tracked Operational Domains` (all tier C,
 `candidate_url: true`, `ui_observed: true`). Their path+method come from hand-authored constants in
 `scripts/portal_tile_crawler.ts:40-162`; the crawler's CLI
-entry runs the offline-simulation branch (`portal_tile_crawler.ts:168`) and never records network traffic.
+entry runs the `offline` branch (`portal_tile_crawler.ts:670,680`) and never records network traffic.
 The former post-processor draft (`append_tracked_domains.mjs`) was removed: it mutated the generated
 spec and reference outside the ledger, duplicated this table, and failed the docs gate.
 The markdown table calls them "Target Wire Endpoint" (`docs/api-reference.md:693`), which is an overclaim.

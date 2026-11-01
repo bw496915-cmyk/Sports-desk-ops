@@ -38,12 +38,12 @@
     "fixture:": "Committed fixture under the worktree; a shape sample, not a wire capture."
   },
   "tierRules": {
-    "A": "Captured wire contract: a real request AND a real response capture exist. Nothing in this release qualifies (the only HAR captured requests and request headers, never response bodies).",
+    "A": "Captured wire contract: a real request AND a real response capture exist. Five operations qualify from the 2026-10-31 live session (getWebLog, getInfoPlayer, getBetTicker, getBetTickerConfig, getSportsVigSetup); see docs/evidence/captures/manifest.json. Earlier releases had none because the 2026-10-28 HAR captured only requests.",
     "B": "Observed first-party evidence. (i) captured wire request: getWebLog mode B and getInfoPlayer (2026-10-28 Manager HAR); (ii) observed request payload: GS getBetReport; or (iii) a route this repository serves, verified against its handler source (GET /health, GET /api/watchlist, POST /api/telegram/alert, POST /api/telegram/report). Response bodies may still be uncaptured.",
     "C": "Inferred only. Authored in docs/openapi.json or its generator scripts, or a repo TypeScript wire type, or a UI/DOM observation whose URL+method is a candidate. No request or response was observed.",
     "D": "A real surface missing from the spec. Recorded in surfaces[], never in operations[].",
     "E": "Documented operation with no implementation in this repository (/api/desk/*).",
-    "crawlerCandidatesRule": "B-vs-C rule for the 11 'Tracked Operational Domains' candidates (gameAdmin, getMessages, adjustBalance, createPlayer, get3rdPartyLimits, getAnalysis, getScores, getAgentTree, getBilling, getRules, getFinancialReport): a launcher tile alone is not enough for B. B requires a URL+method observed on the wire (or a handler that serves it). Those 11 rows take their path+method from hand-authored candidateEndpoint/candidateMethod constants in main:scripts/portal_tile_crawler.ts:40-162. The crawler CLI entry runs the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and its live branch only replaces extracted inputs/L-keys, never the URL/method; no audit JSON or screenshot proof exists in the main tree. They are therefore tier C with candidate_url=true and ui_observed=true, never B. getAnalysis and getFinancialReport also have independent UI action-name evidence (runbook:166-167), which improves the tile evidence but does not observe the URL."
+    "crawlerCandidatesRule": "B-vs-C rule for the 11 'Tracked Operational Domains' candidates (gameAdmin, getMessages, adjustBalance, createPlayer, get3rdPartyLimits, getAnalysis, getScores, getAgentTree, getBilling, getRules, getFinancialReport): a launcher tile alone is not enough for B. B requires a URL+method observed on the wire (or a handler that serves it). Those 11 rows take their path+method from hand-authored candidateEndpoint/candidateMethod constants in main:scripts/portal_tile_crawler.ts:40-162. The crawler CLI entry runs the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and its live branch only replaces extracted inputs/L-keys, never the URL/method; no audit JSON or screenshot proof exists in the main tree. They are therefore tier C with candidate_url=true and ui_observed=true, never B. getAnalysis and getFinancialReport also have independent UI action-name evidence (runbook:166-167), which improves the tile evidence but does not observe the URL."
   },
   "counts": {
     "A": 5,
@@ -208,7 +208,7 @@
           "note": "The one observed Manager session is cookie-based with no Authorization header, which is the opposite of the 'Bearer JWT minted here' model the spec assumes. No auth exchange was captured."
         },
         {
-          "source": "docs/openapi.json:65-139",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec claims a scoped Bearer JWT (~20-25 min lifetime) and an accountInfo object; neither is captured."
         }
@@ -231,7 +231,7 @@
           "note": "RawBetTickerTick declares wagerNumber, Login, TicketWriter, Risk, ToWin, Description, InsertDateTime, ShortDesc. A consumer type declaration, not a capture."
         },
         {
-          "source": "docs/openapi.json:141-238",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec adds the request envelope (agentID, agentOwner, wagerNumber watermark, operation, RRO), the INFO/LIST response envelope and a TickerRowRecord schema; none is captured."
         },
@@ -287,14 +287,14 @@
           "note": "getPending is modelled as a pending snapshot (wagerStatusOnWire 'P', no settled/canceled rows); no fetch client is implemented in this repo."
         },
         {
-          "source": "docs/openapi.json:309-375",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec claims a flat ~6,000+ leg array and a JSON request body {customerID, date}; neither is captured."
         }
       ],
       "requiredCapture": "Capture the request (form vs JSON content type is disputed by the spec's own application/json choice) and a non-empty response; verify BLOCKED sentinel rows (L19.N0518) and zero-stake rows actually appear. Upgrades C->A.",
-      "contradicted": false,
-      "contradictedReason": null
+      "contradicted": true,
+      "contradictedReason": "2026-10-31 capture request is application/x-www-form-urlencoded with an empty body; the spec declares application/json. The response was HTTP 500 with an empty body."
     },
     {
       "path": "/cloud/api/Manager/getWebLog",
@@ -325,9 +325,9 @@
           "note": "RawWebLogEntry declares exactly the four response fields the spec publishes (customerID, ipAddress, timestamp, agentOwner) and notes 'path' is omitted to avoid POISONED_PATH_500. A repo declaration, not a capture."
         },
         {
-          "source": "docs/openapi.json:377-399",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
-          "note": "Spec requires Authorization (BearerAuth), X-Requested-With, Accept and Referrer-Policy request headers, and publishes a 4-field array response at docs/openapi.json:493-519."
+          "note": "Spec requires Authorization (BearerAuth), X-Requested-With, Accept and Referrer-Policy request headers, and publishes a 4-field array response at docs/openapi.json."
         },
         {
           "source": "capture:2026-10-31:cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712",
@@ -341,7 +341,7 @@
       "resolution": {
         "resolvedBy": "capture:2026-10-31/getWebLog.post.json",
         "resolvedAt": "2026-10-31T00:23:00.817Z",
-        "previousReason": "Spec publishes a required Authorization Bearer header (docs/openapi.json:386 -> components/parameters/AuthBearer at docs/openapi.json:3091-3099) and a 4-field row schema (docs/openapi.json:493-519). operational_guardrails_runbook.md:153: 'The session is cookie-based (the capture has no Authorization header), and the response body was not captured, so the row schema is still undocumented.' Only the mode-B request is real."
+        "previousReason": "Spec publishes a required Authorization Bearer header (docs/openapi.json -> components/parameters/AuthBearer at docs/openapi.json) and a 4-field row schema (docs/openapi.json). operational_guardrails_runbook.md:153: 'The session is cookie-based (the capture has no Authorization header), and the response body was not captured, so the row schema is still undocumented.' Only the mode-B request is real."
       }
     },
     {
@@ -363,7 +363,7 @@
           "note": "No search request body appears in the 2026-10-28 HAR; the request fields (term/type/agentID) are inferred from the component."
         },
         {
-          "source": "docs/openapi.json:523-607",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec path /cloud/api/Manager/search and the result rows are authored; the URL was never observed on the wire."
         }
@@ -393,7 +393,7 @@
           "note": "PaddedCustomerId is declared as an 11-char space-padded brand for updateByColumn. Authored type, not an observation."
         },
         {
-          "source": "docs/openapi.json:609-754",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec publishes the full 9-field required form body, the 11-char padding rule, the direct-sub-agent scope rule, Result 1/0/-1 semantics and 400/500 outcomes; none is captured."
         }
@@ -426,7 +426,7 @@
           "note": "Response explicitly not captured ('Resolve the direct parent from ... getInfoPlayer's response (not captured yet)')."
         },
         {
-          "source": "docs/openapi.json:756-844",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec example sends the 11-char padded customerID 'CB112_1    ' and publishes a Result{CurrentBalance,PendingAmount,CreditLimit,confirmationDelaySeconds,wagerLimitRiskCents} response."
         },
@@ -442,7 +442,7 @@
       "resolution": {
         "resolvedBy": "capture:2026-10-31/getInfoPlayer.post.json",
         "resolvedAt": "2026-10-31T00:23:00.817Z",
-        "previousReason": "Example-level contradiction: the spec's getInfoPlayer request example is the 11-char padded 'CB112_1    ' (docs/openapi.json:765-772), while the observed request sent a 7-char trimmed customerID (operational_guardrails_runbook.md:213). The response schema is also unpublished by any capture (runbook:214)."
+        "previousReason": "Example-level contradiction: the spec's getInfoPlayer request example is the 11-char padded 'CB112_1    ' (docs/openapi.json), while the observed request sent a 7-char trimmed customerID (operational_guardrails_runbook.md:213). The response schema is also unpublished by any capture (runbook:214)."
       }
     },
     {
@@ -505,9 +505,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "none",
-          "kind": "none",
-          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+          "source": "docs/evidence/captures/2026-10-31/getInfoManager.post.json",
+          "kind": "live-capture",
+          "note": "Request captured 2026-10-31 (POST, form-urlencoded, field skeleton); upstream returned HTTP 500 with an empty body, so no response contract exists."
         },
         {
           "source": "docs/openapi.json",
@@ -533,7 +533,7 @@
           "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
         },
         {
-          "source": "docs/openapi.json:1202-1284",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec claims it is triggered by data-action='get-weekly-figure'; that string appears in no capture, test or code artifact in either tree."
         }
@@ -561,7 +561,7 @@
           "note": "No getAgentPerformance request is quoted from the HAR; the URL /cloud/api/Report/getAgentPerformance is inferred from the action name."
         },
         {
-          "source": "docs/openapi.json:1286-1375",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec asserts form-urlencoded {agentID, dataType:'C', period} and an array of {agentID, volume, netWon, holdPct}; holdPct/BranchGrade math is not captured."
         }
@@ -586,7 +586,7 @@
           "note": "Reporting action 'get-settled-figure' (Collections) is an observed stage 8 action."
         },
         {
-          "source": "docs/openapi.json:1377-1445",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Request {agentID, weekDate} and the 5-field settlement response are authored; no request or response was captured."
         }
@@ -611,7 +611,7 @@
           "note": "Reporting action 'delete-wager' (_Deleted Wagers_) is an observed stage 5 action for VOID_HEAVY_DISGUST and line-chase cancels."
         },
         {
-          "source": "docs/openapi.json:1447-1526",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Request {agentID, startDate, endDate} and the deleted-ticket rows are authored. Note the spec also publishes POST /cloud/api/Report/getDeletedWagerReport for the same audit log; the relationship between the two is unverified."
         }
@@ -636,7 +636,7 @@
           "note": "Handler returns JSON {status, port, hostname, url, timestamp, uptimeSeconds, runtime, nodeEnv}. This repo serves the route, so the handler is the contract; no HTTP capture exists (hence B, not A)."
         },
         {
-          "source": "docs/openapi.json:1528-1581",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec omits the 'url' and 'timestamp' fields the handler returns; response schema is a subset, not a contradiction."
         }
@@ -664,7 +664,7 @@
           "note": "adminRejection: requires Authorization: Bearer <SPORTSDESK_ADMIN_TOKEN> compared with crypto.timingSafeEqual; 503 when the env token is unset, 401 otherwise. Applied at sportsdesk_webview_server.ts:175-186."
         },
         {
-          "source": "docs/openapi.json:1583-1641",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec documents the 200 shape and the bearer requirement; no 401/503 responses are documented."
         }
@@ -687,7 +687,7 @@
           "note": "Body {customerId?}; defaults to RF2003; dispatches via telegramService.dispatchTestAlert and returns {success, ok, customerId}. Admin-token gated (sportsdesk_webview_server.ts:175-186)."
         },
         {
-          "source": "docs/openapi.json:1643-1692",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec request/response match the handler except it does not document the admin-token gate."
         }
@@ -715,7 +715,7 @@
           "note": "REPORT_TYPES = MORNING_BRIEFING, MIDDAY_STEAM, EVENING_SETTLEMENT."
         },
         {
-          "source": "docs/openapi.json:1694-1739",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec omits the required ?type= query parameter and the 'ok' response field."
         }
@@ -743,7 +743,7 @@
           "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
         },
         {
-          "source": "docs/openapi.json:1741",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Operation is published in the spec only; it predates the generator block and no handler implements it."
         }
@@ -771,7 +771,7 @@
           "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
         },
         {
-          "source": "docs/openapi.json:1741",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Operation is published in the spec only; it predates the generator block and no handler implements it."
         }
@@ -799,7 +799,7 @@
           "note": "The only other '/api/desk' hits in the main tree are the documentation tests themselves; repo-wide grep found no handler, no HMAC verifier and no CookieMap session code."
         },
         {
-          "source": "docs/openapi.json:1809",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Operation is published in the spec only; it predates the generator block and no handler implements it."
         }
@@ -847,14 +847,14 @@
           "note": "'Only Last Bets has an observed action (getBetReport); no transport URL, method, response shape, or auth mechanism has been established for any report.'"
         },
         {
-          "source": "docs/openapi.json:1881-1943",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec asserts POST /manager-tools/ajax.php with application/x-www-form-urlencoded body requiring 'operation' and 'betGroupId' (example '908412'), and a 4-property response {betGroupId, market, steamLagMs, pinnacleReferencePrice}."
         }
       ],
       "requiredCapture": "A redacted browser network capture of the Last Bets report submit: actual transport URL, HTTP method, content type, exact body (action vs operation, partnerIds tenant 118, calcTime semantics), response envelope/rows, auth/CSRF mechanism, pagination and totals. This is the single biggest upstream gap in the release.",
       "contradicted": true,
-      "contradictedReason": "Spec asserts POST /manager-tools/ajax.php + form-urlencoded + required 'operation'/'betGroupId' + a concrete 4-property response (docs/openapi.json:1881-1943). GS evidence forbids exactly that: zip:README.md:3 'no GS endpoint/authentication/response contract is verified'; zip:contracts/contract-map.md:14 'No endpoint URL, method, auth scheme, ... or upstream response schema is fabricated here'; zip:contracts/gs-manager.ts:29-30 'No response capture exists: assigning invented response properties is prohibited'; zip:templates/endpoint-registry.json:281-288 url/method/contentType/responseSchema/authentication all null. The observed payload uses key 'action' (not 'operation'), leaves betGroupId empty (not '908412'), and has 20 fields."
+      "contradictedReason": "Spec asserts POST /manager-tools/ajax.php + form-urlencoded + required 'operation'/'betGroupId' + a concrete 4-property response (docs/openapi.json). GS evidence forbids exactly that: zip:README.md:3 'no GS endpoint/authentication/response contract is verified'; zip:contracts/contract-map.md:14 'No endpoint URL, method, auth scheme, ... or upstream response schema is fabricated here'; zip:contracts/gs-manager.ts:29-30 'No response capture exists: assigning invented response properties is prohibited'; zip:templates/endpoint-registry.json:281-288 url/method/contentType/responseSchema/authentication all null. The observed payload uses key 'action' (not 'operation'), leaves betGroupId empty (not '908412'), and has 20 fields."
     },
     {
       "path": "/cloud/api/System/verifySession",
@@ -921,9 +921,9 @@
           "note": "Operation + schemas were registered by the docs generator script; that is authorship, not wire evidence."
         },
         {
-          "source": "none",
-          "kind": "none",
-          "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
+          "source": "docs/evidence/captures/2026-10-31/getCustomerNotes.post.json",
+          "kind": "live-capture",
+          "note": "Request captured 2026-10-31 (POST, form-urlencoded, field skeleton); upstream returned HTTP 500 with an empty body, so no response contract exists."
         }
       ],
       "requiredCapture": "Capture a customer notes read; confirm the notes row fields and whether notes are operator-annotations or wire-native. Upgrades C->A.",
@@ -1229,10 +1229,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:2688",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Game Admin', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
@@ -1259,10 +1259,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:2727",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Messaging', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
@@ -1289,10 +1289,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:2763",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Cashier', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
@@ -1319,10 +1319,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:2800",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Add Customer', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         },
@@ -1354,10 +1354,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:2838",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile '3rd Party Limits', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
@@ -1384,10 +1384,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:2873",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Analysis', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         },
@@ -1419,10 +1419,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:2909",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Scores', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
@@ -1449,10 +1449,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:2946",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Agent Admin', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
@@ -1479,10 +1479,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:2981",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Billing', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
@@ -1509,10 +1509,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:3016",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Settings & Rules', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
@@ -1539,10 +1539,10 @@
         {
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
-          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
+          "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "docs/openapi.json:3051",
+          "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Transactions History', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         },

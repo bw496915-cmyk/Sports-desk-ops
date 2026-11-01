@@ -20,8 +20,9 @@ it.** Everything else is labelled as observed, inferred or unimplemented — in 
 | **D** | A real surface missing from the spec. Recorded in `surfaces[]`, never in `operations[]`.                                                                                           | 7 surfaces |
 | **E** | Documented operation with no implementation in this repository.                                                                                                                    | 10         |
 
-**Operations:** 48 rows = 47 paths (the spec has 47 paths / 48 operations because
-`/api/desk/auth/session` carries both `POST` and `DELETE`). A 5 + B 5 + C 28 + D 0 + E 10 = 48.
+**Operations:** the ledger has 48 rows = 47 paths (`/api/desk/auth/session` carries both `POST` and
+`DELETE`): A 5 + B 5 + C 28 + D 0 + E 10 = 48. The published spec has **40 paths / 40 operations**: the 10
+tier-E rows and the blocked `/manager-tools/ajax.php` row are intentionally excluded.
 **Surfaces:** 8 rows (D 7, E 1). Surface counts are kept separate from operation counts.
 
 **Tier A is populated by the 2026-10-31 live capture session.** An authenticated headless run
@@ -37,8 +38,8 @@ sports list is separately probed (`getSportsType`, 19/19 sports identical to the
 **B-vs-C rule for the 11 "Tracked Operational Domains" candidates.** A launcher tile is not enough for B.
 B requires a URL+method observed on the wire (or a handler that serves it). The 11 candidates take their
 path+method from hand-authored `candidateEndpoint`/`candidateMethod` constants
-(`scripts/portal_tile_crawler.ts:40-162`); the crawler CLI entry runs its offline-simulation branch
-(`portal_tile_crawler.ts:168`) and its live branch only replaces extracted inputs/L-keys, never the URL or
+(`scripts/portal_tile_crawler.ts:40-162`); the crawler CLI entry runs its `offline` branch
+(`portal_tile_crawler.ts:670,680`) and its live branch only replaces extracted inputs/L-keys, never the URL or
 method; no audit JSON or screenshot proof exists in the tree. They are therefore **C with
 `candidate_url: true`**, not B. `getAnalysis` and `getFinancialReport` also have independent UI action-name
 evidence (`runbook:166-167`), but the URL is still unobserved.
@@ -191,16 +192,17 @@ Full inventory with evidence: [evidence/surfaces.md](./evidence/surfaces.md).
 
 ## Spec integrity notes for the generator
 
-1. **Dangling security scheme.** 24 operations declare `security: [{ "BearerAuth": [] }]` and many reference
-   `#/components/parameters/AuthBearer`, but `components.securitySchemes` is absent from
-   `docs/openapi.json`. OpenAPI 3.1 needs the scheme declared, and `runbook:153` suggests the real Manager
-   auth is a cookie. Resolve with the P3 capture before publishing a Bearer scheme.
+1. **Security schemes are declared, but auth is still `[UNVERIFIED]`.** The spec uses
+   `fantasy402Cookie` (session cookie) and `daemonBearer` (local daemon); no operation references a
+   `BearerAuth` scheme. The 2026-10-28 HAR carried no `Authorization` header, while the 2026-10-31 captures
+   record an `authorization` key with a redacted value. Presence of the key is `[OBSERVED]`; whether the
+   Manager session sends a bearer token is `[UNVERIFIED]` — check a capture with an unredacted header before
+   publishing that claim.
 2. **The 11 `Tracked Operational Domains` rows publish no `requestBody`.** Their `x-extracted-inputs` are DOM
    form-field names, not wire parameters. Do not render them as request schemas.
-3. **Markdown overclaims to fix.** `docs/api-reference.md:693` labels the candidate paths "Target Wire
-   Endpoint"; `:691` says the tiles are "now continuously crawled and tracked" and calls them "the 10
-   previously unmapped launcher tiles" while the table has 11 rows. The crawler defaults to offline
-   simulation and no crawl artifacts exist.
+3. **The removed post-processor is not evidence.** The old `append_tracked_domains.mjs` table called the
+   candidates "Target Wire Endpoint"; it was removed. The crawler defaults to its `offline` branch and no
+   crawl artifacts exist, so the rows stay tier C.
 4. **`getWebLog` title.** The spec calls it "Observed HAR Capture v1.0.279"; the observed part is the
    request, not the response.
 

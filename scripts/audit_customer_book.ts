@@ -6,7 +6,7 @@
  * Usage:
  *   bun run scripts/audit_customer_book.ts [--book <path>] [--json] [--max 20]
  *
- * Exit: 0 clean, 1 issues found, 2 book missing/unreadable.
+ * Exit: 0 clean or warnings only, 1 errors found, 2 book missing/unreadable.
  */
 
 import {

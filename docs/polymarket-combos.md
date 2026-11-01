@@ -10,11 +10,11 @@ Operator and engineering notes for CFB combo work. Public APIs only; no key.
 | Combo positions           | `GET data-api.polymarket.com/v2/positions/combos?user=<0x>`                                                              | Live 2026-10-31: `{data, pagination}`, nested `legs[].market`                                    |
 | Combo activity            | `GET data-api.polymarket.com/v2/activity/combos?user=<0x>`                                                               | Live 2026-10-31: `{data, pagination}`                                                            |
 | Wallet seed (trades)      | `GET data-api.polymarket.com/trades?market=<conditionId>&limit=100`                                                      | Live 2026-10-31: array with `proxyWallet`                                                        |
-| Wallet seed (leaderboard) | `GET data-api.polymarket.com/v2/leaderboard?time_period=week                                                             | month                                                                                            | all&sort_by=PNL&limit=100` | Live 2026-10-31: `{data:[{user_id,...}], pagination}` |
+| Wallet seed (leaderboard) | `GET data-api.polymarket.com/v2/leaderboard?time_period=week \| month \| all&sort_by=PNL&limit=100`                      | Live 2026-10-31: `{data:[{user_id,...}], pagination}`                                            |
 
 `lb-api.polymarket.com` is **retired** (HTTP 410, `[OBSERVED]` 2026-10-31). Do not use it.
 
-No global CFB combo feed was exposed by the endpoints probed on 2026-10-31. Treat that as
+`[OBSERVED]` 2026-10-31: no global CFB combo feed was exposed by the endpoints probed. Treat that as
 `[UNVERIFIED]` for any endpoint added later: discovery is user-anchored — seed wallets, then query
 their combo endpoints.
 
@@ -151,14 +151,14 @@ CLI flags win over environment, which wins over defaults.
 `diagnostics.combosWithoutAttribution` counts combos that touched **zero** indexed games.
 
 The first version of this report indexed only `active=true&closed=false` and took a top-100 slice.
-That was a **resolver-scope bug**, not a long tail. Classifying the systemic keys through CLOB
+That was a **resolver-scope bug**, not a long tail. `[OBSERVED]` Classifying the systemic keys through CLOB
 (`/markets/{conditionId}` — Gamma's `condition_ids`/`condition_id` filters do not filter) showed 7
 of the top 13 were real CFB/NBA markets that had simply **closed**.
 
 The index now:
 
 - includes closed games by default (a settled combo is still a unique combo event),
-- paginates the whole `series_id=12756` (1,719 events) instead of a top-100 slice,
+- paginates the whole `series_id=12756` (`[OBSERVED]` 1,719 events) instead of a top-100 slice,
 - supports `--open-only` and `--since YYYY-MM-DD`.
 
 Effect on the same 322-wallet set:
@@ -197,7 +197,7 @@ Trades seeding is ~6.8× more efficient per wallet and ~4.2× higher touch rate.
 path is a supplement, not the primary discovery route: it costs ~2.5× the wallet fetches for ~27% of
 the CFB combos. Use `--seed-trades --no-leaderboard` when API budget matters.
 
-### Live result (2026-10-31)
+### `[OBSERVED]` Live result (2026-10-31)
 
 With 322 seeded wallets, whole-series index, 3 combo pages per wallet:
 
@@ -235,25 +235,26 @@ warning plus exit 0, so a structurally-zero gate does not fail unattended runs.
 
 Method:
 
-- cost = `SPLIT` / `TRADE` / `BUY` `amount_usdc`; payout = `REDEEM` `payout_usdc` plus
-  `MERGE` / `SELL` `amount_usdc`.
+- `[CODE]` grouping: cost = `SPLIT` / `TRADE` / `BUY` `amount_usdc`; payout = `REDEEM`
+  `payout_usdc` plus `MERGE` / `SELL` `amount_usdc`. The field semantics are `[UNVERIFIED]`.
 - Combos are grouped by `combo_condition_id|wallet`; open combos are reported separately and are
   **excluded** from realized cost/payout/PnL.
 - Win rate = settled combos with `pnl > 0`. Market-maker / split-arbitrage combos can settle at
-  roughly zero, so a very low win rate with a small positive ROI is expected.
+  roughly zero (`[UNVERIFIED]` explanation), so a very low win rate with a small positive ROI is
+  expected.
 - Cross-game share is only defined when the CFB game index is loaded (default); `--all-venues`
   reports it as `null`.
 - Per-day and per-game tables; `--json` returns every trade.
 
-First live run (single wallet, 7 days, all venues):
+`[OBSERVED]` First live run (single wallet, 7 days, all venues):
 
 ```
 1,424 combos (743 settled / 681 open) | cost $387,213.54 | payout $390,417.06
 PnL +$3,203.52 | ROI 0.8% | win 0.4% | avg legs 3.42
 ```
 
-Pricing calibration is a separate pass: `clob.polymarket.com/prices-history?market=<token>&startTs=&endTs=&fidelity=`
-is live-verified and can compare the product-of-legs fair price at the combo entry timestamp with the
+Pricing calibration is a separate pass: `[OBSERVED]` `clob.polymarket.com/prices-history?market=<token>&startTs=&endTs=&fidelity=`
+was verified live and can compare the product-of-legs fair price at the combo entry timestamp with the
 actual entry price. That requires mapping each leg to its CLOB token id; it is not part of the
 realized-PnL backtest yet.
 

@@ -103,14 +103,15 @@ probability-weighted forecast.
 
 ## 4. Fee-aware PnL (why the official number is not the answer)
 
-`lb-api.polymarket.com` is **retired** (HTTP 410). The profiler now reads
+`lb-api.polymarket.com` is **retired** (HTTP 410, `[OBSERVED]` 2026-10-31). The profiler now reads
 `data-api.polymarket.com/v2/leaderboard?user=<0x>&time_period=all|month|week`:
 
-- `all` → lifetime, `month` → 30d, `week` → 7d
-- omitting `time_period` behaves like `day`; it is never used
+- `[OBSERVED]` 2026-10-31: `all` → lifetime, `month` → 30d, `week` → 7d
+- `[OBSERVED]` omitting `time_period` behaves like `day`; it is never used
 
 A third-party toolkit reports that Polymarket's own PnL is **pre-fee** (`[UNVERIFIED]` here — we
-have not confirmed it against a fee-bearing capture). `auditActivityPnl` replays the activity log:
+have not confirmed it against a fee-bearing capture). `auditActivityPnl` replays the activity log (`[CODE]` for the arithmetic; the inflow/outflow
+mapping of activity `type` values is `[UNVERIFIED]` external semantics):
 
 ```
 cashflowPnl = (SELL + REDEEM + MERGE + REBATE) − (BUY + SPLIT) + open position value
@@ -122,11 +123,11 @@ Two honesty rules:
 
 - If pagination was truncated (`pages >= maxActivityPages`), `cashflowPnl` is **null**, not a
   partial number that looks authoritative. The reason string says `ACTIVITY_TRUNCATED`.
-- `feeResidual` is a **lower bound** on taker fees. Zero means maker _or_ fee-exempt, never
-  "no fees".
+- `feeResidual` is a **lower bound** on taker fees (`[UNVERIFIED]`: it assumes `usdcSize` is
+  fee-inclusive on TRADE rows). Zero means maker _or_ fee-exempt, never "no fees".
 
-Active wallets commonly exceed the activity cap (one bridge wallet has 13k+ TRADE rows across 40
-pages and still truncates), so GROSS is the normal basis for whales. That is disclosed in the
+`[OBSERVED]` Active wallets commonly exceed the activity cap (one bridge wallet had 13k+ TRADE rows
+across 40 pages and still truncated), so GROSS is the normal basis for whales. That is disclosed in the
 output rather than silently substituted.
 
 ## 5. Leg-level matching
@@ -167,7 +168,7 @@ breaking side matching and `evaluateBetterVenue` for all underdog spreads.
 
 The tier is printed at the top of `value` output so a fixture run is never mistaken for live data.
 
-## 7. First live run (2026-10-31)
+## 7. `[OBSERVED]` First live run (2026-10-31)
 
 ```bash
 ./bin/dx bridge value --live --concurrency 6
@@ -216,11 +217,11 @@ Reading it honestly:
 
 - Attribution is the bottleneck. 19 of 220 sampled customers are linked; 201 book rows have no
   wallet. Better attribution raises coverage more than any model does.
-- The customer book is a 220-row fixture, not the full 9,435-account downline.
-- The book is **internally inconsistent**: 338/1,100 tickets have `result` contradicting the sign of
-  `net_usd`, `hold_pct` matches `net/volume` on 0/220 rows (sentinels like `-100`), and 48 wager
-  numbers repeat across customers. Run `bun run scripts/audit_customer_book.ts` before quoting any
-  channel or hold figure; treat those as fixture properties, not customer behavior.
+- The customer book is a 220-row fixture, not the full 9,435-account downline (`[OBSERVED]` from `sportsdesk_downline_data.json`).
+- The book **was** internally inconsistent (`[CODE]`): 338/1,100 tickets had `result` contradicting
+  the sign of `net_usd` and `hold_pct` matched `net/volume` on 0/220 rows. `bun run normalize:customer-book
+--write` repaired both; the current audit reports 0 errors and 48 duplicate-wager warnings (44 distinct
+  numbers). Re-run `bun run audit:customer-book` before quoting channel or hold figures.
 - Shared wallets collapse two customers onto one wallet's PnL; resolve before per-customer use.
 - `POLY_ONLY_UP` is observational. Only leg-level matching on the same market, with time
   alignment, can distinguish a hedge from two independent views.
