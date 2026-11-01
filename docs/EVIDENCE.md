@@ -20,8 +20,8 @@ it.** Everything else is labelled as observed, inferred or unimplemented — in 
 | **D** | A real surface missing from the spec. Recorded in `surfaces[]`, never in `operations[]`.                                                                                           | 7 surfaces |
 | **E** | Documented operation with no implementation in this repository.                                                                                                                    | 10         |
 
-**Operations:** the ledger has 48 rows = 47 paths (`/api/desk/auth/session` carries both `POST` and
-`DELETE`): A 5 + B 5 + C 28 + D 0 + E 10 = 48. The published spec has **40 paths / 40 operations**: the 10
+**Operations:** the ledger has 55 rows = 54 paths (`/api/desk/auth/session` carries both `POST` and
+`DELETE`): A 5 + B 5 + C 35 + D 0 + E 10 = 55. The published spec has **47 paths / 47 operations**: the 10
 tier-E rows and the blocked `/manager-tools/ajax.php` row are intentionally excluded.
 **Surfaces:** 8 rows (D 7, E 1). Surface counts are kept separate from operation counts.
 

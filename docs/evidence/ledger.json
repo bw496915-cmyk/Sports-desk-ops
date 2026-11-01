@@ -7,7 +7,7 @@
     "purpose": "Single source of truth for what is verified, observed or merely inferred across the SportsDesk/Fantasy402 docs release. P2 (spec generator) and P3 (markdown generator) must consume this instead of re-asserting contracts.",
     "shape": "{\"schemaVersion\":1,\"generated\":\"YYYY-MM-DD\",\"counts\":{\"A\":n,\"B\":n,\"C\":n,\"D\":n,\"E\":n,\"total\":n},\"operations\":[row...],\"surfaces\":[row...]}",
     "operationFields": {
-      "path": "Exact path string from docs/openapi.json (47 paths, 48 operations).",
+      "path": "Exact path string as published in docs/openapi.json.",
       "method": "Lowercase HTTP method as in the spec.",
       "operationId": "Spec operationId, or null where the spec omits it.",
       "tag": "First spec tag.",
@@ -48,10 +48,10 @@
   "counts": {
     "A": 5,
     "B": 5,
-    "C": 28,
+    "C": 35,
     "D": 0,
     "E": 10,
-    "total": 48
+    "total": 55
   },
   "surfaceCounts": {
     "D": 7,
@@ -745,7 +745,7 @@
         {
           "source": "docs/openapi.json",
           "kind": "spec-claim",
-          "note": "Operation is published in the spec only; it predates the generator block and no handler implements it."
+          "note": "Documented-not-implemented (tier E): it is not published in the spec, and no handler implements it."
         }
       ],
       "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
@@ -773,7 +773,7 @@
         {
           "source": "docs/openapi.json",
           "kind": "spec-claim",
-          "note": "Operation is published in the spec only; it predates the generator block and no handler implements it."
+          "note": "Documented-not-implemented (tier E): it is not published in the spec, and no handler implements it."
         }
       ],
       "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
@@ -801,7 +801,7 @@
         {
           "source": "docs/openapi.json",
           "kind": "spec-claim",
-          "note": "Operation is published in the spec only; it predates the generator block and no handler implements it."
+          "note": "Documented-not-implemented (tier E): it is not published in the spec, and no handler implements it."
         }
       ],
       "requiredCapture": "Cannot be captured into existence: implement the route in sportsdesk_webview_server.ts (session cookie, HMAC DESK-* verification, queue store), then capture request+response. E->A only after implementation. Until then remove it from the published contract or mark it unimplemented.",
@@ -1557,6 +1557,132 @@
       "contradictedReason": null,
       "candidate_url": true,
       "ui_observed": true
+    },
+    {
+      "path": "/cloud/api/Report/Pending",
+      "method": "post",
+      "operationId": "reportPending",
+      "tag": "Reporting & Forensics",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:lib/combo_identity.ts:24-40",
+          "kind": "repo-type",
+          "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture one /cloud/api/Report/Pending call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Report/PendingDelete",
+      "method": "post",
+      "operationId": "reportPendingDelete",
+      "tag": "Reporting & Forensics",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:lib/combo_identity.ts:24-40",
+          "kind": "repo-type",
+          "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture one /cloud/api/Report/PendingDelete call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Report/getDailyFiguresByCustomer",
+      "method": "post",
+      "operationId": "reportDailyFiguresByCustomer",
+      "tag": "Reporting & Forensics",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:lib/combo_identity.ts:24-40",
+          "kind": "repo-type",
+          "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture one /cloud/api/Report/getDailyFiguresByCustomer call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Report/getGradedWagerByCustomer",
+      "method": "post",
+      "operationId": "reportGradedWagerByCustomer",
+      "tag": "Reporting & Forensics",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:lib/combo_identity.ts:24-40",
+          "kind": "repo-type",
+          "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture one /cloud/api/Report/getGradedWagerByCustomer call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Report/getTransactions",
+      "method": "post",
+      "operationId": "reportTransactions",
+      "tag": "Reporting & Forensics",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:lib/combo_identity.ts:24-40",
+          "kind": "repo-type",
+          "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture one /cloud/api/Report/getTransactions call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Report/getGrading",
+      "method": "post",
+      "operationId": "reportGrading",
+      "tag": "Reporting & Forensics",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:lib/combo_identity.ts:24-40",
+          "kind": "repo-type",
+          "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture one /cloud/api/Report/getGrading call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
+    },
+    {
+      "path": "/cloud/api/Report/getTicketDetailPrint",
+      "method": "post",
+      "operationId": "reportTicketDetailPrint",
+      "tag": "Reporting & Forensics",
+      "tier": "C",
+      "capturedResponse": false,
+      "evidence": [
+        {
+          "source": "main:lib/combo_identity.ts:24-40",
+          "kind": "repo-type",
+          "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        }
+      ],
+      "requiredCapture": "Capture one /cloud/api/Report/getTicketDetailPrint call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "contradicted": false,
+      "contradictedReason": null
     }
   ],
   "surfaces": [

@@ -1824,6 +1824,139 @@
         "x-data-language-keys": ["L-1031", "L-1033", "L-1058"]
       }
     },
+    "/cloud/api/Report/Pending": {
+      "post": {
+        "tags": ["Inferred (Unverified)"],
+        "summary": "POST /cloud/api/Report/Pending",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: main:lib/combo_identity.ts:24-40 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportPending",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+          }
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one /cloud/api/Report/Pending call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+        }
+      }
+    },
+    "/cloud/api/Report/PendingDelete": {
+      "post": {
+        "tags": ["Inferred (Unverified)"],
+        "summary": "POST /cloud/api/Report/PendingDelete",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: main:lib/combo_identity.ts:24-40 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportPendingDelete",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+          }
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one /cloud/api/Report/PendingDelete call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+        }
+      }
+    },
+    "/cloud/api/Report/getDailyFiguresByCustomer": {
+      "post": {
+        "tags": ["Inferred (Unverified)"],
+        "summary": "POST /cloud/api/Report/getDailyFiguresByCustomer",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: main:lib/combo_identity.ts:24-40 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetDailyFiguresByCustomer",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+          }
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one /cloud/api/Report/getDailyFiguresByCustomer call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+        }
+      }
+    },
+    "/cloud/api/Report/getGradedWagerByCustomer": {
+      "post": {
+        "tags": ["Inferred (Unverified)"],
+        "summary": "POST /cloud/api/Report/getGradedWagerByCustomer",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: main:lib/combo_identity.ts:24-40 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetGradedWagerByCustomer",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+          }
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one /cloud/api/Report/getGradedWagerByCustomer call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+        }
+      }
+    },
+    "/cloud/api/Report/getTransactions": {
+      "post": {
+        "tags": ["Inferred (Unverified)"],
+        "summary": "POST /cloud/api/Report/getTransactions",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: main:lib/combo_identity.ts:24-40 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetTransactions",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+          }
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one /cloud/api/Report/getTransactions call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+        }
+      }
+    },
+    "/cloud/api/Report/getGrading": {
+      "post": {
+        "tags": ["Inferred (Unverified)"],
+        "summary": "POST /cloud/api/Report/getGrading",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: main:lib/combo_identity.ts:24-40 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetGrading",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+          }
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one /cloud/api/Report/getGrading call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+        }
+      }
+    },
+    "/cloud/api/Report/getTicketDetailPrint": {
+      "post": {
+        "tags": ["Inferred (Unverified)"],
+        "summary": "POST /cloud/api/Report/getTicketDetailPrint",
+        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: main:lib/combo_identity.ts:24-40 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
+        "operationId": "postCloudApiReportGetTicketDetailPrint",
+        "responses": {
+          "default": {
+            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+          }
+        },
+        "x-evidence": {
+          "tier": "C",
+          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "capturedResponse": false,
+          "requiredCapture": "Capture one /cloud/api/Report/getTicketDetailPrint call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+        }
+      }
+    },
     "/cloud/api/Manager/getHistory": {
       "post": {
         "tags": ["Settlement History"],
