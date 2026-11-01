@@ -2,6 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ANALYSIS_REPORTS } from "../lib/analysis_filters.ts";
+import {
+  findSubSport,
+  loadSportCatalog,
+  periodsFor,
+} from "../lib/sport_catalog.ts";
 
 /**
  * Two live manager requests an operator pasted on 2026-11-01, recorded as *request* shapes only.
@@ -27,9 +32,29 @@ const fixture = JSON.parse(
     pathObserved: string | null;
     pathStatus: string;
     contentType: string;
+    caller?: {
+      module: string;
+      function: string;
+      transport: string;
+      observedFrom: string;
+    };
     fields: Record<string, string>;
+    filteredFields?: Record<string, string>;
   }>;
 };
+
+const catalog = loadSportCatalog(
+  JSON.parse(
+    readFileSync(
+      resolve(
+        import.meta.dir,
+        "fixtures/fantasy402-sport-catalog-2026-10-21.json",
+      ),
+      "utf8",
+    ),
+  ),
+);
+if (catalog === null) throw new Error("sport catalog fixture did not load");
 
 const byOperation = (name: string) => {
   const request = fixture.requests.find((entry) => entry.operation === name);
@@ -141,5 +166,98 @@ describe("observed manager requests (2026-11-01)", () => {
         "application/x-www-form-urlencoded",
       );
     }
+  });
+});
+
+describe("the filtered CP request", () => {
+  const request = byOperation("getAgentPerformance");
+  const base = request.fields;
+  const filtered = request.filteredFields;
+
+  const variant = (): Record<string, string> => {
+    if (filtered === undefined)
+      throw new Error("fixture has no filtered variant");
+    return filtered;
+  };
+
+  test("only the four filter fields differ from the unfiltered call", () => {
+    const changed = Object.keys(base).filter(
+      (key) => base[key] !== variant()[key],
+    );
+    expect(changed.sort()).toEqual(
+      ["betType", "period", "subsport", "wagerType"].sort(),
+    );
+    expect(Object.keys(variant())).toEqual(Object.keys(base));
+  });
+
+  test("subsport=NFL is a real sub-sport code under Football", () => {
+    // The wire sends the code, not a number; the captured catalog is the authority on which codes
+    // exist, and NFL is one of Football's 28.
+    const sub = findSubSport(catalog, "Football", variant().subsport ?? "");
+    expect(sub).not.toBeNull();
+    expect(sub?.code).toBe("NFL");
+  });
+
+  test("period=1 means 1st Half under Football, not 'first period' generically", () => {
+    const periods = periodsFor(catalog, "Football");
+    const period = periods.find(
+      (entry) => String(entry.number) === variant().period,
+    );
+    expect(period?.name).toBe("1st Half");
+  });
+
+  test("wagerType and betType stay raw codes", () => {
+    // M and S are carried as sent. The repo has no documented meaning for M, so nothing here may
+    // translate them into "Moneyline" and "Straight".
+    expect(variant().wagerType).toBe("M");
+    expect(variant().betType).toBe("S");
+  });
+
+  test("the form encoding round-trips to the pasted body", () => {
+    // The portal sends spaces as "+", escaped slashes and an empty-string field; building the body
+    // from the recorded fields must reproduce it byte for byte, or a replay is a different request.
+    // The pasted body carried the agent login where the fixture carries its placeholder, so the
+    // identity is substituted on both sides and everything else must match exactly.
+    const placeholder = encodeURIComponent(fixture.agentPlaceholder);
+    const observed = (
+      "start=10%2F21%2F2026&end=11%2F01%2F2026&agentID=<agent>&type=CP&freePlay=Y" +
+      "&store=<agent>&sport=Football++++++++++++&subsport=NFL&period=1" +
+      "&wagerType=M&betType=S&tipo=0&debug=0&operation=getAgentPerformance" +
+      "&RRO=1&agentOwner=<agent>"
+    ).replaceAll("<agent>", placeholder);
+
+    const encoded = new URLSearchParams(
+      Object.entries(variant()) as [string, string][],
+    ).toString();
+
+    expect(encoded).toBe(observed);
+  });
+});
+
+describe("who calls getSubSportByReport", () => {
+  test("the caller module and function are recorded", () => {
+    // A browser stack trace names the caller: send -> ajax -> getSubsport -> agent-performance.js.
+    // That matters because it places the sub-sport call on the same screen as the CP report.
+    const caller = byOperation("getSubSportByReport").caller;
+    expect(caller).toBeDefined();
+    expect(caller?.module).toContain("agent-performance.js");
+    expect(caller?.module).toContain("1.0.280");
+    expect(caller?.function).toBe("getSubsport");
+  });
+
+  test("the transport is jQuery ajax, which explains the form encoding", () => {
+    // $.ajax defaults to application/x-www-form-urlencoded with X-Requested-With, matching the
+    // headers observed on the request itself.
+    const caller = byOperation("getSubSportByReport").caller;
+    expect(caller?.transport).toContain("jQuery");
+    expect(byOperation("getSubSportByReport").contentType).toStartWith(
+      "application/x-www-form-urlencoded",
+    );
+  });
+
+  test("the trace is attributed, not asserted as a capture", () => {
+    const caller = byOperation("getSubSportByReport").caller;
+    expect(caller?.observedFrom).toContain("2026-11-01");
+    expect(caller?.observedFrom).toContain("stack trace");
   });
 });

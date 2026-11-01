@@ -568,7 +568,7 @@
         {
           "source": "tests/fixtures/f402-report-requests-observed-2026-11-01.json",
           "kind": "wire-observation",
-          "note": "2026-11-01: an operator paste carried a getAgentPerformance request body — start, end (M/D/YYYY), agentID, type=CP, freePlay=Y, store, sport (padded to 20 chars), subsport, period=-1, wagerType, betType, tipo=0, debug=0, operation, RRO=1, agentOwner. The paste lost the URL, so the Report/ prefix is still the inferred part, and no response was observed."
+          "note": "2026-11-01: an operator paste carried a getAgentPerformance request body — start, end (M/D/YYYY), agentID, type=CP, freePlay=Y, store, sport (padded to 20 chars), subsport, period=-1, wagerType, betType, tipo=0, debug=0, operation, RRO=1, agentOwner. A second paste of the same operation fills the sport filter row: subsport=NFL, period=1, wagerType=M, betType=S, with those four fields the only difference; the URL is still absent and no response was observed. Both variants encode to the same form body byte for byte (pinned by tests/f402_observed_requests.test.ts). A browser stack trace from the same session shows the sub-sport fetch on app/manager/module/agent-performance.js?bust=1.0.280 via getSubsport() and jQuery ajax, which places both requests on the agent-performance screen."
         },
         {
           "source": "docs/openapi.json",

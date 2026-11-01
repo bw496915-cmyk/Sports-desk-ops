@@ -14,6 +14,12 @@
         "x-requested-with: XMLHttpRequest",
         "origin: https://fantasy402.com"
       ],
+      "caller": {
+        "module": "app/manager/module/agent-performance.js?bust=1.0.280",
+        "function": "getSubsport",
+        "transport": "jQuery $.ajax",
+        "observedFrom": "browser stack trace, 2026-11-01 — send -> ajax -> getSubsport -> agent-performance.js"
+      },
       "fields": {
         "customerID": "<agent>",
         "sport": "Football            ",
@@ -45,7 +51,26 @@
         "operation": "getAgentPerformance",
         "RRO": "1",
         "agentOwner": "<agent>"
-      }
+      },
+      "filteredFields": {
+        "start": "10/21/2026",
+        "end": "11/01/2026",
+        "agentID": "<agent>",
+        "type": "CP",
+        "freePlay": "Y",
+        "store": "<agent>",
+        "sport": "Football            ",
+        "subsport": "NFL",
+        "period": "1",
+        "wagerType": "M",
+        "betType": "S",
+        "tipo": "0",
+        "debug": "0",
+        "operation": "getAgentPerformance",
+        "RRO": "1",
+        "agentOwner": "<agent>"
+      },
+      "filteredFieldsNote": "second observation, same operation, with the sport filter row filled: subsport=NFL, period=1, wagerType=M, betType=S. Only those four fields differ."
     }
   ]
 }

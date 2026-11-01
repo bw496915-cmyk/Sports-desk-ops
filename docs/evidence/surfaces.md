@@ -253,6 +253,18 @@ Asset names are validated (separators, control characters, `..`) and traversal i
   copy and a `discrepancies` array.
 - One result is transcribed: Customer Performance, Baseball, agent BILLY666, 2026-11-01 — 8 rows
   (one a flagged duplicate), net $26,994.99, hold −58.33%.
+- **The wire filter names are not the dropdown names.** An observed `getAgentPerformance` body
+  (`tests/fixtures/f402-report-requests-observed-2026-11-01.json`) carries
+  `sport`/`subsport`/`period`/`wagerType`/`betType` plus `start`/`end` and `type=CP`; this API's
+  parameters are `report`/`activity`/`group`/`week`/`agent`. A future live adapter therefore has to
+  translate, and `week` is not the same field as the wire's `period` (nor the same as `-1` meaning
+  "today" in the week list versus "all periods" in the observed body).
+- The observed values also check out against the captured catalog: `subsport=NFL` is one of
+  Football's 28 sub-sport codes, and `period=1` under Football is `1st Half` — not "first period".
+- A browser stack trace from the same session places the sub-sport fetch on
+  `app/manager/module/agent-performance.js?bust=1.0.280` (`getSubsport()` → jQuery `$.ajax`). The
+  module name is the strongest evidence yet that the CP grid is the `getAgentPerformance` screen, but
+  it is a trace of the _sub-sport_ call, not of the report call, so the report's URL stays unproven.
 
 ## D-15. `surface.daemon-agent-search`
 
