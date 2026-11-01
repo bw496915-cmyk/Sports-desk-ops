@@ -191,6 +191,12 @@ or rewritten as "blocked, capture required". See [evidence/capture-requests.md](
 | `surface.daemon-scoreboard`            | D    | `GET /api/scoreboard`; 22 transcribed games with scores/status, no API capture                                |
 | `surface.daemon-sports-taxonomy`       | D    | `GET /api/sports`; 18 portal categories with counts; All Sports and LIVE are not categories                   |
 | `surface.daemon-game-admin`            | D    | `GET /api/game-admin`; exposure per fixture split Straight/Parlay/Teaser (manual F.A.Q. #4)                   |
+| `surface.daemon-analysis`              | D    | `GET /api/analysis` (+ `/filters`, `/reports`); one transcribed CP result, 501 otherwise                      |
+| `surface.daemon-agent-search`          | D    | `GET /api/agents/search`; tree-backed agent suggestions for the Analysis form                                 |
+| `surface.daemon-game-admin-board`      | D    | `GET /api/game-admin/board`; per-side exposure, abbreviations kept approximate                                |
+| `surface.daemon-sport-catalog`         | D    | `GET /api/sports/catalog`; 19 sports / 230 sub-sports / 42 period entries with sport-specific types           |
+| `surface.daemon-contests`              | D    | `GET /api/contests`; 227 futures extracted from the sports nav markup                                         |
+| `surface.daemon-live-wagers`           | D    | `GET /api/live-wagers`; `{LIST: [...]}` ticker feed with parsed ShortDesc legs                                |
 | `surface.daemon-graph-data-plane`      | D    | Graph feed, two companion JSON files and `docs/assets/*` that the generated graph page fetches                |
 | `surface.gs-manager-cli`               | D    | 6 report kinds + 9 `jobs` subcommands + CLI orchestration, all `blocked_contract`                             |
 | `surface.desk-api-unimplemented`       | E    | 9 paths / 10 operations under `/api/desk/*` with no handler anywhere                                          |

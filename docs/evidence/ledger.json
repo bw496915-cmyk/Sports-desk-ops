@@ -54,9 +54,9 @@
     "total": 55
   },
   "surfaceCounts": {
-    "D": 13,
+    "D": 19,
     "E": 1,
-    "total": 14
+    "total": 20
   },
   "countsByTag": {
     "Upstream Authentication": {
@@ -2100,6 +2100,112 @@
         }
       ],
       "requiredCapture": "Not a capture gap: these are static files the graph page already ships. A capture would only restate their bytes."
+    },
+    {
+      "id": "surface.daemon-analysis",
+      "name": "Analysis report (GET /api/analysis, /api/analysis/filters, /api/analysis/reports)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "The portal's Analysis report vocabulary and any transcribed result. The filter vocabulary is transcribed from report.js; a result is served only for the selection it was recorded under, and everything else answers 501 rather than zeroes.",
+      "members": [
+        "GET /api/analysis",
+        "GET /api/analysis/filters",
+        "GET /api/analysis/reports"
+      ],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:878-1000",
+          "kind": "implementation",
+          "note": "parseAnalysisQuery validates the codes; matchesSelection gates the stored report; the 200 payload carries totals plus a recomputed copy and a discrepancies array."
+        }
+      ],
+      "requiredCapture": "One POST /cloud/api/Report/getAnalysis per report kind and filter set. Today one Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste."
+    },
+    {
+      "id": "surface.daemon-agent-search",
+      "name": "Agent lookup for the Analysis form (GET /api/agents/search)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "Case-insensitive prefix-first search over the committed agent tree; used to offer agent suggestions instead of a free-text field that silently accepts typos. Loopback-gated like the tree itself, because agent names are identity data.",
+      "members": ["GET /api/agents/search"],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:1041-1100",
+          "kind": "implementation",
+          "note": "Requires q of at least two characters, clamps limit to 1..100, reads data/agent-tree.json, and returns key/level/agentType per hit."
+        }
+      ],
+      "requiredCapture": "Not a capture gap: the tree is committed. A capture would not change the contract."
+    },
+    {
+      "id": "surface.daemon-game-admin-board",
+      "name": "Game Admin board with per-side exposure (GET /api/game-admin/board)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "The Admin module of the portal's Game Admin report: each game's spread, moneyline, total and team-total lines with the money on each side. Amounts the portal abbreviates (120k) stay approximate and are excluded from every sum.",
+      "members": ["GET /api/game-admin/board"],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:737-800",
+          "kind": "implementation",
+          "note": "data/game-admin-board.json holds four transcribed games; filterByWindow applies the portal's 48/24/-1 window and biggestSide skips approximate figures."
+        }
+      ],
+      "requiredCapture": "A Game Admin API capture would replace the transcription; none exists, so the file carries source and observedAt."
+    },
+    {
+      "id": "surface.daemon-sport-catalog",
+      "name": "Sport catalog: sub-sports and period menus (GET /api/sports/catalog)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "19 sports, 230 sub-sports and 42 period entries with the portal's own codes. Period numbers are sport-specific (1 is '1st Half' in Football, '1st Period' in Hockey, '1st 5 Innings' in Baseball), so the type index reports every name a number carries and flags the ambiguous ones.",
+      "members": ["GET /api/sports/catalog"],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:806-877",
+          "kind": "implementation",
+          "note": "Reads tests/fixtures/fantasy402-sport-catalog-2026-10-21.json; ?sport and ?subSport resolve an exact market, and unknown values 404 with the known list."
+        }
+      ],
+      "requiredCapture": "Not a capture gap: the catalog fixture is the captured artifact (capturedAt 2026-10-21, periods 2026-10-30)."
+    },
+    {
+      "id": "surface.daemon-contests",
+      "name": "Contest / futures list (GET /api/contests)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "Every contest the sports nav links (data-action=get-games-prop), keyed by the portal's numeric contestNum with sport/market/subject parsed out of the padded type string.",
+      "members": ["GET /api/contests"],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:702-736",
+          "kind": "implementation",
+          "note": "data/contests.json is produced by scripts/extract_contests.ts from saved nav markup; ?group and ?q filter the list."
+        }
+      ],
+      "requiredCapture": "A contest API capture would replace the markup extraction; none exists."
+    },
+    {
+      "id": "surface.daemon-live-wagers",
+      "name": "Live wager ticker list (GET /api/live-wagers)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "The {LIST: [...]} bet-ticker feed, which is a different shape from Report/Pending: WagerNumber is the ticket id, ShortDesc carries one line per leg, and VolumeAmount can differ from AmountWagered. Both grammars of ShortDesc are parsed; the compact one is flagged.",
+      "members": ["GET /api/live-wagers"],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:658-701",
+          "kind": "implementation",
+          "note": "lib/live_wagers.ts parses legs, classifies TicketWriter (GSLIVE/GSBUILDER/Internet/ALERT), flags volume mismatches, and gates on piiRejection."
+        }
+      ],
+      "requiredCapture": "A full ticker capture. data/live-wagers.json currently holds 17 rows salvaged from a partial clipboard paste, and says so."
     }
   ]
 }

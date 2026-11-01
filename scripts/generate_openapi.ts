@@ -1829,6 +1829,182 @@ function surfaceOperationSpecs(
         ),
       },
     },
+    {
+      path: "/api/analysis",
+      httpMethod: "GET",
+      surfaceId: "surface.daemon-analysis",
+      tag: TAG_DAEMON,
+      summary: "Analysis report, or the reason it is not captured",
+      description:
+        "Validates the portal's filter vocabulary (sportsdesk_webview_server.ts:878-1000) and answers 200 only when a transcribed report matches the selection; otherwise 501 with the required capture. A 200 carries the rows, the published totals, a recomputed copy and a discrepancies array, so a transcription slip is visible rather than served as fact. Surface: surface.daemon-analysis (tier D).",
+      requiredCapture:
+        "One POST /cloud/api/Report/getAnalysis per report kind and filter set. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste.",
+      responses: {
+        "200": jsonSurfaceResponse("A transcribed analysis report.", {
+          success: { type: "boolean" },
+          available: { type: "boolean" },
+          rows: { type: "array", items: { type: "object" } },
+          totals: { type: "object" },
+          recomputed: { type: "object" },
+          discrepancies: { type: "array", items: { type: "object" } },
+        }),
+        "501": jsonSurfaceResponse(
+          "No transcribed report matches this selection.",
+          { success: { type: "boolean" }, requiredCapture: { type: "string" } },
+        ),
+      },
+    },
+    {
+      path: "/api/analysis/filters",
+      httpMethod: "GET",
+      surfaceId: "surface.daemon-analysis",
+      tag: TAG_DAEMON,
+      summary: "Analysis filter vocabulary transcribed from report.js",
+      description:
+        "Returns the report kinds (CP/CPS/CPV/G), the fourteen activity codes, the two group modes and the four week windows, with their provenance and the required capture (sportsdesk_webview_server.ts:878-894). Surface: surface.daemon-analysis (tier D).",
+      requiredCapture:
+        "HTTP capture of GET /api/analysis/filters (handler-verified only).",
+      responses: {
+        "200": jsonSurfaceResponse("Filter vocabulary with provenance.", {
+          success: { type: "boolean" },
+          captured: { type: "boolean" },
+          reports: { type: "array", items: { type: "object" } },
+          activities: { type: "array", items: { type: "object" } },
+          groups: { type: "array", items: { type: "object" } },
+          weeks: { type: "array", items: { type: "object" } },
+        }),
+      },
+    },
+    {
+      path: "/api/analysis/reports",
+      httpMethod: "GET",
+      surfaceId: "surface.daemon-analysis",
+      tag: TAG_DAEMON,
+      summary: "Transcribed analysis reports and their recorded context",
+      description:
+        "Lists each stored result with the selection it was run under, so a client can select one instead of reconstructing the filters (sportsdesk_webview_server.ts:629-657). Surface: surface.daemon-analysis (tier D).",
+      requiredCapture:
+        "HTTP capture of GET /api/analysis/reports (handler-verified only).",
+      responses: {
+        "200": jsonSurfaceResponse("Stored reports with context.", {
+          success: { type: "boolean" },
+          count: { type: "integer" },
+          reports: { type: "array", items: { type: "object" } },
+        }),
+      },
+    },
+    {
+      path: "/api/agents/search",
+      httpMethod: "GET",
+      surfaceId: "surface.daemon-agent-search",
+      tag: TAG_DAEMON,
+      summary: "Agent lookup over the committed hierarchy",
+      description:
+        "Case-insensitive prefix-first search over data/agent-tree.json (sportsdesk_webview_server.ts:1041-1100). Requires q of at least two characters and clamps limit to 100. Loopback-gated, because agent names are identity data. Surface: surface.daemon-agent-search (tier D).",
+      requiredCapture:
+        "Not a capture gap: the tree is committed and the handler is the contract.",
+      responses: {
+        "200": jsonSurfaceResponse("Matching agents with their level.", {
+          success: { type: "boolean" },
+          query: { type: "string" },
+          count: { type: "integer" },
+          agents: { type: "array", items: { type: "object" } },
+        }),
+        "400": jsonSurfaceResponse("Query shorter than two characters.", {
+          error: { type: "string" },
+        }),
+      },
+    },
+    {
+      path: "/api/game-admin/board",
+      httpMethod: "GET",
+      surfaceId: "surface.daemon-game-admin-board",
+      tag: TAG_DAEMON,
+      summary: "Game Admin board: lines with the money on each side",
+      description:
+        "Serves the transcribed Admin module: spread, moneyline, total and team-total sides with exposure (sportsdesk_webview_server.ts:737-800). Supports the portal's window selector (48 yesterday, 24 today, -1 current board). Abbreviated amounts carry amountExact null and are excluded from sums. Surface: surface.daemon-game-admin-board (tier D).",
+      requiredCapture:
+        "A Game Admin API capture would replace the transcription; none exists, so source and observedAt travel with the payload.",
+      responses: {
+        "200": jsonSurfaceResponse(
+          "Board games, their sides and the window summary.",
+          {
+            success: { type: "boolean" },
+            window: { type: "string" },
+            games: { type: "array", items: { type: "object" } },
+            summary: { type: "object" },
+          },
+        ),
+        "400": jsonSurfaceResponse("Unknown window code.", {
+          error: { type: "string" },
+        }),
+      },
+    },
+    {
+      path: "/api/sports/catalog",
+      httpMethod: "GET",
+      surfaceId: "surface.daemon-sport-catalog",
+      tag: TAG_DAEMON,
+      summary: "Sub-sports and period menus with their types",
+      description:
+        "19 sports, 230 sub-sports and 42 period entries from the committed catalog fixture (sportsdesk_webview_server.ts:806-877). Period numbers are sport-specific, so periodTypes reports every name a number carries and flags the ambiguous ones; sub-sport codes shared by several sports are marked. Surface: surface.daemon-sport-catalog (tier D).",
+      requiredCapture:
+        "Not a capture gap: the catalog fixture is the captured artifact.",
+      responses: {
+        "200": jsonSurfaceResponse("Catalog with derived indexes.", {
+          summary: { type: "object" },
+          periodTypes: { type: "array", items: { type: "object" } },
+          subSports: { type: "array", items: { type: "object" } },
+          sports: { type: "array", items: { type: "object" } },
+        }),
+        "404": jsonSurfaceResponse("Unknown sport or sub-sport.", {
+          error: { type: "string" },
+        }),
+      },
+    },
+    {
+      path: "/api/contests",
+      httpMethod: "GET",
+      surfaceId: "surface.daemon-contests",
+      tag: TAG_DAEMON,
+      summary: "Contest / futures list from the sports nav",
+      description:
+        "Every contest the nav links, keyed by contestNum with sport, market and subject parsed out of the padded type string (sportsdesk_webview_server.ts:702-736). The list is extracted from saved markup by scripts/extract_contests.ts. Surface: surface.daemon-contests (tier D).",
+      requiredCapture:
+        "A contest API capture would replace the markup extraction; none exists.",
+      responses: {
+        "200": jsonSurfaceResponse("Contests with their group counts.", {
+          success: { type: "boolean" },
+          count: { type: "integer" },
+          entries: { type: "array", items: { type: "object" } },
+        }),
+        "404": jsonSurfaceResponse("No contest list extracted.", {
+          error: { type: "string" },
+        }),
+      },
+    },
+    {
+      path: "/api/live-wagers",
+      httpMethod: "GET",
+      surfaceId: "surface.daemon-live-wagers",
+      tag: TAG_DAEMON,
+      summary: "Live wager ticker list with parsed legs",
+      description:
+        "The {LIST: [...]} bet-ticker feed, which differs from Report/Pending: WagerNumber is the ticket id and ShortDesc carries one line per leg (sportsdesk_webview_server.ts:658-701). Both ShortDesc grammars are parsed and the compact one is flagged; VolumeAmount differing from AmountWagered is reported, not reconciled. Loopback-gated. Surface: surface.daemon-live-wagers (tier D).",
+      requiredCapture:
+        "A full ticker capture. data/live-wagers.json currently holds 17 rows salvaged from a partial clipboard paste and says so.",
+      responses: {
+        "200": jsonSurfaceResponse("Wagers with aggregates.", {
+          success: { type: "boolean" },
+          summary: { type: "object" },
+          all: { type: "object" },
+          wagers: { type: "array", items: { type: "object" } },
+        }),
+        "404": jsonSurfaceResponse("No live wager capture.", {
+          error: { type: "string" },
+        }),
+      },
+    },
   ];
 }
 

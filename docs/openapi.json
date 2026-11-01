@@ -2895,6 +2895,629 @@
         },
         "x-surface-id": "surface.daemon-game-admin"
       }
+    },
+    "/api/analysis": {
+      "get": {
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Analysis report, or the reason it is not captured",
+        "description": "Validates the portal's filter vocabulary (sportsdesk_webview_server.ts:878-1000) and answers 200 only when a transcribed report matches the selection; otherwise 501 with the required capture. A 200 carries the rows, the published totals, a recomputed copy and a discrepancies array, so a transcription slip is visible rather than served as fact. Surface: surface.daemon-analysis (tier D).",
+        "operationId": "getApiAnalysis",
+        "responses": {
+          "200": {
+            "description": "A transcribed analysis report.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "totals": {
+                      "type": "object"
+                    },
+                    "recomputed": {
+                      "type": "object"
+                    },
+                    "discrepancies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "No transcribed report matches this selection.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "requiredCapture": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": ["services/sportsdesk_webview_server.ts:878-1000"],
+          "capturedResponse": false,
+          "requiredCapture": "One POST /cloud/api/Report/getAnalysis per report kind and filter set. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste."
+        },
+        "x-surface-id": "surface.daemon-analysis"
+      }
+    },
+    "/api/analysis/filters": {
+      "get": {
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Analysis filter vocabulary transcribed from report.js",
+        "description": "Returns the report kinds (CP/CPS/CPV/G), the fourteen activity codes, the two group modes and the four week windows, with their provenance and the required capture (sportsdesk_webview_server.ts:878-894). Surface: surface.daemon-analysis (tier D).",
+        "operationId": "getApiAnalysisFilters",
+        "responses": {
+          "200": {
+            "description": "Filter vocabulary with provenance.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "captured": {
+                      "type": "boolean"
+                    },
+                    "reports": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "activities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "weeks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": ["services/sportsdesk_webview_server.ts:878-1000"],
+          "capturedResponse": false,
+          "requiredCapture": "HTTP capture of GET /api/analysis/filters (handler-verified only)."
+        },
+        "x-surface-id": "surface.daemon-analysis"
+      }
+    },
+    "/api/analysis/reports": {
+      "get": {
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Transcribed analysis reports and their recorded context",
+        "description": "Lists each stored result with the selection it was run under, so a client can select one instead of reconstructing the filters (sportsdesk_webview_server.ts:629-657). Surface: surface.daemon-analysis (tier D).",
+        "operationId": "getApiAnalysisReports",
+        "responses": {
+          "200": {
+            "description": "Stored reports with context.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "reports": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": ["services/sportsdesk_webview_server.ts:878-1000"],
+          "capturedResponse": false,
+          "requiredCapture": "HTTP capture of GET /api/analysis/reports (handler-verified only)."
+        },
+        "x-surface-id": "surface.daemon-analysis"
+      }
+    },
+    "/api/agents/search": {
+      "get": {
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Agent lookup over the committed hierarchy",
+        "description": "Case-insensitive prefix-first search over data/agent-tree.json (sportsdesk_webview_server.ts:1041-1100). Requires q of at least two characters and clamps limit to 100. Loopback-gated, because agent names are identity data. Surface: surface.daemon-agent-search (tier D).",
+        "operationId": "getApiAgentsSearch",
+        "responses": {
+          "200": {
+            "description": "Matching agents with their level.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "query": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "agents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Query shorter than two characters.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": ["services/sportsdesk_webview_server.ts:1041-1100"],
+          "capturedResponse": false,
+          "requiredCapture": "Not a capture gap: the tree is committed and the handler is the contract."
+        },
+        "x-surface-id": "surface.daemon-agent-search"
+      }
+    },
+    "/api/game-admin/board": {
+      "get": {
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Game Admin board: lines with the money on each side",
+        "description": "Serves the transcribed Admin module: spread, moneyline, total and team-total sides with exposure (sportsdesk_webview_server.ts:737-800). Supports the portal's window selector (48 yesterday, 24 today, -1 current board). Abbreviated amounts carry amountExact null and are excluded from sums. Surface: surface.daemon-game-admin-board (tier D).",
+        "operationId": "getApiGameAdminBoard",
+        "responses": {
+          "200": {
+            "description": "Board games, their sides and the window summary.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "window": {
+                      "type": "string"
+                    },
+                    "games": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "summary": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown window code.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": ["services/sportsdesk_webview_server.ts:737-800"],
+          "capturedResponse": false,
+          "requiredCapture": "A Game Admin API capture would replace the transcription; none exists, so source and observedAt travel with the payload."
+        },
+        "x-surface-id": "surface.daemon-game-admin-board"
+      }
+    },
+    "/api/sports/catalog": {
+      "get": {
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Sub-sports and period menus with their types",
+        "description": "19 sports, 230 sub-sports and 42 period entries from the committed catalog fixture (sportsdesk_webview_server.ts:806-877). Period numbers are sport-specific, so periodTypes reports every name a number carries and flags the ambiguous ones; sub-sport codes shared by several sports are marked. Surface: surface.daemon-sport-catalog (tier D).",
+        "operationId": "getApiSportsCatalog",
+        "responses": {
+          "200": {
+            "description": "Catalog with derived indexes.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "object"
+                    },
+                    "periodTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "subSports": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "sports": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown sport or sub-sport.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": ["services/sportsdesk_webview_server.ts:806-877"],
+          "capturedResponse": false,
+          "requiredCapture": "Not a capture gap: the catalog fixture is the captured artifact."
+        },
+        "x-surface-id": "surface.daemon-sport-catalog"
+      }
+    },
+    "/api/contests": {
+      "get": {
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Contest / futures list from the sports nav",
+        "description": "Every contest the nav links, keyed by contestNum with sport, market and subject parsed out of the padded type string (sportsdesk_webview_server.ts:702-736). The list is extracted from saved markup by scripts/extract_contests.ts. Surface: surface.daemon-contests (tier D).",
+        "operationId": "getApiContests",
+        "responses": {
+          "200": {
+            "description": "Contests with their group counts.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No contest list extracted.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": ["services/sportsdesk_webview_server.ts:702-736"],
+          "capturedResponse": false,
+          "requiredCapture": "A contest API capture would replace the markup extraction; none exists."
+        },
+        "x-surface-id": "surface.daemon-contests"
+      }
+    },
+    "/api/live-wagers": {
+      "get": {
+        "tags": ["Local Desk & Telegram Gateway"],
+        "summary": "Live wager ticker list with parsed legs",
+        "description": "The {LIST: [...]} bet-ticker feed, which differs from Report/Pending: WagerNumber is the ticket id and ShortDesc carries one line per leg (sportsdesk_webview_server.ts:658-701). Both ShortDesc grammars are parsed and the compact one is flagged; VolumeAmount differing from AmountWagered is reported, not reconciled. Loopback-gated. Surface: surface.daemon-live-wagers (tier D).",
+        "operationId": "getApiLiveWagers",
+        "responses": {
+          "200": {
+            "description": "Wagers with aggregates.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "summary": {
+                      "type": "object"
+                    },
+                    "all": {
+                      "type": "object"
+                    },
+                    "wagers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live wager capture.",
+            "headers": {
+              "Content-Security-Policy": {
+                "$ref": "#/components/headers/CSPHeader"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/XContentTypeOptionsHeader"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicyHeader"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-evidence": {
+          "tier": "D",
+          "sources": ["services/sportsdesk_webview_server.ts:658-701"],
+          "capturedResponse": false,
+          "requiredCapture": "A full ticker capture. data/live-wagers.json currently holds 17 rows salvaged from a partial clipboard paste and says so."
+        },
+        "x-surface-id": "surface.daemon-live-wagers"
+      }
     }
   },
   "x-sportsdesk-gslive": {

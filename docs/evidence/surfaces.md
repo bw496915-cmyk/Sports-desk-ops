@@ -242,13 +242,66 @@ The generated graph page fetches its data relative to the document, so serving o
 
 Asset names are validated (separators, control characters, `..`) and traversal is rejected.
 
+## D-14. `surface.daemon-analysis`
+
+- `GET /api/analysis/filters` returns the report kinds (CP/CPS/CPV/G), 14 activity codes, 2 group
+  modes and 4 week windows, with provenance (`sportsdesk_webview_server.ts:878-894`).
+- `GET /api/analysis/reports` lists transcribed results with the selection each was run under
+  (`sportsdesk_webview_server.ts:629-657`).
+- `GET /api/analysis` answers **200** only when a stored report matches the selection, and **501**
+  with the required capture otherwise. A 200 carries the rows, the published totals, a recomputed
+  copy and a `discrepancies` array.
+- One result is transcribed: Customer Performance, Baseball, agent BILLY666, 2026-11-01 — 8 rows
+  (one a flagged duplicate), net $26,994.99, hold −58.33%.
+
+## D-15. `surface.daemon-agent-search`
+
+- `GET /api/agents/search?q=` searches `data/agent-tree.json`, prefix hits first
+  (`sportsdesk_webview_server.ts:1041-1100`).
+- Requires two characters, clamps `limit` to 1–100, and is loopback-gated because agent names are
+  identity data.
+
+## D-16. `surface.daemon-game-admin-board`
+
+- `GET /api/game-admin/board` serves the Admin module — spread, moneyline, total and team totals
+  with the money on each side (`sportsdesk_webview_server.ts:737-800`).
+- Window values are the portal's: `48` yesterday, `24` today, `-1` current board. A single-day
+  board answers Yesterday with no games rather than repeating today.
+- Abbreviated amounts (`120k`) carry `amountExact: null` and are excluded from every sum.
+
+## D-17. `surface.daemon-sport-catalog`
+
+- `GET /api/sports/catalog` exposes 19 sports, 230 sub-sports and 42 period entries from
+  `tests/fixtures/fantasy402-sport-catalog-2026-10-21.json`
+  (`sportsdesk_webview_server.ts:806-877`).
+- Period numbers are sport-specific; `periodTypes` reports every name a number carries and flags the
+  ambiguous ones. Sub-sport codes claimed by two sports are marked.
+
+## D-18. `surface.daemon-contests`
+
+- `GET /api/contests` serves 227 futures extracted from the sports nav by
+  `scripts/extract_contests.ts` (`sportsdesk_webview_server.ts:702-736`).
+- Rows are keyed by the portal's numeric `contestNum`; sport, market and subject are parsed from the
+  padded type string. `?group` and `?q` filter server-side.
+
+## D-19. `surface.daemon-live-wagers`
+
+- `GET /api/live-wagers` serves the `{LIST: [...]}` ticker feed
+  (`sportsdesk_webview_server.ts:658-701`), which is **not** the Pending shape: `WagerNumber` is the
+  ticket id and `ShortDesc` carries one line per leg.
+- Both `ShortDesc` grammars are parsed; a leg with no `/ Period / Market / Pick` segments is flagged
+  `compact` and its sport is matched against the known sport names.
+- `VolumeAmount` differing from `AmountWagered` is reported (`volumeDiffers`), not reconciled.
+- `data/live-wagers.json` holds 17 rows salvaged from a partial clipboard paste and records that
+  provenance in `captureNote`.
+
 ---
 
 ## Summary
 
 | Tier                               | Count                               | Ids                                                                                                                                                                                                                                                                                                                                                                                                            |
 | ---------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D — real surface missing from spec | 13                                  | `surface.fantasy402-sport-catalog`, `surface.manager-getHistory`, `surface.manager-getGrading`, `surface.daemon-dashboard`, `surface.daemon-miniapp`, `surface.daemon-telegram-admin-routes`, `surface.gs-manager-cli`, `surface.daemon-live-bets`, `surface.daemon-agent-tree`, `surface.daemon-scoreboard`, `surface.daemon-sports-taxonomy`, `surface.daemon-game-admin`, `surface.daemon-graph-data-plane` |
+| D — real surface missing from spec | 19                                  | `surface.fantasy402-sport-catalog`, `surface.manager-getHistory`, `surface.manager-getGrading`, `surface.daemon-dashboard`, `surface.daemon-miniapp`, `surface.daemon-telegram-admin-routes`, `surface.gs-manager-cli`, `surface.daemon-live-bets`, `surface.daemon-agent-tree`, `surface.daemon-scoreboard`, `surface.daemon-sports-taxonomy`, `surface.daemon-game-admin`, `surface.daemon-graph-data-plane` |
 | E — documented, not implemented    | 1 surface (9 paths / 10 operations) | `surface.desk-api-unimplemented`                                                                                                                                                                                                                                                                                                                                                                               |
 
 The D rows should be added to the docs (or explicitly scoped out with a one-line rationale). The E surface
