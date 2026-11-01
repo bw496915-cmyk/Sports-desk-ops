@@ -1,5 +1,6 @@
 /**
- * Replay transport: primary = WebView dataStore + FetchSession; secondary = localhost proxy.
+ * Replay transport: primary = FetchSession + session-file cookie; secondary = localhost proxy.
+ * `profileDir` is not read: Bun.FetchSession has no dataStore, so WebView profile cookies never reach it.
  * @deprecated F402_COOKIE — use profile or session file from WebView login.
  */
 
@@ -65,10 +66,8 @@ export async function createF402ReplayTransport(options?: {
     };
   }
 
-  const profileDir = options?.profileDir ?? resolveF402WebViewProfileDir(env);
   const session = new Bun.FetchSession({
     tls: { rejectUnauthorized: true },
-    dataStore: { directory: profileDir },
   });
 
   const cached = readF402Session();
