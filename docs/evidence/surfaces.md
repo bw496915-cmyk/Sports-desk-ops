@@ -301,11 +301,32 @@ Asset names are validated (separators, control characters, `..`) and traversal i
   Description, Amount; 9,387 rows), while the Analysis grid renders seven aggregate columns per
   agent. The workbook itself is not committed: every row carries a login and a ticket number.
 - **Two header actions sit beside the filters**: `show-config` (Configuration, L-1027) and
-  `show-vip` (Vip List, L-1028). Neither is a report search — they open panels. Which endpoints they
-  call is _not_ observed, so nothing here claims one: `show-config` plausibly reaches the web-report
-  config (`getConfigWebReports`, present in the pinned bundle) and `show-vip` plausibly the VIP
-  account list behind `authorizations.NotifyVipBets`, which `updateBasicSettings` assigns from the
-  Wager Alerts flag. Both are inferences and are labelled as such.
+  `show-vip` (Vip List, L-1028). Neither is a report search — they open panels. `show-config` still
+  has no observed call; it plausibly reaches the web-report config (`getConfigWebReports`, present in
+  the pinned bundle), which is an inference and labelled one.
+- **`show-vip`'s save is observed, and it is a write — three requests, two encodings.** The portal
+  sends `POST /cloud/api/Manager/vipListInsert` (JSON, `{"list":[{"agentID":…,"player":…}]}` — a list
+  array even for one entry), then `POST /cloud/api/Log/writeDetail` (form-encoded, the same list as
+  urlencoded JSON in `data`, `ticket=0`, `info` = `" [SITE : fantasy402.com v1.0.280] "`), then
+  `POST /cloud/api/Log/write` (JSON, `description` = `"Save Action / Vip List [ v1.0.280 |
+fantasy402.com ]"`). A client that assumes one content type for the portal's writes breaks on the
+  middle call. The sequence is pinned in `tests/f402_observed_requests.test.ts`, including a
+  byte-for-byte rebuild of the `writeDetail` body from two independent pastes (encoded and decoded).
+- **Those three are recorded, never replayed.** Correcting an earlier overstatement: `Log/write` does
+  have a registered probe (`lib/f402_probe.ts`, `readOnly: false`), gated behind
+  `--include-unconfirmed` plus `--i-understand-mutations`; it synthesizes its own body rather than
+  replaying a recorded request. `vipListInsert`, `Log/writeDetail` and `updateBetTickerConfig` have no
+  call site at all. Production stays read-only unless a task is explicitly a deploy, and a VIP entry
+  is live customer state. Every identifier in these calls is also the bare 7-character login, which
+  contradicts the runbook's note that `Log/write` pads its `customerID` to 10 characters.
+- **The write acknowledgement is `{"INFO":""}` — an empty _string_.** Not `true`, not `{}`. So an
+  `INFO` envelope in this API is either an object (the ticker config) or an empty string (a write
+  ack), and a parser assuming the object form reads the ack as an empty config. `parseTickerConfig`
+  returns null for it, which was a real bug until the shape was seen: `{"INFO":""}` used to parse
+  into six disabled buckets and an empty agent. An empty `INFO` is **not** evidence that the write
+  succeeded — this portal also acknowledges without inspecting results (`updateBasicSettings` assigns
+  local state from the values it sent) — so it is recorded as "no payload" and nothing more. Which of
+  the three calls it answered was not identified in the paste, so all three remain candidates.
 - **The rendered report names itself.** The table container carries
   `class="TYPE-REPORT-Customer-Volume"`, i.e. the report kind's label with spaces hyphenated. That is
   the DOM's own statement of which report is loaded, alongside the `#btnPerformance` label and the
@@ -318,7 +339,8 @@ Asset names are validated (separators, control characters, `..`) and traversal i
 - A browser stack trace from the same session places the sub-sport fetch on
   `app/manager/module/agent-performance.js?bust=1.0.280` (`getSubsport()` → jQuery `$.ajax`). The
   module name is the strongest evidence yet that the CP grid is the `getAgentPerformance` screen, but
-  it is a trace of the _sub-sport_ call, not of the report call, so the report's URL stays unproven.
+  it is a trace of the _sub-sport_ call, not of the report call — since 2026-11-01 the report's URL
+  _is_ observed (`Manager/getAgentPerformance`); what remains unproven is its response.
 - The padding is confirmed by three observations, not inferred from one: `Football`, `Auto Racing` and
   `Tennis` all pad to the same 20 characters, so the width is a property of the field, not of a name.
 - `lib/f402_agent_performance_request.ts` builds the observed body from a typed selection and is pinned
@@ -360,8 +382,8 @@ Asset names are validated (separators, control characters, `..`) and traversal i
 ## D-19. `surface.daemon-live-wagers`
 
 - `GET /api/live-wagers` serves the `{LIST: [...]}` ticker feed
-  (`sportsdesk_webview_server.ts:658-708`), which is **not** the Pending shape: `WagerNumber` is the
-  ticket id and `ShortDesc` carries one line per leg.
+  (`services/sportsdesk_webview_server.ts:662-707`), which is **not** the Pending shape:
+  `WagerNumber` is the ticket id and `ShortDesc` carries one line per leg.
 - Both `ShortDesc` grammars are parsed; a leg with no `/ Period / Market / Pick` segments is flagged
   `compact` and its sport is matched against the known sport names.
 - `VolumeAmount` differing from `AmountWagered` is reported (`volumeDiffers`), not reconciled.
@@ -379,8 +401,39 @@ Asset names are validated (separators, control characters, `..`) and traversal i
   as disabled. Trim before comparing; the tests state the bug and its fix.
 - **`AgentID` changes width between the two calls**: unpadded in the request, padded to 50
   characters in the response. Same field, two widths.
+- **The config pair now has code, not only a fixture.** `lib/f402_bet_ticker_config.ts` holds both
+  halves: `parseTickerConfig` reads the `INFO` object and `buildTickerConfigWrite` emits the write
+  body, reproducing the observed request field for field and in its order — plays descending
+  (100000 → 499), the five `show*` flags, colours ascending, then `operation` and `agentOwner` —
+  with `body` re-parsing to the same fields
+  (`lib/f402_bet_ticker_config.test.ts`, `tests/f402_bet_ticker_config.test.ts`, both against
+  `tests/fixtures/f402-bet-ticker-config-2026-11-01.json`).
+- **A builder, not a client.** One test reads the module source and fails on `fetch(` or
+  `Bun.connect`, and no production module imports it: `/api/live-wagers` still serves the saved list
+  only, and there is no `updateBetTickerConfig` call site in the repo.
+- **The trim rule is written once**, in `lib/f402_flag_values.ts` (`trimFlag`,
+  `normalizeOnOffFlag`, `isFlagOn`), shared with the web-reports grid
+  (`lib/f402_config_web_reports_customer_admin.ts`). A flag that is neither on nor off is not
+  treated as on — `"yes"` parses to disabled, because an unrecognised value is a contract change,
+  not consent.
+- **The widths live in one place with their evidence status** (`lib/f402_field_widths.ts`):
+  `SPORT_FIELD_WIDTH` 20 and `TICKER_AGENT_ID_WIDTH` 50 are measured (the latter is this response's
+  padding); `CUSTOMER_ID_CANONICAL_WIDTH` 11 (spec claim) and `LOG_WRITE_CUSTOMER_ID_WIDTH` 10
+  (runbook claim, contradicted 2026-11-01) are marked unconfirmed and kept as separate constants so
+  one being wrong cannot move the other. `padField` pads and never truncates.
+- **The parser refuses every envelope that is not this config** (`lib/f402_bet_ticker_config.test.ts`):
+  `{"INFO": ""}` — the write acknowledgement observed 2026-11-01 — parses to `null`, where reading it
+  as an `INFO` object yielded six disabled buckets, an empty agent and no error; `INFO: false` parses
+  to `null` rather than "six disabled buckets, no agent"; and `{}`, `{ unrelated: true }`, `null` and
+  a bare string all return `null`, so an empty object is not "everything off" — a bare object must
+  carry at least one field the parser models before it is trusted.
+- **It reports what it does not understand instead of guessing.** An unrecognised key lands in
+  `unknownKeys` (`color99999` in the test) rather than being dropped, so a widened contract is
+  visible; a colour that is not `#rrggbb` becomes `null` without taking the bucket down with it —
+  `color1-499: "red"` leaves that bucket `enabled: true` with `color: null`.
 - The pasted read is the healthy `INFO` object. The `INFO:false` shape the capture request asks for
-  was not observed, so the two must not be conflated.
+  was not observed, so the two must not be conflated — and `parseTickerConfig` returns `null` for it
+  rather than reading it as an empty ticker.
 - Every response carries that provenance back: `provenance.source` (`paste:clipboard-ticker`),
   `observedAt` (null — the paste carries no timestamp), `captureNote` verbatim and `partial: true`.
   The dashboard renders the list as `17 WAGERS · PARTIAL` and shows the file's own note, so a count

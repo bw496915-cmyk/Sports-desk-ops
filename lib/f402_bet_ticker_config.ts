@@ -86,12 +86,25 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 export function parseTickerConfig(payload: unknown): TickerConfig | null {
   if (typeof payload !== "object" || payload === null) return null;
   const record = payload as Record<string, unknown>;
-  const info =
-    record.INFO !== undefined && typeof record.INFO === "object"
-      ? (record.INFO as Record<string, unknown>)
-      : record;
-  if (record.INFO === false || info === null || typeof info !== "object") {
-    return null;
+
+  let info: Record<string, unknown>;
+  if (record.INFO !== undefined) {
+    // An INFO key that is not an object is a different envelope, not this config: the portal's
+    // write acknowledgements return {"INFO":""}. Treating that as INFO would parse an empty
+    // envelope into six disabled buckets with no agent — wrong, and silently so.
+    if (typeof record.INFO !== "object" || record.INFO === null) return null;
+    info = record.INFO as Record<string, unknown>;
+  } else {
+    // Bare INFO object. Require at least one field this parser models, so `{}` is not "all off".
+    const looksLikeInfo = Object.keys(record).some(
+      (key) =>
+        key === "AgentID" ||
+        key.startsWith("play") ||
+        key.startsWith("color") ||
+        key.startsWith("show"),
+    );
+    if (!looksLikeInfo) return null;
+    info = record;
   }
 
   const rawAgentId = typeof info.AgentID === "string" ? info.AgentID : "";

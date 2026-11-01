@@ -109,6 +109,19 @@ describe("parseTickerConfig", () => {
     expect(parseTickerConfig("nope")).toBeNull();
   });
 
+  test('returns null for the write acknowledgement { "INFO": "" }', () => {
+    // Observed on 2026-11-01 as a write ack. It looked like this config only because both use an
+    // INFO key: parsed as INFO it produced six disabled buckets and an empty agent, silently.
+    expect(parseTickerConfig({ INFO: "" })).toBeNull();
+    expect(parseTickerConfig({ INFO: null })).toBeNull();
+  });
+
+  test("returns null for an empty object, rather than 'everything off'", () => {
+    // A bare object must carry at least one field this parser models before it is trusted.
+    expect(parseTickerConfig({})).toBeNull();
+    expect(parseTickerConfig({ unrelated: true })).toBeNull();
+  });
+
   test("accepts a bare INFO object as well as the envelope", () => {
     const bare = parseTickerConfig(info);
     expect(bare?.agentId).toBe(fixture.agentPlaceholder);

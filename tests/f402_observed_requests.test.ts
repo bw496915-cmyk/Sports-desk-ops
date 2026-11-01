@@ -29,6 +29,14 @@ const fixture = JSON.parse(
   responsesObserved: boolean;
   agentPlaceholder: string;
   writeObservation?: string;
+  writeResponse?: {
+    body: { INFO: string };
+    observedAt: string;
+    whichCall: string;
+    candidates: string[];
+    interpretation: string;
+    notAProof: string;
+  };
   requests: Array<{
     operation: string;
     pathObserved: string | null;
@@ -396,7 +404,40 @@ describe("the vipListInsert write and its audit trail", () => {
     // any of them, and production is read-only unless a task is explicitly a deploy.
     const save = ["vipListInsert", "writeDetail", "write"].map(byOperation);
     expect(save.every((request) => request.mutation === true)).toBe(true);
-    expect(fixture.writeObservation).toContain("never replay");
+    // "never replayed" is about recorded requests. A probe may synthesise its own body, so the
+    // fixture has to say that rather than claim no code can reach these operations.
+    expect(fixture.writeObservation).toContain("never as a script");
+    expect(fixture.writeObservation).toContain("readOnly:false");
+    expect(fixture.writeObservation).toContain(
+      "vipListInsert, Log/writeDetail and updateBetTickerConfig have no",
+    );
+  });
+
+  test("the probe's writable operations are exactly the ones the docs admit to", () => {
+    // Guard against a new non-readOnly probe making the docs' "no call site" claim false silently.
+    const probe = readFileSync(
+      resolve(import.meta.dir, "../lib/f402_probe.ts"),
+      "utf8",
+    );
+    const writable = [...probe.matchAll(/operation: "([A-Za-z]+)"/g)]
+      .filter((match) => {
+        // An entry declares readOnly within a few lines of its operation name.
+        const from = match.index ?? 0;
+        return probe.slice(from, from + 260).includes("readOnly: false");
+      })
+      .map((match) => match[1] ?? "");
+
+    expect(writable.sort()).toEqual(
+      [
+        "PendingDelete",
+        "renewToken",
+        "updateReportConfigCustomerAdmin",
+        "write",
+      ].sort(),
+    );
+    expect(writable).toContain("write");
+    expect(writable).not.toContain("vipListInsert");
+    expect(writable).not.toContain("updateBetTickerConfig");
   });
 
   test("the mutation is JSON and carries a list array", () => {
@@ -494,5 +535,40 @@ describe("writeDetail encoding, confirmed by two independent pastes", () => {
     expect(JSON.parse(data)).toEqual([
       { agentID: "<agent>", player: "<player>" },
     ]);
+  });
+});
+
+describe("the write acknowledgement", () => {
+  const response = fixture.writeResponse;
+
+  test("is recorded as an empty INFO string", () => {
+    expect(response).toBeDefined();
+    expect(response?.body).toEqual({ INFO: "" });
+    expect(typeof response?.body.INFO).toBe("string");
+    expect(response?.body.INFO).toBe("");
+  });
+
+  test("does not claim to be a success signal", () => {
+    // The shape says "no payload". The portal acknowledges writes without inspecting results
+    // elsewhere (updateBasicSettings assigns local state from the values it sent), so "INFO is
+    // empty" cannot be promoted to "the write succeeded".
+    expect(response?.notAProof).toContain("No success semantics");
+    expect(response?.interpretation).toContain("no payload");
+  });
+
+  test("says which call it answered is unknown", () => {
+    expect(response?.whichCall).toContain("not identified");
+    expect(response?.candidates).toEqual([
+      "vipListInsert",
+      "writeDetail",
+      "write",
+    ]);
+  });
+
+  test("it is a different envelope from the ticker config, under the same key", () => {
+    // Same key, two types: INFO as object (config) vs INFO as empty string (write ack). A parser
+    // that assumes one form silently reads the other.
+    expect(typeof response?.body.INFO).toBe("string");
+    expect(response?.interpretation).toContain("either an object");
   });
 });

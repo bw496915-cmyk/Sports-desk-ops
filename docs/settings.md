@@ -38,6 +38,23 @@ Two details of that handler matter more than the field list:
    rejected save therefore looks saved until the next page load. That is a fact about the portal's
    code, not a claim about how often it happens.
 
+## `NotifyVipBets` is the Wager Alerts flag, not the VIP list
+
+The name invites a conflation worth heading off. `updateBasicSettings` copies the Wager Alerts
+selector (`notify-flag`, `Y`/`N`) into `authorizations.NotifyVipBets`, so that authorization is "will
+this account be notified", not "which customers are VIP".
+
+The VIP list itself is a separate surface with its own write, observed 2026-11-01: the Analysis
+screen's `show-vip` button opens it, and saving sends three requests —
+`POST /cloud/api/Manager/vipListInsert` (JSON, `{"list":[…]}`), then `POST /cloud/api/Log/writeDetail`
+(form-encoded, the same list inside the `data` field) and `POST /cloud/api/Log/write` (JSON,
+`description: "Save Action / Vip List [ v1.0.280 | fantasy402.com ]"`). The ack is `{"INFO":""}` — an
+empty string, which is consistent with success but does not establish it. This repository records
+that flow and never replays it.
+
+The two surfaces do share state downstream: the bet ticker carries a `VIP` column, and all 17 rows of
+the salvaged ticker paste read `"0"`, so the repo has never seen the list populated.
+
 ## What this dashboard does
 
 Source: `lib/settings_prefs.ts` (vocabulary, validation, timezone rendering) and the Settings panel in

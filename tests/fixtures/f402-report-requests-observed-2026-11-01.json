@@ -185,5 +185,15 @@
       "fieldsNote": "Form-encoded, and `data` is the same JSON array the mutation sent, urlencoded into a form field. customerID/agentID/agentOwner are unpadded here."
     }
   ],
-  "writeObservation": "The last three requests are mutations, recorded because the repo must never replay them: an operator saved a Vip List entry on 2026-11-01, and the portal sent the mutation plus two audit log writes. Nothing in this repository calls any of the three."
+  "writeObservation": "The last three requests are mutations, recorded as behaviour, never as a script. Correction 2026-11-01: 'nothing in this repository calls them' was too strong \u2014 lib/f402_probe.ts registers Log/write with readOnly:false, gated behind --include-unconfirmed plus --i-understand-mutations, and it synthesizes its own body rather than replaying a recorded one. vipListInsert, Log/writeDetail and updateBetTickerConfig have no call site at all.",
+  "writeResponse": {
+    "body": {
+      "INFO": ""
+    },
+    "observedAt": "2026-11-01",
+    "whichCall": "not identified in the paste",
+    "candidates": ["vipListInsert", "writeDetail", "write"],
+    "interpretation": "The portal's write acknowledgements carry INFO as an empty STRING, not true, not {} and not an object. So an INFO envelope in this API is either an object (the ticker config) or an empty string (a write ack), and a parser that assumes the object form will read this as an empty config rather than as 'no payload'.",
+    "notAProof": "No success semantics are established by this shape. An empty INFO is consistent with a saved write, but the portal also acknowledges without inspecting results (updateBasicSettings assigns local state from the values it sent), so 'INFO is empty' is recorded as 'no payload', not as 'the write succeeded'."
+  }
 }

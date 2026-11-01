@@ -82,7 +82,7 @@ forensic endpoint the runbooks, the code and the spec all point at.
 ## P2 — `updateByColumn` mutation + `getInfoPlayer` read-back
 
 Ledger rows: `POST /cloud/api/Manager/updateByColumn` (C), `POST /cloud/api/Manager/getInfoPlayer` (B,
-example-level contradiction). `operational_guardrails_runbook.md:215` states the only HAR does **not**
+tier A since 2026-10-31, so the example is superseded rather than contradictory). `operational_guardrails_runbook.md:215` states the only HAR does **not**
 include `updateByColumn`, that the only observed padded ID is `Log/write`'s at **10** characters, and that
 the **11**-character width must be confirmed by capture before anyone relies on it. The spec
 (`docs/openapi.json:609-754`) publishes a 9-field body and `Result` 1/0/-1 semantics on no evidence.
@@ -238,23 +238,13 @@ Expected auth: the Manager portal session cookie observed in the 2026-10-28 HAR 
 | 14  | `getPending`   | `POST /cloud/api/Manager/getPending` — **content type contested**: the spec says `application/json`, every other Manager call is form-urlencoded | exact content type + one non-empty response; confirm `BLOCKED`/zero-stake sentinel rows actually appear                    | C→A                                       |
 
 `authenticateCustomer` is deliberately not in this table — the whole auth model needs its own capture and
-is §P3. Two rows with partial observation are tracked elsewhere: `updateByColumn` (§P2) and
-`search`/`getAgentPerformance`/`getSettledFigure`/`delete-wager`/`getAnalysis`/`getFinancialReport`
-(§P6 — UI action names observed, URLs not). `getAgentPerformance` now has one step more: two request
-bodies were observed on 2026-11-01 — the all-periods call (`subsport`/`wagerType`/`betType` empty,
-`period=-1`) and the same call with the sport filter row filled (`subsport=NFL`, `period=1`,
-`wagerType=M`, `betType=S`) — recorded in
-`tests/fixtures/f402-report-requests-observed-2026-11-01.json`, together with a byte-exact encoding pin.
-The URL those bodies were POSTed to was not observed, and no response exists.
-`lib/f402_agent_performance_request.ts` now reproduces either body from a typed selection (byte-exact
-against both observations, catalog-validated), so the capture operator can generate the request instead
-of hand-building a curl. A 2026-11-01 export run also produced the graded workbook, reduced to
+is §P3. Rows with partial observation are tracked elsewhere: `updateByColumn` (§P2) and
+`search`/`getSettledFigure`/`delete-wager`/`getAnalysis`/`getFinancialReport` (§P6 — UI action names
+observed, URLs not). `getAgentPerformance` has left that group: its request is fully observed and only
+its response is missing (§P5a). A 2026-11-01 export run also produced the graded workbook, reduced to
 `data/graded-wagers-export-2026-11-01.json` (shape only; the rows stay out of the repo), and showed
 that `getGrading` sends ISO dates and a self-referential `path` field where `getAgentPerformance`
-sends M/D/YYYY. When the response arrives, the screen's own grid header
-(`tests/fixtures/portal-agent-performance-filterbar-2026-11-01.html`: All Players and Agents · Won ·
-Lost · # of Bets · Risk · Net · Hold %age) is what to reconcile against — it is column markup, not a
-schema.
+sends M/D/YYYY.
 
 **Observed request, still unledgered: `getSubSportByReport`.** A 2026-11-01 operator paste shows
 `POST /cloud/api/Manager/getSubSportByReport`, form-urlencoded, with
@@ -267,9 +257,112 @@ stack trace from the same session names the caller:
 which is also why the request is form-encoded with `X-Requested-With`. That module is the screen whose
 report is `getAgentPerformance`, so the two observed requests belong to one page. It is the call that
 fills the report's sub-sport picker, the wire counterpart of `lib/sport_catalog.ts`. It has
-**no ledger row and no spec path on purpose**: a tier-B row would need a response schema, and nobody
-has seen the response. Capture it (URL, body, rows) and it becomes a real operation with a real schema
-rather than an authored one.
+**no ledger row and no spec path on purpose**: a ledger `path` is an exact `docs/openapi.json` path
+(`docs/evidence/ledger.json:9-21`) and nobody has seen the response, so there is no schema to publish.
+Capture it (URL, body, rows) and it becomes a real operation with a real schema rather than an authored
+one.
+
+## P5a — the `getAgentPerformance` response gap (request fully observed)
+
+Ledger row: `POST /cloud/api/Manager/getAgentPerformance` (tier B — request observed, **response never**).
+The 2026-11-01 observation also contradicts the repo's earlier inferred path
+`/cloud/api/Report/getAgentPerformance` (`docs/evidence/ledger.json:556-579`).
+
+**The request side is closed.** Three bodies are recorded in
+`tests/fixtures/f402-report-requests-observed-2026-11-01.json`: the all-periods CP call, the same call
+with the sport filter row filled, and a CPS (sport performance) call. Only four fields differ between the
+two CP bodies — `subsport`, `period`, `wagerType`, `betType`. `tipo` is `0` for CP and `-1` for CPS, so it
+belongs to the selection rather than being a constant. `sport` is padded to 20 characters, and `period`
+is the catalog's number for the chosen sport (`1` under Football is `1st Half`, not "first period"). The
+CPS call was also observed a second time with `period=0` and everything else equal.
+
+| Observed body        | `type` | `sport` / `subsport`        | `period`  | `tipo` |
+| -------------------- | ------ | --------------------------- | --------- | ------ |
+| CP, all periods      | `CP`   | `Football` (padded) / empty | `-1`      | `0`    |
+| CP, sport filter row | `CP`   | `Football` / `NFL`          | `1`       | `0`    |
+| CPS                  | `CPS`  | `LIVE` / `NCAAF Live`       | `-1`, `0` | `-1`   |
+
+`lib/f402_agent_performance_request.ts` rebuilds every one of those bodies from a typed selection,
+byte-exact and catalog-validated (`lib/f402_agent_performance_request.test.ts:61-87,275-282`), so the
+capture operator can generate the request instead of hand-building a curl. Field order is pinned too:
+`start`, `end`, `agentID`, `type`, `freePlay`, `store`, `sport`, `subsport`, `period`, `wagerType`,
+`betType`, `tipo`, `debug`, `operation`, `RRO`, `agentOwner`.
+
+**The response side is empty.** No response body has ever been seen — not a status, response
+`Content-Type`, envelope or row — so no column set is documented, which is what the ledger row says too
+(`docs/evidence/ledger.json:574,2118`). The module deliberately describes no response either.
+
+**What to capture.** One CP call and one CPS call with the fixtures' agent and date range, recording the
+full response (status, content type, body), plus a zero-row case if the filter can produce one. Reconcile
+against the screen's own grid header, not against a guess:
+`tests/fixtures/portal-agent-performance-filterbar-2026-11-01.html:282-300` names **All Players and
+Agents · Won · Lost · # of Bets · Risk · Net · Hold %age**. Those seven labels are markup, not a schema:
+the JSON keys, their nesting, whether `holdPct` is computed server-side and how `BranchGrade` is applied
+are all unknown until a body exists (`docs/evidence/ledger.json:574`). The 2026-11-01 workbook export is
+not a substitute — it is wager-level with five columns (`data/graded-wagers-export-2026-11-01.json`).
+
+**Upgrades:** B→A. Until then no markdown may publish a result column set for this report.
+
+## P5b — observed writes: the Vip List save and the ticker config save
+
+Neither write surface has a ledger row. Both were observed on 2026-11-01, neither has a response schema,
+and both mutate live state — one VIP-list entry on a customer, one desk setting. They are recorded so the
+wire shape is not lost and a future capture has a target; they are not calls this repo makes.
+
+**A Vip List save is three requests, and all three are mutations.** The `show-vip` panel
+(`docs/evidence/surfaces.md:303-326`) sends, in order:
+
+1. **`vipListInsert`** — `POST /cloud/api/Manager/vipListInsert`, `application/json`:
+   `{"list":[{"agentID":"<agent>","player":"<player>"}],"operation":"vipListInsert","agentID":"<agent>","agentOwner":"<agent>"}`.
+   A `list` array even for one player, so a single save is a batch from the API's point of view.
+2. **`Log/writeDetail`** — `POST /cloud/api/Log/writeDetail`, `application/x-www-form-urlencoded`: the
+   same list as JSON text urlencoded into `data`, plus `ticket=0` (not attached to a wager),
+   `info=" [SITE : fantasy402.com v1.0.280] "`, `customerID`, `operation`, `agentID`, `agentOwner`.
+3. **`Log/write`** — `POST /cloud/api/Log/write`, `application/json`: `customerID`, `additional` (empty),
+   `description="Save Action / Vip List [ v1.0.280 | fantasy402.com ]"`, `operation`, `agentID`,
+   `agentOwner`. The description arrives in the request body and names both the screen and the portal
+   version, so an audit row records what the UI called the action.
+
+The sequence is pinned in `tests/f402_observed_requests.test.ts:401-468`. Its point is that one save uses
+two encodings — JSON, form, JSON — so a client assuming one content type breaks on the middle call.
+
+**None of the three is replayed in this repo.** No code path sends the recorded bodies: production is
+read-only unless the task is explicitly a deploy, and a VIP entry is live customer state
+(`tests/f402_observed_requests.test.ts:402-408`,
+`tests/fixtures/f402-report-requests-observed-2026-11-01.json:188`). One caveat keeps that claim exact:
+`lib/f402_probe.ts:371-386` registers `Log/write` as a non-read-only probe, selected only under
+`--include-unconfirmed`, which the capture CLI also gates behind `--i-understand-mutations`
+(`scripts/capture/f402_probe.ts:369-371`). That probe builds its own body; it never replays the observed
+one.
+
+**The acknowledgement `{"INFO":""}` was observed, and it is an empty string.** The paste recorded the
+body but not which of the three calls answered it, so all three remain candidates. An empty `INFO` proves
+only that the write ack carries no payload; it is **not evidence of success**. The portal acknowledges
+writes without inspecting results elsewhere (`updateBasicSettings` assigns local state from the values it
+sent), and this is a different envelope from the ticker config's `INFO` object under the same key
+(`docs/evidence/surfaces.md:319-326`). Success semantics are unestablished — a capture that shows a
+_rejected_ save is what would separate the two.
+
+**Unledgered but observed: four operations, each a write on live customer or desk state.** None has a
+ledger row yet, because a row without a response would restate the request; what a capture would add is
+the response body and the success/failure signal.
+
+| #   | Operation               | Observed wire                                                                             | What a capture would add                                                                                                         |
+| --- | ----------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `vipListInsert`         | `POST /cloud/api/Manager/vipListInsert`, JSON, `list` array                               | the accepted ack for an insert, and whether a duplicate or unknown `player` is rejected, coalesced or silently accepted          |
+| 2   | `Log/writeDetail`       | `POST /cloud/api/Log/writeDetail`, form, JSON-in-`data`, `ticket=0`                       | whether the server validates `data` as JSON, and what a malformed or oversized detail returns                                    |
+| 3   | `Log/write`             | `POST /cloud/api/Log/write`, JSON, `description` names screen + version                   | the audit headline's response body, and whether a rejected write has a distinguishable shape                                     |
+| 4   | `updateBetTickerConfig` | `POST /cloud/api/Manager/updateBetTickerConfig`, form, `play499`-style upper-bound fields | the save's response envelope (the read's is the healthy `INFO` object), and whether a rejected save differs from an accepted one |
+
+**The ticker config save is the write half of a tier-A read.** Six buckets, named by upper bound in the
+write (`play499`, `color499`) and by range in the read (`play1-499`, `color1-499`); an enabled flag reads
+`"on "` with a trailing space while a disabled one reads `"off"` without; `AgentID` is unpadded in the
+request and padded to 50 characters in the response
+(`tests/fixtures/f402-bet-ticker-config-2026-11-01.json`; `lib/f402_bet_ticker_config.ts:1-20`). The read
+is the tier-A row #1 in §P5; the `INFO:false` misconfigured variant is still unobserved, and a write
+capture is not that. Sending this write changes the desk's ticker, so it needs an operator-approved
+change on a controlled account — the repo's builder deliberately never calls it
+(`lib/f402_bet_ticker_config.ts:18-19`).
 
 ## P6 — the 11 "Tracked Operational Domains" candidates
 
