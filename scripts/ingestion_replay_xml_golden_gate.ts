@@ -13,7 +13,7 @@ import {
   XML_GOLDEN_AST_REPLAY_DRIFT_EXIT,
 } from "../lib/bun_xml_golden_ast_replay.ts";
 import { goldenAstFingerprintFromXml } from "../lib/bun_xml_golden_ast.ts";
-import { replaySportsdeskIngestionLog } from "../sportsdesk_ingestion_replay.ts";
+import { replaySportsdeskIngestionLog } from "../services/sportsdesk_ingestion_replay.ts";
 
 const repoRoot = join(import.meta.dir, "..");
 const domainJsonl = join(

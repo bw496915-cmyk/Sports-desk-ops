@@ -3,7 +3,7 @@
  */
 
 import type { Sha256Hex } from "../domain-branded-types.ts";
-import { sha256HexOfBytes } from "../sportsdesk_ingestion_feed_provenance.ts";
+import { sha256HexOfBytes } from "../services/sportsdesk_ingestion_feed_provenance.ts";
 import type { MatchEvaluationResult } from "./candidate_match_evaluation.ts";
 import { canonicalJsonString } from "./canonical_json.ts";
 

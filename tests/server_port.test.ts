@@ -11,7 +11,7 @@ describe("Server Port Cascade Resolution", () => {
         process.execPath,
         "-e",
         `
-        import { startServer } from "./sportsdesk_webview_server.ts";
+        import { startServer } from "./services/sportsdesk_webview_server.ts";
         const server = startServer();
         console.log(JSON.stringify({ port: server.port, hostname: server.hostname }));
         server.stop(true);

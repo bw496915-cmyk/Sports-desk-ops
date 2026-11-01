@@ -17,7 +17,7 @@ import { auditRunAt, auditRunId } from "../lib/audit_run_id.ts";
 describe("candidate_cli", () => {
   test("pin subcommand exits 0", async () => {
     const proc = Bun.spawn({
-      cmd: ["bun", "run", "sportsdesk_candidate_cli.ts", "pin"],
+      cmd: ["bun", "run", "cli/sportsdesk_candidate_cli.ts", "pin"],
       cwd: import.meta.dir + "/..",
       stdout: "pipe",
       stderr: "pipe",
@@ -66,7 +66,7 @@ describe("candidate_cli", () => {
       cmd: [
         "bun",
         "run",
-        "sportsdesk_candidate_cli.ts",
+        "cli/sportsdesk_candidate_cli.ts",
         "replay",
         "--db",
         dbPath,
@@ -128,7 +128,7 @@ describe("candidate_cli", () => {
       cmd: [
         "bun",
         "run",
-        "sportsdesk_candidate_cli.ts",
+        "cli/sportsdesk_candidate_cli.ts",
         "verify",
         "--db",
         dbPath,
@@ -186,7 +186,7 @@ describe("candidate_cli", () => {
       cmd: [
         "bun",
         "run",
-        "sportsdesk_candidate_cli.ts",
+        "cli/sportsdesk_candidate_cli.ts",
         "verify",
         "--db",
         dbPath,
@@ -230,7 +230,7 @@ describe("candidate_cli", () => {
       cmd: [
         "bun",
         "run",
-        "sportsdesk_candidate_cli.ts",
+        "cli/sportsdesk_candidate_cli.ts",
         "replay",
         "--db",
         dbPath,

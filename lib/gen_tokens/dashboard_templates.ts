@@ -9,7 +9,7 @@ export type DashboardTemplate = {
 };
 
 export const CUSTOMER_DASHBOARD_TEMPLATE: DashboardTemplate = {
-  repoPath: "customer-churn-simulation-dashboard.html",
+  repoPath: "static/customer-churn-simulation-dashboard.html",
   houdiniBlockRegex:
     /\/\* ==========================================================================\s+1\. CSS Houdini @property Declarations[\s\S]*?(?=\/\* ==========================================================================\s+2\. Canonical :root)/,
   rootVarsRegex:
@@ -19,7 +19,7 @@ export const CUSTOMER_DASHBOARD_TEMPLATE: DashboardTemplate = {
 };
 
 export const TELEGRAM_DASHBOARD_TEMPLATE: DashboardTemplate = {
-  repoPath: "telegram-miniapp-dashboard.html",
+  repoPath: "static/telegram-miniapp-dashboard.html",
   houdiniBlockRegex:
     /\/\* ==========================================================================\s+1\. CSS Houdini @property Declarations[\s\S]*?(?=\/\* ==========================================================================\s+2\. TMA Theme Mapping)/,
   rootVarsRegex:

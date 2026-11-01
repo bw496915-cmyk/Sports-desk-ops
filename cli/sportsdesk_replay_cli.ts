@@ -8,11 +8,11 @@
  */
 
 import { resolve } from "node:path";
-import type { SignalChannelCode } from "./domain-branded-types.ts";
+import type { SignalChannelCode } from "../domain-branded-types.ts";
 import {
   ingestionFeedPullExitCode,
   pullIngestionFeedWithProvenance,
-} from "./sportsdesk_ingestion_feed_provenance.ts";
+} from "../services/sportsdesk_ingestion_feed_provenance.ts";
 import {
   formatSportsdeskReplayTradesTable,
   isSignalChannelCode,
@@ -21,7 +21,7 @@ import {
   renderSportsdeskPatternAnsi,
   renderSportsdeskPatternMarkdown,
   SPORTSDESK_INGESTION_LOG_DEFAULT,
-} from "./sportsdesk_ingestion_replay.ts";
+} from "../services/sportsdesk_ingestion_replay.ts";
 
 function warnLatencySla(
   channelCode: SignalChannelCode,
@@ -93,7 +93,7 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  let path = resolve(import.meta.dir, SPORTSDESK_INGESTION_LOG_DEFAULT);
+  let path = resolve(import.meta.dir, "..", SPORTSDESK_INGESTION_LOG_DEFAULT);
   let markdown = false;
   let outPath: string | undefined;
   let json = false;

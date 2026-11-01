@@ -64,7 +64,7 @@ describe("sqlite_schema_registry", () => {
 
   test("schema CLI list exits 0", async () => {
     const proc = Bun.spawn({
-      cmd: ["bun", "run", "sportsdesk_schema_cli.ts", "--list"],
+      cmd: ["bun", "run", "cli/sportsdesk_schema_cli.ts", "--list"],
       cwd: import.meta.dir + "/..",
       stdout: "pipe",
     });

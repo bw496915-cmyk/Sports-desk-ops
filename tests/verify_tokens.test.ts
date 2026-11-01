@@ -287,8 +287,8 @@ describe("4. Discriminated Union Type Guardrails", () => {
 });
 
 const DASHBOARD_FILES = [
-  "customer-churn-simulation-dashboard.html",
-  "telegram-miniapp-dashboard.html",
+  "static/customer-churn-simulation-dashboard.html",
+  "static/telegram-miniapp-dashboard.html",
 ] as const;
 
 const DASHBOARD_TOKENS = [...ALL_QWEN_TOKENS, ...UI_TOKENS];

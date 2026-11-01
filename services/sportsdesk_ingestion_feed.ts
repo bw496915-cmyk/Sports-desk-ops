@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 import {
   type SignalChannelCode,
   INGESTION_CHANNELS,
-} from "./domain-branded-types.ts";
+} from "../domain-branded-types.ts";
 import { getR2Config } from "./sportsdesk_r2_sync.ts";
 
 const INGESTION_AUDIT_OBJECT_KEY =

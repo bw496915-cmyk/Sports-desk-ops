@@ -70,7 +70,8 @@ else
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$REPO_ROOT"
 
 # Validate CLI Prerequisites
 if ! command -v bun &>/dev/null; then
@@ -78,8 +79,8 @@ if ! command -v bun &>/dev/null; then
   exit 1
 fi
 
-if [[ ! -f "sportsdesk_cli.ts" ]]; then
-  echo "[Error] 'sportsdesk_cli.ts' not found in $SCRIPT_DIR." >&2
+if [[ ! -f "cli/sportsdesk_cli.ts" ]]; then
+  echo "[Error] 'cli/sportsdesk_cli.ts' not found in $REPO_ROOT." >&2
   exit 1
 fi
 
@@ -104,7 +105,7 @@ echo "==========================================================================
 # ------------------------------------------------------------------------------
 echo ""
 echo "[1/7] Generating Intra-Day Sniper Surveillance (Top Winners last 24h)..."
-bun run sportsdesk_cli.ts winners \
+bun run cli/sportsdesk_cli.ts winners \
   -p 24h \
   --limit 25 \
   --sort-by net \
@@ -119,7 +120,7 @@ bun run sportsdesk_cli.ts winners \
 # ------------------------------------------------------------------------------
 echo ""
 echo "[2/7] Generating Weekend House-Hold Generators (Top Losers last 48h)..."
-bun run sportsdesk_cli.ts losers \
+bun run cli/sportsdesk_cli.ts losers \
   -p 48h \
   --limit 25 \
   --sort-by net \
@@ -134,7 +135,7 @@ bun run sportsdesk_cli.ts losers \
 # ------------------------------------------------------------------------------
 echo ""
 echo "[3/7] Generating NFL Straight Point-Spread Winners (7-day week)..."
-bun run sportsdesk_cli.ts winners \
+bun run cli/sportsdesk_cli.ts winners \
   -p 7d \
   --league NFL \
   -m spread \
@@ -150,7 +151,7 @@ bun run sportsdesk_cli.ts winners \
 # ------------------------------------------------------------------------------
 echo ""
 echo "[4/7] Generating NBA Total / Over-Under Winners (Last 7 days)..."
-bun run sportsdesk_cli.ts winners \
+bun run cli/sportsdesk_cli.ts winners \
   -p 7d \
   --league NBA \
   -m total \
@@ -166,7 +167,7 @@ bun run sportsdesk_cli.ts winners \
 # ------------------------------------------------------------------------------
 echo ""
 echo "[5/7] Generating Dual-Sided Monthly Leaderboard (30-day window)..."
-bun run sportsdesk_cli.ts leaderboard \
+bun run cli/sportsdesk_cli.ts leaderboard \
   -p month \
   --limit 15 \
   --format "$FORMAT" \
@@ -178,7 +179,7 @@ bun run sportsdesk_cli.ts leaderboard \
 # ------------------------------------------------------------------------------
 echo ""
 echo "[6/7] Generating Sub-Agent Branch Rollup (Top Losing Downlines last 7d)..."
-bun run sportsdesk_cli.ts losers \
+bun run cli/sportsdesk_cli.ts losers \
   -p 7d \
   --by-agent \
   --agent-depth 2 \
@@ -193,7 +194,7 @@ bun run sportsdesk_cli.ts losers \
 # ------------------------------------------------------------------------------
 echo ""
 echo "[7/7] Generating All-Time Biggest Lifetime Losers / Highest Gross Hold..."
-bun run sportsdesk_cli.ts losers \
+bun run cli/sportsdesk_cli.ts losers \
   -p lifetime \
   --limit 50 \
   --sort-by gross_hold \
@@ -236,9 +237,9 @@ ls -lh "$REPORT_DIR"
 if [ "$SYNC_R2" = true ]; then
   echo ""
   echo "Streaming reports to Cloudflare R2 (bucket: sportsdesk-ops-reports)..."
-  if [[ -f "sportsdesk_r2_sync.ts" ]]; then
-    bun run sportsdesk_r2_sync.ts "$REPORT_DIR"
+  if [[ -f "services/sportsdesk_r2_sync.ts" ]]; then
+    bun run services/sportsdesk_r2_sync.ts "$REPORT_DIR"
   else
-    echo "[Notice] sportsdesk_r2_sync.ts not found. Skipping R2 sync."
+    echo "[Notice] services/sportsdesk_r2_sync.ts not found. Skipping R2 sync."
   fi
 fi

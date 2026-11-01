@@ -7,14 +7,14 @@ import { resolve } from "node:path";
 import {
   probeHistoricalJsonlBytes,
   type HistoricalLogReplayResult,
-} from "./lib/jsonl_stream_replay.ts";
+} from "../lib/jsonl_stream_replay.ts";
 import {
   pullRawIngestionFeed,
   resolveIngestionFeedSource,
   type IngestionFeedSource,
 } from "./sportsdesk_ingestion_feed.ts";
-import type { Sha256Hex, SignalChannelCode } from "./domain-branded-types.ts";
-import { sha256Bytes } from "./lib/schema_binary.ts";
+import type { Sha256Hex, SignalChannelCode } from "../domain-branded-types.ts";
+import { sha256Bytes } from "../lib/schema_binary.ts";
 
 export type IngestionFeedHttpMeta = {
   status: number;

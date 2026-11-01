@@ -20,7 +20,7 @@ import {
   resolveIngestionChannel,
   VALID_TIME_OPEN_SENTINEL,
   VALID_TIME_OPEN_SENTINEL_SQL,
-} from "../sportsdesk_ingestion_replay.ts";
+} from "../services/sportsdesk_ingestion_replay.ts";
 import { SPORTSDESK_BUN_SQLITE_OPTIONS } from "../lib/sportsdesk_sqlite.ts";
 
 describe("sportsdesk_ingestion_replay", () => {

@@ -11,7 +11,7 @@ import {
   sqlInt,
   sqlIntOrNull,
   truncateWalAndDisablePersist,
-} from "./lib/sportsdesk_sqlite.ts";
+} from "../lib/sportsdesk_sqlite.ts";
 import {
   parseAsColorHexInt,
   colorHexIntToHexString,
@@ -20,18 +20,18 @@ import {
   SIGNAL_SLA_MS,
   type SignalChannelCode,
   type SignalChannelStatus,
-} from "./domain-branded-types.ts";
+} from "../domain-branded-types.ts";
 import {
   replayHistoricalJsonlFile,
   type HistoricalLogReplayResult,
-} from "./lib/jsonl_stream_replay.ts";
-import { xmlGoldenAstSha256ForIngest } from "./lib/bun_xml_golden_ast.ts";
+} from "../lib/jsonl_stream_replay.ts";
+import { xmlGoldenAstSha256ForIngest } from "../lib/bun_xml_golden_ast.ts";
 import {
   accumulateIngestionJsonlXmlGoldenAst,
   emptyIngestionXmlGoldenAstReplayStats,
   exitCodeFromIngestionXmlGoldenAstStats,
   type IngestionXmlGoldenAstReplayStats,
-} from "./lib/bun_xml_golden_ast_replay.ts";
+} from "../lib/bun_xml_golden_ast_replay.ts";
 
 const INGESTION_CHANNEL_BY_CODE = new Map(
   INGESTION_CHANNELS.map((c) => [c.channelCode, c] as const),

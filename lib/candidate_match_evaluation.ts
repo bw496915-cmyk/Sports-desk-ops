@@ -16,7 +16,7 @@ import {
   type MatchPolicy,
   DEFAULT_MATCH_POLICY,
 } from "./candidate_ticket_enrich.ts";
-import { sha256HexOfBytes } from "../sportsdesk_ingestion_feed_provenance.ts";
+import { sha256HexOfBytes } from "../services/sportsdesk_ingestion_feed_provenance.ts";
 import {
   canonicalJsonString,
   hashEvaluationResult,

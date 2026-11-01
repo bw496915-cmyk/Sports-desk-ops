@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 import {
   buildCatalogDiffReport,
   renderCatalogDiffMarkdown,
-} from "./fantasy402_sport_catalog_diff.ts";
+} from "../catalog/fantasy402_sport_catalog_diff.ts";
 import {
   applyForcedCollisionRegistry,
   buildProposedCatalogRefresh,
@@ -18,7 +18,7 @@ import {
   normalizeCatalogCounts,
   type CatalogValidationResult,
   validateFantasy402SportCatalog,
-} from "./fantasy402_sport_catalog.ts";
+} from "../catalog/fantasy402_sport_catalog.ts";
 
 type GlobalOpts = {
   json: boolean;

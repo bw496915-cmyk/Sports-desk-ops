@@ -3,7 +3,7 @@
  * Candidate overlay evaluation — golden pin check + policy replay (append-only audit).
  */
 
-import { openSportsdeskSqlite } from "./lib/sportsdesk_sqlite.ts";
+import { openSportsdeskSqlite } from "../lib/sportsdesk_sqlite.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -14,16 +14,16 @@ import {
   replayPolicyDelta,
   ValidTimeReplayError,
   type MatchEvaluationSinceAxis,
-} from "./lib/candidate_match_evaluation.ts";
+} from "../lib/candidate_match_evaluation.ts";
 import {
   DEFAULT_MATCH_POLICY,
   hashPolicy,
   type MatchPolicy,
-} from "./lib/candidate_ticket_enrich.ts";
+} from "../lib/candidate_ticket_enrich.ts";
 import {
   hashCanonicalJsonBytes,
   serializeMatchEvaluationResult,
-} from "./lib/match_evaluation_canonical.ts";
+} from "../lib/match_evaluation_canonical.ts";
 
 type GlobalOpts = { json: boolean };
 
@@ -124,7 +124,7 @@ function parseSinceAxis(value: string | undefined): MatchEvaluationSinceAxis {
 }
 
 async function cmdPin(args: string[], opts: GlobalOpts): Promise<number> {
-  let fixturesDir = resolve(import.meta.dir, "tests/fixtures");
+  let fixturesDir = resolve(import.meta.dir, "../tests/fixtures");
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--fixtures-dir" && args[i + 1]) {
       fixturesDir = resolve(args[++i]!);

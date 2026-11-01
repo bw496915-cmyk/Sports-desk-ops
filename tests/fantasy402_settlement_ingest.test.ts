@@ -131,7 +131,7 @@ describe("fantasy402_settlement_ingest", () => {
       cmd: [
         "bun",
         "run",
-        "sportsdesk_settlement_cli.ts",
+        "cli/sportsdesk_settlement_cli.ts",
         "ingest",
         "--db",
         dbPath,

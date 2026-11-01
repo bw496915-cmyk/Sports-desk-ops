@@ -18,18 +18,18 @@ import {
   REPORT_TYPES,
   SportsDeskTelegramService,
   isReportType,
-} from "./sportsdesk_telegram_bot.ts";
+} from "../services/sportsdesk_telegram_bot.ts";
 import {
   ReportingSchedulerService,
   startBotDaemon,
-} from "./reporting_scheduler_service.ts";
-import { runFullBettorSimulationPipeline } from "./simulate_bettor_churn_suite.ts";
-import { AgentOnePassPlugin } from "./agent_onepass_plugin.ts";
+} from "../services/reporting_scheduler_service.ts";
+import { runFullBettorSimulationPipeline } from "../services/simulate_bettor_churn_suite.ts";
+import { AgentOnePassPlugin } from "../services/agent_onepass_plugin.ts";
 import {
   syncReportsDirectory,
   verifyR2Connection,
   getR2ConfigInfo,
-} from "./sportsdesk_r2_sync.ts";
+} from "../services/sportsdesk_r2_sync.ts";
 
 import {
   parseAsCents,
@@ -53,24 +53,24 @@ import {
   ROUTE_CIRCUITS,
   TELEMETRY_SURFACES,
   ALL_QWEN_TOKENS,
-} from "./domain-branded-types.ts";
-import { assertUniqueTokenColors } from "./validation/token_validator.ts";
-import { printAnsiMarkdown } from "./lib/canonical_osc8_links.ts";
+} from "../domain-branded-types.ts";
+import { assertUniqueTokenColors } from "../validation/token_validator.ts";
+import { printAnsiMarkdown } from "../lib/canonical_osc8_links.ts";
 import {
   executePlayerColumnMutation,
   executeVigSetupInsert,
   queryIpTrackerWebLog,
   fetchPlayerInfo,
-} from "./lib/fantasy402_manager_wire.ts";
+} from "../lib/fantasy402_manager_wire.ts";
 import {
   TEN_MODE_CATALOG,
   buildTenModeLiveSnapshot,
-} from "./lib/forensic_diagnostic_modes.ts";
-import { buildGsLiveDualSurfaceDescriptor } from "./lib/gslive_manager_deeplink_sidecar.ts";
+} from "../lib/forensic_diagnostic_modes.ts";
+import { buildGsLiveDualSurfaceDescriptor } from "../lib/gslive_manager_deeplink_sidecar.ts";
 import {
   PER_OFFICE_IP_TRACKER_CLUSTERS,
   buildPerOfficeIpMatcherPayload,
-} from "./lib/bet_ticker_ip_tracker_bridge.ts";
+} from "../lib/bet_ticker_ip_tracker_bridge.ts";
 
 interface DownlineMetadata {
   readonly master_agent: string;
@@ -105,13 +105,15 @@ interface DownlinePayload {
   readonly agents: readonly AgentDownlineRecord[];
 }
 
-const currentDir =
+const repoRoot = resolve(
   typeof import.meta !== "undefined" && import.meta.dir
     ? import.meta.dir
-    : dirname(process.argv[1] || ".");
+    : dirname(process.argv[1] || "."),
+  "..",
+);
 
 function loadDownlineData(): DownlinePayload {
-  const jsonPath = resolve(currentDir, "sportsdesk_downline_data.json");
+  const jsonPath = resolve(repoRoot, "sportsdesk_downline_data.json");
   if (existsSync(jsonPath)) {
     const rawText = readFileSync(jsonPath, "utf-8");
     return JSON.parse(rawText) as DownlinePayload;
@@ -1498,27 +1500,27 @@ export async function main(): Promise<void> {
 
   if (cmd === "combo") {
     const { runPolymarketCombo } =
-      await import("./scripts/polymarket_combo_cli.ts");
+      await import("../scripts/polymarket_combo_cli.ts");
     await runPolymarketCombo(rawArgs.slice(1));
     return;
   }
 
   if (cmd === "profile") {
     const { runPolymarketProfile } =
-      await import("./scripts/polymarket_profile_cli.ts");
+      await import("../scripts/polymarket_profile_cli.ts");
     await runPolymarketProfile(rawArgs.slice(1));
     return;
   }
 
   if (cmd === "bridge" || cmd === "crossdomain") {
     const { runCustomerBridge } =
-      await import("./scripts/customer_bridge_cli.ts");
+      await import("../scripts/customer_bridge_cli.ts");
     await runCustomerBridge(rawArgs.slice(1));
     return;
   }
 
   if (cmd === "shot" || cmd === "screenshot") {
-    const { runWebviewShot } = await import("./scripts/webview_shot_cli.ts");
+    const { runWebviewShot } = await import("../scripts/webview_shot_cli.ts");
     await runWebviewShot(rawArgs.slice(1));
     return;
   }
@@ -1653,10 +1655,10 @@ export async function main(): Promise<void> {
   }
 
   if (cmd === "replay" || cmd === "ingestion-replay") {
-    const replayArgs = ["bun", "run", "sportsdesk_replay_cli.ts"];
+    const replayArgs = ["bun", "run", "cli/sportsdesk_replay_cli.ts"];
     for (const a of rawArgs.slice(1)) replayArgs.push(a);
     const proc = Bun.spawn(replayArgs, {
-      cwd: currentDir,
+      cwd: repoRoot,
       stdout: "inherit",
       stderr: "inherit",
       stdin: "inherit",
@@ -1824,7 +1826,7 @@ export async function main(): Promise<void> {
       const proc = Bun.spawn(
         ["bun", "run", "scripts/audit_docs_webview_cron.ts"],
         {
-          cwd: currentDir,
+          cwd: repoRoot,
           stdout: "inherit",
           stderr: "inherit",
           stdin: "inherit",
@@ -1838,7 +1840,7 @@ export async function main(): Promise<void> {
       const proc = Bun.spawn(
         ["bun", "run", "scripts/audit_docs_webview_cron.ts", "--watch"],
         {
-          cwd: currentDir,
+          cwd: repoRoot,
           stdout: "inherit",
           stderr: "inherit",
           stdin: "inherit",
@@ -1848,7 +1850,7 @@ export async function main(): Promise<void> {
       return;
     }
 
-    const scriptArgs = ["./deploy_docs.sh"];
+    const scriptArgs = ["./scripts/deploy/deploy_docs.sh"];
     if (rawArgs.includes("--test") || rawArgs.includes("-t"))
       scriptArgs.push("--test-only");
     if (rawArgs.includes("--dry-run") || rawArgs.includes("-d"))
@@ -1864,7 +1866,7 @@ export async function main(): Promise<void> {
     }
 
     const proc = Bun.spawn(scriptArgs, {
-      cwd: currentDir,
+      cwd: repoRoot,
       stdout: "inherit",
       stderr: "inherit",
       stdin: "inherit",

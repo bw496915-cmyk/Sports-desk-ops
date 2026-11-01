@@ -13,6 +13,10 @@ verification/gen-tokens-zero-drift-gate/out/
 *.bundle
 *.tar.gz
 
+# Local SQLite and scratch notes at repo root
+customers.sqlite
+Untitled.txt.rtf
+
 # Customer and downline datasets stay local (public repo)
 enriched_customers_full.json
 sportsdesk_downline_data.json

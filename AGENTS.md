@@ -5,7 +5,7 @@ portal and the VPS service. 397 TypeScript files, 89 scripts, 139 tests. Bun **1
 
 ## Entrypoint and the gate chain
 
-`./bin/dx` is the operator entrypoint (`README.md:11-15`); `deploy_to_vps.sh` / `./bin/dx deploy`
+`./bin/dx` is the operator entrypoint (`README.md:11-15`); `scripts/deploy/deploy_to_vps.sh` / `./bin/dx deploy`
 ship to the VPS. CI runs an eight-part chain — reproduce it locally in this order before claiming a
 change works:
 

@@ -3,20 +3,20 @@
  * Fantasy402 settlement/history poll — append-only wager lifecycle ingest (Option A).
  */
 
-import { openSportsdeskSqlite } from "./lib/sportsdesk_sqlite.ts";
+import { openSportsdeskSqlite } from "../lib/sportsdesk_sqlite.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { auditRunId, type AuditRunId } from "./lib/audit_run_id.ts";
+import { auditRunId, type AuditRunId } from "../lib/audit_run_id.ts";
 import {
   createWagerSettlementStore,
   pollManagerGetHistory,
   SETTLEMENT_EXIT_STORE_INVARIANT,
   type SettlementPollBatch,
-} from "./lib/fantasy402_settlement_ingest.ts";
+} from "../lib/fantasy402_settlement_ingest.ts";
 import {
   activeWagerObservationSlicesForSettlementCount,
   patternProvability,
-} from "./lib/fantasy402_wager_universe_scope.ts";
+} from "../lib/fantasy402_wager_universe_scope.ts";
 
 type GlobalOpts = { json: boolean };
 

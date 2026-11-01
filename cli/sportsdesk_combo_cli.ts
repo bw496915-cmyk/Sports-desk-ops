@@ -3,21 +3,21 @@
  * Universal combo index + venue lead-lag (not actor copy-trading).
  */
 
-import { openSportsdeskSqlite } from "./lib/sportsdesk_sqlite.ts";
+import { openSportsdeskSqlite } from "../lib/sportsdesk_sqlite.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { auditRunAt, auditRunId, type AuditRunId } from "./lib/audit_run_id.ts";
+import { auditRunAt, auditRunId, type AuditRunId } from "../lib/audit_run_id.ts";
 import {
   canonicalComboFromWire,
   deriveCanonicalComboId,
   type InternalComboWire,
   type PolymarketComboWire,
-} from "./lib/canonical_combo_index.ts";
-import { createComboVenueStore } from "./lib/combo_venue_store.ts";
+} from "../lib/canonical_combo_index.ts";
+import { createComboVenueStore } from "../lib/combo_venue_store.ts";
 import {
   formatLeadLagReport,
   summarizeVenueLeadLag,
-} from "./lib/venue_lead_lag.ts";
+} from "../lib/venue_lead_lag.ts";
 
 type GlobalOpts = { json: boolean };
 

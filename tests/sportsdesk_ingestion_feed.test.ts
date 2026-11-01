@@ -3,11 +3,11 @@ import { join } from "node:path";
 import {
   pullRawIngestionFeed,
   resolveIngestionFeedSource,
-} from "../sportsdesk_ingestion_feed.ts";
+} from "../services/sportsdesk_ingestion_feed.ts";
 import {
   ingestionFeedPullExitCode,
   pullIngestionFeedWithProvenance,
-} from "../sportsdesk_ingestion_feed_provenance.ts";
+} from "../services/sportsdesk_ingestion_feed_provenance.ts";
 
 describe("sportsdesk_ingestion_feed", () => {
   test("resolve explicit URL", () => {

@@ -46,10 +46,12 @@ function adminRejection(
     : { status: 401, error: "Missing or wrong admin token" };
 }
 
-const currentDir =
+const repoRoot = resolve(
   typeof import.meta !== "undefined" && import.meta.dir
     ? import.meta.dir
-    : dirname(process.argv[1] || ".");
+    : dirname(process.argv[1] || "."),
+  "..",
+);
 
 export interface ServerOptions {
   readonly port?: number;
@@ -62,12 +64,12 @@ export function startServer(options?: ServerOptions) {
   const telegramService = new SportsDeskTelegramService();
   const scheduler = new ReportingSchedulerService(telegramService);
   const customerDashboardPath = resolve(
-    currentDir,
-    "customer-churn-simulation-dashboard.html",
+    repoRoot,
+    "static/customer-churn-simulation-dashboard.html",
   );
   const miniappDashboardPath = resolve(
-    currentDir,
-    "telegram-miniapp-dashboard.html",
+    repoRoot,
+    "static/telegram-miniapp-dashboard.html",
   );
 
   const customerDashboardFile = Bun.file(customerDashboardPath);
@@ -157,7 +159,7 @@ export function startServer(options?: ServerOptions) {
         pathname === "/graph.html" ||
         pathname === "/surveillance-graph"
       ) {
-        return new Response(Bun.file(resolve(currentDir, "docs/graph.html")), {
+        return new Response(Bun.file(resolve(repoRoot, "docs/graph.html")), {
           headers: {
             ...corsHeaders,
             "Content-Type": "text/html; charset=utf-8",
@@ -166,7 +168,7 @@ export function startServer(options?: ServerOptions) {
       }
 
       if (pathname === "/graph.js") {
-        return new Response(Bun.file(resolve(currentDir, "docs/graph.js")), {
+        return new Response(Bun.file(resolve(repoRoot, "docs/graph.js")), {
           headers: {
             ...corsHeaders,
             "Content-Type": "application/javascript; charset=utf-8",

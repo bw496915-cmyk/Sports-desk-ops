@@ -8,7 +8,7 @@ import { type AuditRunId, type IsoDateTimeUtc } from "./audit_run_id.ts";
 import type { ComboLegSemantic } from "./canonical_combo_index.ts";
 import { serializeComboLegs } from "./canonical_combo_index.ts";
 import { canonicalJsonString } from "./match_evaluation_canonical.ts";
-import { sha256HexOfBytes } from "../sportsdesk_ingestion_feed_provenance.ts";
+import { sha256HexOfBytes } from "../services/sportsdesk_ingestion_feed_provenance.ts";
 
 export type ComboVenue = "internal" | "polymarket";
 

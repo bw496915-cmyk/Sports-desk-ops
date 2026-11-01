@@ -189,7 +189,7 @@ export class SportsDeskTelegramService {
         : process.env.TELEGRAM_ACTIVITY_LOG ||
           (process.env.NODE_ENV === "test"
             ? null
-            : resolve(import.meta.dir, "reports/telegram-activity.jsonl"));
+            : resolve(import.meta.dir, "../reports/telegram-activity.jsonl"));
     this.apiBaseUrl = options?.apiBaseUrl ?? "https://api.telegram.org";
     this.botToken = options?.botToken ?? process.env.TELEGRAM_BOT_TOKEN ?? "";
     this.defaultChatId = options?.chatId ?? process.env.TELEGRAM_CHAT_ID ?? "";

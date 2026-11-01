@@ -11,8 +11,8 @@ import { tmpdir } from "node:os";
 import {
   SportsDeskTelegramService,
   type TelegramUpdate,
-} from "../sportsdesk_telegram_bot.ts";
-import { ReportingSchedulerService } from "../reporting_scheduler_service.ts";
+} from "../services/sportsdesk_telegram_bot.ts";
+import { ReportingSchedulerService } from "../services/reporting_scheduler_service.ts";
 
 interface ApiCall {
   readonly method: string;
@@ -206,7 +206,7 @@ describe("Telegram activity log", () => {
 
 describe("Webview server Telegram endpoints", () => {
   let server: ReturnType<
-    typeof import("../sportsdesk_webview_server.ts").startServer
+    typeof import("../services/sportsdesk_webview_server.ts").startServer
   >;
   let base: string;
   const saved = {
@@ -218,7 +218,7 @@ describe("Webview server Telegram endpoints", () => {
   beforeAll(async () => {
     delete env.TELEGRAM_BOT_TOKEN;
     env.TELEGRAM_WEBHOOK_SECRET = "hook-secret";
-    const { startServer } = await import("../sportsdesk_webview_server.ts");
+    const { startServer } = await import("../services/sportsdesk_webview_server.ts");
     server = startServer({ port: 0, hostname: "127.0.0.1" });
     base = `http://127.0.0.1:${server.port}`;
   });

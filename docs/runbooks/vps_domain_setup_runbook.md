@@ -4,7 +4,7 @@ This guide details the deployment of the **SportsDesk & Fantasy402 Ops Daemon**,
 
 ## 1. Automated 1-Step Deployment
 
-The included script `deploy_to_vps.sh` automates the entire installation:
+The included script `scripts/deploy/deploy_to_vps.sh` automates the entire installation:
 
 1. Copy the project files to your VPS:
 
@@ -17,8 +17,8 @@ scp -r sportsdesk-ops/* root@<YOUR_VPS_IP>:/opt/sportsdesk-ops/
 ```bash
 ssh root@<YOUR_VPS_IP>
 cd /opt/sportsdesk-ops
-chmod +x deploy_to_vps.sh
-./deploy_to_vps.sh desk.yourdomain.com
+chmod +x scripts/deploy/deploy_to_vps.sh
+./scripts/deploy/deploy_to_vps.sh desk.yourdomain.com
 ```
 
 The script automatically:

@@ -80,26 +80,26 @@ echo -e "      Bun binary found at: ${BOLD}${BUN_BIN}${NC}"
 
 # Step 3: Deploy Application Files
 echo -e "${GREEN}[3/7] Setting up application directory at ${APP_DIR}...${NC}"
-mkdir -p "$APP_DIR"
+mkdir -p "$APP_DIR" "$APP_DIR/static"
 
-# Copy files from current working directory
+# Copy application tree from repository root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cp -f "${SCRIPT_DIR}"/sportsdesk_webview_server.ts "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/sportsdesk_telegram_bot.ts "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/sportsdesk_cli.ts "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/reporting_scheduler_service.ts "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/agent_onepass_plugin.ts "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/simulate_bettor_churn_suite.ts "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/telegram-miniapp-dashboard.html "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/customer-churn-simulation-dashboard.html "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/*.json "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/*.csv "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/*.xlsx "$APP_DIR/" 2>/dev/null || true
-cp -f "${SCRIPT_DIR}"/package.json "$APP_DIR/" 2>/dev/null || true
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+for dir in cli services lib static catalog validation; do
+  mkdir -p "${APP_DIR}/${dir}"
+  cp -R "${REPO_ROOT}/${dir}/." "${APP_DIR}/${dir}/" 2>/dev/null || true
+done
+mkdir -p "${APP_DIR}/docs"
+cp -f "${REPO_ROOT}/docs/graph.html" "${REPO_ROOT}/docs/graph.js" "${APP_DIR}/docs/" 2>/dev/null || true
+cp -f "${REPO_ROOT}/domain-branded-types.ts" "${REPO_ROOT}/tokens.toml" "${APP_DIR}/" 2>/dev/null || true
+cp -f "${REPO_ROOT}"/*.json "${APP_DIR}/" 2>/dev/null || true
+cp -f "${REPO_ROOT}"/*.csv "${APP_DIR}/" 2>/dev/null || true
+cp -f "${REPO_ROOT}"/*.xlsx "${APP_DIR}/" 2>/dev/null || true
+cp -f "${REPO_ROOT}/package.json" "${APP_DIR}/" 2>/dev/null || true
 
 # Prepare Production .env
-if [ -f "${SCRIPT_DIR}/.env" ]; then
-  cp -f "${SCRIPT_DIR}/.env" "$APP_DIR/.env"
+if [ -f "${REPO_ROOT}/.env" ]; then
+  cp -f "${REPO_ROOT}/.env" "$APP_DIR/.env"
 else
   cat <<EOF > "$APP_DIR/.env"
 # Fantasy402 Portal Gateway
@@ -156,7 +156,7 @@ EnvironmentFile=${APP_DIR}/.env
 Environment="BUN_SOCKET=/run/sportsdesk/webview.sock"
 RuntimeDirectory=sportsdesk
 RuntimeDirectoryMode=0755
-ExecStart=${BUN_BIN} run sportsdesk_webview_server.ts
+ExecStart=${BUN_BIN} run services/sportsdesk_webview_server.ts
 Restart=always
 RestartSec=5s
 KillMode=process

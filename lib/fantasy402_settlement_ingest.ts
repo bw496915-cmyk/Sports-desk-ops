@@ -10,7 +10,7 @@ import {
   type IsoDateTimeUtc,
 } from "./audit_run_id.ts";
 import { canonicalJsonString } from "./match_evaluation_canonical.ts";
-import { sha256HexOfBytes } from "../sportsdesk_ingestion_feed_provenance.ts";
+import { sha256HexOfBytes } from "../services/sportsdesk_ingestion_feed_provenance.ts";
 /** Same semantics as candidate verify/replay store invariant exit (5). */
 export const SETTLEMENT_EXIT_STORE_INVARIANT = 5;
 

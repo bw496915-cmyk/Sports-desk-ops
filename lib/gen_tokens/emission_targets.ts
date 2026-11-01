@@ -21,12 +21,12 @@ export const GEN_TOKEN_EMISSION_TARGETS: readonly GenTokenEmissionTarget[] = [
     reset: "rm-before-gen",
   },
   {
-    repoPath: "customer-churn-simulation-dashboard.html",
+    repoPath: "static/customer-churn-simulation-dashboard.html",
     mode: "splice-from-committed",
     reset: "git-checkout-head",
   },
   {
-    repoPath: "telegram-miniapp-dashboard.html",
+    repoPath: "static/telegram-miniapp-dashboard.html",
     mode: "splice-from-committed",
     reset: "git-checkout-head",
   },

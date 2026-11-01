@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { buildCatalogDiffReport } from "../fantasy402_sport_catalog_diff.ts";
+import { buildCatalogDiffReport } from "../catalog/fantasy402_sport_catalog_diff.ts";
 import {
   configuredExpectedEmptySubSportNameCount,
   computeCatalogProvenance,
@@ -11,7 +11,7 @@ import {
   periodTemplateKey,
   parseFantasy402SportCatalog,
   validateFantasy402SportCatalog,
-} from "../fantasy402_sport_catalog.ts";
+} from "../catalog/fantasy402_sport_catalog.ts";
 
 const FIXTURE = join(
   import.meta.dir,

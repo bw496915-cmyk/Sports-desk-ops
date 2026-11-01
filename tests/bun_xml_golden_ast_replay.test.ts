@@ -10,7 +10,7 @@ import {
 import {
   replayIngestionExitCode,
   replaySportsdeskIngestionLog,
-} from "../sportsdesk_ingestion_replay.ts";
+} from "../services/sportsdesk_ingestion_replay.ts";
 
 describe("bun_xml_golden_ast_replay", () => {
   test("enrichIngestionJsonlRowWithXmlGoldenAst adds stable pin", () => {

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { SportsDeskTelegramService } from "../sportsdesk_telegram_bot.ts";
+import { SportsDeskTelegramService } from "../services/sportsdesk_telegram_bot.ts";
 
 describe("Outbound Fetch Timeout Hardening (AbortSignal.timeout)", () => {
   let slowServer: ReturnType<typeof Bun.serve>;

@@ -3,7 +3,7 @@
  * Reference metadata only — not ingestion-audit.jsonl.
  */
 
-import { sha256HexOfBytes } from "./sportsdesk_ingestion_feed_provenance.ts";
+import { sha256HexOfBytes } from "../services/sportsdesk_ingestion_feed_provenance.ts";
 
 export type Fantasy402SubSport = {
   code: string;

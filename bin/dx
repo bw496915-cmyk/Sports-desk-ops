@@ -191,7 +191,7 @@ EOF
     ;;
   gslive)
     cd "$REPO_ROOT"
-    exec bun run sportsdesk_cli.ts gslive "$@"
+    exec bun run cli/sportsdesk_cli.ts gslive "$@"
     ;;
   docs|api-docs|api)
     cd "$REPO_ROOT"
@@ -203,19 +203,19 @@ EOF
     ;;
   profile)
     cd "$REPO_ROOT"
-    exec bun run sportsdesk_cli.ts profile "$@"
+    exec bun run cli/sportsdesk_cli.ts profile "$@"
     ;;
   combo)
     cd "$REPO_ROOT"
-    exec bun run sportsdesk_cli.ts combo "$@"
+    exec bun run cli/sportsdesk_cli.ts combo "$@"
     ;;
   bridge|crossdomain)
     cd "$REPO_ROOT"
-    exec bun run sportsdesk_cli.ts bridge "$@"
+    exec bun run cli/sportsdesk_cli.ts bridge "$@"
     ;;
   shot|screenshot)
     cd "$REPO_ROOT"
-    exec bun run sportsdesk_cli.ts shot "$@"
+    exec bun run cli/sportsdesk_cli.ts shot "$@"
     ;;
   backtest)
     cd "$REPO_ROOT"

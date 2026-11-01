@@ -3,14 +3,14 @@ import { join } from "node:path";
 import {
   deriveCollisionsFromSports,
   loadFantasy402SportCatalogFromFile,
-} from "../fantasy402_sport_catalog.ts";
+} from "../catalog/fantasy402_sport_catalog.ts";
 
 const FIXTURE = join(
   import.meta.dir,
   "fixtures/fantasy402-sport-catalog-2026-10-21.json",
 );
 
-const CLI = join(import.meta.dir, "../sportsdesk_catalog_cli.ts");
+const CLI = join(import.meta.dir, "../cli/sportsdesk_catalog_cli.ts");
 
 async function runCatalog(
   args: string[],

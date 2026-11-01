@@ -61,7 +61,7 @@ describe("Server Latency & Throughput Benchmark", () => {
   test("bench_bun_file_lazy_handle_vs_manual_read_file_sync", () => {
     const filePath = resolve(
       import.meta.dir,
-      "../customer-churn-simulation-dashboard.html",
+      "../static/customer-churn-simulation-dashboard.html",
     );
     const fileSizeKb = (readFileSync(filePath).length / 1024).toFixed(1);
     const iterations = 1000;

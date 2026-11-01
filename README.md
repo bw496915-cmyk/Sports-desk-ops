@@ -46,7 +46,7 @@ SPORTSDESK_LIVE_INGEST=1 ./bin/dx deploy
 
 - Operations: [docs/schema-dump-operations.md](docs/schema-dump-operations.md) (`schema:dump-prod`, `schema:sync-prod-dump`, fixture allowlist, `captured_at`)
 - Failure modes: [docs/schema-sqlite-failure-mode-matrix.md](docs/schema-sqlite-failure-mode-matrix.md) (parity exit **2** / **3**, `bun:sqlite` strict + safe integers)
-- CLI: `bun run sportsdesk_schema_cli.ts --help`
+- CLI: `bun run schema --help` (sources in `cli/sportsdesk_schema_cli.ts`)
 - CI gate: `bun run schema:gate` · lag metric: `bun run schema:dump-lag`
 - After registry edits: `bun run schema:sync-prod-dump` then commit `tests/fixtures/prod-schema.json` (see [schema-dump-operations.md](docs/schema-dump-operations.md))
 - Index: [docs/README.md](docs/README.md) · diagram: [docs/assets/ARCH-Guide.jpg](docs/assets/ARCH-Guide.jpg)
@@ -62,10 +62,10 @@ bun --version
 bun install --frozen-lockfile
 
 # 1. Inspect nominal branded types & domain invariants
-bun run sportsdesk_cli.ts -b
+bun run cli -b
 
 # 2. Inspect Qwen3.5-4B (Layers 18-28) neuron token registry with TrueColor ANSI swatches
-bun run sportsdesk_cli.ts -N
+bun run cli -N
 
 # 3. Verify design tokens, CIEDE2000 color distance, and WCAG contrast (592 assertions)
 bun test tests/verify_tokens.test.ts
@@ -77,13 +77,13 @@ bun run gen:tokens
 bun test
 
 # 6. Run 24h sniper surveillance
-bun run sportsdesk_cli.ts winners -p 24h --limit 25
+bun run cli winners -p 24h --limit 25
 
 # 7. Generate all 7 auditable surveillance reports
-./run_reports.sh --format table
+bun run reports -- --format table
 
 # 8. Run 52-week bettor churn simulation
-bun run simulate_bettor_churn_suite.ts
+bun run sim
 ```
 
 Repository lint uses exact-pinned Oxlint through Bun; stable Bun 1.4.4 does not
@@ -134,7 +134,7 @@ Server binding in `sportsdesk_webview_server.ts` adheres to Bun's native port re
 
 ### Static File Serving & Zero-Copy Policy
 
-Static HTML surfaces (`customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`) are served via native `new Response(Bun.file(path))` lazy handles.
+Static HTML surfaces under `static/` (`customer-churn-simulation-dashboard.html` and `telegram-miniapp-dashboard.html`) are served via native `new Response(Bun.file(path))` lazy handles.
 
 - **Zero-Copy Specification & Boundary Conditions**: Official Bun runtime documentation specifies kernel zero-copy transfer (`sendfile(2)` on Linux, `copyfile` on macOS) specifically for outbound client file uploads (`fetch(url, { method: "POST", body: Bun.file(...) })`). This optimization activates exclusively under four strict preconditions:
   1. Payload size strictly exceeds 32 KB (under 32 KB, direct in-memory buffer reads outperform kernel syscall setup).
@@ -198,7 +198,7 @@ bun sportsdesk_cli.ts replay --path reports/ingestion-audit.jsonl --json
 
 **Bun.XML golden AST (Plane 1 pin / Plane 3 verify):** each row with `xml` may carry `xml_golden_ast_sha256` and `bun_version` (`sha256` of `Bun.JSON5.stringify(Bun.XML.parse(xml.trim(), { compact: false }))`). Replay verifies pins unless `--no-verify-xml-golden`; `--strict-xml-golden` requires a pin on every `xml` row. Exit precedence: corrupt **1** → tx **2** → SLA **3** → golden drift **4**. Backfill pins: `bun run ingestion:enrich-xml-golden -- in.jsonl [out.jsonl]`.
 
-Implementation: `sportsdesk_ingestion_replay.ts`, `lib/bun_xml_golden_ast_replay.ts`, drain mirror `lib/jsonl_stream_replay.ts`, runbook §8.4 in `bun_server_runtime_shapes_runbook.md`.
+Implementation: `sportsdesk_ingestion_replay.ts`, `lib/bun_xml_golden_ast_replay.ts`, drain mirror `lib/jsonl_stream_replay.ts`, runbook §8.4 in `docs/runbooks/bun_server_runtime_shapes_runbook.md`.
 
 ## Qwen3.5-4B (Layers 18–28) Token Architecture & Single Source of Truth
 
@@ -245,7 +245,7 @@ export enum MitigationActionKind { ... }
 
 All tokens and contracts are verified continuously through `validation/token_validator.ts` and `tests/`:
 
-1. **Zero Drift**: `bun run gen:tokens:gate` (CI step) resets generated outputs, regens from `tokens.toml`, and fails on drift for `domain-branded-types.ts`, `customer-churn-simulation-dashboard.html`, and `telegram-miniapp-dashboard.html`.
+1. **Zero Drift**: `bun run gen:tokens:gate` (CI step) resets generated outputs, regens from `tokens.toml`, and fails on drift for `domain-branded-types.ts` and the two dashboards under `static/`.
 2. **24-bit Exact Uniqueness**: 13 unique `ColorHexInt` values derived from `Bun.color()`.
 3. **CIEDE2000 Perceptual Separation ($\Delta E\_{00} \ge 7.0$)**: Mathematically verified color distance floor across all token pairs, preventing indistinguishable UI swatches.
 4. **WCAG 2.1 Contrast Standards**: $\ge 3.0:1$ for graphical UI badges against dark surfaces (`#070b14` / `#0b1329`) and $\ge 4.5:1$ for typography.
@@ -278,50 +278,31 @@ The test suite consists of 10 test suites across 34 tests and 813 total assertio
 
 ## Project Structure
 
+See **[ROOT_LAYOUT.md](ROOT_LAYOUT.md)** for the full map. At a glance:
+
 ```
-├── tokens.toml                              # Single Source of Truth (SSOT) for design tokens
-├── scripts/
-│   └── generate_tokens.ts                   # Token compiler (TOML -> TS, CSS, HTML)
-├── validation/
-│   └── token_validator.ts                   # CIEDE2000, WCAG 2.1, and token invariant validators
-├── tests/
-│   ├── verify_tokens.test.ts                # Token verification (242 table-driven, 350 property-based assertions)
-│   ├── server_headers.test.ts               # Header snapshot: no X-Frame-Options, CSP frame-ancestors
-│   ├── server_port.test.ts                  # BUN_PORT=4100 cascade verification
-│   ├── server_error.test.ts                 # Production error boundary without stack traces
-│   ├── env_types.test-d.ts                  # Bun.env vs process.env type parity
-│   ├── env_types.test.ts                    # Test runner for env_types
-│   ├── bench_server.test.ts                 # Latency benchmarks: Response.json & Bun.file lazy handles
-│   ├── sendfile_threshold.test.ts           # 16KB, 64KB, 1MB handle latency vs socket transfer benchmark
-│   ├── fetch_timeout.test.ts                # Outbound AbortSignal.timeout enforcement tests
-│   ├── fetch_proxy_isolation.test.ts        # NO_PROXY loopback isolation tests
-│   └── fetch_url_credentials.test.ts        # Codebase audit: 0 URL credentials, 0 rejectUnauthorized: false
-├── domain-branded-types.ts                  # Nominal branded primitives, discriminated unions & tables
-├── env.d.ts                                 # Bun.Env & NodeJS.ProcessEnv interface merging
-├── sportsdesk_webview_server.ts             # Native Bun HTTP server & Telegram Mini App gateway
-├── sportsdesk_cli.ts                        # Surveillance CLI, TrueColor neuron registry (-N), R2 sync
-├── simulate_bettor_churn_suite.ts           # 52-week dual-basis bettor churn simulation suite
-├── customer-churn-simulation-dashboard.html # Webview executive churn dashboard
-├── telegram-miniapp-dashboard.html          # Telegram Mini App (TMA) mobile dashboard
-├── sportsdesk_r2_sync.ts                    # Zero-dependency Cloudflare R2 S3 SigV4 sync client
-├── sportsdesk_telegram_bot.ts               # Telegram wager alert dispatcher & bot commands
-├── reporting_scheduler_service.ts           # 08:00, 13:00, 23:00 EDT scheduled reporting daemon
-├── agent_onepass_plugin.ts                  # Single-pass streaming 50% liability portfolio accumulator
-├── run_reports.sh                           # 7-report auditable surveillance pipeline
-├── deploy_to_vps.sh                         # Production Systemd, Nginx, Let's Encrypt installer
-├── token_architecture_and_verification_runbook.md # Detailed token taxonomy and CI mathematics
-├── bun_server_runtime_shapes_runbook.md     # Bun HTTP Server, WebSocketHandler & TLSOptions specification
-├── cloudflare_r2_and_api_runbook.md         # Cloudflare API & R2 credentials guide
-├── os_bun_cron_integration_guide.md         # OS crontab and Bun cron integration guide
-└── vps_domain_setup_runbook.md              # Production VPS domain deployment runbook
+├── cli/              # sportsdesk_* CLIs (bun run cli, schema, replay, …)
+├── services/         # webview daemon, Telegram bot, R2, churn engine, ingestion
+├── catalog/          # Fantasy402 sport navigation catalog
+├── lib/              # shared modules, F402 capture, schema SSOT
+├── scripts/          # generators & capture; scripts/deploy/ for VPS/docs/reports
+├── static/           # token-compiled daemon HTML
+├── docs/             # API evidence portal; docs/runbooks/ for long-form ops guides
+├── tests/            # bun test suites
+├── bin/dx            # operator entrypoint
+├── domain-branded-types.ts
+└── tokens.toml
 ```
 
 ## Documentation Runbooks
 
-- [Bun Server Runtime Shapes Runbook](bun_server_runtime_shapes_runbook.md) — Comprehensive specification of `Server extends Disposable`, `WebSocketHandler<T>`, and `TLSOptions`.
-- [Token Architecture & Verification Runbook](token_architecture_and_verification_runbook.md) — Mathematical specification of CIEDE2000, WCAG contrast, and token code generation.
-- [Cloudflare R2 & API Runbook](cloudflare_r2_and_api_runbook.md) — Complete Cloudflare API & R2 storage guide.
-- [OS Bun Cron Integration Guide](os_bun_cron_integration_guide.md) — OS crontab and systemd timer integration guide.
-- [VPS Domain Setup Runbook](vps_domain_setup_runbook.md) — Production VPS deployment guide.
+See [docs/runbooks/README.md](docs/runbooks/README.md) for the full index. Highlights:
+
+- [Bun Server Runtime Shapes Runbook](docs/runbooks/bun_server_runtime_shapes_runbook.md) — `Server extends Disposable`, `WebSocketHandler<T>`, and `TLSOptions`.
+- [Token Architecture & Verification Runbook](docs/runbooks/token_architecture_and_verification_runbook.md) — CIEDE2000, WCAG contrast, and token code generation.
+- [Cloudflare R2 & API Runbook](docs/runbooks/cloudflare_r2_and_api_runbook.md) — Cloudflare API & R2 storage guide.
+- [Operational Guardrails Runbook](docs/runbooks/operational_guardrails_runbook.md) — Manager wire evidence and capture guardrails.
+- [OS Bun Cron Integration Guide](docs/runbooks/os_bun_cron_integration_guide.md) — OS crontab and systemd timer integration.
+- [VPS Domain Setup Runbook](docs/runbooks/vps_domain_setup_runbook.md) — Production VPS deployment guide.
 - [GSLive report surfaces](docs/report-surfaces.md) — Operator map of the `#/reports/users` deep link and the `#/events/bet-history` sidecar, with an evidence level per surface.
 - [Real ingestion](docs/REAL_INGESTION.md) — Phase 4: live Polymarket positions (`--live`), provenance and stale-cache rules, and the F402 session plan.

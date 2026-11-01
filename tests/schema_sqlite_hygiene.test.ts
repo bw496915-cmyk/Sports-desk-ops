@@ -23,10 +23,10 @@ function listTsFilesUnder(dirRel: string): string[] {
   return out;
 }
 
-function listRootSportsdeskClis(): string[] {
-  return readdirSync(REPO_ROOT)
-    .filter((name) => name.startsWith("sportsdesk_") && name.endsWith(".ts"))
-    .map((name) => name);
+function listCliSportsdeskEntrypoints(): string[] {
+  return listTsFilesUnder("cli").filter((rel) =>
+    rel.startsWith("cli/sportsdesk_"),
+  );
 }
 
 function findRawDatabaseOpens(relPath: string): number[] {
@@ -45,7 +45,10 @@ function findRawDatabaseOpens(relPath: string): number[] {
 
 describe("schema_sqlite_hygiene", () => {
   test("lib/ and sportsdesk_*.ts open SQLite only via sportsdesk_sqlite.ts", () => {
-    const relPaths = [...listTsFilesUnder("lib"), ...listRootSportsdeskClis()];
+    const relPaths = [
+      ...listTsFilesUnder("lib"),
+      ...listCliSportsdeskEntrypoints(),
+    ];
     const violations: string[] = [];
     for (const rel of relPaths) {
       const norm = relative(REPO_ROOT, join(REPO_ROOT, rel)).replace(

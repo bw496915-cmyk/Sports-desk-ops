@@ -1,5 +1,5 @@
 import { describe, expect, test, afterAll, beforeAll } from "bun:test";
-import { startServer } from "../sportsdesk_webview_server.ts";
+import { startServer } from "../services/sportsdesk_webview_server.ts";
 
 describe("Server Headers & Security Policy Verification", () => {
   let server: ReturnType<typeof startServer>;

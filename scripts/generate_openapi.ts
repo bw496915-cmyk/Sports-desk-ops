@@ -70,8 +70,8 @@ const LEDGER_REL = join("docs", "evidence", "ledger.json");
 const CAPTURES_REL = join("docs", "evidence", "captures");
 const SPEC_REL = join("docs", "openapi.json");
 const EVIDENCE_MD_REL = join("docs", "EVIDENCE.md");
-const CATALOG_TYPE_SOURCE_REL = "fantasy402_sport_catalog.ts";
-const CHURN_TYPE_SOURCE_REL = "simulate_bettor_churn_suite.ts";
+const CATALOG_TYPE_SOURCE_REL = "catalog/fantasy402_sport_catalog.ts";
+const CHURN_TYPE_SOURCE_REL = "services/simulate_bettor_churn_suite.ts";
 const CATALOG_FIXTURE_REL = join(
   "tests",
   "fixtures",

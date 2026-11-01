@@ -39,37 +39,37 @@ import {
   schemaRegistrySourceUrl,
   sqliteDatabaseFileUrl,
   SqliteSchemaReport,
-} from "./lib/schema_report.ts";
+} from "../lib/schema_report.ts";
 import {
   isSqliteFileHeader,
   readDbHeaderBytes,
   reportToJsonWithBinary,
-} from "./lib/schema_binary.ts";
+} from "../lib/schema_binary.ts";
 import {
   emitSnapshot,
   schemaReportJsonDocument,
-} from "./lib/sqlite_schema_snapshot.ts";
+} from "../lib/sqlite_schema_snapshot.ts";
 import {
   assertSchemaReportValid,
   validateSchemaReport,
-} from "./lib/schema_validate.ts";
+} from "../lib/schema_validate.ts";
 import {
   schemaBinaryManifestEnabled,
   schemaStrictEnabled,
-} from "./lib/schema_runtime_flags.ts";
-import { SPORTSDESK_SQLITE_TABLES } from "./lib/sqlite_schema_registry.ts";
-import { schemaDatabaseUrlFromEnv } from "./lib/env.ts";
-import { parseTableParamFromUrl } from "./lib/urls-query.ts";
-import { asDatabaseURL } from "./lib/urls.ts";
+} from "../lib/schema_runtime_flags.ts";
+import { SPORTSDESK_SQLITE_TABLES } from "../lib/sqlite_schema_registry.ts";
+import { schemaDatabaseUrlFromEnv } from "../lib/env.ts";
+import { parseTableParamFromUrl } from "../lib/urls-query.ts";
+import { asDatabaseURL } from "../lib/urls.ts";
 import {
   formatSchemaError,
   maybeOpenSchemaError,
   registryFileUrl,
   ssotFileUrl,
-} from "./lib/schema_cli_errors.ts";
-import { SchemaUnknownTableError } from "./lib/schema_unknown_table_error.ts";
-import { assertSsotRegistryInSync } from "./lib/ssot_registry_sync.ts";
-import { parseSsotTableName } from "./lib/ssot_table_name.ts";
+} from "../lib/schema_cli_errors.ts";
+import { SchemaUnknownTableError } from "../lib/schema_unknown_table_error.ts";
+import { assertSsotRegistryInSync } from "../lib/ssot_registry_sync.ts";
+import { parseSsotTableName } from "../lib/ssot_table_name.ts";
 
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
@@ -154,7 +154,7 @@ Tables: ${listRegisteredTableNames().join(", ")}
 }
 
 async function listMigrationSqlFiles(): Promise<string[]> {
-  const cwd = join(import.meta.dir, "migrations");
+  const cwd = join(import.meta.dir, "../migrations");
   const glob = new Glob("**/*.sql");
   const files: string[] = [];
   for await (const file of glob.scan({ cwd, onlyFiles: true })) {
@@ -258,7 +258,7 @@ async function main(): Promise<number> {
   }
 
   const defaultManifestUrl = pathToFileURL(
-    resolve(import.meta.dir, "schema.manifest.bin"),
+    resolve(import.meta.dir, "../schema.manifest.bin"),
   );
   const manifestOutUrl = manifestPathEarly
     ? sqliteDatabaseFileUrl(resolve(manifestPathEarly))

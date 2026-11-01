@@ -11,9 +11,9 @@
  * 5. 5-minute surveillance daemon loop.
  */
 
-import { openSportsdeskSqlite } from "./lib/sportsdesk_sqlite.ts";
-import { createComboObservationsLegsStore } from "./lib/combo_observations_legs_store.ts";
-import { LayoffRiskEngine } from "./lib/layoff_risk_engine.ts";
+import { openSportsdeskSqlite } from "../lib/sportsdesk_sqlite.ts";
+import { createComboObservationsLegsStore } from "../lib/combo_observations_legs_store.ts";
+import { LayoffRiskEngine } from "../lib/layoff_risk_engine.ts";
 import { resolve } from "node:path";
 
 function printHelp(): void {
