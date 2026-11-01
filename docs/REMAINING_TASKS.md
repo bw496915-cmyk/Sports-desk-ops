@@ -104,6 +104,8 @@ so an id resolves without guessing which artifact it came from.
     `getTransactions`, `getGrading`, `getTicketDetailPrint` has a 2xx request **and** response capture, and
     `apply_captures` upgrades its ledger row.
   - **Blocked by:** an authenticated Manager session and a safe test account.
+  - **Safety:** `PendingDelete` is named like a mutation. The capture allowlist refuses mutation ops by
+    construction, so that endpoint needs an explicit read-only confirmation before it is added.
 
 - [ ] **P0.2 Verify the pre-fee PnL claim**
   - **Ref:** `RT-PREFEE-PNL`
