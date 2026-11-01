@@ -238,3 +238,36 @@ describe("results grid", () => {
     expect(html).not.toContain("holdPct");
   });
 });
+
+describe("the grading panel, which serves the export", () => {
+  test("its label is Graded Wagers and it has its own search action", () => {
+    // Report kind G renders this panel, so the button label and the action differ from the
+    // analysis panel's.
+    const gradeBtn = /<button[^>]*id="gradeBtn"[^>]*>([\s\S]*?)<\/button>/.exec(
+      live,
+    );
+    expect(gradeBtn?.[1]?.trim()).toBe("Graded Wagers");
+    expect(live).toContain('data-action="search-grading"');
+    expect(live).toContain('data-action="search"');
+  });
+
+  test("its date fields are startG/endG, not start/end", () => {
+    // Two panels, two sets of pickers. A builder that reads `start` would read the wrong input.
+    expect(live).toContain('data-field="startG"');
+    expect(live).toContain('data-field="endG"');
+    expect(live).toContain('data-field="start"');
+    expect(live).toContain('data-field="end"');
+  });
+
+  test("the export icon is shown in the grading panel and hidden in the analysis panel", () => {
+    // The graded export exists only because a search ran and un-hid the icon; the analysis panel's
+    // icon keeps `hide` and never appears. That is the difference between "export available" and
+    // "export column present but disabled".
+    const exports = [
+      ...live.matchAll(/<i[^>]*data-export="excel-action"[^>]*>/g),
+    ].map((match) => match[0]);
+    expect(exports).toHaveLength(2);
+    expect(exports.filter((tag) => /\bhide\b/.test(tag))).toHaveLength(1);
+    expect(exports.filter((tag) => !/\bhide\b/.test(tag))).toHaveLength(1);
+  });
+});

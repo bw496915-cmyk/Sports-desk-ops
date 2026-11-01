@@ -243,7 +243,10 @@ bodies were observed on 2026-11-01 — the all-periods call (`subsport`/`wagerTy
 The URL those bodies were POSTed to was not observed, and no response exists.
 `lib/f402_agent_performance_request.ts` now reproduces either body from a typed selection (byte-exact
 against both observations, catalog-validated), so the capture operator can generate the request instead
-of hand-building a curl. When the response arrives, the screen's own grid header
+of hand-building a curl. A 2026-11-01 export run also produced the graded workbook, reduced to
+`data/graded-wagers-export-2026-11-01.json` (shape only; the rows stay out of the repo), and showed
+that `getGrading` sends ISO dates and a self-referential `path` field where `getAgentPerformance`
+sends M/D/YYYY. When the response arrives, the screen's own grid header
 (`tests/fixtures/portal-agent-performance-filterbar-2026-11-01.html`: All Players and Agents · Won ·
 Lost · # of Bets · Risk · Net · Hold %age) is what to reconcile against — it is column markup, not a
 schema.

@@ -275,6 +275,21 @@ Asset names are validated (separators, control characters, `..`) and traversal i
   select sends a comma-separated value — `Straight` is `S,M,L,E,C` — so a consumer that assumes one
   code per selection is wrong. `betType` on this screen labels `M` as Money Line, which does **not**
   document the bet ticker's `WagerType=M`.
+- **Graded Wagers is its own panel**, with its own search action (`search-grading`), its own date
+  fields (`startG`/`endG`) and a working Excel export (`data-export="excel-action"`, un-hidden only
+  after a search). The Analysis panel carries the same export icon with `hide`, so its export never
+  appears. That is why an export of the graded report can exist while the analysis grid cannot be
+  exported at all.
+- **`getGrading` sends ISO dates and echoes its own path.** The observed body is
+  `path=/cloud/api/Report/getGrading&customerID=&agent=…&start=2026-11-01&end=2026-11-01&type=&operation=getGrading&RRO=1&agentID=…&agentOwner=…`
+  — ten fields, ISO `YYYY-MM-DD`, and a `path` field repeating the URL. `getAgentPerformance` sends
+  M/D/YYYY and no such field, so the same screen family uses two date formats and two body shapes.
+  The committed capture for `getGrading` records a three-field body (`customerID`, `operation`,
+  `token`); both shapes are real, and the skeleton is not the whole contract.
+- **A graded export is wager-level, not the grid.** `data/graded-wagers-export-2026-11-01.json`
+  records the shape of the workbook the export produced (Customer, Ticket Number, Accepted,
+  Description, Amount; 9,387 rows), while the Analysis grid renders seven aggregate columns per
+  agent. The workbook itself is not committed: every row carries a login and a ticket number.
 - **The grid's column headers are known; the response keys are not.** The rendered table names
   All Players and Agents · Won · Lost · # of Bets · Risk · Net · Hold %age. That is markup, not a
   response, so no JSON schema follows from it, and the fixture asserts that distinction.

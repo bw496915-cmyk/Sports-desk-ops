@@ -113,9 +113,7 @@ describe("observed manager requests (2026-11-01)", () => {
     // This is the correction: the repo inferred Report/getAgentPerformance from the action name,
     // and an observed call goes to Manager/. The fixture records the path and why it matters.
     const request = byOperation("getAgentPerformance");
-    expect(request.pathObserved).toBe(
-      "/cloud/api/Manager/getAgentPerformance",
-    );
+    expect(request.pathObserved).toBe("/cloud/api/Manager/getAgentPerformance");
     expect(request.pathStatus).toContain("contradicts");
     expect(request.pathObserved).not.toContain("/Report/");
     expect(Object.keys(request.fields)).toEqual([
@@ -146,12 +144,15 @@ describe("observed manager requests (2026-11-01)", () => {
 
   test("sport is padded to 20 characters on the wire", () => {
     // "Football" + 12 spaces. Trimming it is correct for parsing and wrong for a replay, so the
-    // padding is pinned rather than normalised away.
-    for (const request of fixture.requests) {
+    // padding is pinned rather than normalised away. getGrading sends no sport field at all.
+    const withSport = fixture.requests.filter(
+      (request) => request.fields.sport !== undefined,
+    );
+    expect(withSport.length).toBeGreaterThanOrEqual(2);
+    for (const request of withSport) {
       const sport = request.fields.sport ?? "";
-      expect(sport.trim()).toBe("Football");
       expect(sport).toHaveLength(20);
-      expect(sport).toBe("Football".padEnd(20, " "));
+      expect(sport.trim()).not.toBe("");
     }
   });
 
@@ -314,5 +315,62 @@ describe("the sport field, from two observations", () => {
     for (const variant of variants) {
       expect(padSportField(variant.sportTrimmed)).toBe(variant.sport);
     }
+  });
+});
+
+describe("the getGrading request", () => {
+  const request = byOperation("getGrading");
+
+  test("is under the Report prefix, unlike getAgentPerformance", () => {
+    // Two report operations, two prefixes. A single "reports live under one prefix" rule is wrong.
+    expect(request.pathObserved).toBe("/cloud/api/Report/getGrading");
+    expect(byOperation("getAgentPerformance").pathObserved).toBe(
+      "/cloud/api/Manager/getAgentPerformance",
+    );
+  });
+
+  test("echoes its own URL path in a body field", () => {
+    const path = request.pathObserved;
+    if (path === null) throw new Error("getGrading path was not observed");
+    expect(request.fields.path).toBe(path);
+  });
+
+  test("sends ISO dates where getAgentPerformance sends M/D/YYYY", () => {
+    // Recorded because it is a trap: the same screen family uses two date formats.
+    expect(request.fields.start).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(request.fields.end).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    const agentPerformance = byOperation("getAgentPerformance").fields;
+    expect(agentPerformance.start).toMatch(/^\d{1,2}\/\d{1,2}\/\d{4}$/);
+    expect(agentPerformance.start).not.toMatch(/^\d{4}-/);
+  });
+
+  test("sends empty customerID and type rather than omitting them", () => {
+    expect(Object.keys(request.fields)).toContain("customerID");
+    expect(request.fields.customerID).toBe("");
+    expect(request.fields.type).toBe("");
+  });
+
+  test("has no token field, though the capture record stored a 3-field body", () => {
+    // docs/evidence/captures/2026-11-01/getGrading.post.json records {customerID, operation, token}
+    // for this operation. This observed call sends ten fields and no token, so the two shapes are
+    // both real and the skeleton is not the whole contract.
+    expect(Object.keys(request.fields)).not.toContain("token");
+    expect(Object.keys(request.fields)).toHaveLength(10);
+  });
+
+  test("the form encoding round-trips to the pasted body", () => {
+    const placeholder = encodeURIComponent(fixture.agentPlaceholder);
+    const observed = (
+      "path=%2Fcloud%2Fapi%2FReport%2FgetGrading&customerID=&agent=<agent>" +
+      "&start=2026-11-01&end=2026-11-01&type=&operation=getGrading&RRO=1" +
+      "&agentID=<agent>&agentOwner=<agent>"
+    ).replaceAll("<agent>", placeholder);
+
+    expect(
+      new URLSearchParams(
+        Object.entries(request.fields) as [string, string][],
+      ).toString(),
+    ).toBe(observed);
   });
 });

@@ -6,48 +6,6 @@
   "responsesObserved": false,
   "requests": [
     {
-      "operation": "getSubSportByReport",
-      "pathObserved": "/cloud/api/Manager/getSubSportByReport",
-      "pathStatus": "observed",
-      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
-      "requestHeadersObserved": [
-        "x-requested-with: XMLHttpRequest",
-        "origin: https://fantasy402.com"
-      ],
-      "caller": {
-        "module": "app/manager/module/agent-performance.js?bust=1.0.280",
-        "function": "getSubsport",
-        "transport": "jQuery $.ajax",
-        "observedFrom": "browser stack trace, 2026-11-01 \u2014 send -> ajax -> getSubsport -> agent-performance.js"
-      },
-      "fields": {
-        "customerID": "<agent>",
-        "sport": "Football            ",
-        "operation": "getSubSportByReport",
-        "RRO": "1",
-        "agentID": "<agent>",
-        "agentOwner": "<agent>"
-      },
-      "sportVariants": [
-        {
-          "sport": "Football            ",
-          "sportTrimmed": "Football",
-          "paddedLength": 20
-        },
-        {
-          "sport": "Auto Racing         ",
-          "sportTrimmed": "Auto Racing",
-          "paddedLength": 20
-        },
-        {
-          "sport": "Tennis              ",
-          "sportTrimmed": "Tennis",
-          "paddedLength": 20
-        }
-      ],
-      "sportVariantsNote": "three observations of the same call: one single-word sport, one two-word sport and one short name; all pad to 20 characters, so the width is not a property of a particular name"
-    },
-    {
       "operation": "getAgentPerformance",
       "pathObserved": "/cloud/api/Manager/getAgentPerformance",
       "pathStatus": "observed 2026-11-01, third call. This contradicts the repo's inferred /cloud/api/Report/getAgentPerformance: the report is served by the Manager prefix, not Report.",
@@ -112,6 +70,67 @@
         "values": ["-1", "0"],
         "note": "the same CPS call was observed twice with everything else equal except period: -1 and 0. LIVE's catalog period menu has exactly one entry, number 0, named Game, so both are meaningful: -1 is unfiltered and 0 is the whole game."
       }
+    },
+    {
+      "operation": "getGrading",
+      "pathObserved": "/cloud/api/Report/getGrading",
+      "pathStatus": "observed 2026-11-01, fourth call. Note the Report prefix: getGrading really is under Report, unlike getAgentPerformance which is under Manager.",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "fields": {
+        "path": "/cloud/api/Report/getGrading",
+        "customerID": "",
+        "agent": "<agent>",
+        "start": "2026-11-01",
+        "end": "2026-11-01",
+        "type": "",
+        "operation": "getGrading",
+        "RRO": "1",
+        "agentID": "<agent>",
+        "agentOwner": "<agent>"
+      },
+      "fieldsNote": "Oddities worth keeping: the body echoes its own URL path in a `path` field; customerID and type are sent empty; there is no `token` field, although the committed capture record for this operation stores a 3-field body {customerID, operation, token}; and start/end are ISO YYYY-MM-DD here, where getAgentPerformance uses M/D/YYYY."
+    },
+    {
+      "operation": "getSubSportByReport",
+      "pathObserved": "/cloud/api/Manager/getSubSportByReport",
+      "pathStatus": "observed",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "requestHeadersObserved": [
+        "x-requested-with: XMLHttpRequest",
+        "origin: https://fantasy402.com"
+      ],
+      "caller": {
+        "module": "app/manager/module/agent-performance.js?bust=1.0.280",
+        "function": "getSubsport",
+        "transport": "jQuery $.ajax",
+        "observedFrom": "browser stack trace, 2026-11-01 \u2014 send -> ajax -> getSubsport -> agent-performance.js"
+      },
+      "fields": {
+        "customerID": "<agent>",
+        "sport": "Football            ",
+        "operation": "getSubSportByReport",
+        "RRO": "1",
+        "agentID": "<agent>",
+        "agentOwner": "<agent>"
+      },
+      "sportVariants": [
+        {
+          "sport": "Football            ",
+          "sportTrimmed": "Football",
+          "paddedLength": 20
+        },
+        {
+          "sport": "Auto Racing         ",
+          "sportTrimmed": "Auto Racing",
+          "paddedLength": 20
+        },
+        {
+          "sport": "Tennis              ",
+          "sportTrimmed": "Tennis",
+          "paddedLength": 20
+        }
+      ],
+      "sportVariantsNote": "three observations of the same call: one single-word sport, one two-word sport and one short name; all pad to 20 characters, so the width is not a property of a particular name"
     }
   ]
 }

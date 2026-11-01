@@ -204,6 +204,50 @@
     </optgroup>
   </select>
 
+  <!-- Grading panel (report kind G): its own search action, its own date fields, its own export. -->
+  <div class="card-header header-agent-management" data-panel="grading">
+    <button type="button" id="gradeBtn" data-field="display">
+      Graded Wagers
+    </button>
+    <button
+      data-action="search-grading"
+      class="btn btn-icon btn-warning btn-round mr-1"
+    >
+      <i class="fa fa-search"></i>
+    </button>
+    <i data-export="excel-action" class="fa fa-file-excel-o hidden-xs"></i>
+    <input
+      type="text"
+      data-field="startG"
+      class="form-control pickadate picker__input"
+      readonly=""
+    />
+    <input
+      type="text"
+      data-field="endG"
+      class="form-control pickadate picker__input"
+      readonly=""
+    />
+  </div>
+
+  <!-- The analysis panel's export icon keeps the `hide` class, so it is never shown there. -->
+  <i data-export="excel-action" class="fa fa-file-excel-o hidden-xs hide"></i>
+  <button data-action="search" class="btn btn-icon btn-warning btn-round">
+    <i class="fa fa-search"></i>
+  </button>
+  <input
+    type="text"
+    data-field="start"
+    class="form-control pickadate picker__input"
+    readonly=""
+  />
+  <input
+    type="text"
+    data-field="end"
+    class="form-control pickadate picker__input"
+    readonly=""
+  />
+
   <!-- Results grid: the columns the screen renders. Headers only — the response keys are unknown. -->
   <table class="table table-striped base" data-table="dynamic">
     <thead>
