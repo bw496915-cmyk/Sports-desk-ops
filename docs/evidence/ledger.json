@@ -54,9 +54,9 @@
     "total": 55
   },
   "surfaceCounts": {
-    "D": 7,
+    "D": 13,
     "E": 1,
-    "total": 8
+    "total": 14
   },
   "countsByTag": {
     "Upstream Authentication": {
@@ -1988,6 +1988,118 @@
         }
       ],
       "note": "E tier: these are operations in operations[] (tier E) and are also inventoried here so the release has one list. The 9 paths carry 10 operations because /api/desk/auth/session has both POST and DELETE."
+    },
+    {
+      "id": "surface.daemon-live-bets",
+      "name": "Live bets and its summary (GET /api/live-bets, GET /api/live-bets/summary)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "Derives a scoreboard payload from captured Report/Pending rows: games, agent rollup, and aggregates computed per request. Amounts stay in integer cents; Password/NameFirst/Login are stripped by name and the artifact builder refuses to write if any survive.",
+      "members": [
+        "GET /api/live-bets",
+        "GET /api/live-bets/summary",
+        "GET /api/f402/get-pending"
+      ],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:294-345",
+          "kind": "implementation",
+          "note": "Both paths read the same rows through loadLiveBets() and call summarizeGames(), so the two responses cannot disagree. /api/f402/get-pending now answers 410 pointing here."
+        }
+      ],
+      "requiredCapture": "HTTP capture of GET /api/live-bets against a real Report/Pending capture; today the payload comes from data/live-bets.json (2 rows) and no HTTP response was captured."
+    },
+    {
+      "id": "surface.daemon-agent-tree",
+      "name": "Agent hierarchy with wager rollup (GET /api/agent-tree)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "Serves data/agent-tree.json (2,276 agents, 4 roots) joined with per-agent exposure. Keys are canonical agentLoginKey values; a key owned by more than one AgentID is flagged and never given a level.",
+      "members": ["GET /api/agent-tree"],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:610-634",
+          "kind": "implementation",
+          "note": "Reads the committed tree, computes counts from loadLiveBets().agents, and gates on piiRejection for non-loopback peers."
+        }
+      ],
+      "requiredCapture": "HTTP capture of GET /api/agent-tree (handler-verified only; no HTTP response was captured)."
+    },
+    {
+      "id": "surface.daemon-scoreboard",
+      "name": "Transcribed portal scoreboard (GET /api/scoreboard)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "Serves data/scoreboard.json: 22 games (NFL 12, NHL 5, NBA 4, NCAA 1) with scores, status and broadcast, transcribed from the manager page. The pasted logo column was offset, so logos are resolved by team name and verified against the CDN.",
+      "members": ["GET /api/scoreboard"],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:595-608",
+          "kind": "implementation",
+          "note": "Returns the file plus summarizeScoreboard(); source and observedAt travel with the payload so a transcription is never mistaken for a capture."
+        }
+      ],
+      "requiredCapture": "A scoreboard API capture would replace the transcription; none exists, so the file carries source and observedAt instead."
+    },
+    {
+      "id": "surface.daemon-sports-taxonomy",
+      "name": "Sport taxonomy (GET /api/sports)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "The portal's 18 sport categories with counts for the loaded wagers and the scoreboard. All Sports is the absence of a filter and LIVE is a state, so neither is modelled as a category; unmapped sports surface as Other.",
+      "members": ["GET /api/sports"],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:568-593",
+          "kind": "implementation",
+          "note": "Counts are computed per request from loadLiveBets() and loadScoreboard(); lib/sport_taxonomy.ts holds the category list and the wire mappings."
+        }
+      ],
+      "requiredCapture": "HTTP capture of GET /api/sports (handler-verified only; no HTTP response was captured)."
+    },
+    {
+      "id": "surface.daemon-game-admin",
+      "name": "Game Admin exposure (GET /api/game-admin)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": false,
+      "what": "Exposure per fixture split by position (Straight/Parlay/Teaser), the report the portal manual v1.0.280 describes in F.A.Q. #4. preGame is computed from gameDateTime and is a fact about the fixture, not a claim about the operator's delete permission.",
+      "members": ["GET /api/game-admin"],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:550-566",
+          "kind": "implementation",
+          "note": "summarizeByGame() groups the captured wagers and compactPositions() drops empty buckets; position labels come from wagerTypeLabel()."
+        }
+      ],
+      "requiredCapture": "HTTP capture of GET /api/game-admin (handler-verified only; no HTTP response was captured)."
+    },
+    {
+      "id": "surface.daemon-graph-data-plane",
+      "name": "Graph data plane (feed, companion JSON, assets)",
+      "tier": "D",
+      "category": "local-route",
+      "missingFromSpec": true,
+      "what": "docs/graph.js fetches its data relative to the document, so the generated graph page was dead when served by the daemon. These paths serve it: the live feed at two paths, the two companion JSON files, and docs/assets/*.",
+      "members": [
+        "GET /graph-live-feed.json",
+        "GET /api/graph-feed",
+        "GET /combo-uniqueness.json",
+        "GET /cross-domain-bridge.json",
+        "GET /assets/*"
+      ],
+      "evidence": [
+        {
+          "source": "services/sportsdesk_webview_server.ts:415-470",
+          "kind": "implementation",
+          "note": "All five families returned 404 before this route existed. Asset names are validated (separators, control characters, traversal) and traversal is rejected."
+        }
+      ],
+      "requiredCapture": "Not a capture gap: these are static files the graph page already ships. A capture would only restate their bytes."
     }
   ]
 }

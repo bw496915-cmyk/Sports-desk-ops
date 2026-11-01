@@ -183,14 +183,73 @@ Evidence of absence:
 **Resolution:** implement and capture, or remove from the published contract / mark unimplemented. Do not
 present these as callable routes in the docs release.
 
+## D-8. `surface.daemon-live-bets`
+
+- `GET /api/live-bets` and `GET /api/live-bets/summary` derive a scoreboard payload from captured
+  `Report/Pending` rows (`sportsdesk_webview_server.ts:294-345`).
+- Amounts stay in integer cents; `Password`, `NameFirst` and `Login` are stripped by name, and
+  `buildArtifact()` refuses to write when any survive (`lib/live_bets.ts`).
+- Both paths call the same loader and `summarizeGames()` in one request, so the summary cannot
+  disagree with the game list.
+- `GET /api/f402/get-pending` used to answer the same dataset in a second shape; it now returns
+  **410** pointing here.
+
+## D-9. `surface.daemon-agent-tree`
+
+- `GET /api/agent-tree` serves `data/agent-tree.json` joined with per-agent exposure
+  (`sportsdesk_webview_server.ts:610-634`).
+- The forest is built from the portal's own `baseHeriarchy` parent pointers
+  (`scripts/build_agent_tree.ts`), keyed by canonical `agentLoginKey`.
+- A key owned by more than one `AgentID` keeps its node but is flagged `a: true` and never given a
+  level; the real capture has one (`BRANDON`, two agents at levels 6 and 10).
+- Non-loopback peers must present `SPORTSDESK_ADMIN_TOKEN` (`piiRejection`).
+
+## D-10. `surface.daemon-scoreboard`
+
+- `GET /api/scoreboard` serves `data/scoreboard.json` (`sportsdesk_webview_server.ts:595-608`):
+  22 games (NFL 12, NHL 5, NBA 4, NCAA 1) transcribed from the manager page.
+- The payload carries `source` and `observedAt`. These games are **transcribed, not captured**; the
+  pasted logo column was offset by one game, so logos are resolved by team name and verified against
+  the CDN, and Utah Mammoth uses `NHL.png` as a marked placeholder.
+- `lib/scoreboard.ts` joins wagers to these rows by nickname plus league, order-independently.
+
+## D-11. `surface.daemon-sports-taxonomy`
+
+- `GET /api/sports` returns the portal's 18 categories with counts for the loaded wagers and the
+  scoreboard (`sportsdesk_webview_server.ts:568-593`).
+- `All Sports` is the absence of a filter and `LIVE` is a state, so neither is modelled as a category;
+  unmapped sports surface as `Other` (`lib/sport_taxonomy.ts`).
+
+## D-12. `surface.daemon-game-admin`
+
+- `GET /api/game-admin` returns exposure per fixture split by position (`Straight`/`Parlay`/`Teaser`),
+  the report the portal manual v1.0.280 describes in F.A.Q. #4 (`sportsdesk_webview_server.ts:550-566`).
+- `preGame` is computed from `gameDateTime` against the request clock and is a fact about the fixture,
+  **not** a claim about the operator's delete permission (manual F.A.Q. #3).
+
+## D-13. `surface.daemon-graph-data-plane`
+
+The generated graph page fetches its data relative to the document, so serving only `/graph` and
+`/graph.js` left it dead. These paths now serve it (`sportsdesk_webview_server.ts:415-470`):
+
+| Route                           | Serves                                         |
+| ------------------------------- | ---------------------------------------------- |
+| `GET /graph-live-feed.json`     | `docs/graph-live-feed.json`, `no-store`        |
+| `GET /api/graph-feed`           | the same feed at the path `graph.js` documents |
+| `GET /combo-uniqueness.json`    | `docs/combo-uniqueness.json`                   |
+| `GET /cross-domain-bridge.json` | `docs/cross-domain-bridge.json`                |
+| `GET /assets/*`                 | `docs/assets/*` with real content types        |
+
+Asset names are validated (separators, control characters, `..`) and traversal is rejected.
+
 ---
 
 ## Summary
 
-| Tier                               | Count                               | Ids                                                                                                                                                                                                                    |
-| ---------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D — real surface missing from spec | 7                                   | `surface.fantasy402-sport-catalog`, `surface.manager-getHistory`, `surface.manager-getGrading`, `surface.daemon-dashboard`, `surface.daemon-miniapp`, `surface.daemon-telegram-admin-routes`, `surface.gs-manager-cli` |
-| E — documented, not implemented    | 1 surface (9 paths / 10 operations) | `surface.desk-api-unimplemented`                                                                                                                                                                                       |
+| Tier                               | Count                               | Ids                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D — real surface missing from spec | 13                                  | `surface.fantasy402-sport-catalog`, `surface.manager-getHistory`, `surface.manager-getGrading`, `surface.daemon-dashboard`, `surface.daemon-miniapp`, `surface.daemon-telegram-admin-routes`, `surface.gs-manager-cli`, `surface.daemon-live-bets`, `surface.daemon-agent-tree`, `surface.daemon-scoreboard`, `surface.daemon-sports-taxonomy`, `surface.daemon-game-admin`, `surface.daemon-graph-data-plane` |
+| E — documented, not implemented    | 1 surface (9 paths / 10 operations) | `surface.desk-api-unimplemented`                                                                                                                                                                                                                                                                                                                                                                               |
 
 The D rows should be added to the docs (or explicitly scoped out with a one-line rationale). The E surface
 should be removed from the published contract until code exists, or clearly badged as unimplemented.

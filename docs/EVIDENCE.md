@@ -186,6 +186,12 @@ or rewritten as "blocked, capture required". See [evidence/capture-requests.md](
 | `surface.daemon-dashboard`             | D    | `GET /` and `GET /dashboard` dashboard HTML                                                                   |
 | `surface.daemon-miniapp`               | D    | `GET /miniapp` Telegram Mini App HTML                                                                         |
 | `surface.daemon-telegram-admin-routes` | D    | Webhook, telegram status/activity, preflight, error trigger                                                   |
+| `surface.daemon-live-bets`             | D    | `GET /api/live-bets` + `/summary`; derives games and aggregates from captured rows (PII stripped)             |
+| `surface.daemon-agent-tree`            | D    | `GET /api/agent-tree`; canonical agent-keyed forest joined with per-agent exposure                            |
+| `surface.daemon-scoreboard`            | D    | `GET /api/scoreboard`; 22 transcribed games with scores/status, no API capture                                |
+| `surface.daemon-sports-taxonomy`       | D    | `GET /api/sports`; 18 portal categories with counts; All Sports and LIVE are not categories                   |
+| `surface.daemon-game-admin`            | D    | `GET /api/game-admin`; exposure per fixture split Straight/Parlay/Teaser (manual F.A.Q. #4)                   |
+| `surface.daemon-graph-data-plane`      | D    | Graph feed, two companion JSON files and `docs/assets/*` that the generated graph page fetches                |
 | `surface.gs-manager-cli`               | D    | 6 report kinds + 9 `jobs` subcommands + CLI orchestration, all `blocked_contract`                             |
 | `surface.desk-api-unimplemented`       | E    | 9 paths / 10 operations under `/api/desk/*` with no handler anywhere                                          |
 
