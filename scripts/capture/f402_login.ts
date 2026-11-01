@@ -103,12 +103,14 @@ export interface LoginOptions {
   readonly pollMs?: number;
   readonly env?: Env;
   readonly credentials?: F402Credentials;
+  readonly beforeSubmitExpression?: string;
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
 export interface LoginOutcome {
   readonly loginUrl: string;
   readonly usedSubmitButton: boolean;
+  readonly agentId: string;
 }
 
 const PASSWORD_GONE =
@@ -136,6 +138,10 @@ export async function loginF402(
   await view.waitForSelector(login.userSelector, { timeoutMs });
   await sleep(Number.isFinite(hydrationMs) ? Math.max(0, hydrationMs) : 1500);
 
+  if (options.beforeSubmitExpression) {
+    await view.evaluate(options.beforeSubmitExpression);
+  }
+
   const hasSubmit =
     (await view.evaluate(
       `(() => document.querySelector(${JSON.stringify(login.submitSelector)}) !== null)()`,
@@ -149,7 +155,11 @@ export async function loginF402(
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     if ((await view.evaluate(PASSWORD_GONE)) === true) {
-      return { loginUrl: login.loginUrl, usedSubmitButton: hasSubmit };
+      return {
+        loginUrl: login.loginUrl,
+        usedSubmitButton: hasSubmit,
+        agentId: credentials.agentId,
+      };
     }
     if (Date.now() >= deadline) {
       throw new Error(
