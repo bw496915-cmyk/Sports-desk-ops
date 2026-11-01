@@ -68,6 +68,9 @@ const VALUE_FLAGS = [
   "--wait-for",
   "--body",
   "--week",
+  "--ticket",
+  "--wager",
+  "--flag",
   "--prefix",
   "--ops",
   "--login-wait-ms",
@@ -203,6 +206,9 @@ async function main(): Promise<number> {
   const waitFor = flagValue(parsed, "--wait-for", "");
   const explicitBody = flagValue(parsed, "--body", "");
   const weekValue = flagValue(parsed, "--week", "");
+  const ticketValue = flagValue(parsed, "--ticket", "");
+  const wagerValue = flagValue(parsed, "--wager", "");
+  const flagValue_ = flagValue(parsed, "--flag", "");
   const prefix = flagValue(parsed, "--prefix", PROBE_PREFIXES[0]!);
   const opsArg = flagValue(parsed, "--ops", "");
   const loginWaitMs = Number(flagValue(parsed, "--login-wait-ms", "180000"));
@@ -246,6 +252,11 @@ async function main(): Promise<number> {
             op,
             agentId,
             process.env.F402_CUSTOMER_ID?.trim() || "__CUSTOMER_ID__",
+            {
+              ...(ticketValue === "" ? {} : { ticketNumber: ticketValue }),
+              ...(wagerValue === "" ? {} : { wagerNumber: wagerValue }),
+              ...(flagValue_ === "" ? {} : { flag: flagValue_ }),
+            },
           );
 
   if (dryRun) {

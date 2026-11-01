@@ -11,7 +11,15 @@
  */
 
 export type ProbeParam =
-  "agentID" | "customerID" | "week" | "date" | "token" | "operation";
+  | "agentID"
+  | "customerID"
+  | "week"
+  | "date"
+  | "token"
+  | "operation"
+  | "ticketNumber"
+  | "wagerNumber"
+  | "flag";
 
 export interface ProbeOp {
   readonly operation: string;
@@ -63,8 +71,8 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     operation: "getTicketDetailPrint",
     method: "POST",
     readOnly: true,
-    note: "ticket detail read; needs a ticket/wager number",
-    params: ["token", "operation"],
+    note: "ticket detail read; needs a ticket/wager number (portal sends ticketNumber, wagerNumber, flag)",
+    params: ["token", "ticketNumber", "wagerNumber", "flag", "operation"],
   },
   {
     operation: "PendingDelete",
@@ -120,8 +128,10 @@ export function buildProbeExpression(
   const mdy = String(now.getMonth() + 1).padStart(2, "0") + "/" + String(now.getDate()).padStart(2, "0") + "/" + now.getFullYear();
   // Optional week override: an integer index, a date string, or any candidate the probe wants to try.
   // Empty string keeps the historical default (yesterday's date) so existing captures stay comparable.
+  // The portal's own client sends an integer week index (0 = current week, 1..N weeks ago),
+  // not a date string. Default to "0"; a caller may override with --week.
   const weekOverride = ${JSON.stringify(weekValue ?? "")};
-  const weekValueResolved = weekOverride !== "" ? weekOverride : mdy;
+  const weekValueResolved = weekOverride !== "" ? weekOverride : "0";
   const resolvedBody = ${body}
     .replaceAll("__CUSTOMER_ID__", encodeURIComponent(customerID))
     .replaceAll("__DATE__", encodeURIComponent(mdy))
@@ -330,10 +340,17 @@ export const PROBE_PREFIXES = [
  * the local date, so the value never has to cross into Bun. `token` is empty because `Security.token`
  * is empty in the browser session — the edge accepts the bearer instead.
  */
+export interface ProbeBodyOptions {
+  readonly ticketNumber?: string;
+  readonly wagerNumber?: string;
+  readonly flag?: string;
+}
+
 export function buildProbeBody(
   op: ProbeOp,
   agentId: string,
   customerId?: string,
+  options: ProbeBodyOptions = {},
 ): string {
   const params = new URLSearchParams();
   for (const name of op.params) {
@@ -354,6 +371,12 @@ export function buildProbeBody(
       params.set("date", "__DATE__");
     } else if (name === "week") {
       params.set("week", "__WEEK__");
+    } else if (name === "ticketNumber") {
+      params.set("ticketNumber", options.ticketNumber ?? "0");
+    } else if (name === "wagerNumber") {
+      params.set("wagerNumber", options.wagerNumber ?? "0");
+    } else if (name === "flag") {
+      params.set("flag", options.flag ?? "");
     }
   }
   return params.toString();
