@@ -1,5 +1,8 @@
 # Remaining tasks — SportsDesk ops
 
+Render: `bun run tasks:render` (ANSI; colour and OSC 8 links only on a TTY). For CI/logs use
+`--no-color`; for HTML use `--format html --out scratch/remaining-tasks.html`.
+
 Meta task list. Every item carries a **basis** (`[CODE]`, `[OBSERVED]`, `[UNVERIFIED]`, `[ASSUMPTION]`),
 a **done when** condition you can check against an artifact, and the **blocked by** dependency.
 

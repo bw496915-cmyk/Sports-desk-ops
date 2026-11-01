@@ -38,4 +38,14 @@ describe("remaining-tasks markdown", () => {
     expect(html).not.toContain("undefined");
     expect(html).not.toContain("[object Object]");
   });
+
+  test("ANSI rendering keeps task markers and omits HTML", () => {
+    const ansi = Bun.markdown.ansi(markdown, { colors: false, columns: 80 });
+    expect(ansi).toContain("[ ]");
+    expect(ansi).toContain("[x]");
+    expect(ansi).not.toContain("<table>");
+    expect(ansi).not.toContain('type="checkbox"');
+    const colored = Bun.markdown.ansi(markdown, { colors: true, columns: 80 });
+    expect(colored).toContain("\u001b[");
+  });
 });

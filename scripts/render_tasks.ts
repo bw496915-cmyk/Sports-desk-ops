@@ -1,13 +1,16 @@
 #!/usr/bin/env bun
 /**
  * @file scripts/render_tasks.ts
- * @description Render `docs/REMAINING_TASKS.md` with Bun's native GFM parser.
+ * @description Render `docs/REMAINING_TASKS.md` with Bun's native Markdown renderer.
+ *
+ * Default output is ANSI for the terminal, with colour and OSC 8 links only on a TTY:
+ *   bun run tasks:render
+ *   bun run tasks:render --no-color --columns 100
+ *   bun run tasks:render --format html --out scratch/remaining-tasks.html
  *
  * Usage:
- *   bun run scripts/render_tasks.ts [--out scratch/remaining-tasks.html]
- *
- * Bun.markdown enables GFM tables, task lists and strikethrough by default; the options are passed
- * explicitly so a future default change cannot silently drop checkboxes.
+ *   bun run scripts/render_tasks.ts [--format ansi|html] [--out <path>] [--no-color]
+ *                                   [--columns N] [--source <path>]
  */
 
 const GFM = {
@@ -31,19 +34,56 @@ function flag(
 
 const args = process.argv.slice(2);
 const source = flag(args, ["--source"], "docs/REMAINING_TASKS.md");
-const out = flag(args, ["--out"], "scratch/remaining-tasks.html");
+const format = flag(args, ["--format"], "ansi");
+const outPath = flag(args, ["--out"], "");
+const columns = Math.max(
+  0,
+  Number(flag(args, ["--columns"], String(process.stdout.columns || 80))),
+);
+const noColor = args.includes("--no-color");
+
+if (format !== "ansi" && format !== "html") {
+  console.error(`tasks: unknown format "${format}" (ansi|html)`);
+  process.exit(2);
+}
 
 const markdown = await Bun.file(source).text();
-const html = Bun.markdown.html(markdown, GFM);
-await Bun.write(out, html);
-
 const unchecked = (markdown.match(/^- \[ \]/gm) ?? []).length;
 const checked = (markdown.match(/^- \[x\]/gm) ?? []).length;
-const checkboxes = (html.match(/type="checkbox"/g) ?? []).length;
 
-console.log(`tasks: ${unchecked} open, ${checked} done`);
-console.log(`render: ${checkboxes} checkboxes, ${html.length} bytes -> ${out}`);
-if (checkboxes !== unchecked + checked) {
+const rendered =
+  format === "html"
+    ? Bun.markdown.html(markdown, GFM)
+    : (() => {
+        const isTTY = process.stdout.isTTY === true;
+        const light = process.env.COLORFGBG?.endsWith(";15");
+        return Bun.markdown.ansi(markdown, {
+          colors: !noColor && isTTY && Bun.enableANSIColors,
+          hyperlinks: isTTY,
+          columns,
+          kittyGraphics: false,
+          ...(light === undefined ? {} : { light }),
+        });
+      })();
+
+if (outPath !== "") {
+  await Bun.write(outPath, rendered);
+  console.error(`render: ${format} -> ${outPath} (${rendered.length} bytes)`);
+} else {
+  process.stdout.write(rendered);
+  console.error(`render: ${format} (${rendered.length} bytes)`);
+}
+console.error(`tasks: ${unchecked} open, ${checked} done`);
+
+const renderedCheckboxes =
+  format === "html"
+    ? (rendered.match(/type="checkbox"/g) ?? []).length
+    : (
+        Bun.markdown
+          .ansi(markdown, { colors: false, columns })
+          .match(/\[[ x]\]/g) ?? []
+      ).length;
+if (renderedCheckboxes !== unchecked + checked) {
   console.error("checkboxes do not match markdown task count");
   process.exitCode = 1;
 }
