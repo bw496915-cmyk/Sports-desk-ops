@@ -21,6 +21,8 @@ export interface ProbeRow extends ProbeRecord {
   readonly at: string;
 }
 
+import { numberColumn, parseRows, stringColumn } from "./row_parse.ts";
+
 export type ProbeDatabase = InstanceType<typeof Bun.SQL>;
 
 const SCHEMA = `
@@ -83,16 +85,19 @@ export async function latestPerOperation(
     )
     ORDER BY p.operation
   `;
-  return (rows as Record<string, unknown>[]).map((row) => ({
-    path: String(row["path"]),
-    operation: String(row["operation"]),
-    status: Number(row["status"]),
-    verdict: String(row["verdict"]),
-    bytes: Number(row["bytes"]),
-    authMode: String(row["auth_mode"]),
-    capturedAt: String(row["captured_at"]),
-    at: String(row["captured_at"]),
-  }));
+  return parseRows(rows, (row) => {
+    const capturedAt = stringColumn(row, "captured_at");
+    return {
+      path: stringColumn(row, "path"),
+      operation: stringColumn(row, "operation"),
+      status: numberColumn(row, "status"),
+      verdict: stringColumn(row, "verdict"),
+      bytes: numberColumn(row, "bytes"),
+      authMode: stringColumn(row, "auth_mode"),
+      capturedAt,
+      at: capturedAt,
+    };
+  });
 }
 
 /**
@@ -145,10 +150,9 @@ export async function pruneMissingProbes(
   db: ProbeDatabase,
   paths: ReadonlySet<string>,
 ): Promise<number> {
-  const rows = (await db`SELECT path FROM probes`) as Record<string, unknown>[];
+  const rows = await db`SELECT path FROM probes`;
   let removed = 0;
-  for (const row of rows) {
-    const path = String(row["path"]);
+  for (const path of parseRows(rows, (row) => stringColumn(row, "path"))) {
     if (paths.has(path)) continue;
     await db`DELETE FROM probes WHERE path = ${path}`;
     removed += 1;

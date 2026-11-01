@@ -7,6 +7,13 @@
  * id look live. Nothing here authenticates against the portal; it answers "what do we know locally".
  */
 
+import {
+  type Row,
+  numberColumn,
+  parseRows,
+  stringColumn,
+} from "./row_parse.ts";
+
 export interface CustomerRecord {
   readonly id: string;
   readonly source: CustomerSource;
@@ -27,6 +34,19 @@ export const LIVE_SOURCES: ReadonlySet<CustomerSource> =
   new Set<CustomerSource>(["capture"]);
 
 export type CustomerDatabase = InstanceType<typeof Bun.SQL>;
+
+const CUSTOMER_SOURCES: ReadonlySet<string> = new Set([
+  "artifact",
+  "demo-book",
+  "fixture",
+  "capture",
+]);
+
+function customerSource(value: string): CustomerSource {
+  if (!CUSTOMER_SOURCES.has(value))
+    throw new Error(`unknown customer source "${value}"`);
+  return value as CustomerSource;
+}
 
 const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS customers (
@@ -69,13 +89,13 @@ export async function upsertCustomers(
   return written;
 }
 
-function toRecord(row: Record<string, unknown>): CustomerRecord {
+function toRecord(row: Row): CustomerRecord {
   return {
-    id: String(row["id"]),
-    source: String(row["source"]) as CustomerSource,
-    agent: String(row["agent"]),
-    name: String(row["name"]),
-    updatedAt: String(row["updated_at"]),
+    id: stringColumn(row, "id"),
+    source: customerSource(stringColumn(row, "source")),
+    agent: stringColumn(row, "agent"),
+    name: stringColumn(row, "name"),
+    updatedAt: stringColumn(row, "updated_at"),
   };
 }
 
@@ -88,7 +108,7 @@ export async function listCustomers(
     options.source === undefined
       ? await db`SELECT id, source, agent, name, updated_at FROM customers ORDER BY source, id LIMIT ${limit}`
       : await db`SELECT id, source, agent, name, updated_at FROM customers WHERE source = ${options.source} ORDER BY id LIMIT ${limit}`;
-  return (rows as Record<string, unknown>[]).map(toRecord);
+  return parseRows(rows, toRecord);
 }
 
 export async function findCustomer(
@@ -99,7 +119,7 @@ export async function findCustomer(
     SELECT id, source, agent, name, updated_at FROM customers
     WHERE id = ${id} ORDER BY source
   `;
-  return (rows as Record<string, unknown>[]).map(toRecord);
+  return parseRows(rows, toRecord);
 }
 
 /** Substring match on id, agent or name; intended for interactive lookup, not bulk export. */
@@ -114,17 +134,17 @@ export async function searchCustomers(
     WHERE id LIKE ${pattern} OR agent LIKE ${pattern} OR name LIKE ${pattern}
     ORDER BY source, id LIMIT ${Math.max(1, limit)}
   `;
-  return (rows as Record<string, unknown>[]).map(toRecord);
+  return parseRows(rows, toRecord);
 }
 
 export async function countBySource(
   db: CustomerDatabase,
 ): Promise<Array<{ source: string; count: number }>> {
-  const rows = (await db`
+  const rows = await db`
     SELECT source, COUNT(*) AS count FROM customers GROUP BY source ORDER BY source
-  `) as Record<string, unknown>[];
-  return rows.map((row) => ({
-    source: String(row["source"]),
-    count: Number(row["count"]),
+  `;
+  return parseRows(rows, (row) => ({
+    source: stringColumn(row, "source"),
+    count: numberColumn(row, "count"),
   }));
 }

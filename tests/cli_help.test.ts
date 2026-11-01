@@ -5,6 +5,7 @@ const CLIS = [
   { name: "capture:har", path: "scripts/capture/har_probe.ts" },
   { name: "artifacts:cron", path: "scripts/artifacts_cron.ts" },
   { name: "secrets:f402", path: "scripts/secrets_f402.ts" },
+  { name: "docs:serve", path: "scripts/serve_docs.ts" },
 ] as const;
 
 describe("cli help", () => {
