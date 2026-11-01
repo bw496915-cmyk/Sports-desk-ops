@@ -1467,7 +1467,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:41",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:2688"
           ],
           "capturedResponse": false,
@@ -1502,7 +1501,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:52",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:2727"
           ],
           "capturedResponse": false,
@@ -1537,7 +1535,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:63",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:2763"
           ],
           "capturedResponse": false,
@@ -1572,7 +1569,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:74",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:2800",
             "operational_guardrails_runbook.md:213"
           ],
@@ -1609,7 +1605,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:85",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:2838"
           ],
           "capturedResponse": false,
@@ -1639,7 +1634,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:96",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:2873",
             "operational_guardrails_runbook.md:166"
           ],
@@ -1670,7 +1664,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:107",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:2909"
           ],
           "capturedResponse": false,
@@ -1706,7 +1699,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:118",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:2946"
           ],
           "capturedResponse": false,
@@ -1740,7 +1732,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:129",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:2981"
           ],
           "capturedResponse": false,
@@ -1774,7 +1765,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:140",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:3016"
           ],
           "capturedResponse": false,
@@ -1808,7 +1798,6 @@
           "sources": [
             "main:scripts/portal_tile_crawler.ts:151",
             "main:scripts/portal_tile_crawler.ts:164-245",
-            "main:scripts/append_tracked_domains.mjs:22-228",
             "docs/openapi.json:3051",
             "operational_guardrails_runbook.md:167"
           ],

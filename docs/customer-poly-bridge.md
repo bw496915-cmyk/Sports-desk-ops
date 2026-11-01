@@ -10,6 +10,17 @@ Read-only. Public APIs only. `dx bridge` joins three layers, in increasing stren
 | Value       | customer desk P/L ↔ wallet P/L           | `enriched_customers_full.json` + Polymarket profile               | Whether outcomes diverge, observationally                      |
 | Leg         | F402 ticket legs ↔ Polymarket combo legs | `combo_observations_legs` SQLite store                            | Whether the same market is played, on which side, at what line |
 
+## 0. Claim basis
+
+| Claim                                                   | Label                                                                                        |
+| :------------------------------------------------------ | :------------------------------------------------------------------------------------------- |
+| Gate math, dedupe, PnL arithmetic                       | `[CODE]` — tests in `tests/combo_uniqueness.test.ts`, `tests/customer_poly_bridge.test.ts`   |
+| `lb-api.polymarket.com` returns HTTP 410                | `[OBSERVED]` 2026-10-31                                                                      |
+| `v2/leaderboard?user=&time_period=` windows             | `[OBSERVED]` 2026-10-31                                                                      |
+| Provider PnL is pre-fee; the activity residual is a fee | `[UNVERIFIED]` — inferred from a third-party toolkit plus the residual; check before quoting |
+| Customer↔wallet attributions                            | `[UNVERIFIED]` — static map, 50–100% confidence                                              |
+| `lifetime_net_usd` is the desk's net                    | `[ASSUMPTION]` — sign convention in the fixture; verify against F402                         |
+
 ## 1. Commands
 
 ```bash
@@ -56,7 +67,7 @@ placeholder wallets of 20–35 characters that would otherwise produce misleadin
 ## 3. Value math
 
 ```
-customerDeskPnlUsd = -lifetime_net_usd      # the book stores the desk's net
+customerDeskPnlUsd = -lifetime_net_usd      # [ASSUMPTION] the book stores the desk's net
 deskHoldPct        = lifetime_net_usd / lifetime_volume_usd × 100   # desk perspective
 polyAdvantageUsd   = polyBasisPnlUsd - customerDeskPnlUsd
 priorityUsd        = max(0, polyAdvantageUsd) × confidenceBps / 10 000
@@ -98,7 +109,8 @@ probability-weighted forecast.
 - `all` → lifetime, `month` → 30d, `week` → 7d
 - omitting `time_period` behaves like `day`; it is never used
 
-Polymarket's own PnL is **pre-fee**. `auditActivityPnl` replays the activity log:
+A third-party toolkit reports that Polymarket's own PnL is **pre-fee** (`[UNVERIFIED]` here — we
+have not confirmed it against a fee-bearing capture). `auditActivityPnl` replays the activity log:
 
 ```
 cashflowPnl = (SELL + REDEEM + MERGE + REBATE) − (BUY + SPLIT) + open position value

@@ -503,7 +503,10 @@ export interface CustomerPolyValueRow {
   readonly wallet: string;
   readonly attributionType: string;
   readonly confidenceBps: number;
-  /** Customer P/L at the desk. The book stores the desk's net, so this is its negation. */
+  /**
+   * Customer P/L at the desk. `[ASSUMPTION]`: the bundled book stores the desk's net (negative =
+   * desk lost), so the customer's P/L is its negation. Verify against F402 before trusting it.
+   */
   readonly customerDeskPnlUsd: number;
   readonly deskVolumeUsd: number;
   /** Desk perspective (`lifetimeNetUsd / lifetimeVolumeUsd`), not the fixture's `hold_pct`. */
@@ -765,7 +768,7 @@ export function buildCustomerPolyBridge(
     customers: rows,
     quarantined: input.registry.quarantined,
     notes: [
-      "customerDeskPnlUsd = -lifetime_net_usd: the book stores the desk's net, which is the customer's opposite.",
+      "[ASSUMPTION] customerDeskPnlUsd = -lifetime_net_usd: the fixture appears to store the desk's net; verify the sign against F402.",
       "polyAdvantageUsd is observational. It does not prove a hedge, layoff, or leakage without leg-level matching.",
       "Win rate and PnL come from public Polymarket APIs only; no key and no private customer data are sent.",
     ],

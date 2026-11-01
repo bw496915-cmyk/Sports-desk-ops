@@ -4,7 +4,8 @@
  *              upgraded with the de-obfuscated Fantasy402 `customer/report/report.js` Rosetta Stone schema.
  *
  * Implements:
- * 1. Exact `customer/report/report.js` API Endpoint Registry (`api/Report/Pending`, `api/Report/getGrading`, etc.).
+ * 1. Registry extracted from the deobfuscated `customer/report/report.js` (`api/Report/Pending`,
+ *    `api/Report/getGrading`, etc.). `[UNVERIFIED]` — names come from client code, not captures.
  * 2. Definitive 10-Code `WagerType` Map (`getTypeInfo`: S, M, C, T, L, E, I, P, G, A).
  * 3. Deterministic `getRotationNumber(d)` (`d.Team1ID === d.ChosenTeamID ? d.Team1RotNum : d.Team2RotNum`) + DGS `GameNum + 5000` Alt-Spread normalization.
  * 4. Exact `getLineGame(d)` Teaser & Line Math:

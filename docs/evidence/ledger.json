@@ -43,7 +43,7 @@
     "C": "Inferred only. Authored in docs/openapi.json or its generator scripts, or a repo TypeScript wire type, or a UI/DOM observation whose URL+method is a candidate. No request or response was observed.",
     "D": "A real surface missing from the spec. Recorded in surfaces[], never in operations[].",
     "E": "Documented operation with no implementation in this repository (/api/desk/*).",
-    "crawlerCandidatesRule": "B-vs-C rule for the 11 'Tracked Operational Domains' candidates (gameAdmin, getMessages, adjustBalance, createPlayer, get3rdPartyLimits, getAnalysis, getScores, getAgentTree, getBilling, getRules, getFinancialReport): a launcher tile alone is not enough for B. B requires a URL+method observed on the wire (or a handler that serves it). Those 11 rows take their path+method from hand-authored candidateEndpoint/candidateMethod constants in main:scripts/portal_tile_crawler.ts:40-162, echoed by main:scripts/append_tracked_domains.mjs:22-228. The crawler CLI entry runs the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and its live branch only replaces extracted inputs/L-keys, never the URL/method; no audit JSON or screenshot proof exists in the main tree. They are therefore tier C with candidate_url=true and ui_observed=true, never B. getAnalysis and getFinancialReport also have independent UI action-name evidence (runbook:166-167), which improves the tile evidence but does not observe the URL."
+    "crawlerCandidatesRule": "B-vs-C rule for the 11 'Tracked Operational Domains' candidates (gameAdmin, getMessages, adjustBalance, createPlayer, get3rdPartyLimits, getAnalysis, getScores, getAgentTree, getBilling, getRules, getFinancialReport): a launcher tile alone is not enough for B. B requires a URL+method observed on the wire (or a handler that serves it). Those 11 rows take their path+method from hand-authored candidateEndpoint/candidateMethod constants in main:scripts/portal_tile_crawler.ts:40-162. The crawler CLI entry runs the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and its live branch only replaces extracted inputs/L-keys, never the URL/method; no audit JSON or screenshot proof exists in the main tree. They are therefore tier C with candidate_url=true and ui_observed=true, never B. getAnalysis and getFinancialReport also have independent UI action-name evidence (runbook:166-167), which improves the tile evidence but does not observe the URL."
   },
   "counts": {
     "A": 5,
@@ -1232,11 +1232,6 @@
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
-        },
-        {
           "source": "docs/openapi.json:2688",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Game Admin', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
@@ -1265,11 +1260,6 @@
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
-        },
-        {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
         },
         {
           "source": "docs/openapi.json:2727",
@@ -1302,11 +1292,6 @@
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
-        },
-        {
           "source": "docs/openapi.json:2763",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Cashier', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
@@ -1335,11 +1320,6 @@
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
-        },
-        {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
         },
         {
           "source": "docs/openapi.json:2800",
@@ -1377,11 +1357,6 @@
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
-        },
-        {
           "source": "docs/openapi.json:2838",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile '3rd Party Limits', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
@@ -1410,11 +1385,6 @@
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
-        },
-        {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
         },
         {
           "source": "docs/openapi.json:2873",
@@ -1452,11 +1422,6 @@
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
-        },
-        {
           "source": "docs/openapi.json:2909",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Scores', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
@@ -1485,11 +1450,6 @@
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
-        },
-        {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
         },
         {
           "source": "docs/openapi.json:2946",
@@ -1522,11 +1482,6 @@
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
-        },
-        {
           "source": "docs/openapi.json:2981",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Billing', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
@@ -1557,11 +1512,6 @@
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
         },
         {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
-        },
-        {
           "source": "docs/openapi.json:3016",
           "kind": "spec-claim",
           "note": "Spec row carries x-dom-tile 'Settings & Rules', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
@@ -1590,11 +1540,6 @@
           "source": "main:scripts/portal_tile_crawler.ts:164-245",
           "kind": "crawler-behaviour",
           "note": "The crawl path navigates/clicks and extracts only form inputs and L-keys; it never records a network request or response. The CLI entry runs with no portalUrl, so it takes the OFFLINE_SIMULATION branch (main:scripts/portal_tile_crawler.ts:168) and just re-emits the constant. No reports/tile_crawler_audit.json and no reports/tile_crawler_proofs/ exist in the main tree."
-        },
-        {
-          "source": "main:scripts/append_tracked_domains.mjs:22-228",
-          "kind": "generator",
-          "note": "This generator wrote the path/method into docs/openapi.json and appended a markdown table whose column header is 'Target Wire Endpoint' (main:scripts/append_tracked_domains.mjs:244) while the same script's prose claims the tiles are 'continuously crawled and tracked' (:242). The x-discovery-status in docs/openapi.json is UNDER_SURVEILLANCE (:2701 etc.), which is accurate."
         },
         {
           "source": "docs/openapi.json:3051",

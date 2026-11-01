@@ -37,11 +37,32 @@ sports list is separately probed (`getSportsType`, 19/19 sports identical to the
 **B-vs-C rule for the 11 "Tracked Operational Domains" candidates.** A launcher tile is not enough for B.
 B requires a URL+method observed on the wire (or a handler that serves it). The 11 candidates take their
 path+method from hand-authored `candidateEndpoint`/`candidateMethod` constants
-(`scripts/portal_tile_crawler.ts:40-162`, `scripts/append_tracked_domains.mjs:22-228`); the crawler CLI entry
-runs its offline-simulation branch (`portal_tile_crawler.ts:168`) and its live branch only replaces
-extracted inputs/L-keys, never the URL or method; no audit JSON or screenshot proof exists in the tree.
-They are therefore **C with `candidate_url: true`**, not B. `getAnalysis` and `getFinancialReport` also have
-independent UI action-name evidence (`runbook:166-167`), but the URL is still unobserved.
+(`scripts/portal_tile_crawler.ts:40-162`); the crawler CLI entry runs its offline-simulation branch
+(`portal_tile_crawler.ts:168`) and its live branch only replaces extracted inputs/L-keys, never the URL or
+method; no audit JSON or screenshot proof exists in the tree. They are therefore **C with
+`candidate_url: true`**, not B. `getAnalysis` and `getFinancialReport` also have independent UI action-name
+evidence (`runbook:166-167`), but the URL is still unobserved.
+
+---
+
+## Claim categories (reviews and docs)
+
+Every claim in a review, a runbook or a doc names its basis. Only the first two may support a bug claim.
+
+| Label          | Basis                                                                                                                | Can support a bug claim?                    |
+| :------------- | :------------------------------------------------------------------------------------------------------------------- | :------------------------------------------ |
+| `[CODE]`       | Reproducible from source in this repository.                                                                         | Yes                                         |
+| `[OBSERVED]`   | A capture or artifact with a date and a path.                                                                        | Yes                                         |
+| `[UNVERIFIED]` | External-system behaviour inferred from docs, deobfuscated client JS, a third-party toolkit, or absence of evidence. | **No.** Label it "unverified — check this". |
+| `[ASSUMPTION]` | A modelling choice about data (sign convention, ownership, window).                                                  | **No.** State it next to the formula.       |
+
+Two rules follow:
+
+1. **An API shape is not a fact because several secondary sources agree.** Without a capture it is
+   `[UNVERIFIED]`, even when three toolkits describe it the same way.
+2. **Separate the bug from the theory.** "This code path divides by `lifetime_net_usd` without a zero
+   guard" is `[CODE]`. "The upstream returns `net` from the desk's perspective" is `[ASSUMPTION]` and
+   belongs in a doc note, not in a bug report.
 
 ---
 

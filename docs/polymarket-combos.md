@@ -4,7 +4,7 @@ Operator and engineering notes for CFB combo work. Public APIs only; no key.
 
 ## 1. What is verified
 
-| Surface                   | Endpoint                                                                                                                 | Evidence                                                                                         |
+| Surface `[OBSERVED]`      | Endpoint                                                                                                                 | Evidence                                                                                         |
 | :------------------------ | :----------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------- |
 | CFB events / legs         | `GET gamma-api.polymarket.com/events?series_id=12756&active=true&closed=false&order=volume24hr&ascending=false&limit=50` | Live 2026-10-31: 50 events, ML/spread/total markets with `outcomes`/`outcomePrices` JSON strings |
 | Combo positions           | `GET data-api.polymarket.com/v2/positions/combos?user=<0x>`                                                              | Live 2026-10-31: `{data, pagination}`, nested `legs[].market`                                    |
@@ -12,14 +12,15 @@ Operator and engineering notes for CFB combo work. Public APIs only; no key.
 | Wallet seed (trades)      | `GET data-api.polymarket.com/trades?market=<conditionId>&limit=100`                                                      | Live 2026-10-31: array with `proxyWallet`                                                        |
 | Wallet seed (leaderboard) | `GET data-api.polymarket.com/v2/leaderboard?time_period=week                                                             | month                                                                                            | all&sort_by=PNL&limit=100` | Live 2026-10-31: `{data:[{user_id,...}], pagination}` |
 
-`lb-api.polymarket.com` is **retired** (HTTP 410). Do not use it.
+`lb-api.polymarket.com` is **retired** (HTTP 410, `[OBSERVED]` 2026-10-31). Do not use it.
 
-There is **no global CFB combo feed**. Discovery is user-anchored: seed wallets, then query their
-combo endpoints.
+No global CFB combo feed was exposed by the endpoints probed on 2026-10-31. Treat that as
+`[UNVERIFIED]` for any endpoint added later: discovery is user-anchored — seed wallets, then query
+their combo endpoints.
 
 ## 2. Product-of-legs pricing
 
-For independent legs (different games):
+`[CODE]` For independent legs (different games):
 
 ```
 fairPrice = p1 × p2 × … × pn          (decimal probabilities, 0–1)

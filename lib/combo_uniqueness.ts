@@ -3,7 +3,8 @@
  * @description CFB combo uniqueness: per-game distinct combos and wallets, seeded from public
  * CFB trades + the Polymarket leaderboard, with a TTL cache and an optional strict mode.
  *
- * Public APIs only. Combo discovery is user-anchored: there is no global CFB combo feed.
+ * Public APIs only. Combo discovery is user-anchored: no global CFB combo feed was exposed by the
+ * probed endpoints (`[UNVERIFIED]` for any endpoint added later).
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";

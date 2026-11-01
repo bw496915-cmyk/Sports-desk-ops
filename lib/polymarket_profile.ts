@@ -148,7 +148,8 @@ const sleep = (ms: number): Promise<void> =>
 
 /**
  * Resolves a 0x address, or a leaderboard username → wallet (3 cursor pages, 1500 users).
- * The old `lb-api` is retired (HTTP 410); this uses `data-api/v2/leaderboard`, which is cursor-based.
+ * The old `lb-api` is retired (HTTP 410, `[OBSERVED]` 2026-10-31); this uses
+ * `data-api/v2/leaderboard`, which is cursor-based.
  */
 export async function resolvePolymarketAddress(
   input: string,
@@ -192,7 +193,8 @@ export async function resolvePolymarketAddress(
 /**
  * PnL snapshot from the v2 leaderboard single-user lookup.
  *
- * `lb-api.polymarket.com/profit` is retired (HTTP 410). `data-api/v2/leaderboard?user=<0x>`
+ * `lb-api.polymarket.com/profit` is retired (HTTP 410, `[OBSERVED]` 2026-10-31).
+ * `data-api/v2/leaderboard?user=<0x>`
  * returns one object and honours `time_period`: `all` = lifetime, `month` = 30d, `week` = 7d.
  * Omitting `time_period` behaves like `day`, so it is never used here.
  */
