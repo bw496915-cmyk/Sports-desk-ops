@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test";
 import {
   type LoginView,
   MissingF402CredentialsError,
+  SECRET_NAMES,
+  SECRETS_SERVICE,
+  loadF402Credentials,
   loginF402,
   resolveF402Credentials,
 } from "../scripts/capture/f402_login.ts";
@@ -129,5 +132,53 @@ describe("F402 login", () => {
     ).rejects.toThrow("password field still present");
     expect(calls).toContain("fill:#agent:agent-118");
     expect(calls).toContain("fill:#pin:<password>");
+  });
+});
+
+describe("F402 credential sources", () => {
+  const store = new Map<string, string>([
+    [`${SECRETS_SERVICE}/${SECRET_NAMES.agentId}`, "keychain-agent"],
+    [`${SECRETS_SERVICE}/${SECRET_NAMES.password}`, "keychain-secret"],
+  ]);
+  const secrets = {
+    async get({ service, name }: { service: string; name: string }) {
+      return store.get(`${service}/${name}`) ?? null;
+    },
+  };
+
+  test("environment variables win over the credential store", async () => {
+    const credentials = await loadF402Credentials(ENV, secrets);
+    expect(credentials.agentId).toBe(ENV.F402_AGENT_ID);
+    expect(credentials.password).toBe(ENV.F402_PASSWORD);
+  });
+
+  test("falls back to the credential store when env is incomplete", async () => {
+    const credentials = await loadF402Credentials(
+      { F402_AGENT_ID: "from-env" },
+      secrets,
+    );
+    expect(credentials.agentId).toBe("from-env");
+    expect(credentials.password).toBe("keychain-secret");
+
+    const both = await loadF402Credentials({}, secrets);
+    expect(both.agentId).toBe("keychain-agent");
+    expect(both.password).toBe("keychain-secret");
+  });
+
+  test("treats a failing store as absent and never leaks values", async () => {
+    await expect(
+      loadF402Credentials(
+        {},
+        {
+          async get() {
+            throw new Error("keychain locked");
+          },
+        },
+      ),
+    ).rejects.toBeInstanceOf(MissingF402CredentialsError);
+
+    await expect(loadF402Credentials({}, null)).rejects.toBeInstanceOf(
+      MissingF402CredentialsError,
+    );
   });
 });

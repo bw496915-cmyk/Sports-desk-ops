@@ -10,7 +10,11 @@
  * with no entry fails the gate, because the next deploy would have to guess.
  */
 
-import { auditReleases, parseReleases } from "../lib/ops_audit.ts";
+import {
+  auditReleases,
+  compareReleaseTags,
+  parseReleases,
+} from "../lib/ops_audit.ts";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");
@@ -27,7 +31,7 @@ const tags = tagsResult.stdout
   .split("\n")
   .map((tag) => tag.trim())
   .filter((tag) => tag !== "")
-  .sort();
+  .sort(compareReleaseTags);
 
 let registry: ReturnType<typeof parseReleases>;
 try {

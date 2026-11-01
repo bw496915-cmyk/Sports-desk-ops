@@ -40,6 +40,21 @@ function isPlaceholder(value: string): boolean {
   return PLACEHOLDER.has(value.trim().toLowerCase());
 }
 
+/**
+ * Chronological comparison for `docs-vYYYY.MM.DD` tags.
+ *
+ * Uses `Bun.semver.order` on the date portion rather than string sorting, so a tag like
+ * `docs-v2026.9.1` cannot sort above `docs-v2026.10.31` by luck of the alphabet.
+ */
+export function compareReleaseTags(a: string, b: string): number {
+  const strip = (tag: string): string => tag.replace(/^docs-v/, "");
+  try {
+    return Bun.semver.order(strip(a), strip(b));
+  } catch {
+    return strip(a).localeCompare(strip(b));
+  }
+}
+
 export function parseReleases(raw: unknown): Releases {
   if (typeof raw !== "object" || raw === null)
     throw new Error("releases registry is not an object");

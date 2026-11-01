@@ -4,6 +4,7 @@ import {
   type Releases,
   auditArchives,
   auditReleases,
+  compareReleaseTags,
   parseProvenance,
   parseReleases,
 } from "../lib/ops_audit.ts";
@@ -222,5 +223,23 @@ describe("archive provenance", () => {
         ),
       ).toContain("tool.zip: license is not provenance");
     }
+  });
+});
+
+describe("release tag ordering", () => {
+  test("orders by the date, not by the string", () => {
+    expect(compareReleaseTags("docs-v2026.9.1", "docs-v2026.10.31")).toBe(-1);
+    expect(compareReleaseTags("docs-v2026.11.01", "docs-v2026.10.31")).toBe(1);
+    expect(compareReleaseTags("docs-v2026.11.1", "docs-v2026.11.01")).toBe(0);
+    const sorted = [
+      "docs-v2026.11.01",
+      "docs-v2026.9.1",
+      "docs-v2026.10.31",
+    ].sort(compareReleaseTags);
+    expect(sorted).toEqual([
+      "docs-v2026.9.1",
+      "docs-v2026.10.31",
+      "docs-v2026.11.01",
+    ]);
   });
 });

@@ -113,7 +113,8 @@ so an id resolves without guessing which artifact it came from.
   - **Automation:** `bun run capture:f402 --dry-run` prints the six-op plan without launching anything.
     With `F402_AGENT_ID` / `F402_PASSWORD` in the environment, `--login` signs in unattended (defaults:
     `input[name="customerID"]`, `input[type="password"]`, `button.btn.btn-primary`, overridable with
-    `F402_LOGIN_*`); no credential is printed or written. Otherwise it waits for an interactive sign-in or
+    `F402_LOGIN_*`); no credential is printed or written. Credentials may live in `.env` or in the OS
+    credential store (`bun run secrets:f402 set|status|delete`), and env wins when both exist. Otherwise it waits for an interactive sign-in or
     a `--wait-for` selector. Probes run from inside the page so the HttpOnly session cookie applies, and
     results land in `scratch/f402-probes/<stamp>/<op>.json` with the body that was sent, the auth mode, and
     `headersObserved: false`. `PendingDelete` is excluded unless

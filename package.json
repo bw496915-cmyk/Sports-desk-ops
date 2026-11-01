@@ -89,6 +89,7 @@
     "test:docs": "bun test tests/api_reference.test.ts tests/docs_evidence.test.ts",
     "capture:evidence": "bun run scripts/evidence_capture.ts --mode mock",
     "capture:f402": "bun run scripts/capture/f402_probe.ts",
+    "secrets:f402": "bun run scripts/secrets_f402.ts",
     "capture:evidence:live": "bun run scripts/evidence_capture.ts --mode live",
     "apply:captures": "bun run scripts/apply_captures.ts",
     "docs:audit:portal": "bun run scripts/audit_docs_webview_cron.ts --once",

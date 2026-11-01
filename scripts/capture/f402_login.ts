@@ -28,6 +28,48 @@ export class MissingF402CredentialsError extends Error {
 
 type Env = Record<string, string | undefined>;
 
+/** Keychain-backed credential storage, so a password need not sit in `.env`. */
+export const SECRETS_SERVICE = "sportsdesk-ops";
+export const SECRET_NAMES = {
+  agentId: "f402-agent-id",
+  password: "f402-password",
+} as const;
+
+export interface SecretsReader {
+  get(options: { service: string; name: string }): Promise<string | null>;
+}
+
+/**
+ * Env first, then the OS credential store. Env wins so a one-off run can override without touching
+ * the keychain; the fallback means the durable copy can live outside `.env`.
+ */
+export async function loadF402Credentials(
+  env: Env = process.env,
+  secrets: SecretsReader | null = Bun.secrets as SecretsReader,
+): Promise<F402Credentials> {
+  const envAgent = env["F402_AGENT_ID"]?.trim() ?? "";
+  const envPassword = env["F402_PASSWORD"]?.trim() ?? "";
+  if (envAgent !== "" && envPassword !== "") {
+    return { agentId: envAgent, password: envPassword };
+  }
+  const read = async (name: string): Promise<string> => {
+    if (secrets === null) return "";
+    try {
+      return (
+        (await secrets.get({ service: SECRETS_SERVICE, name }))?.trim() ?? ""
+      );
+    } catch {
+      return "";
+    }
+  };
+  const agentId = envAgent !== "" ? envAgent : await read(SECRET_NAMES.agentId);
+  const password =
+    envPassword !== "" ? envPassword : await read(SECRET_NAMES.password);
+  if (agentId === "" || password === "")
+    throw new MissingF402CredentialsError();
+  return { agentId, password };
+}
+
 export function resolveF402Credentials(
   env: Env = process.env,
 ): F402Credentials {
@@ -77,7 +119,7 @@ export async function loginF402(
   options: LoginOptions = {},
 ): Promise<LoginOutcome> {
   const env = options.env ?? process.env;
-  const credentials = options.credentials ?? resolveF402Credentials(env);
+  const credentials = options.credentials ?? (await loadF402Credentials(env));
   const baseUrl = (
     options.baseUrl ??
     env["F402_BASE_URL"]?.trim() ??
