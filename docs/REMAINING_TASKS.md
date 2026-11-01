@@ -8,13 +8,18 @@ Artifact/gate: `bun run tasks:render` (ANSI; colour and OSC 8 links only on a TT
 
 ### Renderer parity
 
-`bun ./docs/REMAINING_TASKS.md` is the CLI `.md` loader (Rust/pulldown-cmark) and is **not** the same
-renderer as `Bun.markdown.ansi()` (JS). The CLI adds syntax highlighting and global table widths; do not
-assume byte-identical output. Pin Bun (1.4.4) and diff both after upgrades if you snapshot either output.
+The JS API and the `bun ./file.md` loader are both documented as Rust-based. The CLI adds global table
+widths and `COLUMNS` detection, not a different parser core; still diff both after a Bun upgrade before
+snapshotting either output.
 
-`Bun.markdown.ansi()` takes an `AnsiTheme` only — `tagFilter`/`headings` belong to `html()`. Per-task
-colouring requires `render()`, where `listItem.checked` is `undefined` for a plain bullet, `false` for
-`- [ ]`, and `true` for `- [x]`.
+`Bun.markdown.ansi()` takes an `AnsiTheme` only — `tagFilter`/`headings` belong to `html()`. It also
+enables `wikiLinks`, `underline` and `latexMath` by default and offers no `Options` to disable them, so
+this doc deliberately avoids wiki brackets, double underscores and dollar math (test-enforced). Per-task colouring requires `render()`,
+where `listItem.checked` is `undefined` for a plain bullet, `false` for `- [ ]`, and `true` for `- [x]`.
+
+`tagFilter` is a GFM compatibility filter, not a sanitizer: it escapes a specific tag list but leaves
+event-handler attributes alone. The HTML artifact therefore also sets `noHtmlBlocks`/`noHtmlSpans`;
+untrusted Markdown would still need a real sanitizer at the boundary.
 
 Meta task list. Every item carries a **basis** (`[CODE]`, `[OBSERVED]`, `[UNVERIFIED]`, `[ASSUMPTION]`),
 a **done when** condition you can check against an artifact, and the **blocked by** dependency.

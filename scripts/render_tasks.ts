@@ -23,9 +23,13 @@ const PARSER_OPTIONS = {
   strikethrough: true,
   tasklists: true,
   autolinks: true,
-  // Sanitize untrusted HTML and give each heading an anchor; `true` would also add autolinks.
+  // GFM tag filter is defense in depth, not a sanitizer: it escapes a specific tag list but
+  // leaves event-handler attributes alone. Raw HTML is disabled below for this trusted doc.
   tagFilter: true,
-  headings: { ids: true },
+  noHtmlBlocks: true,
+  noHtmlSpans: true,
+  // Both fields are required by the type; `true` would also autolink headings.
+  headings: { autolink: false, ids: true },
   // Stable HTML for artifact diffs.
   collapseWhitespace: true,
 } as const;

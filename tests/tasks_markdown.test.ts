@@ -6,7 +6,9 @@ const GFM = {
   tasklists: true,
   autolinks: true,
   tagFilter: true,
-  headings: { ids: true },
+  noHtmlBlocks: true,
+  noHtmlSpans: true,
+  headings: { autolink: false, ids: true },
 } as const;
 
 const markdown = await Bun.file("docs/REMAINING_TASKS.md").text();
@@ -54,14 +56,32 @@ describe("remaining-tasks markdown", () => {
     expect(colored).toContain("\u001b[");
   });
 
-  test("HTML options sanitize tags and add heading IDs", () => {
-    expect(html).toContain("id=");
-    const sanitized = Bun.markdown.html("<script>alert(1)</script>\n\n# Hi", {
+  test("tagFilter is not a sanitizer; noHtml* removes raw HTML", () => {
+    expect(html).toContain('id="p0-trust-blockers"');
+    const filtered = Bun.markdown.html("<img src=x onerror=alert(1)>", {
       tagFilter: true,
-      headings: { ids: true },
     });
-    expect(sanitized).not.toContain("<script>");
-    expect(sanitized).toContain('id="hi"');
+    // The GFM tag filter escapes a tag allowlist; it does not strip attributes or URL schemes.
+    expect(filtered).toContain("onerror=alert(1)");
+    const disabled = Bun.markdown.html("<img src=x onerror=alert(1)>", {
+      tagFilter: true,
+      noHtmlBlocks: true,
+      noHtmlSpans: true,
+    });
+    expect(disabled).toContain("&lt;img");
+    expect(disabled).not.toContain("<img");
+  });
+
+  test("tasklists: false disables the gate by design", () => {
+    const noTasks = Bun.markdown.html("- [x] done", { tasklists: false });
+    expect(noTasks).not.toContain('type="checkbox"');
+  });
+
+  test("the task doc avoids constructs ansi() forces on", () => {
+    // ansi() enables wikiLinks, underline and latexMath with no Options to disable them.
+    expect(markdown).not.toContain("[[");
+    expect(markdown).not.toMatch(/__/);
+    expect(markdown).not.toMatch(/\$/);
   });
 
   test("render(): listItem.checked distinguishes bullets from task state", () => {
