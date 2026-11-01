@@ -16,3 +16,7 @@ verification/gen-tokens-zero-drift-gate/out/
 # Customer and downline datasets stay local (public repo)
 enriched_customers_full.json
 sportsdesk_downline_data.json
+# The synthetic fixture reuses those names because the engine joins fixed paths; it carries no
+# real customer data and must stay tracked or the CI test silently degrades to the snapshot.
+!tests/fixtures/backtest/enriched_customers_full.json
+!tests/fixtures/backtest/sportsdesk_downline_data.json

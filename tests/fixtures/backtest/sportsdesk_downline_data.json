@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "master_agent": "SYNTH_MASTER_01",
+    "total_sub_agents": 3,
+    "active_sports_sub_agents": 2,
+    "total_provisioned_accounts": 41,
+    "active_sports_bettors": 7,
+    "total_lifetime_lost": 0,
+    "total_lifetime_won": 0,
+    "total_lifetime_net_hold": 0,
+    "total_sports_tickets": 9,
+    "total_sports_volume": 24000,
+    "total_sports_net": -1
+  },
+  "agents": []
+}
