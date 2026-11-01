@@ -39,7 +39,7 @@ describe("f402 probe plan", () => {
 
     const allReadOnly = selectProbeOps(false, "all");
     // 25 read-only report/module ops + 8 unique manager-boot ops (getListAgenstByAgent is shared) = 33
-    expect(allReadOnly).toHaveLength(36);
+    expect(allReadOnly).toHaveLength(37);
   });
 
   test("builds URLs from the observed route prefix", () => {
@@ -101,6 +101,37 @@ describe("f402 probe plan", () => {
       "customerID=BILLY666&agentID=BILLY666&operation=getInfoPlayer&RRO=0&agentOwner=BILLY666",
     );
     expect(padLogWriteCustomerId("BILLY666")).toBe("BILLY666  ");
+
+    const customerAdmin = PROBE_OPS.find(
+      (op) => op.operation === "getCustomerAdmin",
+    );
+    if (!customerAdmin) throw new Error("getCustomerAdmin missing from PROBE_OPS");
+    expect(
+      new URLSearchParams(buildProbeBody(customerAdmin, "BILLY666")).toString(),
+    ).toBe(
+      "agentID=BILLY666&sortCustom=1&operation=getCustomerAdmin&RRO=1&agentOwner=BILLY666",
+    );
+    expect(
+      new URLSearchParams(
+        buildProbeBody(customerAdmin, "BILLY666", undefined, {
+          agentOwner: "CUB22HR",
+          sortCustom: "2",
+        }),
+      ).toString(),
+    ).toBe(
+      "agentID=BILLY666&sortCustom=2&operation=getCustomerAdmin&RRO=1&agentOwner=CUB22HR",
+    );
+
+    const configReportsAdmin = PROBE_OPS.find(
+      (op) => op.operation === "getConfigWebReportsCustomerAdmin",
+    );
+    if (!configReportsAdmin)
+      throw new Error("getConfigWebReportsCustomerAdmin missing from PROBE_OPS");
+    expect(
+      new URLSearchParams(buildProbeBody(configReportsAdmin, "BILLY666")).toString(),
+    ).toBe(
+      "agentID=BILLY666&operation=getConfigWebReportsCustomerAdmin&RRO=1&agentOwner=BILLY666",
+    );
 
     const sportsAdmin = PROBE_OPS.find(
       (op) => op.operation === "getSportsCustomerAdmin",

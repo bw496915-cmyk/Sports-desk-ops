@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  F402_CUSTOMER_ADMIN_EXCEL_EXPORT_SELECTOR,
   F402_CUSTOMER_ADMIN_PARTIALS,
   buildLoadCustomerAdminPartialExpression,
+  buildProbeCustomerAdminExcelExportExpression,
   customerAdminAsyncPartialUrl,
   customerAdminPartialUrl,
   resolveCustomerAdminPartialFile,
@@ -60,6 +62,15 @@ describe("customer-admin async partial URLs", () => {
     expect(resolveCustomerAdminPartialFile("player-info.html")).toBe(
       "player-info.html",
     );
+  });
+
+  test("excel export selector matches customer-admin markup hook", () => {
+    expect(F402_CUSTOMER_ADMIN_EXCEL_EXPORT_SELECTOR).toBe(
+      '[data-export="excel-action"]',
+    );
+    const expr = buildProbeCustomerAdminExcelExportExpression();
+    expect(expr).toContain("excel-action");
+    expect(expr).toContain("getComputedStyle");
   });
 
   test("load expression uses credentials and XHR accept", () => {

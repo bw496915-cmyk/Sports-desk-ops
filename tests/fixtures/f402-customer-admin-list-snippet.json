@@ -1,0 +1,28 @@
+{
+  "LIST": [
+    {
+      "CustomerID": "CB112_1   ",
+      "AgentID": "CUB22HR",
+      "Login": "CB112",
+      "Name": "Blake Purvis ",
+      "Password": "<fixture-not-real>",
+      "CurrentBalance": "-1077242.0",
+      "PendingWagerBalance": "2721000.0",
+      "AvailableBalance": "6201758.0",
+      "ReadOnlyFlag": "N",
+      "Active": "Y"
+    },
+    {
+      "CustomerID": "CB100_1   ",
+      "AgentID": "CUB22HR",
+      "Login": "CB100",
+      "Name": "Travis Dickenson ",
+      "Password": "<fixture-not-real>",
+      "CurrentBalance": "-9405.0",
+      "PendingWagerBalance": "1690500.0",
+      "AvailableBalance": "3300095.0",
+      "ReadOnlyFlag": "N",
+      "Active": "Y"
+    }
+  ]
+}

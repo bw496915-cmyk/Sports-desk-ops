@@ -1,0 +1,31 @@
+{
+  "INFO": {
+    "showSportsbookStatus": "on",
+    "showCasinoStatus": "on",
+    "showHorsesStatus": "on",
+    "showSettleFigure": "on",
+    "showTemporaryCredit": null,
+    "showCreditLimit": "on",
+    "showWagerLimit": "on",
+    "Available": "on        ",
+    "Name": "on        ",
+    "Pending": "on        ",
+    "Balance": "on        ",
+    "Password": "off       ",
+    "Enabled": "off       ",
+    "ReadOnly": "off       ",
+    "FreePlay": "on        ",
+    "ParlayMaxBet": "on        ",
+    "ParlayMaxPayout": "on        ",
+    "TeaserMaxBet": "on        ",
+    "ContestMaxBet": "on        ",
+    "MaxContestPrice": "off       ",
+    "MaxMoneyLine": "off       ",
+    "MaxPropPayout": "on        ",
+    "MaxSoccerBet": "on        ",
+    "sortCustom": "1",
+    "ShowEmail": "on        ",
+    "ShowPhone": "on        ",
+    "PlayerNotes": "on        "
+  }
+}

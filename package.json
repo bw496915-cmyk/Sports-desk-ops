@@ -107,6 +107,7 @@
     "capture:reprobe-pending-500s": "bun run scripts/capture/reprobe_pending_500s.ts",
     "capture:ingest-deleted-wagers": "bun run scripts/capture/ingest_deleted_wager_list.ts",
     "capture:ingest-deleted-transactions": "bun run scripts/capture/ingest_deleted_transaction_history.ts",
+    "capture:ingest-customer-admin-list": "bun run scripts/capture/ingest_customer_admin_list.ts",
     "capture:probe-deleted-wagers": "bun run scripts/capture/probe_deleted_wager_targets.ts",
     "capture:probe-protocol-matrix": "bun run scripts/capture/probe_f402_protocol_matrix.ts",
     "capture:verify-batch-pending-delete": "bun run scripts/capture/verify_batch_pending_delete.ts",

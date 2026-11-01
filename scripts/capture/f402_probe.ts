@@ -109,6 +109,8 @@ const VALUE_FLAGS = [
   "--customer-admin-partial",
   "--customer-admin-partial-async",
   "--sport-type",
+  "--sort-custom",
+  "--agent-owner",
 ] as const;
 
 const HELP = `
@@ -152,6 +154,8 @@ Options:
   --customer-admin-partial <f>  After manager customer context, GET UI partial (e.g. playerInfoModals, player-info-me-setting)
   --customer-admin-partial-async <true|false>  Override RequireJS async= query (modals default async=false)
   --sport-type <name>           sportType for getSportsVigSetup (default: Football)
+  --sort-custom <value>         sortCustom for getCustomerAdmin (default: 1)
+  --agent-owner <id>            agentOwner override when it differs from agentID on the wire
   --login-as-player             Customer/player login (F402_PLAYER_ID / F402_PLAYER_PASSWORD or keychain f402-player-*)
   --include-unconfirmed         Include PendingDelete (also needs --i-understand-mutations)
   -h, --help                    This text
@@ -292,6 +296,8 @@ async function main(): Promise<number> {
   const wagerValue = flagValue(parsed, "--wager", "");
   const flagValue_ = flagValue(parsed, "--flag", "");
   const sportTypeValue = flagValue(parsed, "--sport-type", "").trim();
+  const sortCustomValue = flagValue(parsed, "--sort-custom", "").trim();
+  const agentOwnerValue = flagValue(parsed, "--agent-owner", "").trim();
   const prefix = flagValue(parsed, "--prefix", PROBE_PREFIXES[0]!);
   const suiteRaw = flagValue(parsed, "--suite", "").toLowerCase();
   const opsArg = flagValue(parsed, "--ops", "");
@@ -378,6 +384,8 @@ async function main(): Promise<number> {
     ...(wagerValue === "" ? {} : { wagerNumber: wagerValue }),
     ...(flagValue_ === "" ? {} : { flag: flagValue_ }),
     ...(sportTypeValue === "" ? {} : { sportType: sportTypeValue }),
+    ...(sortCustomValue === "" ? {} : { sortCustom: sortCustomValue }),
+    ...(agentOwnerValue === "" ? {} : { agentOwner: agentOwnerValue }),
   });
 
   // PendingDelete and report probes must send the wager owner's customerID, not the agent session.

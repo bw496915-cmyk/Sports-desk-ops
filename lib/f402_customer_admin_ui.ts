@@ -85,6 +85,40 @@ export function customerAdminAsyncPartialUrl(
   return customerAdminPartialUrl(baseUrl, partialFile, { bust, async: true });
 }
 
+/**
+ * Excel export affordance on customer-admin grids (Font Awesome `fa-file-excel-o`,
+ * `data-export="excel-action"`). Export is UI-driven off the `getCustomerAdmin` table,
+ * not a separate `/cloud/api/*` path in the static markup.
+ */
+export const F402_CUSTOMER_ADMIN_EXCEL_EXPORT_SELECTOR =
+  '[data-export="excel-action"]' as const;
+
+/** Probe whether the excel export control is present after customer-admin UI loads. */
+export function buildProbeCustomerAdminExcelExportExpression(): string {
+  const sel = JSON.stringify(F402_CUSTOMER_ADMIN_EXCEL_EXPORT_SELECTOR);
+  return `(() => {
+  const el = document.querySelector(${sel});
+  if (!el) return { found: false };
+  const style = window.getComputedStyle(el);
+  return {
+    found: true,
+    tag: el.tagName.toLowerCase(),
+    exportAttr: el.getAttribute("data-export") || "",
+    className: el.getAttribute("class") || "",
+    display: style.display,
+    visibility: style.visibility,
+  };
+})()`;
+}
+
+/** Manager POST reads for customer-admin shell (grid, config, sports lanes). */
+export const F402_CUSTOMER_ADMIN_API_OPERATIONS = new Set<string>([
+  "getCustomerAdmin",
+  "getConfigWebReportsCustomerAdmin",
+  "getSportsCustomerAdmin",
+  "getSportsVigSetup",
+]);
+
 /** Manager POST reads commonly fired from the player-info tab module. */
 export const F402_PLAYER_INFO_TAB_OPERATIONS = new Set<string>([
   "getInfoPlayer",

@@ -57,7 +57,8 @@ export type ProbeParam =
   | "typeAmount"
   | "positionBySport"
   | "figureDate"
-  | "graded";
+  | "graded"
+  | "sortCustom";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -306,6 +307,14 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: true,
     note: "customer-admin web reports config (Manager envelope); form: agentID, operation, RRO, agentOwner",
     params: ["agentID", "operation", "RRO", "agentOwner"],
+  },
+  {
+    operation: "getCustomerAdmin",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin player list/grid { LIST[] }; wire agentID+sortCustom+operation+RRO+agentOwner; sortCustom=2 + agentOwner=downline id scopes rows (e.g. CUB22HR)",
+    params: ["agentID", "sortCustom", "operation", "RRO", "agentOwner"],
+    defaultPrefix: "/cloud/api/Manager",
   },
   {
     operation: "updateReportConfigCustomerAdmin",
@@ -979,6 +988,8 @@ export interface ProbeBodyOptions {
   readonly description?: string;
   readonly additional?: string;
   readonly sportType?: string;
+  readonly sortCustom?: string;
+  readonly agentOwner?: string;
 }
 
 function resolveParamMap(
@@ -994,7 +1005,10 @@ function resolveParamMap(
     } else if (name === "agentID") {
       out[name] = agentId;
     } else if (name === "agentOwner") {
-      out[name] = agentId;
+      out[name] =
+        options.agentOwner !== undefined && options.agentOwner !== ""
+          ? options.agentOwner
+          : agentId;
     } else if (name === "acc") {
       out[name] = PROBE_ACC_IS_CUSTOMER_OPS.has(op.operation)
         ? customerId !== undefined && customerId !== ""
@@ -1091,6 +1105,8 @@ function resolveParamMap(
       out[name] = "__DATE__";
     } else if (name === "graded") {
       out[name] = "1";
+    } else if (name === "sortCustom") {
+      out[name] = options.sortCustom ?? "1";
     } else {
       // Compile-time exhaustiveness: adding a ProbeParam variant without a case
       // fails the build here instead of silently dropping the field from every body.
