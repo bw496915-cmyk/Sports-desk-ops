@@ -1,0 +1,45 @@
+{
+  "INFO": {
+    "LIST": [
+      {
+        "TicketNumber": "1072976954",
+        "WagerNumber": "1",
+        "WagerStatus": "P",
+        "AmountWagered": "200.0",
+        "DeleteDateTime": "2026-11-01 00:08:16.527",
+        "customerID": "BJ302     ",
+        "Login": "BJ302",
+        "LoginID": "BUYOUT-BJ302",
+        "ItemNumber": "1",
+        "WagerType": "P",
+        "totalPicks": "6"
+      },
+      {
+        "TicketNumber": "1072976954",
+        "WagerNumber": "1",
+        "WagerStatus": "P",
+        "AmountWagered": "200.0",
+        "DeleteDateTime": "2026-11-01 00:08:16.527",
+        "customerID": "BJ302     ",
+        "Login": "BJ302",
+        "LoginID": "BUYOUT-BJ302",
+        "ItemNumber": "6",
+        "WagerType": "P",
+        "totalPicks": "6"
+      },
+      {
+        "TicketNumber": "1073143417",
+        "WagerNumber": "1",
+        "WagerStatus": "P",
+        "AmountWagered": "115000.0",
+        "DeleteDateTime": "2026-11-01 00:11:48.977",
+        "customerID": "PH1009    ",
+        "Login": "PH1009",
+        "LoginID": "PH77",
+        "ItemNumber": "1",
+        "WagerType": "L",
+        "totalPicks": "1"
+      }
+    ]
+  }
+}

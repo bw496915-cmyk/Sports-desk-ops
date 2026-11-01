@@ -13,6 +13,13 @@
  * `--ticket`, it sends sentinel `ticketNumber=-1`.
  */
 
+import {
+  inPageCloudApiHeadersJs,
+  inPageCollectResponseHeadersJs,
+  inPageInjectWireTokenJs,
+  inPageReadSessionAuthJs,
+} from "./f402_in_page_fetch.ts";
+
 export type ProbeParam =
   | "agentID"
   | "agentOwner"
@@ -48,7 +55,9 @@ export type ProbeParam =
   | "sportTypeList"
   | "sportSubTypeList"
   | "typeAmount"
-  | "positionBySport";
+  | "positionBySport"
+  | "figureDate"
+  | "graded";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -111,6 +120,112 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     defaultPrefix: "/cloud/api/Manager",
   },
   {
+    operation: "getTransactionList",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin transactions tab (manager/module/customer-admin/transactions.html); days + type filter codes",
+    params: [
+      "agentID",
+      "agentOwner",
+      "customerID",
+      "days",
+      "type",
+      "token",
+      "operation",
+      "RRO",
+    ],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getDeletedTransactionHistory",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin Deleted/Changed filter; wire uses days=all&type=0 (UI label DELETED); returns LIST[] ledger rows",
+    params: [
+      "agentID",
+      "agentOwner",
+      "customerID",
+      "days",
+      "type",
+      "token",
+      "operation",
+      "RRO",
+    ],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getInfoPlayer",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin player info; wire omits token; Chrome manager.html sends RRO=0 with customerID/agentID/agentOwner",
+    params: ["customerID", "agentID", "operation", "RRO", "agentOwner"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getDeleteWager",
+    method: "POST",
+    readOnly: true,
+    note: "manager delete-wager module (distinct from getReportDeletedTransactions wager report)",
+    params: [
+      "agentID",
+      "agentOwner",
+      "customerID",
+      "days",
+      "token",
+      "operation",
+      "RRO",
+    ],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getCryptoInfo",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin player-info tab (manager/module/customer-admin/player-info.html)",
+    params: ["agentID", "agentOwner", "customerID", "token", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getMail",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin player-info tab mail lookup",
+    params: ["agentID", "agentOwner", "customerID", "token", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getTeaserProfile",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin player-info tab; Chrome wire: acc+operation+RRO+agentID+agentOwner (no token)",
+    params: ["acc", "operation", "RRO", "agentID", "agentOwner"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getPerformancePlayer",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin performance tab (manager/module/customer-admin/performance.html)",
+    params: ["agentID", "agentOwner", "customerID", "token", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getWagersByFigureDate",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin performance tab & daily-figures drill-down (report.js:46608,60279: customerID, figureDate, graded, operation, RRO)",
+    params: ["customerID", "figureDate", "graded", "token", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Report",
+  },
+  {
+    operation: "getCasinoSummaryDetails",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin performance tab casino summary details",
+    params: ["agentID", "agentOwner", "customerID", "token", "operation", "RRO"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
     operation: "getGrading",
     method: "POST",
     readOnly: true,
@@ -132,6 +247,29 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: true,
     note: "agent list by agent (Manager envelope); form: agentID, agentType, operation, RRO, agentOwner",
     params: ["agentID", "agentType", "operation", "RRO", "agentOwner"],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getSportsVigSetup",
+    method: "POST",
+    readOnly: true,
+    note: "vig setup read; Chrome wire customerID=* + sportType + agentID/agentOwner; tier A response 2026-10-31",
+    params: [
+      "customerID",
+      "agentID",
+      "sportType",
+      "operation",
+      "RRO",
+      "agentOwner",
+    ],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getSportsCustomerAdmin",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin sports catalog read; Chrome wire operation+RRO+agentID+agentOwner (no customerID/token)",
+    params: ["operation", "RRO", "agentID", "agentOwner"],
     defaultPrefix: "/cloud/api/Manager",
   },
   {
@@ -195,7 +333,7 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     operation: "write",
     method: "POST",
     readOnly: false,
-    note: "MUTATION: writes a log entry (Log prefix, JSON body); gated behind --include-unconfirmed",
+    note: "MUTATION: manager view-transition audit log (POST /cloud/api/Log/write, application/json, customerID padded to 10); gated behind --include-unconfirmed",
     params: [
       "customerID",
       "description",
@@ -297,6 +435,25 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     defaultPrefix: "/cloud/api/Report",
   },
 ] as const;
+
+/** Wire name says "Delete" but client JS is a read-only Pending[] modal lookup (report.js:8578). */
+export const CLIENT_JS_CONFIRMED_READ_ONLY_OPS = new Set<string>([
+  "PendingDelete",
+]);
+
+/** Player-info tab calls use form field `acc` (padded customer id), not `customerID`. */
+export const PROBE_ACC_IS_CUSTOMER_OPS = new Set<string>(["getTeaserProfile"]);
+
+export function isProbeReadOnlyConfirmed(op: ProbeOp): boolean {
+  return op.readOnly || CLIENT_JS_CONFIRMED_READ_ONLY_OPS.has(op.operation);
+}
+
+/** Log/write pads `customerID` to 10 characters (observed in manager boot waterfall). */
+export function padLogWriteCustomerId(customerId: string): string {
+  const trimmed = customerId.trim();
+  if (trimmed.length >= 10) return trimmed.slice(0, 10);
+  return trimmed.padEnd(10, " ");
+}
 
 /**
  * The 9 read-only `/cloud/api/Manager/*` operations fired on `manager.html?v=1793502037202` (`bust=1.0.280`) boot,
@@ -436,18 +593,8 @@ export function buildProbeExpression(
 
   return `(async () => {
   // The edge wants the token the app stored after login. Read it in-page: it never crosses into Bun.
-  let token = "";
-  let customerID = "";
-  try {
-    const credentials = JSON.parse(sessionStorage.getItem("credentials") ?? "{}");
-    token = credentials.code ?? "";
-    customerID = credentials.customerID ?? "";
-  } catch {}
-  const headers = {
-    "content-type": ${JSON.stringify(contentType)},
-    "x-requested-with": "XMLHttpRequest",
-  };
-  if (token) headers.authorization = "Bearer " + token;
+  ${inPageReadSessionAuthJs()}
+  ${inPageCloudApiHeadersJs(contentType)}
   // Yesterday: today's date is not a settled day for this endpoint (it answers 500).
   const now = new Date(Date.now() - 86_400_000);
   const mdy = String(now.getMonth() + 1).padStart(2, "0") + "/" + String(now.getDate()).padStart(2, "0") + "/" + now.getFullYear();
@@ -456,17 +603,40 @@ export function buildProbeExpression(
   // not a date string. Default to "0"; a caller may override with --week.
   const weekOverride = ${JSON.stringify(weekValue ?? "")};
   const weekValueResolved = weekOverride !== "" ? weekOverride : "0";
-  const resolvedBody = ${replaceExpr};
+  let resolvedBody = ${replaceExpr};
+  ${inPageInjectWireTokenJs(isJson)}
   const response = await fetch(${url}, {
     method: "POST",
     credentials: "include",
     headers,
     body: resolvedBody,
   });
+  // Deterministic DOM markers: version from [data-field="version"], origin from [data-field="domain-me"].
+  // These ride in the same response the caller captured, so the record can compare the runtime against
+  // the spec instead of trusting a JS bundle hash or a static origin config.
+  const versionEl = document.querySelector('[data-field="version"]');
+  const domVersion = versionEl ? (versionEl.textContent ?? "").trim() : "";
+  const domainEl = document.querySelector('[data-field="domain-me"]');
+  const domOrigin = domainEl ? (domainEl.textContent ?? "").trim() : "";
+  let challengePresent = false;
+  let cfRay = "";
+  try {
+    const cfParams = window.__CF$cv$params;
+    if (cfParams && typeof cfParams === "object" && cfParams.r) {
+      challengePresent = true;
+      cfRay = String(cfParams.r);
+    }
+  } catch {}
+  if (!challengePresent) {
+    const edgeScripts = document.querySelectorAll('script[src*="/cdn-cgi/"]');
+    if (edgeScripts.length > 0) challengePresent = true;
+  }
+  ${inPageCollectResponseHeadersJs(false)}
+  if (cfRayHeader) cfRay = cfRay || cfRayHeader;
   // Read bytes once. Binary responses (image/pdf/octet-stream) are wrapped in a Blob so callers
   // can inspect type/size without decoding garbage as text; preview/bodyText stay empty.
   const buffer = new Uint8Array(await response.arrayBuffer());
-  const respContentType = response.headers.get("content-type") ?? "";
+  const respContentType = responseHeaders["content-type"] ?? "";
   const isBinaryResp = new RegExp("^(image/|audio/|video/|application/(pdf|octet-stream|zip|gzip))", "i").test(respContentType);
   let previewText = "";
   let bodyTextOut = "";
@@ -492,6 +662,21 @@ export function buildProbeExpression(
     isBinary: isBinaryResp,
     blobType: blobTypeOut,
     blobSize: blobSizeOut,
+    ...(domVersion === "" ? {} : { domVersion }),
+    ...(domOrigin === "" ? {} : { domOrigin }),
+    challengePresent,
+    ...(cfRay === "" ? {} : { cfRay }),
+    ...(cfRayHeader === "" ? {} : { cfRayFromHeader: cfRayHeader }),
+    responseHeaders,
+    sessionCustomerPresent: customerID !== "",
+    sessionCredentialsCodePresent: token !== "",
+    sessionAgentType: String(sessionStorage.getItem("agentType") ?? ""),
+    sessionIsAgent:
+      sessionStorage.getItem("agentType") === "M" ||
+      sessionStorage.getItem("agentType") === "A",
+    requestBodyTokenInjected:
+      token !== "" &&
+      (/(^|&)token=[^&]+/.test(resolvedBody) && !/(^|&)token=(&|$)/.test(resolvedBody)),
   };
 })()`;
 }
@@ -534,6 +719,7 @@ export function buildInstallRequestSnifferExpression(): string {
   const record = (rawUrl, rawMethod, rawBody) => {
     try {
       const parsed = new URL(String(rawUrl), location.origin);
+      if (parsed.pathname.startsWith("/cdn-cgi/")) return;
       if (!parsed.pathname.includes("/cloud/api/")) return;
       window.__f402SniffedRequests.push({
         path: parsed.pathname,
@@ -587,6 +773,7 @@ export function parseSniffedTemplates(raw: unknown): SniffedFormTemplate[] {
     if (
       typeof path !== "string" ||
       !path.startsWith("/") ||
+      path.startsWith("/cdn-cgi/") ||
       typeof method !== "string" ||
       !Array.isArray(formKeys) ||
       !formKeys.every((key) => typeof key === "string")
@@ -614,6 +801,24 @@ interface ProbePageResultBase {
   readonly bodyText?: string;
   readonly dateUsed?: string;
   readonly weekUsed?: string;
+  /** DOM-extracted version marker (e.g. `"1.0.280"` from `data-field="version"`). Empty when absent. */
+  readonly domVersion?: string;
+  /** DOM-extracted origin marker (e.g. `"www.fantasy402.com"` from `data-field="domain-me"`). Empty when absent. */
+  readonly domOrigin?: string;
+  readonly challengePresent?: boolean;
+  /** Cloudflare Ray ID from response `Cf-Ray` or `window.__CF$cv$params.r`. */
+  readonly cfRay?: string;
+  /** Cloudflare Ray ID specifically read from the `Cf-Ray` HTTP response header. */
+  readonly cfRayFromHeader?: string;
+  /** Observed HTTP response headers (`cf-ray`, `content-type`) from the in-page `fetch()` Response. */
+  readonly responseHeaders?: Readonly<Record<string, string>>;
+  /** True when `sessionStorage.credentials.customerID` was non-empty before the fetch. */
+  readonly sessionCustomerPresent?: boolean;
+  /** True when `sessionStorage.credentials.code` (Bearer) was non-empty before the fetch. */
+  readonly sessionCredentialsCodePresent?: boolean;
+  readonly sessionAgentType?: string;
+  readonly sessionIsAgent?: boolean;
+  readonly requestBodyTokenInjected?: boolean;
 }
 
 export interface TextProbeResult extends ProbePageResultBase {
@@ -657,6 +862,32 @@ export function parseProbePageResult(raw: unknown): ProbePageResult {
     throw new Error("probe result has no body preview");
   const dateUsed = candidate["dateUsed"];
   const weekUsed = candidate["weekUsed"];
+  const domVersion = candidate["domVersion"];
+  const domOrigin = candidate["domOrigin"];
+  const challengePresent = candidate["challengePresent"];
+  const cfRay = candidate["cfRay"];
+  const cfRayFromHeader = candidate["cfRayFromHeader"];
+  const rawResponseHeaders = candidate["responseHeaders"];
+  let responseHeaders: Record<string, string> | undefined;
+  if (
+    typeof rawResponseHeaders === "object" &&
+    rawResponseHeaders !== null &&
+    !Array.isArray(rawResponseHeaders)
+  ) {
+    const cleanHeaders: Record<string, string> = {};
+    for (const [k, v] of Object.entries(
+      rawResponseHeaders as Record<string, unknown>,
+    )) {
+      if (typeof v === "string") cleanHeaders[k.toLowerCase()] = v;
+    }
+    responseHeaders = cleanHeaders;
+  }
+  const sessionCustomerPresent = candidate["sessionCustomerPresent"];
+  const sessionCredentialsCodePresent =
+    candidate["sessionCredentialsCodePresent"];
+  const sessionAgentType = candidate["sessionAgentType"];
+  const sessionIsAgent = candidate["sessionIsAgent"];
+  const requestBodyTokenInjected = candidate["requestBodyTokenInjected"];
   const base = {
     status,
     contentType,
@@ -665,6 +896,29 @@ export function parseProbePageResult(raw: unknown): ProbePageResult {
     ...(typeof bodyText === "string" ? { bodyText } : {}),
     ...(typeof dateUsed === "string" ? { dateUsed } : {}),
     ...(typeof weekUsed === "string" ? { weekUsed } : {}),
+    ...(typeof domVersion === "string" && domVersion !== ""
+      ? { domVersion }
+      : {}),
+    ...(typeof domOrigin === "string" && domOrigin !== "" ? { domOrigin } : {}),
+    ...(challengePresent === true ? { challengePresent: true } : {}),
+    ...(typeof cfRay === "string" && cfRay !== "" ? { cfRay } : {}),
+    ...(typeof cfRayFromHeader === "string" && cfRayFromHeader !== ""
+      ? { cfRayFromHeader }
+      : {}),
+    ...(responseHeaders !== undefined ? { responseHeaders } : {}),
+    ...(sessionCustomerPresent === true
+      ? { sessionCustomerPresent: true }
+      : {}),
+    ...(sessionCredentialsCodePresent === true
+      ? { sessionCredentialsCodePresent: true }
+      : {}),
+    ...(typeof sessionAgentType === "string" && sessionAgentType !== ""
+      ? { sessionAgentType }
+      : {}),
+    ...(sessionIsAgent === true ? { sessionIsAgent: true } : {}),
+    ...(requestBodyTokenInjected === true
+      ? { requestBodyTokenInjected: true }
+      : {}),
   };
   // Old scratch files predate blob metadata; missing means text.
   if (candidate["isBinary"] === true) {
@@ -724,6 +978,7 @@ export interface ProbeBodyOptions {
   readonly days?: string;
   readonly description?: string;
   readonly additional?: string;
+  readonly sportType?: string;
 }
 
 function resolveParamMap(
@@ -741,14 +996,26 @@ function resolveParamMap(
     } else if (name === "agentOwner") {
       out[name] = agentId;
     } else if (name === "acc") {
-      out[name] = agentId;
+      out[name] = PROBE_ACC_IS_CUSTOMER_OPS.has(op.operation)
+        ? customerId !== undefined && customerId !== ""
+          ? customerId
+          : "__CUSTOMER_ID__"
+        : agentId;
     } else if (name === "token") {
       out[name] = "";
     } else if (name === "customerID") {
-      out[name] =
-        customerId !== undefined && customerId !== ""
-          ? customerId
-          : "__CUSTOMER_ID__";
+      if (op.operation === "getSportsVigSetup") {
+        out[name] = "*";
+      } else {
+        const raw =
+          customerId !== undefined && customerId !== ""
+            ? customerId
+            : "__CUSTOMER_ID__";
+        out[name] =
+          op.operation === "write" && raw !== "__CUSTOMER_ID__"
+            ? padLogWriteCustomerId(raw)
+            : raw;
+      }
     } else if (name === "date") {
       out[name] = "__DATE__";
     } else if (name === "week") {
@@ -765,13 +1032,23 @@ function resolveParamMap(
     } else if (name === "type") {
       out[name] =
         options.type ??
-        (op.operation === "getWeeklyFigureByAgentLite" ? "A" : "0");
+        (op.operation === "getWeeklyFigureByAgentLite"
+          ? "A"
+          : op.operation === "getTransactionList"
+            ? "E-I-C-D-Z-Q-B-N"
+            : "0");
     } else if (name === "layout") {
       out[name] = options.layout ?? "byDay";
     } else if (name === "RRO") {
-      out[name] = "1";
+      out[name] = op.operation === "getInfoPlayer" ? "0" : "1";
     } else if (name === "days") {
-      out[name] = options.days ?? "7";
+      out[name] =
+        options.days ??
+        (op.operation === "getTransactionList" ||
+        op.operation === "getDeletedTransactionHistory" ||
+        op.operation === "getDeleteWager"
+          ? "all"
+          : "7");
     } else if (name === "description") {
       out[name] = options.description ?? "probe";
     } else if (name === "additional") {
@@ -783,7 +1060,7 @@ function resolveParamMap(
     } else if (name === "showGraded") {
       out[name] = "false";
     } else if (name === "sportType") {
-      out[name] = "Football";
+      out[name] = options.sportType ?? "Football";
     } else if (name === "sportTypeIn") {
       out[name] = "Football";
     } else if (name === "sportSubTypeIn") {
@@ -810,6 +1087,10 @@ function resolveParamMap(
       out[name] = "2";
     } else if (name === "positionBySport") {
       out[name] = "true";
+    } else if (name === "figureDate") {
+      out[name] = "__DATE__";
+    } else if (name === "graded") {
+      out[name] = "1";
     } else {
       // Compile-time exhaustiveness: adding a ProbeParam variant without a case
       // fails the build here instead of silently dropping the field from every body.

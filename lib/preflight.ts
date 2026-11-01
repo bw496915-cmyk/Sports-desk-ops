@@ -22,6 +22,52 @@ export interface PreflightResult {
   readonly tls: TlsProvenance | null;
   readonly ok: boolean;
   readonly error: string | null;
+  readonly dnsPrefetched?: boolean;
+  readonly dnsCacheStats?: Record<string, number>;
+}
+
+/** Pre-warm Bun's DNS cache before WebView navigate / fetch (see bun.com/docs/runtime/networking/dns). */
+export function prefetchDns(host: string, port = 443): void {
+  const trimmed = host.trim();
+  if (trimmed === "") return;
+  if (!Number.isFinite(port) || port <= 0) return;
+  Bun.dns.prefetch(trimmed, port);
+}
+
+export function readDnsCacheStats(): Record<string, number> | undefined {
+  try {
+    const stats = Bun.dns.getCacheStats?.();
+    if (typeof stats !== "object" || stats === null) return undefined;
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(stats as Record<string, unknown>)) {
+      if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * DNS prefetch + optional fetch.preconnect for HTTPS capture bases.
+ */
+export function warmCaptureNetwork(baseUrl: string): { host: string; port: number } {
+  const parsed = new URL(baseUrl);
+  const port =
+    parsed.port !== ""
+      ? Number(parsed.port)
+      : parsed.protocol === "https:"
+        ? 443
+        : 80;
+  prefetchDns(parsed.hostname, port);
+  if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+    try {
+      fetch.preconnect(parsed.origin);
+    } catch {
+      // preconnect is best-effort
+    }
+  }
+  return { host: parsed.hostname, port };
 }
 
 export async function resolveHost(host: string): Promise<DnsAnswer[]> {
@@ -35,9 +81,11 @@ export async function resolveHost(host: string): Promise<DnsAnswer[]> {
 
 export async function preflight(
   host: string,
-  options: { port?: number; timeoutMs?: number } = {},
+  options: { port?: number; timeoutMs?: number; skipDnsPrefetch?: boolean } = {},
 ): Promise<PreflightResult> {
   const port = options.port ?? 443;
+  if (!options.skipDnsPrefetch) prefetchDns(host, port);
+  const dnsCacheStats = readDnsCacheStats();
   let dns: DnsAnswer[] = [];
   try {
     dns = await resolveHost(host);
@@ -49,6 +97,8 @@ export async function preflight(
       tls: null,
       ok: false,
       error: `DNS lookup failed for ${host}: ${(error as Error).message}`,
+      dnsPrefetched: !options.skipDnsPrefetch,
+      ...(dnsCacheStats ? { dnsCacheStats } : {}),
     };
   }
 
@@ -58,7 +108,16 @@ export async function preflight(
       port,
       timeoutMs: options.timeoutMs ?? 10_000,
     });
-    return { host, port, dns, tls, ok: true, error: null };
+    return {
+      host,
+      port,
+      dns,
+      tls,
+      ok: true,
+      error: null,
+      dnsPrefetched: !options.skipDnsPrefetch,
+      ...(dnsCacheStats ? { dnsCacheStats } : {}),
+    };
   } catch (error) {
     return {
       host,
@@ -67,6 +126,8 @@ export async function preflight(
       tls: null,
       ok: false,
       error: `TLS handshake failed for ${host}:${port}: ${(error as Error).message}`,
+      dnsPrefetched: !options.skipDnsPrefetch,
+      ...(dnsCacheStats ? { dnsCacheStats } : {}),
     };
   }
 }

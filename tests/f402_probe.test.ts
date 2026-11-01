@@ -9,6 +9,7 @@ import {
   buildReadRequestSnifferExpression,
   parseProbePageResult,
   parseSniffedTemplates,
+  padLogWriteCustomerId,
   probeSummary,
   probeUrl,
   probeVerdict,
@@ -37,8 +38,8 @@ describe("f402 probe plan", () => {
     ]);
 
     const allReadOnly = selectProbeOps(false, "all");
-    // 7 read-only report ops + 8 unique manager-boot ops (getListAgenstByAgent is shared) = 15
-    expect(allReadOnly).toHaveLength(24);
+    // 25 read-only report/module ops + 8 unique manager-boot ops (getListAgenstByAgent is shared) = 33
+    expect(allReadOnly).toHaveLength(36);
   });
 
   test("builds URLs from the observed route prefix", () => {
@@ -83,6 +84,52 @@ describe("f402 probe plan", () => {
     expect(tx.get("customerID")).toBe("__CUSTOMER_ID__");
     expect(tx.get("date")).toBe("__DATE__");
 
+    const infoPlayer = PROBE_OPS.find((op) => op.operation === "getInfoPlayer")!;
+    const infoBody = new URLSearchParams(
+      buildProbeBody(infoPlayer, "BILLY666", "BILLY666"),
+    );
+    expect([...infoBody.keys()]).toEqual([
+      "customerID",
+      "agentID",
+      "operation",
+      "RRO",
+      "agentOwner",
+    ]);
+    expect(infoBody.get("operation")).toBe("getInfoPlayer");
+    expect(infoBody.get("RRO")).toBe("0");
+    expect(infoBody.toString()).toBe(
+      "customerID=BILLY666&agentID=BILLY666&operation=getInfoPlayer&RRO=0&agentOwner=BILLY666",
+    );
+    expect(padLogWriteCustomerId("BILLY666")).toBe("BILLY666  ");
+
+    const sportsAdmin = PROBE_OPS.find(
+      (op) => op.operation === "getSportsCustomerAdmin",
+    );
+    if (!sportsAdmin) throw new Error("getSportsCustomerAdmin missing from PROBE_OPS");
+    expect(
+      new URLSearchParams(buildProbeBody(sportsAdmin, "BILLY666")).toString(),
+    ).toBe(
+      "operation=getSportsCustomerAdmin&RRO=1&agentID=BILLY666&agentOwner=BILLY666",
+    );
+
+    const vig = PROBE_OPS.find((op) => op.operation === "getSportsVigSetup")!;
+    expect(
+      new URLSearchParams(
+        buildProbeBody(vig, "BILLY666", "BILLY666", { sportType: "Football" }),
+      ).toString(),
+    ).toBe(
+      "customerID=*&agentID=BILLY666&sportType=Football&operation=getSportsVigSetup&RRO=1&agentOwner=BILLY666",
+    );
+
+    const teaser = PROBE_OPS.find((op) => op.operation === "getTeaserProfile")!;
+    expect(
+      new URLSearchParams(
+        buildProbeBody(teaser, "BILLY666", "BILLY666"),
+      ).toString(),
+    ).toBe(
+      "acc=BILLY666&operation=getTeaserProfile&RRO=1&agentID=BILLY666&agentOwner=BILLY666",
+    );
+
     // PendingDelete sends sentinel ticketNumber=-1 by default
     const pendingDelete = new URLSearchParams(
       buildProbeBody(
@@ -91,6 +138,17 @@ describe("f402 probe plan", () => {
       ),
     );
     expect(pendingDelete.get("ticketNumber")).toBe("-1");
+
+    const pendingDeletePlayer = new URLSearchParams(
+      buildProbeBody(
+        PROBE_OPS.find((op) => op.operation === "PendingDelete")!,
+        "agent-118",
+        "PH1009",
+        { ticketNumber: "1073143417" },
+      ),
+    );
+    expect(pendingDeletePlayer.get("customerID")).toBe("PH1009");
+    expect(pendingDeletePlayer.get("ticketNumber")).toBe("1073143417");
 
     // JSON wire bodies for getAccountInfoOwner (manager.js:31200) & getDailyFiguresByCustomer (report.js:25633)
     const acctOwnerOp = MANAGER_BOOT_OPS.find(
@@ -171,6 +229,7 @@ describe("probe expression", () => {
     expect(expression).toContain('replaceAll("__DATE__"');
     expect(expression).toContain('authorization = "Bearer " + token');
     expect(expression).toContain("sessionStorage.getItem");
+    expect(expression).toContain('sessionStorage.getItem("customerID")');
     // The markers are plain text so URL encoding cannot turn them into %7B…%7D.
     expect(expression).not.toContain("%7B");
   });
@@ -216,6 +275,34 @@ describe("probe expression", () => {
     expect(expression).toContain("isBinary: isBinaryResp");
     expect(expression).toContain("blobType: blobTypeOut");
     expect(expression).toContain("blobSize: blobSizeOut");
+  });
+
+  test("parseProbePageResult accepts Cloudflare challenge metadata", () => {
+    const parsed = parseProbePageResult({
+      status: 500,
+      contentType: "text/html",
+      bytes: 0,
+      preview: "",
+      challengePresent: true,
+      cfRay: "a537f5fb4a4da5da-LAX",
+    });
+    expect(parsed.challengePresent).toBe(true);
+    expect(parsed.cfRay).toBe("a537f5fb4a4da5da-LAX");
+  });
+
+  test("probe expression reads __CF$cv$params and cf-ray header", () => {
+    const expression = buildProbeExpression({
+      operation: "Pending",
+      url: "https://fantasy402.com/cloud/api/Report/Pending",
+      body: "operation=Pending",
+    });
+    expect(expression).toContain("__CF$cv$params");
+    expect(expression).toContain("/cdn-cgi/");
+    expect(expression).toContain('"cf-cache-status"');
+    expect(expression).toContain('responseHeaders["cf-ray"]');
+    expect(expression).toContain("sessionCustomerPresent");
+    expect(expression).toContain("sessionCredentialsCodePresent");
+    expect(expression).toContain("encodeURIComponent(token)");
   });
 
   test("old results without blob metadata parse as text", () => {
@@ -275,6 +362,7 @@ describe("probe expression", () => {
 describe("request sniffer", () => {
   test("installs XHR and fetch hooks scoped to /cloud/api/", () => {
     const expression = buildInstallRequestSnifferExpression();
+    expect(expression).toContain("/cdn-cgi/");
     expect(expression).toContain("XMLHttpRequest.prototype");
     expect(expression).toContain("window.fetch");
     expect(expression).toContain("/cloud/api/");

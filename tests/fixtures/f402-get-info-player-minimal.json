@@ -1,0 +1,39 @@
+{
+  "INFO": {
+    "data": {
+      "AgentType": "M",
+      "Active": "Y",
+      "Login": "BILLY666  ",
+      "CreditLimit": 0,
+      "CurrentBalance": 0,
+      "PendingWagerCount": 0,
+      "ParlayName": "8 Team Max               ",
+      "Password": " ",
+      "Passwordt": ""
+    },
+    "balance": { "AvailableBalance": 0 },
+    "totalNonPostedCasino": { "TotalAmount": null },
+    "added": {
+      "CustomerID": "BILLY666  ",
+      "RebatePercent": 0,
+      "NotifyTelegram": "N"
+    },
+    "thisWeek": false,
+    "parlaySpecs": [
+      {
+        "ParlayName": "8 Team Max               ",
+        "MaxPicks": 8,
+        "DefaultPrice": -110,
+        "ParlayDescription": "",
+        "ParlayDisplayName": "8 Team Max               "
+      },
+      {
+        "ParlayName": "3 Team Max               ",
+        "MaxPicks": 3,
+        "DefaultPrice": -110,
+        "ParlayDescription": "3 Team Max",
+        "ParlayDisplayName": "3 Team Max"
+      }
+    ]
+  }
+}

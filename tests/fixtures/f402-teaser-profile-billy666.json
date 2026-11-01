@@ -1,0 +1,94 @@
+{
+  "LIST": [
+    {
+      "CustomerID": "BILLY666  ",
+      "Description": "Basic +½ (6½ pts FB, 4½ pts BK)",
+      "TeaserName": "Basic +½ - 6T                      ",
+      "info": {
+        "teasername": "Basic +&#189; - 6T            ",
+        "TeaserTies": 0,
+        "MaxPicks": 6,
+        "MinPicks": 2,
+        "Description": "Basic +&#189; (6&#189; pts FB, 4&#189; pts BK)",
+        "InternetOnlyFlag": "N",
+        "SuspendFlag": "N",
+        "CallUnitOnlyFlag": "N",
+        "BaseOfferingFlag": "N",
+        "PushNoReduce": "N",
+        "Office": null
+      }
+    },
+    {
+      "CustomerID": "BILLY666  ",
+      "Description": "Basic +1 (7 pts FB, 5 pts BK)",
+      "TeaserName": "Basic +1 - 6T                      ",
+      "info": {
+        "teasername": "Basic +1 - 6T            ",
+        "TeaserTies": 0,
+        "MaxPicks": 6,
+        "MinPicks": 2,
+        "Description": "Basic +1 (7 pts FB, 5 pts BK)",
+        "InternetOnlyFlag": "N",
+        "SuspendFlag": "N",
+        "CallUnitOnlyFlag": "N",
+        "BaseOfferingFlag": "N",
+        "PushNoReduce": "N",
+        "Office": null
+      }
+    },
+    {
+      "CustomerID": "BILLY666  ",
+      "Description": "Basic (6 pts FB, 4 pts BK)",
+      "TeaserName": "MOOSE Basic - 6T v2                ",
+      "info": {
+        "teasername": "MOOSE Basic - 6T v2      ",
+        "TeaserTies": 0,
+        "MaxPicks": 6,
+        "MinPicks": 2,
+        "Description": "Basic (6 pts FB, 4 pts BK)",
+        "InternetOnlyFlag": "N",
+        "SuspendFlag": "N",
+        "CallUnitOnlyFlag": "N",
+        "BaseOfferingFlag": "N",
+        "PushNoReduce": "N",
+        "Office": null
+      }
+    },
+    {
+      "CustomerID": "BILLY666  ",
+      "Description": "Special 3 Teams (10 pts FB, 7 pts BK) - Ties Lose",
+      "TeaserName": "Special 3 Teams                    ",
+      "info": {
+        "teasername": "Special 3 Teams          ",
+        "TeaserTies": 2,
+        "MaxPicks": 3,
+        "MinPicks": 3,
+        "Description": "Special 3 Teams (10 pts FB, 7 pts BK) - Ties Lose",
+        "InternetOnlyFlag": "N",
+        "SuspendFlag": "N",
+        "CallUnitOnlyFlag": "N",
+        "BaseOfferingFlag": "N",
+        "PushNoReduce": "N",
+        "Office": null
+      }
+    },
+    {
+      "CustomerID": "BILLY666  ",
+      "Description": "Special 4 Teams (13 pts FB, 10 pts BK) - Ties Lose",
+      "TeaserName": "Special 4 Teams                    ",
+      "info": {
+        "teasername": "Special 4 Teams          ",
+        "TeaserTies": 2,
+        "MaxPicks": 4,
+        "MinPicks": 4,
+        "Description": "Special 4 Teams (13 pts FB, 10 pts BK) - Ties Lose",
+        "InternetOnlyFlag": "N",
+        "SuspendFlag": "N",
+        "CallUnitOnlyFlag": "N",
+        "BaseOfferingFlag": "N",
+        "PushNoReduce": "N",
+        "Office": null
+      }
+    }
+  ]
+}

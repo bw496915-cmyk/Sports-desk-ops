@@ -34,6 +34,18 @@ import {
   wantsHelp,
 } from "../../lib/cli_args.ts";
 import {
+  redactedDevToolsRequestHeaders,
+  redactedRequestHeaderProtocolVariants,
+} from "../../lib/f402_in_page_fetch.ts";
+import {
+  buildReportCustomerContextExpression,
+  reportCustomerContextUrl,
+} from "../../lib/f402_report_context.ts";
+import {
+  buildLoadCustomerAdminPartialExpression,
+  customerAdminPartialUrl,
+} from "../../lib/f402_customer_admin_ui.ts";
+import {
   PROBE_PREFIXES,
   type ProbeSuite,
   type ProbeWireContentType,
@@ -44,24 +56,29 @@ import {
   buildProbeBody,
   buildProbeExpression,
   buildReadRequestSnifferExpression,
+  isProbeReadOnlyConfirmed,
   parseProbePageResult,
   parseSniffedTemplates,
   probeSummary,
   probeUrl,
   selectProbeOps,
 } from "../../lib/f402_probe.ts";
-import { preflight } from "../../lib/preflight.ts";
+import { preflight, warmCaptureNetwork } from "../../lib/preflight.ts";
+import { buildDnsPrefetchExpression } from "../../lib/f402_report_context.ts";
 import {
   parseResize,
   type ScreenshotFormat,
 } from "../../lib/screenshot_encode.ts";
 import { htmlToText } from "../../lib/ticket_html.ts";
+import type { CaptureViewMode } from "./types.ts";
 import {
   loginF402,
   MissingF402CredentialsError,
   SECRET_NAMES,
   SECRETS_SERVICE,
 } from "./f402_login.ts";
+import { provenanceFromProbePage } from "./provenance_helpers.ts";
+import { promoteProbeFromFile } from "./promote_probe_from_file.ts";
 import { buildCaptureRecord, CaptureStore } from "./recorder.ts";
 import { ManagedWebView } from "./webview.ts";
 
@@ -79,6 +96,8 @@ const VALUE_FLAGS = [
   "--body",
   "--week",
   "--week-sweep",
+  "--view-mode",
+  "--expected-version",
   "--ticket",
   "--wager",
   "--flag",
@@ -86,6 +105,10 @@ const VALUE_FLAGS = [
   "--suite",
   "--ops",
   "--login-wait-ms",
+  "--report-customer",
+  "--customer-admin-partial",
+  "--customer-admin-partial-async",
+  "--sport-type",
 ] as const;
 
 const HELP = `
@@ -104,10 +127,14 @@ Options:
   --ticket <number>             TicketNumber override for getTicketDetailPrint / PendingDelete (default: -1 for PendingDelete)
   --wager <number>              WagerNumber override for getTicketDetailPrint
   --flag <value>                flag override for getTicketDetailPrint
+  --view-mode <desktop|mobile>  Set MOBILE-DISPLAY before capture (default desktop); records sessionStorageCleared
+  --bet-ticker                  Mark provenance betTickerParam=true for all ops in this run
+  --expected-version <v>        Compare observed DOM version against v; warn on mismatch (deploy-in-progress)
   --profile <dir>               Persistent WebView profile (default: scratch/webview-profile)
   --out <dir>                   Probe output root (default: scratch/f402-probes)
   --promote-dir <dir>           Write value-free CaptureStore records for 2xx read-only probes
-  --from-probes <p1,p2,...>     Promote specific existing 2xx probe JSON files into --promote-dir (fails closed on non-2xx)
+  --from-probes <p1,p2,...>     Promote specific existing probe JSON files into --promote-dir (2xx only unless --allow-non-2xx)
+  --allow-non-2xx               With --from-probes: also promote read-only non-2xx (edge / validation evidence)
   --sniff-requests              Record /cloud/api/ form-field/JSON keys (in-page XHR/fetch on webkit, +CDP on chrome)
   --screenshot                  Save a Bun.Image-formatted proof screenshot (_page.<ext>) in the probe dir
   --screenshot-format <fmt>     png | jpeg | webp (default: webp; encoded via Bun.Image on webkit)
@@ -120,6 +147,12 @@ Options:
   --no-screenshot               Disable the automatic proof screenshot (on by default)
   --list-ops                    Print the available ProbeOps and their form keys, then exit
   --no-preflight                Skip the DNS/TLS preflight
+  --report-customer-context     After agent login, open manager.html?CustomerID=&AgentView=ON (uses F402_CUSTOMER_ID or --report-customer)
+  --report-customer <id>        CustomerID for report context (default: F402_CUSTOMER_ID)
+  --customer-admin-partial <f>  After manager customer context, GET UI partial (e.g. playerInfoModals, player-info-me-setting)
+  --customer-admin-partial-async <true|false>  Override RequireJS async= query (modals default async=false)
+  --sport-type <name>           sportType for getSportsVigSetup (default: Football)
+  --login-as-player             Customer/player login (F402_PLAYER_ID / F402_PLAYER_PASSWORD or keychain f402-player-*)
   --include-unconfirmed         Include PendingDelete (also needs --i-understand-mutations)
   -h, --help                    This text
 
@@ -168,7 +201,7 @@ export function extractFormKeys(postData: string | undefined): string[] {
   return [...keys].sort();
 }
 
-async function resolveAgentId(): Promise<string> {
+export async function resolveAgentId(): Promise<string> {
   const fromEnv = process.env.F402_AGENT_ID?.trim() ?? "";
   if (fromEnv !== "") return fromEnv;
   try {
@@ -220,6 +253,7 @@ async function main(): Promise<number> {
   const screenshotResizeRaw = flagValue(parsed, "--screenshot-resize", "");
   const screenshotQualityRaw = flagValue(parsed, "--screenshot-quality", "82");
   const jsonl = hasFlag(parsed, "--jsonl");
+  const allowNon2xx = hasFlag(parsed, "--allow-non-2xx");
   const noScreenshot = hasFlag(parsed, "--no-screenshot");
   const autoScreenshot = !noScreenshot;
   const wantScreenshot =
@@ -249,14 +283,39 @@ async function main(): Promise<number> {
   const weekSweepRaw = flagValue(parsed, "--week-sweep", "");
   const weekSweep =
     weekSweepRaw === "" ? 0 : Math.max(0, Number(weekSweepRaw) || 0);
+  const viewModeArg = flagValue(parsed, "--view-mode", "desktop").toLowerCase();
+  const viewMode: CaptureViewMode =
+    viewModeArg === "mobile" ? "mobile" : "desktop";
+  const betTickerFlag = hasFlag(parsed, "--bet-ticker");
+  const expectedVersion = flagValue(parsed, "--expected-version", "").trim();
   const ticketValue = flagValue(parsed, "--ticket", "");
   const wagerValue = flagValue(parsed, "--wager", "");
   const flagValue_ = flagValue(parsed, "--flag", "");
+  const sportTypeValue = flagValue(parsed, "--sport-type", "").trim();
   const prefix = flagValue(parsed, "--prefix", PROBE_PREFIXES[0]!);
   const suiteRaw = flagValue(parsed, "--suite", "").toLowerCase();
   const opsArg = flagValue(parsed, "--ops", "");
   const loginWaitMs = Number(flagValue(parsed, "--login-wait-ms", "180000"));
-  const autoLogin = hasFlag(parsed, "--login");
+  const reportCustomerContext = hasFlag(parsed, "--report-customer-context");
+  const reportCustomerId = flagValue(parsed, "--report-customer", "").trim();
+  const customerAdminPartial = flagValue(
+    parsed,
+    "--customer-admin-partial",
+    "",
+  ).trim();
+  const customerAdminPartialAsyncRaw = flagValue(
+    parsed,
+    "--customer-admin-partial-async",
+    "",
+  ).trim();
+  const customerAdminPartialAsyncOverride =
+    customerAdminPartialAsyncRaw === "true"
+      ? true
+      : customerAdminPartialAsyncRaw === "false"
+        ? false
+        : undefined;
+  const loginAsPlayer = hasFlag(parsed, "--login-as-player");
+  const autoLogin = hasFlag(parsed, "--login") || loginAsPlayer;
   const includeUnconfirmed = hasFlag(parsed, "--include-unconfirmed");
   const dryRun = hasFlag(parsed, "--dry-run");
   const listOps = hasFlag(parsed, "--list-ops");
@@ -318,12 +377,19 @@ async function main(): Promise<number> {
     ...(ticketValue === "" ? {} : { ticketNumber: ticketValue }),
     ...(wagerValue === "" ? {} : { wagerNumber: wagerValue }),
     ...(flagValue_ === "" ? {} : { flag: flagValue_ }),
+    ...(sportTypeValue === "" ? {} : { sportType: sportTypeValue }),
   });
+
+  // PendingDelete and report probes must send the wager owner's customerID, not the agent session.
+  const resolveWireCustomerId = (): string =>
+    reportCustomerId ||
+    process.env.F402_CUSTOMER_ID?.trim() ||
+    "__CUSTOMER_ID__";
 
   const bodyFor = (op: (typeof ops)[number]): string => {
     if (explicitBody !== "") return explicitBody;
     if (agentId === "") return "";
-    const cid = process.env.F402_CUSTOMER_ID?.trim() || "__CUSTOMER_ID__";
+    const cid = resolveWireCustomerId();
     return contentTypeFor(op) === "application/json"
       ? buildJsonProbeBody(op, agentId, cid, probeBodyOpts())
       : buildProbeBody(op, agentId, cid, probeBodyOpts());
@@ -361,87 +427,21 @@ async function main(): Promise<number> {
     let latestRunTls: unknown = null;
 
     for (const probePath of probePaths) {
-      const rawProbe = (await Bun.file(probePath).json()) as Record<
-        string,
-        unknown
-      >;
-      const result = parseProbePageResult(rawProbe["result"]);
-      if (result.status < 200 || result.status > 299) {
+      let promoted: Awaited<ReturnType<typeof promoteProbeFromFile>>;
+      try {
+        promoted = await promoteProbeFromFile({
+          probePath,
+          store,
+          allowNon2xx,
+        });
+      } catch (error) {
         console.error(
-          `capture:f402: refusing to promote non-2xx probe ${probePath} (status ${result.status})`,
+          `capture:f402: ${error instanceof Error ? error.message : String(error)}`,
         );
         return 1;
       }
-      if (rawProbe["readOnlyConfirmed"] !== true) {
-        console.error(
-          `capture:f402: refusing to promote unconfirmed-mutation probe ${probePath}`,
-        );
-        return 1;
-      }
-      const probeUrlStr = String(rawProbe["url"] ?? "");
-      const parsedUrl = new URL(probeUrlStr);
-      const opPath = parsedUrl.pathname;
-      const capturedAt = String(
-        rawProbe["capturedAt"] ?? new Date().toISOString(),
-      );
-      const bodyStr = String(rawProbe["body"] ?? "");
-      const reqContentType =
-        typeof rawProbe["requestContentType"] === "string"
-          ? rawProbe["requestContentType"]
-          : bodyStr.trim().startsWith("{")
-            ? "application/json"
-            : "application/x-www-form-urlencoded; charset=UTF-8";
-      let wireText = result.bodyText ?? result.preview;
-      let truncatedPreview = false;
-      if (
-        result.bodyText === undefined &&
-        result.contentType.toLowerCase().includes("json") &&
-        result.bytes > result.preview.length
-      ) {
-        const firstObjEnd = result.preview.indexOf("},{");
-        if (firstObjEnd !== -1) {
-          wireText = `${result.preview.slice(0, firstObjEnd + 1)}]}`;
-          truncatedPreview = true;
-        }
-      }
-
-      const captureRecord = buildCaptureRecord({
-        mode: "live",
-        capturedAt,
-        operation: {
-          path: opPath,
-          method: "POST",
-        },
-        request: {
-          url: probeUrlStr,
-          method: "POST",
-          headers: {
-            "content-type": reqContentType,
-            "x-requested-with": "XMLHttpRequest",
-            authorization: "Bearer <redacted>",
-          },
-          contentType: reqContentType,
-          body: bodyStr,
-        },
-        response: {
-          status: result.status,
-          headers: { "content-type": result.contentType },
-          contentType: result.contentType,
-          bytes: new TextEncoder().encode(wireText),
-          wireBytes: result.bytes,
-          truncatedPreview,
-        },
-        provenance: {
-          portalHost: parsedUrl.host,
-          proxy: "none",
-          auth: "cookie",
-          bunVersion: Bun.version,
-        },
-        samples: 1,
-      });
-      await store.write(captureRecord);
-      promotedOps.push(opPath);
-      promotedDates.add(capturedAt.slice(0, 10));
+      promotedOps.push(promoted.opPath);
+      promotedDates.add(promoted.capturedAt.slice(0, 10));
 
       const siblingRunPath = join(
         probePath.split("/").slice(0, -1).join("/"),
@@ -508,14 +508,18 @@ async function main(): Promise<number> {
   }
 
   let tls: Awaited<ReturnType<typeof preflight>>["tls"] = null;
+  let dnsCacheStats: Record<string, number> | undefined;
   if (!hasFlag(parsed, "--no-preflight")) {
-    const target = new URL(base).hostname;
-    const check = await preflight(target, {
+    const warmed = warmCaptureNetwork(base);
+    const check = await preflight(warmed.host, {
+      port: warmed.port,
       timeoutMs: Math.min(loginWaitMs, 10_000),
+      skipDnsPrefetch: true,
     });
+    dnsCacheStats = check.dnsCacheStats;
     if (!check.ok) {
       console.error(`capture:f402: ${check.error ?? "preflight failed"}`);
-      console.error("  bun run capture:preflight --host " + target);
+      console.error("  bun run capture:preflight --host " + warmed.host);
       return 1;
     }
     tls = check.tls;
@@ -564,6 +568,7 @@ async function main(): Promise<number> {
       const outcome = await loginF402(view, {
         baseUrl: base,
         timeoutMs: loginWaitMs,
+        loginKind: loginAsPlayer ? "player" : "agent",
         ...(sniffRequests
           ? { beforeSubmitExpression: buildInstallRequestSnifferExpression() }
           : {}),
@@ -573,10 +578,45 @@ async function main(): Promise<number> {
       }
       authMode = "env-login";
       console.error(
-        `capture:f402: signed in on ${backend} with F402_AGENT_ID / F402_PASSWORD`,
+        loginAsPlayer
+          ? `capture:f402: signed in on ${backend} as player (F402_PLAYER_ID)`
+          : `capture:f402: signed in on ${backend} with F402_AGENT_ID / F402_PASSWORD`,
       );
       if (sniffRequests) {
         await view.evaluate(buildInstallRequestSnifferExpression());
+      }
+      await view.evaluate(buildDnsPrefetchExpression(base));
+      const ctxCustomer =
+        reportCustomerId || process.env.F402_CUSTOMER_ID?.trim() || "";
+      const openCustomerManagerContext =
+        ctxCustomer !== "" &&
+        (reportCustomerContext || customerAdminPartial !== "");
+      if (openCustomerManagerContext) {
+        const ctxUrl = reportCustomerContextUrl(base, ctxCustomer);
+        console.error(
+          `capture:f402: report customer context navigate (CustomerID + AgentView=ON)`,
+        );
+        await view.navigate(ctxUrl);
+        await view.waitForLoad();
+        await view.evaluate(buildReportCustomerContextExpression(ctxCustomer));
+      }
+      if (customerAdminPartial !== "") {
+        const partialUrl = customerAdminPartialUrl(
+          base,
+          customerAdminPartial,
+          customerAdminPartialAsyncOverride !== undefined
+            ? { async: customerAdminPartialAsyncOverride }
+            : {},
+        );
+        console.error(
+          `capture:f402: load customer-admin partial ${partialUrl}`,
+        );
+        const partialLoad = await view.evaluate(
+          buildLoadCustomerAdminPartialExpression(partialUrl),
+        );
+        console.error(
+          `capture:f402: partial load ${JSON.stringify(partialLoad)}`,
+        );
       }
     } else {
       await view.navigate(base);
@@ -604,6 +644,16 @@ async function main(): Promise<number> {
       }
     }
 
+    // Bootstrap state axis: establish a known view-mode before capturing.
+    // `--view-mode mobile` sets MOBILE-DISPLAY so the mobile path is exercised;
+    // the default clears it (desktop). sessionStorageCleared records which happened.
+    const sessionStorageCleared = viewMode === "desktop";
+    await view.evaluate(
+      viewMode === "mobile"
+        ? `(() => { sessionStorage.setItem("MOBILE-DISPLAY", "mobile"); return true; })()`
+        : `(() => { sessionStorage.removeItem("MOBILE-DISPLAY"); return true; })()`,
+    );
+
     await mkdir(outDir, { recursive: true });
     await Bun.write(
       join(outDir, "run.json"),
@@ -618,6 +668,7 @@ async function main(): Promise<number> {
           backend,
           authMode,
           tls,
+          ...(dnsCacheStats !== undefined ? { dnsCacheStats } : {}),
           ops: ops.map((op) => op.operation),
         },
         null,
@@ -631,6 +682,8 @@ async function main(): Promise<number> {
     const promotedOps: string[] = [];
     const promotedDates = new Set<string>();
     let transportErrors = 0;
+    let firstDomVersion: string | null = null;
+    let versionWarned = false;
     const portalHost = new URL(base).host;
     const jsonlLines: string[] = [];
 
@@ -651,7 +704,7 @@ async function main(): Promise<number> {
             : buildProbeBody(
                 op,
                 agentId,
-                process.env.F402_CUSTOMER_ID?.trim() || "__CUSTOMER_ID__",
+                resolveWireCustomerId(),
                 probeBodyOpts(),
               );
         const outFile =
@@ -683,12 +736,60 @@ async function main(): Promise<number> {
             url,
             method: op.method,
             requestContentType: reqContentType,
+            requestHeadersExplicit: {
+              accept: "*/*",
+              "content-type": reqContentType,
+              "x-requested-with": "XMLHttpRequest",
+              ...(result.sessionCredentialsCodePresent
+                ? { authorization: "Bearer <redacted>" }
+                : {}),
+            },
+            requestHeaders: redactedDevToolsRequestHeaders({
+              baseUrl: base,
+              path: new URL(url).pathname,
+              contentType: reqContentType,
+              tokenPresent: result.sessionCredentialsCodePresent === true,
+            }),
+            requestHeaderProtocols: redactedRequestHeaderProtocolVariants({
+              baseUrl: base,
+              path: new URL(url).pathname,
+              contentType: reqContentType,
+              tokenPresent: result.sessionCredentialsCodePresent === true,
+            }),
             body,
             dateUsed: result.dateUsed ?? null,
             weekUsed: result.weekUsed ?? null,
             authMode,
-            readOnlyConfirmed: op.readOnly,
-            headersObserved: false,
+            readOnlyConfirmed: isProbeReadOnlyConfirmed(op),
+            headersObserved: true,
+            cfRay: result.cfRay ?? null,
+            challengePresent: result.challengePresent === true,
+            sessionCustomerPresent: result.sessionCustomerPresent === true,
+            sessionCredentialsCodePresent:
+              result.sessionCredentialsCodePresent === true,
+            ...(result.sessionAgentType !== undefined
+              ? { sessionAgentType: result.sessionAgentType }
+              : {}),
+            ...(result.sessionIsAgent === true ? { sessionIsAgent: true } : {}),
+            ...(result.requestBodyTokenInjected === true
+              ? { requestBodyTokenInjected: true }
+              : {}),
+            reportCustomerContextApplied:
+              (reportCustomerContext || customerAdminPartial !== "") &&
+              (reportCustomerId ||
+                process.env.F402_CUSTOMER_ID?.trim() ||
+                "") !== "",
+            ...(customerAdminPartial !== ""
+              ? {
+                  customerAdminPartialLoaded: customerAdminPartialUrl(
+                    base,
+                    customerAdminPartial,
+                    customerAdminPartialAsyncOverride !== undefined
+                      ? { async: customerAdminPartialAsyncOverride }
+                      : {},
+                  ),
+                }
+              : {}),
             result: scratchResult,
             extractedText: scratchResult.contentType.includes("text/html")
               ? htmlToText(scratchResult.preview).slice(0, 2_000)
@@ -733,12 +834,28 @@ async function main(): Promise<number> {
                 contentType: result.contentType,
                 bytes: new TextEncoder().encode(wireText),
               },
-              provenance: {
-                portalHost,
-                proxy: "none",
-                auth: "cookie",
-                bunVersion: Bun.version,
-              },
+              provenance: provenanceFromProbePage(
+                {
+                  portalHost,
+                  bunVersion: Bun.version,
+                  backend,
+                  headersObserved: false,
+                  viewMode,
+                  sessionStorageCleared: sessionStorageCleared === true,
+                  betTickerParam:
+                    betTickerFlag ||
+                    op.operation === "getBetTicker" ||
+                    op.operation === "getBetTickerConfig",
+                  request:
+                    op.operation === "PendingDelete" && ticketValue === ""
+                      ? "sentinel"
+                      : reqContentType === "application/json"
+                        ? "exact"
+                        : "minimal",
+                  mutation: op.readOnly ? "read-inferred" : "unknown",
+                },
+                result,
+              ),
               samples: 1,
             });
             await promoteStore.write(captureRecord);
@@ -747,6 +864,19 @@ async function main(): Promise<number> {
             promotedDates.add(capturedAt.slice(0, 10));
           }
 
+          if (result.domVersion !== undefined && firstDomVersion === null) {
+            firstDomVersion = result.domVersion;
+            if (
+              expectedVersion !== "" &&
+              result.domVersion !== expectedVersion &&
+              !versionWarned
+            ) {
+              versionWarned = true;
+              console.error(
+                `capture:f402: WARNING DOM version ${result.domVersion} != expected ${expectedVersion} (deploy-in-progress?)`,
+              );
+            }
+          }
           const summary = probeSummary(op, result);
           console.log(
             `${summary.operation.padEnd(30)} ${String(summary.status).padEnd(5)} ${summary.verdict.padEnd(8)} ${summary.bytes} B`,

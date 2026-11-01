@@ -43,6 +43,9 @@
  */
 
 import { canonicalJson, sha256Hex } from "./capture/json.ts";
+import { parseCaptureProvenance } from "./capture/parse_capture_provenance.ts";
+import { normalizeProvenance } from "./capture/recorder.ts";
+import { deriveTierWithReason } from "./capture/tier.ts";
 import {
   closeSync,
   constants as fsConstants,
@@ -69,16 +72,64 @@ const SPEC_REL = join("docs", "openapi.json");
 const MD_REL = join("docs", "api-reference.md");
 const CAPTURES_REL = join("docs", "evidence", "captures");
 
-/** Read-only Manager operations from the capture contract. Never add mutations. */
+/** Read-only Manager and Report operations from the capture contract. Never add mutations. */
 export const READ_ONLY_OPERATIONS = [
   "getWebLog",
   "getInfoPlayer",
+  "getSportsCustomerAdmin",
   "getBetTicker",
   "getBetTickerConfig",
   "getPending",
   "getSportsVigSetup",
   "getInfoManager",
   "getCustomerNotes",
+  "Pending",
+  "PendingDelete",
+  "getDailyFiguresByCustomer",
+  "getGradedWagerByCustomer",
+  "getTransactions",
+  "getGrading",
+  "getTicketDetailPrint",
+  "getAccountInfoOwner",
+  "getConfigWebReports",
+  "getConfigWebReportsPending",
+  "getSportsType",
+  "getAuthorizations",
+  "getMessage",
+  "getNewEmailsCount",
+  "getWeeklyFigureByAgentLite",
+  "getListAgenstByAgent",
+  "searchCustomerAdmin",
+  "getReportPlayerAnalysis",
+  "getScoresLiveDynamic",
+  "getReportDeletedTransactions",
+  "getHeriarchy",
+  "getMasterSheet",
+  "authenticateCustomer",
+  "verifySession",
+  "search",
+  "getWeeklyFigure",
+  "getAgentPerformance",
+  "getSettledFigure",
+  "getDeletedWagerReport",
+  "getDailyFigure",
+  "getMessages",
+  "get3rdPartyLimits",
+  "getAnalysis",
+  "getScores",
+  "getAgentTree",
+  "getBilling",
+  "getRules",
+  "getFinancialReport",
+  "getDeleteWager",
+  "getTransactionList",
+  "getDeletedTransactionHistory",
+  "getCryptoInfo",
+  "getMail",
+  "getTeaserProfile",
+  "getPerformancePlayer",
+  "getWagersByFigureDate",
+  "getCasinoSummaryDetails",
 ] as const;
 
 /** Known mutations, listed only so refusals can explain what was attempted. */
@@ -89,6 +140,7 @@ export const MUTATION_OPERATIONS = [
   "createPlayer",
   "adjustBalance",
   "deleteWager",
+  "deleteBet",
   "updateCustomerNotes",
   "delete-wager",
   "gameAdmin",
@@ -153,6 +205,10 @@ export interface UpgradeEntry {
   readonly evidenceSource: string;
   readonly responseStatus: number;
   readonly responseBodySha256: string | null;
+  readonly responseBytes?: number;
+  readonly emptyEnvelope?: boolean;
+  /** Explicit derivation reason from `deriveTierWithReason`. */
+  readonly tierReason?: string;
   /** True when this capture resolves the row's contradiction flag. */
   readonly resolvesContradiction: boolean;
   /** The contradictedReason moved into row.resolution.previousReason. */
@@ -564,9 +620,9 @@ export function loadManifestIndex(capturesDir: string): ManifestIndex {
         continue;
       }
       if (isDir) {
-        // Catalog-probe artifacts are evidence for the desk catalog surface,
-        // not upgradeable ledger operations; keep them out of the manifest walk.
-        if (entry === "catalog") continue;
+        // Catalog, 500 diagnostics, schema templates, and runtime capability proofs
+        // are not upgradeable ledger operations; keep them out of the manifest walk.
+        if (NON_CAPTURE_DIRS.has(entry)) continue;
         walk(full);
       } else if (entry === "manifest.json") manifestFiles.push(full);
     }
@@ -621,6 +677,8 @@ export interface CaptureRecordView {
   readonly requestBodySha256: string;
   readonly responseStatus: number;
   readonly responseBodySha256: string | null;
+  readonly responseBytes: number;
+  readonly emptyEnvelope: boolean;
 }
 
 export interface ParsedCapture {
@@ -750,6 +808,8 @@ export function parseCaptureValue(value: unknown): ParsedCapture {
   const response = value.response;
   let responseStatus: number | undefined;
   let responseBodySha256: string | null = null;
+  let responseBytes = 0;
+  let emptyEnvelope = false;
   if (response === null || response === undefined) {
     issues.push({
       code: ISSUE_CODES.RESPONSE_MISSING,
@@ -764,6 +824,7 @@ export function parseCaptureValue(value: unknown): ParsedCapture {
   } else {
     const status = readNumber(response, "status");
     responseStatus = status;
+    responseBytes = readNumber(response, "bytes") ?? 0;
     if (
       status === undefined ||
       !Number.isInteger(status) ||
@@ -782,6 +843,15 @@ export function parseCaptureValue(value: unknown): ParsedCapture {
         message:
           "response.bodySkeleton is required; a captured status without a body shape cannot replace an inferred schema",
       });
+    } else if (
+      isRecord(skeleton) &&
+      skeleton.type === "object" &&
+      isRecord(skeleton.fields) &&
+      Object.keys(skeleton.fields).length === 1 &&
+      isRecord(skeleton.fields.LIST) &&
+      skeleton.fields.LIST.type === "string"
+    ) {
+      emptyEnvelope = true;
     }
     const maybeSha = readString(response, "bodySha256");
     responseBodySha256 =
@@ -853,16 +923,25 @@ export function parseCaptureValue(value: unknown): ParsedCapture {
       requestBodySha256,
       responseStatus,
       responseBodySha256,
+      responseBytes,
+      emptyEnvelope,
     },
   };
 }
 
-const NON_CAPTURE_FILES = new Set(["manifest.json"]);
+const NON_CAPTURE_FILES = new Set(["manifest.json", "run.json"]);
+const NON_CAPTURE_DIRS = new Set([
+  "catalog",
+  "pending-500s",
+  "schema",
+  "runtime",
+]);
 
 function isCaptureFile(name: string): boolean {
   if (!name.endsWith(".json")) return false;
   if (NON_CAPTURE_FILES.has(name)) return false;
   if (name.startsWith("applied-")) return false;
+  if (name.startsWith("_")) return false;
   return true;
 }
 
@@ -885,7 +964,7 @@ export function listCaptureFiles(dir: string): string[] {
         continue;
       }
       if (isDir) {
-        if (entry === "catalog") continue;
+        if (NON_CAPTURE_DIRS.has(entry)) continue;
         walk(full);
       } else if (isCaptureFile(entry)) found.push(full);
     }
@@ -1064,6 +1143,27 @@ export function buildPlan(input: BuildPlanInput): Plan {
       continue;
     }
     const date = record.capturedAt.slice(0, 10);
+    let tierReason: string | undefined;
+    if (isRecord(parsedValue) && isRecord(parsedValue.provenance)) {
+      try {
+        const prov = normalizeProvenance(
+          parseCaptureProvenance(parsedValue.provenance),
+        );
+        const derived = deriveTierWithReason({
+          provenance: prov,
+          response: {
+            status: record.responseStatus,
+            contentType: "application/json",
+            bodySha256: record.responseBodySha256 ?? "0".repeat(64),
+            bodySkeleton: { type: "null", nullable: true },
+            bytes: record.responseBytes,
+          },
+        });
+        tierReason = derived.reason;
+      } catch {
+        // Legacy records without 5-axis fields keep undefined tierReason.
+      }
+    }
     plannedRows.add(key);
     upgrades.push({
       file: relativePath,
@@ -1075,6 +1175,9 @@ export function buildPlan(input: BuildPlanInput): Plan {
       evidenceSource: `capture:${date}:${digest}`,
       responseStatus: record.responseStatus,
       responseBodySha256: record.responseBodySha256,
+      responseBytes: record.responseBytes,
+      emptyEnvelope: record.emptyEnvelope,
+      ...(tierReason === undefined ? {} : { tierReason }),
       resolvesContradiction: row.contradicted,
       previousContradictionReason: row.contradictedReason,
     });
@@ -1124,11 +1227,15 @@ export interface ApplyPlanResult {
 
 function upgradeNote(upgrade: UpgradeEntry): string {
   const sha = upgrade.responseBodySha256 ?? "not recorded";
-  return [
-    `Live capture ${upgrade.capturedAt} from a ${upgrade.responseStatus} response`,
-    `(response bodySha256 ${sha});`,
-    "request and response were captured live with redaction clean (policy v1).",
-  ].join(" ");
+  const tagPrefix = upgrade.emptyEnvelope ? "[A-empty] " : "";
+  const envelopeNote = upgrade.emptyEnvelope
+    ? ' Envelope-only 200 response ({"LIST":""}); item row schema is unverified beyond the outer LIST envelope until a capture with rows is recorded.'
+    : "";
+  const crossPrefixNote =
+    upgrade.path === "/cloud/api/Manager/getTransactions"
+      ? " Cross-prefix routing observed: POST /cloud/api/Manager/getTransactions returns 200 while POST /cloud/api/Report/getTransactions returns 500."
+      : "";
+  return `${tagPrefix}Live capture ${upgrade.capturedAt} from a ${upgrade.responseStatus} response (response bodySha256 ${sha}); request and response were captured live with redaction clean (policy v1).${envelopeNote}${crossPrefixNote}`;
 }
 
 /**
@@ -1189,6 +1296,9 @@ export function applyPlanToLedger(
       source: upgrade.evidenceSource,
       kind: "capture",
       note: upgradeNote(upgrade),
+      ...(upgrade.tierReason === undefined
+        ? {}
+        : { reason: upgrade.tierReason }),
     });
     const upgradedRow: Record<string, unknown> = {
       ...rawRow,
