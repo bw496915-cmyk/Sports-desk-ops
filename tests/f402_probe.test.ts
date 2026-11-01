@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   PROBE_OPS,
   buildInstallRequestSnifferExpression,
-  buildProbeBody,
   buildProbeExpression,
+  buildProbeBody,
   buildReadRequestSnifferExpression,
   parseProbePageResult,
   parseSniffedTemplates,
@@ -102,6 +102,22 @@ describe("f402 probe plan", () => {
       status: 404,
       bytes: 0,
     });
+  });
+});
+
+describe("probe expression", () => {
+  test("resolves markers in-page and sends the bearer", () => {
+    const expression = buildProbeExpression({
+      operation: "getTransactions",
+      url: "https://fantasy402.com/cloud/api/Report/getTransactions",
+      body: "customerID=__CUSTOMER_ID__&date=__DATE__&token=&operation=getTransactions",
+    });
+    expect(expression).toContain('replaceAll("__CUSTOMER_ID__"');
+    expect(expression).toContain('replaceAll("__DATE__"');
+    expect(expression).toContain('authorization = "Bearer " + token');
+    expect(expression).toContain("sessionStorage.getItem");
+    // The markers are plain text so URL encoding cannot turn them into %7B…%7D.
+    expect(expression).not.toContain("%7B");
   });
 });
 
