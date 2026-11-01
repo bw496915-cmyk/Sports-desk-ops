@@ -689,18 +689,66 @@
         font-size: 0.72rem;
         color: var(--sd-text-muted);
       }
+      /* Panel stack. Left Menu = one column; Tile Menu = the same panels in a grid. */
+      .panels {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+      }
+      .panels > .section-card {
+        margin-bottom: 0;
+        min-width: 0;
+      }
       /* Agent Menu = Tile Menu: panels become a two-column tile grid. */
       main.tiles .section-card {
         break-inside: avoid;
       }
+      /* An explicit two-column grid, not auto-fit: `grid-column: 1 / -1` resolves against the
+         explicit lines, so with implicit auto-fit tracks the full-width rule silently spans one
+         column instead of all of them. */
       main.tiles {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 1rem;
         align-items: start;
       }
+      @media (max-width: 1100px) {
+        main.tiles {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
       main.tiles > * {
         margin-bottom: 0;
+      }
+      /* Every panel is a tile, tables included: a half-width card scrolls its table rather than
+         leaving the other half of the row empty. Full-width exceptions were tried first and left a
+         gap beside every panel that followed one. */
+      main.tiles > .section-card {
+        overflow-x: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--sd-surface-border) transparent;
+      }
+      /* A wide monitor should not stretch a table to 3000px. */
+      .header,
+      .kpi-grid,
+      .panels {
+        max-width: 1680px;
+        margin-inline: auto;
+      }
+      /* Keyboard reachability: the panels are mostly tables and chips, and the palette is dark. */
+      :where(a, button, input, select, [tabindex]):focus-visible {
+        outline: 2px solid var(--sd-primary);
+        outline-offset: 2px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
+        }
       }
 
       /* Live wager ticker: rows from the {LIST: [...]} feed. */
@@ -1556,528 +1604,548 @@
       </div>
     </div>
 
-    <!-- Settings (portal #update-settings modal, applied inline) -->
-    <section class="section-card" id="settings" aria-labelledby="st-title">
-      <div class="section-title">
-        <span id="st-title">Settings</span>
-        <span class="badge badge-primary" id="st-badge">DEFAULTS</span>
-      </div>
-
-      <div class="st-grid">
-        <div class="st-field">
-          <label for="st-notify">Wager Alerts</label>
-          <select id="st-notify" data-setting="notify">
-            <option value="Y">On</option>
-            <option value="N">Off</option>
-          </select>
-          <span class="st-effect" id="st-fx-notify"></span>
+    <!-- Panels. The main element is what the Agent Menu setting toggles: without one
+         the Tile Menu preference had no target and changed nothing. -->
+    <main id="panels" class="panels">
+      <!-- Settings (portal #update-settings modal, applied inline) -->
+      <section class="section-card" id="settings" aria-labelledby="st-title">
+        <div class="section-title">
+          <span id="st-title">Settings</span>
+          <span class="badge badge-primary" id="st-badge">DEFAULTS</span>
         </div>
 
-        <div class="st-field">
-          <label for="st-language">Language</label>
-          <select id="st-language" data-setting="language">
-            <option value="English">English</option>
-            <option value="Spanish">Spanish</option>
-            <option value="Chinese (Simp)">Chinese (Simp)</option>
-            <option value="French">French</option>
-          </select>
-          <span class="st-effect" id="st-fx-language"></span>
-        </div>
-
-        <div class="st-field">
-          <label for="st-timezone">Time Zone</label>
-          <select id="st-timezone" data-setting="timezone">
-            <option value="0">(EST)</option>
-            <option value="1">(CST)</option>
-            <option value="2">(MST)</option>
-            <option value="3">(PST)</option>
-          </select>
-          <span class="st-effect" id="st-fx-timezone"></span>
-        </div>
-
-        <div class="st-field">
-          <label for="st-agent-menu">Agent Menu</label>
-          <select id="st-agent-menu" data-setting="agentMenu">
-            <option value="Left Menu">Left Menu</option>
-            <option value="Tile Menu">Tile Menu</option>
-          </select>
-          <span class="st-effect" id="st-fx-agentMenu"></span>
-        </div>
-      </div>
-
-      <div class="st-actions">
-        <button class="btn" type="button" id="st-save">Confirm</button>
-        <button class="btn btn-ghost" type="button" id="st-reset">
-          Cancel
-        </button>
-        <span class="st-status" id="st-status"></span>
-      </div>
-    </section>
-
-    <!-- Live wager ticker: the {LIST: [...]} feed, a different shape from Pending -->
-    <section class="section-card" id="live-wagers" aria-labelledby="lw-title">
-      <div class="section-title">
-        <span id="lw-title">Live Wagers — Ticker</span>
-        <span class="badge badge-primary" id="lw-badge">LOADING</span>
-      </div>
-
-      <p class="ld-note" style="margin-top: 0" id="lw-note">
-        Each row is one wager from the ticker feed. Sport comes from the parsed
-        leg description; a stake whose volume differs is flagged rather than
-        reconciled.
-      </p>
-
-      <dl class="lw-stats" id="lw-stats" hidden>
-        <div class="lw-stat">
-          <dt>Wagers</dt>
-          <dd id="lw-count">–</dd>
-        </div>
-        <div class="lw-stat">
-          <dt>Risk</dt>
-          <dd id="lw-risk">–</dd>
-        </div>
-        <div class="lw-stat">
-          <dt>To win</dt>
-          <dd id="lw-towin">–</dd>
-        </div>
-        <div class="lw-stat">
-          <dt>Volume</dt>
-          <dd id="lw-volume">–</dd>
-        </div>
-        <div class="lw-stat">
-          <dt>Legs</dt>
-          <dd id="lw-legs">–</dd>
-        </div>
-        <div class="lw-stat">
-          <dt>Volume mismatches</dt>
-          <dd id="lw-mismatch">–</dd>
-        </div>
-      </dl>
-
-      <div class="lw-bar" id="lw-writers"></div>
-      <div class="lw-bar" id="lw-types"></div>
-
-      <table class="lw-table">
-        <thead>
-          <tr>
-            <th scope="col">Wager</th>
-            <th scope="col">Agent</th>
-            <th scope="col">Customer</th>
-            <th scope="col">Type</th>
-            <th scope="col">Risk</th>
-            <th scope="col">To win</th>
-            <th scope="col">Volume</th>
-            <th scope="col">Writer</th>
-            <th scope="col">Legs</th>
-          </tr>
-        </thead>
-        <tbody id="lw-rows">
-          <tr>
-            <td class="empty-row" colspan="9">Loading wagers…</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <!-- Contest / futures list (sports nav get-games-prop anchors) -->
-    <section class="section-card" id="contests" aria-labelledby="ct-title">
-      <div class="section-title">
-        <span id="ct-title">Contests — Futures &amp; Props</span>
-        <span class="badge badge-primary" id="ct-badge">LOADING</span>
-      </div>
-
-      <p class="ld-note" style="margin-top: 0" id="ct-note">
-        One row per contest number in the portal's sports nav. The list is
-        extracted from saved markup, so a contest that was not in that markup is
-        absent rather than guessed.
-      </p>
-
-      <div class="ct-toolbar">
-        <input
-          id="ct-search"
-          type="search"
-          placeholder="Filter contests, leagues or subjects…"
-          autocomplete="off"
-          aria-label="Filter contests"
-        />
-        <span id="ct-groups"></span>
-      </div>
-
-      <div class="ct-list" id="ct-list">
-        <p class="ld-note">Loading contests…</p>
-      </div>
-    </section>
-
-    <!-- Game Admin board: lines and the money on each side (portal module Admin) -->
-    <section class="section-card" id="game-board" aria-labelledby="gb-title">
-      <div class="section-title">
-        <span id="gb-title">Game Admin — Board &amp; Exposure</span>
-        <span class="badge badge-primary" id="gb-badge">LOADING</span>
-      </div>
-
-      <div class="gb-toolbar">
-        <label for="gb-module">Module</label>
-        <select id="gb-module" name="module">
-          <option value="A">Admin</option>
-          <option value="P">Position</option>
-        </select>
-        <span class="gb-mode-note" id="gb-mode-note">
-          Admin: the market with the money on each side.
-        </span>
-        <label for="gb-window">Show</label>
-        <select id="gb-window" name="window">
-          <option value="48">Yesterday</option>
-          <option value="24" selected>Today</option>
-          <option value="-1">Current Board</option>
-        </select>
-      </div>
-
-      <p class="ld-note" style="margin-top: 0" id="gb-note">
-        Line and per-side exposure transcribed from the Game Admin report.
-        Values the portal abbreviates (for example “120k”) stay approximate and
-        are excluded from sums; exact figures are marked by their absence of
-        “≈”.
-      </p>
-
-      <div class="gb-list" id="gb-list">
-        <p class="ld-note">Loading the board…</p>
-      </div>
-    </section>
-
-    <!-- Sport catalog: every sub-sport code and each sport's own period menu -->
-    <section class="section-card" id="sport-catalog" aria-labelledby="sc-title">
-      <div class="section-title">
-        <span id="sc-title">Sport Catalog — Sub-Sports &amp; Periods</span>
-        <span class="badge badge-primary" id="sc-badge">LOADING</span>
-      </div>
-
-      <p class="ld-note" style="margin-top: 0">
-        Period numbers are <strong>sport-specific</strong>: <code>1</code> is
-        “1st Half” in Football and Basketball, “1st Period” in Hockey and “1st 5
-        Innings” in Baseball. The list below shows each sport's own menu, and
-        flags sub-sport codes that more than one sport claims.
-      </p>
-
-      <div class="sc-toolbar">
-        <input
-          id="sc-search"
-          type="search"
-          placeholder="Filter sports, sub-sport codes or period names…"
-          autocomplete="off"
-          aria-label="Filter the sport catalog"
-        />
-        <span class="sc-count" id="sc-count"></span>
-        <button class="btn btn-ghost" type="button" id="sc-expand">
-          Expand all
-        </button>
-      </div>
-
-      <div class="sc-list" id="sc-list">
-        <p class="ld-note">Loading the catalog…</p>
-      </div>
-    </section>
-
-    <!-- Analysis report filters (portal report.js vocabulary; no report body captured) -->
-    <section class="section-card" id="analysis" aria-labelledby="an-title">
-      <div class="section-title">
-        <span id="an-title">Analysis — Report Filters</span>
-        <span class="badge badge-warning" id="an-badge">NOT CAPTURED</span>
-      </div>
-      <p class="ld-note" style="margin-top: 0">
-        The portal's filter bar (Customer Performance / Sport Performance /
-        Customer Volume / Graded Wagers, activity, grouping, week). Codes are
-        transcribed from that markup. A transcribed report answers only for the
-        selection it was run for; anything else returns “not captured” rather
-        than zeroes.
-      </p>
-
-      <form class="an-form" id="an-form">
-        <div class="an-field">
-          <label for="an-stored">Stored report</label>
-          <select id="an-stored">
-            <option value="">— none —</option>
-          </select>
-        </div>
-
-        <div class="an-field">
-          <label for="an-sport">Sport</label>
-          <select id="an-sport" name="sport">
-            <option value="all">All</option>
-          </select>
-        </div>
-
-        <div class="an-field">
-          <label for="an-report">Report</label>
-          <select id="an-report" name="report"></select>
-        </div>
-        <div class="an-field">
-          <label for="an-activity">Activity</label>
-          <select id="an-activity" name="activity"></select>
-        </div>
-        <div class="an-field">
-          <label for="an-group">Group</label>
-          <select id="an-group" name="group"></select>
-        </div>
-        <div class="an-field">
-          <label for="an-week">Week</label>
-          <select id="an-week" name="week"></select>
-        </div>
-        <div class="an-field">
-          <label for="an-agent">Agent</label>
-          <input
-            id="an-agent"
-            name="agent"
-            type="search"
-            autocomplete="off"
-            list="an-agents"
-            placeholder="All agents"
-            aria-describedby="an-agent-hint"
-          />
-          <datalist id="an-agents"></datalist>
-          <span class="an-hint" id="an-agent-hint"></span>
-        </div>
-        <div class="an-field">
-          <label>&nbsp;</label>
-          <button class="btn" type="submit">Run analysis</button>
-        </div>
-      </form>
-
-      <div class="an-result" id="an-result" role="status" aria-live="polite">
-        <span class="an-empty">Loading the filter vocabulary…</span>
-      </div>
-    </section>
-
-    <!-- Live Desk: pending exposure joined from the wager capture and the scoreboard -->
-    <section class="section-card" id="live-desk" aria-labelledby="ld-title">
-      <div class="section-title">
-        <span id="ld-title">Live Desk — Pending Exposure</span>
-        <span class="badge badge-primary" id="ld-badge">LOADING</span>
-        <button class="btn btn-ghost" type="button" id="ld-refresh">
-          Refresh
-        </button>
-      </div>
-
-      <dl class="ld-grid" id="ld-stats">
-        <div class="ld-stat">
-          <dt>Pending games</dt>
-          <dd data-ld="games">–</dd>
-        </div>
-        <div class="ld-stat">
-          <dt>Wagered</dt>
-          <dd data-ld="wagered">–</dd>
-        </div>
-        <div class="ld-stat">
-          <dt>To win</dt>
-          <dd data-ld="towin">–</dd>
-        </div>
-        <div class="ld-stat">
-          <dt>Pending rows</dt>
-          <dd data-ld="rows">–</dd>
-        </div>
-      </dl>
-
-      <div class="ld-bar" id="ld-sports"></div>
-
-      <table class="ld-table">
-        <caption class="ld-note" style="text-align: left; caption-side: top">
-          Exposure per fixture, split by position — the Game Admin view the
-          portal manual documents (F.A.Q. #4).
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Fixture</th>
-            <th scope="col">League</th>
-            <th scope="col">Positions</th>
-            <th scope="col" class="num">Wagered</th>
-            <th scope="col" class="num">To win</th>
-            <th scope="col">State</th>
-          </tr>
-        </thead>
-        <tbody id="ld-fixtures">
-          <tr>
-            <td class="empty-row" colspan="6">Loading pending exposure…</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <p class="ld-note" id="ld-scoreboard"></p>
-      <p class="ld-note ld-src" id="ld-source"></p>
-    </section>
-
-    <!-- Telegram Bot Control -->
-    <section
-      class="section-card"
-      id="telegram-control"
-      aria-labelledby="tg-title"
-    >
-      <div class="section-title">
-        <span id="tg-title">Telegram Bot Control</span>
-        <span class="badge badge-warning" id="tg-mode-badge"
-          >NOT CONNECTED</span
-        >
-      </div>
-      <div class="tg-grid">
-        <div>
-          <form class="tg-form" id="tg-token-form">
-            <label for="tg-admin-token">Admin token</label>
-            <input
-              type="password"
-              id="tg-admin-token"
-              autocomplete="off"
-              placeholder="SPORTSDESK_ADMIN_TOKEN"
-            />
-            <button class="btn" type="submit">Connect</button>
-          </form>
-          <dl class="tg-status" id="tg-status">
-            <dt>Bot</dt>
-            <dd data-field="bot">-</dd>
-            <dt>Mode</dt>
-            <dd data-field="mode">-</dd>
-            <dt>Default chat</dt>
-            <dd data-field="chat">-</dd>
-            <dt>Inbound</dt>
-            <dd data-field="inbound">-</dd>
-            <dt>Webhook</dt>
-            <dd data-field="webhook">-</dd>
-            <dt>Pending</dt>
-            <dd data-field="pending">-</dd>
-            <dt>Last error</dt>
-            <dd data-field="error">-</dd>
-            <dt>Schedules</dt>
-            <dd data-field="schedules">-</dd>
-          </dl>
-        </div>
-        <div>
-          <div class="tg-action">
-            <label for="tg-report">Report</label>
-            <select id="tg-report"></select>
-            <button class="btn" type="button" data-action="report">
-              Send report
-            </button>
+        <div class="st-grid">
+          <div class="st-field">
+            <label for="st-notify">Wager Alerts</label>
+            <select id="st-notify" data-setting="notify">
+              <option value="Y">On</option>
+              <option value="N">Off</option>
+            </select>
+            <span class="st-effect" id="st-fx-notify"></span>
           </div>
-          <div class="tg-action">
-            <label>Webhook</label>
-            <button class="btn" type="button" data-action="webhook-set">
-              Register
-            </button>
-            <button
-              class="btn btn-danger"
-              type="button"
-              data-action="webhook-delete"
-            >
-              Remove
-            </button>
-            <button class="btn btn-ghost" type="button" data-action="refresh">
-              Refresh
-            </button>
+
+          <div class="st-field">
+            <label for="st-language">Language</label>
+            <select id="st-language" data-setting="language">
+              <option value="English">English</option>
+              <option value="Spanish">Spanish</option>
+              <option value="Chinese (Simp)">Chinese (Simp)</option>
+              <option value="French">French</option>
+            </select>
+            <span class="st-effect" id="st-fx-language"></span>
           </div>
-          <p class="tg-log" id="tg-log" role="status" aria-live="polite"></p>
+
+          <div class="st-field">
+            <label for="st-timezone">Time Zone</label>
+            <select id="st-timezone" data-setting="timezone">
+              <option value="0">(EST)</option>
+              <option value="1">(CST)</option>
+              <option value="2">(MST)</option>
+              <option value="3">(PST)</option>
+            </select>
+            <span class="st-effect" id="st-fx-timezone"></span>
+          </div>
+
+          <div class="st-field">
+            <label for="st-agent-menu">Agent Menu</label>
+            <select id="st-agent-menu" data-setting="agentMenu">
+              <option value="Left Menu">Left Menu</option>
+              <option value="Tile Menu">Tile Menu</option>
+            </select>
+            <span class="st-effect" id="st-fx-agentMenu"></span>
+          </div>
         </div>
-      </div>
-    </section>
 
-    <!-- Telegram Bot Activity (sent and received, across the bot daemon and this server) -->
-    <section class="section-card" id="bot-activity" aria-labelledby="act-title">
-      <div class="section-title">
-        <span id="act-title">Bot Activity</span>
-        <span class="badge badge-primary" id="act-count">LOCKED</span>
-      </div>
-      <ol class="act-list" id="act-list" aria-live="polite">
-        <li class="empty-row">
-          Connect with the admin token to load activity.
-        </li>
-      </ol>
-    </section>
+        <div class="st-actions">
+          <button class="btn" type="button" id="st-save">Confirm</button>
+          <button class="btn btn-ghost" type="button" id="st-reset">
+            Cancel
+          </button>
+          <span class="st-status" id="st-status"></span>
+        </div>
+      </section>
 
-    <!-- Priority Monitored Accounts Surveillance -->
-    <section class="section-card" id="watchlist" aria-labelledby="wl-title">
-      <div class="section-title">
-        <span id="wl-title"
-          >High-Exposure Accounts &amp; Forensic Watch List</span
-        >
-        <span class="badge badge-warning" id="wl-count">LOCKED</span>
-      </div>
-      <div class="wl-toolbar">
-        <input
-          type="search"
-          id="wl-search"
-          placeholder="Search bettor, agent or archetype"
-          aria-label="Search the watch list"
-        />
-        <select id="wl-tier" aria-label="Filter by risk tier">
-          <option value="">All tiers</option>
-        </select>
-      </div>
-      <div class="table-scroll">
-        <table>
-          <thead id="wl-head">
+      <!-- Live wager ticker: the {LIST: [...]} feed, a different shape from Pending -->
+      <section class="section-card" id="live-wagers" aria-labelledby="lw-title">
+        <div class="section-title">
+          <span id="lw-title">Live Wagers — Ticker</span>
+          <span class="badge badge-primary" id="lw-badge">LOADING</span>
+        </div>
+
+        <p class="ld-note" style="margin-top: 0" id="lw-note">
+          Each row is one wager from the ticker feed. Sport comes from the
+          parsed leg description; a stake whose volume differs is flagged rather
+          than reconciled.
+        </p>
+
+        <dl class="lw-stats" id="lw-stats" hidden>
+          <div class="lw-stat">
+            <dt>Wagers</dt>
+            <dd id="lw-count">–</dd>
+          </div>
+          <div class="lw-stat">
+            <dt>Risk</dt>
+            <dd id="lw-risk">–</dd>
+          </div>
+          <div class="lw-stat">
+            <dt>To win</dt>
+            <dd id="lw-towin">–</dd>
+          </div>
+          <div class="lw-stat">
+            <dt>Volume</dt>
+            <dd id="lw-volume">–</dd>
+          </div>
+          <div class="lw-stat">
+            <dt>Legs</dt>
+            <dd id="lw-legs">–</dd>
+          </div>
+          <div class="lw-stat">
+            <dt>Volume mismatches</dt>
+            <dd id="lw-mismatch">–</dd>
+          </div>
+        </dl>
+
+        <div class="lw-bar" id="lw-writers"></div>
+        <div class="lw-bar" id="lw-types"></div>
+
+        <table class="lw-table">
+          <thead>
             <tr>
-              <th aria-sort="none">
-                <button type="button" class="th-sort" data-sort="customerId">
-                  Bettor ID
-                </button>
-              </th>
-              <th aria-sort="none">
-                <button type="button" class="th-sort" data-sort="agentId">
-                  Owning Agent
-                </button>
-              </th>
-              <th aria-sort="none">
-                <button type="button" class="th-sort" data-sort="archetype">
-                  Archetype
-                </button>
-              </th>
-              <th aria-sort="none">
-                <button type="button" class="th-sort" data-sort="riskTier">
-                  Neuron Channel
-                </button>
-              </th>
-              <th class="num" aria-sort="none">
-                <button
-                  type="button"
-                  class="th-sort"
-                  data-sort="sportsHandleUSD"
-                >
-                  Handle
-                </button>
-              </th>
-              <th class="num" aria-sort="none">
-                <button type="button" class="th-sort" data-sort="ticketsCount">
-                  Tickets
-                </button>
-              </th>
-              <th class="num" aria-sort="none">
-                <button type="button" class="th-sort" data-sort="recentNetUSD">
-                  Recent P&amp;L
-                </button>
-              </th>
-              <th class="num" aria-sort="none">
-                <button
-                  type="button"
-                  class="th-sort"
-                  data-sort="lifetimeNetUSD"
-                >
-                  Lifetime P&amp;L
-                </button>
-              </th>
-              <th>Action Playbook</th>
+              <th scope="col">Wager</th>
+              <th scope="col">Agent</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Type</th>
+              <th scope="col">Risk</th>
+              <th scope="col">To win</th>
+              <th scope="col">Volume</th>
+              <th scope="col">Writer</th>
+              <th scope="col">Legs</th>
             </tr>
           </thead>
-          <tbody id="wl-body">
+          <tbody id="lw-rows">
             <tr>
-              <td class="empty-row" colspan="9">
-                Connect with the admin token to load the watch list.
-              </td>
+              <td class="empty-row" colspan="9">Loading wagers…</td>
             </tr>
           </tbody>
         </table>
-      </div>
-      <p class="wl-note">
-        P&amp;L is the bettor's net: red means the bettor is up and the book is
-        losing. "Alert to Telegram" sends the account's alert to the default
-        chat; apply limits in Fantasy402.
-      </p>
-    </section>
+      </section>
+
+      <!-- Contest / futures list (sports nav get-games-prop anchors) -->
+      <section class="section-card" id="contests" aria-labelledby="ct-title">
+        <div class="section-title">
+          <span id="ct-title">Contests — Futures &amp; Props</span>
+          <span class="badge badge-primary" id="ct-badge">LOADING</span>
+        </div>
+
+        <p class="ld-note" style="margin-top: 0" id="ct-note">
+          One row per contest number in the portal's sports nav. The list is
+          extracted from saved markup, so a contest that was not in that markup
+          is absent rather than guessed.
+        </p>
+
+        <div class="ct-toolbar">
+          <input
+            id="ct-search"
+            type="search"
+            placeholder="Filter contests, leagues or subjects…"
+            autocomplete="off"
+            aria-label="Filter contests"
+          />
+          <span id="ct-groups"></span>
+        </div>
+
+        <div class="ct-list" id="ct-list">
+          <p class="ld-note">Loading contests…</p>
+        </div>
+      </section>
+
+      <!-- Game Admin board: lines and the money on each side (portal module Admin) -->
+      <section class="section-card" id="game-board" aria-labelledby="gb-title">
+        <div class="section-title">
+          <span id="gb-title">Game Admin — Board &amp; Exposure</span>
+          <span class="badge badge-primary" id="gb-badge">LOADING</span>
+        </div>
+
+        <div class="gb-toolbar">
+          <label for="gb-module">Module</label>
+          <select id="gb-module" name="module">
+            <option value="A">Admin</option>
+            <option value="P">Position</option>
+          </select>
+          <span class="gb-mode-note" id="gb-mode-note">
+            Admin: the market with the money on each side.
+          </span>
+          <label for="gb-window">Show</label>
+          <select id="gb-window" name="window">
+            <option value="48">Yesterday</option>
+            <option value="24" selected>Today</option>
+            <option value="-1">Current Board</option>
+          </select>
+        </div>
+
+        <p class="ld-note" style="margin-top: 0" id="gb-note">
+          Line and per-side exposure transcribed from the Game Admin report.
+          Values the portal abbreviates (for example “120k”) stay approximate
+          and are excluded from sums; exact figures are marked by their absence
+          of “≈”.
+        </p>
+
+        <div class="gb-list" id="gb-list">
+          <p class="ld-note">Loading the board…</p>
+        </div>
+      </section>
+
+      <!-- Sport catalog: every sub-sport code and each sport's own period menu -->
+      <section
+        class="section-card"
+        id="sport-catalog"
+        aria-labelledby="sc-title"
+      >
+        <div class="section-title">
+          <span id="sc-title">Sport Catalog — Sub-Sports &amp; Periods</span>
+          <span class="badge badge-primary" id="sc-badge">LOADING</span>
+        </div>
+
+        <p class="ld-note" style="margin-top: 0">
+          Period numbers are <strong>sport-specific</strong>: <code>1</code> is
+          “1st Half” in Football and Basketball, “1st Period” in Hockey and “1st
+          5 Innings” in Baseball. The list below shows each sport's own menu,
+          and flags sub-sport codes that more than one sport claims.
+        </p>
+
+        <div class="sc-toolbar">
+          <input
+            id="sc-search"
+            type="search"
+            placeholder="Filter sports, sub-sport codes or period names…"
+            autocomplete="off"
+            aria-label="Filter the sport catalog"
+          />
+          <span class="sc-count" id="sc-count"></span>
+          <button class="btn btn-ghost" type="button" id="sc-expand">
+            Expand all
+          </button>
+        </div>
+
+        <div class="sc-list" id="sc-list">
+          <p class="ld-note">Loading the catalog…</p>
+        </div>
+      </section>
+
+      <!-- Analysis report filters (portal report.js vocabulary; no report body captured) -->
+      <section class="section-card" id="analysis" aria-labelledby="an-title">
+        <div class="section-title">
+          <span id="an-title">Analysis — Report Filters</span>
+          <span class="badge badge-warning" id="an-badge">NOT CAPTURED</span>
+        </div>
+        <p class="ld-note" style="margin-top: 0">
+          The portal's filter bar (Customer Performance / Sport Performance /
+          Customer Volume / Graded Wagers, activity, grouping, week). Codes are
+          transcribed from that markup. A transcribed report answers only for
+          the selection it was run for; anything else returns “not captured”
+          rather than zeroes.
+        </p>
+
+        <form class="an-form" id="an-form">
+          <div class="an-field">
+            <label for="an-stored">Stored report</label>
+            <select id="an-stored">
+              <option value="">— none —</option>
+            </select>
+          </div>
+
+          <div class="an-field">
+            <label for="an-sport">Sport</label>
+            <select id="an-sport" name="sport">
+              <option value="all">All</option>
+            </select>
+          </div>
+
+          <div class="an-field">
+            <label for="an-report">Report</label>
+            <select id="an-report" name="report"></select>
+          </div>
+          <div class="an-field">
+            <label for="an-activity">Activity</label>
+            <select id="an-activity" name="activity"></select>
+          </div>
+          <div class="an-field">
+            <label for="an-group">Group</label>
+            <select id="an-group" name="group"></select>
+          </div>
+          <div class="an-field">
+            <label for="an-week">Week</label>
+            <select id="an-week" name="week"></select>
+          </div>
+          <div class="an-field">
+            <label for="an-agent">Agent</label>
+            <input
+              id="an-agent"
+              name="agent"
+              type="search"
+              autocomplete="off"
+              list="an-agents"
+              placeholder="All agents"
+              aria-describedby="an-agent-hint"
+            />
+            <datalist id="an-agents"></datalist>
+            <span class="an-hint" id="an-agent-hint"></span>
+          </div>
+          <div class="an-field">
+            <label>&nbsp;</label>
+            <button class="btn" type="submit">Run analysis</button>
+          </div>
+        </form>
+
+        <div class="an-result" id="an-result" role="status" aria-live="polite">
+          <span class="an-empty">Loading the filter vocabulary…</span>
+        </div>
+      </section>
+
+      <!-- Live Desk: pending exposure joined from the wager capture and the scoreboard -->
+      <section class="section-card" id="live-desk" aria-labelledby="ld-title">
+        <div class="section-title">
+          <span id="ld-title">Live Desk — Pending Exposure</span>
+          <span class="badge badge-primary" id="ld-badge">LOADING</span>
+          <button class="btn btn-ghost" type="button" id="ld-refresh">
+            Refresh
+          </button>
+        </div>
+
+        <dl class="ld-grid" id="ld-stats">
+          <div class="ld-stat">
+            <dt>Pending games</dt>
+            <dd data-ld="games">–</dd>
+          </div>
+          <div class="ld-stat">
+            <dt>Wagered</dt>
+            <dd data-ld="wagered">–</dd>
+          </div>
+          <div class="ld-stat">
+            <dt>To win</dt>
+            <dd data-ld="towin">–</dd>
+          </div>
+          <div class="ld-stat">
+            <dt>Pending rows</dt>
+            <dd data-ld="rows">–</dd>
+          </div>
+        </dl>
+
+        <div class="ld-bar" id="ld-sports"></div>
+
+        <table class="ld-table">
+          <caption class="ld-note" style="text-align: left; caption-side: top">
+            Exposure per fixture, split by position — the Game Admin view the
+            portal manual documents (F.A.Q. #4).
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Fixture</th>
+              <th scope="col">League</th>
+              <th scope="col">Positions</th>
+              <th scope="col" class="num">Wagered</th>
+              <th scope="col" class="num">To win</th>
+              <th scope="col">State</th>
+            </tr>
+          </thead>
+          <tbody id="ld-fixtures">
+            <tr>
+              <td class="empty-row" colspan="6">Loading pending exposure…</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="ld-note" id="ld-scoreboard"></p>
+        <p class="ld-note ld-src" id="ld-source"></p>
+      </section>
+
+      <!-- Telegram Bot Control -->
+      <section
+        class="section-card"
+        id="telegram-control"
+        aria-labelledby="tg-title"
+      >
+        <div class="section-title">
+          <span id="tg-title">Telegram Bot Control</span>
+          <span class="badge badge-warning" id="tg-mode-badge"
+            >NOT CONNECTED</span
+          >
+        </div>
+        <div class="tg-grid">
+          <div>
+            <form class="tg-form" id="tg-token-form">
+              <label for="tg-admin-token">Admin token</label>
+              <input
+                type="password"
+                id="tg-admin-token"
+                autocomplete="off"
+                placeholder="SPORTSDESK_ADMIN_TOKEN"
+              />
+              <button class="btn" type="submit">Connect</button>
+            </form>
+            <dl class="tg-status" id="tg-status">
+              <dt>Bot</dt>
+              <dd data-field="bot">-</dd>
+              <dt>Mode</dt>
+              <dd data-field="mode">-</dd>
+              <dt>Default chat</dt>
+              <dd data-field="chat">-</dd>
+              <dt>Inbound</dt>
+              <dd data-field="inbound">-</dd>
+              <dt>Webhook</dt>
+              <dd data-field="webhook">-</dd>
+              <dt>Pending</dt>
+              <dd data-field="pending">-</dd>
+              <dt>Last error</dt>
+              <dd data-field="error">-</dd>
+              <dt>Schedules</dt>
+              <dd data-field="schedules">-</dd>
+            </dl>
+          </div>
+          <div>
+            <div class="tg-action">
+              <label for="tg-report">Report</label>
+              <select id="tg-report"></select>
+              <button class="btn" type="button" data-action="report">
+                Send report
+              </button>
+            </div>
+            <div class="tg-action">
+              <label>Webhook</label>
+              <button class="btn" type="button" data-action="webhook-set">
+                Register
+              </button>
+              <button
+                class="btn btn-danger"
+                type="button"
+                data-action="webhook-delete"
+              >
+                Remove
+              </button>
+              <button class="btn btn-ghost" type="button" data-action="refresh">
+                Refresh
+              </button>
+            </div>
+            <p class="tg-log" id="tg-log" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Telegram Bot Activity (sent and received, across the bot daemon and this server) -->
+      <section
+        class="section-card"
+        id="bot-activity"
+        aria-labelledby="act-title"
+      >
+        <div class="section-title">
+          <span id="act-title">Bot Activity</span>
+          <span class="badge badge-primary" id="act-count">LOCKED</span>
+        </div>
+        <ol class="act-list" id="act-list" aria-live="polite">
+          <li class="empty-row">
+            Connect with the admin token to load activity.
+          </li>
+        </ol>
+      </section>
+
+      <!-- Priority Monitored Accounts Surveillance -->
+      <section class="section-card" id="watchlist" aria-labelledby="wl-title">
+        <div class="section-title">
+          <span id="wl-title"
+            >High-Exposure Accounts &amp; Forensic Watch List</span
+          >
+          <span class="badge badge-warning" id="wl-count">LOCKED</span>
+        </div>
+        <div class="wl-toolbar">
+          <input
+            type="search"
+            id="wl-search"
+            placeholder="Search bettor, agent or archetype"
+            aria-label="Search the watch list"
+          />
+          <select id="wl-tier" aria-label="Filter by risk tier">
+            <option value="">All tiers</option>
+          </select>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead id="wl-head">
+              <tr>
+                <th aria-sort="none">
+                  <button type="button" class="th-sort" data-sort="customerId">
+                    Bettor ID
+                  </button>
+                </th>
+                <th aria-sort="none">
+                  <button type="button" class="th-sort" data-sort="agentId">
+                    Owning Agent
+                  </button>
+                </th>
+                <th aria-sort="none">
+                  <button type="button" class="th-sort" data-sort="archetype">
+                    Archetype
+                  </button>
+                </th>
+                <th aria-sort="none">
+                  <button type="button" class="th-sort" data-sort="riskTier">
+                    Neuron Channel
+                  </button>
+                </th>
+                <th class="num" aria-sort="none">
+                  <button
+                    type="button"
+                    class="th-sort"
+                    data-sort="sportsHandleUSD"
+                  >
+                    Handle
+                  </button>
+                </th>
+                <th class="num" aria-sort="none">
+                  <button
+                    type="button"
+                    class="th-sort"
+                    data-sort="ticketsCount"
+                  >
+                    Tickets
+                  </button>
+                </th>
+                <th class="num" aria-sort="none">
+                  <button
+                    type="button"
+                    class="th-sort"
+                    data-sort="recentNetUSD"
+                  >
+                    Recent P&amp;L
+                  </button>
+                </th>
+                <th class="num" aria-sort="none">
+                  <button
+                    type="button"
+                    class="th-sort"
+                    data-sort="lifetimeNetUSD"
+                  >
+                    Lifetime P&amp;L
+                  </button>
+                </th>
+                <th>Action Playbook</th>
+              </tr>
+            </thead>
+            <tbody id="wl-body">
+              <tr>
+                <td class="empty-row" colspan="9">
+                  Connect with the admin token to load the watch list.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="wl-note">
+          P&amp;L is the bettor's net: red means the bettor is up and the book
+          is losing. "Alert to Telegram" sends the account's alert to the
+          default chat; apply limits in Fantasy402.
+        </p>
+      </section>
+    </main>
 
     <script type="module">
       const TOKEN_KEY = "sportsdesk-admin-token";
@@ -2532,6 +2600,26 @@
       }
 
       /** Shifts an instant into the selected portal zone (fixed offsets, no DST). */
+      /**
+       * Money for the panels: cents in, a compact string out.
+       *
+       * Exact below $100,000 — an operational total rounded to one significant digit ("$1K" for
+       * $1,066.55) is the kind of abbreviation this desk exists to avoid. Above that, thousands
+       * keep one decimal ($106.7K) and millions two ($2.79M), so the magnitude stays readable
+       * without pretending to a precision the figure does not deserve.
+       */
+      function usd(cents) {
+        const value = Number(cents || 0) / 100;
+        const sign = value < 0 ? "-" : "";
+        const abs = Math.abs(value);
+        if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
+        if (abs >= 100_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`;
+        return `${sign}$${abs.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
+      }
+
       function sdFormatTs(iso) {
         if (!iso) return "";
         const parsed = new Date(iso);
@@ -2565,13 +2653,6 @@
           if (className) node.className = className;
           if (text !== undefined) node.textContent = text;
           return node;
-        };
-
-        const usd = (cents) => {
-          const value = Number(cents || 0) / 100;
-          if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
-          if (value >= 1_000) return `$${Math.round(value / 1_000)}K`;
-          return `$${value.toFixed(2)}`;
         };
 
         const setStat = (name, value, sub) => {
@@ -2759,15 +2840,6 @@
         const agentInput = document.getElementById("an-agent");
         const sportSelect = document.getElementById("an-sport");
         const storedSelect = document.getElementById("an-stored");
-
-        const usd = (cents) => {
-          const value = Number(cents || 0) / 100;
-          return value.toLocaleString(undefined, {
-            style: "currency",
-            currency: "USD",
-            minimumFractionDigits: 2,
-          });
-        };
 
         /**
          * A transcribed report answers only for the selection it was run for, so the panel
@@ -3372,13 +3444,6 @@
             "Position: action split by wager shape. Source: the wager capture, not the board.";
         };
 
-        const usd = (cents) => {
-          const value = Number(cents || 0) / 100;
-          if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
-          if (value >= 1_000) return `${Math.round(value / 1_000)}K`;
-          return `${value.toFixed(2)}`;
-        };
-
         const render = (body) => {
           list.replaceChildren();
           const games = body.games ?? [];
@@ -3799,13 +3864,6 @@
           if (className) node.className = className;
           if (text !== undefined) node.textContent = text;
           return node;
-        };
-
-        const usd = (cents) => {
-          const value = Number(cents || 0) / 100;
-          if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
-          if (value >= 1_000) return `$${Math.round(value / 1_000)}K`;
-          return `$${value.toFixed(2)}`;
         };
 
         let all = [];

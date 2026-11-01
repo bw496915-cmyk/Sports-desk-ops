@@ -460,3 +460,128 @@ describe("Settings vocabulary drift", () => {
     expect(literal("DEFAULTS")).toEqual({ ...DEFAULT_SETTINGS });
   });
 });
+
+describe("dashboard layout shell", () => {
+  const html = readFileSync(
+    resolve(
+      import.meta.dir,
+      "../static/customer-churn-simulation-dashboard.html",
+    ),
+    "utf8",
+  );
+
+  test("there is exactly one main element, and it is the panel container", () => {
+    // It used to be missing: the CSS said `main.tiles { … }` and the settings script called
+    // querySelector("main"), so the Agent Menu choice resolved to null and changed nothing.
+    const opens = (html.match(/<main[\s>]/g) ?? []).length;
+    const closes = (html.match(/<\/main>/g) ?? []).length;
+    expect(opens).toBe(1);
+    expect(closes).toBe(1);
+    expect(html).toMatch(/<main id="panels" class="panels">/);
+  });
+
+  test("the Agent Menu toggle has a real target", () => {
+    // Guards the regression directly: the script asks for "main", so the markup must have one.
+    expect(html).toContain('document.querySelector("main")');
+    expect(html).toContain('classList.toggle("tiles"');
+    expect((html.match(/<main[\s>]/g) ?? []).length).toBe(1);
+  });
+
+  test("tile mode is an explicit two-column grid", () => {
+    // Explicit, not auto-fit: `grid-column: 1 / -1` resolves against explicit lines, and with
+    // implicit tracks it silently spanned one column while the badge said TILES.
+    expect(html).toMatch(/main\.tiles\s*\{[^}]*display:\s*grid/);
+    expect(html).toMatch(
+      /main\.tiles\s*\{[^}]*grid-template-columns:\s*repeat\(2,/,
+    );
+    expect(html).toContain("@media (max-width: 1100px)");
+  });
+
+  test("tile mode scrolls tables inside their card instead of leaving gaps", () => {
+    // Full-width exceptions were tried: every full-width panel left an empty half-row beside the
+    // previous one, so each card scrolls its own table instead.
+    expect(html).toMatch(
+      /main\.tiles > \.section-card\s*\{[^}]*overflow-x:\s*auto/,
+    );
+    expect(html).not.toContain("main.tiles > #live-wagers");
+  });
+
+  test("the panel stack is a grid in both modes, not a margin stack", () => {
+    expect(html).toMatch(/\.panels\s*\{[^}]*display:\s*grid/);
+    expect(html).toMatch(
+      /\.panels\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+    );
+  });
+
+  test("every --sd-* token used is declared in :root", () => {
+    // The token gate exists because a made-up custom property renders as nothing at all.
+    const rootBlock = /:root\s*\{([\s\S]*?)\n      \}/.exec(html)?.[1] ?? "";
+    const declared = new Set(
+      [...rootBlock.matchAll(/(--sd-[a-z0-9-]+)\s*:/g)].map(
+        (match) => match[1] ?? "",
+      ),
+    );
+    const used = new Set(
+      [...html.matchAll(/var\((--sd-[a-z0-9-]+)\)/g)].map(
+        (match) => match[1] ?? "",
+      ),
+    );
+    expect(declared.size).toBeGreaterThan(10);
+    const undeclared = [...used].filter((name) => !declared.has(name));
+    expect(undeclared).toEqual([]);
+  });
+});
+
+describe("money formatting", () => {
+  const html = readFileSync(
+    resolve(
+      import.meta.dir,
+      "../static/customer-churn-simulation-dashboard.html",
+    ),
+    "utf8",
+  );
+
+  const script = (() => {
+    const blocks = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
+    const inline = blocks.find((block) => (block[1] ?? "").trim().length > 0);
+    if (inline?.[1] === undefined) throw new Error("no inline script block");
+    return inline[1];
+  })();
+
+  const usd = (() => {
+    const source = /function usd\(cents\) \{[\s\S]*?\n {6}\}/.exec(script)?.[0];
+    if (source === undefined) throw new Error("usd() not found");
+    return new Function(`${source}; return usd;`)() as (
+      cents: number,
+    ) => string;
+  })();
+
+  test("there is one definition, not four", () => {
+    // It was copied into four panels with two different bodies; the copies drifted.
+    expect((script.match(/const usd = \(cents\)/g) ?? []).length).toBe(0);
+    expect((script.match(/function usd\(cents\)/g) ?? []).length).toBe(1);
+  });
+
+  test("keeps exact cents below $100,000", () => {
+    // The ticker's risk total is $1,066.55. It used to render as "$1K": one significant digit for
+    // an operational figure, which is precisely the abbreviation this desk is meant to avoid.
+    expect(usd(106_655)).toBe("$1,066.55");
+    expect(usd(21_600)).toBe("$216.00");
+    expect(usd(7_277)).toBe("$72.77");
+    expect(usd(9_999_999)).toBe("$99,999.99");
+  });
+
+  test("compacts above $100,000, keeping one decimal of thousands", () => {
+    expect(usd(10_000_000)).toBe("$100.0K");
+    expect(usd(10_665_500)).toBe("$106.7K");
+  });
+
+  test("uses two decimals of millions, and keeps the sign outside the dollar", () => {
+    expect(usd(279_000_000)).toBe("$2.79M");
+    expect(usd(-500_000)).toBe("-$5,000.00");
+  });
+
+  test("renders zero as money, not as an empty cell", () => {
+    expect(usd(0)).toBe("$0.00");
+  });
+});
