@@ -95,7 +95,7 @@ https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&m
 
 **Declared type:** apiKey in `cookie` named `session`.
 
-Fantasy402 Manager portal session cookie. [OBSERVED] The 2026-10-28 HAR carried no Authorization header and was cookie-based (operational_guardrails_runbook.md:153); the 2026-10-31 captures record an `authorization` key with a redacted value. [UNVERIFIED] Whether the current Manager session sends a bearer token — check an unredacted capture before relying on it. The cookie name is unrecorded, so 'session' is a placeholder label.
+Fantasy402 Manager portal session. [OBSERVED] 2026-11-01: a Manager page sends `Authorization: Bearer &lt;token>`, where the token is `sessionStorage.credentials.code` after login. The same request without that header is refused with 401 by openresty, so the cookie alone is not sufficient. The 2026-10-28 HAR carried no Authorization header, which is now contradicted. The cookie name is unrecorded, so 'session' is a placeholder label.
 
 Observed: the 2026-10-28 Manager HAR session is cookie-based and sent no Authorization header (`operational_guardrails_runbook.md:153`). The 2026-10-31 captures record an `authorization` key with a **redacted** value, so whether the current session also sends a bearer token is **unverified — check this**. No login/`Set-Cookie` exchange was captured, so the cookie name, lifetime, renewal window and scope are **unverified**. Do not assume a JWT lifetime — the earlier “~20–25 minute” claim had no source and was removed.
 

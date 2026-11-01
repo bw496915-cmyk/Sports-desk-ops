@@ -2256,7 +2256,7 @@ function buildSecuritySchemes(): JsonObject {
       in: "cookie",
       name: "session",
       description:
-        "Fantasy402 Manager portal session cookie. [OBSERVED] The 2026-10-28 HAR carried no Authorization header and was cookie-based (operational_guardrails_runbook.md:153); the 2026-10-31 captures record an `authorization` key with a redacted value. [UNVERIFIED] Whether the current Manager session sends a bearer token — check an unredacted capture before relying on it. The cookie name is unrecorded, so 'session' is a placeholder label.",
+        "Fantasy402 Manager portal session. [OBSERVED] 2026-11-01: a Manager page sends `Authorization: Bearer <token>`, where the token is `sessionStorage.credentials.code` after login. The same request without that header is refused with 401 by openresty, so the cookie alone is not sufficient. The 2026-10-28 HAR carried no Authorization header, which is now contradicted. The cookie name is unrecorded, so 'session' is a placeholder label.",
     },
     daemonBearer: {
       type: "http",

@@ -78,7 +78,6 @@ id that appears on a task but not in this table is a defect, and a test enforces
 | :-------------------- | :------- | :---------------------------------------- | :---------------- |
 | `RT-F402-CAPTURE`     | P0.1     | `[UNVERIFIED]` combo_identity.ts:24       | ledger row        |
 | `RT-PREFEE-PNL`       | P0.2     | `[UNVERIFIED]` third-party toolkit        | one wallet        |
-| `RT-AUTH-HEADER`      | P0.3     | `[OBSERVED]` HAR 2026-10-28               | header capture    |
 | `RT-CHANNEL-MODEL`    | P1.2     | `[CODE]` tokens.toml lanes                | writer capture    |
 | `RT-DUP-WAGERS`       | P1.3     | `[CODE]` audit_customer_book.ts           | audit output      |
 | `RT-GSLIVE-LINKS`     | P1.6     | `[OBSERVED]` three GSLive surfaces        | three captures    |
@@ -102,13 +101,13 @@ so an id resolves without guessing which artifact it came from.
   - **Done when:** each of `Pending`, `PendingDelete`, `getDailyFiguresByCustomer`, `getGradedWagerByCustomer`,
     `getTransactions`, `getGrading`, `getTicketDetailPrint` has a 2xx request **and** response capture, and
     `apply_captures` upgrades its ledger row.
-  - **Blocked by:** the app's OAuth code exchange: the post-login page stores
-    `credentials` = `{code, redirect_uri, password, customerID}` and a 1-character `token`, and a plain
-    in-page fetch is refused at the edge.
+  - **Blocked by:** the parameter set each report expects (date range, customer id); the 500s below are
+    handler errors, not auth failures.
   - **Observed 2026-11-01** (`[OBSERVED]`, `scratch/f402-probes/`): `api/Report/<op>` answers **404**
-    (openresty) — the toolkit names are not routes. `/cloud/api/Manager/<op>` answers **401** (openresty)
-    even from inside the signed-in page, so the route exists and the guard is in front of it. The login
-    itself succeeds unattended with `.env` credentials.
+    (openresty) — the toolkit names are not routes. `/cloud/api/Manager/<op>` with
+    `Authorization: Bearer <sessionStorage.credentials.code>` answers **200** for `getTransactions`
+    (`{"LIST":""}`) and **500 with 0 B** for the other five: the routes and auth are right, the bodies are
+    incomplete. Without the header the same call is **401** at the edge.
   - **Safety:** `PendingDelete` is named like a mutation. The capture allowlist refuses mutation ops by
     construction, so that endpoint needs an explicit read-only confirmation before it is added.
   - **Automation:** `bun run capture:f402 --dry-run` prints the six-op plan without launching anything.
@@ -126,18 +125,6 @@ so an id resolves without guessing which artifact it came from.
   - **Done when:** on one taker-heavy wallet, the residual reconciles to the gap between the official PnL and a
     cashflow replay, with the capture path recorded.
   - **Blocked by:** activity rows that carry `size` and `price` for every fill.
-
-- [ ] **P0.3 Resolve the Authorization-header contradiction**
-  - **Ref:** `RT-AUTH-HEADER`
-  - **Basis:** `[OBSERVED]` every 2026-10-31 live capture (e.g.
-    `docs/evidence/captures/2026-10-31/getInfoPlayer.post.json`) carries `authorization: "<redacted>"`.
-    `redactHeaders` only emits header names that were actually present, so an Authorization header **was
-    sent**. `[OBSERVED]` 2026-11-01: a logged-in page's own `fetch` to `/cloud/api/Manager/<op>` is refused
-    with 401 by openresty, so the header is produced by the app's OAuth exchange rather than stored as a
-    usable token. `[UNVERIFIED]` its scheme and value.
-  - **Done when:** a capture that keeps the scheme (for example `Bearer …`) settles whether it is a bearer
-    token, and the `fantasy402Cookie` / `daemonBearer` descriptions cite that capture.
-  - **Blocked by:** a capture environment that keeps the header scheme while redacting the secret.
 
 ## P1 — coverage and data quality
 
@@ -194,6 +181,8 @@ so an id resolves without guessing which artifact it came from.
 
 ## Done (for context)
 
+- [x] `[OBSERVED]` Manager auth is `Authorization: Bearer <sessionStorage.credentials.code>`; without it
+      openresty answers 401. The `fantasy402Cookie` security scheme now says so.
 - [x] `[CODE]` Claim labels and citation tests (`[CODE]` / `[OBSERVED]` / `[UNVERIFIED]` / `[ASSUMPTION]`).
 - [x] `[CODE]` Seven F402 report endpoints published as tier-C candidates.
 - [x] `[CODE]` TypeScript pinned to 5.9.3 for `bunx tsc`.
