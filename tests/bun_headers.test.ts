@@ -33,7 +33,31 @@ describe("Bun Headers extensions", () => {
     );
   });
 
-  test("count and toJSON match JSON.stringify(headers)", () => {
+  test("count counts stored values, not distinct names", () => {
+    const headers = new Headers();
+    headers.set("a", "1");
+    headers.append("a", "2");
+    // A normal duplicate collapses: one entry, joined value.
+    expect(headers.count).toBe(1);
+    expect(headers.get("a")).toBe("1, 2");
+
+    headers.append("set-cookie", "x=1");
+    headers.append("set-cookie", "y=2");
+    // set-cookie is the exception: each value is its own entry, and iteration shows it twice.
+    expect(headers.count).toBe(3);
+    expect(
+      [...headers.keys()].filter((name) => name === "set-cookie"),
+    ).toHaveLength(2);
+  });
+
+  test("getAll accepts the capitalised name too", () => {
+    const headers = new Headers();
+    headers.append("Set-Cookie", "x=1");
+    headers.append("Set-Cookie", "y=2");
+    expect(headers.getAll("Set-Cookie")).toEqual(["x=1", "y=2"]);
+  });
+
+  test("toJSON and JSON.stringify match, and insertion order is preserved", () => {
     const headers = new Headers({
       "Content-Type": "text/html",
       "X-Custom": "1",
@@ -50,5 +74,12 @@ describe("Bun Headers extensions", () => {
     expect(Object.keys(json)).not.toContain("X-Custom");
     expect(json["set-cookie"]).toEqual(["a=1", "b=2"]);
     expect(JSON.stringify(headers)).toBe(JSON.stringify(json));
+
+    const ordered = new Headers();
+    ordered.append("z", "1");
+    ordered.append("a", "2");
+    ordered.append("m", "3");
+    // The reference says insertion order is not preserved; it is, in this build.
+    expect(Object.keys(ordered.toJSON())).toEqual(["z", "a", "m"]);
   });
 });
