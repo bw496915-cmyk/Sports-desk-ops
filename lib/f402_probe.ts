@@ -251,7 +251,7 @@ export const MANAGER_BOOT_OPS: readonly ProbeOp[] = [
     method: "POST",
     readOnly: true,
     note: "manager.js:55125 boot popup messages read -> t.COMMENT[]; replaces speculative System/getMessages",
-    params: ["acc", "type", "operation", "RRO"],
+    params: ["acc", "type", "operation", "RRO", "agentID", "agentOwner"],
     defaultPrefix: "/cloud/api/Manager",
   },
   {
@@ -259,7 +259,7 @@ export const MANAGER_BOOT_OPS: readonly ProbeOp[] = [
     method: "POST",
     readOnly: true,
     note: "manager.js:31845 boot unread message counter -> e.INFO.LIST, e.INFO.COUNT.total",
-    params: ["acc", "operation", "RRO"],
+    params: ["acc", "operation", "RRO", "agentID", "agentOwner"],
     defaultPrefix: "/cloud/api/Manager",
   },
   {
