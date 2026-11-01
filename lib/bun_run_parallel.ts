@@ -1,5 +1,18 @@
 /**
  * Bun 1.4 `bun run --parallel` / `--sequential` — concurrent package.json scripts.
+ *
+ * Replaces tools like npm-run-all and concurrently. Glob-match script names, fan
+ * out across every workspace with `--filter`, keep going past failures with
+ * `--no-exit-on-error`. Each line of output is prefixed with the script name
+ * (or `package:script` under `--filter`); prebuild/postbuild hooks are grouped
+ * with their main script so dependency order is preserved. `--sequential` runs
+ * scripts one at a time with the same prefixed output and filtering.
+ *
+ * Closes: #26551
+ *
+ * @see https://bun.com/docs/pm/filter#parallel-and-sequential-mode
+ * @see https://bun.com/blog/bun-v1.4#bun-run-parallel-since-1-3-9-improved-1-4-0
+ * @see https://bun.com/blog/bun-v1.3.9#bun-run-parallel-and-bun-run-sequential
  */
 
 export const BUN_RUN_PARALLEL_V14_BLOG_URL =
