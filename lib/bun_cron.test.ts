@@ -2,6 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  BUN_CRON_OS_REGISTER_EXAMPLE,
+  BUN_CRON_OS_WORKER_SCHEDULED_EXAMPLE,
+  BUN_CRON_PARSE_EXAMPLE,
+  type CronScheduledWorker,
   formatCronScheduleLine,
   installOsCronJob,
   isBunOsCronInvocation,
@@ -11,6 +15,7 @@ import {
   previewCronSchedule,
   startInProcessCron,
 } from "./bun_cron.ts";
+import artifactsCron from "../scripts/artifacts_cron.ts";
 
 describe("bun_cron", () => {
   test("isBunOsCronInvocation detects OS cron argv", () => {
@@ -90,6 +95,22 @@ describe("bun_cron", () => {
     });
     expect(job.cron).toBe("*/5 * * * *");
     job.stop();
+  });
+
+  test("OS-level doc examples exported", () => {
+    expect(BUN_CRON_OS_REGISTER_EXAMPLE).toContain("weekly-report");
+    expect(BUN_CRON_PARSE_EXAMPLE).toContain("Bun.cron.parse");
+    expect(BUN_CRON_OS_WORKER_SCHEDULED_EXAMPLE).toContain("scheduled(controller)");
+  });
+
+  test("parse quarter-hour cadence", () => {
+    const next = parseCronScheduleOrNull("*/15 * * * *");
+    expect(next instanceof Date).toBe(true);
+  });
+
+  test("artifacts_cron default export matches CronScheduledWorker", () => {
+    const worker = artifactsCron as CronScheduledWorker;
+    expect(typeof worker.scheduled).toBe("function");
   });
 
   test("installOsCronJob refuses tz", async () => {

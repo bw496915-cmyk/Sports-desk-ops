@@ -4,18 +4,19 @@
  * **Platforms:** crontab (Linux), launchd (macOS), Task Scheduler (Windows).
  *
  * **Three entry points:**
- * - `await Bun.cron(path, schedule, title)` — OS job; worker exports
- *   `default { scheduled(controller) }` (Cloudflare Cron Triggers shape:
- *   `controller.cron`, `controller.scheduledTime`, `controller.type`).
+ * - `await Bun.cron(path, schedule, title)` — OS job; see {@link BUN_CRON_OS_REGISTER_EXAMPLE}
+ *   and {@link BUN_CRON_OS_WORKER_SCHEDULED_EXAMPLE}. Worker exports `default { scheduled }`
+ *   (Cloudflare Cron Triggers: `controller.cron`, `controller.scheduledTime`, `controller.type`).
+ *   Fleet: {@link installOsCronJob} / {@link removeOsCronJob}.
  * - `Bun.cron(schedule, handler, { tz? })` — in-process on the event loop; returns a
  *   `CronJob` (`job.cron`, `ref`/`unref`, `stop`, `[Symbol.dispose]`). Jobs never
  *   overlap (next fire after handler + Promise settle). CronJob handle: `.cron`, `.ref()` /
  *   `.unref()`, `.stop()`, `[Symbol.dispose]` — see {@link BUN_CRON_IN_PROCESS_HANDLE_EXAMPLE}.
  *   {@link startInProcessCron} returns the same handle; daemons use
  *   {@link wireInProcessCronLifecycle} (`ref` + SIGINT/SIGTERM).
- * - `Bun.cron.parse(expression, from?, { tz? })` — next matching `Date` in local time by
- *   default, or `{ tz: "IANA" }`; `null` if no match within 8 years; invalid `from` outside
- *   the ECMAScript Date range throws `TypeError`.
+ * - `Bun.cron.parse(expression, from?, { tz? })` — next matching `Date` ({@link BUN_CRON_PARSE_EXAMPLE});
+ *   **system local wall clock by default** (not UTC unless `{ tz: "UTC" }`). `null` within 8y horizon;
+ *   invalid `from` outside ECMAScript Date range throws `TypeError`.
  *
  * **Syntax:** standard 5-field cron, named days/months, nicknames (`@daily`, …). #26999
  *
@@ -68,6 +69,28 @@ export const BUN_CRON_IN_PROCESS_HANDLE_EXAMPLE =
 job.cron; // "*/5 * * * *"
 job.unref(); // allow process exit
 job.stop(); // cancel (or let \`using\` dispose)` as const;
+
+/** Register launchd / crontab / Task Scheduler job (survives reboot). */
+export const BUN_CRON_OS_REGISTER_EXAMPLE =
+  `await Bun.cron("./worker.ts", "30 2 * * MON", "weekly-report");` as const;
+
+/** Next fire; local TZ by default — pass third arg `{ tz: "UTC" }` for UTC wall clock. */
+export const BUN_CRON_PARSE_EXAMPLE =
+  `const next = Bun.cron.parse("*/15 * * * *");` as const;
+
+/** OS worker module — Bun invokes on schedule (async OK; waits before exit). */
+export const BUN_CRON_OS_WORKER_SCHEDULED_EXAMPLE = `export default {
+  async scheduled(controller) {
+    // controller.cron === "30 2 * * 1"
+    // controller.scheduledTime === 1737340200000
+    await doWork();
+  },
+};` as const;
+
+/** Default export must satisfy this for Tier-2 OS jobs. */
+export type CronScheduledWorkerModule = {
+  default: CronScheduledWorker;
+};
 
 export function startInProcessCron(
   schedule: string,

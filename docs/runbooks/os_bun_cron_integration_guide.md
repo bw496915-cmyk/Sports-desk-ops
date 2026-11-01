@@ -73,6 +73,27 @@ Fleet scripts should not call raw `Bun.cron` except inside this module. Wrappers
 
 Canonical consumers: `scripts/artifacts_cron.ts`, `scripts/f402_portal_drift_cron.ts`, `scripts/graph_feed_poller_daemon.ts`, `scripts/audit_docs_webview_cron.ts`, `services/reporting_scheduler_service.ts`.
 
+### 2.3 OS-level registration & `scheduled()` worker (Bun docs)
+
+```ts
+// Register an OS-level cron job
+await Bun.cron("./worker.ts", "30 2 * * MON", "weekly-report");
+
+// Parse a cron expression → next matching Date (system local TZ; not UTC unless { tz: "UTC" })
+const next = Bun.cron.parse("*/15 * * * *");
+
+// worker.ts
+export default {
+  async scheduled(controller) {
+    // controller.cron === "30 2 * * 1"
+    // controller.scheduledTime === 1737340200000
+    await doWork();
+  },
+};
+```
+
+Repo install/remove: `bun run artifacts:cron --install-os --schedule "0 6 * * *"` (uses `installOsCronJob` + absolute worker path). Reference worker: `scripts/artifacts_cron.ts` `export default { scheduled(controller) }`.
+
 ---
 
 ## 3. In-Process `Bun.cron()` Engine (v1.4+ Callback Overload)
