@@ -1,16 +1,21 @@
 #!/usr/bin/env bun
 /**
  * @file scripts/capture/f402_probe.ts
- * @description Probe the F402 report reads from inside a signed-in WebView page.
+ * @description Probe the F402 report reads from inside a signed-in WebView page (WebKit or Chrome).
  *
  * The session cookie is HttpOnly, so the request must come from the page. The profile directory
  * persists the sign-in, which means later runs start authenticated.
  *
- * Probes are evidence under scratch/ (gitignored). When `--promote-dir <dir>` is passed, any 2xx
- * read-only probe is also converted into a value-free, redacted capture record via `CaptureStore`
- * so `bun run apply:captures` can promote its ledger row directly. When `--backend chrome` and
- * `--sniff-requests` are passed, CDP `Network.requestWillBeSent` passively logs the form-field
- * keys (values redacted) sent by the portal UI.
+ * Capabilities on both `webkit` (macOS default, zero deps) and `chrome`:
+ * - DNS + TLS preflight (`lib/preflight.ts`) recorded into `run.json` alongside probe outputs.
+ * - `--sniff-requests`: Installs an in-page `XMLHttpRequest` + `fetch` interceptor on WebKit (and
+ *   additionally subscribes to CDP `Network.requestWillBeSent` on Chrome) to record `/cloud/api/`
+ *   form-field key templates (`_sniffed_form_templates.json`, values never recorded).
+ * - `--screenshot` / `--screenshot-format <png|jpeg|webp>` / `--screenshot-resize <WxH|W>`:
+ *   Captures a viewport proof screenshot formatted and resized in-memory via `Bun.Image`
+ *   (`lib/screenshot_encode.ts`), so WebP and resizing work natively on WebKit.
+ * - `--promote-dir <dir>`: Converts 2xx read-only probes into value-free, redacted `CaptureStore`
+ *   records ready for `bun run apply:captures`.
  */
 
 import { mkdir } from "node:fs/promises";
@@ -24,16 +29,29 @@ import {
 } from "../../lib/cli_args.ts";
 import {
   PROBE_PREFIXES,
+  type SniffedFormTemplate,
+  buildInstallRequestSnifferExpression,
   buildProbeBody,
   buildProbeExpression,
+  buildReadRequestSnifferExpression,
   parseProbePageResult,
+  parseSniffedTemplates,
   probeSummary,
   probeUrl,
   selectProbeOps,
 } from "../../lib/f402_probe.ts";
 import { preflight } from "../../lib/preflight.ts";
+import {
+  parseResize,
+  type ScreenshotFormat,
+} from "../../lib/screenshot_encode.ts";
 import { htmlToText } from "../../lib/ticket_html.ts";
-import { loginF402, MissingF402CredentialsError } from "./f402_login.ts";
+import {
+  loginF402,
+  MissingF402CredentialsError,
+  SECRET_NAMES,
+  SECRETS_SERVICE,
+} from "./f402_login.ts";
 import { buildCaptureRecord, CaptureStore } from "./recorder.ts";
 import { ManagedWebView } from "./webview.ts";
 
@@ -43,40 +61,50 @@ const VALUE_FLAGS = [
   "--profile",
   "--out",
   "--promote-dir",
+  "--from-probes",
+  "--screenshot-format",
+  "--screenshot-resize",
+  "--screenshot-quality",
   "--wait-for",
   "--body",
+  "--week",
   "--prefix",
   "--ops",
   "--login-wait-ms",
 ] as const;
 
 const HELP = `
-capture:f402 — probe the F402 report reads from a signed-in WebView page
+capture:f402 — probe the F402 report reads from a signed-in WebKit or Chrome page
 
 Options:
-  --login                 Sign in with F402_AGENT_ID / F402_PASSWORD (or the OS credential store)
-  --base <url>            Portal origin (default: F402_BASE_URL or https://fantasy402.com)
-  --backend <name>        webkit (default) or chrome (required for --sniff-requests)
-  --prefix <path>         Route prefix (default: /cloud/api/Manager)
-  --ops <a,b>             Only these operations (default: every confirmed read)
-  --body <form>           Override the form body; {customerID} is resolved in-page
-  --profile <dir>         Persistent WebView profile (default: scratch/webview-profile)
-  --out <dir>             Probe output root (default: scratch/f402-probes)
-  --promote-dir <dir>     Write value-free CaptureStore records for 2xx read-only probes
-  --sniff-requests        Subscribe to CDP Network.requestWillBeSent (chrome backend) and record form keys
-  --wait-for <selector>   Unattended: wait for this selector instead of pressing Enter
-  --login-wait-ms <ms>    Login timeout (default: 180000)
-  --dry-run               Print the plan; launch nothing
-  --no-preflight          Skip the DNS/TLS preflight
-  --include-unconfirmed   Include PendingDelete (also needs --i-understand-mutations)
-  -h, --help              This text
+  --login                       Sign in with F402_AGENT_ID / F402_PASSWORD (or the OS credential store)
+  --base <url>                  Portal origin (default: F402_BASE_URL or https://fantasy402.com)
+  --backend <name>              webkit (macOS default, zero deps) or chrome
+  --prefix <path>               Route prefix (default: /cloud/api/Manager)
+  --ops <a,b>                   Only these operations (default: every confirmed read)
+  --body <form>                 Override the form body; {customerID} is resolved in-page
+  --week <value>                Candidate for the 'week' form field (integer index or date string); default: yesterday (MM/DD/YYYY)
+  --profile <dir>               Persistent WebView profile (default: scratch/webview-profile)
+  --out <dir>                   Probe output root (default: scratch/f402-probes)
+  --promote-dir <dir>           Write value-free CaptureStore records for 2xx read-only probes
+  --from-probes <p1,p2,...>     Promote specific existing 2xx probe JSON files into --promote-dir (fails closed on non-2xx)
+  --sniff-requests              Record /cloud/api/ form-field keys (in-page XHR/fetch on webkit, +CDP on chrome)
+  --screenshot                  Save a Bun.Image-formatted proof screenshot (_page.<ext>) in the probe dir
+  --screenshot-format <fmt>     png | jpeg | webp (default: webp; encoded via Bun.Image on webkit)
+  --screenshot-resize <WxH|W>   Resize proof screenshot via Bun.Image (fit: "inside", withoutEnlargement)
+  --screenshot-quality <1-100>  jpeg/webp quality for proof screenshot (default: 82)
+  --wait-for <selector>         Unattended: wait for this selector instead of pressing Enter
+  --login-wait-ms <ms>          Login timeout (default: 180000)
+  --dry-run                     Print the plan; launch nothing
+  --no-preflight                Skip the DNS/TLS preflight
+  --include-unconfirmed         Include PendingDelete (also needs --i-understand-mutations)
+  -h, --help                    This text
 
 Examples:
   bun run capture:f402 --dry-run
-  bun run capture:f402 --login
+  bun run capture:f402 --login --sniff-requests --screenshot-format webp --screenshot-resize 1280x720
   bun run capture:f402 --login --ops Pending --prefix /cloud/api/Report
   bun run capture:f402 --login --promote-dir docs/evidence/captures
-  bun run capture:f402 --backend chrome --sniff-requests
 
 Every probe records the body it sent and sets headersObserved:false. Nothing is written to docs/
 unless --promote-dir is explicitly supplied.
@@ -90,11 +118,7 @@ interface CdpRequestWillBeSent {
   };
 }
 
-export interface SniffedFormTemplate {
-  readonly path: string;
-  readonly method: string;
-  readonly formKeys: readonly string[];
-}
+export type { SniffedFormTemplate };
 
 /** Extract only form-field keys (never values) from a URL-encoded POST body. */
 export function extractFormKeys(postData: string | undefined): string[] {
@@ -104,6 +128,23 @@ export function extractFormKeys(postData: string | undefined): string[] {
     if (key.trim() !== "") keys.add(key.trim());
   }
   return [...keys].sort();
+}
+
+async function resolveAgentId(): Promise<string> {
+  const fromEnv = process.env.F402_AGENT_ID?.trim() ?? "";
+  if (fromEnv !== "") return fromEnv;
+  try {
+    return (
+      (
+        await Bun.secrets.get({
+          service: SECRETS_SERVICE,
+          name: SECRET_NAMES.agentId,
+        })
+      )?.trim() ?? ""
+    );
+  } catch {
+    return "";
+  }
 }
 
 async function main(): Promise<number> {
@@ -120,15 +161,48 @@ async function main(): Promise<number> {
     "--base",
     process.env.F402_BASE_URL?.trim() || "https://fantasy402.com",
   );
-  const backendRaw = flagValue(parsed, "--backend", "webkit").toLowerCase();
-  const sniffRequests = hasFlag(parsed, "--sniff-requests");
+  const backendRaw = flagValue(
+    parsed,
+    "--backend",
+    process.platform === "darwin" ? "webkit" : "chrome",
+  ).toLowerCase();
   const backend: "webkit" | "chrome" =
-    backendRaw === "chrome" || sniffRequests ? "chrome" : "webkit";
+    backendRaw === "chrome" ? "chrome" : "webkit";
+  const sniffRequests = hasFlag(parsed, "--sniff-requests");
   const profile = flagValue(parsed, "--profile", "scratch/webview-profile");
   const outRoot = flagValue(parsed, "--out", "scratch/f402-probes");
   const promoteDir = flagValue(parsed, "--promote-dir", "");
+  const fromProbesRaw = flagValue(parsed, "--from-probes", "");
+  const screenshotFormatRaw = flagValue(
+    parsed,
+    "--screenshot-format",
+    "",
+  ).toLowerCase();
+  const screenshotResizeRaw = flagValue(parsed, "--screenshot-resize", "");
+  const screenshotQualityRaw = flagValue(parsed, "--screenshot-quality", "82");
+  const wantScreenshot =
+    hasFlag(parsed, "--screenshot") ||
+    screenshotFormatRaw !== "" ||
+    screenshotResizeRaw !== "";
+  const screenshotFormat: ScreenshotFormat =
+    screenshotFormatRaw === "png" || screenshotFormatRaw === "jpeg"
+      ? screenshotFormatRaw
+      : "webp";
+  const screenshotQuality = Number.isFinite(Number(screenshotQualityRaw))
+    ? Math.min(Math.max(Number(screenshotQualityRaw), 1), 100)
+    : 82;
+  const screenshotResize =
+    screenshotResizeRaw === ""
+      ? undefined
+      : {
+          ...parseResize(screenshotResizeRaw),
+          fit: "inside" as const,
+          withoutEnlargement: true,
+        };
+
   const waitFor = flagValue(parsed, "--wait-for", "");
   const explicitBody = flagValue(parsed, "--body", "");
+  const weekValue = flagValue(parsed, "--week", "");
   const prefix = flagValue(parsed, "--prefix", PROBE_PREFIXES[0]!);
   const opsArg = flagValue(parsed, "--ops", "");
   const loginWaitMs = Number(flagValue(parsed, "--login-wait-ms", "180000"));
@@ -162,7 +236,7 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  const agentId = process.env.F402_AGENT_ID?.trim() ?? "";
+  let agentId = await resolveAgentId();
   const bodyFor = (op: (typeof ops)[number]): string =>
     explicitBody !== ""
       ? explicitBody
@@ -171,7 +245,7 @@ async function main(): Promise<number> {
         : buildProbeBody(
             op,
             agentId,
-            process.env.F402_CUSTOMER_ID?.trim() || "{customerID}",
+            process.env.F402_CUSTOMER_ID?.trim() || "__CUSTOMER_ID__",
           );
 
   if (dryRun) {
@@ -191,6 +265,152 @@ async function main(): Promise<number> {
     return 0;
   }
 
+  if (fromProbesRaw !== "") {
+    if (promoteDir === "") {
+      console.error("capture:f402: --from-probes requires --promote-dir <dir>");
+      return 2;
+    }
+    const probePaths = fromProbesRaw
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item !== "");
+    const store = new CaptureStore({ root: promoteDir });
+    const promotedOps: string[] = [];
+    const promotedDates = new Set<string>();
+    let latestRunTls: unknown = null;
+
+    for (const probePath of probePaths) {
+      const rawProbe = (await Bun.file(probePath).json()) as Record<
+        string,
+        unknown
+      >;
+      const result = parseProbePageResult(rawProbe["result"]);
+      if (result.status < 200 || result.status > 299) {
+        console.error(
+          `capture:f402: refusing to promote non-2xx probe ${probePath} (status ${result.status})`,
+        );
+        return 1;
+      }
+      if (rawProbe["readOnlyConfirmed"] !== true) {
+        console.error(
+          `capture:f402: refusing to promote unconfirmed-mutation probe ${probePath}`,
+        );
+        return 1;
+      }
+      const probeUrlStr = String(rawProbe["url"] ?? "");
+      const parsedUrl = new URL(probeUrlStr);
+      const opPath = parsedUrl.pathname;
+      const capturedAt = String(
+        rawProbe["capturedAt"] ?? new Date().toISOString(),
+      );
+      const bodyStr = String(rawProbe["body"] ?? "");
+      let wireText = result.bodyText ?? result.preview;
+      let truncatedPreview = false;
+      if (
+        result.bodyText === undefined &&
+        result.contentType.toLowerCase().includes("json") &&
+        result.bytes > result.preview.length
+      ) {
+        const firstObjEnd = result.preview.indexOf("},{");
+        if (firstObjEnd !== -1) {
+          wireText = `${result.preview.slice(0, firstObjEnd + 1)}]}`;
+          truncatedPreview = true;
+        }
+      }
+
+      const captureRecord = buildCaptureRecord({
+        mode: "live",
+        capturedAt,
+        operation: {
+          path: opPath,
+          method: "POST",
+        },
+        request: {
+          url: probeUrlStr,
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "x-requested-with": "XMLHttpRequest",
+            authorization: "Bearer <redacted>",
+          },
+          contentType: "application/x-www-form-urlencoded; charset=UTF-8",
+          body: bodyStr,
+        },
+        response: {
+          status: result.status,
+          headers: { "content-type": result.contentType },
+          contentType: result.contentType,
+          bytes: new TextEncoder().encode(wireText),
+          wireBytes: result.bytes,
+          truncatedPreview,
+        },
+        provenance: {
+          portalHost: parsedUrl.host,
+          proxy: "none",
+          auth: "cookie",
+          bunVersion: Bun.version,
+        },
+        samples: 1,
+      });
+      await store.write(captureRecord);
+      promotedOps.push(opPath);
+      promotedDates.add(capturedAt.slice(0, 10));
+
+      const siblingRunPath = join(
+        probePath.split("/").slice(0, -1).join("/"),
+        "run.json",
+      );
+      try {
+        const siblingRun = (await Bun.file(siblingRunPath).json()) as Record<
+          string,
+          unknown
+        >;
+        if (siblingRun["tls"]) latestRunTls = siblingRun["tls"];
+      } catch {
+        // Ignore missing sibling run.json.
+      }
+    }
+
+    await store.finalize();
+    for (const dateDir of promotedDates) {
+      const runPath = join(promoteDir, dateDir, "run.json");
+      let existingOps: string[] = [];
+      let existingTls: unknown = null;
+      try {
+        const prev = (await Bun.file(runPath).json()) as {
+          ops?: readonly string[];
+          tls?: unknown;
+        };
+        if (Array.isArray(prev.ops)) existingOps = [...prev.ops];
+        if (prev.tls) existingTls = prev.tls;
+      } catch {
+        // First run.json for this date directory.
+      }
+      const mergedOps = [...new Set([...existingOps, ...promotedOps])].sort();
+      await Bun.write(
+        runPath,
+        `${JSON.stringify(
+          {
+            schemaVersion: 1,
+            kind: "probe-run",
+            startedAt: new Date().toISOString(),
+            base,
+            backend,
+            authMode: "env-login",
+            tls: latestRunTls ?? existingTls,
+            ops: mergedOps,
+          },
+          null,
+          2,
+        )}\n`,
+      );
+    }
+    console.error(
+      `capture:f402: promoted ${promotedOps.length} 2xx capture(s) from probes into ${promoteDir}`,
+    );
+    return 0;
+  }
+
   if (!autoLogin && waitFor === "" && !process.stdin.isTTY) {
     console.error("capture:f402: no TTY and no --wait-for selector.");
     console.error(
@@ -200,6 +420,7 @@ async function main(): Promise<number> {
     return 2;
   }
 
+  let tls: Awaited<ReturnType<typeof preflight>>["tls"] = null;
   if (!hasFlag(parsed, "--no-preflight")) {
     const target = new URL(base).hostname;
     const check = await preflight(target, {
@@ -210,6 +431,7 @@ async function main(): Promise<number> {
       console.error("  bun run capture:preflight --host " + target);
       return 1;
     }
+    tls = check.tls;
     console.error(
       `capture:f402: preflight ok · ${check.dns.length} address(es) · ${check.tls?.tlsVersion ?? "?"} ${check.tls?.cipher.name ?? ""}`,
     );
@@ -224,21 +446,58 @@ async function main(): Promise<number> {
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const outDir = join(outRoot, stamp);
-  const sniffedTemplates: SniffedFormTemplate[] = [];
+  const cdpSniffed: SniffedFormTemplate[] = [];
   let unsubscribeSniffer: (() => void) | null = null;
 
   try {
+    if (sniffRequests && backend === "chrome") {
+      await view.cdp("Network.enable");
+      unsubscribeSniffer = view.onCdpEvent<CdpRequestWillBeSent>(
+        "Network.requestWillBeSent",
+        (event) => {
+          const reqUrl = event.request?.url ?? "";
+          if (!reqUrl.includes("/cloud/api/")) return;
+          try {
+            const parsedUrl = new URL(reqUrl);
+            cdpSniffed.push({
+              path: parsedUrl.pathname,
+              method: (event.request?.method ?? "POST").toUpperCase(),
+              formKeys: extractFormKeys(event.request?.postData),
+            });
+          } catch {
+            // Ignore malformed URLs.
+          }
+        },
+      );
+    }
+
     let authMode: "env-login" | "selector" | "interactive";
 
     if (autoLogin) {
-      await loginF402(view, { baseUrl: base, timeoutMs: loginWaitMs });
+      const outcome = await loginF402(view, {
+        baseUrl: base,
+        timeoutMs: loginWaitMs,
+        ...(sniffRequests
+          ? { beforeSubmitExpression: buildInstallRequestSnifferExpression() }
+          : {}),
+      });
+      if (agentId === "" && outcome.agentId !== "") {
+        agentId = outcome.agentId;
+      }
       authMode = "env-login";
       console.error(
-        "capture:f402: signed in with F402_AGENT_ID / F402_PASSWORD",
+        `capture:f402: signed in on ${backend} with F402_AGENT_ID / F402_PASSWORD`,
       );
+      if (sniffRequests) {
+        await view.evaluate(buildInstallRequestSnifferExpression());
+      }
     } else {
       await view.navigate(base);
       await view.waitForLoad();
+      if (sniffRequests) {
+        // Install before interactive navigation/clicks so UI actions are captured on WebKit too.
+        await view.evaluate(buildInstallRequestSnifferExpression());
+      }
 
       if (waitFor !== "") {
         await view.waitForSelector(waitFor, { timeoutMs: loginWaitMs });
@@ -254,33 +513,36 @@ async function main(): Promise<number> {
         );
         authMode = "interactive";
       }
-    }
-
-    if (sniffRequests && backend === "chrome") {
-      await view.cdp("Network.enable");
-      unsubscribeSniffer = view.onCdpEvent<CdpRequestWillBeSent>(
-        "Network.requestWillBeSent",
-        (event) => {
-          const reqUrl = event.request?.url ?? "";
-          if (!reqUrl.includes("/cloud/api/")) return;
-          try {
-            const parsedUrl = new URL(reqUrl);
-            sniffedTemplates.push({
-              path: parsedUrl.pathname,
-              method: (event.request?.method ?? "POST").toUpperCase(),
-              formKeys: extractFormKeys(event.request?.postData),
-            });
-          } catch {
-            // Ignore malformed URLs.
-          }
-        },
-      );
+      if (sniffRequests) {
+        await view.evaluate(buildInstallRequestSnifferExpression());
+      }
     }
 
     await mkdir(outDir, { recursive: true });
+    await Bun.write(
+      join(outDir, "run.json"),
+      `${JSON.stringify(
+        {
+          schemaVersion: 1,
+          kind: "probe-run",
+          startedAt: new Date().toISOString(),
+          base,
+          prefix,
+          backend,
+          authMode,
+          tls,
+          ops: ops.map((op) => op.operation),
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
     const promoteStore =
       promoteDir !== "" ? new CaptureStore({ root: promoteDir }) : null;
     let promotedCount = 0;
+    const promotedOps: string[] = [];
+    const promotedDates = new Set<string>();
     let transportErrors = 0;
     const portalHost = new URL(base).host;
 
@@ -289,25 +551,33 @@ async function main(): Promise<number> {
       const body = bodyFor(op);
       try {
         const raw = await view.evaluate(
-          buildProbeExpression({ operation: op.operation, url, body }),
+          buildProbeExpression(
+            { operation: op.operation, url, body },
+            2_000,
+            weekValue === "" ? undefined : weekValue,
+          ),
         );
         const result = parseProbePageResult(raw);
+        const { bodyText, ...scratchResult } = result;
         const capturedAt = new Date().toISOString();
         const record = {
           schemaVersion: 1,
           kind: "webview-probe",
+          backend,
           capturedAt,
           operation: op.operation,
           url,
           method: op.method,
           body,
+          dateUsed: result.dateUsed ?? null,
+          weekUsed: result.weekUsed ?? null,
           authMode,
           readOnlyConfirmed: op.readOnly,
           headersObserved: false,
-          result,
+          result: scratchResult,
           // Printable endpoints answer HTML; keep a readable excerpt beside the raw preview.
-          extractedText: result.contentType.includes("text/html")
-            ? htmlToText(result.preview).slice(0, 2_000)
+          extractedText: scratchResult.contentType.includes("text/html")
+            ? htmlToText(scratchResult.preview).slice(0, 2_000)
             : null,
           note: op.note,
         };
@@ -324,6 +594,7 @@ async function main(): Promise<number> {
           result.status <= 299
         ) {
           const opPath = `${prefix.replace(/\/$/, "")}/${op.operation}`;
+          const wireText = bodyText ?? result.preview;
           const captureRecord = buildCaptureRecord({
             mode: "live",
             capturedAt,
@@ -347,7 +618,7 @@ async function main(): Promise<number> {
               status: result.status,
               headers: { "content-type": result.contentType },
               contentType: result.contentType,
-              bytes: new TextEncoder().encode(result.preview),
+              bytes: new TextEncoder().encode(wireText),
             },
             provenance: {
               portalHost,
@@ -359,6 +630,8 @@ async function main(): Promise<number> {
           });
           await promoteStore.write(captureRecord);
           promotedCount += 1;
+          promotedOps.push(opPath);
+          promotedDates.add(capturedAt.slice(0, 10));
         }
 
         const summary = probeSummary(op, result);
@@ -371,21 +644,86 @@ async function main(): Promise<number> {
       }
     }
 
+    if (wantScreenshot) {
+      const ext = screenshotFormat === "jpeg" ? "jpg" : screenshotFormat;
+      const shotPath = join(outDir, `_page.${ext}`);
+      const shot = await view.screenshotToFile(
+        shotPath,
+        screenshotFormat === "png"
+          ? {
+              format: "png",
+              ...(screenshotResize === undefined
+                ? {}
+                : { resize: screenshotResize }),
+            }
+          : {
+              format: screenshotFormat,
+              quality: screenshotQuality,
+              ...(screenshotResize === undefined
+                ? {}
+                : { resize: screenshotResize }),
+            },
+      );
+      console.error(
+        `capture:f402: saved ${screenshotFormat} proof screenshot (${shot.bytes} B, sha256 ${shot.sha256.slice(0, 12)}…) -> ${shot.path}`,
+      );
+    }
+
     if (promoteStore !== null && promotedCount > 0) {
       await promoteStore.finalize();
+      for (const dateDir of promotedDates) {
+        const runPath = join(promoteDir, dateDir, "run.json");
+        let existingOps: string[] = [];
+        try {
+          const prev = (await Bun.file(runPath).json()) as {
+            ops?: readonly string[];
+          };
+          if (Array.isArray(prev.ops)) existingOps = [...prev.ops];
+        } catch {
+          // First run.json for this date directory.
+        }
+        const mergedOps = [...new Set([...existingOps, ...promotedOps])].sort();
+        await Bun.write(
+          runPath,
+          `${JSON.stringify(
+            {
+              schemaVersion: 1,
+              kind: "probe-run",
+              startedAt: new Date().toISOString(),
+              base,
+              prefix,
+              backend,
+              authMode,
+              tls,
+              ops: mergedOps,
+            },
+            null,
+            2,
+          )}\n`,
+        );
+      }
       console.error(
         `capture:f402: promoted ${promotedCount} 2xx capture(s) into ${promoteDir}`,
       );
     }
 
-    if (sniffedTemplates.length > 0) {
-      await Bun.write(
-        join(outDir, "_sniffed_form_templates.json"),
-        `${JSON.stringify(sniffedTemplates, null, 2)}\n`,
-      );
-      console.error(
-        `capture:f402: recorded ${sniffedTemplates.length} CDP request template(s)`,
-      );
+    if (sniffRequests) {
+      const inPageRaw = await view
+        .evaluate(buildReadRequestSnifferExpression())
+        .catch(() => []);
+      const combined = parseSniffedTemplates([
+        ...(Array.isArray(inPageRaw) ? inPageRaw : []),
+        ...cdpSniffed,
+      ]);
+      if (combined.length > 0) {
+        await Bun.write(
+          join(outDir, "_sniffed_form_templates.json"),
+          `${JSON.stringify(combined, null, 2)}\n`,
+        );
+        console.error(
+          `capture:f402: recorded ${combined.length} request template(s) on ${backend}`,
+        );
+      }
     }
 
     console.error(

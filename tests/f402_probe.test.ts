@@ -119,6 +119,38 @@ describe("probe expression", () => {
     // The markers are plain text so URL encoding cannot turn them into %7B…%7D.
     expect(expression).not.toContain("%7B");
   });
+
+  test("a supplied week value overrides the default yesterday date", () => {
+    const expression = buildProbeExpression(
+      {
+        operation: "getDailyFiguresByCustomer",
+        url: "https://fantasy402.com/cloud/api/Report/getDailyFiguresByCustomer",
+        body: "agentID=1&customerID=__CUSTOMER_ID__&week=__WEEK__&token=&operation=getDailyFiguresByCustomer",
+      },
+      2_000,
+      "3",
+    );
+    // The override is carried into the page as a JSON string (never interpolated raw).
+    expect(expression).toContain('const weekOverride = "3";');
+    expect(expression).toContain(
+      'replaceAll("__WEEK__", encodeURIComponent(weekValueResolved))',
+    );
+    // The default (yesterday's date) is still computed for the __DATE__ marker.
+    expect(expression).toContain("const mdy =");
+  });
+
+  test("an empty week value keeps the historical default", () => {
+    const expression = buildProbeExpression(
+      {
+        operation: "getDailyFiguresByCustomer",
+        url: "https://fantasy402.com/cloud/api/Report/getDailyFiguresByCustomer",
+        body: "week=__WEEK__&token=&operation=getDailyFiguresByCustomer",
+      },
+      2_000,
+      undefined,
+    );
+    expect(expression).toContain('const weekOverride = "";');
+  });
 });
 
 describe("request sniffer", () => {

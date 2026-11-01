@@ -96,6 +96,7 @@ export interface ProbeRequest {
 export function buildProbeExpression(
   request: ProbeRequest,
   previewChars = 2_000,
+  weekValue?: string,
 ): string {
   const url = JSON.stringify(request.url);
   const body = JSON.stringify(request.body);
@@ -117,10 +118,14 @@ export function buildProbeExpression(
   // Yesterday: today's date is not a settled day for this endpoint (it answers 500).
   const now = new Date(Date.now() - 86_400_000);
   const mdy = String(now.getMonth() + 1).padStart(2, "0") + "/" + String(now.getDate()).padStart(2, "0") + "/" + now.getFullYear();
+  // Optional week override: an integer index, a date string, or any candidate the probe wants to try.
+  // Empty string keeps the historical default (yesterday's date) so existing captures stay comparable.
+  const weekOverride = ${JSON.stringify(weekValue ?? "")};
+  const weekValueResolved = weekOverride !== "" ? weekOverride : mdy;
   const resolvedBody = ${body}
     .replaceAll("__CUSTOMER_ID__", encodeURIComponent(customerID))
     .replaceAll("__DATE__", encodeURIComponent(mdy))
-    .replaceAll("__WEEK__", encodeURIComponent(mdy));
+    .replaceAll("__WEEK__", encodeURIComponent(weekValueResolved));
   const response = await fetch(${url}, {
     method: "POST",
     credentials: "include",
@@ -138,6 +143,7 @@ export function buildProbeExpression(
     preview: decoder.decode(buffer.subarray(0, ${preview})),
     bodyText: decoder.decode(buffer),
     dateUsed: mdy,
+    weekUsed: weekValueResolved,
   };
 })()`;
 }
@@ -250,6 +256,7 @@ export interface ProbePageResult {
   readonly preview: string;
   readonly bodyText?: string;
   readonly dateUsed?: string;
+  readonly weekUsed?: string;
 }
 
 /** Validate what came back from the page before it is written as evidence. */
@@ -273,6 +280,7 @@ export function parseProbePageResult(raw: unknown): ProbePageResult {
   if (typeof preview !== "string")
     throw new Error("probe result has no body preview");
   const dateUsed = candidate["dateUsed"];
+  const weekUsed = candidate["weekUsed"];
   return {
     status,
     contentType,
@@ -280,6 +288,7 @@ export function parseProbePageResult(raw: unknown): ProbePageResult {
     preview,
     ...(typeof bodyText === "string" ? { bodyText } : {}),
     ...(typeof dateUsed === "string" ? { dateUsed } : {}),
+    ...(typeof weekUsed === "string" ? { weekUsed } : {}),
   };
 }
 

@@ -77,55 +77,69 @@ Each task carries a stable `Ref:` id. The id does not change when tasks are renu
 the table resolves it to the record that justifies the basis and to the artifact that closes it. A ref
 id that appears on a task but not in this table is a defect, and a test enforces it.
 
-| Ref                   | Task     | Basis record                              | Closes against    |
-| :-------------------- | :------- | :---------------------------------------- | :---------------- |
-| `RT-F402-CAPTURE`     | P0.1     | `[UNVERIFIED]` combo_identity.ts:24       | ledger row        |
-| `RT-PREFEE-PNL`       | P0.2     | `[UNVERIFIED]` third-party toolkit        | one wallet        |
-| `RT-GSLIVE-LINKS`     | P1.6     | `[OBSERVED]` three GSLive surfaces        | three captures    |
-| `RT-CLI-ZIP`          | P2.1     | `[OBSERVED]` gs-manager-cli.zip           | provenance note   |
-| `RT-ARTIFACT-CADENCE` | P2.3     | `[CODE]` package.json:76                  | cadence + check   |
-| `RT-RENDER-HTML`      | Renderer | `[OBSERVED]` MCP api:Bun.markdown.html    | HTML artifact     |
-| `RT-RENDER-ANSI`      | Renderer | `[OBSERVED]` MCP api:Bun.markdown.ansi    | CLI/JS diff       |
-| `RT-RENDER-LISTITEM`  | Renderer | `[OBSERVED]` MCP api:Bun.markdown.render  | checked semantics |
-| `RT-RENDER-SECURITY`  | Renderer | `[OBSERVED]` MCP api:Bun.markdown.Options | tagFilter tests   |
-| `RT-DOCS-MANIFEST`    | Pipeline | `[CODE]` lib/docs_render_cache.ts         | stable buildId    |
-| `RT-DOCS-SERVE`       | Pipeline | `[CODE]` lib/docs_server.ts               | q-value + range   |
+| Ref                    | Task     | Basis record                              | Closes against    |
+| :--------------------- | :------- | :---------------------------------------- | :---------------- |
+| `RT-F402-CAPTURE`      | P0.1     | `[OBSERVED]` captures/2026-11-01/         | ledger row        |
+| `RT-PREFEE-PNL`        | P0.2     | `[UNVERIFIED]` third-party toolkit        | one wallet        |
+| `RT-AUTH-BACKEND-DIFF` | P0.3     | `[OBSERVED]` captures/2026-11-01/run.json | CDP vs WebKit     |
+| `RT-GSLIVE-LINKS`      | P1.6     | `[OBSERVED]` three GSLive surfaces        | three captures    |
+| `RT-CLI-ZIP`           | P2.1     | `[OBSERVED]` gs-manager-cli.zip           | provenance note   |
+| `RT-ARTIFACT-CADENCE`  | P2.3     | `[CODE]` package.json:76                  | cadence + check   |
+| `RT-RENDER-HTML`       | Renderer | `[OBSERVED]` MCP api:Bun.markdown.html    | HTML artifact     |
+| `RT-RENDER-ANSI`       | Renderer | `[OBSERVED]` MCP api:Bun.markdown.ansi    | CLI/JS diff       |
+| `RT-RENDER-LISTITEM`   | Renderer | `[OBSERVED]` MCP api:Bun.markdown.render  | checked semantics |
+| `RT-RENDER-SECURITY`   | Renderer | `[OBSERVED]` MCP api:Bun.markdown.Options | tagFilter tests   |
+| `RT-DOCS-MANIFEST`     | Pipeline | `[CODE]` lib/docs_render_cache.ts         | stable buildId    |
+| `RT-DOCS-SERVE`        | Pipeline | `[CODE]` lib/docs_server.ts               | q-value + range   |
 
 Full paths and line numbers stay on each task's **Basis** line; this table is the ref-to-record index,
 so an id resolves without guessing which artifact it came from.
 
 ## P0 — trust blockers
 
-- [ ] **P0.1 Capture the seven F402 report endpoints**
+- [ ] **P0.1 Capture the seven F402 report endpoints (split by route prefix)**
   - **Ref:** `RT-F402-CAPTURE`
-  - **Basis:** `[UNVERIFIED]` names from `lib/combo_identity.ts:24-40`; `[CODE]` tier-C rows in the spec.
-  - **Done when:** each of `Pending`, `PendingDelete`, `getDailyFiguresByCustomer`, `getGradedWagerByCustomer`,
-    `getTransactions`, `getGrading`, `getTicketDetailPrint` has a 2xx request **and** response capture, and
-    `apply_captures` upgrades its ledger row.
-  - **Blocked by:** a valid customerID from the agent's downline — the session's own id is rejected with
-    "Invalid CustomerID" — plus each report's date filter. `bun run customers` indexes the local cohorts
-    (artifact 49, demo-book 220, fixture 6) for lookup, but those are demo ids and the live endpoints
-    reject them; a `capture` source appears only when a capture keeps a real id.
-  - **Observed 2026-11-01** (`[OBSERVED]`, `scratch/f402-probes/`): the portal's own client at
-    `/app/customer/report/report.js` builds every report from `customerID`, `token` (empty in the browser
-    session; the edge accepts the bearer instead) and `operation`, plus `week` for the daily-figures and
-    graded-wager reports, `date` (MM/DD/YYYY) for transactions, and `agentID` for daily figures. With that
-    envelope `Pending` answers **200 with 41 KB**, `getTransactions` **200 `{"LIST":[]}`** and `getGrading`
-    **200 `{"LIST":[]}`**. `getDailyFiguresByCustomer` and `getGradedWagerByCustomer` still answer 500 on
-    the `week` value, and `getTicketDetailPrint` needs a ticket/wager number.
-  - **Privacy:** the `Pending` payload includes customer names and a `Password` field, so probe records
-    keep only a 2 KB preview under `scratch/` and nothing is promoted to `docs/`.
-  - **Safety:** `PendingDelete` is named like a mutation. The capture allowlist refuses mutation ops by
-    construction, so that endpoint needs an explicit read-only confirmation before it is added.
-  - **Automation:** `bun run capture:f402 --dry-run` prints the six-op plan without launching anything.
-    With `F402_AGENT_ID` / `F402_PASSWORD` in the environment, `--login` signs in unattended (defaults:
-    `input[name="customerID"]`, `input[type="password"]`, `button.btn.btn-primary`, overridable with
-    `F402_LOGIN_*`); no credential is printed or written. Credentials may live in `.env` or in the OS
-    credential store (`bun run secrets:f402 set|status|delete`), and env wins when both exist. Otherwise it waits for an interactive sign-in or
-    a `--wait-for` selector. Probes run from inside the page so the HttpOnly session cookie applies, and
-    results land in `scratch/f402-probes/<stamp>/<op>.json` with the body that was sent, the auth mode, and
-    `headersObserved: false`. `PendingDelete` is excluded unless
-    `--include-unconfirmed --i-understand-mutations` is passed.
+  - **Basis:** `[OBSERVED]` `docs/evidence/captures/2026-11-01/` (3 promoted 200s + `run.json` TLSv1.3 provenance);
+    `[CODE]` PII-safe form-key contract in `docs/evidence/captures/schema/` (parameter names only, no parameter
+    values recorded); `[OBSERVED]` 500 diagnostic artifact in `docs/evidence/captures/pending-500s/diagnostics.json`.
+  - **Per-prefix status (`[Report]` vs `[Manager]` vs `[unknown]`):**
+    - **`[Report]` (`Pending` — substantive `[A]`):** `POST /cloud/api/Report/Pending` with a real downline player id
+      returns **200 with 41–46 KB** (73-field `Pending[]` leg objects). Promoted to `[A]` in
+      `docs/evidence/captures/2026-11-01/Pending.post.json` (value-free skeleton, PII redacted).
+    - **`[Report]` (`getGrading` — `[A-empty]`):** `POST /cloud/api/Report/getGrading` returns **200 `{"LIST":""}`** (11 B)
+      on `/cloud/api/Report` and 500 on `/cloud/api/Manager`. Promoted to `[A]` in
+      `docs/evidence/captures/2026-11-01/getGrading.post.json` with an `[A-empty]` ledger note stating that the item
+      row schema is unverified beyond the outer `LIST` envelope until a run with graded rows is captured.
+    - **`[Manager]` (`getTransactions` — `[A-empty]` + cross-prefix routing):** `getTransactions` returns **500** (0 B)
+      on `/cloud/api/Report` when called with the default Manager envelope, and **200 `{"LIST":""}`** (11 B) on
+      `/cloud/api/Manager/getTransactions` (or **200 `{"LIST":[]}`** on `/cloud/api/Report/getTransactions` only when
+      `date=MM/DD/YYYY` for a settled day is supplied). Promoted on `/cloud/api/Manager/getTransactions` in
+      `docs/evidence/captures/2026-11-01/getTransactions.post.json` with the cross-prefix routing finding recorded.
+    - **`[unknown]` (`getDailyFiguresByCustomer`, `getGradedWagerByCustomer`, `getTicketDetailPrint` — 500 on both prefixes):**
+      Both `/cloud/api/Manager` and `/cloud/api/Report` return **500** with a 0-byte `text/html` body. Not promoted as
+      endpoint captures; staged under `docs/evidence/captures/pending-500s/diagnostics.json` with finding
+      `"both Manager and Report return 500; error body pending"`.
+    - **`[unconfirmed-mutation]` (`PendingDelete`):** Excluded by default until read-only confirmation.
+  - **Parameter-name contract (`[CODE]`):** In-page WebKit XHR/fetch sniffing recorded all six `/cloud/api/Manager/*`
+    form-key signatures (`["RRO", "agentID", "agentOwner", "customerID", "operation"]`) and `/cloud/api/Report/*`
+    form-key signatures without CDP and with **no parameter values recorded** (PII-safe, committed under
+    `docs/evidence/captures/schema/`).
+  - **Runtime & TLS sidecars:** The `1152x720` WebP viewport proof (`Bun.Image` on WebKit, 1,536 B, sha256
+    `3f302482ed919d3da6a0a6293d297660774b03a8ea3571201dfd8b8edf0959da`) lives under
+    `docs/evidence/captures/runtime/bun-image/`, and `docs/evidence/captures/2026-11-01/run.json` records the live
+    `TLSv1.3` (`TLS_AES_128_GCM_SHA256`, 73 ms, Google Trust Services WE1) handshake beside the promoted captures.
+  - **Done when:** the three `[unknown]` endpoints (`getDailyFiguresByCustomer`, `getGradedWagerByCustomer`,
+    `getTicketDetailPrint`) have 2xx request+response captures (after inspecting the 500 error cause / supplying
+    valid `week` or `TicketNumber`/`WagerNumber` fields), `getGrading` and `getTransactions` are upgraded from
+    `[A-empty]` to non-empty `LIST` rows, and `PendingDelete` is either confirmed read-only and captured or retired
+    to the mutation list.
+  - **Blocked by:** valid `week` index/date format for `getDailyFiguresByCustomer` and `getGradedWagerByCustomer`,
+    a live `TicketNumber`/`WagerNumber` parameter pair for `getTicketDetailPrint`, and non-empty grading/transaction
+    history windows for `[A-empty]` row schemas.
+  - **Probe support (2026-11-01):** `capture:f402` now accepts `--week <value>` to try an integer index or date
+    string instead of the historical default (yesterday, `MM/DD/YYYY`); the value is resolved in-page so it never
+    crosses into Bun, and the run record stores `weekUsed` beside `dateUsed`. `--body` already allows supplying
+    `TicketNumber`/`WagerNumber` overrides for `getTicketDetailPrint`.
 
 - [ ] **P0.2 Verify the pre-fee PnL claim**
   - **Ref:** `RT-PREFEE-PNL`
@@ -133,6 +147,22 @@ so an id resolves without guessing which artifact it came from.
   - **Done when:** on one taker-heavy wallet, the residual reconciles to the gap between the official PnL and a
     cashflow replay, with the capture path recorded.
   - **Blocked by:** activity rows that carry `size` and `price` for every fill.
+
+- [ ] **P0.3 Verify the backend-layer resolution for the Authorization-header discrepancy**
+  - **Ref:** `RT-AUTH-BACKEND-DIFF`
+  - **Basis:** `[OBSERVED]` 2026-10-28 HAR recorded no `Authorization` header (`auth: "cookie"`), 2026-10-31 live
+    captures recorded `authorization: "<redacted>"`, and 2026-11-01 WebKit probes (`docs/evidence/captures/2026-11-01/run.json`)
+    recorded `backend: "webkit"`, `authMode: "env-login"`, `headersObserved: false`.
+  - **Hypothesis:** Both prior observations were truthful views of different capture backends. Under `env-login`,
+    WebKit in-page `fetch`/`XMLHttpRequest` sniffing (`--sniff-requests`) observes form keys in page context without
+    exposing wire headers (`headersObserved: false`), whereas CDP-backed captures (`Network.requestWillBeSent` on
+    `--backend chrome`) surface the outbound `Authorization: Bearer <redacted>` header attached from
+    `sessionStorage.credentials.code`.
+  - **Done when:** one confirmed 200 operation (`getTransactions` on `/cloud/api/Manager` or `getGrading` on
+    `/cloud/api/Report`) is re-captured with `--backend chrome` (CDP) and diffed against the WebKit `run.json` +
+    probe record, confirming CDP surfaces the redacted `Authorization` header while WebKit records
+    `authMode: "env-login"` with `headersObserved: false`.
+  - **Blocked by:** a local Chrome/Chromium binary (`BUN_CHROME_PATH`) to execute the single-op CDP comparison run.
 
 ## P1 — coverage and data quality
 
