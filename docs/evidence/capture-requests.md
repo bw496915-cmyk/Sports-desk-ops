@@ -292,6 +292,24 @@ Also absent from the spec and documented from source only: `GET /`, `GET /dashbo
 The `/api/desk/*` routes cannot be captured: no implementation exists anywhere in the repo. They need
 implementation first (`sportsdesk_webview_server.ts` has no `/api/desk` handler and 404s at `:299-307`).
 
+## P7 — the customer report surface (7 candidates)
+
+`lib/combo_identity.ts:24-40` names these from the deobfuscated `customer/report/report.js`. None has a
+capture; they are published as tier C with no request or response content.
+
+| Endpoint                                           | Used by                  | Required capture                                         |
+| :------------------------------------------------- | :----------------------- | :------------------------------------------------------- |
+| `POST /cloud/api/Report/Pending`                   | pending-bet modes        | one authenticated call + leg rows; confirm contentType   |
+| `POST /cloud/api/Report/PendingDelete`             | ticket deletion          | one call on a test ticket; confirm the response envelope |
+| `POST /cloud/api/Report/getDailyFiguresByCustomer` | 7-day P/L                | one call; confirm the figure row fields                  |
+| `POST /cloud/api/Report/getGradedWagerByCustomer`  | Modes 8/10 (settled net) | one call + graded rows                                   |
+| `POST /cloud/api/Report/getTransactions`           | Modes 8/10 (ledger)      | one call + ledger rows                                   |
+| `POST /cloud/api/Report/getGrading`                | figure-date grading      | one call with a date filter + rows                       |
+| `POST /cloud/api/Report/getTicketDetailPrint`      | ticket detail            | one call; confirm whether the response is HTML           |
+
+`getGradedWagerByCustomer`, `getGrading`, `getTransactions` and `getDailyFiguresByCustomer` are the
+settlement plane the operator runbook advertises; treat their current spec entries as candidates.
+
 ## Status after the 2026-10-31 live run
 
 Captured live (tier A): `getWebLog`, `getInfoPlayer`, `getBetTicker`, `getBetTickerConfig`,

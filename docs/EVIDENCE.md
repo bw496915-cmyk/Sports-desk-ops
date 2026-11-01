@@ -106,6 +106,9 @@ only sanctioned upgrade path: dry-run by default, B/C→A, and it refuses mock, 
 response-less and mutation captures. A contradicted B row is resolved only through a valid live capture
 (previous reason preserved), the same capture hash is an idempotent no-op, and `--write` regenerates the
 spec and markdown, re-stages dist, runs the docs gate, and restores ledger/spec/markdown on any failure. The
+`counts.withResponse` means a response status was recorded, including HTTP 500 with an empty body;
+the authoritative tier-A accounting is `captures/applied-*.json` → `rejections[]`.
+
 architecture, commands, read-only allowlist, redaction policy, tier-upgrade rules, release-baseline
 blocker and limitations are in [evidence/capture-tooling.md](./evidence/capture-tooling.md).
 
