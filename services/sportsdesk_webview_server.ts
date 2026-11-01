@@ -23,6 +23,45 @@ import {
   summarizeCategories,
 } from "../lib/sport_taxonomy.ts";
 import {
+  findSubSport,
+  loadSportCatalog,
+  periodTypeIndex,
+  periodsFor,
+  subSportIndex,
+  summarizeCatalog,
+} from "../lib/sport_catalog.ts";
+import {
+  ANALYSIS_ACTIVITIES,
+  ANALYSIS_GROUPS,
+  ANALYSIS_REPORTS,
+  ANALYSIS_REQUIRED_CAPTURE,
+  ANALYSIS_WEEKS,
+  describeSelection,
+  parseAnalysisQuery,
+} from "../lib/analysis_filters.ts";
+import {
+  contestsInGroup,
+  readContestFile,
+  searchContests,
+  summarizeContests,
+} from "../lib/contests.ts";
+import {
+  compareTotals,
+  matchesSelection,
+  readAnalysisReport,
+  recomputeTotals,
+} from "../lib/analysis_report.ts";
+import { readWagerList, summarizeLiveWagers } from "../lib/live_wagers.ts";
+import {
+  BOARD_WINDOWS,
+  biggestSide,
+  filterByWindow,
+  parseBoardWindow,
+  readBoardFile,
+  sidesOf,
+  summarizeBoard,
+} from "../lib/game_admin_board.ts";
+import {
   compactPositions,
   summarizeByGame,
   wagerTypeLabel,
@@ -160,6 +199,46 @@ async function loadLiveBets(): Promise<{
     dataSource: "sample-fixture:tests/f402-pending-wager-sample.json",
     capturedAt: null,
   };
+}
+
+/** The live wager list ({LIST: [...]}), when a capture has been saved. */
+async function loadLiveWagerList() {
+  const file = Bun.file(resolve(repoRoot, "data/live-wagers.json"));
+  if (!(await file.exists())) return null;
+  return readWagerList(await file.json());
+}
+
+/** A stored Analysis report result, when one has been transcribed. */
+async function loadAnalysisReport() {
+  const file = Bun.file(
+    resolve(repoRoot, "data/analysis-cp-baseball-2026-11-01.json"),
+  );
+  if (!(await file.exists())) return null;
+  return readAnalysisReport(await file.json());
+}
+
+/** Contest (futures) list extracted from the sports nav markup. */
+async function loadContests() {
+  const file = Bun.file(resolve(repoRoot, "data/contests.json"));
+  if (!(await file.exists())) return null;
+  return readContestFile(await file.json());
+}
+
+/** Game Admin "Admin" module: per-game lines and the money on each side. */
+async function loadBoard() {
+  const file = Bun.file(resolve(repoRoot, "data/game-admin-board.json"));
+  if (!(await file.exists())) return null;
+  return readBoardFile(await file.json());
+}
+
+/** Portal sport catalog (19 sports / 230 sub-sports / 42 period entries). */
+const SPORT_CATALOG_PATH =
+  "tests/fixtures/fantasy402-sport-catalog-2026-10-21.json";
+
+async function loadCatalog() {
+  const file = Bun.file(resolve(repoRoot, SPORT_CATALOG_PATH));
+  if (!(await file.exists())) return null;
+  return loadSportCatalog(await file.json());
 }
 
 /** Portal scoreboard transcribed from the manager page; null when absent. */
@@ -545,6 +624,357 @@ export function startServer(options?: ServerOptions) {
         );
       }
 
+      // Which analysis reports have been transcribed, so a client can select one instead of
+      // guessing the selection it was run for.
+      if (pathname === "/api/analysis/reports") {
+        const stored = await loadAnalysisReport();
+        if (stored === null) {
+          return Response.json(
+            { success: true, count: 0, reports: [] },
+            { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+          );
+        }
+        return Response.json(
+          {
+            success: true,
+            count: 1,
+            reports: [
+              {
+                id: "analysis-cp-baseball-2026-11-01",
+                report: stored.report,
+                source: stored.source,
+                observedAt: stored.observedAt,
+                context: stored.context,
+                rows: stored.rows.length,
+                discrepancies: compareTotals(stored).length,
+              },
+            ],
+          },
+          { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+        );
+      }
+
+      // Live wager list: the bet-ticker feed ({LIST: [...]}), a different shape from Pending.
+      if (pathname === "/api/live-wagers") {
+        const rejected = piiRejection(req, server.requestIP(req)?.address);
+        if (rejected !== null) {
+          return Response.json(
+            { success: false, error: rejected.error },
+            { status: rejected.status, headers: corsHeaders },
+          );
+        }
+
+        const wagers = await loadLiveWagerList();
+        if (wagers === null) {
+          return Response.json(
+            {
+              error: "no live wager list",
+              hint: "save the ticker response as data/live-wagers.json and reload",
+            },
+            { status: 404, headers: corsHeaders },
+          );
+        }
+
+        const writer = (url.searchParams.get("writer") ?? "")
+          .trim()
+          .toLowerCase();
+        const type = (url.searchParams.get("type") ?? "").trim().toUpperCase();
+        const filtered = wagers.filter(
+          (wager) =>
+            (writer === "" || wager.writer === writer) &&
+            (type === "" || wager.wagerType === type),
+        );
+
+        return Response.json(
+          {
+            success: true,
+            summary: summarizeLiveWagers(filtered),
+            all: summarizeLiveWagers(wagers),
+            writer: writer === "" ? null : writer,
+            type: type === "" ? null : type,
+            wagers: filtered,
+          },
+          { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+        );
+      }
+
+      // Contest / futures list: the sports nav's get-games-prop anchors.
+      if (pathname === "/api/contests") {
+        const contests = await loadContests();
+        if (contests === null) {
+          return Response.json(
+            {
+              error: "no contest list",
+              hint: "bun run contests:extract --html <saved sports nav markup>",
+            },
+            { status: 404, headers: corsHeaders },
+          );
+        }
+
+        const group = url.searchParams.get("group") ?? "";
+        const query = url.searchParams.get("q") ?? "";
+        const filtered = searchContests(
+          { ...contests, entries: contestsInGroup(contests, group) },
+          query,
+        );
+
+        return Response.json(
+          {
+            success: true,
+            source: contests.source,
+            extractedAt: contests.extractedAt,
+            summary: summarizeContests(contests),
+            group: group === "" ? null : group,
+            query: query === "" ? null : query,
+            count: filtered.length,
+            entries: filtered,
+          },
+          { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+        );
+      }
+
+      // Game Admin board: the market with exposure on each side, per game.
+      if (pathname === "/api/game-admin/board") {
+        const board = await loadBoard();
+        if (board === null) {
+          return Response.json(
+            { error: "no game board; add data/game-admin-board.json" },
+            { status: 404, headers: corsHeaders },
+          );
+        }
+
+        const gameNum = Number(url.searchParams.get("game") ?? "");
+        if (Number.isFinite(gameNum) && gameNum > 0) {
+          const game = board.games.find((entry) => entry.gameNum === gameNum);
+          if (game === undefined) {
+            return Response.json(
+              {
+                success: false,
+                error: `no game ${gameNum}`,
+                known: board.games.map((entry) => entry.gameNum),
+              },
+              { status: 404, headers: corsHeaders },
+            );
+          }
+          return Response.json(
+            {
+              success: true,
+              game,
+              markets: {
+                spread: sidesOf(game, "spread"),
+                money: sidesOf(game, "money"),
+                total: sidesOf(game, "total"),
+                teamTotal: sidesOf(game, "teamTotal"),
+              },
+            },
+            { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+          );
+        }
+
+        // The report's own window selector: 48 yesterday, 24 today, -1 current board.
+        const window = parseBoardWindow(url.searchParams.get("window"));
+        if (window === null) {
+          return Response.json(
+            {
+              success: false,
+              error: "window must be 48, 24 or -1",
+              windows: BOARD_WINDOWS,
+            },
+            { status: 400, headers: corsHeaders },
+          );
+        }
+        const games = filterByWindow(board, window);
+
+        return Response.json(
+          {
+            success: true,
+            source: board.source,
+            observedAt: board.observedAt,
+            window,
+            windows: BOARD_WINDOWS,
+            notes: board.notes ?? [],
+            // The summary describes the games in this window, not the whole file.
+            summary: summarizeBoard({ ...board, games }),
+            biggest: biggestSide({ ...board, games }),
+            games,
+          },
+          { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+        );
+      }
+
+      // Sport catalog: sub-sports and the full period menus, with their types.
+      if (pathname === "/api/sports/catalog") {
+        const catalog = await loadCatalog();
+        if (catalog === null) {
+          return Response.json(
+            { error: "no sport catalog fixture" },
+            { status: 404, headers: corsHeaders },
+          );
+        }
+
+        const sportFilter = (url.searchParams.get("sport") ?? "").trim();
+        const codeFilter = (url.searchParams.get("subSport") ?? "").trim();
+
+        if (codeFilter !== "" && sportFilter !== "") {
+          const subSport = findSubSport(catalog, sportFilter, codeFilter);
+          if (subSport === null) {
+            return Response.json(
+              {
+                success: false,
+                error: `${sportFilter} has no sub-sport "${codeFilter}"`,
+                periods: periodsFor(catalog, sportFilter),
+              },
+              { status: 404, headers: corsHeaders },
+            );
+          }
+          return Response.json(
+            {
+              success: true,
+              sport: sportFilter,
+              subSport,
+              periods: periodsFor(catalog, sportFilter),
+              source: SPORT_CATALOG_PATH,
+            },
+            { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+          );
+        }
+
+        const sports =
+          sportFilter === ""
+            ? catalog.sports
+            : catalog.sports.filter((entry) => entry.sport === sportFilter);
+        if (sportFilter !== "" && sports.length === 0) {
+          return Response.json(
+            {
+              success: false,
+              error: `unknown sport "${sportFilter}"`,
+              known: catalog.sports.map((entry) => entry.sport),
+            },
+            { status: 404, headers: corsHeaders },
+          );
+        }
+
+        return Response.json(
+          {
+            success: true,
+            source: SPORT_CATALOG_PATH,
+            provider: catalog.provider,
+            capturedAt: catalog.capturedAt,
+            periodsCapturedAt: catalog.periodsCapturedAt,
+            summary: summarizeCatalog(catalog),
+            periodTypes: periodTypeIndex(catalog),
+            subSports: subSportIndex(catalog),
+            collisions: catalog.collisions,
+            migrationRisks: catalog.migrationRisks,
+            expectedEmptySubSportPaths: catalog.expectedEmptySubSportPaths,
+            sports,
+          },
+          { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+        );
+      }
+
+      // Analysis report vocabulary: the codes the portal's filter bar sends, transcribed from
+      // its markup. No report body exists in this repo, so the query is validated but not run.
+      if (pathname === "/api/analysis/filters") {
+        return Response.json(
+          {
+            success: true,
+            provenance:
+              "portal markup: report.js filter bar (report kind, activity, group, week)",
+            captured: false,
+            reports: ANALYSIS_REPORTS,
+            activities: ANALYSIS_ACTIVITIES,
+            groups: ANALYSIS_GROUPS,
+            weeks: ANALYSIS_WEEKS,
+            requiredCapture: ANALYSIS_REQUIRED_CAPTURE,
+          },
+          { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+        );
+      }
+
+      if (pathname === "/api/analysis") {
+        const parsed = parseAnalysisQuery(url.searchParams);
+        if (!parsed.ok || parsed.selection === undefined) {
+          return Response.json(
+            {
+              success: false,
+              error: "invalid analysis selection",
+              issues: parsed.errors,
+            },
+            { status: 400, headers: corsHeaders },
+          );
+        }
+
+        // Resolve the typed agent against the committed tree so the response can say whether
+        // the name is one the hierarchy knows, instead of echoing it unexamined.
+        let agentKnown: boolean | null = null;
+        let agentLevel: number | null = null;
+        const selection = parsed.selection;
+        if (selection.agent !== "") {
+          const treeFile = Bun.file(resolve(repoRoot, "data/agent-tree.json"));
+          if (await treeFile.exists()) {
+            const tree = (await treeFile.json()) as {
+              nodes?: Record<string, { l?: number | null }>;
+            };
+            const node = tree.nodes?.[selection.agent.toUpperCase()];
+            agentKnown = node !== undefined;
+            agentLevel =
+              node !== undefined && typeof node.l === "number" ? node.l : null;
+          }
+        }
+        // A transcribed result answers only for the selection it was run for. Everything else
+        // stays 501: inventing zeroes here would read as "no action".
+        const stored = await loadAnalysisReport();
+        if (
+          stored !== null &&
+          matchesSelection(stored, {
+            report: selection.report,
+            agent: selection.agent,
+            sport: url.searchParams.get("sport") ?? "all",
+            week: selection.week,
+            activity: selection.activity,
+          })
+        ) {
+          const discrepancies = compareTotals(stored);
+          return Response.json(
+            {
+              success: true,
+              available: true,
+              filter: parsed.selection,
+              description: describeSelection(parsed.selection),
+              agentKnown,
+              agentLevel,
+              report: stored.report,
+              source: stored.source,
+              observedAt: stored.observedAt,
+              context: stored.context,
+              notes: stored.notes ?? [],
+              rows: stored.rows,
+              totals: stored.totals,
+              // Recomputed independently of the stored footer so a transcription slip is visible.
+              recomputed: recomputeTotals(stored),
+              discrepancies,
+            },
+            { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+          );
+        }
+
+        return Response.json(
+          {
+            success: false,
+            available: false,
+            filter: parsed.selection,
+            description: describeSelection(parsed.selection),
+            agentKnown,
+            agentLevel,
+            error: "no transcribed analysis report matches this selection",
+            storedReports: stored === null ? [] : [stored.context],
+            requiredCapture: ANALYSIS_REQUIRED_CAPTURE,
+          },
+          { status: 501, headers: corsHeaders },
+        );
+      }
+
       // "Action on a game", the Game Admin report the portal manual documents (F.A.Q. #4):
       // exposure per fixture with the Straight/Parlay/Teaser split.
       if (pathname === "/api/game-admin") {
@@ -584,6 +1014,7 @@ export function startServer(options?: ServerOptions) {
             success: true,
             liveFilter: LIVE_FILTER,
             all: SPORT_CATEGORIES,
+            catalog: "/api/sports/catalog",
             wagers: summarizeCategories(wagerRows),
             scoreboard: summarizeCategories(boardRows),
           },
@@ -602,6 +1033,68 @@ export function startServer(options?: ServerOptions) {
         }
         return Response.json(
           { ...scoreboard, summary: summarizeScoreboard(scoreboard) },
+          { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
+        );
+      }
+
+      // Agent lookup over the committed tree: the Analysis form needs names, not the forest.
+      if (pathname === "/api/agents/search") {
+        const rejected = piiRejection(req, server.requestIP(req)?.address);
+        if (rejected !== null) {
+          return Response.json(
+            { success: false, error: rejected.error },
+            { status: rejected.status, headers: corsHeaders },
+          );
+        }
+
+        const treeFile = Bun.file(resolve(repoRoot, "data/agent-tree.json"));
+        if (!(await treeFile.exists())) {
+          return Response.json(
+            { error: "no agent tree; run bun run build:agent-tree" },
+            { status: 404, headers: corsHeaders },
+          );
+        }
+
+        const query = (url.searchParams.get("q") ?? "").trim().toUpperCase();
+        const limitRaw = Number(url.searchParams.get("limit") ?? 20);
+        const limit = Math.min(
+          Math.max(Number.isFinite(limitRaw) ? Math.trunc(limitRaw) : 20, 1),
+          100,
+        );
+        if (query.length < 2) {
+          return Response.json(
+            {
+              success: false,
+              error: "q must be at least 2 characters",
+              minLength: 2,
+            },
+            { status: 400, headers: corsHeaders },
+          );
+        }
+
+        const tree = (await treeFile.json()) as {
+          nodes?: Record<string, { l?: number | null; t?: string | null }>;
+        };
+        const nodes = tree.nodes ?? {};
+        const matches = Object.entries(nodes)
+          .filter(([key]) => key.includes(query))
+          .sort((a, b) => {
+            // Prefix hits first, then shortest name, then alphabetical.
+            const aPrefix = a[0].startsWith(query) ? 0 : 1;
+            const bPrefix = b[0].startsWith(query) ? 0 : 1;
+            if (aPrefix !== bPrefix) return aPrefix - bPrefix;
+            if (a[0].length !== b[0].length) return a[0].length - b[0].length;
+            return a[0].localeCompare(b[0]);
+          })
+          .slice(0, limit)
+          .map(([key, node]) => ({
+            key,
+            level: typeof node.l === "number" ? node.l : null,
+            agentType: node.t ?? null,
+          }));
+
+        return Response.json(
+          { success: true, query, count: matches.length, agents: matches },
           { headers: { ...corsHeaders, "Cache-Control": "no-store" } },
         );
       }
