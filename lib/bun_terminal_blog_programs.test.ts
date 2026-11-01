@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 
 import {
   driveBashScript,
@@ -10,26 +10,31 @@ const bashPath = Bun.which("bash");
 const vimPath = Bun.which("vim");
 const htopPath = Bun.which("htop");
 
-describe("Bun.Terminal blog programs (bash, vim, htop)", () => {
-  test.skipIf(bashPath === null)("bash: login command under PTY", async () => {
-    const result = await spawnInPty([bashPath!, "-lc", "echo Hello from bash PTY"]);
+test.skipIf(bashPath === null)(
+  "Bun.Terminal PTY runs bash -lc echo and returns exit 0 with Hello from bash PTY on stdout",
+  async () => {
+    const result = await spawnInPty([
+      bashPath!,
+      "-lc",
+      "echo Hello from bash PTY",
+    ]);
     expect(result.code).toBe(0);
     expect(result.out).toContain("Hello from bash PTY");
-  });
+  },
+);
 
-  test.skipIf(bashPath === null)(
-    "bash: terminal.write drives interactive shell",
-    async () => {
-      const result = await driveBashScript([
-        "echo scripted-input",
-        "exit",
-      ]);
-      expect(result.code).toBe(0);
-      expect(result.out).toContain("scripted-input");
-    },
-  );
+test.skipIf(bashPath === null)(
+  "Bun.Terminal PTY driveBashScript terminal.write sends echo scripted-input and exit then bash exits 0 with that line captured",
+  async () => {
+    const result = await driveBashScript(["echo scripted-input", "exit"]);
+    expect(result.code).toBe(0);
+    expect(result.out).toContain("scripted-input");
+  },
+);
 
-  test.skipIf(vimPath === null)("vim: batch quit under PTY", async () => {
+test.skipIf(vimPath === null)(
+  "Bun.Terminal PTY runs vim -N -u NONE -n -c qa! batch quit and returns exit 0",
+  async () => {
     const result = await spawnInPty([
       vimPath!,
       "-N",
@@ -40,9 +45,12 @@ describe("Bun.Terminal blog programs (bash, vim, htop)", () => {
       "qa!",
     ]);
     expect(result.code).toBe(0);
-  });
+  },
+);
 
-  test.skipIf(vimPath === null)("vim: sees TTY inside session", async () => {
+test.skipIf(vimPath === null)(
+  "Bun.Terminal PTY runs vim -c echo isatty(1) and PTY capture shows stdout is a TTY before qa!",
+  async () => {
     const result = await spawnInPty([
       vimPath!,
       "-N",
@@ -56,9 +64,12 @@ describe("Bun.Terminal blog programs (bash, vim, htop)", () => {
     ]);
     expect(result.code).toBe(0);
     expect(result.out).toMatch(/1|true/i);
-  });
+  },
+);
 
-  test.skipIf(htopPath === null)("htop: TUI paints under PTY", async () => {
+test.skipIf(htopPath === null)(
+  "Bun.Terminal PTY runs htop until F1Help or F10Quit paints then SIGTERM leaves more than 100 raw bytes and killed true",
+  async () => {
     const htopUi = /F10Quit|F1Help|htoprc/i;
     const result = await spawnInPtyUntil([htopPath!], {
       cols: 120,
@@ -69,5 +80,5 @@ describe("Bun.Terminal blog programs (bash, vim, htop)", () => {
     expect(result.rawBytes).toBeGreaterThan(100);
     expect(result.out).toMatch(htopUi);
     expect(result.killed).toBe(true);
-  });
-});
+  },
+);
