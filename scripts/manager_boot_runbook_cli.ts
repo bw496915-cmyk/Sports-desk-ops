@@ -11,7 +11,7 @@ import { parseArgs } from "node:util";
 import {
   loadManagerBootRunbookMarkdown,
   printManagerBootRunbook,
-  renderManagerBootRunbookTerminal,
+  renderManagerBootRunbookHtml,
 } from "../lib/manager_boot_runbook_render.ts";
 
 const { values } = parseArgs({
@@ -32,7 +32,7 @@ Options:
   --file <path>     Markdown source (default: docs/evidence/manager-boot-hierarchy.md)
   --no-appendix     Omit operator loop (login / probe / ingest / gates)
   --plain           No ANSI color (NO_COLOR semantics)
-  --html            Write Bun.markdown.html to stdout (not sanitized — do not pipe to browser untrusted)
+  --html            Bun.markdown.html() + DOCS_RENDER_OPTIONS (unsanitized — trusted docs only)
   -h, --help
 `);
   process.exit(0);
@@ -44,7 +44,7 @@ const markdown = await loadManagerBootRunbookMarkdown({
 });
 
 if (values.html) {
-  process.stdout.write(`${Bun.markdown.html(markdown)}\n`);
+  process.stdout.write(`${renderManagerBootRunbookHtml(markdown)}\n`);
   process.exit(0);
 }
 

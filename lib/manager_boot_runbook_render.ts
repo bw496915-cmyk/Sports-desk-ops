@@ -1,8 +1,18 @@
 /**
- * Manager-boot evidence docs → terminal via Bun.markdown.render (custom ANSI hooks).
+ * Manager-boot evidence docs → terminal.
+ *
+ * Bun.markdown surfaces (trusted repo markdown only):
+ * - `html()` — HTML string; **not sanitized** (raw HTML, event handlers, `javascript:` hrefs pass through).
+ * - `react()` — JSX with per-tag overrides (Plane 3 SSR elsewhere in the fleet).
+ * - `render()` — callback per element; used here for gate-table ANSI + OSC 8 file links.
+ *
+ * GFM tables / strikethrough / task lists / autolinks: {@link DOCS_RENDER_OPTIONS} as parser third arg.
+ * `.md` bundler loader + linear-time parser apply at the Bun runtime; see bun.com/docs/runtime/markdown.
  */
 
 import { join } from "node:path";
+
+import { DOCS_RENDER_OPTIONS } from "./docs_render_cache.ts";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
@@ -80,7 +90,9 @@ export function renderManagerBootRunbookTerminal(
     return cell;
   };
 
-  return Bun.markdown.render(markdown, {
+  return Bun.markdown.render(
+    markdown,
+    {
     heading: (children, meta) => {
       const level = meta.depth ?? 1;
       const prefix =
@@ -113,7 +125,14 @@ export function renderManagerBootRunbookTerminal(
     td: (children) => `${gateStatus(String(children))} | `,
     hr: () => `${dim}${"─".repeat(48)}${reset}\n\n`,
     listItem: (children) => `  • ${children}\n`,
-  });
+    },
+    DOCS_RENDER_OPTIONS,
+  );
+}
+
+/** Trusted internal markdown → HTML (`--html`); output is not sanitized. */
+export function renderManagerBootRunbookHtml(markdown: string): string {
+  return Bun.markdown.html(markdown, DOCS_RENDER_OPTIONS);
 }
 
 export async function loadManagerBootRunbookMarkdown(options?: {
