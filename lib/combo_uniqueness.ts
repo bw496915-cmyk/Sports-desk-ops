@@ -19,6 +19,10 @@ export interface ComboUniquenessOptions {
   readonly concurrency?: number;
   readonly cacheDir?: string;
   readonly cacheTtlHours?: number;
+  /** Cache the CFB event index on disk. Off by default; `offline` implies it. */
+  readonly cacheGames?: boolean;
+  /** Read the event index only from cache and fail instead of fetching. */
+  readonly offline?: boolean;
   readonly fresh?: boolean;
   readonly leaderboard?: boolean;
   readonly leaderboardLimit?: number;
@@ -221,6 +225,61 @@ async function getJson(
   return response.json();
 }
 
+interface EventCacheFile {
+  readonly schemaVersion: 1;
+  readonly url: string;
+  readonly fetchedAtIso: string;
+  readonly payload: unknown;
+}
+
+/**
+ * Disk cache for the paginated CFB event index.
+ *
+ * Off unless `cacheGames`/`offline` is set, because the CLI's default is a fresh index per run.
+ * `offline` ignores the TTL and throws when a page is missing, rather than silently returning a
+ * partial index: a short index would look like fewer games, not like a failed fetch.
+ */
+async function cachedEvents(
+  url: string,
+  options?: ComboUniquenessOptions,
+): Promise<unknown> {
+  const dir = options?.cacheDir ?? "scratch/cfb-combo-cache";
+  await mkdir(dir, { recursive: true });
+  const key = new Bun.CryptoHasher("sha256").update(url).digest("hex");
+  const path = join(dir, `events-${key}.json`);
+  const offline = options?.offline === true;
+
+  if (options?.fresh !== true) {
+    try {
+      const parsed = JSON.parse(
+        await readFile(path, "utf8"),
+      ) as Partial<EventCacheFile>;
+      if (parsed.schemaVersion === 1 && parsed.url === url) {
+        const fetchedAt = Date.parse(parsed.fetchedAtIso ?? "");
+        const ttl = cacheTtlMs(options);
+        const age = (options?.now ?? Date.now()) - fetchedAt;
+        if (offline || (Number.isFinite(fetchedAt) && ttl > 0 && age <= ttl)) {
+          return parsed.payload;
+        }
+      }
+    } catch {
+      // fall through to fetch or to the offline error
+    }
+  }
+
+  if (offline) throw new Error(`offline: no cached events for ${url}`);
+
+  const payload = await getJson(url, options);
+  const file: EventCacheFile = {
+    schemaVersion: 1,
+    url,
+    fetchedAtIso: new Date(options?.now ?? Date.now()).toISOString(),
+    payload,
+  };
+  await writeFile(path, `${JSON.stringify(file)}\n`, "utf8");
+  return payload;
+}
+
 async function mapLimit<T, R>(
   items: readonly T[],
   limit: number,
@@ -252,6 +311,7 @@ export async function loadCfbGames(
   const since = options?.since ?? null;
   const sources: Array<"active" | "closed"> =
     options?.includeClosedGames === false ? ["active"] : ["active", "closed"];
+  const useCache = options?.cacheGames === true || options?.offline === true;
 
   const games: CfbGame[] = [];
   const seen = new Set<string>();
@@ -264,7 +324,9 @@ export async function loadCfbGames(
           ? "active=true&closed=false&order=volume24hr&ascending=false"
           : "closed=true&order=endDate&ascending=false";
       const url = `${gamma}/events?series_id=${CFB_SERIES_ID}&${ordering}&limit=${pageSize}&offset=${page * pageSize}`;
-      const body = await getJson(url, options);
+      const body = useCache
+        ? await cachedEvents(url, options)
+        : await getJson(url, options);
       if (!Array.isArray(body) || body.length === 0) break;
       for (const game of mapCfbEvents(body)) {
         if (

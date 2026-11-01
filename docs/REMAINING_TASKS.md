@@ -158,13 +158,14 @@ so an id resolves without guessing which artifact it came from.
 - [ ] **P2.3 Schedule artifact regeneration**
   - **Ref:** `RT-ARTIFACT-CADENCE`
   - **Basis:** `[CODE]` `docs/combo-uniqueness.json` and `docs/cross-domain-bridge.json` only change when
-    `artifacts:value` is run manually. `[CODE]` the combo half cannot run offline: `loadCfbGames()` always
-    fetches `gamma-api`, so a freshness check needs a cached-input path before it can run in CI.
+    `artifacts:value` is run manually. `[CODE]` `--offline` now reproduces the combo half from the cached
+    CFB event index, but the bridge half still needs `scratch/bridge-live-all.json` or the demo book, so a
+    clean CI checkout cannot regenerate either artifact.
   - **Done when:** a documented cadence (or cron job) regenerates and deploys them, with a freshness check.
   - **Guard:** `bun run artifacts:lock` fails when an artifact or one of its generator inputs changed
     since `docs/artifacts.lock.json` was written. It proves nothing changed since the lock, not that the
     lock was taken right after a regeneration — so pair `artifacts:value` with `artifacts:lock --update`.
-  - **Blocked by:** a host for the scheduled run, and an offline input path for the combo half.
+  - **Blocked by:** a host for the scheduled run.
 
 ## Done (for context)
 

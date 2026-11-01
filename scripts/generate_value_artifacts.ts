@@ -7,9 +7,13 @@
  * Combo gates are always recomputed (cache-backed). The bridge artifact is recomputed offline
  * unless `--bridge-json <path>` reuses a live `dx bridge value --live --json` capture.
  *
+ * The CFB event index is cached next to the combo cache, so a run with `--offline` reproduces the
+ * artifacts without network access once the index has been fetched at least once.
+ *
  * Usage:
  *   bun run scripts/generate_value_artifacts.ts --wallet-file scratch/seed.txt \
  *     --bridge-json scratch/bridge-live-all.json --no-leaderboard
+ *   bun run scripts/generate_value_artifacts.ts --offline --bridge-json scratch/bridge-live-all.json
  */
 
 import { mkdir } from "node:fs/promises";
@@ -59,6 +63,8 @@ for (const gate of gates) {
       maxComboPages: Number(flag(args, ["--max-combo-pages"], "3")),
       cacheDir: flag(args, ["--cache-dir"], "scratch/cfb-combo-cache"),
       concurrency: 6,
+      cacheGames: true,
+      offline: args.includes("--offline"),
     }),
   );
 }
