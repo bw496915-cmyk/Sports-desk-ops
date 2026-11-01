@@ -100,6 +100,7 @@ describe("f402 probe plan", () => {
     expect(JSON.parse(buildJsonProbeBody(acctOwnerOp, "MILLER500"))).toEqual({
       agentID: "MILLER500",
       operation: "getAccountInfoOwner",
+      agentOwner: "MILLER500",
     });
 
     const dailyFigOp = PROBE_OPS.find(
