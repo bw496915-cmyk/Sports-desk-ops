@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 2,
+  "kind": "sniffed-form-templates",
+  "capturedAt": "2026-11-01T02:27:56.000Z",
+  "backend": "webkit",
+  "portalVersion": "1.0.280",
+  "mechanism": "in-page XMLHttpRequest.prototype + window.fetch hook (lib/f402_probe.ts) + RequireJS bundle extraction (report.js & manager.js)",
+  "piiSafe": true,
+  "valuesRecorded": false,
+  "note": "Parameter names only (sorted URLSearchParams or JSON top-level keys); parameter values never leave the page context.",
+  "templates": [
+    {
+      "path": "/cloud/api/Manager/Pending",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "agentOwner", "customerID", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getPending",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "operation", "type"]
+    },
+    {
+      "path": "/cloud/api/Manager/getDailyFiguresByCustomer",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "agentOwner", "customerID", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getGradedWagerByCustomer",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "agentOwner", "customerID", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getTransactions",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "agentOwner", "customerID", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getGrading",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "agentOwner", "customerID", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getTicketDetailPrint",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "agentOwner", "customerID", "operation"]
+    },
+    {
+      "path": "/cloud/api/Report/Pending",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["customerID", "operation", "token"]
+    },
+    {
+      "path": "/cloud/api/Report/PendingDelete",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["customerID", "operation", "ticketNumber", "token"]
+    },
+    {
+      "path": "/cloud/api/Report/getDailyFiguresByCustomer",
+      "method": "POST",
+      "contentType": "application/json",
+      "formKeys": ["agentID", "customerID", "operation", "week"]
+    },
+    {
+      "path": "/cloud/api/Report/getGradedWagerByCustomer",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["customerID", "operation", "token", "week"]
+    },
+    {
+      "path": "/cloud/api/Report/getTransactions",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["customerID", "date", "operation", "token"]
+    },
+    {
+      "path": "/cloud/api/Report/getGrading",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["customerID", "operation", "token"]
+    },
+    {
+      "path": "/cloud/api/Report/getTicketDetailPrint",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["flag", "operation", "ticketNumber", "token", "wagerNumber"]
+    },
+    {
+      "path": "/cloud/api/Manager/getAccountInfoOwner",
+      "method": "POST",
+      "contentType": "application/json",
+      "formKeys": ["agentID", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getConfigWebReports",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getConfigWebReportsPending",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getSportsType",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "agentOwner", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getAuthorizations",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "agentOwner", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getMessage",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "acc", "operation", "type"]
+    },
+    {
+      "path": "/cloud/api/Manager/getNewEmailsCount",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "acc", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getWeeklyFigureByAgentLite",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "layout", "operation", "type", "week"]
+    },
+    {
+      "path": "/cloud/api/Manager/getListAgenstByAgent",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "agentOwner", "agentType", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/searchCustomerAdmin",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "filter", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getReportPlayerAnalysis",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": [
+        "RRO",
+        "agentID",
+        "agentOwner",
+        "customerID",
+        "endDate",
+        "lineType",
+        "operation",
+        "reportType",
+        "startDate"
+      ]
+    },
+    {
+      "path": "/cloud/api/Report/getScoresLiveDynamic",
+      "method": "POST",
+      "contentType": "application/json",
+      "formKeys": ["operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getHeriarchy",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "operation"]
+    },
+    {
+      "path": "/cloud/api/Manager/getMasterSheet",
+      "method": "POST",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "formKeys": ["RRO", "agentID", "date", "operation"]
+    }
+  ]
+}

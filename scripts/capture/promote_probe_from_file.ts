@@ -104,7 +104,9 @@ export function captureRecordFromProbeScratch(
   ) {
     const firstObjEnd = result.preview.indexOf("},{");
     if (firstObjEnd !== -1) {
-      wireText = `${result.preview.slice(0, firstObjEnd + 1)}]}`;
+      wireText = result.preview.trimStart().startsWith("[")
+        ? `${result.preview.slice(0, firstObjEnd + 1)}]`
+        : `${result.preview.slice(0, firstObjEnd + 1)}]}`;
       truncatedPreview = true;
     }
   }

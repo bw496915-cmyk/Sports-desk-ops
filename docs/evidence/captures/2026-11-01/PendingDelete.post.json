@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "mode": "live",
+  "capturedAt": "2026-11-01T04:19:29.720Z",
+  "operation": {
+    "path": "/cloud/api/Report/PendingDelete",
+    "method": "POST"
+  },
+  "request": {
+    "url": "https://fantasy402.com/cloud/api/Report/PendingDelete",
+    "method": "POST",
+    "headers": {
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "x-requested-with": "XMLHttpRequest",
+      "authorization": "<redacted>"
+    },
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "bodySha256": "4ce26e0411b0e050e9a1911b3fe45ad6c02e9746ccb85fa88960559e86d77258",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "customerID": {
+          "type": "string",
+          "nullable": false
+        },
+        "operation": {
+          "type": "string",
+          "nullable": false
+        },
+        "ticketNumber": {
+          "type": "string",
+          "nullable": false
+        },
+        "token": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json; charset=utf-8",
+    "bodySha256": "af7ff3397ceee92fbfe8142bbcfee14c72b8cb94adc897af19555235dfbad335",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "Pending": {
+          "type": "array",
+          "nullable": false,
+          "items": null
+        }
+      }
+    },
+    "bytes": 14
+  },
+  "redaction": {
+    "policyVersion": 1,
+    "clean": true,
+    "fieldsRedacted": [
+      "request.body.customerID",
+      "request.body.token",
+      "request.headers.authorization"
+    ],
+    "piiRedacted": ["customer-id", "token"]
+  },
+  "provenance": {
+    "portalHost": "fantasy402.com",
+    "proxy": "none",
+    "auth": "cookie",
+    "bunVersion": "1.4.4",
+    "observation": "webkit",
+    "body": "populated",
+    "mutation": "read-inferred",
+    "request": "minimal",
+    "waf": "cloudflare",
+    "cfRay": "a53819fe9ed6191d-ATL",
+    "backend": "webkit",
+    "state": {
+      "viewMode": "unknown",
+      "sessionStorageCleared": false,
+      "betTickerParam": false,
+      "challengePresent": false
+    }
+  },
+  "samples": 1
+}

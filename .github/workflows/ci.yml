@@ -80,6 +80,9 @@ jobs:
       - name: "Artifact freshness (generator inputs unchanged since regeneration)"
         timeout-minutes: 2
         run: bun run artifacts:lock
+      - name: "Markdown & Task Rendering Gate (Bun.markdown HTML/ANSI/Zstd)"
+        timeout-minutes: 2
+        run: bun run tasks:render --no-color --columns 0 >/dev/null && bun run docs:render
       - name: Token SSOT Zero-Drift Gate
         timeout-minutes: 3
         run: bun run gen:tokens:gate

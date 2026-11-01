@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "store": "evidence-captures",
+  "generatedAt": "2026-11-01T04:18:16.406Z",
+  "policyVersion": 1,
+  "counts": {
+    "total": 1,
+    "live": 1,
+    "mock": 0,
+    "withResponse": 1,
+    "withoutResponse": 0,
+    "withSuccessResponse": 0,
+    "withErrorResponse": 1,
+    "emptyResponse": 1,
+    "clean": 1,
+    "operations": ["/cloud/api/Report/getGradedWagerByCustomer"]
+  },
+  "captures": [
+    {
+      "file": "2026-11-01/getGradedWagerByCustomer.post.json",
+      "mode": "live",
+      "capturedAt": "2026-11-01T04:18:16.362Z",
+      "operation": {
+        "path": "/cloud/api/Report/getGradedWagerByCustomer",
+        "method": "POST"
+      },
+      "captureHash": "6c67aa9ad26172ed8346a7adf95ff23885d5a5cc1de5ba45676bb0132b77b432",
+      "requestBodySha256": "b8fe94363f0719233cf85c4779cd2ce5c8cd3779e6ec7c0881a44ecbae32e711",
+      "responseStatus": 500,
+      "responseBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "responseBytes": 0,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 3,
+        "piiRedacted": 2
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4",
+        "observation": "webkit",
+        "body": "empty-500",
+        "mutation": "read-inferred",
+        "request": "minimal",
+        "waf": "cloudflare",
+        "cfRay": "a53818343f1c8857-ATL",
+        "backend": "webkit",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
+      },
+      "samples": 1,
+      "derivedTier": "C-edge"
+    }
+  ]
+}

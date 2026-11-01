@@ -42,10 +42,10 @@ describe("evidence ledger citations", () => {
 
   test("tier-A prose agrees with the tier-A rows", () => {
     const tierA = ledger.operations.filter((op) => op.tier === "A").length;
-    expect(tierA).toBe(5);
+    expect(tierA).toBe(8);
     expect(ledger.tierRules.A).not.toContain(
       "Nothing in this release qualifies",
     );
-    expect(ledger.tierRules.A).toContain("Five operations qualify");
+    expect(ledger.tierRules.A).toContain("Eight operations qualify");
   });
 });

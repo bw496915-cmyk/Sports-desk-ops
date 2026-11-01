@@ -451,7 +451,7 @@ interface LaunchedCrawlWebView {
 async function launchCrawlWebView(
   runtime: CrawlRuntime,
   portalUrl: string,
-  consoleSink: (...args: unknown[]) => void,
+  consoleSink: (type: string, ...args: unknown[]) => void,
 ): Promise<LaunchedCrawlWebView> {
   const failures: string[] = [];
   for (const backend of ["chrome", "webkit"] as const) {
@@ -540,14 +540,13 @@ async function runLiveCrawl(
   readonly tiles: readonly CrawledTile[];
 }> {
   const consoleMessages: string[] = [];
-  const consoleSink = (...args: unknown[]): void => {
-    consoleMessages.push(
-      args
-        .map((argument) =>
-          typeof argument === "string" ? argument : JSON.stringify(argument),
-        )
-        .join(" "),
-    );
+  const consoleSink = (type: string, ...args: unknown[]): void => {
+    const body = args
+      .map((argument) =>
+        typeof argument === "string" ? argument : JSON.stringify(argument),
+      )
+      .join(" ");
+    consoleMessages.push(type ? `[${type}] ${body}` : body);
   };
 
   const launched = await launchCrawlWebView(runtime, portalUrl, consoleSink);

@@ -1,0 +1,384 @@
+{
+  "schemaVersion": 1,
+  "mode": "live",
+  "capturedAt": "2026-11-01T02:22:35.774Z",
+  "operation": {
+    "path": "/cloud/api/Report/Pending",
+    "method": "POST"
+  },
+  "request": {
+    "url": "https://fantasy402.com/cloud/api/Report/Pending",
+    "method": "POST",
+    "headers": {
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "x-requested-with": "XMLHttpRequest",
+      "authorization": "<redacted>"
+    },
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "bodySha256": "c39bb4bf24bf685fd211430466ac8bf4cd052ea032487d39cc8357b8ba404d49",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "customerID": {
+          "type": "string",
+          "nullable": false
+        },
+        "operation": {
+          "type": "string",
+          "nullable": false
+        },
+        "token": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json; charset=utf-8",
+    "bodySha256": "6c65708478ad70ca3286c68cb0e32e400998d7f4c9fed2f8c614084315e2c277",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "Pending": {
+          "type": "array",
+          "nullable": false,
+          "items": {
+            "type": "object",
+            "nullable": false,
+            "fields": {
+              "ARBirdcageLink": {
+                "type": "null",
+                "nullable": true
+              },
+              "ARLink": {
+                "type": "null",
+                "nullable": true
+              },
+              "AcceptedDateTime": {
+                "type": "string",
+                "nullable": false
+              },
+              "AdjSpread": {
+                "type": "number",
+                "nullable": false
+              },
+              "AdjTotalPoints": {
+                "type": "number",
+                "nullable": false
+              },
+              "AdjustableOddsFlag": {
+                "type": "string",
+                "nullable": false
+              },
+              "AmountLost": {
+                "type": "null",
+                "nullable": true
+              },
+              "AmountRefunded": {
+                "type": "null",
+                "nullable": true
+              },
+              "AmountWagered": {
+                "type": "number",
+                "nullable": false
+              },
+              "AmountWon": {
+                "type": "null",
+                "nullable": true
+              },
+              "BoxLink": {
+                "type": "null",
+                "nullable": true
+              },
+              "BuyPoints": {
+                "type": "number",
+                "nullable": false
+              },
+              "ChosenTeamID": {
+                "type": "string",
+                "nullable": false
+              },
+              "Comments": {
+                "type": "string",
+                "nullable": false
+              },
+              "ContinueOnPushFlag": {
+                "type": "null",
+                "nullable": true
+              },
+              "CreditAcctFlag": {
+                "type": "string",
+                "nullable": false
+              },
+              "Description": {
+                "type": "string",
+                "nullable": false
+              },
+              "FinalDecimal": {
+                "type": "null",
+                "nullable": true
+              },
+              "FinalMoney": {
+                "type": "number",
+                "nullable": false
+              },
+              "FreePlayFlag": {
+                "type": "string",
+                "nullable": false
+              },
+              "GameDateTime": {
+                "type": "string",
+                "nullable": false
+              },
+              "ItemNumber": {
+                "type": "number",
+                "nullable": false
+              },
+              "LegAmountWagered": {
+                "type": "number",
+                "nullable": false
+              },
+              "LegToWinAmount": {
+                "type": "number",
+                "nullable": false
+              },
+              "LegWagerType": {
+                "type": "string",
+                "nullable": false
+              },
+              "ListedPitcher1": {
+                "type": "null",
+                "nullable": true
+              },
+              "ListedPitcher2": {
+                "type": "null",
+                "nullable": true
+              },
+              "Login": {
+                "type": "string",
+                "nullable": false
+              },
+              "LogoTeam1": {
+                "type": "string",
+                "nullable": false
+              },
+              "LogoTeam2": {
+                "type": "string",
+                "nullable": false
+              },
+              "NameFirst": {
+                "type": "string",
+                "nullable": false
+              },
+              "OrigSpread": {
+                "type": "number",
+                "nullable": false
+              },
+              "OrigTotalPoints": {
+                "type": "number",
+                "nullable": false
+              },
+              "Outcome": {
+                "type": "string",
+                "nullable": false
+              },
+              "ParlayName": {
+                "type": "string",
+                "nullable": false
+              },
+              "Password": {
+                "type": "string",
+                "nullable": false
+              },
+              "PeriodDescription": {
+                "type": "string",
+                "nullable": false
+              },
+              "PeriodNumber": {
+                "type": "number",
+                "nullable": false
+              },
+              "Pitcher1ReqFlag": {
+                "type": "string",
+                "nullable": false
+              },
+              "Pitcher2ReqFlag": {
+                "type": "string",
+                "nullable": false
+              },
+              "PlacedOn": {
+                "type": "string",
+                "nullable": false
+              },
+              "PlayNumber": {
+                "type": "number",
+                "nullable": false
+              },
+              "RifBackwardTicketNumber": {
+                "type": "null",
+                "nullable": true
+              },
+              "RifBackwardWagerNumber": {
+                "type": "null",
+                "nullable": true
+              },
+              "RifForwardAmountWagered": {
+                "type": "null",
+                "nullable": true
+              },
+              "RifForwardTicketNumber": {
+                "type": "null",
+                "nullable": true
+              },
+              "RifForwardWagerNumber": {
+                "type": "null",
+                "nullable": true
+              },
+              "RifForwardWinOnlyFlag": {
+                "type": "null",
+                "nullable": true
+              },
+              "RifNoActionFlag": {
+                "type": "null",
+                "nullable": true
+              },
+              "RifWinOnlyFlag": {
+                "type": "null",
+                "nullable": true
+              },
+              "RoundRobinLink": {
+                "type": "null",
+                "nullable": true
+              },
+              "ShortName1": {
+                "type": "string",
+                "nullable": false
+              },
+              "ShortName2": {
+                "type": "string",
+                "nullable": false
+              },
+              "SportSubType": {
+                "type": "string",
+                "nullable": false
+              },
+              "SportType": {
+                "type": "string",
+                "nullable": false
+              },
+              "Team1FinalScore": {
+                "type": "number",
+                "nullable": false
+              },
+              "Team1ID": {
+                "type": "string",
+                "nullable": false
+              },
+              "Team1RotNum": {
+                "type": "number",
+                "nullable": false
+              },
+              "Team2FinalScore": {
+                "type": "number",
+                "nullable": false
+              },
+              "Team2ID": {
+                "type": "string",
+                "nullable": false
+              },
+              "Team2RotNum": {
+                "type": "number",
+                "nullable": false
+              },
+              "TeaserName": {
+                "type": "null",
+                "nullable": true
+              },
+              "TeaserPoints": {
+                "type": "number",
+                "nullable": false
+              },
+              "TicketNumber": {
+                "type": "number",
+                "nullable": false
+              },
+              "Ties": {
+                "type": "number",
+                "nullable": false
+              },
+              "ToWinAmount": {
+                "type": "number",
+                "nullable": false
+              },
+              "TotalPointsOU": {
+                "type": "null",
+                "nullable": true
+              },
+              "WagerCount": {
+                "type": "number",
+                "nullable": false
+              },
+              "WagerNumber": {
+                "type": "number",
+                "nullable": false
+              },
+              "WagerStatus": {
+                "type": "string",
+                "nullable": false
+              },
+              "WagerType": {
+                "type": "string",
+                "nullable": false,
+                "enumCandidates": ["S"]
+              },
+              "customerID": {
+                "type": "string",
+                "nullable": false
+              },
+              "totalPicks": {
+                "type": "number",
+                "nullable": false
+              }
+            }
+          }
+        }
+      },
+      "truncated": true
+    },
+    "bytes": 41339
+  },
+  "redaction": {
+    "policyVersion": 1,
+    "clean": true,
+    "fieldsRedacted": [
+      "request.body.customerID",
+      "request.body.token",
+      "request.headers.authorization",
+      "response.body.Pending[0].Login",
+      "response.body.Pending[0].NameFirst",
+      "response.body.Pending[0].Password",
+      "response.body.Pending[0].customerID"
+    ],
+    "piiRedacted": ["customer-id", "login", "password", "token"]
+  },
+  "provenance": {
+    "portalHost": "fantasy402.com",
+    "proxy": "none",
+    "auth": "cookie",
+    "bunVersion": "1.4.4",
+    "observation": "authored",
+    "body": "none",
+    "mutation": "unknown",
+    "state": {
+      "viewMode": "unknown",
+      "sessionStorageCleared": false,
+      "betTickerParam": false,
+      "challengePresent": false
+    }
+  },
+  "samples": 1
+}

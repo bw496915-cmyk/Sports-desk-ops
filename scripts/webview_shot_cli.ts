@@ -1,10 +1,12 @@
 #!/usr/bin/env bun
 /**
  * @file scripts/webview_shot_cli.ts
- * @description Bun.WebView screenshot tool with an optional F402 login flow.
+ * @description Bun.WebView screenshot tool with an optional F402 login flow and Blob/Base64/Shmem modes.
  *
  * Usage:
  *   ./bin/dx shot <url> [--out scratch/shots/page.png] [--backend webkit|chrome]
+ *   ./bin/dx shot <url> --encoding base64 --format webp
+ *   ./bin/dx shot <url> --encoding shmem --kitty
  *   F402_LIVE_LOGIN=1 ./bin/dx shot --f402-login --f402-page /manager --out scratch/shots/f402.png
  *
  * The login path never prints credentials; it reuses the evidence-capture WebView wrapper and the
@@ -13,9 +15,11 @@
 
 import { join } from "node:path";
 import { ManagedWebView } from "./capture/webview.ts";
-import { encodeScreenshot, parseResize } from "../lib/screenshot_encode.ts";
+import {
+  parseResize,
+  type ScreenshotEncoding,
+} from "../lib/screenshot_encode.ts";
 import { loginF402 } from "./capture/f402_login.ts";
-import { sha256Hex } from "./capture/json.ts";
 
 const HELP = `Bun.WebView screenshot tool
 
@@ -29,6 +33,8 @@ Options:
   --height <px>           Viewport height (default 900)
   --backend <name>        webkit (macOS default/zero deps) or chrome
   --format <name>         png | jpeg | webp (webp is re-encoded via Bun.Image on webkit)
+  --encoding <name>       blob (default, mmap-backed on webkit) | buffer | base64 | shmem
+  --kitty                 Write Kitty graphics protocol t=s escape sequence (implies --encoding shmem)
   --resize <WxH|W>        Resize with Bun.Image after capture
   --quality <1-100>       jpeg/webp quality (default 82)
   --wait-selector <css>   Wait for this selector before the screenshot
@@ -48,6 +54,8 @@ interface Options {
   height: number;
   backend: "webkit" | "chrome";
   format: "png" | "jpeg" | "webp";
+  encoding: ScreenshotEncoding;
+  kitty: boolean;
   quality: number;
   resize: { width: number; height?: number } | null;
   waitSelector: string | null;
@@ -76,6 +84,8 @@ function parseArgs(args: readonly string[]): Options {
     "--height",
     "--backend",
     "--format",
+    "--encoding",
+    "--resize",
     "--quality",
     "--wait-selector",
     "--wait-ms",
@@ -97,6 +107,18 @@ function parseArgs(args: readonly string[]): Options {
   const formatRaw = flag(args, ["--format"], "png").toLowerCase();
   const format: Options["format"] =
     formatRaw === "jpeg" || formatRaw === "webp" ? formatRaw : "png";
+  const kitty = args.includes("--kitty");
+  const encodingRaw = flag(
+    args,
+    ["--encoding"],
+    kitty ? "shmem" : "blob",
+  ).toLowerCase();
+  const encoding: ScreenshotEncoding =
+    encodingRaw === "buffer" ||
+    encodingRaw === "base64" ||
+    encodingRaw === "shmem"
+      ? encodingRaw
+      : "blob";
   const backendRaw = flag(
     args,
     ["--backend"],
@@ -124,6 +146,8 @@ function parseArgs(args: readonly string[]): Options {
       : 900,
     backend,
     format,
+    encoding,
+    kitty,
     quality: Number.isFinite(quality)
       ? Math.min(Math.max(quality, 1), 100)
       : 82,
@@ -159,87 +183,126 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
   const out =
     options.out ?? join(DEFAULT_SHOT_DIR, `webview-${Date.now()}.${extension}`);
 
-  const view = ManagedWebView.launch({
+  await using view = ManagedWebView.launch({
     backend: options.backend,
     width: options.width,
     height: options.height,
     navigateTimeoutMs: options.timeoutMs,
   });
 
-  try {
-    if (options.f402Login) {
-      if (process.env.F402_LIVE_LOGIN?.trim() !== "1") {
-        throw new Error("F402 login is opt-in: set F402_LIVE_LOGIN=1");
-      }
-      await loginF402(view, { timeoutMs: options.timeoutMs });
-      const baseUrl = (
-        process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
-      ).replace(/\/$/, "");
-      const suffix = options.f402Page.startsWith("/")
-        ? options.f402Page
-        : `/${options.f402Page}`;
-      await view.navigate(`${baseUrl}${suffix}`, {
-        timeoutMs: options.timeoutMs,
-      });
-    } else {
-      await view.navigate(options.url!, { timeoutMs: options.timeoutMs });
+  if (options.f402Login) {
+    if (process.env.F402_LIVE_LOGIN?.trim() !== "1") {
+      throw new Error("F402 login is opt-in: set F402_LIVE_LOGIN=1");
     }
+    await loginF402(view, { timeoutMs: options.timeoutMs });
+    const baseUrl = (
+      process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
+    ).replace(/\/$/, "");
+    const suffix = options.f402Page.startsWith("/")
+      ? options.f402Page
+      : `/${options.f402Page}`;
+    await view.navigate(`${baseUrl}${suffix}`, {
+      timeoutMs: options.timeoutMs,
+    });
+  } else {
+    await view.navigate(options.url!, { timeoutMs: options.timeoutMs });
+  }
 
-    if (options.waitSelector !== null) {
-      await view.waitForSelector(options.waitSelector, {
-        timeoutMs: options.timeoutMs,
-      });
-    }
-    if (options.waitMs > 0) await Bun.sleep(options.waitMs);
+  if (options.waitSelector !== null) {
+    await view.waitForSelector(options.waitSelector, {
+      timeoutMs: options.timeoutMs,
+    });
+  }
+  if (options.waitMs > 0) await Bun.sleep(options.waitMs);
 
-    const needsEncode =
-      options.resize !== null ||
-      (options.format === "webp" && options.backend === "webkit");
-    let screenshot: { path: string; bytes: number; sha256: string };
-    if (!needsEncode) {
-      screenshot = await view.screenshotToFile(
-        out,
-        options.format === "png"
-          ? { format: "png" }
-          : { format: options.format, quality: options.quality },
+  const shotOptions =
+    options.format === "png"
+      ? {
+          format: "png" as const,
+          ...(options.resize === null ? {} : { resize: options.resize }),
+        }
+      : {
+          format: options.format,
+          quality: options.quality,
+          ...(options.resize === null ? {} : { resize: options.resize }),
+        };
+
+  if (options.encoding === "shmem") {
+    if (options.format !== "png") {
+      console.error(
+        `webview-shot: --encoding shmem captures a PNG shared-memory segment, so --format ${options.format} has no effect.`,
       );
-    } else {
-      const source = `${out}.src.png`;
-      await view.screenshotToFile(source, { format: "png" });
-      const png = new Uint8Array(await Bun.file(source).arrayBuffer());
-      await Bun.file(source).delete();
-      const encoded = await encodeScreenshot(png, {
-        format: options.format,
-        quality: options.quality,
-        ...(options.resize === null ? {} : { resize: options.resize }),
-      });
-      await Bun.write(out, encoded);
-      screenshot = {
-        path: out,
-        bytes: encoded.byteLength,
-        sha256: sha256Hex(encoded),
-      };
+      console.error(
+        "  Pass --format png (the default) or use --encoding blob/base64 for another format.",
+      );
+      process.exitCode = 2;
+      return;
     }
-    const title = String((await view.evaluate("document.title")) ?? "");
-    const url = String((await view.evaluate("location.href")) ?? "");
+    const shmem = await view.screenshotShmem();
+    if (options.kitty) {
+      process.stdout.write(shmem.kittyEscape);
+    } else {
+      console.log(JSON.stringify(shmem, null, 2));
+    }
+    return;
+  }
+
+  if (options.encoding === "base64") {
+    const b64 = await view.screenshotBase64(shotOptions);
     console.log(
       JSON.stringify(
         {
-          screenshot: screenshot.path,
-          bytes: screenshot.bytes,
-          sha256: screenshot.sha256,
+          encoding: "base64",
+          mimeType: b64.mimeType,
+          dataUri: b64.dataUri,
           backend: options.backend,
           format: options.format,
-          title,
-          url,
         },
         null,
         2,
       ),
     );
-  } finally {
-    await view.close();
+    return;
   }
+
+  if (options.encoding === "buffer") {
+    const blob = await view.screenshotBlob(shotOptions);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    console.log(
+      JSON.stringify(
+        {
+          encoding: "buffer",
+          mimeType: blob.type,
+          bytes: bytes.byteLength,
+          base64: Buffer.from(bytes).toString("base64"),
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  const screenshot = await view.screenshotToFile(out, shotOptions);
+  const title = String((await view.evaluate("document.title")) ?? "");
+  const url = String((await view.evaluate("location.href")) ?? "");
+  console.log(
+    JSON.stringify(
+      {
+        screenshot: screenshot.path,
+        bytes: screenshot.bytes,
+        sha256: screenshot.sha256,
+        mimeType: screenshot.mimeType,
+        backend: options.backend,
+        format: options.format,
+        encoding: options.encoding,
+        title,
+        url,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 if (import.meta.main) {

@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "mode": "live",
+  "capturedAt": "2026-11-01T04:05:20.098Z",
+  "operation": {
+    "path": "/cloud/api/Report/getDailyFiguresByCustomer",
+    "method": "POST"
+  },
+  "request": {
+    "url": "https://fantasy402.com/cloud/api/Report/getDailyFiguresByCustomer",
+    "method": "POST",
+    "headers": {
+      "content-type": "application/json",
+      "x-requested-with": "XMLHttpRequest",
+      "authorization": "<redacted>"
+    },
+    "contentType": "application/json",
+    "bodySha256": "863c0ab1efeacc967399bd4210b1cd2ab347fb5612c929e941470f7eb1480de2",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "agentID": {
+          "type": "string",
+          "nullable": false
+        },
+        "customerID": {
+          "type": "string",
+          "nullable": false
+        },
+        "operation": {
+          "type": "string",
+          "nullable": false
+        },
+        "week": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json; charset=utf-8",
+    "bodySha256": "b072a7a032394c3c24182b89587d8881878cb077a6a2690279d3f66eb00e54df",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "INFO": {
+          "type": "boolean",
+          "nullable": false
+        }
+      }
+    },
+    "bytes": 14
+  },
+  "redaction": {
+    "policyVersion": 1,
+    "clean": true,
+    "fieldsRedacted": [
+      "request.body.agentID",
+      "request.body.customerID",
+      "request.headers.authorization"
+    ],
+    "piiRedacted": ["agent-id", "customer-id"]
+  },
+  "provenance": {
+    "portalHost": "fantasy402.com",
+    "proxy": "none",
+    "auth": "cookie",
+    "bunVersion": "1.4.4",
+    "observation": "webkit",
+    "body": "populated-shell",
+    "request": "minimal",
+    "mutation": "read-inferred",
+    "waf": "cloudflare",
+    "cfRay": "a5380531ccb34532-ATL",
+    "backend": "webkit",
+    "state": {
+      "viewMode": "unknown",
+      "sessionStorageCleared": false,
+      "betTickerParam": false,
+      "domVersion": "1.0.280",
+      "domOrigin": "fantasy402.com",
+      "challengePresent": false
+    },
+    "origin": "fantasy402.com"
+  },
+  "samples": 1
+}

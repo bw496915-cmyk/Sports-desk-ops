@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "appliedAt": "2026-11-01T02:29:00.429Z",
+  "tool": "scripts/apply_captures.ts",
+  "capturesDir": "/Users/nolarose/code/sportsdesk-ops/docs/evidence/captures",
+  "ledgerCountsBefore": {
+    "A": 5,
+    "B": 5,
+    "C": 35,
+    "D": 0,
+    "E": 10,
+    "total": 55
+  },
+  "ledgerCountsAfter": {
+    "A": 8,
+    "B": 5,
+    "C": 32,
+    "D": 0,
+    "E": 10,
+    "total": 55
+  },
+  "upgrades": [
+    {
+      "file": "2026-11-01/Pending.post.json",
+      "operation": "Pending",
+      "path": "/cloud/api/Report/Pending",
+      "method": "POST",
+      "digest": "f247cb829d114dd1b2ba10ba2a52a3c9124aa1522d9bf01c91155693589daa47",
+      "capturedAt": "2026-11-01T02:22:35.774Z",
+      "evidenceSource": "capture:2026-11-01:f247cb829d114dd1b2ba10ba2a52a3c9124aa1522d9bf01c91155693589daa47",
+      "responseStatus": 200,
+      "responseBodySha256": "6c65708478ad70ca3286c68cb0e32e400998d7f4c9fed2f8c614084315e2c277",
+      "responseBytes": 41339,
+      "emptyEnvelope": false,
+      "resolvesContradiction": false,
+      "previousContradictionReason": null
+    },
+    {
+      "file": "2026-11-01/getGrading.post.json",
+      "operation": "getGrading",
+      "path": "/cloud/api/Report/getGrading",
+      "method": "POST",
+      "digest": "766265b07e8a3e8d5b7f8271c99411e9b544f8c695b169b90c9a95fb2bc1c819",
+      "capturedAt": "2026-11-01T02:22:35.993Z",
+      "evidenceSource": "capture:2026-11-01:766265b07e8a3e8d5b7f8271c99411e9b544f8c695b169b90c9a95fb2bc1c819",
+      "responseStatus": 200,
+      "responseBodySha256": "b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c",
+      "responseBytes": 11,
+      "emptyEnvelope": true,
+      "resolvesContradiction": false,
+      "previousContradictionReason": null
+    },
+    {
+      "file": "2026-11-01/getTransactions.post.json",
+      "operation": "getTransactions",
+      "path": "/cloud/api/Manager/getTransactions",
+      "method": "POST",
+      "digest": "f367fe25112898b2a5e654fd74e82586ae9bc41dc5415adae3d122677b937b32",
+      "capturedAt": "2026-11-01T02:07:42.209Z",
+      "evidenceSource": "capture:2026-11-01:f367fe25112898b2a5e654fd74e82586ae9bc41dc5415adae3d122677b937b32",
+      "responseStatus": 200,
+      "responseBodySha256": "b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c",
+      "responseBytes": 11,
+      "emptyEnvelope": true,
+      "resolvesContradiction": false,
+      "previousContradictionReason": null
+    }
+  ],
+  "skips": [
+    {
+      "file": "2026-10-31/getBetTicker.post.json",
+      "operation": "getBetTicker",
+      "path": "/cloud/api/Manager/getBetTicker",
+      "reason": "row already has capturedResponse:true (idempotent no-op)"
+    },
+    {
+      "file": "2026-10-31/getBetTickerConfig.post.json",
+      "operation": "getBetTickerConfig",
+      "path": "/cloud/api/Manager/getBetTickerConfig",
+      "reason": "row already has capturedResponse:true (idempotent no-op)"
+    },
+    {
+      "file": "2026-10-31/getInfoPlayer.post.json",
+      "operation": "getInfoPlayer",
+      "path": "/cloud/api/Manager/getInfoPlayer",
+      "reason": "row already has capturedResponse:true (idempotent no-op)"
+    },
+    {
+      "file": "2026-10-31/getSportsVigSetup.post.json",
+      "operation": "getSportsVigSetup",
+      "path": "/cloud/api/Manager/getSportsVigSetup",
+      "reason": "row already has capturedResponse:true (idempotent no-op)"
+    },
+    {
+      "file": "2026-10-31/getWebLog.post.json",
+      "operation": "getWebLog",
+      "path": "/cloud/api/Manager/getWebLog",
+      "reason": "row already has capturedResponse:true (idempotent no-op)"
+    }
+  ],
+  "rejections": [
+    {
+      "file": "2026-10-31/getCustomerNotes.post.json",
+      "operation": "/cloud/api/Manager/getCustomerNotes",
+      "code": "E_RESPONSE_STATUS",
+      "message": "response.status must be a 2xx integer (found 500)"
+    },
+    {
+      "file": "2026-10-31/getInfoManager.post.json",
+      "operation": "/cloud/api/Manager/getInfoManager",
+      "code": "E_RESPONSE_STATUS",
+      "message": "response.status must be a 2xx integer (found 500)"
+    },
+    {
+      "file": "2026-10-31/getPending.post.json",
+      "operation": "/cloud/api/Manager/getPending",
+      "code": "E_RESPONSE_STATUS",
+      "message": "response.status must be a 2xx integer (found 500)"
+    }
+  ],
+  "verify": {
+    "ok": true,
+    "exitCode": 0
+  }
+}

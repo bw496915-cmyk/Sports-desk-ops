@@ -155,4 +155,32 @@ describe("provenance_helpers", () => {
       'cfRay "a537f5fb4a4da5da-LAX" present but waf is "unknown"',
     );
   });
+
+  test("captureRecordFromProbeScratch preserves valid array skeleton for truncated top-level JSON arrays (getSportsCustomerAdmin)", async () => {
+    const { captureRecordFromProbeScratch } = await import(
+      "./promote_probe_from_file.ts"
+    );
+    const record = captureRecordFromProbeScratch({
+      url: "https://www.fantasy402.com/cloud/api/Manager/getSportsCustomerAdmin",
+      capturedAt: "2026-11-01T04:48:42.301Z",
+      backend: "webkit",
+      requestContentType: "application/x-www-form-urlencoded; charset=UTF-8",
+      body: "operation=getSportsCustomerAdmin&RRO=1&agentID=BILLY666&agentOwner=BILLY666",
+      readOnlyConfirmed: true,
+      headersObserved: true,
+      result: {
+        status: 200,
+        contentType: "application/json; charset=utf-8",
+        bytes: 14072,
+        preview:
+          '[{"SportType":"Auto Racing         ","SequenceNumber":"12001"},{"SportType":"Virtual Sports      ","SequenceNumber":"18001"}',
+        cfRay: "a53844c7c9d46d3d-ATL",
+        cfRayFromHeader: "a53844c7c9d46d3d-ATL",
+        isBinary: false,
+      },
+    });
+    expect(record.response?.bodySkeleton.truncated).toBe(true);
+    expect(record.response?.bytes).toBe(14072);
+    expect(record.response?.bodySkeleton.type).toBe("array");
+  });
 });

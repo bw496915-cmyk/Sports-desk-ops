@@ -667,6 +667,8 @@ async function readCache(
       return null;
     const fetchedAt = Date.parse(parsed.fetchedAtIso ?? "");
     if (!Number.isFinite(fetchedAt)) return null;
+    // TTL applies in offline mode too: `offline` only switches fetch behavior (fail instead
+    // of network when a page is missing), it must not turn a stale cache into a fresh hit.
     const ttl = cacheTtlMs(options);
     if (ttl === 0) return null;
     if ((options?.now ?? Date.now()) - fetchedAt > ttl) return null;
@@ -724,6 +726,9 @@ async function cachedCombos(
   if (cached !== null) {
     stats.hits += 1;
     return [...cached];
+  }
+  if (options?.offline === true) {
+    throw new Error(`offline: no cached combos for ${wallet}`);
   }
   stats.misses += 1;
   const records = await fetchCombosUncached(wallet, options);

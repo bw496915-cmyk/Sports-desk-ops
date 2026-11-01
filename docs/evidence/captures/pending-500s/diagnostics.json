@@ -1,0 +1,576 @@
+{
+  "schemaVersion": 2,
+  "kind": "pending-500-diagnostic",
+  "capturedAt": "2026-11-01T02:22:35.000Z",
+  "finding": "prefix-identical 500 (0 B) on both /cloud/api/Manager and /cloud/api/Report — treat as origin crash OR Cloudflare edge drop until cfRay/challenge provenance is recorded on re-probe",
+  "reprobePipeline2026-11-01": {
+    "assertCaptureRecord": "Full CaptureProvenance axes round-trip on read (fixes captureHash verify for promoted cfRay records)",
+    "manifestRepair": "bun run capture:repair-manifest after on-disk provenance enrichment without re-finalize",
+    "edgePromotion": "bun run capture:reprobe-pending-500s --promote-edge writes C-edge failures to docs/evidence/captures/pending-500s/edge-store via --allow-non-2xx",
+    "sessionDiagnostics": "Scratch probes record sessionCustomerPresent / sessionCredentialsCodePresent (booleans only) to separate empty customerID from edge 500",
+    "ticketReprobe": "F402_PROBE_TICKET / F402_PROBE_WAGER / F402_PROBE_FLAG env vars forwarded to capture:f402 for getTicketDetailPrint"
+  },
+  "reprobe2026-11-01T04-19Z": {
+    "pendingDeleteHunt": "capture:discover --hunt-pending-delete probes up to 8 Pending rows; open pending tickets return 200 + Pending:[] — non-empty legs need delete-wager modal tickets",
+    "wafBrief": "capture:waf-ray-brief → waf_correlation_brief.json (12 unique ATL Ray IDs on graded 500 probes)",
+    "playerLogin": "capture:f402 --login-as-player requires F402_PLAYER_ID / keychain f402-player-id (not configured in this environment)",
+    "getTicketDetailPrint": "Still blocked under agent session; player credentials required for print HTML tier-A attempt"
+  },
+  "reprobe2026-11-01T04-18Z": {
+    "reportCustomerContext": "manager.html?CustomerID=&AgentView=ON + sessionStorage customerID (customer.js init)",
+    "getGradedWagerAfterContext": {
+      "status": 500,
+      "bytes": 0,
+      "cfRay": "a53818343f1c8857-ATL",
+      "requestBodyTokenInjected": true,
+      "reportCustomerContextApplied": true,
+      "conclusion": "Rules out missing token and missing AgentView CustomerID binding; remains C-edge / origin handler"
+    },
+    "artifacts": [
+      "docs/evidence/captures/schema/report_js_graded_wager.json",
+      "docs/evidence/captures/pending-500s/cf_ray_ledger.json"
+    ],
+    "commands": [
+      "capture:report-all-tiers",
+      "capture:cf-ray-ledger",
+      "capture:f402 --report-customer-context --ops getGradedWagerByCustomer"
+    ]
+  },
+  "reprobe2026-11-01T04-15Z": {
+    "reportJsRoute": "docs/evidence/captures/schema/report_js_ticket_detail.json (live /app/customer/report/report.js)",
+    "getTicketDetailPrintUnderAgentLogin": {
+      "envelope": "token+ticketNumber+wagerNumber+flag+operation (flag from Pending WagerType)",
+      "status": 400,
+      "msg": "Invalid Method: Model:",
+      "interpretation": "Report controller method not bound for agent (M/A) session — not wrong URL path"
+    },
+    "pendingDeleteAlternative": {
+      "status": 200,
+      "note": "Same customerID+ticketNumber via Report/PendingDelete (report.js:8578 read-only modal)"
+    },
+    "getGradedWagerByCustomerBothBackends": {
+      "webkit": { "status": 500, "bytes": 0, "cfRay": "a5381323afd4b16c-ATL" },
+      "chrome": { "status": 500, "bytes": 0, "cfRay": "a53813373e71d7da-ATL" },
+      "conclusion": "Not CDP-only; C-edge / origin shared handler under both backends"
+    }
+  },
+  "reprobe2026-11-01T04-10Z": {
+    "tool": "capture:discover --login (Pending ticket sample) + capture:reprobe-pending-500s --from-discover --report-only --promote-edge",
+    "gradedWagerConclusion": "sessionCustomerPresent=true and F402_CUSTOMER_ID in template body; still HTTP 500 (0 B) with cfRay — classify C-edge (not missing customerID). Promoted to pending-500s/edge-store.",
+    "ticketDetailConclusion": "Report/Pending-derived ticketNumber+wagerNumber: HTTP 400 {\"status\":\"Failed\",\"msg\":\"Invalid Method: Model:\"} — MODEL_ERROR routing (same family as wrong /Customer vs /Manager controller), not empty-500 edge drop.",
+    "probeFixes": [
+      "In-page form/json token injection from sessionStorage.credentials.code",
+      "discover ticketSample via Report/Pending first row",
+      "reprobe --from-discover --report-only --ops filter"
+    ],
+    "scratchDir": "scratch/f402-probes/2026-11-01T04-10-17-268Z",
+    "edgeStore": "docs/evidence/captures/pending-500s/edge-store/2026-11-01/getGradedWagerByCustomer.post.json",
+    "cfRayGraded": "a5380ca0d9eeb469-ATL"
+  },
+  "reprobe2026-11-01T04Z": {
+    "tool": "capture:f402 --login (webkit + chrome)",
+    "results": [
+      {
+        "operation": "getDailyFiguresByCustomer",
+        "prefix": "/cloud/api/Report",
+        "status": 200,
+        "bytes": 14,
+        "cfRay": "a5380531ccb34532-ATL",
+        "challengePresent": false,
+        "note": "Promoted to docs/evidence/captures/2026-11-01/getDailyFiguresByCustomer.post.json (application/json envelope)."
+      },
+      {
+        "operation": "getGradedWagerByCustomer",
+        "prefix": "/cloud/api/Report",
+        "status": 500,
+        "bytes": 0,
+        "cfRay": "a53805418c4d4532-ATL",
+        "deriveTier": "C-edge",
+        "webkitVsChrome": "Both webkit and chrome returned 500 (0 B) with distinct cfRay; not a CDP-only pass."
+      },
+      {
+        "operation": "getTicketDetailPrint",
+        "prefix": "/cloud/api/Report",
+        "status": 400,
+        "bytes": 50,
+        "note": "Validation envelope (not empty-500); needs report.js ticketNumber/wagerNumber/flag."
+      },
+      {
+        "operation": "getGradedWagerByCustomer",
+        "prefix": "/cloud/api/Manager",
+        "status": 400,
+        "bytes": 50
+      }
+    ],
+    "scratchDirs": [
+      "scratch/f402-probes/2026-11-01T04-05-13-055Z",
+      "scratch/f402-probes/2026-11-01T04-05-23-099Z",
+      "scratch/f402-probes/2026-11-01T04-05-42-863Z"
+    ]
+  },
+  "cloudflareEdgeHypothesis": {
+    "trigger": "DOM shows window.__CF$cv$params (JS detection / bot management) or Cf-Ray on responses",
+    "empty500AtEdge": "WAF block or mid-flight drop can surface as HTTP 500/502 with 0 bytes; correlate via cfRay in Cloudflare WAF logs before reading upstream error logs",
+    "webkitVsCdp": "Chrome/CDP may pass challenges (cf_clearance); WebKit may not — headersObserved:false on in-page fetch is separate from edge-negotiated wire headers",
+    "pipelineAxes": "CaptureProvenance.waf, cfRay, state.challengePresent; deriveTier maps empty-500+edge → C-edge; challenge-bound 2xx gets captureRecipeSha256 on manifest",
+    "edgePathsIgnored": "/cdn-cgi/* excluded from request sniffer (not origin API)"
+  },
+  "diagnosticPrinciples": {
+    "zeroByte500": "HTTP 500 with a 0-byte body is not a parameter-validation rejection (which produces a 4xx with a body). It may be an origin crash before serialization OR a Cloudflare edge drop — use cfRay + WAF logs to disambiguate.",
+    "prefixIdenticalVsDivergent": "When both /cloud/api/Manager and /cloud/api/Report return 500 (0 B), prefix routing is ruled out (prefix-identical: failure is in the shared handler/backend). When one prefix returns 500 and the other returns 200 (Pending, getGrading, getTransactions), the prefixes are distinct handlers (prefix-divergent).",
+    "pointInTimeEvidence": "Captures from 2026-10-31 and 2026-11-01 are dated observations, not claims about current live state. Re-probing with the identical captured payload separates deterministic crashes from transient failures."
+  },
+  "prefixIdentical500s": [
+    {
+      "operation": "getDailyFiguresByCustomer",
+      "classification": "prefix-identical",
+      "lastObservedAt": "2026-11-01T02:22:17.125Z",
+      "finding": "500 (0 B) on both /cloud/api/Manager and /cloud/api/Report",
+      "clientJsObservation": "In cached customer/report/report.js (offset 25633), getDailyFigures is the only operation that sends contentType: 'application/json' with data: JSON.stringify({ agentID, customerID, week, operation: 'getDailyFiguresByCustomer' }). Sending application/x-www-form-urlencoded caused the backend JSON deserializer to throw before response serialization.",
+      "attempts": [
+        {
+          "prefix": "/cloud/api/Manager",
+          "url": "https://fantasy402.com/cloud/api/Manager/getDailyFiguresByCustomer",
+          "method": "POST",
+          "formKeys": [
+            "RRO",
+            "agentID",
+            "agentOwner",
+            "customerID",
+            "operation"
+          ],
+          "status": 500,
+          "contentType": "text/html; charset=UTF-8",
+          "bytes": 0,
+          "sourceProbe": "scratch/f402-probes/2026-11-01T02-07-38-875Z/getDailyFiguresByCustomer.json"
+        },
+        {
+          "prefix": "/cloud/api/Report",
+          "url": "https://fantasy402.com/cloud/api/Report/getDailyFiguresByCustomer",
+          "method": "POST",
+          "formKeys": ["agentID", "customerID", "operation", "token", "week"],
+          "status": 500,
+          "contentType": "text/html; charset=UTF-8",
+          "bytes": 0,
+          "sourceProbe": "scratch/f402-probes/2026-11-01T02-22-17-125Z/getDailyFiguresByCustomer.json"
+        }
+      ],
+      "nextAction": "1. Re-probe with capture:f402 and record cfRay/challengePresent on the probe JSON; 2. If cfRay present, check Cloudflare WAF for that Ray before upstream logs; 3. Re-probe JSON body per report.js:25633 (contentType application/json, week integer)."
+    },
+    {
+      "operation": "getGradedWagerByCustomer",
+      "classification": "prefix-identical",
+      "lastObservedAt": "2026-11-01T02:22:17.125Z",
+      "finding": "500 (0 B) on both /cloud/api/Manager and /cloud/api/Report",
+      "clientJsObservation": "In cached customer/report/report.js (offset 33171), getGradedWagers sends { customerID: n.ID, week: e.week, operation: 'getGradedWagerByCustomer' } where week is initialized to integer 0 (t.getGradedWagers({ week: 0, date: new Date })).",
+      "attempts": [
+        {
+          "prefix": "/cloud/api/Manager",
+          "url": "https://fantasy402.com/cloud/api/Manager/getGradedWagerByCustomer",
+          "method": "POST",
+          "formKeys": [
+            "RRO",
+            "agentID",
+            "agentOwner",
+            "customerID",
+            "operation"
+          ],
+          "status": 500,
+          "contentType": "text/html; charset=UTF-8",
+          "bytes": 0,
+          "sourceProbe": "scratch/f402-probes/2026-11-01T02-07-38-875Z/getGradedWagerByCustomer.json"
+        },
+        {
+          "prefix": "/cloud/api/Report",
+          "url": "https://fantasy402.com/cloud/api/Report/getGradedWagerByCustomer",
+          "method": "POST",
+          "formKeys": ["customerID", "operation", "token", "week"],
+          "status": 500,
+          "contentType": "text/html; charset=UTF-8",
+          "bytes": 0,
+          "sourceProbe": "scratch/f402-probes/2026-11-01T02-22-17-125Z/getGradedWagerByCustomer.json"
+        }
+      ],
+      "nextAction": "1. Retrieve upstream server error log for the shared handler crash; 2. Re-probe with the identical captured payload to rule out transient failure before testing week=0 from customer/report/report.js:33171."
+    },
+    {
+      "operation": "getTicketDetailPrint",
+      "classification": "prefix-identical",
+      "lastObservedAt": "2026-11-01T02:07:38.875Z",
+      "finding": "500 (0 B) on both /cloud/api/Manager and /cloud/api/Report",
+      "clientJsObservation": "In cached customer/report/report.js (offset 108955), getTicketDetail sends { token: a.token, ticketNumber: r, wagerNumber: n, flag: l, operation: 'getTicketDetailPrint' }. Omitting ticketNumber/wagerNumber caused an unhandled null/parse exception in the shared handler before response serialization.",
+      "attempts": [
+        {
+          "prefix": "/cloud/api/Manager",
+          "url": "https://fantasy402.com/cloud/api/Manager/getTicketDetailPrint",
+          "method": "POST",
+          "formKeys": [
+            "RRO",
+            "agentID",
+            "agentOwner",
+            "customerID",
+            "operation"
+          ],
+          "status": 500,
+          "contentType": "text/html; charset=UTF-8",
+          "bytes": 0,
+          "sourceProbe": "scratch/f402-probes/2026-11-01T02-07-38-875Z/getTicketDetailPrint.json"
+        },
+        {
+          "prefix": "/cloud/api/Report",
+          "url": "https://fantasy402.com/cloud/api/Report/getTicketDetailPrint",
+          "method": "POST",
+          "formKeys": ["operation", "token"],
+          "status": 500,
+          "contentType": "text/html; charset=UTF-8",
+          "bytes": 0,
+          "sourceProbe": "scratch/f402-probes/2026-11-01T01-35-57-963Z/getTicketDetailPrint.json"
+        }
+      ],
+      "nextAction": "1. Retrieve upstream server error log for the shared handler crash; 2. Re-probe with the identical captured payload, then test the exact 5-key report.js:108955 envelope { token, ticketNumber, wagerNumber, flag, operation }."
+    }
+  ],
+  "datedManagerStore500s": [
+    {
+      "operation": "getCustomerNotes",
+      "path": "/cloud/api/Manager/getCustomerNotes",
+      "classification": "single-prefix-500",
+      "lastObservedAt": "2026-10-31T00:19:57.603Z",
+      "sourceCapture": "docs/evidence/captures/2026-10-31/getCustomerNotes.post.json",
+      "status": 500,
+      "bytes": 0,
+      "nextAction": "1. Retrieve upstream server error log; 2. Re-probe with the identical 2026-10-31 payload to separate deterministic handler crash from point-in-time failure."
+    },
+    {
+      "operation": "getInfoManager",
+      "path": "/cloud/api/Manager/getInfoManager",
+      "classification": "wrong-operation-name-in-spec",
+      "lastObservedAt": "2026-10-31T00:19:55.752Z",
+      "sourceCapture": "docs/evidence/captures/2026-10-31/getInfoManager.post.json",
+      "status": 500,
+      "bytes": 0,
+      "clientJsObservation": "The manager.html?v=1793502037202 (bust=1.0.280) boot waterfall and app/manager/manager.js (Blob 610B48F7F455B4D77131D88AD56832DFBB66A519) prove that no 'getInfoManager' operation exists in the Manager bundle. Instead, boot calls POST /cloud/api/Manager/getAccountInfoOwner with contentType: 'application/json' and JSON.stringify({ agentID: o.id, operation: 'getAccountInfoOwner' }), plus POST /cloud/api/Manager/getWeeklyFigureByAgentLite (which populates the [data-field='grand-total-weekly'] and [data-field='grand-total-player'] DOM nodes the spec misattributed to getInfoManager).",
+      "nextAction": "Retire /cloud/api/Manager/getInfoManager as a non-existent authored name; capture POST /cloud/api/Manager/getAccountInfoOwner (application/json) and POST /cloud/api/Manager/getWeeklyFigureByAgentLite (form-urlencoded)."
+    },
+    {
+      "operation": "getPending",
+      "path": "/cloud/api/Manager/getPending",
+      "classification": "prefix-divergent",
+      "lastObservedAt": "2026-10-31T00:19:53.632Z",
+      "sourceCapture": "docs/evidence/captures/2026-10-31/getPending.post.json",
+      "status": 500,
+      "bytes": 0,
+      "clientJsObservation": "In the Manager Pending report module (Blob A7FD1C99172E9A2877DDF9A60C3B750AA5E717D4), POST /cloud/api/Manager/getPending sends form-urlencoded { agentID: r.agent, type: r.type, operation: 'getPending', RRO: n.RRO } and reads e.LIST and e.TOTAL, whereas POST /cloud/api/Report/Pending sends { customerID, operation: 'Pending' } and reads e.Pending[]. The 2026-10-31 probe sent an empty body on /Manager/getPending.",
+      "nextAction": "Prefix-divergent: /cloud/api/Manager/getPending (agent-wide summary { agentID, type, operation: 'getPending', RRO } -> { LIST, TOTAL }) and /cloud/api/Report/Pending (player-scoped 73-field legs { customerID, operation: 'Pending' } -> { Pending }) are distinct handlers."
+    }
+  ],
+  "managerBootWaterfall10280": {
+    "pageUrl": "https://www.fantasy402.com/manager.html?v=1793502037202",
+    "portalVersion": "1.0.280",
+    "cachedManagerJsBlob": "scratch/webview-profile/NetworkCache/Version 17/Blobs/610B48F7F455B4D77131D88AD56832DFBB66A519",
+    "observedApiEndpoints": [
+      {
+        "url": "https://www.fantasy402.com/cloud/api/Log/write",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+        "payloadShape": "{ customerID: padded10, description, operation: 'write' }",
+        "role": "Audit log write fired on view transitions"
+      },
+      {
+        "url": "https://www.fantasy402.com/cloud/api/Manager/getAccountInfoOwner",
+        "method": "POST",
+        "contentType": "application/json",
+        "payloadShape": "JSON.stringify({ agentID: this.ID, operation: 'getAccountInfoOwner' })",
+        "responseField": "a.accountInfo",
+        "replacesSpeculativeTierC": "/cloud/api/Manager/getInfoManager"
+      },
+      {
+        "url": "https://www.fantasy402.com/cloud/api/Manager/getConfigWebReports",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+        "payloadShape": "{ agentID: this.ID, operation: 'getConfigWebReports', RRO: 1 }",
+        "responseField": "s.INFO"
+      },
+      {
+        "url": "https://www.fantasy402.com/cloud/api/Manager/getConfigWebReportsPending",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+        "payloadShape": "{ agentID: this.ID, operation: 'getConfigWebReportsPending', RRO: 1 }",
+        "responseField": "n.INFO"
+      },
+      {
+        "url": "https://www.fantasy402.com/cloud/api/Manager/getSportsType",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+        "payloadShape": "{ agentID: this.ID, agentOwner: this.ID, operation: 'getSportsType', RRO: 1 }",
+        "responseField": "n.LIST"
+      },
+      {
+        "url": "https://www.fantasy402.com/cloud/api/Manager/getAuthorizations",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+        "payloadShape": "{ agentID: this.ID, agentOwner: this.ID, operation: 'getAuthorizations', RRO: 1 }",
+        "responseField": "a.INFO, a.DISTRIBUTION"
+      },
+      {
+        "url": "https://www.fantasy402.com/cloud/api/Manager/getMessage",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+        "payloadShape": "{ acc: this.ID, type: 0, operation: 'getMessage', RRO: 1 }",
+        "responseField": "t.COMMENT",
+        "replacesSpeculativeTierC": "/cloud/api/System/getMessages"
+      },
+      {
+        "url": "https://www.fantasy402.com/cloud/api/Manager/getNewEmailsCount",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+        "payloadShape": "{ acc: this.ID, operation: 'getNewEmailsCount', RRO: 1 }",
+        "responseField": "e.INFO.LIST, e.INFO.COUNT.total"
+      },
+      {
+        "url": "https://www.fantasy402.com/cloud/api/Manager/getWeeklyFigureByAgentLite",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+        "payloadShape": "{ agentID: i.agent, week: 0, type: 'A', layout: 'byDay', operation: 'getWeeklyFigureByAgentLite', RRO: 1 }",
+        "responseField": "populates [data-field='grand-total-player'] and [data-field='grand-total-weekly']",
+        "replacesSpeculativeTierC": "/cloud/api/Report/getWeeklyFigure (and the grand-total-weekly claim on /cloud/api/Manager/getInfoManager)"
+      },
+      {
+        "url": "https://www.fantasy402.com/cloud/api/Manager/getListAgenstByAgent",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+        "payloadShape": "{ agentID: i.agentID, agentType: i.agentType, operation: 'getListAgenstByAgent', RRO: 1 }",
+        "replacesSpeculativeTierC": "/cloud/api/Manager/getAgentTree (alongside getHeriarchy)"
+      }
+    ],
+    "additionalManagerJsWireReplacements": [
+      {
+        "speculativeTierCPath": "/cloud/api/Manager/search",
+        "realWireOperation": "POST /cloud/api/Manager/searchCustomerAdmin",
+        "payloadShape": "{ agentID: this.ID, filter: $('[data-field=\"search-customer\"]').val(), operation: 'searchCustomerAdmin', RRO: 1 }",
+        "sourceOffset": "manager.js:49675"
+      },
+      {
+        "speculativeTierCPath": "/cloud/api/Report/getAnalysis",
+        "realWireOperation": "POST /cloud/api/Manager/getReportPlayerAnalysis",
+        "payloadShape": "{ agentID, agentOwner, customerID, reportType, startDate, endDate, lineType, operation: 'getReportPlayerAnalysis', RRO: 1 }",
+        "sourceOffset": "manager.js:93668"
+      },
+      {
+        "speculativeTierCPath": "/cloud/api/Manager/getScores",
+        "realWireOperation": "POST /cloud/api/Report/getScoresLiveDynamic",
+        "contentType": "application/json",
+        "payloadShape": "JSON.stringify({ operation: 'getScoresLiveDynamic' })",
+        "sourceOffset": "manager.js:86861"
+      },
+      {
+        "speculativeTierCPath": "/cloud/api/Report/getDeletedWagerReport & /cloud/api/Report/delete-wager",
+        "realWireOperation": "POST /cloud/api/Manager/getReportDeletedTransactions",
+        "sourceOffset": "Blob 96EA5CDA963AEB351179D7B5F369049898047C8E"
+      },
+      {
+        "speculativeTierCPath": "/cloud/api/Manager/deleteWager",
+        "realWireOperation": "POST /cloud/api/Manager/deleteBet",
+        "sourceOffset": "Blob A7FD1C99172E9A2877DDF9A60C3B750AA5E717D4"
+      }
+    ]
+  },
+  "prefixDivergentPairs": [
+    {
+      "operation": "Pending vs getPending",
+      "classification": "prefix-divergent",
+      "failedPrefix": "/cloud/api/Manager",
+      "failedStatus": 500,
+      "workingPrefix": "/cloud/api/Report",
+      "workingStatus": 200,
+      "sourceProbe": "scratch/f402-probes/2026-11-01T02-07-38-875Z/Pending.json",
+      "implication": "/Manager/getPending ({ agentID, type, operation: 'getPending', RRO } -> { LIST, TOTAL }) and /Report/Pending ({ customerID, operation: 'Pending' } -> { Pending }) are distinct handlers."
+    },
+    {
+      "operation": "getGrading",
+      "classification": "prefix-divergent",
+      "failedPrefix": "/cloud/api/Manager",
+      "failedStatus": 500,
+      "workingPrefix": "/cloud/api/Report",
+      "workingStatus": 200,
+      "emptyEnvelopeContract": "Returns 200 {\"LIST\":\"\"} (JSON string \"\", not []) when empty; handled explicitly by parseF402ListEnvelope() in lib/blob_ingest.ts.",
+      "sourceProbe": "scratch/f402-probes/2026-11-01T02-07-38-875Z/getGrading.json"
+    },
+    {
+      "operation": "getTransactions",
+      "classification": "prefix-divergent",
+      "failedPrefix": "/cloud/api/Report (without date=MM/DD/YYYY)",
+      "failedStatus": 500,
+      "workingPrefix": "/cloud/api/Manager (200 {\"LIST\":\"\"} without date) and /cloud/api/Report (200 {\"LIST\":[]} with date=MM/DD/YYYY)",
+      "workingStatus": 200,
+      "emptyEnvelopeContract": "Returns 200 {\"LIST\":\"\"} on /Manager when empty and 200 {\"LIST\":[]} on /Report with date; both shapes handled by parseF402ListEnvelope() in lib/blob_ingest.ts.",
+      "sourceProbe": "scratch/f402-probes/2026-11-01T01-53-47-209Z/getTransactions.json"
+    }
+  ],
+  "pendingDeleteResolution": {
+    "operation": "PendingDelete",
+    "path": "/cloud/api/Report/PendingDelete",
+    "clientJsSource": "scratch/webview-profile/NetworkCache/Version 17/Blobs/F5D0F39D9ABFE7F995C65F3152C690EFF1B0F9EF (offsets 8578, 42092, 57012)",
+    "readOnlyConfirmedInClientJs": true,
+    "finding": "In customer/report/report.js, setDeleteWager opens the 'Ticket Detail' modal for a previously bought-out/deleted transaction row (data-action='get-delete-wager') and calls getPendingWagers({ deleteWagers: true, ticketNumber }). That sends POST api/Report/PendingDelete with { customerID: $.playerWeekly, ticketNumber: e.ticketNumber, operation: 'PendingDelete' }, logs 'View Pending Plays Selected', and renders e.Pending[] into the modal. Despite its name, PendingDelete is a read-only ticket-detail lookup, not a delete mutation.",
+    "probeStrategy": "1. Confirmed read-only via client JS (report.js:8578); 2. Probe POST /cloud/api/Report/PendingDelete with sentinel ticketNumber=-1 to verify read-style empty/error response on the wire before promoting."
+  },
+  "unprobedTierCDispositions": [
+    {
+      "method": "POST",
+      "path": "/cloud/api/Report/PendingDelete",
+      "tag": "Reporting & Forensics",
+      "disposition": "probe: confirmed read-only lookup in report.js:8578 ({ customerID, ticketNumber, operation: 'PendingDelete' }); probe with sentinel ticketNumber=-1 then a valid ticketNumber"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/System/authenticateCustomer",
+      "tag": "Upstream Authentication",
+      "disposition": "probe: capture redacted login exchange during WebView sign-in to verify token/cookie minting"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/System/verifySession",
+      "tag": "System & Authentication",
+      "disposition": "probe: safe read-only session check; include in next Manager probe batch"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/search",
+      "tag": "Forensic Surveillance",
+      "disposition": "retire/replace: real wire operation in manager.js:49675 is POST /cloud/api/Manager/searchCustomerAdmin ({ agentID, filter, operation: 'searchCustomerAdmin', RRO: 1 })"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Report/getWeeklyFigure",
+      "tag": "Downline Accounting",
+      "disposition": "retire/replace: real wire operation on manager.html boot (manager.js:52703) is POST /cloud/api/Manager/getWeeklyFigureByAgentLite (plus getMasterSheet at manager.js:43955)"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Report/getAgentPerformance",
+      "tag": "Downline Accounting",
+      "disposition": "probe: read-only stage-4 BranchGrade report (data-action='get-agent-performance'); capture from Reporting UI"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Report/getSettledFigure",
+      "tag": "Downline Accounting",
+      "disposition": "probe: read-only stage-8 Collections report (data-action='get-settled-figure'); capture from Reporting UI"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Report/getDeletedWagerReport",
+      "tag": "Reporting & Forensics",
+      "disposition": "retire/replace: real wire operation in Manager report bundle (Blob 96EA5CDA) is POST /cloud/api/Manager/getReportDeletedTransactions"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Report/getDailyFigure",
+      "tag": "Reporting & Forensics",
+      "disposition": "probe: read-only daily figure report; compare against getDailyFiguresByCustomer"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Report/delete-wager",
+      "tag": "Downline Accounting",
+      "disposition": "retire/replace: UI data-action='delete-wager' routes to POST /cloud/api/Manager/getReportDeletedTransactions (Blob 96EA5CDA)"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/updateByColumn",
+      "tag": "Customer State Mutations",
+      "disposition": "defer: live account state mutation; requires disposable test player + HITL approval gate"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/vigSetupInsert",
+      "tag": "Customer State Mutations",
+      "disposition": "defer: live vig/juice mutation; requires sandboxed vig profile + read-back gate"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/updateCustomerNotes",
+      "tag": "Manager & Player Admin",
+      "disposition": "defer: live player-notes write mutation; blocked until getCustomerNotes 500 is resolved"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/deleteSportsVigSetup",
+      "tag": "Vig & Juice Setup",
+      "disposition": "defer: destructive vig setup deletion; excluded from automated probing"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/deleteWager",
+      "tag": "Wagers & Live Surveillance",
+      "disposition": "defer: destructive live wager deletion (real wire name in Blob A7FD1C99 is deleteBet); excluded from automated probing"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/gameAdmin",
+      "tag": "Tracked Operational Domains",
+      "disposition": "defer: privileged board/line mutation candidate_url from portal_tile_crawler.ts; do not probe on live book"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/adjustBalance",
+      "tag": "Tracked Operational Domains",
+      "disposition": "defer: financial balance mutation candidate_url; excluded from automated probing"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/createPlayer",
+      "tag": "Tracked Operational Domains",
+      "disposition": "defer: account-creation mutation candidate_url; excluded from automated probing"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/System/getMessages",
+      "tag": "Tracked Operational Domains",
+      "disposition": "retire/replace: real wire operations on manager.html boot (manager.js:55125, 31845) are POST /cloud/api/Manager/getMessage, getNewEmailsCount, and getCommunicationMessages"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/get3rdPartyLimits",
+      "tag": "Tracked Operational Domains",
+      "disposition": "probe: read-only crawler tile candidate_url; sniff real wire path when clicking 3rd Party Limits tile"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Report/getAnalysis",
+      "tag": "Tracked Operational Domains",
+      "disposition": "retire/replace: real wire operation in manager.js:93668 is POST /cloud/api/Manager/getReportPlayerAnalysis"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/getScores",
+      "tag": "Tracked Operational Domains",
+      "disposition": "retire/replace: real wire operation in manager.js:86861 is POST /cloud/api/Report/getScoresLiveDynamic (contentType: 'application/json')"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/getAgentTree",
+      "tag": "Tracked Operational Domains",
+      "disposition": "retire/replace: real wire operations on manager.html boot (manager.js:60492, 33074) are POST /cloud/api/Manager/getListAgenstByAgent [sic] and getHeriarchy [sic]"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/getBilling",
+      "tag": "Tracked Operational Domains",
+      "disposition": "defer: low operational priority billing tile candidate_url; sniff only during full tile walk"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Manager/getRules",
+      "tag": "Tracked Operational Domains",
+      "disposition": "defer: static house-rules tile candidate_url; low forensic value"
+    },
+    {
+      "method": "POST",
+      "path": "/cloud/api/Report/getFinancialReport",
+      "tag": "Tracked Operational Domains",
+      "disposition": "probe: read-only stage-7 surveillance action (get-financial-report); sniff real wire path from Reporting UI"
+    }
+  ]
+}

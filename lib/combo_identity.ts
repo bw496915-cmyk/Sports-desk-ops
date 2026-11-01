@@ -5,7 +5,15 @@
  *
  * Implements:
  * 1. Registry extracted from the deobfuscated `customer/report/report.js` (`api/Report/Pending`,
- *    `api/Report/getGrading`, etc.). `[UNVERIFIED]` — names come from client code, not captures.
+ *    `api/Report/getGrading`, etc.).
+ *    - `[CODE]` Parameter names (`["RRO", "agentID", "agentOwner", "customerID", "operation"]` on Manager
+ *      and `["customerID", "operation", "token"]` / `date` / `week` on Report) verified PII-safe (no parameter
+ *      values recorded) in `docs/evidence/captures/schema/_sniffed_form_templates.json`.
+ *    - `[OBSERVED]` Per-prefix routing (`docs/evidence/captures/2026-11-01/`):
+ *      - `[Report]`: `/cloud/api/Report/Pending` (`[A]`, 73-field leg schema) and `/cloud/api/Report/getGrading` (`[A-empty]`).
+ *      - `[Manager]`: `/cloud/api/Manager/getTransactions` (`[A-empty]`, 200 on Manager vs 500 on Report without `date`).
+ *      - `[unknown]`: `getDailyFiguresByCustomer`, `getGradedWagerByCustomer`, `getTicketDetailPrint` (500 on both prefixes;
+ *        tracked in `docs/evidence/captures/pending-500s/diagnostics.json`).
  * 2. Definitive 10-Code `WagerType` Map (`getTypeInfo`: S, M, C, T, L, E, I, P, G, A).
  * 3. Deterministic `getRotationNumber(d)` (`d.Team1ID === d.ChosenTeamID ? d.Team1RotNum : d.Team2RotNum`) + DGS `GameNum + 5000` Alt-Spread normalization.
  * 4. Exact `getLineGame(d)` Teaser & Line Math:
@@ -22,19 +30,19 @@ import type { Brand, Sha256Hex } from "../domain-branded-types.ts";
 // ============================================================================
 
 export const F402_CUSTOMER_REPORT_ENDPOINTS = {
-  /** Fetches open/pending wagers (`getPendingWagers` -> `e.Pending` leg array) */
+  /** `[Report]` `[A]` Fetches open/pending wagers (`getPendingWagers` -> `e.Pending` 73-field leg array) */
   pending: "api/Report/Pending",
-  /** Fetches a specific pending ticket for deletion (`setDeleteWager`) */
+  /** `[UNVERIFIED]` Fetches a specific pending ticket for deletion (`setDeleteWager`; excluded until read-only confirmed) */
   pendingDelete: "api/Report/PendingDelete",
-  /** Fetches 7-day P&L summary (`getDailyFigures`) */
+  /** `[unknown]` 500 on both Manager and Report (`docs/evidence/captures/pending-500s/diagnostics.json`) */
   dailyFiguresByCustomer: "api/Report/getDailyFiguresByCustomer",
-  /** Fetches settled/closed wagers (`getGradedWagers`) */
+  /** `[unknown]` 500 on both Manager and Report (`docs/evidence/captures/pending-500s/diagnostics.json`) */
   gradedWagerByCustomer: "api/Report/getGradedWagerByCustomer",
-  /** Fetches balance/ledger history (`getTransactions`) */
+  /** `[Manager]` `[A-empty]` 200 on `/cloud/api/Manager/getTransactions` (500 on Report without `date=MM/DD/YYYY`) */
   transactions: "api/Report/getTransactions",
-  /** Fetches graded wagers by figure date when `filterDate === true` (4-week backtest endpoint) */
+  /** `[Report]` `[A-empty]` Fetches graded wagers by figure date (`{"LIST":""}` envelope confirmed on `/cloud/api/Report/getGrading`) */
   gradingByFigureDate: "api/Report/getGrading",
-  /** Fetches printable HTML ticket detail (`getTicketDetail`) */
+  /** `[unknown]` 500 on both Manager and Report (`docs/evidence/captures/pending-500s/diagnostics.json`) */
   ticketDetailPrint: "api/Report/getTicketDetailPrint",
 } as const;
 

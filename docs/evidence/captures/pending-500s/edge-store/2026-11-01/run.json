@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "probe-run",
+  "startedAt": "2026-11-01T04:18:16.406Z",
+  "base": "https://fantasy402.com",
+  "backend": "webkit",
+  "authMode": "env-login",
+  "tls": null,
+  "ops": ["/cloud/api/Report/getGradedWagerByCustomer"]
+}

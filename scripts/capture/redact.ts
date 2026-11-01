@@ -75,16 +75,17 @@ const PII_KEY_RULES: readonly KeyRule[] = [
   {
     kind: "customer-id",
     pattern:
-      /^(?:customer_?id|padded_?customer_?id|acct|account_?id|customer_?number)$/i,
+      /^(?:customer_?id|padded_?customer_?id|acct|account_?id|customer_?number|telegram_?id)$/i,
   },
   {
     kind: "login",
     pattern:
-      /^(?:login|customer_?login|user_?name|username|user_?id|userid|bettor|player_?id)$/i,
+      /^(?:login|customer_?login|user_?name|username|user_?id|userid|bettor|player_?id|name_?first|name_?last|name_?mi|first_?name|last_?name)$/i,
   },
   {
     kind: "agent-id",
-    pattern: /^(?:agent_?id|agent_?owner|owner_?id|master_?agent)$/i,
+    pattern:
+      /^(?:agent_?id|agent_?owner|agent_?login|owner_?id|master_?agent)$/i,
   },
   {
     kind: "ip",
@@ -96,7 +97,7 @@ const PII_KEY_RULES: readonly KeyRule[] = [
   },
   {
     kind: "password",
-    pattern: /^(?:password|passwd|pass_?code|pwd|secret)$/i,
+    pattern: /^(?:password|passwordt|passwd|pass_?code|pwd|secret)$/i,
   },
   {
     kind: "token",
@@ -105,7 +106,8 @@ const PII_KEY_RULES: readonly KeyRule[] = [
   },
   {
     kind: "phone",
-    pattern: /^(?:phone|telephone|mobile|cell|phone_?number)$/i,
+    pattern:
+      /^(?:phone|telephone|mobile|cell|phone_?number|sms_?phone_?number|home_?phone|business_?phone|fax)$/i,
   },
   {
     kind: "address",

@@ -83,7 +83,6 @@ id that appears on a task but not in this table is a defect, and a test enforces
 | `RT-PREFEE-PNL`        | P0.2     | `[UNVERIFIED]` third-party toolkit        | one wallet        |
 | `RT-AUTH-BACKEND-DIFF` | P0.3     | `[OBSERVED]` captures/2026-11-01/run.json | CDP vs WebKit     |
 | `RT-GSLIVE-LINKS`      | P1.6     | `[OBSERVED]` three GSLive surfaces        | three captures    |
-| `RT-CLI-ZIP`           | P2.1     | `[OBSERVED]` gs-manager-cli.zip           | provenance note   |
 | `RT-ARTIFACT-CADENCE`  | P2.3     | `[CODE]` package.json:76                  | cadence + check   |
 | `RT-RENDER-HTML`       | Renderer | `[OBSERVED]` MCP api:Bun.markdown.html    | HTML artifact     |
 | `RT-RENDER-ANSI`       | Renderer | `[OBSERVED]` MCP api:Bun.markdown.ansi    | CLI/JS diff       |
@@ -97,36 +96,39 @@ so an id resolves without guessing which artifact it came from.
 
 ## P0 — trust blockers
 
-- [ ] **P0.1 Capture the seven F402 report endpoints (split by prefix-divergent vs prefix-identical)**
+- [ ] **P0.1 Capture the seven F402 customer-report operations by per-prefix group (`[Manager]`, `[Report]`, `[unknown]`)**
   - **Ref:** `RT-F402-CAPTURE`
   - **Basis:** `[OBSERVED]` `docs/evidence/captures/2026-11-01/` (3 promoted 200s + `run.json` TLSv1.3 provenance);
     `[CODE]` PII-safe form-key contract in `docs/evidence/captures/schema/` (parameter names only, no parameter
     values recorded); `[OBSERVED]` client JS inspection of cached `customer/report/report.js` (`offset 8578`,
     `offset 25633`, `offset 33171`, `offset 108955`) and diagnostic/disposition artifact in
     `docs/evidence/captures/pending-500s/diagnostics.json`.
-  - **Prefix-divergent vs prefix-identical classification:**
-    - **`[prefix-divergent]` (`Pending` vs `getPending` — substantive `[A]` on Report):** `POST /cloud/api/Report/Pending`
-      with a real downline player id returned **200 with 41–46 KB** on `2026-11-01` (promoted to `[A]` in
-      `docs/evidence/captures/2026-11-01/Pending.post.json`), whereas `POST /cloud/api/Manager/getPending` last
-      returned **500 (0 B)** on `2026-10-31`. The two prefixes are distinct handlers, not aliases: use
-      `/cloud/api/Report/Pending` and retire `/cloud/api/Manager/getPending` after one identical-payload re-probe.
-    - **`[prefix-divergent]` (`getGrading` — `[A-empty]` + polymorphic `LIST` schema):** `POST /cloud/api/Report/getGrading`
-      returned **200 `{"LIST":""}`** (11 B) on `/cloud/api/Report` and 500 (0 B) on `/cloud/api/Manager` on `2026-11-01`.
-      The empty envelope is a JSON string (`""`), not `[]` or `null`; `parseF402ListEnvelope()` in `lib/blob_ingest.ts`
-      enforces this polymorphic contract (`"" | null -> []`, `Array -> rows`, anything else throws).
-    - **`[prefix-divergent]` (`getTransactions` — `[A-empty]` + cross-prefix routing):** Returned **500 (0 B)** on
-      `/cloud/api/Report` without `date`, **200 `{"LIST":""}`** (11 B) on `/cloud/api/Manager/getTransactions`, and
-      **200 `{"LIST":[]}`** on `/cloud/api/Report/getTransactions` when `date=MM/DD/YYYY` for a settled day is supplied.
-      Both empty shapes (`""` and `[]`) are handled by `parseF402ListEnvelope()`.
-    - **`[prefix-identical]` (`getGradedWagerByCustomer`, `getTicketDetailPrint` — last observed 500 (0 B) on both prefixes on 2026-11-01):**
-      `getDailyFiguresByCustomer` is now **resolved**: with `week` as an integer (0..ShowHowManyWeeks) it returns **200**
-      with real figure data (verified against customers CLL118, NNC128). The original 500 was caused by sending a date
-      string where the server expected an integer week index.
-      Both `/cloud/api/Manager` and `/cloud/api/Report` returned **500 (0 B)** on `2026-11-01`. Because both prefixes
-      fail identically with zero bytes, prefix routing and 4xx parameter validation are ruled out — the shared handler
-      threw before response serialization. Client JS (`customer/report/report.js:25633`) also reveals that
-      `getDailyFiguresByCustomer` is the sole operation sending `contentType: "application/json"` with `JSON.stringify`,
-      explaining why a form-urlencoded probe crashed the JSON body deserializer.
+  - **Per-prefix groups (`[Manager]`, `[Report]`, `[unknown]` — replacing the single-prefix "seven F402 report endpoints" phrasing):**
+    - **`[Manager]` (`getTransactions` — `[A-empty]` + cross-prefix routing):** `POST /cloud/api/Manager/getTransactions`
+      returned **200 `{"LIST":""}`** (11 B, promoted in `docs/evidence/captures/2026-11-01/getTransactions.post.json`),
+      whereas `/cloud/api/Report/getTransactions` returned **500 (0 B)** without `date` and **200 `{"LIST":[]}`** only when
+      `date=MM/DD/YYYY` for a settled day is supplied. Both empty shapes (`""` and `[]`) are handled by
+      `parseF402ListEnvelope()` in `lib/blob_ingest.ts`.
+    - **`[Report]` (`getGrading` and `Pending` — `[A-empty]` and substantive `[A]`):**
+      - `Pending` (`[A]`, prefix-divergent from `Manager/getPending`): `POST /cloud/api/Report/Pending` with a real downline
+        player id returned **200 with 41–46 KB** on `2026-11-01` (73-field `Pending[]` leg objects, promoted to `[A]` in
+        `docs/evidence/captures/2026-11-01/Pending.post.json`), whereas `POST /cloud/api/Manager/getPending` last returned
+        **500 (0 B)** on `2026-10-31`. The two prefixes are distinct handlers, not aliases: use `/cloud/api/Report/Pending`
+        and retire `/cloud/api/Manager/getPending` after one identical-payload re-probe.
+      - `getGrading` (`[A-empty]` + polymorphic `LIST` schema): `POST /cloud/api/Report/getGrading` returned
+        **200 `{"LIST":""}`** (11 B, promoted to `[A]` in `docs/evidence/captures/2026-11-01/getGrading.post.json`) on
+        `/cloud/api/Report` and **500 (0 B)** on `/cloud/api/Manager` on `2026-11-01`. The empty envelope is a JSON string
+        (`""`), not `[]` or `null`; `parseF402ListEnvelope()` in `lib/blob_ingest.ts` enforces this polymorphic contract
+        (`"" | null -> []`, `Array -> rows`, anything else throws).
+    - **`[unknown]` (`getDailyFiguresByCustomer`, `getGradedWagerByCustomer`, `getTicketDetailPrint` — the three 500-on-both):**
+      Both `/cloud/api/Manager` and `/cloud/api/Report` returned **500 (0 B)** on the initial `2026-11-01` default-envelope
+      probe (staged in `docs/evidence/captures/pending-500s/diagnostics.json`). Because both prefixes failed identically with
+      zero bytes, prefix routing and 4xx parameter validation were ruled out — the shared handler threw before response
+      serialization. Client JS (`customer/report/report.js:25633`) subsequently revealed that `getDailyFiguresByCustomer` is
+      the sole operation sending `contentType: "application/json"` with `JSON.stringify` and an integer `week` index
+      (`0..ShowHowManyWeeks`), resolving `getDailyFiguresByCustomer` to **200** with real figure data (verified against
+      customers CLL118, NNC128); `getGradedWagerByCustomer` and `getTicketDetailPrint` remain `[unknown]` (500-on-both)
+      pending valid `week` / `ticketNumber`+`wagerNumber`+`flag` captures.
     - **`[client-js-read-only]` (`PendingDelete` — resolved in `customer/report/report.js:8578`):** Client JS inspection
       (`setDeleteWager` at `offset 42092` -> `getPendingWagers` with `deleteWagers: true` at `offset 8578`) confirms
       `PendingDelete` sends `{ customerID, ticketNumber, operation: "PendingDelete" }`, logs `"View Pending Plays Selected"`,
@@ -143,9 +145,9 @@ so an id resolves without guessing which artifact it came from.
     `3f302482ed919d3da6a0a6293d297660774b03a8ea3571201dfd8b8edf0959da`) lives under
     `docs/evidence/captures/runtime/bun-image/`, and `docs/evidence/captures/2026-11-01/run.json` records the live
     `TLSv1.3` (`TLS_AES_128_GCM_SHA256`, 73 ms, Google Trust Services WE1) handshake beside the promoted captures.
-  - **Done when:** (1) one upstream server error log line is retrieved for the `prefix-identical` 500 handler group,
+  - **Done when:** (1) one upstream server error log line is retrieved for the `[unknown]` 500-on-both handler group,
     (2) the six dated 500s (`3` from `2026-11-01` and `3` from `2026-10-31`) are re-probed with their identical captured
-    payloads to separate deterministic crashes from transient failures, (3) `getDailyFiguresByCustomer` is probed with
+    payloads to separate deterministic crashes from transient failures, (3) `getDailyFiguresByCustomer` is promoted with
     `application/json` per `report.js:25633`, and (4) `PendingDelete` is probed with sentinel `ticketNumber=-1` and
     promoted or retired.
   - **Blocked by:** upstream server error log access for the `500 (0 B)` handler crashes and a live session to execute
@@ -163,21 +165,22 @@ so an id resolves without guessing which artifact it came from.
     cashflow replay, with the capture path recorded.
   - **Blocked by:** activity rows that carry `size` and `price` for every fill.
 
-- [ ] **P0.3 Verify the backend-layer resolution for the Authorization-header discrepancy**
+- [ ] **P0.3 Verify the backend-difference resolution (WebKit in-page vs CDP) for the Authorization-header discrepancy**
   - **Ref:** `RT-AUTH-BACKEND-DIFF`
   - **Basis:** `[OBSERVED]` 2026-10-28 HAR recorded no `Authorization` header (`auth: "cookie"`), 2026-10-31 live
     captures recorded `authorization: "<redacted>"`, and 2026-11-01 WebKit probes (`docs/evidence/captures/2026-11-01/run.json`)
     recorded `backend: "webkit"`, `authMode: "env-login"`, `headersObserved: false`.
-  - **Hypothesis:** Both prior observations were truthful views of different capture backends. Under `env-login`,
-    WebKit in-page `fetch`/`XMLHttpRequest` sniffing (`--sniff-requests`) observes form keys in page context without
-    exposing wire headers (`headersObserved: false`), whereas CDP-backed captures (`Network.requestWillBeSent` on
-    `--backend chrome`) surface the outbound `Authorization: Bearer <redacted>` header attached from
-    `sessionStorage.credentials.code`.
-  - **Done when:** one confirmed 200 operation (`getTransactions` on `/cloud/api/Manager` or `getGrading` on
-    `/cloud/api/Report`) is re-captured with `--backend chrome` (CDP) and diffed against the WebKit `run.json` +
-    probe record, confirming CDP surfaces the redacted `Authorization` header while WebKit records
-    `authMode: "env-login"` with `headersObserved: false`.
-  - **Blocked by:** a local Chrome/Chromium binary (`BUN_CHROME_PATH`) to execute the single-op CDP comparison run.
+  - **Likely resolution (backend-difference hypothesis — WebKit in-page vs CDP):** Both prior observations were truthful
+    views of different capture backends rather than an upstream auth change. Under `env-login`, WebKit in-page
+    `fetch`/`XMLHttpRequest` sniffing (`--sniff-requests`) observes form keys in page context without exposing wire
+    headers (`headersObserved: false`), whereas CDP-backed captures (`Network.requestWillBeSent` on `--backend chrome`)
+    intercept at the browser network stack and surface the outbound `Authorization: Bearer <redacted>` header attached
+    from `sessionStorage.credentials.code`.
+  - **Done when:** CDP re-capture (`--backend chrome`) of one confirmed 200 (`getTransactions` on `/cloud/api/Manager`,
+    or `getGrading` / `Pending` on `/cloud/api/Report`) is diffed against the WebKit `run.json` + probe record,
+    confirming CDP surfaces the redacted `Authorization` header while WebKit records `authMode: "env-login"` with
+    `headersObserved: false`.
+  - **Blocked by:** a local Chrome/Chromium binary (`BUN_CHROME_PATH`) to execute the single-op CDP re-capture.
 
 ## P1 — coverage and data quality
 
@@ -189,18 +192,6 @@ so an id resolves without guessing which artifact it came from.
   - **Blocked by:** a GSLive session.
 
 ## P2 — hygiene
-
-- [ ] **P2.1 Resolve the untracked `gs-manager-cli.zip`**
-  - **Ref:** `RT-CLI-ZIP`
-  - **Basis:** `[OBSERVED]` 31 KB, 18 files, `package.json` says `gs-manager-cli 0.2.0`, `"private": true`,
-    and declares **no licence**; README describes a dependency-free Bun CLI whose live acquisition is
-    deliberately blocked. The contents are self-describing enough for a checksum sidecar, but not for a
-    redistribution grant.
-  - **Done when:** it is either documented and committed with provenance, or deleted.
-  - **Guard:** `bun run audit:archives` fails on any tracked archive without a matching
-    `provenance/<name>.json` (checksum, origin, licence), so it cannot be committed by accident.
-  - **Blocked by:** a licence statement (or a delete). With `private: true` and no licence file, committing
-    it would assert a redistribution right nobody has recorded.
 
 - [ ] **P2.3 Schedule artifact regeneration**
   - **Ref:** `RT-ARTIFACT-CADENCE`
@@ -222,6 +213,8 @@ so an id resolves without guessing which artifact it came from.
 
 ## Done (for context)
 
+- [x] `[CODE]` Untracked `gs-manager-cli.zip` deleted (`P2.1`, `RT-CLI-ZIP`): its extracted contents remain in
+      `scratch/docs-audit/gs-manager-cli/` for local audit reference, and `bun run audit:archives` passes with zero warnings.
 - [x] `[OBSERVED]` Channel model: 955 live `getBetTicker` rows carry `TicketWriter` = Internet, ALERT,
       GSLIVE, GSBUILDER, plus one dirty `WILBANKS.` value that is an agent login. `GATEWAY`, `BLOCKED` and
       `CSLEVEL2` never appear, so the lane table describes configuration, not observed traffic.
@@ -230,7 +223,8 @@ so an id resolves without guessing which artifact it came from.
 - [x] `[OBSERVED]` Manager auth is `Authorization: Bearer <sessionStorage.credentials.code>`; without it
       openresty answers 401. The `fantasy402Cookie` security scheme now says so.
 - [x] `[CODE]` Claim labels and citation tests (`[CODE]` / `[OBSERVED]` / `[UNVERIFIED]` / `[ASSUMPTION]`).
-- [x] `[CODE]` Seven F402 report endpoints published as tier-C candidates.
+- [x] `[CODE]` Seven F402 customer-report operations published as tier-C candidates (split by route prefix in P0.1:
+      `[Manager]` for `getTransactions`, `[Report]` for `getGrading` and `Pending`, `[unknown]` for the three 500-on-both).
 - [x] `[CODE]` TypeScript pinned to 5.9.3 for `bunx tsc`.
 - [x] `[CODE]` Stale docs tags are registered as superseded and non-deployable: `docs/releases.json`,
       enforced by `bun run audit:release`.

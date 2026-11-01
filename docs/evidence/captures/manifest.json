@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
   "store": "evidence-captures",
-  "generatedAt": "2026-10-31T00:19:57.603Z",
+  "generatedAt": "2026-11-01T04:25:37.691Z",
   "policyVersion": 1,
   "counts": {
-    "total": 8,
-    "live": 8,
+    "total": 15,
+    "live": 15,
     "mock": 0,
-    "withResponse": 8,
+    "withResponse": 15,
     "withoutResponse": 0,
-    "withSuccessResponse": 5,
-    "withErrorResponse": 3,
-    "emptyResponse": 3,
-    "clean": 8,
+    "withSuccessResponse": 11,
+    "withErrorResponse": 4,
+    "emptyResponse": 4,
+    "clean": 15,
     "operations": [
       "/cloud/api/Manager/getBetTicker",
       "/cloud/api/Manager/getBetTickerConfig",
@@ -20,8 +20,15 @@
       "/cloud/api/Manager/getInfoManager",
       "/cloud/api/Manager/getInfoPlayer",
       "/cloud/api/Manager/getPending",
+      "/cloud/api/Manager/getSportsType",
       "/cloud/api/Manager/getSportsVigSetup",
-      "/cloud/api/Manager/getWebLog"
+      "/cloud/api/Manager/getTransactions",
+      "/cloud/api/Manager/getWebLog",
+      "/cloud/api/Report/Pending",
+      "/cloud/api/Report/PendingDelete",
+      "/cloud/api/Report/getDailyFiguresByCustomer",
+      "/cloud/api/Report/getGradedWagerByCustomer",
+      "/cloud/api/Report/getGrading"
     ]
   },
   "captures": [
@@ -34,7 +41,7 @@
         "method": "POST",
         "operationId": "postCloudApiManagerGetBetTicker"
       },
-      "captureHash": "c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9",
+      "captureHash": "7812193f3ba148e79626a877a33a7bdadd1bb6aa8ed61b21cb576511126a5f02",
       "requestBodySha256": "e82ab1293b5134178a5c2644cbf55125669e2f2968ec650d837f13ae0128e94e",
       "responseStatus": 200,
       "responseBodySha256": "6476f3f36fde99907c849cc28e3e8ccd7b1b63de43a3f659636c9664054bff5d",
@@ -49,9 +56,20 @@
         "portalHost": "fantasy402.com",
         "proxy": "none",
         "auth": "cookie",
-        "bunVersion": "1.4.4"
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
       },
-      "samples": 1
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
     },
     {
       "file": "2026-10-31/getBetTickerConfig.post.json",
@@ -62,7 +80,7 @@
         "method": "POST",
         "operationId": "postCloudApiManagerGetBetTickerConfig"
       },
-      "captureHash": "a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e",
+      "captureHash": "d0bf271bd072308af85c0b857b03aa59a42a338f49f479511b4dbffeef39a0c9",
       "requestBodySha256": "f5847aeda6ee571a84bd54a442c10dc023ec4488a894dd85f279662436d7f575",
       "responseStatus": 200,
       "responseBodySha256": "8e8fedd17bfabe36c7753dbdf7c5e71f5748adb1fd5b13fe4d8a1993b7ff686e",
@@ -77,9 +95,20 @@
         "portalHost": "fantasy402.com",
         "proxy": "none",
         "auth": "cookie",
-        "bunVersion": "1.4.4"
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
       },
-      "samples": 1
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
     },
     {
       "file": "2026-10-31/getCustomerNotes.post.json",
@@ -90,7 +119,7 @@
         "method": "POST",
         "operationId": "postCloudApiManagerGetCustomerNotes"
       },
-      "captureHash": "297d776148e6e3f8e76eec8cd21f2658fe00d31d270727709fd8a94f50768bed",
+      "captureHash": "92f716edf063b37e842968ab908356cf234a71d59374e0727e43d86e1d8ff231",
       "requestBodySha256": "2c2b65f7f40122799aa97e2a01def8a46a12b42b0d88837fb0a4dcb9f72cdd89",
       "responseStatus": 500,
       "responseBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -105,9 +134,20 @@
         "portalHost": "fantasy402.com",
         "proxy": "none",
         "auth": "cookie",
-        "bunVersion": "1.4.4"
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
       },
-      "samples": 1
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
     },
     {
       "file": "2026-10-31/getInfoManager.post.json",
@@ -118,7 +158,7 @@
         "method": "POST",
         "operationId": "postCloudApiManagerGetInfoManager"
       },
-      "captureHash": "999d43e882a56179f88293ccfed4c02fff9a34ffc0523bb8c8265f9cd35c843a",
+      "captureHash": "652b8e4197d0724975584ba2b0b8573f2b2511d3e60849b17fa65761642bb41b",
       "requestBodySha256": "69f8ac9ca1d6f9d8b12297de2809d2d4fc96c2291eeee35c350136447204f63b",
       "responseStatus": 500,
       "responseBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -133,9 +173,20 @@
         "portalHost": "fantasy402.com",
         "proxy": "none",
         "auth": "cookie",
-        "bunVersion": "1.4.4"
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
       },
-      "samples": 1
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
     },
     {
       "file": "2026-10-31/getInfoPlayer.post.json",
@@ -146,7 +197,7 @@
         "method": "POST",
         "operationId": "postCloudApiManagerGetInfoPlayer"
       },
-      "captureHash": "431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597",
+      "captureHash": "79a5b83c3c818fe6f7356b334c7703839336c4de0857b6ca6f9f62df0938a49e",
       "requestBodySha256": "3e51819066874957bf6521b3f69deb40cb49894b214740f848e5cabdc47d1b32",
       "responseStatus": 200,
       "responseBodySha256": "3eeb9db890d90b53b1c51cf04b7d9c3a47cba5f4c64eac3b541e7f50d39a37e1",
@@ -161,9 +212,20 @@
         "portalHost": "fantasy402.com",
         "proxy": "none",
         "auth": "cookie",
-        "bunVersion": "1.4.4"
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
       },
-      "samples": 1
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
     },
     {
       "file": "2026-10-31/getPending.post.json",
@@ -174,7 +236,7 @@
         "method": "POST",
         "operationId": "postCloudApiManagerGetPending"
       },
-      "captureHash": "fc7ce31bf46d2b1b73ca2dd16ed71e73cd7999d23f9c545ec9c3b2d15c0ddb90",
+      "captureHash": "359a57f5b391586bb30c5077d2464f0c2ad438390656b3c09bbb9012b2980c7c",
       "requestBodySha256": "83a7f447299604af587427d8df4e1d2c5540da8a98b4bd2a9fd50abcd1f810e1",
       "responseStatus": 500,
       "responseBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -189,9 +251,50 @@
         "portalHost": "fantasy402.com",
         "proxy": "none",
         "auth": "cookie",
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
+      },
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
+    },
+    {
+      "file": "2026-10-31/getSportsType.post.json",
+      "mode": "live",
+      "capturedAt": "2026-10-31T00:21:29.359Z",
+      "operation": {
+        "path": "/cloud/api/Manager/getSportsType",
+        "method": "POST",
+        "operationId": "catalogProbeGetSportsType"
+      },
+      "captureHash": "436e1cc17b831c747b322ac900146da22fe229dcaec685f3751ab38b7d92396d",
+      "requestBodySha256": "d646025067ee3cd3ef6ce062541efa5a1493c000a587e3a5d95e4130712b1402",
+      "responseStatus": 200,
+      "responseBodySha256": "105edc9c5766b3d5f0e896d3267286ce404cf2c6ef755a3ed92bcbba3c5f4221",
+      "responseBytes": 1226,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 4,
+        "piiRedacted": 1
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
         "bunVersion": "1.4.4"
       },
-      "samples": 1
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
     },
     {
       "file": "2026-10-31/getSportsVigSetup.post.json",
@@ -202,7 +305,7 @@
         "method": "POST",
         "operationId": "postCloudApiManagerGetSportsVigSetup"
       },
-      "captureHash": "25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606",
+      "captureHash": "061bc4d62e351f56c76cb510d012b2e53e2a1db293806a5b70728725139667b8",
       "requestBodySha256": "82aeda4769109092b977519e475ec3eacbe665455e31c6a9ccbf29286d6b729b",
       "responseStatus": 200,
       "responseBodySha256": "9e34409b3ae72b41bea2421597ae611453b419fa9ff197ccd09ca6627fb4b677",
@@ -217,9 +320,20 @@
         "portalHost": "fantasy402.com",
         "proxy": "none",
         "auth": "cookie",
-        "bunVersion": "1.4.4"
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
       },
-      "samples": 1
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
     },
     {
       "file": "2026-10-31/getWebLog.post.json",
@@ -230,7 +344,7 @@
         "method": "POST",
         "operationId": "postCloudApiManagerGetWebLog"
       },
-      "captureHash": "cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712",
+      "captureHash": "3b9a7c7061285460ca36b821af59741f44ea79277ae8bfbe4d100e011f1185ac",
       "requestBodySha256": "cd6846cccd4c35ad7efdbb277528703a6688416638d2b4e81b1a3f7ba8429bd6",
       "responseStatus": 200,
       "responseBodySha256": "979266c4b6abea5fff0de99966ece0363c5354859c92f5260870ea9507d2abaf",
@@ -245,9 +359,265 @@
         "portalHost": "fantasy402.com",
         "proxy": "none",
         "auth": "cookie",
-        "bunVersion": "1.4.4"
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
       },
-      "samples": 1
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
+    },
+    {
+      "file": "2026-11-01/getDailyFiguresByCustomer.post.json",
+      "mode": "live",
+      "capturedAt": "2026-11-01T04:05:20.098Z",
+      "operation": {
+        "path": "/cloud/api/Report/getDailyFiguresByCustomer",
+        "method": "POST"
+      },
+      "captureHash": "2d93abcd22ea99b329d417e0771c82efa912f80b291cb0b59194726ad3a7a3b6",
+      "requestBodySha256": "863c0ab1efeacc967399bd4210b1cd2ab347fb5612c929e941470f7eb1480de2",
+      "responseStatus": 200,
+      "responseBodySha256": "b072a7a032394c3c24182b89587d8881878cb077a6a2690279d3f66eb00e54df",
+      "responseBytes": 14,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 3,
+        "piiRedacted": 2
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4",
+        "observation": "webkit",
+        "body": "populated-shell",
+        "request": "minimal",
+        "mutation": "read-inferred",
+        "waf": "cloudflare",
+        "cfRay": "a5380531ccb34532-ATL",
+        "backend": "webkit",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "domVersion": "1.0.280",
+          "domOrigin": "fantasy402.com",
+          "challengePresent": false
+        },
+        "origin": "fantasy402.com"
+      },
+      "samples": 1,
+      "derivedTier": "A-shell",
+      "derivedTierReason": "body is populated-shell (server-rendered layout chrome/metadata, dynamic content unpopulated)",
+      "captureRecipeSha256": "0dfcf4dab71ea2f758484bfaa2d938bf91d6b279fc24d36945040860e64ddb70"
+    },
+    {
+      "file": "2026-11-01/getGradedWagerByCustomer.post.json",
+      "mode": "live",
+      "capturedAt": "2026-11-01T04:18:16.362Z",
+      "operation": {
+        "path": "/cloud/api/Report/getGradedWagerByCustomer",
+        "method": "POST"
+      },
+      "captureHash": "6c67aa9ad26172ed8346a7adf95ff23885d5a5cc1de5ba45676bb0132b77b432",
+      "requestBodySha256": "b8fe94363f0719233cf85c4779cd2ce5c8cd3779e6ec7c0881a44ecbae32e711",
+      "responseStatus": 500,
+      "responseBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "responseBytes": 0,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 3,
+        "piiRedacted": 2
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4",
+        "observation": "webkit",
+        "body": "empty-500",
+        "mutation": "read-inferred",
+        "request": "minimal",
+        "waf": "cloudflare",
+        "cfRay": "a53818343f1c8857-ATL",
+        "backend": "webkit",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
+      },
+      "samples": 1,
+      "derivedTier": "C-edge",
+      "derivedTierReason": "empty-500 at Cloudflare edge (cfRay=a53818343f1c8857-ATL)"
+    },
+    {
+      "file": "2026-11-01/getGrading.post.json",
+      "mode": "live",
+      "capturedAt": "2026-11-01T02:22:35.993Z",
+      "operation": {
+        "path": "/cloud/api/Report/getGrading",
+        "method": "POST"
+      },
+      "captureHash": "253af38aeb01e56e32e0db8922efc7ec525cc2aa53f1b345c41be5675483c06c",
+      "requestBodySha256": "ba03abdbe11d32c298ee4f21b6b59ebc4f92f018c332ce774897dd6897356c7f",
+      "responseStatus": 200,
+      "responseBodySha256": "b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c",
+      "responseBytes": 11,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 3,
+        "piiRedacted": 2
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
+      },
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
+    },
+    {
+      "file": "2026-11-01/getTransactions.post.json",
+      "mode": "live",
+      "capturedAt": "2026-11-01T02:07:42.209Z",
+      "operation": {
+        "path": "/cloud/api/Manager/getTransactions",
+        "method": "POST"
+      },
+      "captureHash": "3de9ac6c0f61a78d131416a0ed8d14e3bed065675b0106f25e53dea97c303ef7",
+      "requestBodySha256": "94a4142905b8fe7b174d68aedf38f3c4c5eb75053a1178823920ac379f0715e5",
+      "responseStatus": 200,
+      "responseBodySha256": "b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c",
+      "responseBytes": 11,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 4,
+        "piiRedacted": 2
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
+      },
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
+    },
+    {
+      "file": "2026-11-01/Pending.post.json",
+      "mode": "live",
+      "capturedAt": "2026-11-01T02:22:35.774Z",
+      "operation": {
+        "path": "/cloud/api/Report/Pending",
+        "method": "POST"
+      },
+      "captureHash": "719cb5f63fe0123aa26e02a01e4969a7051bc822e1e0fb9de42ea3308896dcc3",
+      "requestBodySha256": "c39bb4bf24bf685fd211430466ac8bf4cd052ea032487d39cc8357b8ba404d49",
+      "responseStatus": 200,
+      "responseBodySha256": "6c65708478ad70ca3286c68cb0e32e400998d7f4c9fed2f8c614084315e2c277",
+      "responseBytes": 41339,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 7,
+        "piiRedacted": 4
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4",
+        "observation": "authored",
+        "body": "none",
+        "mutation": "unknown",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
+      },
+      "samples": 1,
+      "derivedTier": "C",
+      "derivedTierReason": "body is none (no response body text recorded)"
+    },
+    {
+      "file": "2026-11-01/PendingDelete.post.json",
+      "mode": "live",
+      "capturedAt": "2026-11-01T04:19:29.720Z",
+      "operation": {
+        "path": "/cloud/api/Report/PendingDelete",
+        "method": "POST"
+      },
+      "captureHash": "c1aa1efea5f537c2db2d036c07d9a0423e5f5f1bd9fb53d62ef308cde9aef59e",
+      "requestBodySha256": "4ce26e0411b0e050e9a1911b3fe45ad6c02e9746ccb85fa88960559e86d77258",
+      "responseStatus": 200,
+      "responseBodySha256": "af7ff3397ceee92fbfe8142bbcfee14c72b8cb94adc897af19555235dfbad335",
+      "responseBytes": 14,
+      "redaction": {
+        "policyVersion": 1,
+        "clean": true,
+        "fieldsRedacted": 3,
+        "piiRedacted": 2
+      },
+      "provenance": {
+        "portalHost": "fantasy402.com",
+        "proxy": "none",
+        "auth": "cookie",
+        "bunVersion": "1.4.4",
+        "observation": "webkit",
+        "body": "populated",
+        "mutation": "read-inferred",
+        "request": "minimal",
+        "waf": "cloudflare",
+        "cfRay": "a53819fe9ed6191d-ATL",
+        "backend": "webkit",
+        "state": {
+          "viewMode": "unknown",
+          "sessionStorageCleared": false,
+          "betTickerParam": false,
+          "challengePresent": false
+        }
+      },
+      "samples": 1,
+      "derivedTier": "A",
+      "derivedTierReason": "body is populated with minimal request and read-inferred mutation",
+      "captureRecipeSha256": "5ea701dfa714d51a698cf58b20b66bbdd687078f1ea1e6a8e8b85612fb4230ad"
     }
   ]
 }

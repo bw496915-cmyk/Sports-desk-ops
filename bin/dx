@@ -104,6 +104,7 @@ SportsDesk DX — operator commands
   ./bin/dx poll [--once] [--live] [--live-f402]
                                   Poll feeds (--live = Polymarket, --live-f402 = F402 probe)
   ./bin/dx watch                  In-process Bun.cron daemon (60s) + R2 sync
+  ./bin/dx pipeline               End-to-end verification + docs/tasks render + lock check
   ./bin/dx stage                  Regenerate + stage dist/ (no upload)
   ./bin/dx deploy                 Stage, publish to R2 and Cloudflare Pages
   ./bin/dx ship                   Deploy, then push main
@@ -227,6 +228,16 @@ EOF
   watch)
     cd "$REPO_ROOT"
     exec bun --watch run scripts/graph_feed_poller_daemon.ts --cron "$@"
+    ;;
+  pipeline)
+    cd "$REPO_ROOT"
+    bun run apply:captures --dry-run
+    bun run artifacts:lock
+    bun run audit:ops
+    bun run docs:render
+    bun run tasks:render --no-color --columns 0 >/dev/null
+    bun run verify:docs
+    echo "✓ Pipeline verification gates passed (apply:captures, artifacts:lock, audit:ops, docs:render, tasks:render, verify:docs)"
     ;;
   stage)
     cd "$REPO_ROOT"

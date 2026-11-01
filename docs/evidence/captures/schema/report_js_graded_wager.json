@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "kind": "client-js-route-evidence",
+  "capturedAt": "2026-11-01T04:18:00.000Z",
+  "sourceUrl": "https://www.fantasy402.com/app/customer/report/report.js",
+  "getGradedWagerByCustomer": {
+    "function": "getGradedWagers",
+    "operation": "getGradedWagerByCustomer",
+    "httpMethod": "POST",
+    "wireUrl": "this.path + param.operation",
+    "resolvedPath": "/cloud/api/Report/getGradedWagerByCustomer",
+    "bodyKeys": ["customerID", "week", "token", "operation"],
+    "customerIdSource": "Customer.ID (customer/customer.js init; AgentView=ON uses URL CustomerID param)",
+    "weekSource": "options.week (integer index, default 0 in setGradedWagers)",
+    "tokenSource": "Security.token"
+  },
+  "agentProbeNote": "Probes from manager login without report UI may send correct customerID in body but lack Customer module context; use capture:f402 --report-customer-context when reprobing graded 500s."
+}

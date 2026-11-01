@@ -141,13 +141,13 @@
           "tier": "A",
           "sources": [
             "capture:2026-10-31/getBetTicker.post.json",
-            "sha256:c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9"
+            "sha256:7812193f3ba148e79626a877a33a7bdadd1bb6aa8ed61b21cb576511126a5f02"
           ],
           "capturedResponse": true
         },
         "x-capture": {
           "file": "2026-10-31/getBetTicker.post.json",
-          "sha256": "c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9",
+          "sha256": "7812193f3ba148e79626a877a33a7bdadd1bb6aa8ed61b21cb576511126a5f02",
           "capturedAt": "2026-10-31T00:19:51.608Z",
           "status": 200,
           "samples": 1
@@ -267,13 +267,13 @@
           "tier": "A",
           "sources": [
             "capture:2026-10-31/getBetTickerConfig.post.json",
-            "sha256:a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e"
+            "sha256:d0bf271bd072308af85c0b857b03aa59a42a338f49f479511b4dbffeef39a0c9"
           ],
           "capturedResponse": true
         },
         "x-capture": {
           "file": "2026-10-31/getBetTickerConfig.post.json",
-          "sha256": "a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e",
+          "sha256": "d0bf271bd072308af85c0b857b03aa59a42a338f49f479511b4dbffeef39a0c9",
           "capturedAt": "2026-10-31T00:19:51.741Z",
           "status": 200,
           "samples": 1
@@ -320,10 +320,11 @@
           "sources": [
             "simulate_bettor_churn_suite.ts:91-104",
             "lib/fantasy402_wager_universe_scope.ts:13-21",
-            "docs/openapi.json"
+            "docs/openapi.json",
+            "docs/evidence/captures/pending-500s/diagnostics.json"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Capture the request (form vs JSON content type is disputed by the spec's own application/json choice) and a non-empty response; verify BLOCKED sentinel rows (L19.N0518) and zero-stake rows actually appear. Upgrades C->A.",
+          "requiredCapture": "Prefix-divergent from /cloud/api/Report/Pending (Tier A, 200 41-46 KB). In Manager report bundle (Blob A7FD1C99), Manager/getPending sends form-urlencoded {agentID, type, operation: \"getPending\", RRO} and reads {LIST, TOTAL}. Re-probe with {agentID, type: \"\", operation: \"getPending\", RRO: \"1\"} or retire in favor of /cloud/api/Report/Pending.",
           "contradicted": true
         }
       }
@@ -413,13 +414,13 @@
           "tier": "A",
           "sources": [
             "capture:2026-10-31/getWebLog.post.json",
-            "sha256:cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712"
+            "sha256:3b9a7c7061285460ca36b821af59741f44ea79277ae8bfbe4d100e011f1185ac"
           ],
           "capturedResponse": true
         },
         "x-capture": {
           "file": "2026-10-31/getWebLog.post.json",
-          "sha256": "cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712",
+          "sha256": "3b9a7c7061285460ca36b821af59741f44ea79277ae8bfbe4d100e011f1185ac",
           "capturedAt": "2026-10-31T00:19:51.204Z",
           "status": 200,
           "samples": 1
@@ -445,7 +446,7 @@
             "docs/openapi.json"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Capture one omnisearch request triggered from search-component (URL, method, content type, term/type/agentID fields) and its result rows. Upgrades C->A and confirms candidate_url.",
+          "requiredCapture": "In app/manager/manager.js:49675 (v1.0.280), the omnisearch handler calls POST /cloud/api/Manager/searchCustomerAdmin with {agentID, filter, operation: \"searchCustomerAdmin\", RRO: 1}. Capture searchCustomerAdmin on the wire and reconcile this candidate_url.",
           "candidateUrl": true
         }
       }
@@ -535,13 +536,13 @@
           "tier": "A",
           "sources": [
             "capture:2026-10-31/getInfoPlayer.post.json",
-            "sha256:431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597"
+            "sha256:79a5b83c3c818fe6f7356b334c7703839336c4de0857b6ca6f9f62df0938a49e"
           ],
           "capturedResponse": true
         },
         "x-capture": {
           "file": "2026-10-31/getInfoPlayer.post.json",
-          "sha256": "431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597",
+          "sha256": "79a5b83c3c818fe6f7356b334c7703839336c4de0857b6ca6f9f62df0938a49e",
           "capturedAt": "2026-10-31T00:19:51.314Z",
           "status": 200,
           "samples": 1
@@ -614,13 +615,13 @@
           "tier": "A",
           "sources": [
             "capture:2026-10-31/getSportsVigSetup.post.json",
-            "sha256:25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606"
+            "sha256:061bc4d62e351f56c76cb510d012b2e53e2a1db293806a5b70728725139667b8"
           ],
           "capturedResponse": true
         },
         "x-capture": {
           "file": "2026-10-31/getSportsVigSetup.post.json",
-          "sha256": "25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606",
+          "sha256": "061bc4d62e351f56c76cb510d012b2e53e2a1db293806a5b70728725139667b8",
           "capturedAt": "2026-10-31T00:19:53.742Z",
           "status": 200,
           "samples": 1
@@ -666,10 +667,11 @@
           "tier": "C",
           "sources": [
             "docs/evidence/captures/2026-10-31/getInfoManager.post.json",
-            "docs/openapi.json"
+            "docs/openapi.json",
+            "docs/evidence/captures/pending-500s/diagnostics.json"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Capture the dashboard header request/response; confirm the exact JSON keys (the spec uses hyphenated names like 'grand-total-weekly', which is unusual enough to need proof). Upgrades C->A."
+          "requiredCapture": "Last observed 500 (0 B) on 2026-10-31. In app/manager/manager.js (v1.0.280, Blob 610B48F7), no getInfoManager operation exists: manager.html boot calls POST /cloud/api/Manager/getAccountInfoOwner (application/json, {agentID, operation}) for accountInfo and POST /cloud/api/Manager/getWeeklyFigureByAgentLite for [data-field=\"grand-total-weekly\"]. Retrieve upstream 500 log or replace with getAccountInfoOwner."
         }
       }
     },
@@ -688,7 +690,7 @@
           "tier": "C",
           "sources": ["none", "docs/openapi.json"],
           "capturedResponse": false,
-          "requiredCapture": "Capture the Reporting weekly-figure request/response (the data-action is itself unverified). Upgrades C->A."
+          "requiredCapture": "On manager.html (v1.0.280) boot, weekly figures are fetched via POST /cloud/api/Manager/getWeeklyFigureByAgentLite ({agentID, week: 0, type: \"A\", layout: \"byDay\", operation: \"getWeeklyFigureByAgentLite\", RRO: 1} at manager.js:52703) and POST /cloud/api/Manager/getMasterSheet (manager.js:43955). Capture getWeeklyFigureByAgentLite and reconcile."
         }
       }
     },
@@ -757,7 +759,7 @@
             "docs/openapi.json"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Capture the Reporting Deleted Wagers view request/response; also determine whether delete-wager and getDeletedWagerReport are distinct wire actions. Upgrades C->A.",
+          "requiredCapture": "UI stage-5 Deleted Wagers action routes to POST /cloud/api/Manager/getReportDeletedTransactions in Blob 96EA5CDA (whereas PendingDelete in report.js:8578 is the read-only Ticket Detail modal lookup). Capture getReportDeletedTransactions and reconcile.",
           "candidateUrl": true
         }
       }
@@ -1359,7 +1361,7 @@
             "docs/evidence/captures/2026-10-31/getCustomerNotes.post.json"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Capture a customer notes read; confirm the notes row fields and whether notes are operator-annotations or wire-native. Upgrades C->A."
+          "requiredCapture": "Last observed 500 (0 B) on 2026-10-31 (handler crashed before response serialization). 1. Retrieve upstream server error log for the 500; 2. Re-probe with the identical 2026-10-31 payload to separate deterministic crash from transient failure."
         }
       }
     },
@@ -1435,7 +1437,7 @@
           "tier": "C",
           "sources": ["scripts/enhance_docs.mjs:213", "none"],
           "capturedResponse": false,
-          "requiredCapture": "Capture the deleted-wager audit read; determine whether it duplicates POST /cloud/api/Report/delete-wager. Upgrades C->A."
+          "requiredCapture": "In the Manager deleted-wagers report bundle (Blob 96EA5CDA), the wire call is POST /cloud/api/Manager/getReportDeletedTransactions. Capture getReportDeletedTransactions and reconcile with /cloud/api/Report/delete-wager."
         }
       }
     },
@@ -1511,7 +1513,7 @@
             "docs/openapi.json"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Open the 'Messaging' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "requiredCapture": "On manager.html (v1.0.280) boot, messages are fetched via POST /cloud/api/Manager/getMessage ({acc, type: 0, operation: \"getMessage\", RRO: 1} at manager.js:55125) and POST /cloud/api/Manager/getNewEmailsCount (manager.js:31845). Capture Manager/getMessage and reconcile this candidate_url.",
           "candidateUrl": true
         },
         "x-discovery-status": "UNDER_SURVEILLANCE",
@@ -1645,7 +1647,7 @@
             "operational_guardrails_runbook.md:166"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Open the 'Analysis' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "requiredCapture": "In app/manager/manager.js:93668 (v1.0.280), the Analysis view calls POST /cloud/api/Manager/getReportPlayerAnalysis ({agentID, agentOwner, customerID, reportType, startDate, endDate, lineType, operation: \"getReportPlayerAnalysis\", RRO: 1}). Capture getReportPlayerAnalysis and reconcile.",
           "candidateUrl": true
         },
         "x-discovery-status": "UNDER_SURVEILLANCE",
@@ -1674,7 +1676,7 @@
             "docs/openapi.json"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Open the 'Scores' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "requiredCapture": "In app/manager/manager.js:86861 (v1.0.280), the Scores panel calls POST /cloud/api/Report/getScoresLiveDynamic with contentType: \"application/json\" and JSON.stringify({operation: \"getScoresLiveDynamic\"}). Capture getScoresLiveDynamic and reconcile.",
           "candidateUrl": true
         },
         "x-discovery-status": "UNDER_SURVEILLANCE",
@@ -1709,7 +1711,7 @@
             "docs/openapi.json"
           ],
           "capturedResponse": false,
-          "requiredCapture": "Open the 'Agent Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+          "requiredCapture": "On manager.html (v1.0.280) boot, downline hierarchy is fetched via POST /cloud/api/Manager/getListAgenstByAgent [sic] ({agentID, agentType, operation: \"getListAgenstByAgent\", RRO: 1} at manager.js:60492) and POST /cloud/api/Manager/getHeriarchy [sic] (manager.js:33074). Capture getListAgenstByAgent and reconcile.",
           "candidateUrl": true
         },
         "x-discovery-status": "UNDER_SURVEILLANCE",
@@ -1826,20 +1828,291 @@
     },
     "/cloud/api/Report/Pending": {
       "post": {
-        "tags": ["Inferred (Unverified)"],
-        "summary": "POST /cloud/api/Report/Pending",
-        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: main:lib/combo_identity.ts:24-40 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
-        "operationId": "postCloudApiReportPending",
+        "tags": ["Live-captured (request unverified)"],
+        "summary": "Live-captured /cloud/api/Report/Pending (request template unverified)",
+        "parameters": [],
+        "description": "Live-captured contract: 2026-11-01/Pending.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Report/Pending at 2026-11-01T02:22:35.774Z with a 200 response (response body sha256 6c65708478ad70ca3286c68cb0e32e400998d7f4c9fed2f8c614084315e2c277). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The endpoint path/method were previously inferred (tier C); the live capture now evidences both, while the request field template remains unverified.",
         "responses": {
+          "200": {
+            "description": "Captured live 200 response from 2026-11-01/Pending.post.json; schema derived from the captured body skeleton.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "Pending": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ARBirdcageLink": {
+                            "type": "null"
+                          },
+                          "ARLink": {
+                            "type": "null"
+                          },
+                          "AcceptedDateTime": {
+                            "type": "string"
+                          },
+                          "AdjSpread": {
+                            "type": "number"
+                          },
+                          "AdjTotalPoints": {
+                            "type": "number"
+                          },
+                          "AdjustableOddsFlag": {
+                            "type": "string"
+                          },
+                          "AmountLost": {
+                            "type": "null"
+                          },
+                          "AmountRefunded": {
+                            "type": "null"
+                          },
+                          "AmountWagered": {
+                            "type": "number"
+                          },
+                          "AmountWon": {
+                            "type": "null"
+                          },
+                          "BoxLink": {
+                            "type": "null"
+                          },
+                          "BuyPoints": {
+                            "type": "number"
+                          },
+                          "ChosenTeamID": {
+                            "type": "string"
+                          },
+                          "Comments": {
+                            "type": "string"
+                          },
+                          "ContinueOnPushFlag": {
+                            "type": "null"
+                          },
+                          "CreditAcctFlag": {
+                            "type": "string"
+                          },
+                          "Description": {
+                            "type": "string"
+                          },
+                          "FinalDecimal": {
+                            "type": "null"
+                          },
+                          "FinalMoney": {
+                            "type": "number"
+                          },
+                          "FreePlayFlag": {
+                            "type": "string"
+                          },
+                          "GameDateTime": {
+                            "type": "string"
+                          },
+                          "ItemNumber": {
+                            "type": "number"
+                          },
+                          "LegAmountWagered": {
+                            "type": "number"
+                          },
+                          "LegToWinAmount": {
+                            "type": "number"
+                          },
+                          "LegWagerType": {
+                            "type": "string"
+                          },
+                          "ListedPitcher1": {
+                            "type": "null"
+                          },
+                          "ListedPitcher2": {
+                            "type": "null"
+                          },
+                          "Login": {
+                            "type": "string"
+                          },
+                          "LogoTeam1": {
+                            "type": "string"
+                          },
+                          "LogoTeam2": {
+                            "type": "string"
+                          },
+                          "NameFirst": {
+                            "type": "string"
+                          },
+                          "OrigSpread": {
+                            "type": "number"
+                          },
+                          "OrigTotalPoints": {
+                            "type": "number"
+                          },
+                          "Outcome": {
+                            "type": "string"
+                          },
+                          "ParlayName": {
+                            "type": "string"
+                          },
+                          "Password": {
+                            "type": "string"
+                          },
+                          "PeriodDescription": {
+                            "type": "string"
+                          },
+                          "PeriodNumber": {
+                            "type": "number"
+                          },
+                          "Pitcher1ReqFlag": {
+                            "type": "string"
+                          },
+                          "Pitcher2ReqFlag": {
+                            "type": "string"
+                          },
+                          "PlacedOn": {
+                            "type": "string"
+                          },
+                          "PlayNumber": {
+                            "type": "number"
+                          },
+                          "RifBackwardTicketNumber": {
+                            "type": "null"
+                          },
+                          "RifBackwardWagerNumber": {
+                            "type": "null"
+                          },
+                          "RifForwardAmountWagered": {
+                            "type": "null"
+                          },
+                          "RifForwardTicketNumber": {
+                            "type": "null"
+                          },
+                          "RifForwardWagerNumber": {
+                            "type": "null"
+                          },
+                          "RifForwardWinOnlyFlag": {
+                            "type": "null"
+                          },
+                          "RifNoActionFlag": {
+                            "type": "null"
+                          },
+                          "RifWinOnlyFlag": {
+                            "type": "null"
+                          },
+                          "RoundRobinLink": {
+                            "type": "null"
+                          },
+                          "ShortName1": {
+                            "type": "string"
+                          },
+                          "ShortName2": {
+                            "type": "string"
+                          },
+                          "SportSubType": {
+                            "type": "string"
+                          },
+                          "SportType": {
+                            "type": "string"
+                          },
+                          "Team1FinalScore": {
+                            "type": "number"
+                          },
+                          "Team1ID": {
+                            "type": "string"
+                          },
+                          "Team1RotNum": {
+                            "type": "number"
+                          },
+                          "Team2FinalScore": {
+                            "type": "number"
+                          },
+                          "Team2ID": {
+                            "type": "string"
+                          },
+                          "Team2RotNum": {
+                            "type": "number"
+                          },
+                          "TeaserName": {
+                            "type": "null"
+                          },
+                          "TeaserPoints": {
+                            "type": "number"
+                          },
+                          "TicketNumber": {
+                            "type": "number"
+                          },
+                          "Ties": {
+                            "type": "number"
+                          },
+                          "ToWinAmount": {
+                            "type": "number"
+                          },
+                          "TotalPointsOU": {
+                            "type": "null"
+                          },
+                          "WagerCount": {
+                            "type": "number"
+                          },
+                          "WagerNumber": {
+                            "type": "number"
+                          },
+                          "WagerStatus": {
+                            "type": "string"
+                          },
+                          "WagerType": {
+                            "type": "string",
+                            "enum": ["S"]
+                          },
+                          "customerID": {
+                            "type": "string"
+                          },
+                          "totalPicks": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "x-capture-truncated": true
+                }
+              }
+            }
+          },
           "default": {
-            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+            "description": "Other status codes were not captured by this record."
           }
         },
         "x-evidence": {
-          "tier": "C",
-          "sources": ["main:lib/combo_identity.ts:24-40"],
-          "capturedResponse": false,
-          "requiredCapture": "Capture one /cloud/api/Report/Pending call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+          "tier": "A",
+          "sources": [
+            "capture:2026-11-01/Pending.post.json",
+            "sha256:719cb5f63fe0123aa26e02a01e4969a7051bc822e1e0fb9de42ea3308896dcc3"
+          ],
+          "capturedResponse": true
+        },
+        "x-capture": {
+          "file": "2026-11-01/Pending.post.json",
+          "sha256": "719cb5f63fe0123aa26e02a01e4969a7051bc822e1e0fb9de42ea3308896dcc3",
+          "capturedAt": "2026-11-01T02:22:35.774Z",
+          "status": 200,
+          "samples": 1
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "customerID": {
+                    "type": "string"
+                  },
+                  "operation": {
+                    "type": "string"
+                  },
+                  "token": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -1856,9 +2129,12 @@
         },
         "x-evidence": {
           "tier": "C",
-          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "sources": [
+            "main:lib/combo_identity.ts:24-40",
+            "docs/evidence/captures/pending-500s/diagnostics.json"
+          ],
           "capturedResponse": false,
-          "requiredCapture": "Capture one /cloud/api/Report/PendingDelete call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+          "requiredCapture": "Confirmed read-only modal lookup in customer/report/report.js:8578 (setDeleteWager -> getPendingWagers({deleteWagers:true, ticketNumber}) sends {customerID, ticketNumber, operation: \"PendingDelete\"} and renders e.Pending[]). Probe POST /cloud/api/Report/PendingDelete with sentinel ticketNumber=-1 then a valid ticketNumber to upgrade C->A."
         }
       }
     },
@@ -1875,9 +2151,12 @@
         },
         "x-evidence": {
           "tier": "C",
-          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "sources": [
+            "main:lib/combo_identity.ts:24-40",
+            "docs/evidence/captures/pending-500s/diagnostics.json"
+          ],
           "capturedResponse": false,
-          "requiredCapture": "Capture one /cloud/api/Report/getDailyFiguresByCustomer call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+          "requiredCapture": "Prefix-identical 500 (0 B) on both /Manager and /Report on 2026-11-01 when sent form-urlencoded. Client JS (customer/report/report.js:25633) sends contentType: \"application/json\" with JSON.stringify({agentID, customerID, week: 0, operation: \"getDailyFiguresByCustomer\"}). 1. Retrieve upstream 500 error log; 2. Re-probe with application/json (wired in lib/f402_probe.ts)."
         }
       }
     },
@@ -1894,47 +2173,146 @@
         },
         "x-evidence": {
           "tier": "C",
-          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "sources": [
+            "main:lib/combo_identity.ts:24-40",
+            "docs/evidence/captures/pending-500s/diagnostics.json"
+          ],
           "capturedResponse": false,
-          "requiredCapture": "Capture one /cloud/api/Report/getGradedWagerByCustomer call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+          "requiredCapture": "Prefix-identical 500 (0 B) on both /Manager and /Report on 2026-11-01 (shared handler threw before response serialization). 1. Retrieve upstream server error log for the shared handler group; 2. Re-probe with the identical captured payload, then test integer week=0 per customer/report/report.js:33171."
         }
       }
     },
-    "/cloud/api/Report/getTransactions": {
+    "/cloud/api/Manager/getTransactions": {
       "post": {
-        "tags": ["Inferred (Unverified)"],
-        "summary": "POST /cloud/api/Report/getTransactions",
-        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: main:lib/combo_identity.ts:24-40 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
-        "operationId": "postCloudApiReportGetTransactions",
+        "tags": ["Live-captured (request unverified)"],
+        "summary": "Live-captured /cloud/api/Manager/getTransactions (request template unverified)",
+        "parameters": [],
+        "description": "Live-captured contract: 2026-11-01/getTransactions.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Manager/getTransactions at 2026-11-01T02:07:42.209Z with a 200 response (response body sha256 b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The endpoint path/method were previously inferred (tier C); the live capture now evidences both, while the request field template remains unverified.",
         "responses": {
+          "200": {
+            "description": "Captured live 200 response from 2026-11-01/getTransactions.post.json; schema derived from the captured body skeleton.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "LIST": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "default": {
-            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+            "description": "Other status codes were not captured by this record."
           }
         },
         "x-evidence": {
-          "tier": "C",
-          "sources": ["main:lib/combo_identity.ts:24-40"],
-          "capturedResponse": false,
-          "requiredCapture": "Capture one /cloud/api/Report/getTransactions call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+          "tier": "A",
+          "sources": [
+            "capture:2026-11-01/getTransactions.post.json",
+            "sha256:3de9ac6c0f61a78d131416a0ed8d14e3bed065675b0106f25e53dea97c303ef7"
+          ],
+          "capturedResponse": true
+        },
+        "x-capture": {
+          "file": "2026-11-01/getTransactions.post.json",
+          "sha256": "3de9ac6c0f61a78d131416a0ed8d14e3bed065675b0106f25e53dea97c303ef7",
+          "capturedAt": "2026-11-01T02:07:42.209Z",
+          "status": 200,
+          "samples": 1
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "RRO": {
+                    "type": "string"
+                  },
+                  "agentID": {
+                    "type": "string"
+                  },
+                  "agentOwner": {
+                    "type": "string"
+                  },
+                  "customerID": {
+                    "type": "string"
+                  },
+                  "operation": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
     "/cloud/api/Report/getGrading": {
       "post": {
-        "tags": ["Inferred (Unverified)"],
-        "summary": "POST /cloud/api/Report/getGrading",
-        "description": "UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: main:lib/combo_identity.ts:24-40 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.",
-        "operationId": "postCloudApiReportGetGrading",
+        "tags": ["Live-captured (request unverified)"],
+        "summary": "Live-captured /cloud/api/Report/getGrading (request template unverified)",
+        "parameters": [],
+        "description": "Live-captured contract: 2026-11-01/getGrading.post.json (schemaVersion 1, mode live) recorded POST /cloud/api/Report/getGrading at 2026-11-01T02:22:35.993Z with a 200 response (response body sha256 b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c). Request and response were captured live with redaction clean (policy v1). The response schema is derived from the captured body skeleton and the request schema from the captured request skeleton; no field values are published. The endpoint path/method were previously inferred (tier C); the live capture now evidences both, while the request field template remains unverified.",
         "responses": {
+          "200": {
+            "description": "Captured live 200 response from 2026-11-01/getGrading.post.json; schema derived from the captured body skeleton.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "LIST": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "default": {
-            "description": "Unknown — no response was captured, so no status code or body schema is documented."
+            "description": "Other status codes were not captured by this record."
           }
         },
         "x-evidence": {
-          "tier": "C",
-          "sources": ["main:lib/combo_identity.ts:24-40"],
-          "capturedResponse": false,
-          "requiredCapture": "Capture one /cloud/api/Report/getGrading call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+          "tier": "A",
+          "sources": [
+            "capture:2026-11-01/getGrading.post.json",
+            "sha256:253af38aeb01e56e32e0db8922efc7ec525cc2aa53f1b345c41be5675483c06c"
+          ],
+          "capturedResponse": true
+        },
+        "x-capture": {
+          "file": "2026-11-01/getGrading.post.json",
+          "sha256": "253af38aeb01e56e32e0db8922efc7ec525cc2aa53f1b345c41be5675483c06c",
+          "capturedAt": "2026-11-01T02:22:35.993Z",
+          "status": 200,
+          "samples": 1
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "customerID": {
+                    "type": "string"
+                  },
+                  "operation": {
+                    "type": "string"
+                  },
+                  "token": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -1951,9 +2329,12 @@
         },
         "x-evidence": {
           "tier": "C",
-          "sources": ["main:lib/combo_identity.ts:24-40"],
+          "sources": [
+            "main:lib/combo_identity.ts:24-40",
+            "docs/evidence/captures/pending-500s/diagnostics.json"
+          ],
           "capturedResponse": false,
-          "requiredCapture": "Capture one /cloud/api/Report/getTicketDetailPrint call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A."
+          "requiredCapture": "Prefix-identical 500 (0 B) on both /Manager and /Report on 2026-11-01 when ticketNumber/wagerNumber were omitted. 1. Retrieve upstream server error log; 2. Re-probe identical payload, then probe with the 5-key customer/report/report.js:108955 envelope {token, ticketNumber, wagerNumber, flag, operation}."
         }
       }
     },

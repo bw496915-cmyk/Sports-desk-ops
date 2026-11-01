@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "kind": "probe-run",
+  "startedAt": "2026-11-01T04:19:29.754Z",
+  "base": "https://fantasy402.com",
+  "backend": "webkit",
+  "authMode": "env-login",
+  "tls": {
+    "host": "fantasy402.com",
+    "port": 443,
+    "tlsVersion": "TLSv1.3",
+    "cipher": {
+      "name": "TLS_AES_128_GCM_SHA256",
+      "version": "TLSv1.3"
+    },
+    "alpn": "",
+    "authorized": true,
+    "authorizationError": null,
+    "peer": {
+      "subjectCommonName": "fantasy402.com",
+      "issuerCommonName": "WE1",
+      "issuerOrganisation": "Google Trust Services",
+      "validFrom": "Oct  9 06:57:09 2026 GMT",
+      "validTo": "Jan  7 07:57:03 2027 GMT",
+      "fingerprintSha256": "7A:63:B8:34:FC:8F:18:F5:B1:D0:5E:D4:E5:21:91:F8:6D:82:47:4D:F5:BF:71:D4:FF:1D:D7:21:04:ED:4E:83"
+    },
+    "sessionReused": false,
+    "connectMs": 73,
+    "measuredAt": "2026-11-01T02:07:38.874Z"
+  },
+  "ops": [
+    "/cloud/api/Manager/getTransactions",
+    "/cloud/api/Report/Pending",
+    "/cloud/api/Report/PendingDelete",
+    "/cloud/api/Report/getDailyFiguresByCustomer",
+    "/cloud/api/Report/getGrading"
+  ]
+}

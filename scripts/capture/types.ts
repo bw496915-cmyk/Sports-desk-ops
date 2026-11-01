@@ -99,6 +99,56 @@ export interface RedactionReport {
   piiRedacted: PiiKind[];
 }
 
+// ---------------------------------------------------------------------------
+// Evidence axes (tier inputs)
+// ---------------------------------------------------------------------------
+
+/** Axis 1: how the captured bytes were observed. */
+export type CaptureObservation = "cdp" | "webkit" | "har" | "code" | "authored";
+
+/**
+ * Axis 2: what the response body proves. `"populated-shell"` is the server-rendered
+ * layout chrome plus metadata (`data-field="version"`, `data-field="domain-me"`) while the
+ * dynamic containers are still empty: routing is evidenced, the data is not.
+ */
+export type CaptureBodyVerdict =
+  | "populated"
+  | "populated-shell"
+  | "empty-envelope"
+  | "template"
+  | "error-body"
+  | "empty-500"
+  | "none";
+
+/** Axis 3: how specific the recorded request was. */
+export type CaptureRequestVerdict =
+  "exact" | "minimal" | "sentinel" | "synthetic" | "mismatched";
+
+/** Axis 5: read, write, or unknown. */
+export type CaptureMutationVerdict =
+  "read" | "read-inferred" | "write" | "unknown";
+
+/** Axis 4: client state that conditioned the response. */
+export type CaptureViewMode = "desktop" | "mobile" | "unknown";
+
+export type CaptureWafVerdict = "cloudflare" | "none" | "unknown";
+
+export interface CaptureProvenanceState {
+  viewMode?: CaptureViewMode | undefined;
+  sessionStorageCleared?: boolean | undefined;
+  betTickerParam?: boolean | undefined;
+  /** DOM-extracted version marker, e.g. `"1.0.280"` from `data-field="version"`. */
+  domVersion?: string | undefined;
+  /** DOM-extracted origin marker, e.g. `"www.fantasy402.com"` from `data-field="domain-me"`. */
+  domOrigin?: string | undefined;
+  /** True when `window.__CF$cv$params` or `/cdn-cgi/` challenge scripts are present in the DOM. */
+  challengePresent?: boolean | undefined;
+}
+
+/**
+ * Client-state + observation provenance. Every axis is optional and normalized at the
+ * record boundary (`buildCaptureRecord`); missing means "not established", never "not applicable".
+ */
 export interface CaptureProvenance {
   /** Host only; never a full URL with credentials or query. */
   portalHost: string;
@@ -106,6 +156,26 @@ export interface CaptureProvenance {
   proxy: "env" | "none";
   auth: "cookie" | "none";
   bunVersion: string;
+  /** Runtime origin extracted from the DOM (`[data-field="domain-me"]`), for comparison against `portalHost`. */
+  origin?: string | undefined;
+  /** Axis 1: how the bytes were observed. Safe default `"authored"` (no observation). */
+  observation?: CaptureObservation | undefined;
+  /** Axis 2: what the response body proves. Safe default `"none"` (no body verdict). */
+  body?: CaptureBodyVerdict | undefined;
+  /** Axis 3: how specific the recorded request was. */
+  request?: CaptureRequestVerdict | undefined;
+  /** Axis 5: read/write/unknown. Safe default `"unknown"`. */
+  mutation?: CaptureMutationVerdict | undefined;
+  /** Axis 4: client state that conditioned the response. */
+  state?: CaptureProvenanceState | undefined;
+  /** WAF in front of the portal (edge), distinct from origin errors. */
+  waf?: CaptureWafVerdict | undefined;
+  /** Cloudflare Ray ID from `Cf-Ray` response header or `__CF$cv$params.r`. */
+  cfRay?: string | undefined;
+  /** Carried from existing records, unchanged. */
+  prefix?: string | undefined;
+  backend?: "webkit" | "chrome" | undefined;
+  headersObserved?: boolean | undefined;
 }
 
 export interface CaptureRecord {
@@ -146,6 +216,12 @@ export interface ManifestCaptureEntry {
   };
   provenance: CaptureProvenance;
   samples: number;
+  /** Projection from provenance axes (`deriveTier`); not stored on the capture record. */
+  derivedTier?: string;
+  /** Human/machine-auditable reason from `deriveTierWithReason`. */
+  derivedTierReason?: string;
+  /** When Cloudflare challenge/clearance bound a 2xx (`captureRecipeFingerprint`). */
+  captureRecipeSha256?: string;
 }
 
 export interface CaptureManifest {

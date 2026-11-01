@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "kind": "client-js-route-evidence",
+  "capturedAt": "2026-11-01T04:15:00.000Z",
+  "sourceUrl": "https://www.fantasy402.com/app/customer/report/report.js",
+  "utilApiPath": "/cloud/",
+  "reportClassPath": "Util.apiPath + 'api/Report/'",
+  "getTicketDetailPrint": {
+    "function": "getTicketDetail",
+    "operation": "getTicketDetailPrint",
+    "httpMethod": "POST",
+    "wireUrl": "_self.path + param.operation",
+    "resolvedPath": "/cloud/api/Report/getTicketDetailPrint",
+    "bodyKeys": ["token", "ticketNumber", "wagerNumber", "flag", "operation"],
+    "tokenSource": "Security.token (sessionStorage.credentials.code after verifySession)",
+    "flagSource": "options.flag or item.WagerType from wager row"
+  },
+  "agentSessionNote": "F402 capture login uses agent credentials (sessionStorage.agentType M/A). Live probe 2026-11-01: same 5-key envelope returns HTTP 400 Invalid Method: Model: under agent session, while Report/PendingDelete with customerID+ticketNumber returns 200. Treat getTicketDetailPrint as customer-report-surface binding until reproduced from a player session or report UI navigation.",
+  "agentAlternativeRead": {
+    "operation": "PendingDelete",
+    "path": "/cloud/api/Report/PendingDelete",
+    "bodyKeys": ["customerID", "ticketNumber", "operation", "token"],
+    "clientJs": "report.js setDeleteWager / getPendingWagers deleteWagers modal"
+  }
+}

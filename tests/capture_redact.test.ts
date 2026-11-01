@@ -138,6 +138,48 @@ describe("redactJson", () => {
     expect(result.piiRedacted).toContain("agent-id");
   });
 
+  test("redacts getInfoPlayer INFO.data and INFO.added sensitive keys (Passwordt, SMSPhoneNumber, HomePhone, BusinessPhone, Fax, NameMI, AgentLogin, TelegramID)", () => {
+    const infoPlayerSample = {
+      INFO: {
+        data: {
+          Login: "BILLY666  ",
+          Password: " ",
+          Passwordt: "temp-secret",
+          NameFirst: "          ",
+          NameMI: "M",
+          AgentLogin: "MASTER1",
+          SMSPhoneNumber: "555-000-1111",
+          HomePhone: "555-000-2222",
+          BusinessPhone: "555-000-3333",
+          Fax: "555-000-4444",
+          ParlayName: "8 Team Max               ",
+        },
+        added: {
+          CustomerID: "BILLY666  ",
+          TelegramID: "@billy_desk",
+          RebatePercent: 0,
+        },
+      },
+    };
+    const result = redactJson(infoPlayerSample);
+    const info = (result.clean as Record<string, Record<string, unknown>>)[
+      "INFO"
+    ]!;
+    const data = info["data"] as Record<string, unknown>;
+    const added = info["added"] as Record<string, unknown>;
+    expect(data["Password"]).toBe("<redacted:password>");
+    expect(data["Passwordt"]).toBe("<redacted:password>");
+    expect(data["NameMI"]).toBe("<redacted:login>");
+    expect(data["AgentLogin"]).toBe("<redacted:agent-id>");
+    expect(data["SMSPhoneNumber"]).toBe("<redacted:phone>");
+    expect(data["HomePhone"]).toBe("<redacted:phone>");
+    expect(data["BusinessPhone"]).toBe("<redacted:phone>");
+    expect(data["Fax"]).toBe("<redacted:phone>");
+    expect(data["ParlayName"]).toBe("8 Team Max               ");
+    expect(added["TelegramID"]).toBe("<redacted:customer-id>");
+    expect(added["RebatePercent"]).toBe(0);
+  });
+
   test("redaction is deterministic", () => {
     expect(JSON.stringify(redactJson(body))).toBe(
       JSON.stringify(redactJson(body)),

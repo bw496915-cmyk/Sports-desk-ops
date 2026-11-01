@@ -38,7 +38,7 @@
     "fixture:": "Committed fixture under the worktree; a shape sample, not a wire capture."
   },
   "tierRules": {
-    "A": "Captured wire contract: a real request AND a real response capture exist. Five operations qualify from the 2026-10-31 live session (getWebLog, getInfoPlayer, getBetTicker, getBetTickerConfig, getSportsVigSetup); see docs/evidence/captures/manifest.json. Earlier releases had none because the 2026-10-28 HAR captured only requests.",
+    "A": "Captured wire contract: a real request AND a real response capture exist. Eight operations qualify from the 2026-10-31/2026-11-01 live sessions (getWebLog, getInfoPlayer, getBetTicker, getBetTickerConfig, getSportsVigSetup, Pending, getTransactions, getGrading); see docs/evidence/captures/manifest.json. Earlier releases had none because the 2026-10-28 HAR captured only requests.",
     "B": "Observed first-party evidence. (i) captured wire request: getWebLog mode B and getInfoPlayer (2026-10-28 Manager HAR); (ii) observed request payload: GS getBetReport; or (iii) a route this repository serves, verified against its handler source (GET /health, GET /api/watchlist, POST /api/telegram/alert, POST /api/telegram/report). Response bodies may still be uncaptured.",
     "C": "Inferred only. Authored in docs/openapi.json or its generator scripts, or a repo TypeScript wire type, or a UI/DOM observation whose URL+method is a candidate. No request or response was observed.",
     "D": "A real surface missing from the spec. Recorded in surfaces[], never in operations[].",
@@ -46,9 +46,9 @@
     "crawlerCandidatesRule": "B-vs-C rule for the 11 'Tracked Operational Domains' candidates (gameAdmin, getMessages, adjustBalance, createPlayer, get3rdPartyLimits, getAnalysis, getScores, getAgentTree, getBilling, getRules, getFinancialReport): a launcher tile alone is not enough for B. B requires a URL+method observed on the wire (or a handler that serves it). Those 11 rows take their path+method from hand-authored candidateEndpoint/candidateMethod constants in main:scripts/portal_tile_crawler.ts:40-162. The crawler CLI entry runs the offline branch (main:scripts/portal_tile_crawler.ts:670,680) and its live branch only replaces extracted inputs/L-keys, never the URL/method; no audit JSON or screenshot proof exists in the main tree. They are therefore tier C with candidate_url=true and ui_observed=true, never B. getAnalysis and getFinancialReport also have independent UI action-name evidence (runbook:166-167), which improves the tile evidence but does not observe the URL."
   },
   "counts": {
-    "A": 5,
+    "A": 8,
     "B": 5,
-    "C": 35,
+    "C": 32,
     "D": 0,
     "E": 10,
     "total": 55
@@ -156,12 +156,12 @@
       "total": 1
     },
     "Reporting & Forensics": {
-      "A": 0,
+      "A": 3,
       "B": 0,
-      "C": 2,
+      "C": 6,
       "D": 0,
       "E": 0,
-      "total": 2
+      "total": 9
     },
     "Desk & HITL Operations": {
       "A": 0,
@@ -290,9 +290,14 @@
           "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Spec claims a flat ~6,000+ leg array and a JSON request body {customerID, date}; neither is captured."
+        },
+        {
+          "source": "docs/evidence/captures/pending-500s/diagnostics.json",
+          "kind": "implementation-context",
+          "note": "Prefix-divergent pair: /cloud/api/Report/Pending returned 200 (41-46 KB) on 2026-11-01 while /cloud/api/Manager/getPending returned 500 (0 B) on 2026-10-31 when called with an empty body."
         }
       ],
-      "requiredCapture": "Capture the request (form vs JSON content type is disputed by the spec's own application/json choice) and a non-empty response; verify BLOCKED sentinel rows (L19.N0518) and zero-stake rows actually appear. Upgrades C->A.",
+      "requiredCapture": "Prefix-divergent from /cloud/api/Report/Pending (Tier A, 200 41-46 KB). In Manager report bundle (Blob A7FD1C99), Manager/getPending sends form-urlencoded {agentID, type, operation: \"getPending\", RRO} and reads {LIST, TOTAL}. Re-probe with {agentID, type: \"\", operation: \"getPending\", RRO: \"1\"} or retire in favor of /cloud/api/Report/Pending.",
       "contradicted": true,
       "contradictedReason": "2026-10-31 capture request is application/x-www-form-urlencoded with an empty body; the spec declares application/json. The response was HTTP 500 with an empty body."
     },
@@ -368,7 +373,7 @@
           "note": "Spec path /cloud/api/Manager/search and the result rows are authored; the URL was never observed on the wire."
         }
       ],
-      "requiredCapture": "Capture one omnisearch request triggered from search-component (URL, method, content type, term/type/agentID fields) and its result rows. Upgrades C->A and confirms candidate_url.",
+      "requiredCapture": "In app/manager/manager.js:49675 (v1.0.280), the omnisearch handler calls POST /cloud/api/Manager/searchCustomerAdmin with {agentID, filter, operation: \"searchCustomerAdmin\", RRO: 1}. Capture searchCustomerAdmin on the wire and reconcile this candidate_url.",
       "contradicted": false,
       "contradictedReason": null,
       "candidate_url": true,
@@ -513,9 +518,14 @@
           "source": "docs/openapi.json",
           "kind": "spec-claim",
           "note": "Claim under test lives in docs/openapi.json; it has no supporting artifact."
+        },
+        {
+          "source": "docs/evidence/captures/pending-500s/diagnostics.json",
+          "kind": "implementation-context",
+          "note": "manager.html?v=1793502037202 (v1.0.280) boot waterfall and app/manager/manager.js:31200 call POST /cloud/api/Manager/getAccountInfoOwner (application/json) and getWeeklyFigureByAgentLite instead of getInfoManager."
         }
       ],
-      "requiredCapture": "Capture the dashboard header request/response; confirm the exact JSON keys (the spec uses hyphenated names like 'grand-total-weekly', which is unusual enough to need proof). Upgrades C->A.",
+      "requiredCapture": "Last observed 500 (0 B) on 2026-10-31. In app/manager/manager.js (v1.0.280, Blob 610B48F7), no getInfoManager operation exists: manager.html boot calls POST /cloud/api/Manager/getAccountInfoOwner (application/json, {agentID, operation}) for accountInfo and POST /cloud/api/Manager/getWeeklyFigureByAgentLite for [data-field=\"grand-total-weekly\"]. Retrieve upstream 500 log or replace with getAccountInfoOwner.",
       "contradicted": false,
       "contradictedReason": null
     },
@@ -538,7 +548,7 @@
           "note": "Spec claims it is triggered by data-action='get-weekly-figure'; that string appears in no capture, test or code artifact in either tree."
         }
       ],
-      "requiredCapture": "Capture the Reporting weekly-figure request/response (the data-action is itself unverified). Upgrades C->A.",
+      "requiredCapture": "On manager.html (v1.0.280) boot, weekly figures are fetched via POST /cloud/api/Manager/getWeeklyFigureByAgentLite ({agentID, week: 0, type: \"A\", layout: \"byDay\", operation: \"getWeeklyFigureByAgentLite\", RRO: 1} at manager.js:52703) and POST /cloud/api/Manager/getMasterSheet (manager.js:43955). Capture getWeeklyFigureByAgentLite and reconcile.",
       "contradicted": false,
       "contradictedReason": null
     },
@@ -616,7 +626,7 @@
           "note": "Request {agentID, startDate, endDate} and the deleted-ticket rows are authored. Note the spec also publishes POST /cloud/api/Report/getDeletedWagerReport for the same audit log; the relationship between the two is unverified."
         }
       ],
-      "requiredCapture": "Capture the Reporting Deleted Wagers view request/response; also determine whether delete-wager and getDeletedWagerReport are distinct wire actions. Upgrades C->A.",
+      "requiredCapture": "UI stage-5 Deleted Wagers action routes to POST /cloud/api/Manager/getReportDeletedTransactions in Blob 96EA5CDA (whereas PendingDelete in report.js:8578 is the read-only Ticket Detail modal lookup). Capture getReportDeletedTransactions and reconcile.",
       "contradicted": false,
       "contradictedReason": null,
       "candidate_url": true,
@@ -926,7 +936,7 @@
           "note": "Request captured 2026-10-31 (POST, form-urlencoded, field skeleton); upstream returned HTTP 500 with an empty body, so no response contract exists."
         }
       ],
-      "requiredCapture": "Capture a customer notes read; confirm the notes row fields and whether notes are operator-annotations or wire-native. Upgrades C->A.",
+      "requiredCapture": "Last observed 500 (0 B) on 2026-10-31 (handler crashed before response serialization). 1. Retrieve upstream server error log for the 500; 2. Re-probe with the identical 2026-10-31 payload to separate deterministic crash from transient failure.",
       "contradicted": false,
       "contradictedReason": null
     },
@@ -1018,7 +1028,7 @@
           "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
         }
       ],
-      "requiredCapture": "Capture the deleted-wager audit read; determine whether it duplicates POST /cloud/api/Report/delete-wager. Upgrades C->A.",
+      "requiredCapture": "In the Manager deleted-wagers report bundle (Blob 96EA5CDA), the wire call is POST /cloud/api/Manager/getReportDeletedTransactions. Capture getReportDeletedTransactions and reconcile with /cloud/api/Report/delete-wager.",
       "contradicted": false,
       "contradictedReason": null
     },
@@ -1267,7 +1277,7 @@
           "note": "Spec row carries x-dom-tile 'Messaging', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
       ],
-      "requiredCapture": "Open the 'Messaging' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "requiredCapture": "On manager.html (v1.0.280) boot, messages are fetched via POST /cloud/api/Manager/getMessage ({acc, type: 0, operation: \"getMessage\", RRO: 1} at manager.js:55125) and POST /cloud/api/Manager/getNewEmailsCount (manager.js:31845). Capture Manager/getMessage and reconcile this candidate_url.",
       "contradicted": false,
       "contradictedReason": null,
       "candidate_url": true,
@@ -1397,7 +1407,7 @@
           "note": "Independent UI evidence: 'get-analysis' is an observed Reporting action (stage 6, market/sport concentration). The action name is real; the URL/method are still candidates."
         }
       ],
-      "requiredCapture": "Open the 'Analysis' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "requiredCapture": "In app/manager/manager.js:93668 (v1.0.280), the Analysis view calls POST /cloud/api/Manager/getReportPlayerAnalysis ({agentID, agentOwner, customerID, reportType, startDate, endDate, lineType, operation: \"getReportPlayerAnalysis\", RRO: 1}). Capture getReportPlayerAnalysis and reconcile.",
       "contradicted": false,
       "contradictedReason": null,
       "candidate_url": true,
@@ -1427,7 +1437,7 @@
           "note": "Spec row carries x-dom-tile 'Scores', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
       ],
-      "requiredCapture": "Open the 'Scores' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "requiredCapture": "In app/manager/manager.js:86861 (v1.0.280), the Scores panel calls POST /cloud/api/Report/getScoresLiveDynamic with contentType: \"application/json\" and JSON.stringify({operation: \"getScoresLiveDynamic\"}). Capture getScoresLiveDynamic and reconcile.",
       "contradicted": false,
       "contradictedReason": null,
       "candidate_url": true,
@@ -1457,7 +1467,7 @@
           "note": "Spec row carries x-dom-tile 'Agent Admin', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         }
       ],
-      "requiredCapture": "Open the 'Agent Admin' launcher tile and capture the network request it actually triggers (URL incl. /Manager vs /Report vs another model prefix, method, content type, body, auth) plus a response. Would replace candidate_url with a confirmed URL and upgrade C->A. Do not promote to B on the tile alone.",
+      "requiredCapture": "On manager.html (v1.0.280) boot, downline hierarchy is fetched via POST /cloud/api/Manager/getListAgenstByAgent [sic] ({agentID, agentType, operation: \"getListAgenstByAgent\", RRO: 1} at manager.js:60492) and POST /cloud/api/Manager/getHeriarchy [sic] (manager.js:33074). Capture getListAgenstByAgent and reconcile.",
       "contradicted": false,
       "contradictedReason": null,
       "candidate_url": true,
@@ -1563,16 +1573,21 @@
       "method": "post",
       "operationId": "reportPending",
       "tag": "Reporting & Forensics",
-      "tier": "C",
-      "capturedResponse": false,
+      "tier": "A",
+      "capturedResponse": true,
       "evidence": [
         {
           "source": "main:lib/combo_identity.ts:24-40",
           "kind": "repo-type",
           "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        },
+        {
+          "source": "capture:2026-11-01:f247cb829d114dd1b2ba10ba2a52a3c9124aa1522d9bf01c91155693589daa47",
+          "kind": "capture",
+          "note": "Live capture 2026-11-01T02:22:35.774Z from a 200 response (response bodySha256 6c65708478ad70ca3286c68cb0e32e400998d7f4c9fed2f8c614084315e2c277); request and response were captured live with redaction clean (policy v1)."
         }
       ],
-      "requiredCapture": "Capture one /cloud/api/Report/Pending call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "requiredCapture": null,
       "contradicted": false,
       "contradictedReason": null
     },
@@ -1588,9 +1603,14 @@
           "source": "main:lib/combo_identity.ts:24-40",
           "kind": "repo-type",
           "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        },
+        {
+          "source": "docs/evidence/captures/pending-500s/diagnostics.json",
+          "kind": "implementation-context",
+          "note": "Confirmed read-only in customer/report/report.js:8578 & 42092: fetches e.Pending[] legs for the Ticket Detail modal (logs \"View Pending Plays Selected\"). Added to READ_ONLY_OPERATIONS in scripts/apply_captures.ts."
         }
       ],
-      "requiredCapture": "Capture one /cloud/api/Report/PendingDelete call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "requiredCapture": "Confirmed read-only modal lookup in customer/report/report.js:8578 (setDeleteWager -> getPendingWagers({deleteWagers:true, ticketNumber}) sends {customerID, ticketNumber, operation: \"PendingDelete\"} and renders e.Pending[]). Probe POST /cloud/api/Report/PendingDelete with sentinel ticketNumber=-1 then a valid ticketNumber to upgrade C->A.",
       "contradicted": false,
       "contradictedReason": null
     },
@@ -1606,9 +1626,14 @@
           "source": "main:lib/combo_identity.ts:24-40",
           "kind": "repo-type",
           "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        },
+        {
+          "source": "docs/evidence/captures/pending-500s/diagnostics.json",
+          "kind": "implementation-context",
+          "note": "Prefix-identical 500 (0 B) on 2026-11-01 across /Manager and /Report; report.js:25633 specifies contentType: \"application/json\"."
         }
       ],
-      "requiredCapture": "Capture one /cloud/api/Report/getDailyFiguresByCustomer call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "requiredCapture": "Prefix-identical 500 (0 B) on both /Manager and /Report on 2026-11-01 when sent form-urlencoded. Client JS (customer/report/report.js:25633) sends contentType: \"application/json\" with JSON.stringify({agentID, customerID, week: 0, operation: \"getDailyFiguresByCustomer\"}). 1. Retrieve upstream 500 error log; 2. Re-probe with application/json (wired in lib/f402_probe.ts).",
       "contradicted": false,
       "contradictedReason": null
     },
@@ -1624,27 +1649,37 @@
           "source": "main:lib/combo_identity.ts:24-40",
           "kind": "repo-type",
           "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        },
+        {
+          "source": "docs/evidence/captures/pending-500s/diagnostics.json",
+          "kind": "implementation-context",
+          "note": "Prefix-identical 500 (0 B) on 2026-11-01 across /Manager and /Report (docs/evidence/captures/pending-500s/diagnostics.json)."
         }
       ],
-      "requiredCapture": "Capture one /cloud/api/Report/getGradedWagerByCustomer call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "requiredCapture": "Prefix-identical 500 (0 B) on both /Manager and /Report on 2026-11-01 (shared handler threw before response serialization). 1. Retrieve upstream server error log for the shared handler group; 2. Re-probe with the identical captured payload, then test integer week=0 per customer/report/report.js:33171.",
       "contradicted": false,
       "contradictedReason": null
     },
     {
-      "path": "/cloud/api/Report/getTransactions",
+      "path": "/cloud/api/Manager/getTransactions",
       "method": "post",
-      "operationId": "reportTransactions",
+      "operationId": "managerTransactions",
       "tag": "Reporting & Forensics",
-      "tier": "C",
-      "capturedResponse": false,
+      "tier": "A",
+      "capturedResponse": true,
       "evidence": [
         {
           "source": "main:lib/combo_identity.ts:24-40",
           "kind": "repo-type",
-          "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+          "note": "[OBSERVED] Cross-prefix routing (2026-11-01): deobfuscated customer/report/report.js listed getTransactions alongside Report reads, but live probing showed POST /cloud/api/Report/getTransactions returns HTTP 500 (0 B) both with and without customerID=H1716, whereas POST /cloud/api/Manager/getTransactions returns HTTP 200 (11 B {\"LIST\":\"\"})."
+        },
+        {
+          "source": "capture:2026-11-01:f367fe25112898b2a5e654fd74e82586ae9bc41dc5415adae3d122677b937b32",
+          "kind": "capture",
+          "note": "[A-empty] Live capture 2026-11-01T02:07:42.209Z from a 200 response (response bodySha256 b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c); request and response were captured live with redaction clean (policy v1). Envelope-only 200 response ({\"LIST\":\"\"}); item row schema is unverified beyond the outer LIST envelope until a capture with rows is recorded. Cross-prefix routing observed: POST /cloud/api/Manager/getTransactions returns 200 while POST /cloud/api/Report/getTransactions returns 500."
         }
       ],
-      "requiredCapture": "Capture one /cloud/api/Report/getTransactions call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "requiredCapture": null,
       "contradicted": false,
       "contradictedReason": null
     },
@@ -1653,16 +1688,21 @@
       "method": "post",
       "operationId": "reportGrading",
       "tag": "Reporting & Forensics",
-      "tier": "C",
-      "capturedResponse": false,
+      "tier": "A",
+      "capturedResponse": true,
       "evidence": [
         {
           "source": "main:lib/combo_identity.ts:24-40",
           "kind": "repo-type",
           "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        },
+        {
+          "source": "capture:2026-11-01:766265b07e8a3e8d5b7f8271c99411e9b544f8c695b169b90c9a95fb2bc1c819",
+          "kind": "capture",
+          "note": "[A-empty] Live capture 2026-11-01T02:22:35.993Z from a 200 response (response bodySha256 b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c); request and response were captured live with redaction clean (policy v1). Envelope-only 200 response ({\"LIST\":\"\"}); item row schema is unverified beyond the outer LIST envelope until a capture with rows is recorded."
         }
       ],
-      "requiredCapture": "Capture one /cloud/api/Report/getGrading call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "requiredCapture": null,
       "contradicted": false,
       "contradictedReason": null
     },
@@ -1678,9 +1718,14 @@
           "source": "main:lib/combo_identity.ts:24-40",
           "kind": "repo-type",
           "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
+        },
+        {
+          "source": "docs/evidence/captures/pending-500s/diagnostics.json",
+          "kind": "implementation-context",
+          "note": "Prefix-identical 500 (0 B) on 2026-11-01 across /Manager and /Report; report.js:108955 sends {token, ticketNumber, wagerNumber, flag, operation: \"getTicketDetailPrint\"}."
         }
       ],
-      "requiredCapture": "Capture one /cloud/api/Report/getTicketDetailPrint call from an authenticated Manager session and its rows; confirm method, content type and response schema. Upgrades C->A.",
+      "requiredCapture": "Prefix-identical 500 (0 B) on both /Manager and /Report on 2026-11-01 when ticketNumber/wagerNumber were omitted. 1. Retrieve upstream server error log; 2. Re-probe identical payload, then probe with the 5-key customer/report/report.js:108955 envelope {token, ticketNumber, wagerNumber, flag, operation}.",
       "contradicted": false,
       "contradictedReason": null
     }

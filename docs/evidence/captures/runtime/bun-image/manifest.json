@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "kind": "runtime-capability-evidence",
+  "capability": "Bun.Image WebP resize/encode from Bun.WebView (webkit)",
+  "capturedAt": "2026-11-01T02:07:42.500Z",
+  "bunVersion": "1.4.4",
+  "backend": "webkit",
+  "artifacts": [
+    {
+      "sha256": "3f302482ed919d3da6a0a6293d297660774b03a8ea3571201dfd8b8edf0959da",
+      "file": "3f302482ed919d3da6a0a6293d297660774b03a8ea3571201dfd8b8edf0959da.webp",
+      "format": "webp",
+      "width": 1152,
+      "height": 720,
+      "bytes": 1536,
+      "sourceViewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "resizeTarget": {
+        "width": 1280,
+        "height": 720,
+        "fit": "inside",
+        "withoutEnlargement": true
+      },
+      "placeholder": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAASCAYAAAA6yNxSAAAAKklEQVR4nGP8/+/Pf4YBBEwDafmoA0ZDYDQERkNgNARGQ2A0BEZDABQCAKP3BBwga3jDAAAAAElFTkSuQmCC"
+    }
+  ]
+}

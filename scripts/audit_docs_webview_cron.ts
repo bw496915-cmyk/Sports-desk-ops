@@ -544,7 +544,7 @@ export interface WebViewOptions {
   readonly width: number;
   readonly height: number;
   readonly backend: WebViewBackend;
-  readonly console: (...args: unknown[]) => void;
+  readonly console: (type: string, ...args: unknown[]) => void;
 }
 
 export interface WebViewScreenshotOptions {
@@ -560,7 +560,9 @@ export interface WebViewHandle {
   navigate(url: string): Promise<void>;
   evaluate(expression: string): Promise<unknown>;
   screenshot(options?: WebViewScreenshotOptions): Promise<Blob>;
-  close(): Promise<void>;
+  close(): void | Promise<void>;
+  [Symbol.dispose]?(): void;
+  [Symbol.asyncDispose]?(): void | Promise<void>;
 }
 
 type WebViewConstructor = new (options: WebViewOptions) => WebViewHandle;
@@ -754,7 +756,7 @@ interface LaunchedWebView {
 async function launchPortalWebView(
   runtime: AuditRuntime,
   portalUrl: string,
-  consoleSink: (...args: unknown[]) => void,
+  consoleSink: (type: string, ...args: unknown[]) => void,
 ): Promise<LaunchedWebView> {
   const failures: string[] = [];
   for (const backend of ["chrome", "webkit"] as const) {
@@ -943,14 +945,13 @@ async function auditWebView(
   const checks: AuditCheck[] = [];
   const issues: AuditIssue[] = [];
   const consoleMessages: string[] = [];
-  const consoleSink = (...args: unknown[]): void => {
-    consoleMessages.push(
-      args
-        .map((argument) =>
-          typeof argument === "string" ? argument : JSON.stringify(argument),
-        )
-        .join(" "),
-    );
+  const consoleSink = (type: string, ...args: unknown[]): void => {
+    const body = args
+      .map((argument) =>
+        typeof argument === "string" ? argument : JSON.stringify(argument),
+      )
+      .join(" ");
+    consoleMessages.push(type ? `[${type}] ${body}` : body);
   };
 
   let view: WebViewHandle | undefined;

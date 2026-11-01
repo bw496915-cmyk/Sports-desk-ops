@@ -24,6 +24,7 @@ import {
   openCustomerIndex,
   upsertCustomers,
 } from "../../lib/customer_index.ts";
+import { pendingDeleteHuntExpression } from "./discover_ticket_hunt.ts";
 import { loginF402 } from "./f402_login.ts";
 import { ManagedWebView } from "./webview.ts";
 
@@ -32,9 +33,12 @@ capture:discover — read getBetTicker and index the real customer ids it return
 
 Options:
   --login          Sign in with F402_AGENT_ID / F402_PASSWORD
+  --hunt-pending-delete  Probe PendingDelete until a ticket returns non-empty Pending[] (slower)
   --base <url>     Portal origin (default: F402_BASE_URL or https://fantasy402.com)
   --out <dir>      Where to write the discovery JSON (default: scratch/f402-discover)
   --db <path>      Customer index (default: scratch/customers.sqlite)
+
+Ticket sample for getTicketDetailPrint reprobe uses Report/Pending first row (ticketNumber, wagerNumber, flag=WagerType).
   -h, --help       This text
 
 Examples:
@@ -46,6 +50,7 @@ Writes identifiers only (customer id, agent id, login, writer, wager number) and
 
 const VALUE_FLAGS = ["--base", "--out", "--db"] as const;
 const parsed = parseCliArgs(process.argv.slice(2), { valueFlags: VALUE_FLAGS });
+const huntPendingDelete = hasFlag(parsed, "--hunt-pending-delete");
 if (wantsHelp(parsed)) {
   printHelp(HELP);
   process.exit(0);
@@ -81,6 +86,7 @@ const EXPRESSION = (baseUrl: string) => `(async () => {
   const customers = new Map();
   const writers = {};
   const wagerNumbers = {};
+  const sampleWagers = [];
   for (const row of rows) {
     const id = String(row.CustomerID ?? "").trim();
     if (id !== "") {
@@ -92,17 +98,79 @@ const EXPRESSION = (baseUrl: string) => `(async () => {
     if (writer !== "") writers[writer] = (writers[writer] ?? 0) + 1;
     const wager = String(row.WagerNumber ?? "").trim();
     if (wager !== "") wagerNumbers[wager] = (wagerNumbers[wager] ?? 0) + 1;
+    if (sampleWagers.length < 5) {
+      const ticketNumber = String(row.TicketNumber ?? row.ticketNumber ?? "").trim();
+      if (ticketNumber !== "" && wager !== "" && id !== "") {
+        sampleWagers.push({ customerId: id, ticketNumber, wagerNumber: wager });
+      }
+    }
   }
   return {
     status: r.status,
     totalRows: rows.length,
     customers: [...customers.values()],
     writers,
+    sampleWagers,
     duplicateWagerNumbers: Object.entries(wagerNumbers)
       .filter(([, count]) => count > 1)
       .map(([wagerNumber, count]) => ({ wagerNumber, count })),
   };
 })()`;
+
+function pendingTicketSampleExpression(
+  baseUrl: string,
+  customerId: string,
+): string {
+  const origin = baseUrl.replace(/\/$/, "");
+  return `(async () => {
+  const creds = JSON.parse(sessionStorage.getItem("credentials") ?? "{}");
+  const body = new URLSearchParams({
+    customerID: ${JSON.stringify(customerId)},
+    token: "",
+    operation: "Pending",
+  }).toString();
+  const r = await fetch(${JSON.stringify(origin)} + "/cloud/api/Report/Pending", {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "x-requested-with": "XMLHttpRequest",
+      accept: "application/json",
+      authorization: "Bearer " + (creds.code ?? ""),
+    },
+    body,
+  });
+  const text = await r.text();
+  if (!r.ok) return { status: r.status, error: text.slice(0, 200) };
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return { status: r.status, error: "non-json pending body" };
+  }
+  const pending = Array.isArray(payload.Pending) ? payload.Pending : [];
+  const row = pending[0];
+  if (!row || typeof row !== "object") {
+    return { status: r.status, pendingCount: pending.length, sample: null };
+  }
+  const ticketNumber = String(row.TicketNumber ?? "").trim();
+  const wagerNumber = String(row.WagerNumber ?? "").trim();
+  if (ticketNumber === "" || wagerNumber === "") {
+    return { status: r.status, pendingCount: pending.length, sample: null };
+  }
+  const wagerType = String(row.WagerType ?? row.wagerType ?? "").trim();
+  return {
+    status: r.status,
+    pendingCount: pending.length,
+    sample: {
+      customerId: ${JSON.stringify(customerId)},
+      ticketNumber,
+      wagerNumber,
+      flag: String(row.flag ?? row.Flag ?? wagerType).trim(),
+    },
+  };
+})()`;
+}
 
 if (!hasFlag(parsed, "--login")) {
   console.error("capture:discover: --login is required (reads a live page).");
@@ -136,12 +204,55 @@ try {
   const duplicates =
     (raw["duplicateWagerNumbers"] as Array<Record<string, unknown>>) ?? [];
 
+  const pickCustomer =
+    customers.find((row) => Number(row["wagers"] ?? 0) >= 1)?.["customerId"] ??
+    customers[0]?.["customerId"];
+  let ticketSample: Record<string, unknown> | null = null;
+  let pendingDeleteHit: Record<string, unknown> | null = null;
+  let pendingDeleteCandidates: unknown[] = [];
+  if (pickCustomer !== undefined && String(pickCustomer).trim() !== "") {
+    const customer = String(pickCustomer).trim();
+    if (huntPendingDelete) {
+      const huntRaw = (await view.evaluate(
+        pendingDeleteHuntExpression(base, customer),
+      )) as Record<string, unknown>;
+      pendingDeleteCandidates =
+        (huntRaw["candidates"] as unknown[] | undefined) ?? [];
+      const hit = huntRaw["hit"];
+      if (typeof hit === "object" && hit !== null) {
+        pendingDeleteHit = hit as Record<string, unknown>;
+        ticketSample = hit as Record<string, unknown>;
+      }
+    }
+    if (ticketSample === null) {
+      const pendingRaw = (await view.evaluate(
+        pendingTicketSampleExpression(base, customer),
+      )) as Record<string, unknown>;
+      const sample = pendingRaw["sample"];
+      if (typeof sample === "object" && sample !== null) {
+        ticketSample = sample as Record<string, unknown>;
+      }
+    }
+  }
+
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const outDir = join(outRoot, stamp);
   await mkdir(outDir, { recursive: true });
+  const document = {
+    ...raw,
+    ticketSample,
+    ...(pendingDeleteHit ? { pendingDeleteHit } : {}),
+    ...(pendingDeleteCandidates.length > 0 ? { pendingDeleteCandidates } : {}),
+    ...(huntPendingDelete && pendingDeleteHit === null
+      ? {
+          pendingDeleteHuntNote:
+            "Probed PendingDelete for first Pending rows: all returned 200 with empty Pending[] (expected for open pending wagers; modal path in report.js:8578 uses bought-out/deleted rows).",
+        }
+      : {}),
+  };
   await Bun.write(
     join(outDir, "getBetTicker.json"),
-    `${JSON.stringify(raw, null, 2)}\n`,
+    `${JSON.stringify(document, null, 2)}\n`,
   );
 
   const db = openCustomerIndex(`sqlite://${dbPath}`);
@@ -175,6 +286,9 @@ try {
     }`,
   );
   console.log(`duplicate wager numbers: ${duplicates.length}`);
+  console.log(
+    `ticket sample: ${ticketSample === null ? "none" : pendingDeleteHit !== null ? "yes (PendingDelete hit)" : "yes (Report/Pending)"}`,
+  );
   console.error(
     `capture:discover: wrote ${outDir}/getBetTicker.json and indexed ${customers.length} customer(s)`,
   );

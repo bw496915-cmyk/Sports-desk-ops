@@ -67,7 +67,16 @@
     "portalHost": "fantasy402.com",
     "proxy": "none",
     "auth": "cookie",
-    "bunVersion": "1.4.4"
+    "bunVersion": "1.4.4",
+    "observation": "authored",
+    "body": "none",
+    "mutation": "unknown",
+    "state": {
+      "viewMode": "unknown",
+      "sessionStorageCleared": false,
+      "betTickerParam": false,
+      "challengePresent": false
+    }
   },
   "samples": 1
 }

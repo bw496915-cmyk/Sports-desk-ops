@@ -21,6 +21,8 @@ import {
   sha256Hex,
   tryParseJson,
 } from "./json.ts";
+import { manifestProjectionForRecord } from "./manifest_projection.ts";
+import { parseCaptureProvenance } from "./parse_capture_provenance.ts";
 import {
   assertNoPii,
   redactHeaders,
@@ -37,6 +39,7 @@ import type {
   CaptureManifest,
   CaptureMode,
   CaptureProvenance,
+  CaptureProvenanceState,
   CaptureRecord,
   CapturedRequest,
   CapturedResponse,
@@ -76,6 +79,36 @@ export interface BuildRecordInput {
   response: RecordResponseInput | null;
   provenance: CaptureProvenance;
   samples?: number;
+}
+
+/**
+ * Fill the safe defaults for the optional evidence axes at the record boundary. Missing means
+ * "not established", never "not applicable"; every downstream consumer reads the normalized form.
+ */
+export function normalizeProvenance(
+  input: CaptureProvenance,
+): CaptureProvenance {
+  const state: CaptureProvenanceState = input.state ?? {};
+  const origin = state.domOrigin ?? input.origin;
+  return {
+    ...input,
+    ...(origin === undefined || origin === "" ? {} : { origin }),
+    observation: input.observation ?? "authored",
+    body: input.body ?? "none",
+    mutation: input.mutation ?? "unknown",
+    state: {
+      viewMode: state.viewMode ?? "unknown",
+      sessionStorageCleared: state.sessionStorageCleared ?? false,
+      betTickerParam: state.betTickerParam ?? false,
+      ...(state.domVersion === undefined
+        ? {}
+        : { domVersion: state.domVersion }),
+      ...(state.domOrigin === undefined ? {} : { domOrigin: state.domOrigin }),
+      challengePresent: state.challengePresent ?? false,
+    },
+    ...(input.waf === undefined ? {} : { waf: input.waf }),
+    ...(input.cfRay === undefined ? {} : { cfRay: input.cfRay }),
+  };
 }
 
 /** Normalize/validate an ISO timestamp to canonical UTC form. */
@@ -139,7 +172,8 @@ export function buildCaptureRecord(input: BuildRecordInput): CaptureRecord {
       input.response.contentType,
     );
     const bodySkeleton: Skeleton =
-      input.response.truncatedPreview && inferred.type === "object"
+      input.response.truncatedPreview &&
+      (inferred.type === "object" || inferred.type === "array")
         ? { ...inferred, truncated: true }
         : inferred;
     responseCapture = {
@@ -166,7 +200,7 @@ export function buildCaptureRecord(input: BuildRecordInput): CaptureRecord {
     request: requestCapture,
     response: responseCapture,
     redaction: report,
-    provenance: { ...input.provenance },
+    provenance: normalizeProvenance(input.provenance),
     samples,
   };
 
@@ -253,6 +287,7 @@ export function manifestEntryFor(
   record: CaptureRecord,
   file: string,
 ): ManifestCaptureEntry {
+  const projection = manifestProjectionForRecord(record);
   return {
     file,
     mode: record.mode,
@@ -271,6 +306,11 @@ export function manifestEntryFor(
     },
     provenance: { ...record.provenance },
     samples: record.samples,
+    derivedTier: projection.derivedTier,
+    derivedTierReason: projection.derivedTierReason,
+    ...(projection.captureRecipeSha256 === undefined
+      ? {}
+      : { captureRecipeSha256: projection.captureRecipeSha256 }),
   };
 }
 
@@ -348,6 +388,12 @@ export class CaptureStore {
   readonly root: string;
   private readonly now: () => Date;
   private readonly written = new Map<string, ManifestCaptureEntry>();
+  /**
+   * Serializes `finalize` merges: `Bun.serve` handles requests concurrently against one store
+   * instance, and finalize is a read-modify-write over the on-disk manifest. Without this chain,
+   * two in-flight finalizes interleave and the earlier merge is lost.
+   */
+  private finalizeChain: Promise<unknown> = Promise.resolve();
 
   constructor(options: CaptureStoreOptions) {
     this.root = options.root;
@@ -381,6 +427,15 @@ export class CaptureStore {
 
   /** Merge this run's entries into the manifest and write it atomically. */
   async finalize(): Promise<CaptureManifest> {
+    const result = this.finalizeChain.then(() => this.doFinalize());
+    this.finalizeChain = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  private async doFinalize(): Promise<CaptureManifest> {
     const existing = await readCaptureManifest(this.root);
     const merged = new Map<string, ManifestCaptureEntry>();
     for (const entry of existing?.captures ?? []) merged.set(entry.file, entry);
@@ -617,21 +672,7 @@ function expectOperation(value: unknown, field: string): OperationRef {
 }
 
 function expectProvenance(value: unknown, field: string): CaptureProvenance {
-  const provenance = expectObject(value, field);
-  const proxy = expectString(provenance["proxy"], `${field}.proxy`);
-  if (proxy !== "env" && proxy !== "none") {
-    fail(`${field}.proxy`, '"env" or "none"');
-  }
-  const auth = expectString(provenance["auth"], `${field}.auth`);
-  if (auth !== "cookie" && auth !== "none") {
-    fail(`${field}.auth`, '"cookie" or "none"');
-  }
-  return {
-    portalHost: expectString(provenance["portalHost"], `${field}.portalHost`),
-    proxy,
-    auth,
-    bunVersion: expectString(provenance["bunVersion"], `${field}.bunVersion`),
-  };
+  return normalizeProvenance(parseCaptureProvenance(value, field));
 }
 
 /** Validate an untrusted value as a capture record (boundary parse). */
@@ -785,6 +826,15 @@ export function assertCaptureManifest(value: unknown): CaptureManifest {
         },
         provenance: expectProvenance(entry["provenance"], "provenance"),
         samples: expectNumber(entry["samples"], "samples"),
+        ...(typeof entry["derivedTier"] === "string"
+          ? { derivedTier: entry["derivedTier"] }
+          : {}),
+        ...(typeof entry["derivedTierReason"] === "string"
+          ? { derivedTierReason: entry["derivedTierReason"] }
+          : {}),
+        ...(typeof entry["captureRecipeSha256"] === "string"
+          ? { captureRecipeSha256: entry["captureRecipeSha256"] }
+          : {}),
       };
     },
   );

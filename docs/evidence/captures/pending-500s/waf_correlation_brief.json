@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "kind": "waf-correlation-brief",
+  "generatedAt": "2026-11-01T04:19:14.165Z",
+  "sourceLedger": "docs/evidence/captures/pending-500s/cf_ray_ledger.json",
+  "gradedProbeRows": 14,
+  "uniqueRays": [
+    {
+      "cfRay": "a53805418c4d4532-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["webkit"],
+      "tiers": ["C-edge?"]
+    },
+    {
+      "cfRay": "a5380563ccda340c-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["webkit"],
+      "tiers": ["—"]
+    },
+    {
+      "cfRay": "a53805e84e3cd3be-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["chrome"],
+      "tiers": ["C-edge?"]
+    },
+    {
+      "cfRay": "a5380ca0d9eeb469-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["webkit"],
+      "tiers": ["C-edge?"]
+    },
+    {
+      "cfRay": "a5380d00bf37846c-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["webkit"],
+      "tiers": ["C-edge?"]
+    },
+    {
+      "cfRay": "a5381322ff09b16c-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["webkit"],
+      "tiers": ["C-edge?"]
+    },
+    {
+      "cfRay": "a53813373e71d7da-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["chrome"],
+      "tiers": ["C-edge?"]
+    },
+    {
+      "cfRay": "a53815b6583fc63a-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["webkit"],
+      "tiers": ["C-edge?"]
+    },
+    {
+      "cfRay": "a53815c78b837d4e-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["webkit"],
+      "tiers": ["—"]
+    },
+    {
+      "cfRay": "a538164268323670-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["webkit"],
+      "tiers": ["C-edge?"]
+    },
+    {
+      "cfRay": "a53816532934128d-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["webkit"],
+      "tiers": ["—"]
+    },
+    {
+      "cfRay": "a53818343f1c8857-ATL",
+      "datacenter": "ATL",
+      "observations": 1,
+      "backends": ["webkit"],
+      "tiers": ["C-edge?"]
+    }
+  ],
+  "operatorSteps": [
+    "Cloudflare Dashboard → Security → Events (or WAF) → filter by Ray ID",
+    "Correlate empty HTTP 500 (0 B) + cfRay with Block/Challenge action vs Allow",
+    "If Block: edge hypothesis confirmed; if Allow: pull origin error log for same timestamp"
+  ]
+}

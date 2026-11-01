@@ -1,22 +1,29 @@
 /**
  * @file lib/screenshot_encode.ts
- * @description Re-encode WebView screenshots with Bun.Image.
+ * @description Re-encode WebView screenshots with Bun.Image and canonical Blob/Base64/Shmem/ThumbHash helpers.
  *
- * The WebKit backend can only produce png/jpeg, so webp and resizing are done after the fact rather
- * than by forcing the Chrome backend. `Bun.Image` is mutable: `resize()` and `webp()` return the same
- * instance, so the order of operations is visible in the chain below.
+ * The WebKit backend can only produce png/jpeg, so webp/avif/heic and resizing are done after the fact
+ * rather than by forcing the Chrome backend. `Bun.Image` is mutable: `resize()` and `webp()` return the
+ * same instance, and all processing runs off the main thread (except `metadata()`).
  *
- * Canonical Bun.Image contract (`docs/runtime/image.mdx` & `bun.d.ts`):
- * - `new Bun.Image(input, { maxPixels, autoOrient })` guards against decompression bombs before
- *   allocating the pixel buffer.
- * - `resize(width, height, { fit, withoutEnlargement, filter })` supports `"inside"` aspect-preserving
- *   fit, `withoutEnlargement: true`, and resampling kernels (`"lanczos3"` default).
- * - `png({ compressionLevel, palette, colors, dither })` supports indexed palette PNGs (3-5x smaller
- *   for UI screenshots).
- * - `.bytes()` is the canonical `Promise<Uint8Array>` terminal (`.toBuffer()` is a Sharp-compat alias).
+ * Canonical Bun 1.4.4 `Bun.Image` & `Bun.WebView` contract:
+ * - Off-thread terminal methods: `.bytes()`, `.buffer()`, `.blob()`, `.toBase64()`, `.dataurl()`,
+ *   `.placeholder()` (ThumbHash data URL for blur-up), `.metadata()`, and `.write(dest)`.
+ * - `Bun.file(path).image()` loads a `BunFile` directly into a `Bun.Image` pipeline (`await Bun.file(p).image().placeholder()`).
+ * - Body integration: `new Response(buildConfiguredImage(input, options))` streams the encoded image
+ *   with automatic `Content-Type` header (`image/png`, `image/jpeg`, `image/webp`, `image/avif`, `image/heic`).
+ * - Platform codecs: JPEG/PNG/WebP/GIF/BMP are statically linked across all OSes; HEIC and AVIF use
+ *   ImageIO + vImage on macOS (Apple Silicon) with zero startup cost via lazy symbol resolution.
+ * - `view.screenshot({ encoding: "blob" })` (default) returns a zero-copy mmap-backed `Blob` on WebKit.
+ * - `view.screenshot({ encoding: "base64" })` is zero-decode on Chrome (CDP returns base64 natively).
+ * - `view.screenshot({ encoding: "shmem" })` writes the PNG to a POSIX shared-memory segment for Kitty (`t=s`).
  */
 
-export type ScreenshotFormat = "png" | "jpeg" | "webp";
+export type ScreenshotFormat = "png" | "jpeg" | "webp" | "avif" | "heic";
+export type ScreenshotMimeType =
+  "image/png" | "image/jpeg" | "image/webp" | "image/avif" | "image/heic";
+export type ScreenshotEncoding = "blob" | "buffer" | "base64" | "shmem";
+export type ImageBinaryInput = Uint8Array | ArrayBuffer | Blob;
 
 export interface ResizeSpec {
   readonly width: number;
@@ -32,7 +39,7 @@ export interface EncodeOptions {
   readonly quality?: number;
   /** Emit a progressive JPEG (default false). */
   readonly progressive?: boolean;
-  /** Emit a lossless WebP (default false). */
+  /** Emit a lossless WebP/AVIF/HEIC (default false). */
   readonly lossless?: boolean;
   /** Quantize PNG to a <=256-color indexed palette (3-5x smaller for UI screenshots). */
   readonly palette?: boolean;
@@ -41,18 +48,63 @@ export interface EncodeOptions {
   readonly maxPixels?: number;
 }
 
+export interface ShmemGraphicSegment {
+  readonly name: string;
+  readonly size: number;
+  /** Kitty graphics protocol `t=s` escape sequence (`\x1b_Gf=100,t=s,a=T,S=<size>;<b64(name)>\x1b\\`). */
+  readonly kittyEscape: string;
+}
+
 const DEFAULT_MAX_PIXELS = 16_384 * 16_384;
 
-const MAGIC: Record<ScreenshotFormat, readonly number[]> = {
+const MAGIC: Record<"png" | "jpeg" | "webp", readonly number[]> = {
   png: [0x89, 0x50, 0x4e, 0x47],
   jpeg: [0xff, 0xd8, 0xff],
   webp: [0x52, 0x49, 0x46, 0x46], // RIFF; "WEBP" follows at offset 8
 };
 
+export const MIME_TYPE_BY_FORMAT: Readonly<
+  Record<ScreenshotFormat, ScreenshotMimeType>
+> = {
+  png: "image/png",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  avif: "image/avif",
+  heic: "image/heic",
+};
+
+export function mimeTypeForFormat(
+  format: ScreenshotFormat,
+): ScreenshotMimeType {
+  return MIME_TYPE_BY_FORMAT[format];
+}
+
 export function looksLike(
   format: ScreenshotFormat,
   bytes: Uint8Array,
 ): boolean {
+  if (format === "avif" || format === "heic") {
+    // ISOBMFF: size(4) + "ftyp"(4) + major brand(4) at offsets 4..8 and 8..12. The major
+    // brand distinguishes AVIF ("avif") from HEIC/HEIF ("heic"); checking only the ftyp box
+    // would let one format's bytes pass the other's magic guard.
+    if (bytes.byteLength < 12) return false;
+    if (
+      bytes[4] !== 0x66 ||
+      bytes[5] !== 0x74 ||
+      bytes[6] !== 0x79 ||
+      bytes[7] !== 0x70
+    ) {
+      return false;
+    }
+    const brand = String.fromCharCode(
+      bytes[8]!,
+      bytes[9]!,
+      bytes[10]!,
+      bytes[11]!,
+    );
+    const expectedBrand = format === "avif" ? "avif" : "heic";
+    return brand === expectedBrand;
+  }
   const magic = MAGIC[format];
   if (!magic.every((byte, index) => bytes[index] === byte)) return false;
   if (format === "webp") {
@@ -66,20 +118,46 @@ export function looksLike(
   return true;
 }
 
-/** Read `width`, `height`, and `format` from the image header without decoding pixels. */
+function inputByteLength(input: ImageBinaryInput): number {
+  if (input instanceof Blob) return input.size;
+  return input.byteLength;
+}
+
+/** Read `width`, `height`, and `format` from the image header (~0.004 ms, 70x faster than sharp). */
 export async function readImageMetadata(
-  input: Uint8Array | ArrayBuffer | Blob,
+  input: ImageBinaryInput,
   maxPixels: number = DEFAULT_MAX_PIXELS,
 ): Promise<Bun.Image.Metadata> {
+  if (inputByteLength(input) === 0) throw new Error("screenshot is empty");
   return new Bun.Image(input, { maxPixels }).metadata();
 }
 
-export async function encodeScreenshot(
-  png: Uint8Array,
+/**
+ * Compute a ThumbHash blur-up placeholder data URL (`data:image/png;base64,...`) off the main thread
+ * from either binary input or a file path via `Bun.file(path).image().placeholder()`.
+ */
+export async function computeImagePlaceholder(
+  source: ImageBinaryInput | string,
+  maxPixels: number = DEFAULT_MAX_PIXELS,
+): Promise<string> {
+  if (typeof source === "string") {
+    return await Bun.file(source).image({ maxPixels }).placeholder();
+  }
+  if (inputByteLength(source) === 0) throw new Error("screenshot is empty");
+  return await new Bun.Image(source, { maxPixels }).placeholder();
+}
+
+/**
+ * Configure a mutable `Bun.Image` pipeline (resize + format codec).
+ * Can be passed directly to `new Response(buildConfiguredImage(input, options))` for automatic
+ * `Content-Type` header setting, or terminated via `.bytes()`, `.blob()`, `.toBase64()`, `.dataurl()`, or `.write(dest)`.
+ */
+export function buildConfiguredImage(
+  input: ImageBinaryInput,
   options: EncodeOptions,
-): Promise<Uint8Array> {
-  if (png.byteLength === 0) throw new Error("screenshot is empty");
-  const image = new Bun.Image(png, {
+): Bun.Image {
+  if (inputByteLength(input) === 0) throw new Error("screenshot is empty");
+  const image = new Bun.Image(input, {
     maxPixels: options.maxPixels ?? DEFAULT_MAX_PIXELS,
     autoOrient: true,
   });
@@ -108,27 +186,42 @@ export async function encodeScreenshot(
   }
 
   const quality = options.quality ?? 80;
-  const encoded =
-    options.format === "png"
-      ? options.palette === true
-        ? image.png({ palette: true, dither: true })
-        : image.png()
-      : options.format === "jpeg"
-        ? image.jpeg({
-            quality,
-            ...(options.progressive === undefined
-              ? {}
-              : { progressive: options.progressive }),
-          })
-        : image.webp({
-            quality,
-            ...(options.lossless === undefined
-              ? {}
-              : { lossless: options.lossless }),
-          });
+  if (options.format === "png") {
+    return options.palette === true
+      ? image.png({ palette: true, dither: true })
+      : image.png();
+  }
+  if (options.format === "jpeg") {
+    return image.jpeg({
+      quality,
+      ...(options.progressive === undefined
+        ? {}
+        : { progressive: options.progressive }),
+    });
+  }
+  if (options.format === "avif") {
+    return image.avif({
+      quality,
+      ...(options.lossless === undefined ? {} : { lossless: options.lossless }),
+    });
+  }
+  if (options.format === "heic") {
+    return image.heic({
+      quality,
+      ...(options.lossless === undefined ? {} : { lossless: options.lossless }),
+    });
+  }
+  return image.webp({
+    quality,
+    ...(options.lossless === undefined ? {} : { lossless: options.lossless }),
+  });
+}
 
-  // `.bytes()` is the canonical Uint8Array terminal in Bun.Image (`docs/runtime/image.mdx`);
-  // fall back to `.toBuffer()` if a test stub only implements the Sharp alias.
+export async function encodeScreenshot(
+  input: ImageBinaryInput,
+  options: EncodeOptions,
+): Promise<Uint8Array> {
+  const encoded = buildConfiguredImage(input, options);
   const bytes =
     typeof encoded.bytes === "function"
       ? await encoded.bytes()
@@ -139,6 +232,85 @@ export async function encodeScreenshot(
     );
   }
   return bytes;
+}
+
+/**
+ * Off-thread native `.blob()` terminal on `Bun.Image`: returns a `Blob` with `blob.type`
+ * set automatically (`image/png`, `image/jpeg`, `image/webp`, `image/avif`, `image/heic`).
+ */
+export async function encodeScreenshotBlob(
+  input: ImageBinaryInput,
+  options: EncodeOptions,
+): Promise<Blob> {
+  const encoded = buildConfiguredImage(input, options);
+  if (typeof encoded.blob === "function") {
+    return await encoded.blob();
+  }
+  const bytes = await encodeScreenshot(input, options);
+  return new Blob([bytes], { type: mimeTypeForFormat(options.format) });
+}
+
+/**
+ * Off-thread native `.toBase64()` and `.dataurl()` terminals on `Bun.Image`.
+ */
+export async function encodeScreenshotDataUrl(
+  input: ImageBinaryInput,
+  options: EncodeOptions,
+): Promise<{
+  readonly base64: string;
+  readonly dataUri: string;
+  readonly mimeType: ScreenshotMimeType;
+}> {
+  const encoded = buildConfiguredImage(input, options);
+  const [base64, dataUri] = await Promise.all([
+    encoded.toBase64(),
+    encoded.dataurl(),
+  ]);
+  return {
+    base64,
+    dataUri,
+    mimeType: mimeTypeForFormat(options.format),
+  };
+}
+
+/**
+ * Off-thread native `.write(dest)` terminal on `Bun.Image`.
+ */
+export async function writeScreenshot(
+  dest: string,
+  input: ImageBinaryInput,
+  options: EncodeOptions,
+): Promise<number> {
+  const encoded = buildConfiguredImage(input, options);
+  return await encoded.write(dest);
+}
+
+/** Format a data URI (`data:image/<fmt>;base64,...`) from base64 screenshot output. */
+export function toScreenshotDataUri(
+  base64: string,
+  format: ScreenshotFormat = "png",
+): string {
+  return `data:${mimeTypeForFormat(format)};base64,${base64}`;
+}
+
+/**
+ * Build the Kitty terminal graphics protocol `t=s` shared-memory escape sequence
+ * (`\x1b_Gf=100,t=s,a=T,S=<size>;<b64(name)>\x1b\\`) from `view.screenshot({ encoding: "shmem" })`.
+ * Kitty reads the PNG from the POSIX shared-memory segment and calls `shm_unlink` when done.
+ */
+export function formatKittyShmemEscape(segment: {
+  readonly name: string;
+  readonly size: number;
+}): ShmemGraphicSegment {
+  if (segment.name.trim() === "" || segment.size <= 0) {
+    throw new Error("invalid shared-memory screenshot segment");
+  }
+  const encodedName = Buffer.from(segment.name, "utf8").toString("base64");
+  return {
+    name: segment.name,
+    size: segment.size,
+    kittyEscape: `\x1b_Gf=100,t=s,a=T,S=${segment.size};${encodedName}\x1b\\`,
+  };
 }
 
 /** Parse `WxH` or `W` from a CLI flag. */

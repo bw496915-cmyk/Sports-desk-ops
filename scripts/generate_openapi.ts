@@ -1888,12 +1888,19 @@ interface CaptureStoreLoad {
   readonly problems: readonly string[];
 }
 
-const NON_CAPTURE_FILES = new Set(["manifest.json"]);
+const NON_CAPTURE_FILES = new Set(["manifest.json", "run.json"]);
+const NON_CAPTURE_DIRS = new Set([
+  "catalog",
+  "pending-500s",
+  "schema",
+  "runtime",
+]);
 
 function isCaptureFileName(name: string): boolean {
   if (!name.endsWith(".json")) return false;
   if (NON_CAPTURE_FILES.has(name)) return false;
   if (name.startsWith("applied-")) return false;
+  if (name.startsWith("_")) return false;
   return true;
 }
 
@@ -1916,9 +1923,9 @@ function listCaptureFiles(dir: string): string[] {
         continue;
       }
       if (directory) {
-        // Catalog-probe artifacts are evidence for the desk catalog surface,
-        // not upgradeable ledger operations.
-        if (entry === "catalog") continue;
+        // Non-endpoint artifact directories (catalog, pending-500s, schema, runtime)
+        // are not upgradeable ledger operations.
+        if (NON_CAPTURE_DIRS.has(entry)) continue;
         walk(full);
       } else if (isCaptureFileName(entry)) found.push(full);
     }

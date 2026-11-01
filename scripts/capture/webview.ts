@@ -3,8 +3,9 @@
  *
  * Built on the probed Bun 1.4.4 API: `title`/`url`/`loading` are properties,
  * `onNavigated` is an assignable callback, `evaluate` needs a single expression
- * or IIFE, `screenshot` returns a Blob, `cdp` is a command-only sender, and the
- * only supported teardown is `await view.close()` (+ `Bun.WebView.closeAll()`
+ * or IIFE, `screenshot` supports `encoding: "blob" | "buffer" | "base64" | "shmem"`,
+ * `cdp` is a command-only sender (+ `EventTarget` listeners for CDP events), and
+ * teardown uses `view.close()` / `[Symbol.dispose]` (+ `Bun.WebView.closeAll()`
  * as a process-exit net).
  *
  * The wrapper exists so the CLI can be tested without a browser: load-wait and
@@ -15,8 +16,16 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
-  encodeScreenshot,
+  computeImagePlaceholder,
+  encodeScreenshotBlob,
+  encodeScreenshotDataUrl,
+  formatKittyShmemEscape,
+  mimeTypeForFormat,
+  toScreenshotDataUri,
   type ResizeSpec,
+  type ScreenshotFormat,
+  type ScreenshotMimeType,
+  type ShmemGraphicSegment,
 } from "../../lib/screenshot_encode.ts";
 import { parseCdpCookies, type CdpCookie } from "./cookies.ts";
 import { sha256Hex } from "./json.ts";
@@ -78,6 +87,15 @@ export interface ScreenshotResult {
   path: string;
   bytes: number;
   sha256: string;
+  mimeType: ScreenshotMimeType;
+  /** ThumbHash blur-up data URL (`data:image/png;base64,...`) from `Bun.Image.prototype.placeholder()`. */
+  placeholder?: string;
+}
+
+export interface Base64ScreenshotResult {
+  base64: string;
+  mimeType: ScreenshotMimeType;
+  dataUri: string;
 }
 
 export type ScreenshotOptions =
@@ -534,104 +552,253 @@ export class ManagedWebView {
     );
   }
 
-  /**
-   * Screenshot to a file.
-   *
-   * On WebKit, `webp` is not natively supported by WKWebView (`view.screenshot({ format: "webp" })`
-   * throws), and neither backend resizes or quantizes in-place. Whenever `webp` is requested on
-   * WebKit — or when `resize`, `palette`, `lossless`, or `progressive` is specified — capture a
-   * lossless PNG buffer and transform/encode it in-memory with `Bun.Image` (`encodeScreenshot`).
-   */
-  async screenshotToFile(
-    path: string,
-    options?: ScreenshotOptions,
-  ): Promise<ScreenshotResult> {
-    this.assertOpen();
-    const needsBunImage =
+  private needsBunImageTransform(options?: ScreenshotOptions): boolean {
+    return (
       options !== undefined &&
       ((this.backend === "webkit" && options.format === "webp") ||
         options.resize !== undefined ||
         (options.format === "png" && options.palette === true) ||
         (options.format === "jpeg" && options.progressive === true) ||
-        (options.format === "webp" && options.lossless === true));
+        (options.format === "webp" && options.lossless === true))
+    );
+  }
 
-    let bytes: Uint8Array;
+  /**
+   * Capture a screenshot as a `Blob` (`encoding: "blob"`, zero-copy mmap-backed on WebKit)
+   * with its MIME type set (`image/png`, `image/jpeg`, `image/webp`), ready for `Bun.write()`,
+   * `new Response(blob)`, or `new Bun.Image(blob)`.
+   */
+  async screenshotBlob(options?: ScreenshotOptions): Promise<Blob> {
+    this.assertOpen();
+    const format = options?.format ?? "png";
     try {
-      if (needsBunImage && options !== undefined) {
+      if (this.needsBunImageTransform(options) && options !== undefined) {
         const rawPng: unknown = await this.view.screenshot({
-          encoding: "buffer",
+          encoding: "blob",
           format: "png",
         });
-        const pngBytes =
-          rawPng instanceof Uint8Array
+        const input =
+          rawPng instanceof Blob || rawPng instanceof Uint8Array
             ? rawPng
-            : new Uint8Array(await (rawPng as Blob).arrayBuffer());
-        bytes = await encodeScreenshot(pngBytes, {
-          format: options.format,
-          ...(options.format === "png"
-            ? options.palette === undefined
-              ? {}
-              : { palette: options.palette }
-            : options.format === "jpeg"
-              ? {
-                  ...(options.quality === undefined
-                    ? {}
-                    : { quality: options.quality }),
-                  ...(options.progressive === undefined
-                    ? {}
-                    : { progressive: options.progressive }),
-                }
-              : {
-                  ...(options.quality === undefined
-                    ? {}
-                    : { quality: options.quality }),
-                  ...(options.lossless === undefined
-                    ? {}
-                    : { lossless: options.lossless }),
-                }),
-          ...(options.resize === undefined ? {} : { resize: options.resize }),
-        });
-      } else {
-        const raw: unknown =
-          options === undefined
-            ? await this.view.screenshot({ encoding: "buffer" })
-            : options.format === "jpeg"
+            : new Uint8Array(rawPng as ArrayBuffer);
+        const encodeOptions: {
+          format: ScreenshotFormat;
+          quality?: number;
+          progressive?: boolean;
+          lossless?: boolean;
+          palette?: boolean;
+          resize?: ResizeSpec;
+        } = { format: options.format };
+        if (options.format === "png") {
+          if (options.palette !== undefined)
+            encodeOptions.palette = options.palette;
+        } else if (options.format === "jpeg") {
+          if (options.quality !== undefined)
+            encodeOptions.quality = options.quality;
+          if (options.progressive !== undefined) {
+            encodeOptions.progressive = options.progressive;
+          }
+        } else {
+          if (options.quality !== undefined)
+            encodeOptions.quality = options.quality;
+          if (options.lossless !== undefined)
+            encodeOptions.lossless = options.lossless;
+        }
+        if (options.resize !== undefined) encodeOptions.resize = options.resize;
+        return await encodeScreenshotBlob(input, encodeOptions);
+      }
+
+      const raw: unknown =
+        options === undefined
+          ? await this.view.screenshot({ encoding: "blob" })
+          : options.format === "jpeg"
+            ? await this.view.screenshot({
+                encoding: "blob",
+                format: "jpeg",
+                quality: options.quality ?? 80,
+              })
+            : options.format === "webp"
               ? await this.view.screenshot({
-                  encoding: "buffer",
-                  format: "jpeg",
+                  encoding: "blob",
+                  format: "webp",
                   quality: options.quality ?? 80,
                 })
-              : options.format === "webp"
-                ? await this.view.screenshot({
-                    encoding: "buffer",
-                    format: "webp",
-                    quality: options.quality ?? 80,
-                  })
-                : await this.view.screenshot({
-                    encoding: "buffer",
-                    format: "png",
-                  });
-        bytes =
-          raw instanceof Uint8Array
-            ? raw
-            : new Uint8Array(await (raw as Blob).arrayBuffer());
-      }
+              : await this.view.screenshot({
+                  encoding: "blob",
+                  format: "png",
+                });
+      if (raw instanceof Blob) return raw;
+      const bytes =
+        raw instanceof Uint8Array
+          ? raw
+          : new Uint8Array(raw as ArrayBufferLike);
+      return new Blob([bytes], { type: mimeTypeForFormat(format) });
     } catch (error) {
       throw new WebViewError(
         "screenshot-failed",
         `screenshot failed: ${redactError(error)}`,
       );
     }
+  }
+
+  /**
+   * Capture a screenshot as a Base64 string + `data:` URI.
+   * Uses `encoding: "base64"` directly when no `Bun.Image` transform is needed (zero-decode on Chrome).
+   */
+  async screenshotBase64(
+    options?: ScreenshotOptions,
+  ): Promise<Base64ScreenshotResult> {
+    this.assertOpen();
+    const format = options?.format ?? "png";
+    const mimeType = mimeTypeForFormat(format);
+    try {
+      if (!this.needsBunImageTransform(options)) {
+        const raw: unknown =
+          options === undefined
+            ? await this.view.screenshot({ encoding: "base64" })
+            : options.format === "jpeg"
+              ? await this.view.screenshot({
+                  encoding: "base64",
+                  format: "jpeg",
+                  quality: options.quality ?? 80,
+                })
+              : options.format === "webp"
+                ? await this.view.screenshot({
+                    encoding: "base64",
+                    format: "webp",
+                    quality: options.quality ?? 80,
+                  })
+                : await this.view.screenshot({
+                    encoding: "base64",
+                    format: "png",
+                  });
+        let base64: string;
+        if (typeof raw === "string") {
+          base64 = raw;
+        } else if (raw instanceof Uint8Array) {
+          base64 = Buffer.from(raw).toString("base64");
+        } else {
+          const bytes =
+            raw instanceof ArrayBuffer
+              ? new Uint8Array(raw)
+              : new Uint8Array(await (raw as Blob).arrayBuffer());
+          base64 = Buffer.from(bytes).toString("base64");
+        }
+        return {
+          base64,
+          mimeType,
+          dataUri: toScreenshotDataUri(base64, format),
+        };
+      }
+      const rawPng: unknown = await this.view.screenshot({
+        encoding: "blob",
+        format: "png",
+      });
+      const input =
+        rawPng instanceof Blob || rawPng instanceof Uint8Array
+          ? rawPng
+          : new Uint8Array(rawPng as ArrayBuffer);
+      const dataOptions: {
+        format: ScreenshotFormat;
+        quality?: number;
+        progressive?: boolean;
+        lossless?: boolean;
+        palette?: boolean;
+        resize?: ResizeSpec;
+      } = { format: options?.format ?? "png" };
+      if (options?.format === "png") {
+        if (options.palette !== undefined)
+          dataOptions.palette = options.palette;
+      } else if (options?.format === "jpeg") {
+        if (options.quality !== undefined)
+          dataOptions.quality = options.quality;
+        if (options.progressive !== undefined) {
+          dataOptions.progressive = options.progressive;
+        }
+      } else {
+        if (options?.quality !== undefined)
+          dataOptions.quality = options?.quality;
+        if (options?.lossless !== undefined)
+          dataOptions.lossless = options?.lossless;
+      }
+      if (options?.resize !== undefined) dataOptions.resize = options.resize;
+      return await encodeScreenshotDataUrl(input, dataOptions);
+    } catch (error) {
+      if (error instanceof WebViewError) throw error;
+      throw new WebViewError(
+        "screenshot-failed",
+        `screenshot failed: ${redactError(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Compute a ThumbHash blur-up placeholder data URL (`data:image/png;base64,...`)
+   * from the current viewport off the main thread via `Bun.Image.prototype.placeholder()`.
+   */
+  async screenshotPlaceholder(): Promise<string> {
+    this.assertOpen();
+    try {
+      const blob = await this.screenshotBlob({ format: "png" });
+      return await computeImagePlaceholder(blob);
+    } catch (error) {
+      if (error instanceof WebViewError) throw error;
+      throw new WebViewError(
+        "screenshot-failed",
+        `placeholder screenshot failed: ${redactError(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Capture a screenshot into a POSIX shared-memory segment (`encoding: "shmem"`)
+   * for Kitty terminal graphics protocol `t=s` transmission.
+   * Note: the caller or Kitty terminal must `shm_unlink` the returned segment `name`.
+   */
+  async screenshotShmem(): Promise<ShmemGraphicSegment> {
+    this.assertOpen();
+    try {
+      const seg = await this.view.screenshot({ encoding: "shmem" });
+      return formatKittyShmemEscape(seg);
+    } catch (error) {
+      throw new WebViewError(
+        "screenshot-failed",
+        `shmem screenshot failed: ${redactError(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Screenshot to a file using `screenshotBlob` (`encoding: "blob"` mmap-backed on WebKit
+   * + `Bun.Image` when `webp`, `resize`, `palette`, `lossless`, or `progressive` is requested).
+   */
+  async screenshotToFile(
+    path: string,
+    options?: ScreenshotOptions,
+  ): Promise<ScreenshotResult> {
+    const format = options?.format ?? "png";
+    const blob = await this.screenshotBlob(options);
+    const [ab, placeholder] = await Promise.all([
+      blob.arrayBuffer(),
+      computeImagePlaceholder(blob).catch(() => undefined),
+    ]);
+    const bytes = new Uint8Array(ab);
     try {
       await mkdir(dirname(path), { recursive: true });
-      await Bun.write(path, bytes);
+      await Bun.write(path, blob);
     } catch (error) {
       throw new WebViewError(
         "screenshot-failed",
         `writing screenshot to ${path} failed: ${redactError(error)}`,
       );
     }
-    return { path, bytes: bytes.length, sha256: sha256Hex(bytes) };
+    return {
+      path,
+      bytes: bytes.byteLength,
+      sha256: sha256Hex(bytes),
+      mimeType: (blob.type as ScreenshotMimeType) || mimeTypeForFormat(format),
+      ...(placeholder === undefined ? {} : { placeholder }),
+    };
   }
 
   /** Send one CDP command (Chrome backend only). */

@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "mode": "live",
+  "capturedAt": "2026-11-01T02:22:35.993Z",
+  "operation": {
+    "path": "/cloud/api/Report/getGrading",
+    "method": "POST"
+  },
+  "request": {
+    "url": "https://fantasy402.com/cloud/api/Report/getGrading",
+    "method": "POST",
+    "headers": {
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "x-requested-with": "XMLHttpRequest",
+      "authorization": "<redacted>"
+    },
+    "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+    "bodySha256": "ba03abdbe11d32c298ee4f21b6b59ebc4f92f018c332ce774897dd6897356c7f",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "customerID": {
+          "type": "string",
+          "nullable": false
+        },
+        "operation": {
+          "type": "string",
+          "nullable": false
+        },
+        "token": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "contentType": "application/json; charset=utf-8",
+    "bodySha256": "b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c",
+    "bodySkeleton": {
+      "type": "object",
+      "nullable": false,
+      "fields": {
+        "LIST": {
+          "type": "string",
+          "nullable": false
+        }
+      }
+    },
+    "bytes": 11
+  },
+  "redaction": {
+    "policyVersion": 1,
+    "clean": true,
+    "fieldsRedacted": [
+      "request.body.customerID",
+      "request.body.token",
+      "request.headers.authorization"
+    ],
+    "piiRedacted": ["customer-id", "token"]
+  },
+  "provenance": {
+    "portalHost": "fantasy402.com",
+    "proxy": "none",
+    "auth": "cookie",
+    "bunVersion": "1.4.4",
+    "observation": "authored",
+    "body": "none",
+    "mutation": "unknown",
+    "state": {
+      "viewMode": "unknown",
+      "sessionStorageCleared": false,
+      "betTickerParam": false,
+      "challengePresent": false
+    }
+  },
+  "samples": 1
+}
