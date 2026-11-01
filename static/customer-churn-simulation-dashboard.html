@@ -703,6 +703,104 @@
         margin-bottom: 0;
       }
 
+      /* Live wager ticker: rows from the {LIST: [...]} feed. */
+      .lw-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+        gap: 0.6rem;
+        margin-bottom: 0.8rem;
+      }
+      .lw-stat {
+        border: 1px solid var(--sd-surface-border);
+        border-radius: 8px;
+        padding: 0.5rem 0.7rem;
+        background: var(--sd-surface-card);
+      }
+      .lw-stat dt {
+        margin: 0;
+        font-size: 0.64rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--sd-text-muted);
+      }
+      .lw-stat dd {
+        margin: 0.15rem 0 0;
+        font-size: 1.05rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .lw-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+        margin-bottom: 0.7rem;
+      }
+      .lw-bar button {
+        font: inherit;
+        font-size: 0.68rem;
+        padding: 0.12rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid var(--sd-surface-border);
+        background: var(--sd-surface-card);
+        color: var(--sd-text-muted);
+        cursor: pointer;
+      }
+      .lw-bar button[aria-pressed="true"] {
+        background: var(--sd-accent);
+        border-color: var(--sd-accent);
+        color: var(--sd-text-on-fill);
+      }
+      .lw-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.74rem;
+      }
+      .lw-table th,
+      .lw-table td {
+        padding: 0.28rem 0.45rem;
+        border-bottom: 1px solid var(--sd-surface-border);
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .lw-table th {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--sd-text-muted);
+        font-weight: 600;
+      }
+      .lw-table th:nth-child(2),
+      .lw-table td:nth-child(2),
+      .lw-table th:nth-child(3),
+      .lw-table td:nth-child(3),
+      .lw-table th:nth-child(9),
+      .lw-table td:nth-child(9) {
+        text-align: left;
+      }
+      .lw-table td:nth-child(9) > span:first-child {
+        display: block;
+        font-variant-numeric: tabular-nums;
+      }
+      .lw-leg {
+        display: block;
+        text-align: left;
+        color: var(--sd-text-muted);
+        font-size: 0.66rem;
+        max-width: 26rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .lw-vol {
+        color: var(--sd-warning);
+      }
+      .lw-type {
+        display: inline-block;
+        font-size: 0.6rem;
+        padding: 0 0.3rem;
+        border-radius: 3px;
+        border: 1px solid var(--sd-surface-border);
+      }
+
       /* Contest / futures browser. */
       .ct-toolbar {
         display: flex;
@@ -1514,6 +1612,71 @@
         </button>
         <span class="st-status" id="st-status"></span>
       </div>
+    </section>
+
+    <!-- Live wager ticker: the {LIST: [...]} feed, a different shape from Pending -->
+    <section class="section-card" id="live-wagers" aria-labelledby="lw-title">
+      <div class="section-title">
+        <span id="lw-title">Live Wagers — Ticker</span>
+        <span class="badge badge-primary" id="lw-badge">LOADING</span>
+      </div>
+
+      <p class="ld-note" style="margin-top: 0" id="lw-note">
+        Each row is one wager from the ticker feed. Sport comes from the parsed
+        leg description; a stake whose volume differs is flagged rather than
+        reconciled.
+      </p>
+
+      <dl class="lw-stats" id="lw-stats" hidden>
+        <div class="lw-stat">
+          <dt>Wagers</dt>
+          <dd id="lw-count">–</dd>
+        </div>
+        <div class="lw-stat">
+          <dt>Risk</dt>
+          <dd id="lw-risk">–</dd>
+        </div>
+        <div class="lw-stat">
+          <dt>To win</dt>
+          <dd id="lw-towin">–</dd>
+        </div>
+        <div class="lw-stat">
+          <dt>Volume</dt>
+          <dd id="lw-volume">–</dd>
+        </div>
+        <div class="lw-stat">
+          <dt>Legs</dt>
+          <dd id="lw-legs">–</dd>
+        </div>
+        <div class="lw-stat">
+          <dt>Volume mismatches</dt>
+          <dd id="lw-mismatch">–</dd>
+        </div>
+      </dl>
+
+      <div class="lw-bar" id="lw-writers"></div>
+      <div class="lw-bar" id="lw-types"></div>
+
+      <table class="lw-table">
+        <thead>
+          <tr>
+            <th scope="col">Wager</th>
+            <th scope="col">Agent</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Type</th>
+            <th scope="col">Risk</th>
+            <th scope="col">To win</th>
+            <th scope="col">Volume</th>
+            <th scope="col">Writer</th>
+            <th scope="col">Legs</th>
+          </tr>
+        </thead>
+        <tbody id="lw-rows">
+          <tr>
+            <td class="empty-row" colspan="9">Loading wagers…</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
 
     <!-- Contest / futures list (sports nav get-games-prop anchors) -->
@@ -3612,6 +3775,211 @@
         fillEffects();
         apply(readStored());
         status.textContent = "Loaded";
+      })();
+
+      /* ------------------------------------------------------------------ *
+       * Live wager ticker panel                                            *
+       *                                                                    *
+       * Reads /api/live-wagers, which parses the {LIST: [...]} feed. A       *
+       * stake whose volume differs is shown in the warning colour with the   *
+       * volume printed, never averaged away.                                *
+       * ------------------------------------------------------------------ */
+      (() => {
+        const list = document.getElementById("lw-rows");
+        if (list === null) return;
+
+        const badge = document.getElementById("lw-badge");
+        const note = document.getElementById("lw-note");
+        const stats = document.getElementById("lw-stats");
+        const writersBar = document.getElementById("lw-writers");
+        const typesBar = document.getElementById("lw-types");
+
+        const make = (tag, className, text) => {
+          const node = document.createElement(tag);
+          if (className) node.className = className;
+          if (text !== undefined) node.textContent = text;
+          return node;
+        };
+
+        const usd = (cents) => {
+          const value = Number(cents || 0) / 100;
+          if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+          if (value >= 1_000) return `$${Math.round(value / 1_000)}K`;
+          return `$${value.toFixed(2)}`;
+        };
+
+        let all = [];
+        let summaryData = { count: 0, byWriter: {}, byType: {} };
+        let writer = "";
+        let type = "";
+
+        const chip = (value, label, current, onPick) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.setAttribute(
+            "aria-pressed",
+            current === value ? "true" : "false",
+          );
+          button.textContent = label;
+          button.addEventListener("click", () =>
+            onPick(current === value ? "" : value),
+          );
+          return button;
+        };
+
+        const buildBars = (summary) => {
+          writersBar.replaceChildren(
+            chip("", `All writers ${summary.count}`, writer, (value) => {
+              writer = value;
+              render();
+            }),
+            ...Object.entries(summary.byWriter).map(([name, count]) =>
+              chip(name, `${name} ${count}`, writer, (value) => {
+                writer = value;
+                render();
+              }),
+            ),
+          );
+          typesBar.replaceChildren(
+            ...Object.entries(summary.byType).map(([code, count]) =>
+              chip(code, `type ${code} ${count}`, type, (value) => {
+                type = value;
+                render();
+              }),
+            ),
+          );
+        };
+
+        const render = () => {
+          if (all.length === 0) return;
+          const rows = all.filter(
+            (wager) =>
+              (writer === "" || wager.writer === writer) &&
+              (type === "" || wager.wagerType === type),
+          );
+
+          list.replaceChildren();
+          if (rows.length === 0) {
+            const tr = make("tr");
+            const td = make("td", "empty-row", "No wager matches this filter.");
+            td.colSpan = 9;
+            tr.append(td);
+            list.append(tr);
+          }
+
+          for (const wager of rows) {
+            const tr = make("tr");
+            tr.append(make("td", "", `#${wager.wagerNumber}`));
+            tr.append(make("td", "", wager.agentLogin || wager.agentId));
+            tr.append(make("td", "", wager.login));
+
+            const typeCell = make("td");
+            typeCell.append(make("span", "lw-type", wager.wagerType || "—"));
+            tr.append(typeCell);
+
+            tr.append(make("td", "", usd(wager.amountWagered)));
+            tr.append(make("td", "", usd(wager.toWinAmount)));
+
+            const volume = make(
+              "td",
+              wager.volumeDiffers ? "lw-vol" : "",
+              usd(wager.volumeAmount),
+            );
+            if (wager.volumeDiffers) {
+              volume.title = `Volume differs from the ${usd(wager.amountWagered)} stake`;
+            }
+            tr.append(volume);
+
+            tr.append(make("td", "", wager.writer));
+
+            const legCell = make("td");
+            legCell.append(make("span", "", String(wager.legs.length)));
+            const first = wager.legs[0];
+            if (first !== undefined) {
+              const label =
+                first.game === ""
+                  ? `${first.sport} — ${first.pick}`
+                  : `${first.sport} · ${first.game}${first.market === "" ? "" : ` · ${first.market}`}`;
+              legCell.append(
+                make(
+                  "span",
+                  "lw-leg",
+                  wager.legs.length > 1
+                    ? `${label} (+${wager.legs.length - 1} more)`
+                    : label,
+                ),
+              );
+            }
+            tr.append(legCell);
+
+            list.append(tr);
+          }
+
+          buildBars(summaryData);
+        };
+
+        const loadLiveWagers = async () => {
+          try {
+            const res = await fetch("/api/live-wagers", { cache: "no-store" });
+            if (res.status === 404) {
+              badge.textContent = "NOT CAPTURED";
+              badge.className = "badge badge-warning";
+              note.textContent =
+                "No ticker capture yet. Save the {LIST: [...]} response as data/live-wagers.json.";
+              return;
+            }
+            if (res.status === 401 || res.status === 503) {
+              badge.textContent = "TOKEN REQUIRED";
+              badge.className = "badge badge-warning";
+              return;
+            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const body = await res.json();
+            all = body.wagers ?? [];
+            summaryData = body.summary ?? summaryData;
+
+            document.getElementById("lw-count").textContent = String(
+              summaryData.count ?? 0,
+            );
+            document.getElementById("lw-risk").textContent = usd(
+              summaryData.risk,
+            );
+            document.getElementById("lw-towin").textContent = usd(
+              summaryData.toWin,
+            );
+            document.getElementById("lw-volume").textContent = usd(
+              summaryData.volume,
+            );
+            document.getElementById("lw-legs").textContent = String(
+              summaryData.legs ?? 0,
+            );
+            document.getElementById("lw-mismatch").textContent = String(
+              summaryData.volumeMismatches ?? 0,
+            );
+            stats.hidden = false;
+
+            badge.textContent = `${summaryData.count ?? 0} WAGERS`;
+            badge.className = "badge badge-accent";
+            render();
+          } catch (err) {
+            badge.textContent = "UNAVAILABLE";
+            badge.className = "badge badge-alert";
+            list.replaceChildren();
+            const tr = make("tr");
+            const td = make(
+              "td",
+              "empty-row",
+              `Could not load wagers: ${String(err)}`,
+            );
+            td.colSpan = 9;
+            tr.append(td);
+            list.append(tr);
+          }
+        };
+
+        globalThis.addEventListener("sportsdesk-settings", loadLiveWagers);
+        loadLiveWagers();
       })();
     </script>
   </body>

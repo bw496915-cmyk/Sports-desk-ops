@@ -323,3 +323,70 @@ describe("Analysis report table", () => {
     expect(moduleScript).toContain("context.agent");
   });
 });
+
+describe("Live wager ticker panel", () => {
+  const html = readFileSync(
+    resolve(
+      import.meta.dir,
+      "../static/customer-churn-simulation-dashboard.html",
+    ),
+    "utf8",
+  );
+
+  const moduleScript = (() => {
+    const blocks = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
+    const inline = blocks.find((b) => (b[1] ?? "").trim().length > 0);
+    if (inline?.[1] === undefined) throw new Error("no inline script block");
+    return inline[1];
+  })();
+
+  const panel = (() => {
+    const start = moduleScript.indexOf('document.getElementById("lw-rows")');
+    expect(start).toBeGreaterThan(-1);
+    const end = moduleScript.indexOf("})();", start);
+    return moduleScript.slice(start, end === -1 ? undefined : end);
+  })();
+
+  test("declares the ticker hooks", () => {
+    for (const id of [
+      "live-wagers",
+      "lw-badge",
+      "lw-note",
+      "lw-stats",
+      "lw-writers",
+      "lw-types",
+      "lw-rows",
+      "lw-count",
+      "lw-risk",
+      "lw-volume",
+      "lw-mismatch",
+    ]) {
+      expect(html).toContain(`id="${id}"`);
+    }
+  });
+
+  test("reads the ticker endpoint and handles its empty state", () => {
+    expect(panel).toContain("/api/live-wagers");
+    expect(panel).toContain("NOT CAPTURED");
+    expect(panel).toContain("data/live-wagers.json");
+  });
+
+  test("flags a volume mismatch instead of hiding it", () => {
+    expect(panel).toContain("volumeDiffers");
+    expect(panel).toContain("lw-vol");
+  });
+
+  test("renders one cell per declared column", () => {
+    // Nine headers; the Legs cell carries the count and the first leg's label together.
+    const headerCount = (html.match(/<th scope="col">/g) ?? []).length;
+    expect(headerCount).toBeGreaterThanOrEqual(9);
+    expect(panel).toContain("legCell");
+    expect(panel).not.toContain('tr.append(make("td", "", ""))');
+  });
+
+  test("offers writer and type filters", () => {
+    expect(panel).toContain("buildBars");
+    expect(panel).toContain("byWriter");
+    expect(panel).toContain("byType");
+  });
+});
