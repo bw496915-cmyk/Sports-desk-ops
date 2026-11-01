@@ -87,6 +87,11 @@ include `updateByColumn`, that the only observed padded ID is `Log/write`'s at *
 the **11**-character width must be confirmed by capture before anyone relies on it. The spec
 (`docs/openapi.json:609-754`) publishes a 9-field body and `Result` 1/0/-1 semantics on no evidence.
 
+**Padding note, corrected 2026-11-01.** `Log/writeDetail`, `Log/write` and `vipListInsert` were observed
+sending `customerID`/`agentID`/`agentOwner` as the bare 7-character login, so the "padded to 10
+characters" reading of `Log/write` above does not hold for those calls. The 11-character width in the
+spec is still unconfirmed; what is now ruled out is assuming padding from this operation family.
+
 **Capture on a controlled test account only.**
 
 ```http

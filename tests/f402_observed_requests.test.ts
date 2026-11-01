@@ -28,11 +28,14 @@ const fixture = JSON.parse(
   observedAt: string;
   responsesObserved: boolean;
   agentPlaceholder: string;
+  writeObservation?: string;
   requests: Array<{
     operation: string;
     pathObserved: string | null;
     pathStatus: string;
     contentType: string;
+    mutation?: boolean;
+    body?: Record<string, unknown>;
     sportVariants?: Array<{
       sport: string;
       sportTrimmed: string;
@@ -62,6 +65,11 @@ const catalog = loadSportCatalog(
 );
 if (catalog === null) throw new Error("sport catalog fixture did not load");
 
+/** JSON-bodied requests carry no form fields; normalise so accesses stay total. */
+for (const request of fixture.requests) {
+  request.fields ??= {};
+}
+
 const byOperation = (name: string) => {
   const request = fixture.requests.find((entry) => entry.operation === name);
   if (request === undefined) throw new Error(`fixture has no ${name}`);
@@ -90,8 +98,10 @@ describe("observed manager requests (2026-11-01)", () => {
     }
     // Identifiers are placeholders, not the pasted logins.
     for (const request of fixture.requests) {
-      expect(request.fields.agentID).toBe(fixture.agentPlaceholder);
-      expect(request.fields.agentOwner).toBe(fixture.agentPlaceholder);
+      const agentId = request.fields.agentID ?? request.body?.agentID;
+      const agentOwner = request.fields.agentOwner ?? request.body?.agentOwner;
+      expect(agentId).toBe(fixture.agentPlaceholder);
+      expect(agentOwner).toBe(fixture.agentPlaceholder);
     }
   });
 
@@ -171,8 +181,13 @@ describe("observed manager requests (2026-11-01)", () => {
     expect(fields.end).toMatch(/^\d{1,2}\/\d{1,2}\/\d{4}$/);
   });
 
-  test("both requests are form-encoded", () => {
-    for (const request of fixture.requests) {
+  test("the report calls are form-encoded", () => {
+    // The write flow is excluded on purpose: it mixes JSON and form encoding (see its own tests).
+    const reports = fixture.requests.filter(
+      (request) => request.mutation !== true,
+    );
+    expect(reports.length).toBeGreaterThanOrEqual(3);
+    for (const request of reports) {
       expect(request.contentType).toStartWith(
         "application/x-www-form-urlencoded",
       );
@@ -372,5 +387,74 @@ describe("the getGrading request", () => {
         Object.entries(request.fields) as [string, string][],
       ).toString(),
     ).toBe(observed);
+  });
+});
+
+describe("the vipListInsert write and its audit trail", () => {
+  test("a save is three requests, and all three are mutations", () => {
+    // Recorded as evidence of behaviour, never as something to replay: nothing in this repo calls
+    // any of them, and production is read-only unless a task is explicitly a deploy.
+    const save = ["vipListInsert", "writeDetail", "write"].map(byOperation);
+    expect(save.every((request) => request.mutation === true)).toBe(true);
+    expect(fixture.writeObservation).toContain("never replay");
+  });
+
+  test("the mutation is JSON and carries a list array", () => {
+    const insert = byOperation("vipListInsert");
+    expect(insert.contentType).toBe("application/json");
+    const body = insert.body ?? {};
+    expect(body.operation).toBe("vipListInsert");
+    expect(Array.isArray(body.list)).toBe(true);
+    const entry = (body.list as Array<Record<string, string>>)[0];
+    expect(entry?.agentID).toBe(fixture.agentPlaceholder);
+    expect(entry?.player).toBe("<player>");
+  });
+
+  test("writeDetail carries the same list as encoded JSON in a form field", () => {
+    const detail = byOperation("writeDetail");
+    expect(detail.contentType).toStartWith("application/x-www-form-urlencoded");
+    const parsed = JSON.parse(detail.fields.data ?? "[]") as Array<
+      Record<string, string>
+    >;
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.player).toBe("<player>");
+    // ticket=0: this audit row is not attached to a wager.
+    expect(detail.fields.ticket).toBe("0");
+    expect(detail.fields.info).toContain("v1.0.280");
+  });
+
+  test("write names the screen it logged", () => {
+    const write = byOperation("write");
+    expect(write.contentType).toBe("application/json");
+    expect(write.body?.description).toContain("Save Action / Vip List");
+    expect(write.body?.description).toContain("v1.0.280");
+  });
+
+  test("one save flow uses two encodings", () => {
+    // JSON, then form, then JSON. A client that assumes one content type for writes breaks on the
+    // middle call.
+    const encodings = ["vipListInsert", "writeDetail", "write"].map(
+      (name) => byOperation(name).contentType.split(";")[0],
+    );
+    expect(encodings).toEqual([
+      "application/json",
+      "application/x-www-form-urlencoded",
+      "application/json",
+    ]);
+  });
+
+  test("identifiers are unpadded in these calls", () => {
+    // This contradicts the runbook's note that Log/write pads its customerID to 10 characters:
+    // every identifier observed here is the bare login.
+    const detail = byOperation("writeDetail");
+    for (const key of ["customerID", "agentID", "agentOwner"]) {
+      expect(detail.fields[key]).toBe(fixture.agentPlaceholder);
+    }
+    expect(byOperation("write").body?.customerID).toBe(
+      fixture.agentPlaceholder,
+    );
+    expect(byOperation("vipListInsert").body?.agentID).toBe(
+      fixture.agentPlaceholder,
+    );
   });
 });

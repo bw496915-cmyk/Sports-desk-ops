@@ -131,6 +131,59 @@
         }
       ],
       "sportVariantsNote": "three observations of the same call: one single-word sport, one two-word sport and one short name; all pad to 20 characters, so the width is not a property of a particular name"
+    },
+    {
+      "operation": "vipListInsert",
+      "pathObserved": "/cloud/api/Manager/vipListInsert",
+      "pathStatus": "observed 2026-11-01, from the Vip List panel's save. This is a WRITE.",
+      "contentType": "application/json",
+      "mutation": true,
+      "body": {
+        "list": [
+          {
+            "agentID": "<agent>",
+            "player": "<player>"
+          }
+        ],
+        "operation": "vipListInsert",
+        "agentID": "<agent>",
+        "agentOwner": "<agent>"
+      },
+      "fieldsNote": "JSON, unlike every report call observed so far (all form-urlencoded). The body carries a list array even for one player, so a single save is a batch from the API's point of view."
+    },
+    {
+      "operation": "write",
+      "pathObserved": "/cloud/api/Log/write",
+      "pathStatus": "observed 2026-11-01, after the two calls above. Audit log headline.",
+      "contentType": "application/json",
+      "mutation": true,
+      "body": {
+        "customerID": "<agent>",
+        "description": "Save Action / Vip List [ v1.0.280 | fantasy402.com ]",
+        "additional": "",
+        "operation": "write",
+        "agentID": "<agent>",
+        "agentOwner": "<agent>"
+      },
+      "fieldsNote": "The description names the screen and the portal version. A save therefore leaves a human-readable audit row naming what was changed."
+    },
+    {
+      "operation": "writeDetail",
+      "pathObserved": "/cloud/api/Log/writeDetail",
+      "pathStatus": "observed 2026-11-01, immediately after vipListInsert. Audit log detail.",
+      "contentType": "application/x-www-form-urlencoded; charset=UTF-8",
+      "mutation": true,
+      "fields": {
+        "customerID": "<agent>",
+        "data": "[{\"agentID\":\"<agent>\",\"player\":\"<player>\"}]",
+        "ticket": "0",
+        "info": " [SITE : fantasy402.com v1.0.280] ",
+        "operation": "writeDetail",
+        "agentID": "<agent>",
+        "agentOwner": "<agent>"
+      },
+      "fieldsNote": "Form-encoded, and `data` is the same JSON array the mutation sent, urlencoded into a form field. customerID/agentID/agentOwner are unpadded here."
     }
-  ]
+  ],
+  "writeObservation": "The last three requests are mutations, recorded because the repo must never replay them: an operator saved a Vip List entry on 2026-11-01, and the portal sent the mutation plus two audit log writes. Nothing in this repository calls any of the three."
 }
