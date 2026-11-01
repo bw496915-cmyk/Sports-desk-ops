@@ -22,7 +22,9 @@ export type ProbeParam =
   | "flag"
   | "agentType"
   | "RRO"
-  | "agentOwner";
+  | "agentOwner"
+  | "type"
+  | "layout";
 
 export interface ProbeOp {
   readonly operation: string;
@@ -83,6 +85,21 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: true,
     note: "agent list by agent (Manager envelope); form: agentID, agentType, operation, RRO, agentOwner",
     params: ["agentID", "agentType", "operation", "RRO", "agentOwner"],
+  },
+  {
+    operation: "getWeeklyFigureByAgentLite",
+    method: "POST",
+    readOnly: true,
+    note: "weekly figure by agent lite (Manager envelope); form: agentID, week, type, layout, operation, RRO, agentOwner",
+    params: [
+      "agentID",
+      "week",
+      "type",
+      "layout",
+      "operation",
+      "RRO",
+      "agentOwner",
+    ],
   },
   {
     operation: "PendingDelete",
@@ -393,6 +410,10 @@ export function buildProbeBody(
       params.set("RRO", "1");
     } else if (name === "agentOwner") {
       params.set("agentOwner", agentId);
+    } else if (name === "type") {
+      params.set("type", "A");
+    } else if (name === "layout") {
+      params.set("layout", "byDay");
     }
   }
   return params.toString();
