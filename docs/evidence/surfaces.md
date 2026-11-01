@@ -264,6 +264,20 @@ Asset names are validated (separators, control characters, `..`) and traversal i
 - **`tipo` is not a constant**: `0` for CP, `-1` for CPS. And `sport=LIVE` is valid — the captured
   catalog lists LIVE as a sport with one period (`0` = Game) and 11 sub-sport codes including
   `NCAAF Live`, which is why the CPS body can send `period=0`.
+- **The screen's own options confirm four things** (`tests/fixtures/portal-agent-performance-filterbar-2026-11-01.html`,
+  pasted 2026-11-01): sports option values are padded to 20 characters in the DOM, not just on the
+  wire, so `padSportField` mirrors the control; the static period menu is Football's (and says
+  "1st Qtr" where the catalog says "1st Quarter"); retired activity codes 6 and 9 exist only inside
+  HTML comments, which is why the vocabulary ships 14; and `-1` means **Today** in the week select
+  while the adjacent period select uses `-1` for **All Periods**.
+- **Two wager-type selects, two shapes.** The report's own `wagers` list repeats the code `I`
+  (If-Bets and Action Reverses), so a code is not a unique label. The grading panel's `wager-type`
+  select sends a comma-separated value — `Straight` is `S,M,L,E,C` — so a consumer that assumes one
+  code per selection is wrong. `betType` on this screen labels `M` as Money Line, which does **not**
+  document the bet ticker's `WagerType=M`.
+- **The grid's column headers are known; the response keys are not.** The rendered table names
+  All Players and Agents · Won · Lost · # of Bets · Risk · Net · Hold %age. That is markup, not a
+  response, so no JSON schema follows from it, and the fixture asserts that distinction.
 - The observed values also check out against the captured catalog: `subsport=NFL` is one of
   Football's 28 sub-sport codes, and `period=1` under Football is `1st Half` — not "first period".
 - A browser stack trace from the same session places the sub-sport fetch on
