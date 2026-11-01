@@ -30,6 +30,7 @@ export interface AgentGraphNodeData {
   readonly id: string;
   readonly label: string;
   readonly level: number;
+  readonly seqNumber: number | null;
   readonly metrics: unknown | null;
 }
 
@@ -50,6 +51,7 @@ interface AgentRow {
   readonly login: string;
   readonly level: number;
   readonly parent_id: string | null;
+  readonly seq_number: number | null;
 }
 
 export function cytoscapeGraphFromAgentsDb(
@@ -58,7 +60,7 @@ export function cytoscapeGraphFromAgentsDb(
 ): CytoscapeGraphExport {
   const agents = db
     .query(
-      "SELECT agent_id, login, level, parent_id FROM agents ORDER BY level, agent_id",
+      "SELECT agent_id, login, level, parent_id, seq_number FROM agents ORDER BY level, agent_id",
     )
     .all() as AgentRow[];
   const nodes = agents.map((a) => ({
@@ -66,6 +68,7 @@ export function cytoscapeGraphFromAgentsDb(
       id: a.agent_id,
       label: a.login,
       level: Number(a.level),
+      seqNumber: a.seq_number === null ? null : Number(a.seq_number),
       metrics: null,
     },
   }));

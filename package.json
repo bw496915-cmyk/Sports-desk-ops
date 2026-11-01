@@ -172,7 +172,9 @@
     "graph:poll": "./bin/dx poll",
     "graph:watch": "./bin/dx watch",
     "graph:deploy": "./bin/dx deploy",
-    "backtest:4wk": "./bin/dx backtest"
+    "backtest:4wk": "./bin/dx backtest",
+    "image:meta": "bun run bin/image-meta.ts",
+    "blob:formdata": "bun run bin/blob-formdata.ts"
   },
   "keywords": [
     "sportsdesk",

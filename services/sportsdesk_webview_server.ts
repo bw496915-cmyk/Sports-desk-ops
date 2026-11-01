@@ -112,6 +112,54 @@ export function startServer(options?: ServerOptions) {
         return new Response(null, { status: 204, headers: corsHeaders });
       }
 
+      // 2a. Form-data parse debug (Blob.formData)
+      if (pathname === "/api/parse-formdata" && req.method === "POST") {
+        try {
+          const ct = req.headers.get("content-type") || "";
+          const buf = await req.arrayBuffer();
+          const blob = new Blob([buf], { type: ct });
+          const fd = await blob.formData();
+          const out: Record<string, string | string[]> = {};
+          for (const [k, v] of fd.entries()) {
+            if (out[k] === undefined) out[k] = String(v);
+            else if (Array.isArray(out[k])) (out[k] as string[]).push(String(v));
+            else out[k] = [out[k] as string, String(v)];
+          }
+          return Response.json(out, { headers: corsHeaders });
+        } catch (err) {
+          return Response.json(
+            { error: String(err) },
+            { status: 400, headers: corsHeaders },
+          );
+        }
+      }
+
+      // 2b. Live bets context (mock shape until wired to real feed)
+      if (pathname === "/api/live-bets") {
+        return Response.json(
+          {
+            games: [
+              {
+                key: "NFL-619115914-Tennessee‡Titans-Cincinnati‡Bengals",
+                status: "Not‡Final",
+                quarter: "3rd Q 08:09",
+                home: { team: "Titans", score: 13, logo: "Tennessee-Titans.png" },
+                away: { team: "Bengals", score: 21, logo: "Cincinnati-Bengals.png" },
+              },
+              {
+                key: "NFL-619115918-New‡England‡Patriots-Miami‡Dolphins",
+                status: "Not‡Final",
+                quarter: "3:25 pm CST",
+                home: { team: "Patriots", score: null, logo: "New-England-Patriots.png" },
+                away: { team: "Dolphins", score: null, logo: "miami_dolphins_logo.png" },
+              },
+            ],
+            generatedAt: new Date().toISOString(),
+          },
+          { headers: corsHeaders },
+        );
+      }
+
       // 2. Health & Telemetry Probe
       if (pathname === "/health") {
         return Response.json(

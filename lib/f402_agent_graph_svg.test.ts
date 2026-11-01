@@ -17,6 +17,7 @@ describe("f402_agent_graph_svg", () => {
             id: String(r.AgentID).trim(),
             label: String(r.Login).trim(),
             level: r.Level,
+            seqNumber: null,
             metrics: null,
           },
         }),
