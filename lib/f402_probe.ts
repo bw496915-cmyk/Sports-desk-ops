@@ -29,7 +29,9 @@ export type ProbeParam =
   | "ticketNumber"
   | "wagerNumber"
   | "flag"
-  | "days";
+  | "days"
+  | "description"
+  | "additional";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -51,7 +53,10 @@ export interface ProbeOp {
   readonly wireContentType?: ProbeWireContentType;
   /** Default route prefix observed in client JS. */
   readonly defaultPrefix?:
-    "/cloud/api/Manager" | "/cloud/api/Report" | "/cloud/api/System";
+    | "/cloud/api/Manager"
+    | "/cloud/api/Report"
+    | "/cloud/api/System"
+    | "/cloud/api/Log";
 }
 
 export const PROBE_OPS: readonly ProbeOp[] = [
