@@ -1,6 +1,5 @@
-# Scaffolded for 1Password Environments (see ~/dotfiles/cursor/templates/FINISH-1PASSWORD.md)
-# Wire via: wire-1password-env-id sportsdesk-ops env_<id>
+# wired by code-project sync-environments --apply
 
 [[environment]]
-id = ""
+id = "wdy67qsd32k77qijxb5dvc4pba"
 mount_paths = [".env"]
