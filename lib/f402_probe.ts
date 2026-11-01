@@ -50,7 +50,8 @@ export interface ProbeOp {
    */
   readonly wireContentType?: ProbeWireContentType;
   /** Default route prefix observed in client JS. */
-  readonly defaultPrefix?: "/cloud/api/Manager" | "/cloud/api/Report";
+  readonly defaultPrefix?:
+    "/cloud/api/Manager" | "/cloud/api/Report" | "/cloud/api/System";
 }
 
 export const PROBE_OPS: readonly ProbeOp[] = [
@@ -152,6 +153,14 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: false,
     note: "MUTATION: persists customer-admin report config; requires --include-unconfirmed --i-understand-mutations",
     params: ["agentID", "operation", "RRO", "agentOwner"],
+  },
+  {
+    operation: "renewToken",
+    method: "POST",
+    readOnly: false,
+    note: "token renewal (System prefix); returns a fresh JWT. Form: operation, agentID, agentOwner. Mutation-ish (rotates token).",
+    params: ["operation", "agentID", "agentOwner"],
+    defaultPrefix: "/cloud/api/System",
   },
   {
     operation: "PendingDelete",
@@ -526,6 +535,7 @@ export function probeSummary(
 export const PROBE_PREFIXES = [
   "/cloud/api/Manager",
   "/cloud/api/Report",
+  "/cloud/api/System",
 ] as const;
 
 export interface ProbeBodyOptions {
