@@ -1,16 +1,22 @@
 #!/usr/bin/env bun
 /**
  * @file scripts/capture/f402_probe.ts
- * @description Probe the F402 report reads from inside a signed-in WebView page (WebKit or Chrome).
+ * @description Probe the F402 report and manager.html boot reads from inside a signed-in WebView page (WebKit or Chrome).
  *
  * The session cookie is HttpOnly, so the request must come from the page. The profile directory
  * persists the sign-in, which means later runs start authenticated.
  *
  * Capabilities on both `webkit` (macOS default, zero deps) and `chrome`:
  * - DNS + TLS preflight (`lib/preflight.ts`) recorded into `run.json` alongside probe outputs.
+ * - `--suite <report|manager-boot|all>`: Selects the 7 report ops, the 9 `manager.html` (`v1.0.280`)
+ *   boot ops (`getAccountInfoOwner`, `getConfigWebReports`, `getConfigWebReportsPending`, `getSportsType`,
+ *   `getAuthorizations`, `getMessage`, `getNewEmailsCount`, `getWeeklyFigureByAgentLite`,
+ *   `getListAgenstByAgent`), or both.
+ * - Automatic `contentType: "application/json"` dispatch for `getAccountInfoOwner` (`manager.js:31200`)
+ *   and `getDailyFiguresByCustomer` (`report.js:25633`), or explicit override via `--json-body`.
  * - `--sniff-requests`: Installs an in-page `XMLHttpRequest` + `fetch` interceptor on WebKit (and
  *   additionally subscribes to CDP `Network.requestWillBeSent` on Chrome) to record `/cloud/api/`
- *   form-field key templates (`_sniffed_form_templates.json`, values never recorded).
+ *   form-field or JSON key templates (`_sniffed_form_templates.json`, values never recorded).
  * - `--screenshot` / `--screenshot-format <png|jpeg|webp>` / `--screenshot-resize <WxH|W>`:
  *   Captures a viewport proof screenshot formatted and resized in-memory via `Bun.Image`
  *   (`lib/screenshot_encode.ts`), so WebP and resizing work natively on WebKit.
@@ -29,8 +35,12 @@ import {
 } from "../../lib/cli_args.ts";
 import {
   PROBE_PREFIXES,
+  type ProbeSuite,
+  type ProbeWireContentType,
   type SniffedFormTemplate,
   buildInstallRequestSnifferExpression,
+  buildJsonProbeBody,
+  PROBE_OPS,
   buildProbeBody,
   buildProbeExpression,
   buildReadRequestSnifferExpression,
@@ -72,26 +82,32 @@ const VALUE_FLAGS = [
   "--wager",
   "--flag",
   "--prefix",
+  "--suite",
   "--ops",
   "--login-wait-ms",
 ] as const;
 
 const HELP = `
-capture:f402 — probe the F402 report reads from a signed-in WebKit or Chrome page
+capture:f402 — probe the F402 report and manager.html boot reads from a signed-in WebKit or Chrome page
 
 Options:
   --login                       Sign in with F402_AGENT_ID / F402_PASSWORD (or the OS credential store)
   --base <url>                  Portal origin (default: F402_BASE_URL or https://fantasy402.com)
   --backend <name>              webkit (macOS default, zero deps) or chrome
+  --suite <name>                report (default) | manager-boot (9 v1.0.280 boot ops) | all
   --prefix <path>               Route prefix (default: /cloud/api/Manager)
-  --ops <a,b>                   Only these operations (default: every confirmed read)
-  --body <form>                 Override the form body; {customerID} is resolved in-page
-  --week <value>                Candidate for the 'week' form field (integer index or date string); default: yesterday (MM/DD/YYYY)
+  --ops <a,b>                   Only these operations (searches across report + manager-boot ops)
+  --json-body                   Force application/json request serialization (auto-enabled for getAccountInfoOwner & getDailyFiguresByCustomer)
+  --body <form>                 Override the request body; __CUSTOMER_ID__ is resolved in-page
+  --week <value>                Candidate for the 'week' field (default: "0" per report.js)
+  --ticket <number>             TicketNumber override for getTicketDetailPrint / PendingDelete (default: -1 for PendingDelete)
+  --wager <number>              WagerNumber override for getTicketDetailPrint
+  --flag <value>                flag override for getTicketDetailPrint
   --profile <dir>               Persistent WebView profile (default: scratch/webview-profile)
   --out <dir>                   Probe output root (default: scratch/f402-probes)
   --promote-dir <dir>           Write value-free CaptureStore records for 2xx read-only probes
   --from-probes <p1,p2,...>     Promote specific existing 2xx probe JSON files into --promote-dir (fails closed on non-2xx)
-  --sniff-requests              Record /cloud/api/ form-field keys (in-page XHR/fetch on webkit, +CDP on chrome)
+  --sniff-requests              Record /cloud/api/ form-field/JSON keys (in-page XHR/fetch on webkit, +CDP on chrome)
   --screenshot                  Save a Bun.Image-formatted proof screenshot (_page.<ext>) in the probe dir
   --screenshot-format <fmt>     png | jpeg | webp (default: webp; encoded via Bun.Image on webkit)
   --screenshot-resize <WxH|W>   Resize proof screenshot via Bun.Image (fit: "inside", withoutEnlargement)
@@ -99,15 +115,17 @@ Options:
   --wait-for <selector>         Unattended: wait for this selector instead of pressing Enter
   --login-wait-ms <ms>          Login timeout (default: 180000)
   --dry-run                     Print the plan; launch nothing
+  --list-ops                    Print the available ProbeOps and their form keys, then exit
   --no-preflight                Skip the DNS/TLS preflight
   --include-unconfirmed         Include PendingDelete (also needs --i-understand-mutations)
   -h, --help                    This text
 
 Examples:
   bun run capture:f402 --dry-run
+  bun run capture:f402 --suite manager-boot --dry-run
+  bun run capture:f402 --login --suite manager-boot --promote-dir docs/evidence/captures
+  bun run capture:f402 --login --ops getDailyFiguresByCustomer --prefix /cloud/api/Report
   bun run capture:f402 --login --sniff-requests --screenshot-format webp --screenshot-resize 1280x720
-  bun run capture:f402 --login --ops Pending --prefix /cloud/api/Report
-  bun run capture:f402 --login --promote-dir docs/evidence/captures
 
 Every probe records the body it sent and sets headersObserved:false. Nothing is written to docs/
 unless --promote-dir is explicitly supplied.
@@ -123,9 +141,23 @@ interface CdpRequestWillBeSent {
 
 export type { SniffedFormTemplate };
 
-/** Extract only form-field keys (never values) from a URL-encoded POST body. */
+/** Extract only form-field or JSON top-level keys (never values) from a POST body. */
 export function extractFormKeys(postData: string | undefined): string[] {
   if (!postData || postData.trim() === "") return [];
+  const trimmed = postData.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const obj = JSON.parse(trimmed) as unknown;
+      if (typeof obj === "object" && obj !== null && !Array.isArray(obj)) {
+        return Object.keys(obj)
+          .map((k) => k.trim())
+          .filter(Boolean)
+          .sort();
+      }
+    } catch {
+      // Fall back to URLSearchParams.
+    }
+  }
   const keys = new Set<string>();
   for (const [key] of new URLSearchParams(postData)) {
     if (key.trim() !== "") keys.add(key.trim());
@@ -172,6 +204,7 @@ async function main(): Promise<number> {
   const backend: "webkit" | "chrome" =
     backendRaw === "chrome" ? "chrome" : "webkit";
   const sniffRequests = hasFlag(parsed, "--sniff-requests");
+  const forceJsonBody = hasFlag(parsed, "--json-body");
   const profile = flagValue(parsed, "--profile", "scratch/webview-profile");
   const outRoot = flagValue(parsed, "--out", "scratch/f402-probes");
   const promoteDir = flagValue(parsed, "--promote-dir", "");
@@ -210,20 +243,40 @@ async function main(): Promise<number> {
   const wagerValue = flagValue(parsed, "--wager", "");
   const flagValue_ = flagValue(parsed, "--flag", "");
   const prefix = flagValue(parsed, "--prefix", PROBE_PREFIXES[0]!);
+  const suiteRaw = flagValue(parsed, "--suite", "").toLowerCase();
   const opsArg = flagValue(parsed, "--ops", "");
   const loginWaitMs = Number(flagValue(parsed, "--login-wait-ms", "180000"));
   const autoLogin = hasFlag(parsed, "--login");
   const includeUnconfirmed = hasFlag(parsed, "--include-unconfirmed");
   const dryRun = hasFlag(parsed, "--dry-run");
+  const listOps = hasFlag(parsed, "--list-ops");
+
+  if (listOps) {
+    for (const op of PROBE_OPS) {
+      console.log(
+        op.operation.padEnd(32),
+        op.readOnly ? "read " : "MUT  ",
+        op.params.join(","),
+      );
+    }
+    return 0;
+  }
 
   if (includeUnconfirmed && !hasFlag(parsed, "--i-understand-mutations")) {
     console.error(
-      "capture:f402: --include-unconfirmed also needs --i-understand-mutations; PendingDelete is not confirmed read-only",
+      "capture:f402: --include-unconfirmed also needs --i-understand-mutations; PendingDelete is gated behind explicit opt-in",
     );
     return 2;
   }
 
-  const selected = selectProbeOps(includeUnconfirmed);
+  const suite: ProbeSuite =
+    suiteRaw === "manager-boot" || suiteRaw === "all"
+      ? suiteRaw
+      : opsArg !== ""
+        ? "all"
+        : "report";
+
+  const selected = selectProbeOps(includeUnconfirmed, suite);
   const wanted =
     opsArg === ""
       ? null
@@ -243,25 +296,29 @@ async function main(): Promise<number> {
   }
 
   let agentId = await resolveAgentId();
-  const bodyFor = (op: (typeof ops)[number]): string =>
-    explicitBody !== ""
-      ? explicitBody
-      : agentId === ""
-        ? ""
-        : buildProbeBody(
-            op,
-            agentId,
-            process.env.F402_CUSTOMER_ID?.trim() || "__CUSTOMER_ID__",
-            {
-              ...(ticketValue === "" ? {} : { ticketNumber: ticketValue }),
-              ...(wagerValue === "" ? {} : { wagerNumber: wagerValue }),
-              ...(flagValue_ === "" ? {} : { flag: flagValue_ }),
-            },
-          );
+  const contentTypeFor = (op: (typeof ops)[number]): ProbeWireContentType =>
+    forceJsonBody
+      ? "application/json"
+      : (op.wireContentType ??
+        "application/x-www-form-urlencoded; charset=UTF-8");
+
+  const bodyFor = (op: (typeof ops)[number]): string => {
+    if (explicitBody !== "") return explicitBody;
+    if (agentId === "") return "";
+    const bodyOpts = {
+      ...(ticketValue === "" ? {} : { ticketNumber: ticketValue }),
+      ...(wagerValue === "" ? {} : { wagerNumber: wagerValue }),
+      ...(flagValue_ === "" ? {} : { flag: flagValue_ }),
+    };
+    const cid = process.env.F402_CUSTOMER_ID?.trim() || "__CUSTOMER_ID__";
+    return contentTypeFor(op) === "application/json"
+      ? buildJsonProbeBody(op, agentId, cid, bodyOpts)
+      : buildProbeBody(op, agentId, cid, bodyOpts);
+  };
 
   if (dryRun) {
     console.error(
-      `capture:f402: plan for ${base} (${ops.length} operations, prefix ${prefix}, backend ${backend})`,
+      `capture:f402: plan for ${base} (${ops.length} operations, suite ${suite}, prefix ${prefix}, backend ${backend})`,
     );
     for (const op of ops) {
       const shown =
@@ -269,7 +326,7 @@ async function main(): Promise<number> {
           ? bodyFor(op)
           : bodyFor(op).replaceAll(agentId, "<agent>");
       console.log(
-        `${op.operation.padEnd(30)} ${op.method.padEnd(4)} ${probeUrl(base, op, prefix)}  body=${shown}  ${op.readOnly ? "" : "[unconfirmed]"}`,
+        `${op.operation.padEnd(30)} ${op.method.padEnd(4)} ${probeUrl(base, op, prefix)}  contentType=${contentTypeFor(op)}  body=${shown}  ${op.readOnly ? "" : "[unconfirmed]"}`,
       );
     }
     console.error("capture:f402: dry run; nothing launched");
@@ -315,6 +372,12 @@ async function main(): Promise<number> {
         rawProbe["capturedAt"] ?? new Date().toISOString(),
       );
       const bodyStr = String(rawProbe["body"] ?? "");
+      const reqContentType =
+        typeof rawProbe["requestContentType"] === "string"
+          ? rawProbe["requestContentType"]
+          : bodyStr.trim().startsWith("{")
+            ? "application/json"
+            : "application/x-www-form-urlencoded; charset=UTF-8";
       let wireText = result.bodyText ?? result.preview;
       let truncatedPreview = false;
       if (
@@ -340,11 +403,11 @@ async function main(): Promise<number> {
           url: probeUrlStr,
           method: "POST",
           headers: {
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "content-type": reqContentType,
             "x-requested-with": "XMLHttpRequest",
             authorization: "Bearer <redacted>",
           },
-          contentType: "application/x-www-form-urlencoded; charset=UTF-8",
+          contentType: reqContentType,
           body: bodyStr,
         },
         response: {
@@ -506,7 +569,6 @@ async function main(): Promise<number> {
       await view.navigate(base);
       await view.waitForLoad();
       if (sniffRequests) {
-        // Install before interactive navigation/clicks so UI actions are captured on WebKit too.
         await view.evaluate(buildInstallRequestSnifferExpression());
       }
 
@@ -538,6 +600,7 @@ async function main(): Promise<number> {
           kind: "probe-run",
           startedAt: new Date().toISOString(),
           base,
+          suite,
           prefix,
           backend,
           authMode,
@@ -559,11 +622,17 @@ async function main(): Promise<number> {
 
     for (const op of ops) {
       const url = probeUrl(base, op, prefix);
+      const reqContentType = contentTypeFor(op);
       const body = bodyFor(op);
       try {
         const raw = await view.evaluate(
           buildProbeExpression(
-            { operation: op.operation, url, body },
+            {
+              operation: op.operation,
+              url,
+              body,
+              contentType: reqContentType,
+            },
             2_000,
             weekValue === "" ? undefined : weekValue,
           ),
@@ -579,6 +648,7 @@ async function main(): Promise<number> {
           operation: op.operation,
           url,
           method: op.method,
+          requestContentType: reqContentType,
           body,
           dateUsed: result.dateUsed ?? null,
           weekUsed: result.weekUsed ?? null,
@@ -586,7 +656,6 @@ async function main(): Promise<number> {
           readOnlyConfirmed: op.readOnly,
           headersObserved: false,
           result: scratchResult,
-          // Printable endpoints answer HTML; keep a readable excerpt beside the raw preview.
           extractedText: scratchResult.contentType.includes("text/html")
             ? htmlToText(scratchResult.preview).slice(0, 2_000)
             : null,
@@ -597,7 +666,6 @@ async function main(): Promise<number> {
           `${JSON.stringify(record, null, 2)}\n`,
         );
 
-        // Promote 2xx read-only probes into value-free CaptureStore records when requested.
         if (
           promoteStore !== null &&
           op.readOnly &&
@@ -617,12 +685,11 @@ async function main(): Promise<number> {
               url,
               method: "POST",
               headers: {
-                "content-type":
-                  "application/x-www-form-urlencoded; charset=UTF-8",
+                "content-type": reqContentType,
                 "x-requested-with": "XMLHttpRequest",
                 authorization: "Bearer <redacted>",
               },
-              contentType: "application/x-www-form-urlencoded; charset=UTF-8",
+              contentType: reqContentType,
               body,
             },
             response: {
@@ -702,6 +769,7 @@ async function main(): Promise<number> {
               kind: "probe-run",
               startedAt: new Date().toISOString(),
               base,
+              suite,
               prefix,
               backend,
               authMode,

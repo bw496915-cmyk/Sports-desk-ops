@@ -163,6 +163,13 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     defaultPrefix: "/cloud/api/System",
   },
   {
+    operation: "getAccountInfo",
+    method: "POST",
+    readOnly: true,
+    note: "UNVERIFIED: manager account info read (Manager envelope); form guessed: agentID, operation, RRO, agentOwner",
+    params: ["agentID", "operation", "RRO", "agentOwner"],
+  },
+  {
     operation: "PendingDelete",
     method: "POST",
     readOnly: false,
