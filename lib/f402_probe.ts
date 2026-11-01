@@ -43,7 +43,12 @@ export type ProbeParam =
   | "storeIn"
   | "numberStart"
   | "numberEnd"
-  | "filtro";
+  | "filtro"
+  | "storeAgent"
+  | "sportTypeList"
+  | "sportSubTypeList"
+  | "typeAmount"
+  | "positionBySport";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -253,6 +258,31 @@ export const PROBE_OPS: readonly ProbeOp[] = [
       "numberStart",
       "numberEnd",
       "filtro",
+      "operation",
+      "RRO",
+      "agentOwner",
+    ],
+  },
+  {
+    operation: "getGamesPosition",
+    method: "POST",
+    readOnly: true,
+    note: "UNVERIFIED: games position (Manager envelope); captured body adds sportTypeList, sportSubTypeList, typeAmount, positionBySport, storeAgent, filtro=O,I,H,C,X.",
+    params: [
+      "sportTypeIn",
+      "sportSubTypeIn",
+      "periodDescriptionIn",
+      "periodNumberIn",
+      "storeIn",
+      "agentID",
+      "numberStart",
+      "numberEnd",
+      "storeAgent",
+      "filtro",
+      "sportTypeList",
+      "sportSubTypeList",
+      "typeAmount",
+      "positionBySport",
       "operation",
       "RRO",
       "agentOwner",
@@ -719,6 +749,16 @@ function resolveParamMap(
       out[name] = "24";
     } else if (name === "filtro") {
       out[name] = "O,I,H";
+    } else if (name === "storeAgent") {
+      out[name] = "";
+    } else if (name === "sportTypeList") {
+      out[name] = "Football";
+    } else if (name === "sportSubTypeList") {
+      out[name] = "";
+    } else if (name === "typeAmount") {
+      out[name] = "2";
+    } else if (name === "positionBySport") {
+      out[name] = "true";
     }
   }
   return out;
