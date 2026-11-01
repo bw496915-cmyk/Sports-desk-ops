@@ -5,13 +5,14 @@ import {
   spawnInPty,
   spawnInPtyUntil,
 } from "./bun_terminal.ts";
+import { BUN_TERMINAL_PTY_TEST_NAME } from "./bun_terminal_test_names.ts";
 
 const bashPath = Bun.which("bash");
 const vimPath = Bun.which("vim");
 const htopPath = Bun.which("htop");
 
 test.skipIf(bashPath === null)(
-  "Bun.Terminal PTY runs bash -lc echo and returns exit 0 with Hello from bash PTY on stdout",
+  BUN_TERMINAL_PTY_TEST_NAME.blog.bashLcEcho,
   async () => {
     const result = await spawnInPty([
       bashPath!,
@@ -24,7 +25,7 @@ test.skipIf(bashPath === null)(
 );
 
 test.skipIf(bashPath === null)(
-  "Bun.Terminal PTY driveBashScript terminal.write sends echo scripted-input and exit then bash exits 0 with that line captured",
+  BUN_TERMINAL_PTY_TEST_NAME.blog.bashTerminalWriteScript,
   async () => {
     const result = await driveBashScript(["echo scripted-input", "exit"]);
     expect(result.code).toBe(0);
@@ -33,7 +34,7 @@ test.skipIf(bashPath === null)(
 );
 
 test.skipIf(vimPath === null)(
-  "Bun.Terminal PTY runs vim -N -u NONE -n -c qa! batch quit and returns exit 0",
+  BUN_TERMINAL_PTY_TEST_NAME.blog.vimBatchQuit,
   async () => {
     const result = await spawnInPty([
       vimPath!,
@@ -49,7 +50,7 @@ test.skipIf(vimPath === null)(
 );
 
 test.skipIf(vimPath === null)(
-  "Bun.Terminal PTY runs vim -c echo isatty(1) and PTY capture shows stdout is a TTY before qa!",
+  BUN_TERMINAL_PTY_TEST_NAME.blog.vimIsattyStdout,
   async () => {
     const result = await spawnInPty([
       vimPath!,
@@ -68,7 +69,7 @@ test.skipIf(vimPath === null)(
 );
 
 test.skipIf(htopPath === null)(
-  "Bun.Terminal PTY runs htop until F1Help or F10Quit paints then SIGTERM leaves more than 100 raw bytes and killed true",
+  BUN_TERMINAL_PTY_TEST_NAME.blog.htopTuiFooterThenKill,
   async () => {
     const htopUi = /F10Quit|F1Help|htoprc/i;
     const result = await spawnInPtyUntil([htopPath!], {
