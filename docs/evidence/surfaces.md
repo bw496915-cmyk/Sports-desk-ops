@@ -300,6 +300,12 @@ Asset names are validated (separators, control characters, `..`) and traversal i
   records the shape of the workbook the export produced (Customer, Ticket Number, Accepted,
   Description, Amount; 9,387 rows), while the Analysis grid renders seven aggregate columns per
   agent. The workbook itself is not committed: every row carries a login and a ticket number.
+- **Two header actions sit beside the filters**: `show-config` (Configuration, L-1027) and
+  `show-vip` (Vip List, L-1028). Neither is a report search — they open panels. Which endpoints they
+  call is _not_ observed, so nothing here claims one: `show-config` plausibly reaches the web-report
+  config (`getConfigWebReports`, present in the pinned bundle) and `show-vip` plausibly the VIP
+  account list behind `authorizations.NotifyVipBets`, which `updateBasicSettings` assigns from the
+  Wager Alerts flag. Both are inferences and are labelled as such.
 - **The rendered report names itself.** The table container carries
   `class="TYPE-REPORT-Customer-Volume"`, i.e. the report kind's label with spaces hyphenated. That is
   the DOM's own statement of which report is loaded, alongside the `#btnPerformance` label and the

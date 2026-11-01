@@ -284,3 +284,20 @@ describe("the report-kind marker", () => {
     expect(label?.replaceAll(" ", "-")).toBe(match?.[1]);
   });
 });
+
+describe("header actions", () => {
+  const actions = [...live.matchAll(/data-action="(show-[a-z]+)"/g)].map(
+    (match) => match[1] ?? "",
+  );
+
+  test("Configuration and Vip List are the two header actions", () => {
+    expect(actions).toEqual(["show-config", "show-vip"]);
+  });
+
+  test("they open panels; they are not the report search", () => {
+    // Distinct from data-action="search" / "search-grading": neither action sends the report call.
+    expect(actions).not.toContain("search");
+    expect(live).toContain('data-language="L-1027"');
+    expect(live).toContain('data-language="L-1028"');
+  });
+});
