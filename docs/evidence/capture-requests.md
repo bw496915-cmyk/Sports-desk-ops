@@ -241,6 +241,9 @@ bodies were observed on 2026-11-01 — the all-periods call (`subsport`/`wagerTy
 `wagerType=M`, `betType=S`) — recorded in
 `tests/fixtures/f402-report-requests-observed-2026-11-01.json`, together with a byte-exact encoding pin.
 The URL those bodies were POSTed to was not observed, and no response exists.
+`lib/f402_agent_performance_request.ts` now reproduces either body from a typed selection (byte-exact
+against both observations, catalog-validated), so the capture operator can generate the request instead
+of hand-building a curl.
 
 **Observed request, still unledgered: `getSubSportByReport`.** A 2026-11-01 operator paste shows
 `POST /cloud/api/Manager/getSubSportByReport`, form-urlencoded, with
