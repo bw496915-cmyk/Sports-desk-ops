@@ -140,24 +140,79 @@ export function startServer(options?: ServerOptions) {
           {
             games: [
               {
-                key: "NFL-619115914-Tennessee‡Titans-Cincinnati‡Bengals",
-                status: "Not‡Final",
-                quarter: "3rd Q 08:09",
-                home: { team: "Titans", score: 13, logo: "Tennessee-Titans.png" },
-                away: { team: "Bengals", score: 21, logo: "Cincinnati-Bengals.png" },
+                ticketNumber: 1073351436,
+                agentID: "HRGROUP",
+                customerID: "CC364",
+                key: "NFL-244-Arizona‡Cardinals-Dallas‡Cowboys",
+                status: "P",
+                quarter: "2nd Half",
+                wagered: 22400000,
+                toWin: 20000000,
+                home: { team: "Cardinals", score: 0, logo: "Arizona-Cardinals.png", logoUrl: "https://cdn.fastassets.io/images/team-logos/Arizona-Cardinals.png" },
+                away: { team: "Cowboys", score: 0, logo: "Dallas-Cowboys.png", logoUrl: "https://cdn.fastassets.io/images/team-logos/Dallas-Cowboys.png" },
               },
               {
-                key: "NFL-619115918-New‡England‡Patriots-Miami‡Dolphins",
-                status: "Not‡Final",
-                quarter: "3:25 pm CST",
-                home: { team: "Patriots", score: null, logo: "New-England-Patriots.png" },
-                away: { team: "Dolphins", score: null, logo: "miami_dolphins_logo.png" },
+                ticketNumber: 1073270123,
+                agentID: "VIPMIAMI",
+                customerID: "VIPM126",
+                key: "NFL-241-Las‡Vegas‡Raiders-New‡York‡Jets",
+                status: "P",
+                quarter: "Game",
+                wagered: 15750000,
+                toWin: 15000000,
+                home: { team: "Raiders", score: 0, logo: "Oakland-Raiders.png", logoUrl: "https://cdn.fastassets.io/images/team-logos/Oakland-Raiders.png" },
+                away: { team: "Jets", score: 0, logo: "New-York-Jets.png", logoUrl: "https://cdn.fastassets.io/images/team-logos/New-York-Jets.png" },
+              },
+              {
+                ticketNumber: 1073270123,
+                agentID: "VIPMIAMI",
+                customerID: "VIPM126",
+                key: "NFL-248-Buffalo‡Bills-Baltimore‡Ravens",
+                status: "P",
+                quarter: "Game",
+                wagered: 16500000,
+                toWin: 15000000,
+                home: { team: "Ravens", score: 0, logo: "Baltimore-Ravens.png", logoUrl: "https://cdn.fastassets.io/images/team-logos/Baltimore-Ravens.png" },
+                away: { team: "Bills", score: 0, logo: "Buffalo-Bills.png", logoUrl: "https://cdn.fastassets.io/images/team-logos/Buffalo-Bills.png" },
+              },
+              {
+                ticketNumber: 1073270123,
+                agentID: "VIPMIAMI",
+                customerID: "VIPM126",
+                key: "NFL-240-Detroit‡Lions-Minnesota‡Vikings",
+                status: "P",
+                quarter: "Game",
+                wagered: 9000000,
+                toWin: 7500000,
+                home: { team: "Vikings", score: 0, logo: "Minnesota-Vikings.png", logoUrl: "https://cdn.fastassets.io/images/team-logos/Minnesota-Vikings.png" },
+                away: { team: "Lions", score: 0, logo: "Detroit-Lions.png", logoUrl: "https://cdn.fastassets.io/images/team-logos/Detroit-Lions.png" },
               },
             ],
             generatedAt: new Date().toISOString(),
           },
           { headers: corsHeaders },
         );
+      }
+
+      // 2c. Logo proxy (fetches team logo and returns the image blob)
+      if (pathname.startsWith("/api/logo/")) {
+        const name = decodeURIComponent(pathname.slice("/api/logo/".length));
+        if (!name) {
+          return new Response("missing name", { status: 400, headers: corsHeaders });
+        }
+        try {
+          const url = "https://cdn.fastassets.io/images/team-logos/" + name;
+          const res = await fetch(url);
+          if (!res.ok) {
+            return new Response("not found", { status: res.status, headers: corsHeaders });
+          }
+          const blob = await res.blob();
+          return new Response(blob, {
+            headers: { ...corsHeaders, "Content-Type": blob.type || "image/png" },
+          });
+        } catch (err) {
+          return Response.json({ error: String(err) }, { status: 502, headers: corsHeaders });
+        }
       }
 
       // 2. Health & Telemetry Probe
