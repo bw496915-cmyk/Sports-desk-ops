@@ -101,13 +101,13 @@ so an id resolves without guessing which artifact it came from.
   - **Done when:** each of `Pending`, `PendingDelete`, `getDailyFiguresByCustomer`, `getGradedWagerByCustomer`,
     `getTransactions`, `getGrading`, `getTicketDetailPrint` has a 2xx request **and** response capture, and
     `apply_captures` upgrades its ledger row.
-  - **Blocked by:** the parameter set each report expects (date range, customer id); the 500s below are
-    handler errors, not auth failures.
-  - **Observed 2026-11-01** (`[OBSERVED]`, `scratch/f402-probes/`): `api/Report/<op>` answers **404**
-    (openresty) — the toolkit names are not routes. `/cloud/api/Manager/<op>` with
-    `Authorization: Bearer <sessionStorage.credentials.code>` answers **200** for `getTransactions`
-    (`{"LIST":""}`) and **500 with 0 B** for the other five: the routes and auth are right, the bodies are
-    incomplete. Without the header the same call is **401** at the edge.
+  - **Blocked by:** a valid customerID from the agent's downline — the session's own id is rejected with
+    "Invalid CustomerID" — plus each report's date filter.
+  - **Observed 2026-11-01** (`[OBSERVED]`, `scratch/f402-probes/`): the working envelope is
+    `/cloud/api/<Manager|Report>/<op>` with `Authorization: Bearer <sessionStorage.credentials.code>`.
+    `getGrading` (Report) and `getTransactions` (Manager) answer 200 `{"LIST":""}`; `Pending` (Report)
+    answers 400 `{"status":"Failed","msg":"Invalid CustomerID"}`; the rest answer 500 with 0 B. Without
+    the header every call is 401 at openresty, so auth is settled and only parameters remain.
   - **Safety:** `PendingDelete` is named like a mutation. The capture allowlist refuses mutation ops by
     construction, so that endpoint needs an explicit read-only confirmation before it is added.
   - **Automation:** `bun run capture:f402 --dry-run` prints the six-op plan without launching anything.

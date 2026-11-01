@@ -91,17 +91,23 @@ export function buildProbeExpression(
   return `(async () => {
   // The edge wants the token the app stored after login. Read it in-page: it never crosses into Bun.
   let token = "";
-  try { token = JSON.parse(sessionStorage.getItem("credentials") ?? "{}").code ?? ""; } catch {}
+  let customerID = "";
+  try {
+    const credentials = JSON.parse(sessionStorage.getItem("credentials") ?? "{}");
+    token = credentials.code ?? "";
+    customerID = credentials.customerID ?? "";
+  } catch {}
   const headers = {
     "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
     "x-requested-with": "XMLHttpRequest",
   };
   if (token) headers.authorization = "Bearer " + token;
+  const resolvedBody = ${body}.replaceAll("{customerID}", encodeURIComponent(customerID));
   const response = await fetch(${url}, {
     method: "POST",
     credentials: "include",
     headers,
-    body: ${body},
+    body: resolvedBody,
   });
   const text = await response.text();
   return {
