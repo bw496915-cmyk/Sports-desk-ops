@@ -59,9 +59,25 @@ export interface SpawnInPtyUntilOptions extends SpawnInPtyOptions {
   readonly untilOutput?: RegExp;
 }
 
-export interface PtyRunUntilResult extends PtyRunResult {
-  readonly killed: boolean;
+/** PTY watch outcome — `killed` is meaningful only when `mode` is `watch`. */
+export type PtyRunUntilResult = PtyRunResult & {
   readonly rawBytes: number;
+} & (
+    | { readonly mode: "simple"; readonly killed: false }
+    | { readonly mode: "watch"; readonly killed: boolean }
+  );
+
+/** Narrow `proc.terminal` after `Bun.spawn({ terminal })` — boundary guard. */
+export function requireSubprocessTerminal(proc: {
+  readonly terminal?: { write: (input: string) => number; close: () => void } | null;
+}): { write: (input: string) => number; close: () => void } {
+  const terminal = proc.terminal;
+  if (terminal === undefined || terminal === null) {
+    throw new Error(
+      "Subprocess has no terminal handle; pass terminal to Bun.spawn",
+    );
+  }
+  return terminal;
 }
 
 /** Strip CR and SGR escapes from PTY capture (assertions on plain text). */
@@ -82,11 +98,12 @@ export async function runBlogTerminalWriteHelloExample(): Promise<PtyRunResult> 
       },
     },
   });
-  proc.terminal.write(BUN_TERMINAL_SPAWN_PTY_WRITE_PAYLOAD);
+  const terminal = requireSubprocessTerminal(proc);
+  terminal.write(BUN_TERMINAL_SPAWN_PTY_WRITE_PAYLOAD);
   // Blog leaves interactive bash at a prompt; tests send exit so proc.exited settles.
-  proc.terminal.write("exit\n");
+  terminal.write("exit\n");
   const code = await proc.exited;
-  proc.terminal?.close();
+  terminal.close();
   return { code, out: stripPtyCapture(raw) };
 }
 
@@ -149,9 +166,12 @@ export async function spawnInPtyUntil(
   }
 
   const code = await proc.exited;
-  proc.terminal?.close();
+  requireSubprocessTerminal(proc).close();
   const out = stripPtyCapture(raw);
-  return { code, out, killed, rawBytes: raw.length };
+  if (needsWatch) {
+    return { code, out, rawBytes: raw.length, mode: "watch", killed };
+  }
+  return { code, out, rawBytes: raw.length, mode: "simple", killed: false };
 }
 
 /** Blog pattern: drive an shell with `terminal.write` lines (each should end with `\n`). */
@@ -170,10 +190,11 @@ export async function driveBashScript(
       },
     },
   });
+  const terminal = requireSubprocessTerminal(proc);
   for (const line of lines) {
-    proc.terminal.write(line.endsWith("\n") ? line : `${line}\n`);
+    terminal.write(line.endsWith("\n") ? line : `${line}\n`);
   }
   const code = await proc.exited;
-  proc.terminal?.close();
+  terminal.close();
   return { code, out: stripPtyCapture(raw) };
 }

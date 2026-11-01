@@ -97,7 +97,13 @@ export const BUN_CRON_OS_WORKER_SCHEDULED_EXAMPLE = `export default {
   },
 };` as const;
 
-/** Default export must satisfy this for Tier-2 OS jobs. */
+/**
+ * Tier-2 OS worker — ESM `import worker from "./worker.ts"` yields {@link CronScheduledWorker}
+ * directly (not `{ default: … }` at runtime).
+ */
+export type CronScheduledWorkerExport = CronScheduledWorker;
+
+/** Type-only shape for `export default { scheduled }` modules. */
 export type CronScheduledWorkerModule = {
   default: CronScheduledWorker;
 };
@@ -161,18 +167,16 @@ export function formatCronScheduleLine(preview: CronSchedulePreview): string {
  * OS-level registration. Refuses `{ tz }` — crontab/launchd/Task Scheduler have no IANA pin in
  * Bun's path overload (use in-process `startInProcessCron` for explicit zones).
  */
-export async function installOsCronJob(options: {
+/** OS install — no `tz` field (illegal at type level; use in-process cron to pin IANA). */
+export interface OsCronInstallOptions {
   readonly workerImportMetaUrl: string;
   readonly schedule: string;
   readonly title: string;
-  readonly tz?: string;
-}): Promise<void> {
-  const tz = options.tz?.trim();
-  if (tz !== undefined && tz !== "") {
-    throw new Error(
-      `OS-level Bun.cron cannot pin timezone (got ${JSON.stringify(tz)})`,
-    );
-  }
+}
+
+export async function installOsCronJob(
+  options: OsCronInstallOptions,
+): Promise<void> {
   await Bun.cron(
     osCronWorkerPath(options.workerImportMetaUrl),
     options.schedule,

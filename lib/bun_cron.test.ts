@@ -7,7 +7,7 @@ import {
   BUN_CRON_OS_REGISTER_EXAMPLE,
   BUN_CRON_OS_WORKER_SCHEDULED_EXAMPLE,
   BUN_CRON_PARSE_EXAMPLE,
-  type CronScheduledWorker,
+  type CronScheduledWorkerExport,
   formatCronScheduleLine,
   installOsCronJob,
   isBunOsCronInvocation,
@@ -117,19 +117,8 @@ describe("bun_cron", () => {
     expect(next instanceof Date).toBe(true);
   });
 
-  test("artifacts_cron default export matches CronScheduledWorker", () => {
-    const worker = artifactsCron as CronScheduledWorker;
+  test("artifacts_cron default export satisfies CronScheduledWorkerExport", () => {
+    const worker = artifactsCron as CronScheduledWorkerExport;
     expect(typeof worker.scheduled).toBe("function");
-  });
-
-  test("installOsCronJob refuses tz", async () => {
-    await expect(
-      installOsCronJob({
-        workerImportMetaUrl: import.meta.url,
-        schedule: "0 6 * * *",
-        title: "test-should-not-install",
-        tz: "UTC",
-      }),
-    ).rejects.toThrow(/cannot pin timezone/i);
   });
 });
