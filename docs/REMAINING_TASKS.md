@@ -102,7 +102,9 @@ so an id resolves without guessing which artifact it came from.
     `getTransactions`, `getGrading`, `getTicketDetailPrint` has a 2xx request **and** response capture, and
     `apply_captures` upgrades its ledger row.
   - **Blocked by:** a valid customerID from the agent's downline — the session's own id is rejected with
-    "Invalid CustomerID" — plus each report's date filter.
+    "Invalid CustomerID" — plus each report's date filter. `bun run customers` indexes the local cohorts
+    (artifact 49, demo-book 220, fixture 6) for lookup, but those are demo ids and the live endpoints
+    reject them; a `capture` source appears only when a capture keeps a real id.
   - **Observed 2026-11-01** (`[OBSERVED]`, `scratch/f402-probes/`): the working envelope is
     `/cloud/api/<Manager|Report>/<op>` with `Authorization: Bearer <sessionStorage.credentials.code>`.
     `getGrading` (Report) and `getTransactions` (Manager) answer 200 `{"LIST":""}`; `Pending` (Report)
