@@ -14,13 +14,12 @@ export function resolveF402WebViewProfileDir(
 ): string {
   const explicit = env.F402_WEBVIEW_PROFILE?.trim();
   if (explicit !== undefined && explicit !== "") return explicit;
-  return join(
-    import.meta.dir,
-    "../scratch/f402-manager-webview-profile",
-  );
+  return join(import.meta.dir, "../scratch/f402-manager-webview-profile");
 }
 
-export function warnIfDeprecatedCookieEnv(env: NodeJS.ProcessEnv = Bun.env): void {
+export function warnIfDeprecatedCookieEnv(
+  env: NodeJS.ProcessEnv = Bun.env,
+): void {
   const raw = env[DEPRECATED_F402_COOKIE_ENV]?.trim();
   if (raw === undefined || raw === "") return;
   console.warn(
@@ -29,7 +28,8 @@ export function warnIfDeprecatedCookieEnv(env: NodeJS.ProcessEnv = Bun.env): voi
 }
 
 export interface F402ReplayTransport {
-  readonly label: "datastore-fetch-session" | "session-file" | "proxy" | "deprecated-cookie";
+  readonly label:
+    "datastore-fetch-session" | "session-file" | "proxy" | "deprecated-cookie";
   fetch(url: string, init: RequestInit): Promise<Response>;
   close(): Promise<void>;
 }

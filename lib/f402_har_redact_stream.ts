@@ -31,7 +31,9 @@ export interface RedactedHarWriteResult {
 }
 
 /** Redact in memory; run sentinel sweep; then caller writes (or use writeRedactedHarFile). */
-export function prepareRedactedHarText(harObject: unknown): RedactedHarWriteResult {
+export function prepareRedactedHarText(
+  harObject: unknown,
+): RedactedHarWriteResult {
   const raw = `${JSON.stringify(harObject, null, 2)}\n`;
   const redactedText = redactHarJsonText(raw);
   assertRedactedCaptureSweep(redactedText);

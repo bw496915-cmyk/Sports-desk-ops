@@ -16,7 +16,9 @@ import type { PinnedManifestWithExtracted } from "../../lib/f402_portal_oracle_s
 
 const REPO = join(import.meta.dir, "../..");
 const MANIFEST = join(import.meta.dir, "pinned/manifest.json");
-const manifest = (await Bun.file(MANIFEST).json()) as PinnedManifestWithExtracted;
+const manifest = (await Bun.file(
+  MANIFEST,
+).json()) as PinnedManifestWithExtracted;
 
 const derived = await deriveVarianceGate(REPO, manifest);
 

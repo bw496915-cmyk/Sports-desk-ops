@@ -93,38 +93,42 @@ export function renderManagerBootRunbookTerminal(
   return Bun.markdown.render(
     markdown,
     {
-    heading: (children, meta) => {
-      const level = meta.depth ?? 1;
-      const prefix =
-        level === 1 ? `${bold}${cyan}` : level === 2 ? `${bold}${underline}` : bold;
-      return `${prefix}${children}${reset}\n\n`;
-    },
-    paragraph: (children) => `${children}\n\n`,
-    strong: (children) => `${bold}${children}${reset}`,
-    emphasis: (children) => `${underline}${children}${reset}`,
-    codespan: (children) => `${yellow}${children}${reset}`,
-    code: (children) => `${dim}${children}${reset}\n`,
-    blockquote: (children) => `${dim}│ ${children}${reset}\n`,
-    link: (children, meta) => {
-      const href = meta.url ?? String(children);
-      if (href.startsWith("http://") || href.startsWith("https://")) {
-        return colors ? osc8Link(String(children), href) : String(children);
-      }
-      if (href.endsWith(".md")) {
-        const abs = href.startsWith("/")
-          ? href
-          : join(REPO_ROOT, "docs/evidence", href.replace(/^\.\//, ""));
-        return colors
-          ? osc8Link(String(children), `file://${abs}`)
-          : String(children);
-      }
-      return String(children);
-    },
-    tr: (children) => `${children}\n`,
-    th: (children) => `${bold}${cyan}${children}${reset} | `,
-    td: (children) => `${gateStatus(String(children))} | `,
-    hr: () => `${dim}${"─".repeat(48)}${reset}\n\n`,
-    listItem: (children) => `  • ${children}\n`,
+      heading: (children, meta) => {
+        const level = meta.depth ?? 1;
+        const prefix =
+          level === 1
+            ? `${bold}${cyan}`
+            : level === 2
+              ? `${bold}${underline}`
+              : bold;
+        return `${prefix}${children}${reset}\n\n`;
+      },
+      paragraph: (children) => `${children}\n\n`,
+      strong: (children) => `${bold}${children}${reset}`,
+      emphasis: (children) => `${underline}${children}${reset}`,
+      codespan: (children) => `${yellow}${children}${reset}`,
+      code: (children) => `${dim}${children}${reset}\n`,
+      blockquote: (children) => `${dim}│ ${children}${reset}\n`,
+      link: (children, meta) => {
+        const href = meta.url ?? String(children);
+        if (href.startsWith("http://") || href.startsWith("https://")) {
+          return colors ? osc8Link(String(children), href) : String(children);
+        }
+        if (href.endsWith(".md")) {
+          const abs = href.startsWith("/")
+            ? href
+            : join(REPO_ROOT, "docs/evidence", href.replace(/^\.\//, ""));
+          return colors
+            ? osc8Link(String(children), `file://${abs}`)
+            : String(children);
+        }
+        return String(children);
+      },
+      tr: (children) => `${children}\n`,
+      th: (children) => `${bold}${cyan}${children}${reset} | `,
+      td: (children) => `${gateStatus(String(children))} | `,
+      hr: () => `${dim}${"─".repeat(48)}${reset}\n\n`,
+      listItem: (children) => `  • ${children}\n`,
     },
     DOCS_RENDER_OPTIONS,
   );

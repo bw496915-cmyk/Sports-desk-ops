@@ -75,92 +75,194 @@ export function runBaseHeriarchyParserWithAgentMap(
       if (p[t] === undefined) p[t] = [];
       slot(p, t)[A] = v;
       a = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: t });
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: t,
+      });
     } else if (level === 3) {
       if (slot(p, t)[a] === undefined) slot(p, t)[a] = [];
       slot(slot(p, t), a)[A] = v;
       o = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: a });
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: a,
+      });
     } else if (level === 4) {
       if (slot(slot(p, t), a)[o] === undefined) slot(slot(p, t), a)[o] = [];
       slot(slot(slot(p, t), a), o)[A] = v;
       i = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: o });
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: o,
+      });
     } else if (level === 5) {
       if (slot(slot(slot(p, t), a), o)[i] === undefined) {
         slot(slot(slot(p, t), a), o)[i] = [];
       }
       slot(slot(slot(slot(p, t), a), o), i)[A] = v;
       s = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: i });
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: i,
+      });
     } else if (level === 6) {
       if (slot(slot(slot(slot(p, t), a), o), i)[s] === undefined) {
         slot(slot(slot(slot(p, t), a), o), i)[s] = [];
       }
       slot(slot(slot(slot(slot(p, t), a), o), i), s)[A] = v;
       r = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: i });
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: i,
+      });
     } else if (level === 7) {
       if (slot(slot(slot(slot(slot(p, t), a), o), i), s)[r] === undefined) {
         slot(slot(slot(slot(slot(p, t), a), o), i), s)[r] = [];
       }
       slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r)[A] = v;
       c = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: r });
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: r,
+      });
     } else if (level === 8) {
-      if (slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r)[c] === undefined) {
+      if (
+        slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r)[c] === undefined
+      ) {
         slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r)[c] = [];
       }
       slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c)[A] = v;
       l = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: c });
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: c,
+      });
     } else if (level === 9) {
-      if (slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c)[l] === undefined) {
-        slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c)[l] = [];
-      }
-      slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l)[A] = v;
-      d = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: l });
-    } else if (level === 10) {
       if (
-        slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l)[d] ===
+        slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c)[l] ===
         undefined
       ) {
-        slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l)[d] = [];
+        slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c)[l] =
+          [];
       }
-      slot(slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l), d)[A] =
-        v;
-      g = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: d });
-    } else if (level === 11) {
+      slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l)[
+        A
+      ] = v;
+      d = A;
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: l,
+      });
+    } else if (level === 10) {
       if (
-        slot(slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l), d)[
-          g
-        ] === undefined
+        slot(
+          slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c),
+          l,
+        )[d] === undefined
       ) {
-        slot(slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l), d)[
-          g
-        ] = [];
-      }
-      slot(
-        slot(slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l), d),
-        g,
-      )[A] = v;
-      u = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: g });
-    } else if (level === 12) {
-      if (
-        slot(slot(slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l), d), g)[
-          u
-        ] === undefined
-      ) {
-        slot(slot(slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l), d), g)[
-          u
-        ] = [];
+        slot(
+          slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c),
+          l,
+        )[d] = [];
       }
       slot(
         slot(
-          slot(slot(slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c), l), d),
+          slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c),
+          l,
+        ),
+        d,
+      )[A] = v;
+      g = A;
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: d,
+      });
+    } else if (level === 11) {
+      if (
+        slot(
+          slot(
+            slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c),
+            l,
+          ),
+          d,
+        )[g] === undefined
+      ) {
+        slot(
+          slot(
+            slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c),
+            l,
+          ),
+          d,
+        )[g] = [];
+      }
+      slot(
+        slot(
+          slot(
+            slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c),
+            l,
+          ),
+          d,
+        ),
+        g,
+      )[A] = v;
+      u = A;
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: g,
+      });
+    } else if (level === 12) {
+      if (
+        slot(
+          slot(
+            slot(
+              slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c),
+              l,
+            ),
+            d,
+          ),
+          g,
+        )[u] === undefined
+      ) {
+        slot(
+          slot(
+            slot(
+              slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c),
+              l,
+            ),
+            d,
+          ),
+          g,
+        )[u] = [];
+      }
+      slot(
+        slot(
+          slot(
+            slot(
+              slot(slot(slot(slot(slot(slot(slot(p, t), a), o), i), s), r), c),
+              l,
+            ),
+            d,
+          ),
           g,
         ),
         u,

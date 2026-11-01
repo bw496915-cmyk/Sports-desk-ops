@@ -15,10 +15,7 @@ describe("portal runtime pin", () => {
 
   test("compareRuntimePin detects version mismatch", () => {
     const live = readCurrentPortalRuntimePin();
-    const drift = compareRuntimePin(
-      { ...live, bunVersion: "0.0.0" },
-      live,
-    );
+    const drift = compareRuntimePin({ ...live, bunVersion: "0.0.0" }, live);
     expect(drift.length).toBeGreaterThan(0);
   });
 });

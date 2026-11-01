@@ -8,7 +8,10 @@
  */
 import { join } from "node:path";
 
-import { logCaptureEvent, flushCaptureLog } from "../../lib/f402_hierarchy_redact_log.ts";
+import {
+  logCaptureEvent,
+  flushCaptureLog,
+} from "../../lib/f402_hierarchy_redact_log.ts";
 import {
   fetchListAgentsGeneralProbe,
   generalProbeFromWireText,
@@ -22,8 +25,10 @@ const REPO = join(import.meta.dir, "../..");
 const SCRATCH = join(REPO, "scratch");
 
 const mode = (Bun.env.MODE ?? "file").trim().toLowerCase();
-const outPath = Bun.env.F402_PARSED_TREE_OUT?.trim() || join(SCRATCH, "parsed-tree.json");
-const logPath = Bun.env.F402_PROBE_LOG?.trim() || join(SCRATCH, "parse-tree-only.log.jsonl");
+const outPath =
+  Bun.env.F402_PARSED_TREE_OUT?.trim() || join(SCRATCH, "parsed-tree.json");
+const logPath =
+  Bun.env.F402_PROBE_LOG?.trim() || join(SCRATCH, "parse-tree-only.log.jsonl");
 
 function emit(event: Record<string, unknown>): void {
   logCaptureEvent(logPath, event);
@@ -36,7 +41,8 @@ async function loadGeneralProbe(): Promise<{
 }> {
   if (mode === "file") {
     const rawPath =
-      Bun.env.F402_RAW_ENVELOPE?.trim() || join(SCRATCH, "raw-f402-list-agents.json");
+      Bun.env.F402_RAW_ENVELOPE?.trim() ||
+      join(SCRATCH, "raw-f402-list-agents.json");
     if (!rawPath.startsWith(`${SCRATCH}/`)) {
       throw new Error("F402_RAW_ENVELOPE must be under scratch/ (gitignored)");
     }
@@ -64,11 +70,15 @@ async function loadGeneralProbe(): Promise<{
     throw new Error(`MODE must be file|replay (got ${JSON.stringify(mode)})`);
   }
 
-  const accountArg = Bun.argv.find((a) => a.startsWith("--account="))?.slice(9)?.trim()
-    ?? (Bun.argv.includes("--account")
+  const accountArg =
+    Bun.argv
+      .find((a) => a.startsWith("--account="))
+      ?.slice(9)
+      ?.trim() ??
+    (Bun.argv.includes("--account")
       ? Bun.argv[Bun.argv.indexOf("--account") + 1]?.trim()
-      : undefined)
-    ?? "tests/fixtures/f402-get-account-info-owner-fixture.json";
+      : undefined) ??
+    "tests/fixtures/f402-get-account-info-owner-fixture.json";
 
   const account =
     Bun.env.F402_AGENT_ID !== undefined && Bun.env.F402_AGENT_TYPE !== undefined

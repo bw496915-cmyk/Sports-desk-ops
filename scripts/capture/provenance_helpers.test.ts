@@ -157,9 +157,8 @@ describe("provenance_helpers", () => {
   });
 
   test("captureRecordFromProbeScratch preserves valid array skeleton for truncated top-level JSON arrays (getSportsCustomerAdmin)", async () => {
-    const { captureRecordFromProbeScratch } = await import(
-      "./promote_probe_from_file.ts"
-    );
+    const { captureRecordFromProbeScratch } =
+      await import("./promote_probe_from_file.ts");
     const record = captureRecordFromProbeScratch({
       url: "https://www.fantasy402.com/cloud/api/Manager/getSportsCustomerAdmin",
       capturedAt: "2026-11-01T04:48:42.301Z",

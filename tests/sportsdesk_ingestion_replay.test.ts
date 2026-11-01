@@ -6,7 +6,7 @@ const FIXTURE_DOMAIN = join(
   dirname(fileURLToPath(import.meta.url)),
   "fixtures/ingestion-replay-domain.jsonl",
 );
-import { SIGNAL_SLA_MS } from "../domain-branded-types.ts";
+import { SIGNAL_SLA_MS } from "../design/domain-branded-types.ts";
 import {
   classifySportsdeskPricePattern,
   extractXmlBoardPrice,

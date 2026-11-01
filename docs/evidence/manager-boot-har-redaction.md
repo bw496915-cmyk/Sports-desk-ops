@@ -23,13 +23,13 @@ Operator-facing spec. Apply **before** committing any capture under `docs/eviden
 
 After redaction, **retain only** these header names (case-insensitive) on each HAR entry:
 
-| Header | Notes |
-|--------|--------|
-| `:method` / `method` | HTTP method |
+| Header                   | Notes                                        |
+| ------------------------ | -------------------------------------------- |
+| `:method` / `method`     | HTTP method                                  |
 | `:path` / `:url` / `url` | Path + query (scrub query tokens if present) |
-| `content-type` | Must show form vs JSON |
-| `x-requested-with` | Portal ajax marker |
-| `status` / `:status` | Response code |
+| `content-type`           | Must show form vs JSON                       |
+| `x-requested-with`       | Portal ajax marker                           |
+| `status` / `:status`     | Response code                                |
 
 **Remove entirely** (do not replace with placeholders):
 

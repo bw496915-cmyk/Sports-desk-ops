@@ -52,12 +52,12 @@ function resolveRepoPath(path: string): string {
   return path.startsWith("/") ? path : join(REPO_ROOT, path);
 }
 
-const manifest = (await Bun.file(MANIFEST).json()) as PinnedManifestWithExtracted;
+const manifest = (await Bun.file(
+  MANIFEST,
+).json()) as PinnedManifestWithExtracted;
 const harGate = manifest.harRedactionProofGate;
 
-const harPath = resolveRepoPath(
-  values.har?.trim() || harGate?.harPath || "",
-);
+const harPath = resolveRepoPath(values.har?.trim() || harGate?.harPath || "");
 const proofPath = resolveRepoPath(
   values.proof?.trim() || harGate?.proofPath || "",
 );
@@ -131,7 +131,9 @@ try {
     e instanceof ProductionFixtureRedactionError
       ? { violations: e.violations }
       : { error: String(e) };
-  console.error(JSON.stringify({ signal: "F402_EXTRACT_FIXTURE_FAILED", ...detail }));
+  console.error(
+    JSON.stringify({ signal: "F402_EXTRACT_FIXTURE_FAILED", ...detail }),
+  );
   process.exit(GATE_EXIT_FAILED);
 }
 

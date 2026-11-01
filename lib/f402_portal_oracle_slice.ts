@@ -130,9 +130,7 @@ export async function diffExtractedSlicesAgainstPinnedManager(): Promise<
 export async function assertOracleSlicesFresh(): Promise<void> {
   const mismatches = await diffExtractedSlicesAgainstPinnedManager();
   if (mismatches.length === 0) return;
-  const lines = mismatches.map(
-    (m) => `[${m.method}] ${m.kind}: ${m.detail}`,
-  );
+  const lines = mismatches.map((m) => `[${m.method}] ${m.kind}: ${m.detail}`);
   throw new Error(
     `manager-boot-oracle slice guard failed:\n${lines.join("\n")}`,
   );

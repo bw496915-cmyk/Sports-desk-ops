@@ -10,7 +10,11 @@ import { sha256HexText } from "./f402_portal_version_pin.ts";
 
 export type HarProofVerifyOutcome =
   | { readonly kind: "ok" }
-  | { readonly kind: "failed"; readonly signal: string; readonly detail: Record<string, unknown> };
+  | {
+      readonly kind: "failed";
+      readonly signal: string;
+      readonly detail: Record<string, unknown>;
+    };
 
 export function parseHarRedactionProofDocument(
   raw: unknown,
@@ -77,7 +81,10 @@ export async function verifyHarRedactionProofFiles(options: {
   const proofRaw: unknown = await proofFile.json();
   const proofParsed = parseHarRedactionProofDocument(proofRaw);
   if ("kind" in proofParsed && proofParsed.kind === "failed") {
-    return { ...proofParsed, detail: { ...proofParsed.detail, proofPath: options.proofPath } };
+    return {
+      ...proofParsed,
+      detail: { ...proofParsed.detail, proofPath: options.proofPath },
+    };
   }
   const proof = proofParsed as HarRedactionProof;
   const harText = await harFile.text();
@@ -101,10 +108,7 @@ export async function verifyHarRedactionProofFiles(options: {
     };
   }
 
-  if (
-    options.requireListAgents !== false &&
-    !proof.listAgentsCaptured
-  ) {
+  if (options.requireListAgents !== false && !proof.listAgentsCaptured) {
     return {
       kind: "failed",
       signal: "F402_HAR_MISSING_LIST_AGENTS",

@@ -38,6 +38,9 @@ describe("getSportsCustomerAdmin rows", () => {
     const rows = parseSportsCustomerAdminRows(
       JSON.parse(readFileSync(fixture, "utf8")),
     );
-    expect(indexSequenceNumbersBySport(rows).Football).toEqual(["2001", "2002"]);
+    expect(indexSequenceNumbersBySport(rows).Football).toEqual([
+      "2001",
+      "2002",
+    ]);
   });
 });

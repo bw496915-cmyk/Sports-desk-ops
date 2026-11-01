@@ -37,7 +37,11 @@ export async function fetchListAgentsGeneralProbe(options: {
   readonly proxyUrl?: string;
   readonly host?: string;
 }): Promise<ListAgentsGeneralProbe> {
-  const plan = buildListAgentsReplayPlan(options.account, {}, { host: options.host });
+  const plan = buildListAgentsReplayPlan(
+    options.account,
+    {},
+    { host: options.host },
+  );
   const transport = await createF402ReplayTransport({
     profileDir: options.profileDir,
     proxyUrl: options.proxyUrl,
@@ -64,9 +68,10 @@ export async function loadAccountForGeneralProbe(
   return loadAccountInfoOwnerFixture(await Bun.file(resolved).json());
 }
 
-export function masterContextFromAccount(
-  account: AccountInfoOwnerFixture,
-): { readonly masterId: string; readonly masterLogin: string } {
+export function masterContextFromAccount(account: AccountInfoOwnerFixture): {
+  readonly masterId: string;
+  readonly masterLogin: string;
+} {
   const login = account.accountInfo.Login?.trim();
   return {
     masterId: account.agentID,

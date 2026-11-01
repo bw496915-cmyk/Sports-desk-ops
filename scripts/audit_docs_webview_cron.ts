@@ -29,10 +29,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import {
-  startInProcessCron,
-  type InProcessCronJob,
-} from "../lib/bun_cron.ts";
+import { startInProcessCron, type InProcessCronJob } from "../lib/bun_cron.ts";
 
 const SCRIPT_DIR = import.meta.dir;
 const DEFAULT_ROOT_DIR = resolve(SCRIPT_DIR, "..");

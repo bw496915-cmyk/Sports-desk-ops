@@ -9,7 +9,9 @@ const rootDir = resolve(import.meta.dir, "..");
 
 describe("parseTokensToml", () => {
   it("parses production tokens.toml with discriminated sla and thresholds", async () => {
-    const tomlText = await Bun.file(resolve(rootDir, "tokens.toml")).text();
+    const tomlText = await Bun.file(
+      resolve(rootDir, "design/tokens.toml"),
+    ).text();
     const ssot = parseTokensToml(tomlText);
 
     expect(ssot.meta.version).toBe("1.1.0");

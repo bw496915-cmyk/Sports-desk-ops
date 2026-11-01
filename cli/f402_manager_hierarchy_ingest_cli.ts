@@ -48,7 +48,9 @@ const envelopePath =
   Bun.env.F402_RAW_ENVELOPE?.trim() ||
   join(SCRATCH, "raw-f402-list-agents.json");
 
-const probe = generalProbeFromWireText(await Bun.file(resolve(envelopePath)).text());
+const probe = generalProbeFromWireText(
+  await Bun.file(resolve(envelopePath)).text(),
+);
 const result = ingestManagerHierarchyFile(
   resolve(dbPath),
   { GENERAL: probe.general },
@@ -71,6 +73,8 @@ console.log(
 );
 
 if (result.rowCount !== result.cteRowCount) {
-  console.error("CTE row count does not match agents table — parent graph broken");
+  console.error(
+    "CTE row count does not match agents table — parent graph broken",
+  );
   process.exit(1);
 }

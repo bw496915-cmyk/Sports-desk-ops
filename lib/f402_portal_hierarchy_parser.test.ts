@@ -39,7 +39,9 @@ describe("runBaseHeriarchyParser vs oracle", () => {
     for (let level = 2; level <= 12; level++) {
       general.push(row(level, `NODE${level}`, level === 12 ? "A" : "M"));
     }
-    const oracle = await runPortalHierarchyOracle(general, { runSetComplete: false });
+    const oracle = await runPortalHierarchyOracle(general, {
+      runSetComplete: false,
+    });
     const parsed = runBaseHeriarchyParser(general, CTX);
     expect(oracleSnapshot(normalizeNested(parsed))).toBe(
       oracleSnapshot(oracle.nested),
@@ -52,7 +54,10 @@ describe("runBaseHeriarchyParser vs oracle", () => {
       "../tests/fixtures/f402-general-oracle-production.json",
     );
     const manifest = (await Bun.file(
-      join(import.meta.dir, "../verification/manager-boot-oracle/pinned/manifest.json"),
+      join(
+        import.meta.dir,
+        "../verification/manager-boot-oracle/pinned/manifest.json",
+      ),
     ).json()) as { productionOracleGate?: { nestedSnapshotSha256?: string } };
     const pinned = manifest.productionOracleGate?.nestedSnapshotSha256;
     expect(pinned).toBeString();

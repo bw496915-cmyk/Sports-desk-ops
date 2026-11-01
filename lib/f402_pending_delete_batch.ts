@@ -120,8 +120,11 @@ export function redactPendingDeletePreview(text: string): string {
   return text.replace(PASSWORD_FIELD, '"Password":"<redacted>"');
 }
 
-export function parsePendingDeleteBatchRows(raw: unknown): PendingDeleteBatchRow[] {
-  if (!Array.isArray(raw)) throw new Error("batch PendingDelete result must be an array");
+export function parsePendingDeleteBatchRows(
+  raw: unknown,
+): PendingDeleteBatchRow[] {
+  if (!Array.isArray(raw))
+    throw new Error("batch PendingDelete result must be an array");
   const rows: PendingDeleteBatchRow[] = [];
   for (const entry of raw) {
     if (typeof entry !== "object" || entry === null) continue;
@@ -129,7 +132,8 @@ export function parsePendingDeleteBatchRows(raw: unknown): PendingDeleteBatchRow
     const ticketNumber = row["ticketNumber"];
     const status = row["status"];
     const bodyText = row["bodyText"];
-    if (typeof ticketNumber !== "string" || typeof status !== "number") continue;
+    if (typeof ticketNumber !== "string" || typeof status !== "number")
+      continue;
     if (typeof bodyText !== "string") continue;
     const responseHeaders = row["responseHeaders"];
     rows.push({

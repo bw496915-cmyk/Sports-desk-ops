@@ -47,7 +47,10 @@ describe("prepareProductionOracleFixtureTextFromHar", () => {
       ],
       EXTRA: true,
     });
-    const text = await prepareProductionOracleFixtureTextFromHar(har, "operator");
+    const text = await prepareProductionOracleFixtureTextFromHar(
+      har,
+      "operator",
+    );
     const doc = JSON.parse(text) as {
       GENERAL: { Login: string; AgentID: string }[];
       PLAYERS: unknown[];

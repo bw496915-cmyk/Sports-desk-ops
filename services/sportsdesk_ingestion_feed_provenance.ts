@@ -13,7 +13,10 @@ import {
   resolveIngestionFeedSource,
   type IngestionFeedSource,
 } from "./sportsdesk_ingestion_feed.ts";
-import type { Sha256Hex, SignalChannelCode } from "../domain-branded-types.ts";
+import type {
+  Sha256Hex,
+  SignalChannelCode,
+} from "../design/domain-branded-types.ts";
 import { sha256Bytes } from "../lib/schema_binary.ts";
 
 export type IngestionFeedHttpMeta = {

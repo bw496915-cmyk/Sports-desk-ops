@@ -9,7 +9,12 @@ import { prepareProductionOracleFixtureTextFromWireEnvelope } from "./f402_produ
 import { parseListAgentsByAgentWireText } from "./f402_list_agents_wire_boundary.ts";
 import { sha256HexText } from "./f402_portal_version_pin.ts";
 
-const PLAYER_PII_KEYS = new Set(["Password", "NameFirst", "Login", "customerID"]);
+const PLAYER_PII_KEYS = new Set([
+  "Password",
+  "NameFirst",
+  "Login",
+  "customerID",
+]);
 
 /** Strip PLAYERS PII before stringify; fixture path clears PLAYERS entirely. */
 export function redactListAgentsEnvelopeInMemory(
@@ -70,7 +75,10 @@ export async function buildEnvelopeRedactionProof(
 export async function redactScratchEnvelopeToProductionFixture(options: {
   readonly rawText: string;
   readonly redactedByRole: string;
-}): Promise<{ readonly fixtureText: string; readonly proof: EnvelopeRedactionProof }> {
+}): Promise<{
+  readonly fixtureText: string;
+  readonly proof: EnvelopeRedactionProof;
+}> {
   const envelope = parseListAgentsByAgentWireText(options.rawText);
   const fixtureText = await prepareProductionOracleFixtureTextFromWireEnvelope(
     envelope,

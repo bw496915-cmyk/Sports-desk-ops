@@ -32,7 +32,7 @@ import {
 } from "../lib/gen_tokens/tokens_ssot.ts";
 
 const rootDir = resolve(import.meta.dir, "..");
-const tomlPath = resolve(rootDir, "tokens.toml");
+const tomlPath = resolve(rootDir, "design/tokens.toml");
 const emittedThisRun: string[] = [];
 
 function recordEmission(repoRelativePath: string): void {

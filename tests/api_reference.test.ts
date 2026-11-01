@@ -30,7 +30,7 @@ const ROOT = join(import.meta.dir, "..");
 const SPEC_PATH = join(ROOT, "docs", "openapi.json");
 const MARKDOWN_PATH = join(ROOT, "docs", "api-reference.md");
 const INDEX_PATH = join(ROOT, "docs", "index.html");
-const HEADERS_PATH = join(ROOT, "functions", "_headers");
+const HEADERS_PATH = join(ROOT, "infra", "pages", "_headers");
 const EVIDENCE_MD_PATH = join(ROOT, "docs", "EVIDENCE.md");
 
 function readText(path: string): string {
@@ -370,9 +370,9 @@ describe("generated markdown + portal artifacts", () => {
     expect(html).not.toMatch(/@latest/);
   });
 
-  test("functions/_headers ships the required security headers", () => {
+  test("infra/pages/_headers ships the required security headers", () => {
     if (!existsSync(HEADERS_PATH))
-      throw new Error("functions/_headers missing");
+      throw new Error("infra/pages/_headers missing");
     expectNoIssues(checkHeaders(readText(HEADERS_PATH)));
   });
 });

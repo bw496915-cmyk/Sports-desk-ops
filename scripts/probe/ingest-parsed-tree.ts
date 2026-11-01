@@ -10,12 +10,12 @@ import { ingestNormalizedTreeToSqlite } from "../../lib/f402_sqlite_agents_inges
 const REPO = join(import.meta.dir, "../..");
 const SCRATCH = join(REPO, "scratch");
 
-const ingestFrom =
-  (Bun.env.F402_INGEST_FROM ?? "tree").trim().toLowerCase();
+const ingestFrom = (Bun.env.F402_INGEST_FROM ?? "tree").trim().toLowerCase();
 const treePath =
   Bun.env.F402_PARSED_TREE_IN?.trim() || join(SCRATCH, "parsed-tree.json");
 const rawEnvelopePath =
-  Bun.env.F402_RAW_ENVELOPE?.trim() || join(SCRATCH, "raw-f402-list-agents.json");
+  Bun.env.F402_RAW_ENVELOPE?.trim() ||
+  join(SCRATCH, "raw-f402-list-agents.json");
 const dbPath =
   Bun.env.F402_AGENTS_DB?.trim() || join(SCRATCH, "manager-agents.sqlite");
 

@@ -28,10 +28,7 @@ import {
 export const DEPRECATED_ENV_CREDENTIALS_FLAG = "F402_ALLOW_ENV_CREDENTIALS";
 
 export type F402CredentialSource =
-  | "keychain"
-  | "tty"
-  | "deprecated-env"
-  | "injected";
+  "keychain" | "tty" | "deprecated-env" | "injected";
 
 export type SecureF402Credentials = F402Credentials & {
   readonly credentialSource: F402CredentialSource;
@@ -107,7 +104,9 @@ async function readKeychain(
   if (fromPlatform !== "") return fromPlatform;
   if (secrets === null) return "";
   try {
-    return (await secrets.get({ service: SECRETS_SERVICE, name }))?.trim() ?? "";
+    return (
+      (await secrets.get({ service: SECRETS_SERVICE, name }))?.trim() ?? ""
+    );
   } catch {
     return "";
   }

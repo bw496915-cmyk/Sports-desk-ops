@@ -122,7 +122,9 @@ export async function runPortalHierarchyOracle(
   host.buildTree = compileFromSlice(bodies.buildTree).bind(host);
   host.findInTree = compileFromSlice(bodies.findInTree).bind(host);
 
-  const baseHeriarchy = compileFromSlice(bodies.baseHeriarchy, ["n"]).bind(host);
+  const baseHeriarchy = compileFromSlice(bodies.baseHeriarchy, ["n"]).bind(
+    host,
+  );
   host.baseHeriarchy = (payload: { data: PortalGeneralRow[] }) =>
     baseHeriarchy(payload, util);
   const nested = normalizeNested(baseHeriarchy({ data: [...general] }, util));
@@ -142,9 +144,7 @@ export async function runPortalHierarchyOracle(
     const require = (): void => undefined;
     const r = { write: (): void => undefined };
     setComplete({ data: [...general] }, util, $stub, require, r);
-    completeHeriarchy = normalizeNested(
-      proto.completeHeriarchy ?? nested,
-    );
+    completeHeriarchy = normalizeNested(proto.completeHeriarchy ?? nested);
   }
 
   return {

@@ -163,7 +163,7 @@ Bun automatically loads environment files at startup in strict order of increasi
 3. `.env.local` (**Exception**: strictly skipped when `NODE_ENV=test` to ensure deterministic test isolation)
 4. `.env.production.local`, `.env.development.local`, `.env.test.local` (mode-specific local overrides)
 
-TypeScript declaration merging in `env.d.ts` extends both `Bun.Env` and `NodeJS.ProcessEnv` with strict typing for all SportsDesk credentials (`PORT`, `BUN_SOCKET`, `NO_PROXY`, `BUN_CONFIG_MAX_HTTP_REQUESTS`, `F402_*`, `CLOUDFLARE_*`, `R2_*`, `TELEGRAM_*`), verified via `tests/env_types.test-d.ts`.
+TypeScript declaration merging in `types/env.d.ts` extends both `Bun.Env` and `NodeJS.ProcessEnv` with strict typing for all SportsDesk credentials (`PORT`, `BUN_SOCKET`, `NO_PROXY`, `BUN_CONFIG_MAX_HTTP_REQUESTS`, `F402_*`, `CLOUDFLARE_*`, `R2_*`, `TELEGRAM_*`), verified via `tests/env_types.test-d.ts`.
 
 ### Security Headers & Telegram Mini App Embedding
 
@@ -202,7 +202,7 @@ Implementation: `sportsdesk_ingestion_replay.ts`, `lib/bun_xml_golden_ast_replay
 
 ## Qwen3.5-4B (Layers 18–28) Token Architecture & Single Source of Truth
 
-The system uses `tokens.toml` as the authoritative **Single Source of Truth (SSOT)** for all 13 neuron tokens, dark surfaces, ingestion channels, and algorithmic routes:
+The system uses `design/tokens.toml` as the authoritative **Single Source of Truth (SSOT)** for all 13 neuron tokens, dark surfaces, ingestion channels, and algorithmic routes:
 
 - **Surface Tokens**: `--sd-surface-primary` (`#070b14`), `--sd-surface-card` (`#0b1329`).
 - **Channel Ingestion Tokens (Axis 1)**:
@@ -243,9 +243,9 @@ export enum MitigationActionKind { ... }
 
 ## Verification & CI Quality Gates
 
-All tokens and contracts are verified continuously through `validation/token_validator.ts` and `tests/`:
+All tokens and contracts are verified continuously through `lib/validation/token_validator.ts` and `tests/`:
 
-1. **Zero Drift**: `bun run gen:tokens:gate` (CI step) resets generated outputs, regens from `tokens.toml`, and fails on drift for `domain-branded-types.ts` and the two dashboards under `static/`.
+1. **Zero Drift**: `bun run gen:tokens:gate` (CI step) resets generated outputs, regens from `design/tokens.toml`, and fails on drift for `design/domain-branded-types.ts` and the two dashboards under `static/`.
 2. **24-bit Exact Uniqueness**: 13 unique `ColorHexInt` values derived from `Bun.color()`.
 3. **CIEDE2000 Perceptual Separation ($\Delta E\_{00} \ge 7.0$)**: Mathematically verified color distance floor across all token pairs, preventing indistinguishable UI swatches.
 4. **WCAG 2.1 Contrast Standards**: $\ge 3.0:1$ for graphical UI badges against dark surfaces (`#070b14` / `#0b1329`) and $\ge 4.5:1$ for typography.
@@ -290,8 +290,10 @@ See **[ROOT_LAYOUT.md](ROOT_LAYOUT.md)** for the full map. At a glance:
 ├── docs/             # API evidence portal; docs/runbooks/ for long-form ops guides
 ├── tests/            # bun test suites
 ├── bin/dx            # operator entrypoint
-├── domain-branded-types.ts
-└── tokens.toml
+├── design/           # tokens.toml + domain-branded-types.ts (gen:tokens)
+├── schema/           # migrations, manifest.bin, schema preload
+├── infra/            # Cloudflare Pages _headers
+└── types/env.d.ts
 ```
 
 ## Documentation Runbooks

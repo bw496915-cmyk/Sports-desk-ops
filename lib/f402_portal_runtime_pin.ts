@@ -28,7 +28,9 @@ export function readCurrentPortalRuntimePin(
 ): PortalRuntimePin {
   const webkit = process.versions.webkit;
   if (typeof webkit !== "string" || webkit === "") {
-    throw new Error("process.versions.webkit missing — cannot pin JSC revision");
+    throw new Error(
+      "process.versions.webkit missing — cannot pin JSC revision",
+    );
   }
   return {
     bunVersion: Bun.version,

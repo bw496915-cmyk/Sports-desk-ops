@@ -64,7 +64,11 @@ export function oracleSnapshotLabelAgnostic(
   labels: readonly string[],
 ): string {
   const canonical = "__AGENT_LABEL__";
-  const normalized = relabelOracleValue(normalizeNested(nested), labels, canonical);
+  const normalized = relabelOracleValue(
+    normalizeNested(nested),
+    labels,
+    canonical,
+  );
   return oracleSnapshot(normalized);
 }
 

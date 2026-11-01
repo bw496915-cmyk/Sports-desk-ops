@@ -24,8 +24,7 @@ export interface ListAgentsByAgentGeneralWireRates {
 }
 
 /** Raw wire row (PascalCase keys from JSON). */
-export interface ListAgentsByAgentGeneralWireRow
-  extends ListAgentsByAgentGeneralWireRates {
+export interface ListAgentsByAgentGeneralWireRow extends ListAgentsByAgentGeneralWireRates {
   readonly AgentID?: string;
   readonly Login?: string;
   readonly SeqNumber?: number;
@@ -137,9 +136,7 @@ export function summarizeListAgentsByAgentPlayers(
 
   const first = normalizeAgentTreePlayerRow(players[0] ?? {});
   const hasPortalDummyRow =
-    first !== null &&
-    first.customerId === "1_0" &&
-    first.nameFirst === "Dummy";
+    first !== null && first.customerId === "1_0" && first.nameFirst === "Dummy";
 
   return {
     playerCount: players.length,
@@ -293,7 +290,11 @@ export function generalSeqNumbersMatchBasePlusIndex(
   base?: number,
 ): GeneralSeqIndexCheck {
   if (general.length === 0) {
-    return { ok: true, base: base ?? F402_GENERAL_SEQ_BASE_AT_INDEX_ZERO, firstMismatch: null };
+    return {
+      ok: true,
+      base: base ?? F402_GENERAL_SEQ_BASE_AT_INDEX_ZERO,
+      firstMismatch: null,
+    };
   }
   const resolvedBase =
     base ??
@@ -342,10 +343,8 @@ export function summarizeListAgentsByAgent(
 
   for (const row of normalized) {
     agentTypeCounts[row.agentType] = (agentTypeCounts[row.agentType] ?? 0) + 1;
-    levelMin =
-      levelMin === null ? row.level : Math.min(levelMin, row.level);
-    levelMax =
-      levelMax === null ? row.level : Math.max(levelMax, row.level);
+    levelMin = levelMin === null ? row.level : Math.min(levelMin, row.level);
+    levelMax = levelMax === null ? row.level : Math.max(levelMax, row.level);
     seqMin = seqMin === null ? row.seqNumber : Math.min(seqMin, row.seqNumber);
     seqMax = seqMax === null ? row.seqNumber : Math.max(seqMax, row.seqNumber);
     seqSeen.set(row.seqNumber, (seqSeen.get(row.seqNumber) ?? 0) + 1);

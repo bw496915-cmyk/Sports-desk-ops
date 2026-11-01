@@ -4,7 +4,7 @@
 
 import type { Database } from "bun:sqlite";
 import { openSportsdeskSqlite } from "./sportsdesk_sqlite.ts";
-import type { Sha256Hex } from "../domain-branded-types.ts";
+import type { Sha256Hex } from "../design/domain-branded-types.ts";
 import { sha256HexOfBytes } from "../services/sportsdesk_ingestion_feed_provenance.ts";
 
 export type MatchPolicyMode = "exact" | "candidate-review" | "reject";

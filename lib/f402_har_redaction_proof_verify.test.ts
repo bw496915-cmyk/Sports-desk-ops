@@ -21,9 +21,10 @@ describe("HAR redaction proof verifier (synthetic)", () => {
     });
     expect(result.kind).toBe("failed");
     if (result.kind === "failed") {
-      expect(["F402_HAR_SWEEP_FAILED", "F402_HAR_PROOF_HASH_MISMATCH"]).toContain(
-        result.signal,
-      );
+      expect([
+        "F402_HAR_SWEEP_FAILED",
+        "F402_HAR_PROOF_HASH_MISMATCH",
+      ]).toContain(result.signal);
     }
   });
 

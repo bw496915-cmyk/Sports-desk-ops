@@ -154,7 +154,7 @@ Tables: ${listRegisteredTableNames().join(", ")}
 }
 
 async function listMigrationSqlFiles(): Promise<string[]> {
-  const cwd = join(import.meta.dir, "../migrations");
+  const cwd = join(import.meta.dir, "../schema/migrations");
   const glob = new Glob("**/*.sql");
   const files: string[] = [];
   for await (const file of glob.scan({ cwd, onlyFiles: true })) {
@@ -258,7 +258,7 @@ async function main(): Promise<number> {
   }
 
   const defaultManifestUrl = pathToFileURL(
-    resolve(import.meta.dir, "../schema.manifest.bin"),
+    resolve(import.meta.dir, "../schema/manifest.bin"),
   );
   const manifestOutUrl = manifestPathEarly
     ? sqliteDatabaseFileUrl(resolve(manifestPathEarly))

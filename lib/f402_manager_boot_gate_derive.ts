@@ -60,8 +60,15 @@ export async function deriveHarRedactionProofGate(
   }
   const harPath = join(repoRoot, gate.harPath);
   const proofPath = join(repoRoot, gate.proofPath);
-  if (!(await Bun.file(harPath).exists()) || !(await Bun.file(proofPath).exists())) {
-    return { phase: "blocked", harPath: gate.harPath, proofPath: gate.proofPath };
+  if (
+    !(await Bun.file(harPath).exists()) ||
+    !(await Bun.file(proofPath).exists())
+  ) {
+    return {
+      phase: "blocked",
+      harPath: gate.harPath,
+      proofPath: gate.proofPath,
+    };
   }
   const verified = await verifyHarRedactionProofFiles({
     harPath,
@@ -100,7 +107,10 @@ export async function deriveProductionOracleGate(
       nestedSnapshotSha256: gate.nestedSnapshotSha256,
     };
   }
-  if (gate.nestedSnapshotSha256 === null || gate.nestedSnapshotSha256.trim() === "") {
+  if (
+    gate.nestedSnapshotSha256 === null ||
+    gate.nestedSnapshotSha256.trim() === ""
+  ) {
     return {
       phase: "blocked",
       generalFixture: gate.generalFixture,
@@ -188,14 +198,18 @@ export async function deriveManagerBootGates(
   repoRoot: string,
   manifest: PinnedManifestWithExtracted,
 ): Promise<DerivedManagerBootGates> {
-  const harRedactionProof = await deriveHarRedactionProofGate(repoRoot, manifest);
+  const harRedactionProof = await deriveHarRedactionProofGate(
+    repoRoot,
+    manifest,
+  );
   const productionOracle = await deriveProductionOracleGate(repoRoot, manifest);
   const variance = await deriveVarianceGate(repoRoot, manifest);
   return { harRedactionProof, productionOracle, variance };
 }
 
 export interface ManifestConsistencyMismatch {
-  readonly gate: "harRedactionProofGate" | "productionOracleGate" | "varianceGate";
+  readonly gate:
+    "harRedactionProofGate" | "productionOracleGate" | "varianceGate";
   readonly manifestStatus: string;
   readonly derivedPhase: DerivedGatePhase;
   readonly detail?: Record<string, unknown>;

@@ -53,8 +53,8 @@ import {
   ROUTE_CIRCUITS,
   TELEMETRY_SURFACES,
   ALL_QWEN_TOKENS,
-} from "../domain-branded-types.ts";
-import { assertUniqueTokenColors } from "../validation/token_validator.ts";
+} from "../design/domain-branded-types.ts";
+import { assertUniqueTokenColors } from "../lib/validation/token_validator.ts";
 import { printAnsiMarkdown } from "../lib/canonical_osc8_links.ts";
 import {
   executePlayerColumnMutation,

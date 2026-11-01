@@ -54,7 +54,9 @@ export function parseConfigWebReportsCustomerAdminEnvelope(
   raw: unknown,
 ): ConfigWebReportsCustomerAdminEnvelope {
   if (typeof raw !== "object" || raw === null)
-    throw new Error("getConfigWebReportsCustomerAdmin envelope must be an object");
+    throw new Error(
+      "getConfigWebReportsCustomerAdmin envelope must be an object",
+    );
   const info = (raw as { INFO?: unknown }).INFO;
   if (typeof info !== "object" || info === null)
     throw new Error("INFO must be an object");

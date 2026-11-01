@@ -56,7 +56,9 @@ if (accountPath === undefined || accountPath === "") {
 
 const modeRaw = (values.mode ?? "dry").trim().toLowerCase();
 if (modeRaw !== "dry" && modeRaw !== "replay" && modeRaw !== "oracle") {
-  console.error(`--mode must be dry|replay|oracle (got ${JSON.stringify(values.mode)})`);
+  console.error(
+    `--mode must be dry|replay|oracle (got ${JSON.stringify(values.mode)})`,
+  );
   process.exit(1);
 }
 const mode = modeRaw as HierarchyReplayMode;

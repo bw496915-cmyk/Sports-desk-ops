@@ -19,7 +19,7 @@ import {
   type TickerOverlayInput,
 } from "../lib/candidate_match_evaluation.ts";
 import { auditRunAt, auditRunId } from "../lib/audit_run_id.ts";
-import { sha256HexFromDigest } from "../domain-branded-types.ts";
+import { sha256HexFromDigest } from "../design/domain-branded-types.ts";
 import { hashCanonicalJsonBytes } from "../lib/match_evaluation_canonical.ts";
 import {
   DEFAULT_MATCH_POLICY,

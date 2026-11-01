@@ -10,7 +10,11 @@ export interface PinnedManifest {
   readonly artifacts: Readonly<
     Record<
       string,
-      { readonly sha256: string; readonly bustQuery?: string; readonly bytes?: number }
+      {
+        readonly sha256: string;
+        readonly bustQuery?: string;
+        readonly bytes?: number;
+      }
     >
   >;
 }

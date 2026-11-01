@@ -20,7 +20,7 @@ import {
   SIGNAL_SLA_MS,
   type SignalChannelCode,
   type SignalChannelStatus,
-} from "../domain-branded-types.ts";
+} from "../design/domain-branded-types.ts";
 import {
   replayHistoricalJsonlFile,
   type HistoricalLogReplayResult,

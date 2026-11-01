@@ -9,7 +9,6 @@ import {
   BUN_CRON_PARSE_EXAMPLE,
   type CronScheduledWorkerExport,
   formatCronScheduleLine,
-  installOsCronJob,
   isBunOsCronInvocation,
   osCronWorkerPath,
   parseCronSchedule,
@@ -61,9 +60,9 @@ describe("bun_cron", () => {
   });
 
   test("parseCronSchedule rejects from outside ECMAScript Date range", () => {
-    expect(() =>
-      parseCronSchedule("* * * * *", { from: 8.64e15 + 1 }),
-    ).toThrow(TypeError);
+    expect(() => parseCronSchedule("* * * * *", { from: 8.64e15 + 1 })).toThrow(
+      TypeError,
+    );
   });
 
   test("previewCronSchedule and formatCronScheduleLine", () => {
@@ -103,13 +102,17 @@ describe("bun_cron", () => {
     expect(BUN_CRON_V14_BLOG_LOCAL_TZ_URL).toContain("bun.sh/blog/bun-v1.4");
     expect(BUN_CRON_V14_BLOG_LOCAL_TZ_URL).toContain("35122");
     expect(BUN_CRON_V14_BLOG_LOCAL_TZ_SHIP_NOTE).toContain("{ tz }");
-    expect(BUN_CRON_V14_BLOG_LOCAL_TZ_SHIP_NOTE).toContain("ECMAScript Date range");
+    expect(BUN_CRON_V14_BLOG_LOCAL_TZ_SHIP_NOTE).toContain(
+      "ECMAScript Date range",
+    );
   });
 
   test("OS-level doc examples exported", () => {
     expect(BUN_CRON_OS_REGISTER_EXAMPLE).toContain("weekly-report");
     expect(BUN_CRON_PARSE_EXAMPLE).toContain("Bun.cron.parse");
-    expect(BUN_CRON_OS_WORKER_SCHEDULED_EXAMPLE).toContain("scheduled(controller)");
+    expect(BUN_CRON_OS_WORKER_SCHEDULED_EXAMPLE).toContain(
+      "scheduled(controller)",
+    );
   });
 
   test("parse quarter-hour cadence", () => {

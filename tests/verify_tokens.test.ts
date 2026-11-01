@@ -14,7 +14,7 @@ import {
   parseAsColorHexInt,
   parseAsCents,
   parseAsBasisPoints,
-} from "../domain-branded-types.ts";
+} from "../design/domain-branded-types.ts";
 import {
   assertUniqueTokenColors,
   evaluatePerceptualDistances,
@@ -24,13 +24,13 @@ import {
   calculateDeltaE00,
   calculateContrastRatio,
   type TokenEntry,
-} from "../validation/token_validator.ts";
+} from "../lib/validation/token_validator.ts";
 
 const rootDir = resolve(import.meta.dir, "..");
 
 describe("1. Single Source of Truth & Zero-Drift Regeneration", () => {
   it("test_assert_tokens_toml_is_valid_and_complete", async () => {
-    const tomlPath = resolve(rootDir, "tokens.toml");
+    const tomlPath = resolve(rootDir, "design/tokens.toml");
     const tomlText = await Bun.file(tomlPath).text();
     const { parseTokensToml } =
       await import("../lib/gen_tokens/tokens_ssot.ts");
@@ -52,7 +52,7 @@ describe("1. Single Source of Truth & Zero-Drift Regeneration", () => {
   });
 
   it("test_assert_zero_drift_between_tokens_toml_and_source_code", async () => {
-    const tomlPath = resolve(rootDir, "tokens.toml");
+    const tomlPath = resolve(rootDir, "design/tokens.toml");
     const tomlText = await Bun.file(tomlPath).text();
     const { parseTokensToml } =
       await import("../lib/gen_tokens/tokens_ssot.ts");

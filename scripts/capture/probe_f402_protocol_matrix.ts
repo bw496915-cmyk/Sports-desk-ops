@@ -35,8 +35,10 @@ function flag(name: string, fallback: string): string {
   return args[i + 1] ?? fallback;
 }
 
-const base =
-  flag("--base", process.env.F402_BASE_URL?.trim() || "https://fantasy402.com");
+const base = flag(
+  "--base",
+  process.env.F402_BASE_URL?.trim() || "https://fantasy402.com",
+);
 const customer = flag("--customer", "TACO217").trim();
 const backend = flag("--backend", "webkit") === "chrome" ? "chrome" : "webkit";
 const profile = flag("--profile", "scratch/webview-profile");
@@ -104,7 +106,11 @@ export async function main(): Promise<number> {
   await view.evaluate(buildReportCustomerContextExpression(customer));
 
   const raw = await view.evaluate(
-    buildApiPrefixMatrixExpression(base, matrixItems, F402_FORM_WIRE_CONTENT_TYPE),
+    buildApiPrefixMatrixExpression(
+      base,
+      matrixItems,
+      F402_FORM_WIRE_CONTENT_TYPE,
+    ),
   );
 
   const rows = Array.isArray(raw) ? raw : [];
@@ -137,8 +143,17 @@ export async function main(): Promise<number> {
     rows,
   };
 
-  await Bun.write(join(outDir, "protocol-matrix.json"), `${JSON.stringify(summary, null, 2)}\n`);
-  console.log(JSON.stringify({ outDir, rowCount: rows.length, tlsAlpn: pf.tls?.alpn }, null, 2));
+  await Bun.write(
+    join(outDir, "protocol-matrix.json"),
+    `${JSON.stringify(summary, null, 2)}\n`,
+  );
+  console.log(
+    JSON.stringify(
+      { outDir, rowCount: rows.length, tlsAlpn: pf.tls?.alpn },
+      null,
+      2,
+    ),
+  );
   for (const row of rows as Array<Record<string, unknown>>) {
     console.log(
       `${String(row.prefix).padEnd(22)} ${String(row.operation).padEnd(28)} ${row.status} ${row.bytes}B`,

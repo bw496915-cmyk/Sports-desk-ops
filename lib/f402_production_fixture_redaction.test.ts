@@ -67,8 +67,8 @@ describe("production oracle fixture redaction gate", () => {
 
   test("fails on Bearer substring in file", () => {
     const text = `${JSON.stringify(valid)} Bearer eyJhbGciOiJIUzI1NiJ9`;
-    expect(() =>
-      assertProductionOracleFixtureRedaction(text, valid),
-    ).toThrow(ProductionFixtureRedactionError);
+    expect(() => assertProductionOracleFixtureRedaction(text, valid)).toThrow(
+      ProductionFixtureRedactionError,
+    );
   });
 });

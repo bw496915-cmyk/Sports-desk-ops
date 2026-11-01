@@ -16,7 +16,10 @@ import { urlPathLooksLikeListAgents } from "../../lib/f402_list_agents_url_match
 import type { PinnedManifestWithExtracted } from "../../lib/f402_portal_oracle_slice.ts";
 
 const REPO = join(import.meta.dir, "../..");
-const MANIFEST = join(REPO, "verification/manager-boot-oracle/pinned/manifest.json");
+const MANIFEST = join(
+  REPO,
+  "verification/manager-boot-oracle/pinned/manifest.json",
+);
 
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
@@ -46,7 +49,9 @@ if (!inPath.startsWith(`${join(REPO, "scratch")}/`)) {
   process.exit(GATE_EXIT_FAILED);
 }
 
-const manifest = (await Bun.file(MANIFEST).json()) as PinnedManifestWithExtracted;
+const manifest = (await Bun.file(
+  MANIFEST,
+).json()) as PinnedManifestWithExtracted;
 const gate = manifest.harRedactionProofGate;
 if (gate === undefined) {
   console.error(JSON.stringify({ signal: "F402_HAR_GATE_MISCONFIG" }));

@@ -7,7 +7,7 @@ import {
   normalizePaddedField,
 } from "./candidate_match_evaluation.ts";
 import { canonicalJsonString } from "./match_evaluation_canonical.ts";
-import type { Sha256Hex } from "../domain-branded-types.ts";
+import type { Sha256Hex } from "../design/domain-branded-types.ts";
 import { sha256HexOfBytes } from "../services/sportsdesk_ingestion_feed_provenance.ts";
 
 export type ComboMarketKind =

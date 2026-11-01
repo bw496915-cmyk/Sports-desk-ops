@@ -5,7 +5,7 @@ wrangler
 .env.local
 reports/
 tests/.tmp-*
-schema.manifest.bin
+schema/manifest.bin
 scratch/
 verification/gen-tokens-zero-drift-gate/out/
 *.log

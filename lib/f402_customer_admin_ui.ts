@@ -43,17 +43,18 @@ export interface CustomerAdminPartialUrlOptions {
   readonly async?: boolean;
 }
 
-function resolvePartialAsyncDefault(
-  idOrFile: string,
-  file: string,
-): boolean {
+function resolvePartialAsyncDefault(idOrFile: string, file: string): boolean {
   const key = idOrFile as CustomerAdminPartialKey;
   if (key in F402_CUSTOMER_ADMIN_PARTIAL_ASYNC_DEFAULT) {
     return F402_CUSTOMER_ADMIN_PARTIAL_ASYNC_DEFAULT[key] ?? true;
   }
   for (const [k, filename] of Object.entries(F402_CUSTOMER_ADMIN_PARTIALS)) {
     if (filename === file) {
-      return F402_CUSTOMER_ADMIN_PARTIAL_ASYNC_DEFAULT[k as CustomerAdminPartialKey] ?? true;
+      return (
+        F402_CUSTOMER_ADMIN_PARTIAL_ASYNC_DEFAULT[
+          k as CustomerAdminPartialKey
+        ] ?? true
+      );
     }
   }
   return true;

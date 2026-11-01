@@ -23,7 +23,7 @@
  * 6. LineHundredths integer precision (-3.25 -> -325) & order-independent SHA-256 identity/shape/pick-shape hashes.
  */
 
-import type { Brand, Sha256Hex } from "../domain-branded-types.ts";
+import type { Brand, Sha256Hex } from "../design/domain-branded-types.ts";
 
 // ============================================================================
 // 0. ROSETTA STONE: EXACT `customer/report/report.js` ENDPOINTS & WAGER TYPES

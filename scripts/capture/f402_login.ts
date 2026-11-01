@@ -2,7 +2,8 @@
  * @file scripts/capture/f402_login.ts
  * @description Unattended F402 portal login for WebView-driven capture.
  *
- * Credentials come from `F402_AGENT_ID` / `F402_PASSWORD` only, never argv, and are never printed.
+ * Credentials: OS keychain (`secrets:f402`), TTY prompt, or an explicit in-memory object in tests.
+ * `F402_PASSWORD` in env is not read unless `F402_ALLOW_ENV_CREDENTIALS=1` (deprecated).
  * Selectors are overridable because the portal markup is not contractual; the defaults live in
  * `resolveLoginConfig`.
  *
@@ -28,7 +29,7 @@ export interface F402LoginIdentity {
 export class MissingF402CredentialsError extends Error {
   constructor() {
     super(
-      "F402 login requires F402_AGENT_ID and F402_PASSWORD (values are not printed)",
+      "F402 login requires keychain (secrets:f402), TTY prompt, or a bootstrapped WebView profile (values are not printed)",
     );
     this.name = "MissingF402CredentialsError";
   }
@@ -49,35 +50,14 @@ export interface SecretsReader {
   get(options: { service: string; name: string }): Promise<string | null>;
 }
 
-/**
- * Env first, then the OS credential store. Env wins so a one-off run can override without touching
- * the keychain; the fallback means the durable copy can live outside `.env`.
- */
+/** @see loadF402CredentialsSecure in lib/f402_credentials_policy.ts */
 export async function loadF402Credentials(
   env: Env = process.env,
   secrets: SecretsReader | null = Bun.secrets as SecretsReader,
 ): Promise<F402Credentials> {
-  const envAgent = env["F402_AGENT_ID"]?.trim() ?? "";
-  const envPassword = env["F402_PASSWORD"]?.trim() ?? "";
-  if (envAgent !== "" && envPassword !== "") {
-    return { agentId: envAgent, password: envPassword };
-  }
-  const read = async (name: string): Promise<string> => {
-    if (secrets === null) return "";
-    try {
-      return (
-        (await secrets.get({ service: SECRETS_SERVICE, name }))?.trim() ?? ""
-      );
-    } catch {
-      return "";
-    }
-  };
-  const agentId = envAgent !== "" ? envAgent : await read(SECRET_NAMES.agentId);
-  const password =
-    envPassword !== "" ? envPassword : await read(SECRET_NAMES.password);
-  if (agentId === "" || password === "")
-    throw new MissingF402CredentialsError();
-  return { agentId, password };
+  const { loadF402CredentialsSecure } =
+    await import("../../lib/f402_credentials_policy.ts");
+  return loadF402CredentialsSecure(env, secrets);
 }
 
 export async function loadF402PlayerCredentials(
@@ -116,14 +96,21 @@ export async function loadF402LoginIdentity(
   return { loginId: agent.agentId, password: agent.password, kind: "agent" };
 }
 
+/** Tests and callers pass credentials explicitly — not from process env. */
 export function resolveF402Credentials(
-  env: Env = process.env,
+  credentials?: F402Credentials,
 ): F402Credentials {
-  const agentId = env["F402_AGENT_ID"]?.trim() ?? "";
-  const password = env["F402_PASSWORD"]?.trim() ?? "";
-  if (agentId === "" || password === "")
-    throw new MissingF402CredentialsError();
-  return { agentId, password };
+  if (
+    credentials !== undefined &&
+    credentials.agentId.trim() !== "" &&
+    credentials.password.trim() !== ""
+  ) {
+    return {
+      agentId: credentials.agentId.trim(),
+      password: credentials.password,
+    };
+  }
+  throw new MissingF402CredentialsError();
 }
 
 /** The subset of `ManagedWebView` the login needs; lets tests inject a stub. */

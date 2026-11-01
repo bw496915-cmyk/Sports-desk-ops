@@ -9,9 +9,9 @@ import {
   resolveF402Credentials,
 } from "../scripts/capture/f402_login.ts";
 
-const ENV = {
-  F402_AGENT_ID: "agent-118",
-  F402_PASSWORD: "not-a-real-secret",
+const TEST_CREDS = {
+  agentId: "agent-118",
+  password: "not-a-real-secret",
 };
 
 function stubView(overrides: Partial<LoginView> = {}): {
@@ -37,7 +37,7 @@ function stubView(overrides: Partial<LoginView> = {}): {
     },
     async fill(selector, text) {
       calls.push(
-        `fill:${selector}:${text === ENV.F402_PASSWORD ? "<password>" : text}`,
+        `fill:${selector}:${text === TEST_CREDS.password ? "<password>" : text}`,
       );
     },
     async click(selector) {
@@ -56,31 +56,20 @@ function stubView(overrides: Partial<LoginView> = {}): {
 const noSleep = async (): Promise<void> => {};
 
 describe("F402 login", () => {
-  test("requires both credentials and never echoes a value", () => {
-    expect(() => resolveF402Credentials({})).toThrow(
-      MissingF402CredentialsError,
-    );
-    expect(() => resolveF402Credentials({ F402_AGENT_ID: "a" })).toThrow(
-      "F402_AGENT_ID and F402_PASSWORD",
-    );
+  test("requires explicit credentials object (not process env)", () => {
+    expect(() => resolveF402Credentials()).toThrow(MissingF402CredentialsError);
     expect(() =>
-      resolveF402Credentials({ F402_AGENT_ID: "a", F402_PASSWORD: " " }),
+      resolveF402Credentials({ agentId: "a", password: " " }),
     ).toThrow(MissingF402CredentialsError);
-    const credentials = resolveF402Credentials(ENV);
+    const credentials = resolveF402Credentials(TEST_CREDS);
     expect(credentials.agentId).toBe("agent-118");
-    expect(credentials.password).toBe(ENV.F402_PASSWORD);
-    try {
-      resolveF402Credentials({ F402_AGENT_ID: "secret-agent" });
-    } catch (error) {
-      expect((error as Error).message).not.toContain("secret-agent");
-    }
+    expect(credentials.password).toBe(TEST_CREDS.password);
   });
 
   test("fills both fields, clicks submit, and waits for the form to disappear", async () => {
     const { view, calls } = stubView();
     const outcome = await loginF402(view, {
-      credentials: resolveF402Credentials(ENV),
-      env: ENV,
+      credentials: resolveF402Credentials(TEST_CREDS),
       baseUrl: "https://www.fantasy402.com",
       hydrationMs: 0,
       sleep: noSleep,
@@ -101,8 +90,7 @@ describe("F402 login", () => {
       },
     });
     const outcome = await loginF402(view, {
-      credentials: resolveF402Credentials(ENV),
-      env: ENV,
+      credentials: resolveF402Credentials(TEST_CREDS),
       hydrationMs: 0,
       sleep: noSleep,
     });
@@ -118,9 +106,8 @@ describe("F402 login", () => {
     });
     await expect(
       loginF402(view, {
-        credentials: resolveF402Credentials(ENV),
+        credentials: resolveF402Credentials(TEST_CREDS),
         env: {
-          ...ENV,
           F402_LOGIN_USER_SELECTOR: "#agent",
           F402_LOGIN_PASS_SELECTOR: "#pin",
         },
@@ -146,23 +133,29 @@ describe("F402 credential sources", () => {
     },
   };
 
-  test("environment variables win over the credential store", async () => {
-    const credentials = await loadF402Credentials(ENV, secrets);
-    expect(credentials.agentId).toBe(ENV.F402_AGENT_ID);
-    expect(credentials.password).toBe(ENV.F402_PASSWORD);
-  });
-
-  test("falls back to the credential store when env is incomplete", async () => {
+  test("keychain wins over env without ALLOW flag", async () => {
     const credentials = await loadF402Credentials(
-      { F402_AGENT_ID: "from-env" },
+      {
+        F402_AGENT_ID: "from-env",
+        F402_PASSWORD: "env-secret",
+      },
       secrets,
     );
-    expect(credentials.agentId).toBe("from-env");
+    expect(credentials.agentId).toBe("keychain-agent");
     expect(credentials.password).toBe("keychain-secret");
+  });
 
-    const both = await loadF402Credentials({}, secrets);
-    expect(both.agentId).toBe("keychain-agent");
-    expect(both.password).toBe("keychain-secret");
+  test("deprecated env only when F402_ALLOW_ENV_CREDENTIALS=1", async () => {
+    const credentials = await loadF402Credentials(
+      {
+        F402_ALLOW_ENV_CREDENTIALS: "1",
+        F402_AGENT_ID: "from-env",
+        F402_PASSWORD: "env-secret",
+      },
+      null,
+    );
+    expect(credentials.agentId).toBe("from-env");
+    expect(credentials.password).toBe("env-secret");
   });
 
   test("treats a failing store as absent and never leaks values", async () => {

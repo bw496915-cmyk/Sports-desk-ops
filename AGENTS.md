@@ -29,7 +29,7 @@ green badge does not exist; the local chain _is_ the proof.
 
 `lib/` (ingestion, settlement, combo identity, venue stores) · `bin/` (dx, linters) ·
 `tests/` (84 files) plus **colocated tests in `lib/` and `scripts/`** (~55 more — CI only runs
-`tests/`, so run `bun test` before pushing) · `packages/` · `functions/` · `migrations/` ·
+`tests/`, so run `bun test` before pushing) · `packages/` · `design/` · `schema/` · `infra/` ·
 `docs/` · root runbooks (runtime shapes, guardrails, token architecture, R2/API, VPS domain).
 
 ## Hard rules

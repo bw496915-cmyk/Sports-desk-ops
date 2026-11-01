@@ -89,8 +89,9 @@ export function listListAgentsCandidatesFromHar(
     const status = responseStatus(obj);
     if (status !== 200) continue;
 
-    const content = (obj.response as { content?: { text?: string } } | undefined)
-      ?.content;
+    const content = (
+      obj.response as { content?: { text?: string } } | undefined
+    )?.content;
     const bodyText = content?.text;
     if (typeof bodyText !== "string" || bodyText.trim() === "") continue;
     if (!hasStrictEnvelopeKeys(bodyText)) continue;
@@ -101,9 +102,10 @@ export function listListAgentsCandidatesFromHar(
 }
 
 /** Last qualifying list-agents response (boot retries; final tree wins). */
-export function pickListAgentsEnvelopeFromHar(
-  harRoot: unknown,
-): { readonly envelope: ListAgentsByAgentEnvelope; readonly url: string } {
+export function pickListAgentsEnvelopeFromHar(harRoot: unknown): {
+  readonly envelope: ListAgentsByAgentEnvelope;
+  readonly url: string;
+} {
   const hits = listListAgentsCandidatesFromHar(harRoot);
   if (hits.length === 0) {
     throw new Error(

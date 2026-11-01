@@ -18,11 +18,13 @@ export function postDataDeclaresListAgentsOperation(
     if (typeof text === "string" && text !== "") {
       return postDataDeclaresListAgentsOperation(text);
     }
-    const params = (postData as { params?: readonly { name?: string; value?: string }[] })
-      .params;
+    const params = (
+      postData as { params?: readonly { name?: string; value?: string }[] }
+    ).params;
     if (Array.isArray(params)) {
       for (const p of params) {
-        if (p.name === "operation" && p.value === LIST_AGENTS_OPERATION) return true;
+        if (p.name === "operation" && p.value === LIST_AGENTS_OPERATION)
+          return true;
       }
     }
   }

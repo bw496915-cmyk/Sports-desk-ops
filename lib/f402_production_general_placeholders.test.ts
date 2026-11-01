@@ -19,9 +19,9 @@ describe("applyProductionGeneralPlaceholders", () => {
     expect(trimPaddedField(out[1]?.Login)).toBe("AGENT_L1_N1");
     expect(trimPaddedField(out[2]?.Login)).toBe("AGENT_L2_N0");
     for (const row of out) {
-      expect(PRODUCTION_AGENT_PLACEHOLDER.test(trimPaddedField(row.Login))).toBe(
-        true,
-      );
+      expect(
+        PRODUCTION_AGENT_PLACEHOLDER.test(trimPaddedField(row.Login)),
+      ).toBe(true);
     }
   });
 
@@ -47,12 +47,16 @@ describe("applyProductionGeneralPlaceholders", () => {
       { AgentID: "X ", Login: "X", Level: 1, AgentType: "M", SeqNumber: 1 },
     ];
     const placeholder = applyProductionGeneralPlaceholders(original);
-    expect(generalRowsDifferOnlyInAgentLabels(original, placeholder)).toBe(true);
+    expect(generalRowsDifferOnlyInAgentLabels(original, placeholder)).toBe(
+      true,
+    );
   });
 });
 
 describe("replacePaddedWireLabel", () => {
   test("keeps trailing space count", () => {
-    expect(replacePaddedWireLabel("AGENT_L1_N0", "USER667  ")).toBe("AGENT_L1_N0  ");
+    expect(replacePaddedWireLabel("AGENT_L1_N0", "USER667  ")).toBe(
+      "AGENT_L1_N0  ",
+    );
   });
 });

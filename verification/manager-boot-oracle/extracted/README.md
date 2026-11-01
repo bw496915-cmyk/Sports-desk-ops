@@ -3,12 +3,12 @@
 Source: `app/manager/manager.js?bust=1.0.280`, SHA-256
 `82c3d4ec9b5d0531b06219761f0b40db20bf07f4f4250eacdabf527e90e01937`.
 
-| File | Portal method | Bytes (body) |
-|------|---------------|-------------|
-| `baseHeriarchy.body.js` | `baseHeriarchy` | full `name:function(e){…}` slice |
-| `buildTree.body.js` | `buildTree` | 286 |
-| `findInTree.body.js` | `findInTree` | 87 |
-| `setCompleteHeriarchy.body.js` | `setCompleteHeriarchy` | 1885 |
+| File                           | Portal method          | Bytes (body)                     |
+| ------------------------------ | ---------------------- | -------------------------------- |
+| `baseHeriarchy.body.js`        | `baseHeriarchy`        | full `name:function(e){…}` slice |
+| `buildTree.body.js`            | `buildTree`            | 286                              |
+| `findInTree.body.js`           | `findInTree`           | 87                               |
+| `setCompleteHeriarchy.body.js` | `setCompleteHeriarchy` | 1885                             |
 
 Regenerate after bust drift: run `pinned/fetch-pinned-bundles.sh`, re-slice with
 `verification/manager-boot-oracle/slice-methods.mjs`, update `extracted/*` hashes in

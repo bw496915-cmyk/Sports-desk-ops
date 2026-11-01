@@ -29,11 +29,11 @@ Options:
 
 Examples:
   bun run secrets:f402 status
-  printf '%s\\n' "$F402_PASSWORD" | bun run secrets:f402 set --agent-id 118
+  op read "op://Private/f402/password" | bun run secrets:f402 set --agent-id 118
   op read "op://Private/f402/password" | bun run secrets:f402 set --agent-id 118
   bun run secrets:f402 delete
 
-env F402_AGENT_ID / F402_PASSWORD still win over the store, so a one-off override never touches it.
+Capture login reads the store via lib/f402_credentials_policy.ts (not F402_PASSWORD in env).
 `.trim();
 
 async function readLine(): Promise<string> {

@@ -10,7 +10,7 @@ cp "$gen" "$bak"
 restore() {
   cp "$bak" "$gen"
   rm -f "$bak"
-  git -C "$root" checkout HEAD -- domain-branded-types.ts 2>/dev/null || true
+  git -C "$root" checkout HEAD -- design/domain-branded-types.ts 2>/dev/null || true
 }
 trap restore EXIT
 

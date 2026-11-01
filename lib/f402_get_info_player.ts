@@ -51,7 +51,9 @@ export function trimPaddedId(raw: string | undefined): string {
   return (raw ?? "").trim();
 }
 
-export function parseGetInfoPlayerEnvelope(raw: unknown): GetInfoPlayerEnvelope {
+export function parseGetInfoPlayerEnvelope(
+  raw: unknown,
+): GetInfoPlayerEnvelope {
   if (typeof raw !== "object" || raw === null)
     throw new Error("getInfoPlayer envelope must be an object");
   const info = (raw as { INFO?: unknown }).INFO;

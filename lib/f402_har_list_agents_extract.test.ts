@@ -47,8 +47,12 @@ describe("listListAgentsCandidatesFromHar", () => {
     const har = {
       log: {
         entries: [
-          harEntry({ body: { GENERAL: [{ Level: 1 }], PLAYERS: [], EXTRA: false } }),
-          harEntry({ body: { GENERAL: [{ Level: 2 }], PLAYERS: [], EXTRA: true } }),
+          harEntry({
+            body: { GENERAL: [{ Level: 1 }], PLAYERS: [], EXTRA: false },
+          }),
+          harEntry({
+            body: { GENERAL: [{ Level: 2 }], PLAYERS: [], EXTRA: true },
+          }),
         ],
       },
     };

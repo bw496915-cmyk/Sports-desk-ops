@@ -51,8 +51,8 @@ describe("pending delete batch", () => {
     ];
     const rows = parsePendingDeleteBatchRows(raw);
     expect(rows[0]?.ticketNumber).toBe("99");
-    expect(
-      redactPendingDeletePreview('{"Password":"secret"}'),
-    ).toContain("<redacted>");
+    expect(redactPendingDeletePreview('{"Password":"secret"}')).toContain(
+      "<redacted>",
+    );
   });
 });

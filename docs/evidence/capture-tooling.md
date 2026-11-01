@@ -13,6 +13,7 @@ of it still cannot be applied to this release.
   release-baseline dependency that blocks `--write` today.
 - **Related docs:** [EVIDENCE.md](../EVIDENCE.md) (tier model) ·
   [capture-requests.md](./capture-requests.md) (what to capture) ·
+  [manager-boot-hierarchy.md](./manager-boot-hierarchy.md) · [manager-boot-primary-sources.md](./manager-boot-primary-sources.md) ·
   [ledger.json](./ledger.json) (machine-readable evidence).
 
 ---

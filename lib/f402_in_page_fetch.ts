@@ -76,8 +76,7 @@ function sharedRedactedRequestFields(
   options: RedactedDevToolsRequestOptions,
 ): Record<string, string> {
   const origin = new URL(options.baseUrl).origin;
-  const referer =
-    options.refererPath ?? `${origin}/manager.html?v=<session>`;
+  const referer = options.refererPath ?? `${origin}/manager.html?v=<session>`;
   return {
     accept: F402_WIRE_ACCEPT,
     "accept-encoding": F402_ACCEPT_ENCODING_BROWSER_DEFAULT,
@@ -99,9 +98,7 @@ export function redactedRequestHeaderProtocolVariants(
   options: RedactedDevToolsRequestOptions,
 ): RequestHeaderProtocolVariants {
   const authority = new URL(options.baseUrl).host;
-  const path = options.path.startsWith("/")
-    ? options.path
-    : `/${options.path}`;
+  const path = options.path.startsWith("/") ? options.path : `/${options.path}`;
   const shared = sharedRedactedRequestFields(options);
   return {
     http2: {

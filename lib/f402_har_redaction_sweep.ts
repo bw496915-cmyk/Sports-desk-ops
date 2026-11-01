@@ -4,7 +4,8 @@
 
 import { PRODUCTION_PASSWORD_SENTINEL } from "./f402_production_fixture_redaction.ts";
 
-export const F402_HAR_REDACTION_SWEEP_FAILED = "F402_HAR_REDACTION_SWEEP_FAILED";
+export const F402_HAR_REDACTION_SWEEP_FAILED =
+  "F402_HAR_REDACTION_SWEEP_FAILED";
 
 export interface HarRedactionSweepViolation {
   readonly code: string;

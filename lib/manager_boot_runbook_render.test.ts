@@ -7,9 +7,12 @@ import {
 
 describe("manager_boot_runbook_render", () => {
   test("render applies heading and strong hooks", () => {
-    const out = renderManagerBootRunbookTerminal("# Title\n\n**gate** wired\n", {
-      colors: true,
-    });
+    const out = renderManagerBootRunbookTerminal(
+      "# Title\n\n**gate** wired\n",
+      {
+        colors: true,
+      },
+    );
     expect(out).toContain("Title");
     expect(out).toContain("gate");
     expect(out).toContain("\x1b[");
@@ -26,6 +29,8 @@ describe("manager_boot_runbook_render", () => {
 
   test("operator appendix documents probe and ingest", () => {
     expect(MANAGER_BOOT_OPERATOR_APPENDIX).toContain("probe:parse-tree");
-    expect(MANAGER_BOOT_OPERATOR_APPENDIX).toContain("manager:ingest-hierarchy");
+    expect(MANAGER_BOOT_OPERATOR_APPENDIX).toContain(
+      "manager:ingest-hierarchy",
+    );
   });
 });

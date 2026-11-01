@@ -1,21 +1,22 @@
 # Repository layout (root)
 
-The root keeps **SSOT config**, **workspace metadata**, and **operator shortcuts**. Executable code lives in subdirectories.
+The root holds **workspace metadata** and **operator entrypoints**. Code and SSOT live in subdirectories.
 
-| Path | Purpose |
-| ---- | ------- |
-| `cli/` | All `sportsdesk_*_cli.ts` entrypoints ([cli/README.md](cli/README.md)) |
-| `services/` | Daemon, bot, R2, churn engine, ingestion ([services/README.md](services/README.md)) |
-| `catalog/` | Fantasy402 sport navigation catalog ([catalog/README.md](catalog/README.md)) |
-| `lib/` | Shared modules, F402 probes, schema, capture |
-| `scripts/` | Generators, capture tooling, audits; deploy scripts in `scripts/deploy/` |
-| `static/` | Token-compiled daemon HTML dashboards |
-| `docs/` | Evidence-labelled API docs, operator runbooks under `docs/runbooks/` |
-| `tests/` | Bun test suites |
-| `bin/dx` | Primary operator wrapper (status, deploy, modes, backtest) |
-| `domain-branded-types.ts` | Generated branded types (`bun run gen:tokens`) |
-| `tokens.toml` | Design token SSOT |
-| `package.json` | Scripts map to `cli/` and `services/` paths |
+| Path        | Purpose                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| `cli/`      | All `sportsdesk_*_cli.ts` entrypoints ([cli/README.md](cli/README.md))                     |
+| `services/` | Daemon, bot, R2, churn engine, ingestion ([services/README.md](services/README.md))        |
+| `catalog/`  | Fantasy402 sport navigation catalog ([catalog/README.md](catalog/README.md))               |
+| `design/`   | `tokens.toml` + generated `domain-branded-types.ts` ([design/README.md](design/README.md)) |
+| `lib/`      | Shared modules; token math in `lib/validation/`                                            |
+| `schema/`   | Migrations, local manifest, schema preload ([schema/README.md](schema/README.md))          |
+| `infra/`    | Pages `_headers` for docs deploy ([infra/README.md](infra/README.md))                      |
+| `types/`    | Ambient `env.d.ts` ([types/README.md](types/README.md))                                    |
+| `scripts/`  | Generators, capture, audits; `scripts/deploy/` for VPS/docs/reports                        |
+| `static/`   | Token-compiled daemon HTML dashboards                                                      |
+| `docs/`     | Evidence portal; `docs/runbooks/`; `docs/provenance/`                                      |
+| `tests/`    | Bun test suites                                                                            |
+| `bin/dx`    | Primary operator wrapper                                                                   |
 
 **Deploy & reports**
 

@@ -46,7 +46,9 @@ export function applyProductionGeneralPlaceholders(
     const agentIdWasBlank = trimPaddedField(row.AgentID) === "";
     return {
       ...row,
-      ...(loginWasBlank ? {} : { Login: replacePaddedWireLabel(token, row.Login) }),
+      ...(loginWasBlank
+        ? {}
+        : { Login: replacePaddedWireLabel(token, row.Login) }),
       ...(agentIdWasBlank
         ? {}
         : { AgentID: replacePaddedWireLabel(token, row.AgentID) }),

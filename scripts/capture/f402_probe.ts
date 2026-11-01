@@ -17,7 +17,7 @@
  * - `--sniff-requests`: Installs an in-page `XMLHttpRequest` + `fetch` interceptor on WebKit (and
  *   additionally subscribes to CDP `Network.requestWillBeSent` on Chrome) to record `/cloud/api/`
  *   form-field or JSON key templates (`_sniffed_form_templates.json`, values never recorded).
- * - `--screenshot` / `--screenshot-format <png|jpeg|webp>` / `--screenshot-resize <WxH|W>`:
+ * - `--screenshot` / `--screenshot-format` / `--screenshot-resize` / `--screenshot-rotate`:
  *   Captures a viewport proof screenshot formatted and resized in-memory via `Bun.Image`
  *   (`lib/screenshot_encode.ts`), so WebP and resizing work natively on WebKit.
  * - `--promote-dir <dir>`: Converts 2xx read-only probes into value-free, redacted `CaptureStore`
@@ -308,9 +308,7 @@ async function main(): Promise<number> {
           withoutEnlargement: true,
         };
   const screenshotRotate =
-    screenshotRotateRaw === ""
-      ? undefined
-      : parseRotate(screenshotRotateRaw);
+    screenshotRotateRaw === "" ? undefined : parseRotate(screenshotRotateRaw);
 
   const waitFor = flagValue(parsed, "--wait-for", "");
   const explicitBody = flagValue(parsed, "--body", "");

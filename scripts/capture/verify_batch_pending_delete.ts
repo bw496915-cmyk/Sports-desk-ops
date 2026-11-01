@@ -61,7 +61,8 @@ const summary = (await Bun.file(summaryPath).json()) as {
 };
 
 if (summary.schemaVersion !== 2) fail(`schemaVersion ${summary.schemaVersion}`);
-if (summary.mode !== "single-webview-pending-delete") fail(`mode ${summary.mode}`);
+if (summary.mode !== "single-webview-pending-delete")
+  fail(`mode ${summary.mode}`);
 if (!summary.outDir || summary.outDir.length === 0) fail("missing outDir");
 if (!Array.isArray(summary.results) || summary.results.length === 0) {
   fail("empty results");
@@ -70,14 +71,16 @@ if (!Array.isArray(summary.results) || summary.results.length === 0) {
 const runFile = Bun.file(join(summary.outDir, "run.json"));
 if (!(await runFile.exists())) fail(`missing ${summary.outDir}/run.json`);
 const run = (await runFile.json()) as { mode?: string; ticketCount?: number };
-if (run.mode !== "single-webview-pending-delete") fail("run.json mode mismatch");
+if (run.mode !== "single-webview-pending-delete")
+  fail("run.json mode mismatch");
 if (run.ticketCount !== summary.total) {
   fail(`ticketCount ${run.ticketCount} !== summary.total ${summary.total}`);
 }
 
 let artifactMismatch = 0;
 for (const row of summary.results) {
-  if (row.error) fail(`row error ${row.customerId} ${row.ticketNumber}: ${row.error}`);
+  if (row.error)
+    fail(`row error ${row.customerId} ${row.ticketNumber}: ${row.error}`);
   if (row.status < 200 || row.status >= 300) {
     fail(`bad status ${row.status} for ${row.ticketNumber}`);
   }
@@ -104,7 +107,9 @@ for (const row of summary.results) {
   if (row.pendingCount === 0 && !/"Pending"\s*:\s*\[\s*\]/.test(preview)) {
     // allow truncated preview with tickets
     if (countPendingInResponseText(preview) !== 0) {
-      fail(`pendingCount=0 but preview suggests pending for ${row.ticketNumber}`);
+      fail(
+        `pendingCount=0 but preview suggests pending for ${row.ticketNumber}`,
+      );
     }
   }
   artifactMismatch++;

@@ -10,10 +10,9 @@ export const LIST_AGENTS_ENVELOPE_KEYS = [
 
 export type ListAgentsEnvelopeKey = (typeof LIST_AGENTS_ENVELOPE_KEYS)[number];
 
-export function assertListAgentsTopLevelKeys(raw: unknown): asserts raw is Record<
-  ListAgentsEnvelopeKey,
-  unknown
-> {
+export function assertListAgentsTopLevelKeys(
+  raw: unknown,
+): asserts raw is Record<ListAgentsEnvelopeKey, unknown> {
   if (typeof raw !== "object" || raw === null) {
     throw new Error(
       "getListAgenstByAgent response must be a JSON object (not empty HTML or error wrapper)",

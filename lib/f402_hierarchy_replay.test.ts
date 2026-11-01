@@ -25,7 +25,12 @@ describe("f402 hierarchy replay scaffolding", () => {
 
   test("strict envelope keys reject login HTML wrapper", () => {
     expect(() =>
-      assertListAgentsTopLevelKeys({ GENERAL: [], PLAYERS: [], EXTRA: true, error: 1 }),
+      assertListAgentsTopLevelKeys({
+        GENERAL: [],
+        PLAYERS: [],
+        EXTRA: true,
+        error: 1,
+      }),
     ).toThrow(/exactly \{GENERAL, PLAYERS, EXTRA\}/);
   });
 

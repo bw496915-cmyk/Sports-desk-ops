@@ -3,7 +3,7 @@ import {
   isSha256Hex,
   sha256HexFromDigest,
   isoDateTimeUtc,
-} from "../domain-branded-types.ts";
+} from "../design/domain-branded-types.ts";
 import { sha256Bytes } from "../lib/schema_binary.ts";
 
 describe("domain hash brands", () => {

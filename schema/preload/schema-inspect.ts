@@ -13,7 +13,11 @@
  */
 
 import { buildSqliteSchemaReport } from "../../lib/schema_report.ts";
-import { inspectColumns, inspectKeys, inspectSummary } from "../../lib/inspect.ts";
+import {
+  inspectColumns,
+  inspectKeys,
+  inspectSummary,
+} from "../../lib/inspect.ts";
 
 const report = buildSqliteSchemaReport();
 

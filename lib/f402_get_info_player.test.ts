@@ -42,8 +42,6 @@ describe("getInfoPlayer envelope", () => {
   });
 
   test("rejects missing INFO.data", () => {
-    expect(() => parseGetInfoPlayerEnvelope({ INFO: {} })).toThrow(
-      "INFO.data",
-    );
+    expect(() => parseGetInfoPlayerEnvelope({ INFO: {} })).toThrow("INFO.data");
   });
 });

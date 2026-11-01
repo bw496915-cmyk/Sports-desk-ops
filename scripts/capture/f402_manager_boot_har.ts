@@ -47,8 +47,7 @@ const base = (Bun.env.F402_BASE_URL ?? "https://www.fantasy402.com").replace(
   /\/$/,
   "",
 );
-const startUrl =
-  values.url?.trim() || `${base}/manager/manager.html`;
+const startUrl = values.url?.trim() || `${base}/manager/manager.html`;
 const profile = values.profile?.trim() || resolveF402WebViewProfileDir();
 const defaultHar = join(
   REPO_ROOT,
@@ -56,7 +55,8 @@ const defaultHar = join(
 );
 const outPath = values.out?.trim() || defaultHar;
 const proofPath =
-  values.proof?.trim() || `${outPath.replace(/\.har\.json$/i, "")}.redaction-proof.json`;
+  values.proof?.trim() ||
+  `${outPath.replace(/\.har\.json$/i, "")}.redaction-proof.json`;
 const waitMs = Number(values.waitMs ?? "45000");
 
 interface HarEntry {
@@ -101,7 +101,10 @@ view.onCdpEvent<{
 }>("Network.responseReceived", (event) => {
   const url = event.response?.url ?? "";
   if (!url.includes("/cloud/api/Manager/")) return;
-  if (url.includes("getListAgenstByAgent") || url.includes("getListAgentByAgent")) {
+  if (
+    url.includes("getListAgenstByAgent") ||
+    url.includes("getListAgentByAgent")
+  ) {
     listAgentsCaptured = true;
   }
   void (async () => {

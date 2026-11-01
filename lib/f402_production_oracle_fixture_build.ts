@@ -46,7 +46,10 @@ export async function assertProductionFixtureOracleLabelEquivalenceOnEnvelope(
   envelope: ListAgentsByAgentEnvelope,
 ): Promise<void> {
   const general = applyProductionGeneralPlaceholders(envelope.GENERAL);
-  await assertOracleEquivalentAfterGeneralPlaceholder(envelope.GENERAL, general);
+  await assertOracleEquivalentAfterGeneralPlaceholder(
+    envelope.GENERAL,
+    general,
+  );
 }
 
 export async function assertProductionFixtureOracleLabelEquivalence(

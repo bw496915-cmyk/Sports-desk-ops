@@ -48,15 +48,16 @@ const targetsPath = flag(
   "scratch/f402-deleted-wagers/probe-targets.json",
 );
 const limitIdx = args.indexOf("--limit");
-const limit =
-  limitIdx === -1 ? 9999 : Number(args[limitIdx + 1] ?? "9999");
+const limit = limitIdx === -1 ? 9999 : Number(args[limitIdx + 1] ?? "9999");
 const effectiveLimit = Number.isFinite(limit) && limit > 0 ? limit : 9999;
 const outRoot = flag("--out", "scratch/f402-probes");
 const backend = flag("--backend", "webkit") === "chrome" ? "chrome" : "webkit";
 const profile = flag("--profile", "scratch/webview-profile");
 const prefix = flag("--prefix", "/cloud/api/Report");
-const base =
-  flag("--base", process.env.F402_BASE_URL?.trim() || "https://fantasy402.com");
+const base = flag(
+  "--base",
+  process.env.F402_BASE_URL?.trim() || "https://fantasy402.com",
+);
 
 interface TargetsFile {
   targets: DeletedWagerTicketTarget[];
@@ -93,10 +94,11 @@ export async function runBatchPendingDeleteSession(options?: {
   ms: number;
 }> {
   const t0 = Bun.nanoseconds();
-  const targetsFile = (await Bun.file(join(root, targetsPath)).json()) as TargetsFile;
+  const targetsFile = (await Bun.file(
+    join(root, targetsPath),
+  ).json()) as TargetsFile;
   const targets =
-    options?.targets ??
-    targetsFile.targets.slice(0, effectiveLimit);
+    options?.targets ?? targetsFile.targets.slice(0, effectiveLimit);
 
   let agentId = await resolveAgentId();
   const op = pendingDeleteProbeOp();
@@ -156,8 +158,7 @@ export async function runBatchPendingDeleteSession(options?: {
     await view.evaluate(buildReportCustomerContextExpression(customerId));
 
     const items = buildPendingDeleteBodies(agentId, customerId, tickets);
-    const wireContentType =
-      op.wireContentType ?? F402_FORM_WIRE_CONTENT_TYPE;
+    const wireContentType = op.wireContentType ?? F402_FORM_WIRE_CONTENT_TYPE;
     const raw = await view.evaluate(
       buildBatchPendingDeleteExpression(url, items, wireContentType),
     );
@@ -174,7 +175,9 @@ export async function runBatchPendingDeleteSession(options?: {
           pendingCount: 0,
           bytes: 0,
           error:
-            error instanceof Error ? error.message : "batch evaluate parse failed",
+            error instanceof Error
+              ? error.message
+              : "batch evaluate parse failed",
         });
       }
       continue;
@@ -284,9 +287,12 @@ export async function main(): Promise<number> {
 
   const withPending = results.filter((r) => r.pendingCount > 0);
   const emptyPending = results.filter(
-    (r) => !r.error && r.status >= 200 && r.status < 300 && r.pendingCount === 0,
+    (r) =>
+      !r.error && r.status >= 200 && r.status < 300 && r.pendingCount === 0,
   );
-  const failed = results.filter((r) => r.error || r.status < 200 || r.status >= 300);
+  const failed = results.filter(
+    (r) => r.error || r.status < 200 || r.status >= 300,
+  );
 
   const summary = {
     schemaVersion: 2,

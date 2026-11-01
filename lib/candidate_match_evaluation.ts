@@ -22,7 +22,7 @@ import {
   hashEvaluationResult,
   serializeMatchEvaluationResult,
 } from "./match_evaluation_canonical.ts";
-import type { Sha256Hex } from "../domain-branded-types.ts";
+import type { Sha256Hex } from "../design/domain-branded-types.ts";
 import {
   auditRunAt,
   type AuditRunId,

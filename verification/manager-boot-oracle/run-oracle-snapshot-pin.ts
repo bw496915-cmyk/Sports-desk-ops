@@ -36,7 +36,9 @@ if (values.help) {
   process.exit(0);
 }
 
-const manifest = (await Bun.file(MANIFEST).json()) as PinnedManifestWithExtracted;
+const manifest = (await Bun.file(
+  MANIFEST,
+).json()) as PinnedManifestWithExtracted;
 const rel =
   values.fixture?.trim() || manifest.productionOracleGate?.generalFixture || "";
 if (rel === "") {
@@ -46,7 +48,9 @@ if (rel === "") {
 
 const fixturePath = join(REPO, rel);
 if (!(await Bun.file(fixturePath).exists())) {
-  console.error(JSON.stringify({ signal: "F402_PIN_FIXTURE_MISSING", fixture: rel }));
+  console.error(
+    JSON.stringify({ signal: "F402_PIN_FIXTURE_MISSING", fixture: rel }),
+  );
   process.exit(1);
 }
 

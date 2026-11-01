@@ -44,7 +44,9 @@ export interface HierarchyReplayPlan {
   readonly bodyRecord: Record<string, string>;
 }
 
-export function loadAccountInfoOwnerFixture(raw: unknown): AccountInfoOwnerFixture {
+export function loadAccountInfoOwnerFixture(
+  raw: unknown,
+): AccountInfoOwnerFixture {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("account fixture must be an object");
   }
@@ -58,7 +60,8 @@ export function loadAccountInfoOwnerFixture(raw: unknown): AccountInfoOwnerFixtu
   const agentType = String(
     (accountInfo as Record<string, unknown>).AgentType ?? "",
   ).trim();
-  if (agentType === "") throw new Error("account fixture missing accountInfo.AgentType");
+  if (agentType === "")
+    throw new Error("account fixture missing accountInfo.AgentType");
   return {
     agentID,
     accountInfo: accountInfo as AccountInfoOwnerFixture["accountInfo"],
@@ -69,7 +72,8 @@ export function loadListAgentsRequestFixture(
   raw: unknown,
 ): ListAgentsRequestFixture {
   if (raw === undefined || raw === null) return {};
-  if (typeof raw !== "object") throw new Error("list-agents body fixture must be an object");
+  if (typeof raw !== "object")
+    throw new Error("list-agents body fixture must be an object");
   return raw as ListAgentsRequestFixture;
 }
 
@@ -163,7 +167,10 @@ export async function fetchListAgentsEnvelope(
 
 export async function runHierarchyOracleOnEnvelope(
   envelope: ListAgentsByAgentEnvelope,
-): Promise<{ readonly generalLength: number; readonly oracleSnapshot: string }> {
+): Promise<{
+  readonly generalLength: number;
+  readonly oracleSnapshot: string;
+}> {
   const result = await runPortalHierarchyOracle(
     envelope.GENERAL as PortalGeneralRow[],
     { runSetComplete: true },
@@ -177,7 +184,10 @@ export async function runHierarchyOracleOnEnvelope(
 /** Parse at wire boundary, then oracle (for fixture text / one-off callers). */
 export async function runHierarchyOracleOnEnvelopeText(
   envelopeText: string,
-): Promise<{ readonly generalLength: number; readonly oracleSnapshot: string }> {
+): Promise<{
+  readonly generalLength: number;
+  readonly oracleSnapshot: string;
+}> {
   return runHierarchyOracleOnEnvelope(
     parseListAgentsByAgentWireText(envelopeText),
   );
@@ -189,7 +199,10 @@ export interface HierarchyReplayOutcome {
   readonly mode: HierarchyReplayMode;
   readonly plan: HierarchyReplayPlan;
   readonly envelopeText?: string;
-  readonly oracle?: { readonly generalLength: number; readonly oracleSnapshot: string };
+  readonly oracle?: {
+    readonly generalLength: number;
+    readonly oracleSnapshot: string;
+  };
 }
 
 export async function runHierarchyReplay(options: {

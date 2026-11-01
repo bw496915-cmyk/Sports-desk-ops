@@ -25,7 +25,7 @@ import {
   padCustomerIdCanonical,
   customerIdentifier,
   agentIdentifier,
-} from "../domain-branded-types.ts";
+} from "../design/domain-branded-types.ts";
 
 export const PlayerMutationResultCode = {
   SUCCESS: 1,

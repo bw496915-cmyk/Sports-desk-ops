@@ -77,7 +77,7 @@ describe("customer-admin async partial URLs", () => {
     const expr = buildLoadCustomerAdminPartialExpression(
       "https://www.fantasy402.com/app/ui/component/manager/module/customer-admin/player-info.html?v=1&async=true",
     );
-    expect(expr).toContain("credentials: \"include\"");
+    expect(expr).toContain('credentials: "include"');
     expect(expr).toContain("*/*");
     expect(expr).toContain("XMLHttpRequest");
   });

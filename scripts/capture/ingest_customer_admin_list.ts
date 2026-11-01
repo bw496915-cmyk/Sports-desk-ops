@@ -55,7 +55,11 @@ async function main(): Promise<void> {
 
   await mkdir(dirname(outRedacted), { recursive: true });
   await mkdir(dirname(outSummary), { recursive: true });
-  await writeFile(outRedacted, `${JSON.stringify(redacted, null, 2)}\n`, "utf8");
+  await writeFile(
+    outRedacted,
+    `${JSON.stringify(redacted, null, 2)}\n`,
+    "utf8",
+  );
   await writeFile(
     outSummary,
     `${JSON.stringify({ schemaVersion: 1, kind: "customer-admin-list-summary", ...summary }, null, 2)}\n`,

@@ -32,8 +32,8 @@ describe("HAR redaction sentinel sweep", () => {
 
   test("fails on raw password", () => {
     const text = '{"Password":"supersecret"}';
-    expect(sweepRedactedCaptureText(text).some((v) => v.code === "password_leak")).toBe(
-      true,
-    );
+    expect(
+      sweepRedactedCaptureText(text).some((v) => v.code === "password_leak"),
+    ).toBe(true);
   });
 });

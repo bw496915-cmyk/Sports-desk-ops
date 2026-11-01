@@ -149,13 +149,6 @@ export async function refreshF402Session(
       "F402 live login disabled (set F402_LIVE_LOGIN=1 to allow one WebView login)",
     );
   }
-  const agentId = env["F402_AGENT_ID"]?.trim() ?? "";
-  const password = env["F402_PASSWORD"]?.trim() ?? "";
-  if (agentId === "" || password === "") {
-    throw new Error(
-      "F402 live login requires F402_AGENT_ID and F402_PASSWORD (values not logged)",
-    );
-  }
   const baseUrl = (
     env["F402_BASE_URL"]?.trim() || "https://www.fantasy402.com"
   ).replace(/\/$/, "");

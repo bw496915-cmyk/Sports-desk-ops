@@ -26,9 +26,9 @@ export const PROBE_HOST = (
 export const MANAGER_RRO = Number(Bun.env.F402_RRO ?? Bun.env.RRO ?? 1);
 
 /** Query bust for live fetches; drift logging uses manifest SHA-256 (see `recordBustDrift`). */
-export const PINNED_MANAGER_BUST = Bun.env.F402_PINNED_MANAGER_BUST ?? "1.0.280";
+export const PINNED_MANAGER_BUST =
+  Bun.env.F402_PINNED_MANAGER_BUST ?? "1.0.280";
 
-export const CAPTURE_LOG_PATH =
-  Bun.env.F402_CAPTURE_LOG?.trim() || "";
+export const CAPTURE_LOG_PATH = Bun.env.F402_CAPTURE_LOG?.trim() || "";
 
 export const AUDIT_DB_PATH = Bun.env.F402_AUDIT_DB?.trim() || "";

@@ -39,9 +39,7 @@ describe("f402_sqlite_agents_ingest", () => {
 
       const db = openSportsdeskSqlite(dbPath, { readonly: true });
       const level2 = db
-        .query(
-          `SELECT agent_id, parent_id FROM agents WHERE level = 2 LIMIT 1`,
-        )
+        .query(`SELECT agent_id, parent_id FROM agents WHERE level = 2 LIMIT 1`)
         .get() as { agent_id: string; parent_id: string | null };
       expect(level2.parent_id).toBeString();
       const parent = db

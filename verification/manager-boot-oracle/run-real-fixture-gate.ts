@@ -19,7 +19,9 @@ import type { PinnedManifestWithExtracted } from "../../lib/f402_portal_oracle_s
 
 const REPO = join(import.meta.dir, "../..");
 const MANIFEST = join(import.meta.dir, "pinned/manifest.json");
-const manifest = (await Bun.file(MANIFEST).json()) as PinnedManifestWithExtracted;
+const manifest = (await Bun.file(
+  MANIFEST,
+).json()) as PinnedManifestWithExtracted;
 const gate = manifest.productionOracleGate;
 
 if (gate === undefined) {
@@ -34,7 +36,8 @@ const harDerived = await deriveHarRedactionProofGate(REPO, manifest);
 if (harDerived.phase !== "ready" && derived.phase !== "ready") {
   emitGateBlocked("F402_PRODUCTION_ORACLE_GATE_BLOCKED", {
     reason: "har_redaction_proof_not_ready",
-    prerequisite: "verify:manager-har-redaction-proof (gate i) or envelope redact + snapshot pin (gate j)",
+    prerequisite:
+      "verify:manager-har-redaction-proof (gate i) or envelope redact + snapshot pin (gate j)",
     harPhase: harDerived.phase,
     productionPhase: derived.phase,
     ownerRole: gate.ownerRole,
@@ -63,5 +66,7 @@ if (derived.phase === "invalid") {
   });
 }
 
-console.log("manager-boot-oracle: production GENERAL matches pinned nested snapshot");
+console.log(
+  "manager-boot-oracle: production GENERAL matches pinned nested snapshot",
+);
 process.exit(GATE_EXIT_OK);

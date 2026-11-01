@@ -15,7 +15,9 @@ export function redactUnknown(
   }
   const out: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(value)) {
-    out[key] = SENSITIVE_KEY.test(key) ? "[REDACTED]" : redactUnknown(val, seen);
+    out[key] = SENSITIVE_KEY.test(key)
+      ? "[REDACTED]"
+      : redactUnknown(val, seen);
   }
   return out;
 }

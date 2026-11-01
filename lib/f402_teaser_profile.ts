@@ -32,7 +32,9 @@ export function trimPaddedCustomerId(raw: string | undefined): string {
   return (raw ?? "").trim();
 }
 
-export function parseTeaserProfileEnvelope(raw: unknown): TeaserProfileEnvelope {
+export function parseTeaserProfileEnvelope(
+  raw: unknown,
+): TeaserProfileEnvelope {
   if (typeof raw !== "object" || raw === null)
     throw new Error("teaser profile envelope must be an object");
   const list = (raw as { LIST?: unknown }).LIST;

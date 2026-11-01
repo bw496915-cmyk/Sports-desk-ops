@@ -21,7 +21,7 @@ export function logCaptureEvent(
   event: Record<string, unknown>,
 ): void {
   if (path === undefined || path === "") return;
-  const line = `${JSON.stringify({ ts: Date.now(), ...redactUnknown(event) as Record<string, unknown> })}\n`;
+  const line = `${JSON.stringify({ ts: Date.now(), ...(redactUnknown(event) as Record<string, unknown>) })}\n`;
   captureSink(path).write(line);
 }
 

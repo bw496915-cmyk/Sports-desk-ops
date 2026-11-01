@@ -218,7 +218,8 @@ describe("Webview server Telegram endpoints", () => {
   beforeAll(async () => {
     delete env.TELEGRAM_BOT_TOKEN;
     env.TELEGRAM_WEBHOOK_SECRET = "hook-secret";
-    const { startServer } = await import("../services/sportsdesk_webview_server.ts");
+    const { startServer } =
+      await import("../services/sportsdesk_webview_server.ts");
     server = startServer({ port: 0, hostname: "127.0.0.1" });
     base = `http://127.0.0.1:${server.port}`;
   });

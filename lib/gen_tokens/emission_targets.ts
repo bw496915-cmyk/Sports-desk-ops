@@ -16,7 +16,7 @@ export type GenTokenEmissionTarget = {
 /** Single registry — gate and generator must agree on these paths. */
 export const GEN_TOKEN_EMISSION_TARGETS: readonly GenTokenEmissionTarget[] = [
   {
-    repoPath: "domain-branded-types.ts",
+    repoPath: "design/domain-branded-types.ts",
     mode: "full-from-toml",
     reset: "rm-before-gen",
   },

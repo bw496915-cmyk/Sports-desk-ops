@@ -8,7 +8,7 @@
  */
 
 import { resolve } from "node:path";
-import type { SignalChannelCode } from "../domain-branded-types.ts";
+import type { SignalChannelCode } from "../design/domain-branded-types.ts";
 import {
   ingestionFeedPullExitCode,
   pullIngestionFeedWithProvenance,

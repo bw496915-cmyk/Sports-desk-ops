@@ -28,6 +28,8 @@ describe("diffManifestGateStatuses", () => {
       },
     } as DerivedManagerBootGates;
     const mismatches = diffManifestGateStatuses(manifest, derived);
-    expect(mismatches.some((m) => m.gate === "harRedactionProofGate")).toBe(true);
+    expect(mismatches.some((m) => m.gate === "harRedactionProofGate")).toBe(
+      true,
+    );
   });
 });

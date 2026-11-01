@@ -1,1 +1,7 @@
-{"log":{"entries":[{"response":{"content":{"text":"Bearer eyJhbGciOiJIUzI1NiJ9"}}}]}}
+{
+  "log": {
+    "entries": [
+      { "response": { "content": { "text": "Bearer eyJhbGciOiJIUzI1NiJ9" } } }
+    ]
+  }
+}

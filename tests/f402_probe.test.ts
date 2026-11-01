@@ -84,7 +84,9 @@ describe("f402 probe plan", () => {
     expect(tx.get("customerID")).toBe("__CUSTOMER_ID__");
     expect(tx.get("date")).toBe("__DATE__");
 
-    const infoPlayer = PROBE_OPS.find((op) => op.operation === "getInfoPlayer")!;
+    const infoPlayer = PROBE_OPS.find(
+      (op) => op.operation === "getInfoPlayer",
+    )!;
     const infoBody = new URLSearchParams(
       buildProbeBody(infoPlayer, "BILLY666", "BILLY666"),
     );
@@ -105,7 +107,8 @@ describe("f402 probe plan", () => {
     const customerAdmin = PROBE_OPS.find(
       (op) => op.operation === "getCustomerAdmin",
     );
-    if (!customerAdmin) throw new Error("getCustomerAdmin missing from PROBE_OPS");
+    if (!customerAdmin)
+      throw new Error("getCustomerAdmin missing from PROBE_OPS");
     expect(
       new URLSearchParams(buildProbeBody(customerAdmin, "BILLY666")).toString(),
     ).toBe(
@@ -126,9 +129,13 @@ describe("f402 probe plan", () => {
       (op) => op.operation === "getConfigWebReportsCustomerAdmin",
     );
     if (!configReportsAdmin)
-      throw new Error("getConfigWebReportsCustomerAdmin missing from PROBE_OPS");
+      throw new Error(
+        "getConfigWebReportsCustomerAdmin missing from PROBE_OPS",
+      );
     expect(
-      new URLSearchParams(buildProbeBody(configReportsAdmin, "BILLY666")).toString(),
+      new URLSearchParams(
+        buildProbeBody(configReportsAdmin, "BILLY666"),
+      ).toString(),
     ).toBe(
       "agentID=BILLY666&operation=getConfigWebReportsCustomerAdmin&RRO=1&agentOwner=BILLY666",
     );
@@ -136,7 +143,8 @@ describe("f402 probe plan", () => {
     const sportsAdmin = PROBE_OPS.find(
       (op) => op.operation === "getSportsCustomerAdmin",
     );
-    if (!sportsAdmin) throw new Error("getSportsCustomerAdmin missing from PROBE_OPS");
+    if (!sportsAdmin)
+      throw new Error("getSportsCustomerAdmin missing from PROBE_OPS");
     expect(
       new URLSearchParams(buildProbeBody(sportsAdmin, "BILLY666")).toString(),
     ).toBe(

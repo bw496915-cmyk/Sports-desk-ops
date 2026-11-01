@@ -10,15 +10,14 @@ import {
   deriveManagerBootGates,
   diffManifestGateStatuses,
 } from "../../lib/f402_manager_boot_gate_derive.ts";
-import {
-  emitGateFailed,
-  GATE_EXIT_OK,
-} from "../../lib/f402_gate_exit.ts";
+import { emitGateFailed, GATE_EXIT_OK } from "../../lib/f402_gate_exit.ts";
 import type { PinnedManifestWithExtracted } from "../../lib/f402_portal_oracle_slice.ts";
 
 const REPO = join(import.meta.dir, "../..");
 const MANIFEST = join(import.meta.dir, "pinned/manifest.json");
-const manifest = (await Bun.file(MANIFEST).json()) as PinnedManifestWithExtracted;
+const manifest = (await Bun.file(
+  MANIFEST,
+).json()) as PinnedManifestWithExtracted;
 
 const derived = await deriveManagerBootGates(REPO, manifest);
 const mismatches = diffManifestGateStatuses(manifest, derived);

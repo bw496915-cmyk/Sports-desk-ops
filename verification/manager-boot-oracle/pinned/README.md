@@ -2,12 +2,12 @@
 
 Hashes are authoritative in **`manifest.json`** (compare with `fetch-pinned-bundles.sh`).
 
-| Artifact | Role |
-|----------|------|
-| `version.js` | Bust string source; drift = **SHA-256**, not semver string compare |
-| `manager.js` | Oracle extraction + RRO grep |
-| `util.js` | `apiPath`, `RRO:1` |
-| `security.js` | qubic→cloud ajax prefilter |
+| Artifact      | Role                                                               |
+| ------------- | ------------------------------------------------------------------ |
+| `version.js`  | Bust string source; drift = **SHA-256**, not semver string compare |
+| `manager.js`  | Oracle extraction + RRO grep                                       |
+| `util.js`     | `apiPath`, `RRO:1`                                                 |
+| `security.js` | qubic→cloud ajax prefilter                                         |
 
 Re-fetch (no credentials):
 

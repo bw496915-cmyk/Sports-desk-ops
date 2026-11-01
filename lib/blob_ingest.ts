@@ -14,7 +14,7 @@
 
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { Sha256Hex } from "../domain-branded-types.ts";
+import type { Sha256Hex } from "../design/domain-branded-types.ts";
 import { auditRunId, type AuditRunId } from "./audit_run_id.ts";
 import {
   groupF402PendingRowsByTicket,

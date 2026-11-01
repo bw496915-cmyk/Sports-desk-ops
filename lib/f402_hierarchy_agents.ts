@@ -20,10 +20,7 @@ export function agentLoginKey(row: ListAgentsByAgentGeneralWireRow): string {
 export function detectAgentLoginCollisions(
   general: readonly ListAgentsByAgentGeneralWireRow[],
 ): AgentLoginCollision[] {
-  const seen = new Map<
-    string,
-    { agentId: string; seqNumber: number | null }
-  >();
+  const seen = new Map<string, { agentId: string; seqNumber: number | null }>();
   const collisions: AgentLoginCollision[] = [];
 
   for (const row of general) {
@@ -37,9 +34,9 @@ export function detectAgentLoginCollisions(
     if (prev !== undefined && prev.agentId !== agentId) {
       const existing = collisions.find((c) => c.key === key);
       if (existing) {
-        (existing as { agentIds: string[]; seqNumbers: number[] }).agentIds.push(
-          agentId,
-        );
+        (
+          existing as { agentIds: string[]; seqNumbers: number[] }
+        ).agentIds.push(agentId);
         if (seqNumber !== null) {
           (existing as { seqNumbers: number[] }).seqNumbers.push(seqNumber);
         }

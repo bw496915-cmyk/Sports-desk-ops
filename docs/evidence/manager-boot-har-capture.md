@@ -14,12 +14,12 @@ If sweep fails after capture, exit **1** FAILED — fix the redactor, do not com
 
 ## Gate chain
 
-| Step | What |
-|------|------|
-| **(n)** | Synthetic fixtures — verifier pass/fail observed in CI |
+| Step     | What                                                                                  |
+| -------- | ------------------------------------------------------------------------------------- |
+| **(n)**  | Synthetic fixtures — verifier pass/fail observed in CI                                |
 | **(i′)** | Real capture — ~2.5k `GENERAL`, ~5.7k `PLAYERS` source (fixture stores `PLAYERS: []`) |
-| **(j)** | Production GENERAL fixture + oracle snapshot pin |
-| **(k)** | Variance index N≥3 (live + synthetic-oracle rows) |
+| **(j)**  | Production GENERAL fixture + oracle snapshot pin                                      |
+| **(k)**  | Variance index N≥3 (live + synthetic-oracle rows)                                     |
 
 ## Troubleshooting / raw exports (macOS)
 

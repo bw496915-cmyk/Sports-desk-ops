@@ -348,11 +348,15 @@ export function evaluateLiveGate(env: Env): LiveGate {
 export async function authenticateWithWebView(
   config: LiveAuthConfig,
 ): Promise<LiveAuthSession> {
-  const agentID = config.env["F402_AGENT_ID"] ?? "";
-  const password = config.env["F402_PASSWORD"] ?? "";
-  if (agentID.length === 0 || password.length === 0) {
+  const { loadF402CredentialsSecure } =
+    await import("../lib/f402_credentials_policy.ts");
+  const { agentId: agentID, password } = await loadF402CredentialsSecure(
+    config.env,
+  );
+  void password;
+  if (agentID.length === 0) {
     throw new Error(
-      "live capture gate passed without credentials in the environment",
+      "live capture requires keychain (secrets:f402) or TTY credentials",
     );
   }
   const view = ManagedWebView.launch({

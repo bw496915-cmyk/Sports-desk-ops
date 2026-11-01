@@ -21,13 +21,15 @@ export const PRODUCTION_AGENT_PLACEHOLDER = /^AGENT_L\d+_N\d+$/i;
 
 const META_KEY = "_f402Redaction";
 
-const FORBIDDEN_FILE_PATTERNS: readonly { readonly re: RegExp; readonly label: string }[] =
-  [
-    { re: /\bset-cookie\b/i, label: "set-cookie" },
-    { re: /\bauthorization\b/i, label: "authorization header name" },
-    { re: /\bBearer\s+[A-Za-z0-9._-]{8,}/, label: "Bearer token" },
-    { re: /\bcookie\s*:\s*[^<\s]/i, label: "raw Cookie header value" },
-  ];
+const FORBIDDEN_FILE_PATTERNS: readonly {
+  readonly re: RegExp;
+  readonly label: string;
+}[] = [
+  { re: /\bset-cookie\b/i, label: "set-cookie" },
+  { re: /\bauthorization\b/i, label: "authorization header name" },
+  { re: /\bBearer\s+[A-Za-z0-9._-]{8,}/, label: "Bearer token" },
+  { re: /\bcookie\s*:\s*[^<\s]/i, label: "raw Cookie header value" },
+];
 
 const ALLOWED_TOP_LEVEL = new Set(["GENERAL", "PLAYERS", "EXTRA", META_KEY]);
 
@@ -144,7 +146,10 @@ export function validateProductionOracleFixtureText(
   }
 
   if (typeof parsed !== "object" || parsed === null) {
-    violations.push({ code: "not_object", detail: "fixture must be a JSON object" });
+    violations.push({
+      code: "not_object",
+      detail: "fixture must be a JSON object",
+    });
     return violations;
   }
 
@@ -202,7 +207,10 @@ export function validateProductionOracleFixtureText(
           detail: `${META_KEY}.specVersion must be 1`,
         });
       }
-      if (typeof m.redactedByRole !== "string" || m.redactedByRole.trim() === "") {
+      if (
+        typeof m.redactedByRole !== "string" ||
+        m.redactedByRole.trim() === ""
+      ) {
         violations.push({
           code: "meta_role",
           detail: `${META_KEY}.redactedByRole must name operator role (spec accountability)`,

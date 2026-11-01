@@ -51,7 +51,10 @@ export function readDnsCacheStats(): Record<string, number> | undefined {
 /**
  * DNS prefetch + optional fetch.preconnect for HTTPS capture bases.
  */
-export function warmCaptureNetwork(baseUrl: string): { host: string; port: number } {
+export function warmCaptureNetwork(baseUrl: string): {
+  host: string;
+  port: number;
+} {
   const parsed = new URL(baseUrl);
   const port =
     parsed.port !== ""
@@ -81,7 +84,11 @@ export async function resolveHost(host: string): Promise<DnsAnswer[]> {
 
 export async function preflight(
   host: string,
-  options: { port?: number; timeoutMs?: number; skipDnsPrefetch?: boolean } = {},
+  options: {
+    port?: number;
+    timeoutMs?: number;
+    skipDnsPrefetch?: boolean;
+  } = {},
 ): Promise<PreflightResult> {
   const port = options.port ?? 443;
   if (!options.skipDnsPrefetch) prefetchDns(host, port);

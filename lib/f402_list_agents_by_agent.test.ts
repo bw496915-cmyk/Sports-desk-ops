@@ -195,9 +195,7 @@ describe("getListAgenstByAgent PLAYERS", () => {
     const env = parseListAgentsByAgentEnvelope(
       JSON.parse(readFileSync(fixture, "utf8")),
     );
-    const line = describeListAgentsByAgentProbeResponse(
-      JSON.stringify(env),
-    );
+    const line = describeListAgentsByAgentProbeResponse(JSON.stringify(env));
     expect(line).toContain("GENERAL=4");
     expect(line).toContain("PLAYERS=1");
     expect(line).toContain("dummyRow=true");

@@ -8,12 +8,12 @@ Is `RRO` ever **per-agent** on the wire, or always the session **`util.RRO`** si
 
 ## `getCompleteHeriarchy` caller chain
 
-| Step | Location | RRO on wire |
-|------|----------|-------------|
-| Boot | `main-manager.js` (via `getAccountInfo` → `setAccountInfo`) | — |
-| UI delay | `settings:function` — `setTimeout(..., 500)` when `AgentMenuStyle === "Tile Menu"`, else immediate | — |
-| Call site | **Only** `e.getCompleteHeriarchy()` (no arguments at call sites in pinned bundle) | — |
-| Request build | `getCompleteHeriarchy:function(e)` | **`RRO: n.RRO`** always |
+| Step          | Location                                                                                           | RRO on wire             |
+| ------------- | -------------------------------------------------------------------------------------------------- | ----------------------- |
+| Boot          | `main-manager.js` (via `getAccountInfo` → `setAccountInfo`)                                        | —                       |
+| UI delay      | `settings:function` — `setTimeout(..., 500)` when `AgentMenuStyle === "Tile Menu"`, else immediate | —                       |
+| Call site     | **Only** `e.getCompleteHeriarchy()` (no arguments at call sites in pinned bundle)                  | —                       |
+| Request build | `getCompleteHeriarchy:function(e)`                                                                 | **`RRO: n.RRO`** always |
 
 Extracted request object (portal):
 
@@ -38,10 +38,10 @@ override **agentID/agentType** only through `i`; **`s` does not read `i.RRO` or 
 rg -o 'RRO[^,}]{0,40}' verification/manager-boot-oracle/pinned/manager.js | sort | uniq -c
 ```
 
-| Count | Pattern |
-|------:|---------|
-| 17 | `RRO:n.RRO` |
-| 4 | `RROR.icon` (unrelated substring) |
+| Count | Pattern                           |
+| ----: | --------------------------------- |
+|    17 | `RRO:n.RRO`                       |
+|     4 | `RROR.icon` (unrelated substring) |
 
 No `RRO:1` literal, no `RRO:i.`, no per-row `GENERAL[].RRO` in client POST builders.
 
