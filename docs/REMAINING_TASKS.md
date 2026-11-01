@@ -74,23 +74,22 @@ Each task carries a stable `Ref:` id. The id does not change when tasks are renu
 the table resolves it to the record that justifies the basis and to the artifact that closes it. A ref
 id that appears on a task but not in this table is a defect, and a test enforces it.
 
-| Ref                   | Task     | Basis record                                     | Closes against    |
-| :-------------------- | :------- | :----------------------------------------------- | :---------------- |
-| `RT-F402-CAPTURE`     | P0.1     | `[UNVERIFIED]` combo_identity.ts:24              | ledger row        |
-| `RT-PREFEE-PNL`       | P0.2     | `[UNVERIFIED]` third-party toolkit               | one wallet        |
-| `RT-AUTH-HEADER`      | P0.3     | `[OBSERVED]` HAR 2026-10-28                      | header capture    |
-| `RT-CI-BACKTEST`      | P1.1     | `[CODE]` parlay_combo_backtest_engine.test.ts:41 | CI fixture        |
-| `RT-CHANNEL-MODEL`    | P1.2     | `[CODE]` tokens.toml lanes                       | writer capture    |
-| `RT-DUP-WAGERS`       | P1.3     | `[CODE]` audit_customer_book.ts                  | audit output      |
-| `RT-GSLIVE-LINKS`     | P1.6     | `[OBSERVED]` three GSLive surfaces               | three captures    |
-| `RT-CLI-ZIP`          | P2.1     | `[OBSERVED]` gs-manager-cli.zip                  | provenance note   |
-| `RT-ARTIFACT-CADENCE` | P2.3     | `[CODE]` package.json:76                         | cadence + check   |
-| `RT-RENDER-HTML`      | Renderer | `[OBSERVED]` MCP api:Bun.markdown.html           | HTML artifact     |
-| `RT-RENDER-ANSI`      | Renderer | `[OBSERVED]` MCP api:Bun.markdown.ansi           | CLI/JS diff       |
-| `RT-RENDER-LISTITEM`  | Renderer | `[OBSERVED]` MCP api:Bun.markdown.render         | checked semantics |
-| `RT-RENDER-SECURITY`  | Renderer | `[OBSERVED]` MCP api:Bun.markdown.Options        | tagFilter tests   |
-| `RT-DOCS-MANIFEST`    | Pipeline | `[CODE]` lib/docs_render_cache.ts                | stable buildId    |
-| `RT-DOCS-SERVE`       | Pipeline | `[CODE]` lib/docs_server.ts                      | q-value + range   |
+| Ref                   | Task     | Basis record                              | Closes against    |
+| :-------------------- | :------- | :---------------------------------------- | :---------------- |
+| `RT-F402-CAPTURE`     | P0.1     | `[UNVERIFIED]` combo_identity.ts:24       | ledger row        |
+| `RT-PREFEE-PNL`       | P0.2     | `[UNVERIFIED]` third-party toolkit        | one wallet        |
+| `RT-AUTH-HEADER`      | P0.3     | `[OBSERVED]` HAR 2026-10-28               | header capture    |
+| `RT-CHANNEL-MODEL`    | P1.2     | `[CODE]` tokens.toml lanes                | writer capture    |
+| `RT-DUP-WAGERS`       | P1.3     | `[CODE]` audit_customer_book.ts           | audit output      |
+| `RT-GSLIVE-LINKS`     | P1.6     | `[OBSERVED]` three GSLive surfaces        | three captures    |
+| `RT-CLI-ZIP`          | P2.1     | `[OBSERVED]` gs-manager-cli.zip           | provenance note   |
+| `RT-ARTIFACT-CADENCE` | P2.3     | `[CODE]` package.json:76                  | cadence + check   |
+| `RT-RENDER-HTML`      | Renderer | `[OBSERVED]` MCP api:Bun.markdown.html    | HTML artifact     |
+| `RT-RENDER-ANSI`      | Renderer | `[OBSERVED]` MCP api:Bun.markdown.ansi    | CLI/JS diff       |
+| `RT-RENDER-LISTITEM`  | Renderer | `[OBSERVED]` MCP api:Bun.markdown.render  | checked semantics |
+| `RT-RENDER-SECURITY`  | Renderer | `[OBSERVED]` MCP api:Bun.markdown.Options | tagFilter tests   |
+| `RT-DOCS-MANIFEST`    | Pipeline | `[CODE]` lib/docs_render_cache.ts         | stable buildId    |
+| `RT-DOCS-SERVE`       | Pipeline | `[CODE]` lib/docs_server.ts               | q-value + range   |
 
 Full paths and line numbers stay on each task's **Basis** line; this table is the ref-to-record index,
 so an id resolves without guessing which artifact it came from.
@@ -123,12 +122,6 @@ so an id resolves without guessing which artifact it came from.
   - **Blocked by:** a capture environment that keeps the header value without redaction.
 
 ## P1 — coverage and data quality
-
-- [ ] **P1.1 Make the backtest freshness test run in CI**
-  - **Ref:** `RT-CI-BACKTEST`
-  - **Basis:** `[CODE]` the test is guarded by `existsSync("enriched_customers_full.json")`; CI has no book.
-  - **Done when:** a committed slim fixture drives the engine, and CI asserts the committed artifact matches it.
-  - **Blocked by:** a fixture that does not expose customer data.
 
 - [ ] **P1.2 Reconcile the channel model**
   - **Ref:** `RT-CHANNEL-MODEL`
@@ -183,4 +176,7 @@ so an id resolves without guessing which artifact it came from.
       `attributionTypes` kept as a deprecated alias.
 - [x] `[CODE]` `reports/docs-review/PLAN-full-coverage.md` reconciled in place: stale `append_tracked_domains.mjs`
       references annotated, disproved deploy-target claim closed, status block added.
+- [x] `[CODE]` Backtest engine runs in CI from a committed synthetic fixture
+      (`tests/fixtures/backtest/`); file-independent sections are pinned against
+      `docs/backtest-4wk-cfb-nba.json`.
 - [x] `[OBSERVED]` `docs-v2026.11.01` tagged and deployed; 47-path spec live.
