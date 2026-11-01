@@ -13,7 +13,7 @@
 
 import { join } from "node:path";
 import { ManagedWebView } from "./capture/webview.ts";
-import { resolveLoginConfig } from "./capture/ops.ts";
+import { loginF402 } from "./capture/f402_login.ts";
 
 const HELP = `Bun.WebView screenshot tool
 
@@ -129,52 +129,6 @@ function parseArgs(args: readonly string[]): Options {
   };
 }
 
-async function loginF402(
-  view: ManagedWebView,
-  timeoutMs: number,
-): Promise<void> {
-  const baseUrl = (
-    process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
-  ).replace(/\/$/, "");
-  const agentId = process.env.F402_AGENT_ID?.trim() ?? "";
-  const password = process.env.F402_PASSWORD?.trim() ?? "";
-  if (agentId === "" || password === "") {
-    throw new Error(
-      "F402 login requires F402_AGENT_ID and F402_PASSWORD (values are not printed)",
-    );
-  }
-  const login = resolveLoginConfig(process.env, baseUrl);
-  await view.navigate(login.loginUrl, { allowOpaqueUrl: true, timeoutMs });
-  await view.waitForSelector(login.userSelector, { timeoutMs });
-  const hydrationMs = Number(process.env.F402_LOGIN_HYDRATION_MS ?? "1500");
-  await Bun.sleep(
-    Number.isFinite(hydrationMs) ? Math.max(0, hydrationMs) : 1500,
-  );
-
-  const hasSubmit =
-    (await view.evaluate(
-      `(() => document.querySelector(${JSON.stringify(login.submitSelector)}) !== null)()`,
-    )) === true;
-  await view.fill(login.userSelector, agentId);
-  await view.fill(login.passSelector, password);
-  if (hasSubmit) await view.click(login.submitSelector);
-  else await view.press("Enter");
-
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const passwordGone =
-      (await view.evaluate(
-        '(() => document.querySelector("input[type=password]") === null)()',
-      )) === true;
-    if (passwordGone) return;
-    if (Date.now() >= deadline)
-      throw new Error(
-        "F402 login did not complete: password field still present",
-      );
-    await Bun.sleep(250);
-  }
-}
-
 export const DEFAULT_SHOT_DIR = "scratch/shots";
 
 export async function runWebviewShot(argv: readonly string[]): Promise<void> {
@@ -210,7 +164,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
       if (process.env.F402_LIVE_LOGIN?.trim() !== "1") {
         throw new Error("F402 login is opt-in: set F402_LIVE_LOGIN=1");
       }
-      await loginF402(view, options.timeoutMs);
+      await loginF402(view, { timeoutMs: options.timeoutMs });
       const baseUrl = (
         process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
       ).replace(/\/$/, "");

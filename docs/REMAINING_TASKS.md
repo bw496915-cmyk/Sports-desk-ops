@@ -106,11 +106,13 @@ so an id resolves without guessing which artifact it came from.
   - **Safety:** `PendingDelete` is named like a mutation. The capture allowlist refuses mutation ops by
     construction, so that endpoint needs an explicit read-only confirmation before it is added.
   - **Automation:** `bun run capture:f402 --dry-run` prints the six-op plan without launching anything.
-    Without `--dry-run` it opens WebKit with the persistent profile `scratch/webview-profile`, waits for
-    sign-in, and probes each read from inside the page so the HttpOnly session cookie applies. Results are
-    written to `scratch/f402-probes/<stamp>/<op>.json` with the request body that was sent and
-    `headersObserved: false`; a 404/405 is recorded as a finding, not a failure. `PendingDelete` is excluded
-    unless `--include-unconfirmed --i-understand-mutations` is passed.
+    With `F402_AGENT_ID` / `F402_PASSWORD` in the environment, `--login` signs in unattended (defaults:
+    `input[name="customerID"]`, `input[type="password"]`, `button.btn.btn-primary`, overridable with
+    `F402_LOGIN_*`); no credential is printed or written. Otherwise it waits for an interactive sign-in or
+    a `--wait-for` selector. Probes run from inside the page so the HttpOnly session cookie applies, and
+    results land in `scratch/f402-probes/<stamp>/<op>.json` with the body that was sent, the auth mode, and
+    `headersObserved: false`. `PendingDelete` is excluded unless
+    `--include-unconfirmed --i-understand-mutations` is passed.
 
 - [ ] **P0.2 Verify the pre-fee PnL claim**
   - **Ref:** `RT-PREFEE-PNL`
