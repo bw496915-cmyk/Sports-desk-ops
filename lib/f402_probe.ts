@@ -267,7 +267,7 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     operation: "getGamesPosition",
     method: "POST",
     readOnly: true,
-    note: "UNVERIFIED: games position (Manager envelope); captured body adds sportTypeList, sportSubTypeList, typeAmount, positionBySport, storeAgent, filtro=O,I,H,C,X.",
+    note: "games position (Manager envelope); verified 200 (579799 B). Body adds sportTypeList, sportSubTypeList, typeAmount, positionBySport, storeAgent, filtro=O,I,H,C,X.",
     params: [
       "sportTypeIn",
       "sportSubTypeIn",
