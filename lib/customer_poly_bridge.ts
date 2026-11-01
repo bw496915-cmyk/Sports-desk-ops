@@ -534,11 +534,22 @@ export interface CustomerPolyBridgeReport {
     readonly customersInBook: number;
     readonly linkedCustomers: number;
     readonly linkYieldPct: number;
+    /** Distinct attributed wallets. A shared wallet is counted once, so this is not a row count. */
     readonly wallets: number;
+    /**
+     * Attribution link rows: one per (customer, wallet) pair in the registry. This is a link count,
+     * not a wallet count, and it can exceed `wallets` when several customers share a wallet. It
+     * equals the sum of `attributionLinks`, and it also counts links whose customer is missing from
+     * the book (those do not become `customers` rows).
+     */
+    readonly attributionLinkRows: number;
     readonly observedWallets: number;
     readonly invalidWallets: number;
     readonly multiWalletCustomers: number;
     readonly sharedWallets: number;
+    /** Link rows per attribution type. Sums to `attributionLinkRows`, not `wallets`. */
+    readonly attributionLinks: Readonly<Record<string, number>>;
+    /** @deprecated Legacy name for `attributionLinks`; same values, same link-row basis. */
     readonly attributionTypes: Readonly<Record<string, number>>;
   };
   readonly value: {
@@ -660,10 +671,11 @@ export function buildCustomerPolyBridge(
   const observedWalletSet = new Set(withPoly.map((row) => row.wallet));
   const count = (verdict: CrossVenueVerdict): number =>
     rows.filter((row) => row.verdict === verdict).length;
-  const attributionTypes: Record<string, number> = {};
+  // Counts link rows, not wallets: one shared wallet attributed to two customers contributes two.
+  const attributionLinks: Record<string, number> = {};
   for (const link of input.registry.links) {
-    attributionTypes[link.attributionType] =
-      (attributionTypes[link.attributionType] ?? 0) + 1;
+    attributionLinks[link.attributionType] =
+      (attributionLinks[link.attributionType] ?? 0) + 1;
   }
 
   const sum = (values: readonly number[]): number =>
@@ -729,11 +741,13 @@ export function buildCustomerPolyBridge(
           ? round2((linkedCustomers.size / input.customers.length) * 100)
           : 0,
       wallets: input.registry.stats.wallets,
+      attributionLinkRows: input.registry.links.length,
       observedWallets: observedWalletSet.size,
       invalidWallets: input.registry.stats.invalid,
       multiWalletCustomers: input.registry.stats.multiWalletCustomers,
       sharedWallets: input.registry.stats.sharedWallets,
-      attributionTypes,
+      attributionLinks,
+      attributionTypes: attributionLinks,
     },
     value: {
       customersWithPoly: withPoly.length,

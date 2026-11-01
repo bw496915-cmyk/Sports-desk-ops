@@ -17,9 +17,15 @@ import {
   parseOpsArgument,
   READ_ONLY_OPS,
 } from "../scripts/capture/allowlist.ts";
-import { loadCaptureStore } from "../scripts/capture/recorder.ts";
+import {
+  assertCaptureManifest,
+  buildCaptureRecord,
+  CaptureStore,
+  loadCaptureStore,
+} from "../scripts/capture/recorder.ts";
 import { SessionError } from "../scripts/capture/session.ts";
 import type {
+  CaptureRecord,
   Env,
   HttpTransport,
   RawHttpRequest,
@@ -256,6 +262,13 @@ describe("CLI — mock end to end", () => {
     expect(store.manifest.counts.mock).toBe(READ_ONLY_OPS.length);
     expect(store.manifest.counts.withResponse).toBe(READ_ONLY_OPS.length - 1);
     expect(store.manifest.counts.withoutResponse).toBe(1);
+    // Every responding mock fixture is a non-empty 200, so the strict view
+    // agrees with withResponse minus the response-less fixture.
+    expect(store.manifest.counts.withSuccessResponse).toBe(
+      READ_ONLY_OPS.length - 1,
+    );
+    expect(store.manifest.counts.withErrorResponse).toBe(0);
+    expect(store.manifest.counts.emptyResponse).toBe(0);
     expect(store.manifest.counts.clean).toBe(READ_ONLY_OPS.length);
     for (const capture of store.captures) {
       expect(capture.record.mode).toBe("mock");
@@ -717,6 +730,9 @@ describe("CLI — live pipeline with injected browser/transport (no network)", (
     expect(store.captures).toHaveLength(2);
     expect(store.manifest.counts.withResponse).toBe(1);
     expect(store.manifest.counts.withoutResponse).toBe(1);
+    expect(store.manifest.counts.withSuccessResponse).toBe(1);
+    expect(store.manifest.counts.withErrorResponse).toBe(0);
+    expect(store.manifest.counts.emptyResponse).toBe(0);
     const failed = store.captures.find(
       (capture) => capture.record.response === null,
     );
@@ -727,4 +743,121 @@ describe("CLI — live pipeline with injected browser/transport (no network)", (
     expect(output).toContain("response:null");
     expect(output).not.toContain("SECRET123");
   }, 20_000);
+});
+
+describe("manifest response accounting", () => {
+  function captureRecord(input: {
+    path: string;
+    status: number | null;
+    body?: string;
+  }): CaptureRecord {
+    return buildCaptureRecord({
+      mode: "live",
+      capturedAt: "2026-10-31T00:00:00.000Z",
+      operation: { path: input.path, method: "POST" },
+      request: {
+        url: `https://portal.invalid${input.path}`,
+        method: "POST",
+        headers: {},
+        contentType: "application/x-www-form-urlencoded",
+        body: "operation=fixture&RRO=1",
+      },
+      response:
+        input.status === null
+          ? null
+          : {
+              status: input.status,
+              headers: { "content-type": "application/json" },
+              contentType: "application/json",
+              bytes: new TextEncoder().encode(input.body ?? ""),
+            },
+      provenance: {
+        portalHost: "portal.invalid",
+        proxy: "none",
+        auth: "cookie",
+        bunVersion: "1.4.4",
+      },
+    });
+  }
+
+  test("counts 2xx, error, empty-body and missing responses separately", async () => {
+    const out = join(tempDir("capture-counts-"), "store");
+    const store = new CaptureStore({
+      root: out,
+      now: () => new Date("2026-10-31T00:00:00.000Z"),
+    });
+    for (const record of [
+      captureRecord({
+        path: "/cloud/api/Manager/getWebLog",
+        status: 200,
+        body: JSON.stringify({ INFO: true }),
+      }),
+      captureRecord({
+        path: "/cloud/api/Manager/getPending",
+        status: 500,
+        body: JSON.stringify({ error: "boom" }),
+      }),
+      captureRecord({
+        path: "/cloud/api/Manager/getInfoPlayer",
+        status: 200,
+        body: "",
+      }),
+      captureRecord({
+        path: "/cloud/api/Manager/getCustomerNotes",
+        status: null,
+      }),
+    ]) {
+      await store.write(record);
+    }
+
+    const manifest = await store.finalize();
+    expect(manifest.counts).toMatchObject({
+      total: 4,
+      withResponse: 3,
+      withoutResponse: 1,
+      withSuccessResponse: 2,
+      withErrorResponse: 1,
+      emptyResponse: 1,
+    });
+    // withResponse keeps its old "any HTTP response" meaning, 500 included.
+    expect(manifest.counts.withResponse).toBe(3);
+
+    // The empty body is an independent axis: the empty 200 is counted in both
+    // withSuccessResponse and emptyResponse.
+    const loaded = await loadCaptureStore(out);
+    expect(loaded.manifest.counts).toEqual(manifest.counts);
+    const empty = loaded.captures.find(
+      (capture) => capture.entry.responseBytes === 0,
+    );
+    expect(empty?.record.response?.status).toBe(200);
+    expect(empty?.record.operation.path).toBe(
+      "/cloud/api/Manager/getInfoPlayer",
+    );
+  });
+
+  test("rejects a manifest whose strict counts do not partition withResponse", async () => {
+    const out = join(tempDir("capture-counts-invalid-"), "store");
+    const store = new CaptureStore({ root: out });
+    await store.write(
+      captureRecord({
+        path: "/cloud/api/Manager/getWebLog",
+        status: 200,
+        body: JSON.stringify({ INFO: true }),
+      }),
+    );
+    const manifest = await store.finalize();
+    const broken = JSON.parse(JSON.stringify(manifest)) as {
+      counts: Record<string, number>;
+    };
+    broken.counts["withSuccessResponse"] = 0;
+    expect(() => assertCaptureManifest(broken)).toThrow(/counts\.withResponse/);
+
+    const emptyTooHigh = JSON.parse(JSON.stringify(manifest)) as {
+      counts: Record<string, number>;
+    };
+    emptyTooHigh.counts["emptyResponse"] = 2;
+    expect(() => assertCaptureManifest(emptyTooHigh)).toThrow(
+      /counts\.emptyResponse/,
+    );
+  });
 });

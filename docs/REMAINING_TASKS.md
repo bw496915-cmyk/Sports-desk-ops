@@ -17,6 +17,18 @@ asserts that one decode restores the HTML exactly and that no `<img` survives.
 `[OBSERVED]` 2026-10-31, local headless Chrome on a scratch page: the `"`-only form executed
 `onerror` and retitled the parent document; the `&`-first form did not. The probe was not committed.
 
+### Docs pipeline
+
+`bun run docs:render` renders every `docs/**/*.md` to a content-addressed cache and writes
+`manifest.json`; `bun run docs:serve` serves that cache with zstd negotiation. The manifest `buildId`
+is a hash of the entries, so an unchanged tree rebuilds byte-identically and a changed tree gets a
+new id.
+
+`Bun.zstdCompress` returns `Promise<Buffer>`, and `Bun.write(path, promise)` stores the string
+`[object Promise]`: the write succeeds, `.byteLength` is `undefined`, and the `.zst` only fails later
+with `ERR_ZSTD`. The builder uses `Bun.zstdCompressSync` and writes through a temp file plus rename,
+so a crash cannot leave a truncated entry that the next run trusts.
+
 ### Renderer parity
 
 The JS API and the `bun ./file.md` loader are both documented as Rust-based. The CLI adds global table
@@ -62,25 +74,23 @@ Each task carries a stable `Ref:` id. The id does not change when tasks are renu
 the table resolves it to the record that justifies the basis and to the artifact that closes it. A ref
 id that appears on a task but not in this table is a defect, and a test enforces it.
 
-| Ref                    | Task     | Basis record                                     | Closes against    |
-| :--------------------- | :------- | :----------------------------------------------- | :---------------- |
-| `RT-F402-CAPTURE`      | P0.1     | `[UNVERIFIED]` combo_identity.ts:24              | ledger row        |
-| `RT-PREFEE-PNL`        | P0.2     | `[UNVERIFIED]` third-party toolkit               | one wallet        |
-| `RT-AUTH-HEADER`       | P0.3     | `[OBSERVED]` HAR 2026-10-28                      | header capture    |
-| `RT-STALE-TAG`         | P0.4     | `[OBSERVED]` docs-v2026.10.31                    | tag list          |
-| `RT-CI-BACKTEST`       | P1.1     | `[CODE]` parlay_combo_backtest_engine.test.ts:41 | CI fixture        |
-| `RT-CHANNEL-MODEL`     | P1.2     | `[CODE]` tokens.toml lanes                       | writer capture    |
-| `RT-DUP-WAGERS`        | P1.3     | `[CODE]` audit_customer_book.ts                  | audit output      |
-| `RT-CAPTURE-MANIFEST`  | P1.4     | `[CODE]` capture/recorder.ts:345                 | manifest counts   |
-| `RT-ATTRIBUTION-TYPES` | P1.5     | `[CODE]` customer_poly_bridge.ts:663             | bridge artifact   |
-| `RT-GSLIVE-LINKS`      | P1.6     | `[OBSERVED]` three GSLive surfaces               | three captures    |
-| `RT-CLI-ZIP`           | P2.1     | `[OBSERVED]` gs-manager-cli.zip                  | provenance note   |
-| `RT-STALE-PLAN`        | P2.2     | `[CODE]` PLAN-full-coverage.md:134               | plan updated      |
-| `RT-ARTIFACT-CADENCE`  | P2.3     | `[CODE]` package.json:76                         | cadence + check   |
-| `RT-RENDER-HTML`       | Renderer | `[OBSERVED]` MCP api:Bun.markdown.html           | HTML artifact     |
-| `RT-RENDER-ANSI`       | Renderer | `[OBSERVED]` MCP api:Bun.markdown.ansi           | CLI/JS diff       |
-| `RT-RENDER-LISTITEM`   | Renderer | `[OBSERVED]` MCP api:Bun.markdown.render         | checked semantics |
-| `RT-RENDER-SECURITY`   | Renderer | `[OBSERVED]` MCP api:Bun.markdown.Options        | tagFilter tests   |
+| Ref                   | Task     | Basis record                                     | Closes against    |
+| :-------------------- | :------- | :----------------------------------------------- | :---------------- |
+| `RT-F402-CAPTURE`     | P0.1     | `[UNVERIFIED]` combo_identity.ts:24              | ledger row        |
+| `RT-PREFEE-PNL`       | P0.2     | `[UNVERIFIED]` third-party toolkit               | one wallet        |
+| `RT-AUTH-HEADER`      | P0.3     | `[OBSERVED]` HAR 2026-10-28                      | header capture    |
+| `RT-CI-BACKTEST`      | P1.1     | `[CODE]` parlay_combo_backtest_engine.test.ts:41 | CI fixture        |
+| `RT-CHANNEL-MODEL`    | P1.2     | `[CODE]` tokens.toml lanes                       | writer capture    |
+| `RT-DUP-WAGERS`       | P1.3     | `[CODE]` audit_customer_book.ts                  | audit output      |
+| `RT-GSLIVE-LINKS`     | P1.6     | `[OBSERVED]` three GSLive surfaces               | three captures    |
+| `RT-CLI-ZIP`          | P2.1     | `[OBSERVED]` gs-manager-cli.zip                  | provenance note   |
+| `RT-ARTIFACT-CADENCE` | P2.3     | `[CODE]` package.json:76                         | cadence + check   |
+| `RT-RENDER-HTML`      | Renderer | `[OBSERVED]` MCP api:Bun.markdown.html           | HTML artifact     |
+| `RT-RENDER-ANSI`      | Renderer | `[OBSERVED]` MCP api:Bun.markdown.ansi           | CLI/JS diff       |
+| `RT-RENDER-LISTITEM`  | Renderer | `[OBSERVED]` MCP api:Bun.markdown.render         | checked semantics |
+| `RT-RENDER-SECURITY`  | Renderer | `[OBSERVED]` MCP api:Bun.markdown.Options        | tagFilter tests   |
+| `RT-DOCS-MANIFEST`    | Pipeline | `[CODE]` lib/docs_render_cache.ts                | stable buildId    |
+| `RT-DOCS-SERVE`       | Pipeline | `[CODE]` lib/docs_server.ts                      | q-value + range   |
 
 Full paths and line numbers stay on each task's **Basis** line; this table is the ref-to-record index,
 so an id resolves without guessing which artifact it came from.
@@ -110,13 +120,6 @@ so an id resolves without guessing which artifact it came from.
     `daemonBearer` descriptions cite that capture.
   - **Blocked by:** a capture environment that keeps the header value without redaction.
 
-- [ ] **P0.4 Retire the stale `docs-v2026.10.31` tag**
-  - **Ref:** `RT-STALE-TAG`
-  - **Basis:** `[OBSERVED]` the tag still cites `scripts/append_tracked_domains.mjs`, which no longer exists.
-  - **Done when:** consumers point at `docs-v2026.11.01` and the old tag is either deleted or annotated as
-    superseded and non-deployable.
-  - **Blocked by:** nothing technical; needs a decision on tag deletion.
-
 ## P1 — coverage and data quality
 
 - [ ] **P1.1 Make the backtest freshness test run in CI**
@@ -140,19 +143,6 @@ so an id resolves without guessing which artifact it came from.
     accordingly, or the generator is fixed.
   - **Blocked by:** an F402 numbering reference.
 
-- [ ] **P1.4 Separate response accounting in the capture manifest**
-  - **Ref:** `RT-CAPTURE-MANIFEST`
-  - **Basis:** `[CODE]` `counts.withResponse` includes HTTP 500/empty responses; the strict view lives only in
-    `applied-*.json`.
-  - **Done when:** the recorder emits `withSuccessResponse` / `withErrorResponse` / `emptyResponse`, with tests.
-  - **Blocked by:** nothing.
-
-- [ ] **P1.5 Clarify `coverage.attributionTypes`**
-  - **Ref:** `RT-ATTRIBUTION-TYPES`
-  - **Basis:** `[CODE]` it sums to 26 link rows while `coverage.wallets` is 22.
-  - **Done when:** the field is renamed or documented as link counts beside the wallet count.
-  - **Blocked by:** nothing.
-
 - [ ] **P1.6 Capture GSLive deep-link behaviour**
   - **Ref:** `RT-GSLIVE-LINKS`
   - **Basis:** `[OBSERVED]` the three surfaces exist; `[UNVERIFIED]` window/bot parameters beyond the captured
@@ -166,24 +156,29 @@ so an id resolves without guessing which artifact it came from.
   - **Ref:** `RT-CLI-ZIP`
   - **Basis:** `[OBSERVED]` 31 KB archive, no provenance or license trail.
   - **Done when:** it is either documented and committed with provenance, or deleted.
+  - **Guard:** `bun run audit:archives` fails on any tracked archive without a matching
+    `provenance/<name>.json` (checksum, origin, licence), so it cannot be committed by accident.
   - **Blocked by:** the owner’s decision.
-
-- [ ] **P2.2 Update or delete `reports/docs-review/PLAN-full-coverage.md`**
-  - **Ref:** `RT-STALE-PLAN`
-  - **Basis:** `[CODE]` untracked plan still names the removed `append_tracked_domains.mjs`.
-  - **Done when:** the plan is updated or removed before it is ever committed.
-  - **Blocked by:** nothing.
 
 - [ ] **P2.3 Schedule artifact regeneration**
   - **Ref:** `RT-ARTIFACT-CADENCE`
   - **Basis:** `[CODE]` `docs/combo-uniqueness.json` and `docs/cross-domain-bridge.json` only change when
-    `artifacts:value` is run manually.
+    `artifacts:value` is run manually. `[CODE]` the combo half cannot run offline: `loadCfbGames()` always
+    fetches `gamma-api`, so a freshness check needs a cached-input path before it can run in CI.
   - **Done when:** a documented cadence (or cron job) regenerates and deploys them, with a freshness check.
-  - **Blocked by:** a host for the scheduled run.
+  - **Blocked by:** a host for the scheduled run, and an offline input path for the combo half.
 
 ## Done (for context)
 
 - [x] `[CODE]` Claim labels and citation tests (`[CODE]` / `[OBSERVED]` / `[UNVERIFIED]` / `[ASSUMPTION]`).
 - [x] `[CODE]` Seven F402 report endpoints published as tier-C candidates.
 - [x] `[CODE]` TypeScript pinned to 5.9.3 for `bunx tsc`.
+- [x] `[CODE]` Stale docs tags are registered as superseded and non-deployable: `docs/releases.json`,
+      enforced by `bun run audit:release`.
+- [x] `[CODE]` Capture manifest splits response accounting: `withSuccessResponse`, `withErrorResponse`,
+      `emptyResponse` beside the legacy `withResponse`; validity invariants enforced on read.
+- [x] `[CODE]` `coverage.attributionLinkRows` and `attributionLinks` separate link counts from `wallets`;
+      `attributionTypes` kept as a deprecated alias.
+- [x] `[CODE]` `reports/docs-review/PLAN-full-coverage.md` reconciled in place: stale `append_tracked_domains.mjs`
+      references annotated, disproved deploy-target claim closed, status block added.
 - [x] `[OBSERVED]` `docs-v2026.11.01` tagged and deployed; 47-path spec live.

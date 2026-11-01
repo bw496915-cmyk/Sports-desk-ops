@@ -230,6 +230,49 @@ describe("cross-venue value", () => {
     ).toBe(2_000);
   });
 
+  test("counts attribution links, not wallets, and keeps the legacy alias", () => {
+    const links = buildAttributionRegistry(
+      [
+        {
+          proxyWallet: W1,
+          customerId: "C1",
+          attributionType: "WHALE_CTF_BRIDGE",
+        },
+        { proxyWallet: W2, customerId: "C1", attributionType: "IP_CLUSTER" },
+        { proxyWallet: W2, customerId: "C2", attributionType: "IP_CLUSTER" },
+      ],
+      { includeEngineMap: false },
+    );
+    const report = buildCustomerPolyBridge({
+      customers: [
+        customer({ customerId: "C1" }),
+        customer({ customerId: "C2" }),
+      ],
+      registry: links,
+    });
+    const linkSum = Object.values(report.coverage.attributionLinks).reduce(
+      (total, count) => total + count,
+      0,
+    );
+
+    // Two wallets, three link rows: `wallets` undercounts what attributionTypes reports.
+    expect(report.coverage.wallets).toBe(2);
+    expect(linkSum).toBe(3);
+    expect(linkSum).toBe(report.coverage.attributionLinkRows);
+    expect(report.coverage.attributionLinkRows).toBe(links.links.length);
+    expect(report.coverage.attributionLinkRows).toBeGreaterThan(
+      report.coverage.wallets,
+    );
+    expect(report.coverage.attributionLinks).toEqual({
+      WHALE_CTF_BRIDGE: 1,
+      IP_CLUSTER: 2,
+    });
+    // The legacy field still resolves to the same link counts for existing readers.
+    expect(report.coverage.attributionTypes).toEqual(
+      report.coverage.attributionLinks,
+    );
+  });
+
   test("reports fixture evidence when nothing was fetched", () => {
     const report = buildCustomerPolyBridge({
       customers: [customer({ customerId: "C1" })],

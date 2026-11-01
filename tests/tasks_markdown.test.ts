@@ -125,7 +125,7 @@ describe("remaining-tasks markdown", () => {
     const table = new Set(tableRefs);
     for (const ref of taskRefs) expect(table.has(ref)).toBe(true);
     for (const ref of table) {
-      if (ref.startsWith("RT-RENDER-")) continue;
+      if (ref.startsWith("RT-RENDER-") || ref.startsWith("RT-DOCS-")) continue;
       expect(taskRefs).toContain(ref);
     }
   });

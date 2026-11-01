@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "current": "docs-v2026.11.01",
+  "tags": {
+    "docs-v2026.11.01": {
+      "status": "current",
+      "deployable": true,
+      "commit": "d96327b",
+      "releasedAt": "2026-10-31"
+    },
+    "docs-v2026.10.31": {
+      "status": "superseded",
+      "deployable": false,
+      "supersededBy": "docs-v2026.11.01",
+      "reason": "its docs tree cites scripts/append_tracked_domains.mjs, which does not exist in the repository"
+    }
+  }
+}

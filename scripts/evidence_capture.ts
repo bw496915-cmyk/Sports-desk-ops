@@ -1167,7 +1167,7 @@ function printHumanSummary(payload: Record<string, unknown>): void {
   const counts = payload["counts"];
   if (isPlainObject(counts)) {
     process.stdout.write(
-      `counts: total=${String(counts["total"])} withResponse=${String(counts["withResponse"])} withoutResponse=${String(counts["withoutResponse"])} clean=${String(counts["clean"])}\n`,
+      `counts: total=${String(counts["total"])} withResponse=${String(counts["withResponse"])} withSuccessResponse=${String(counts["withSuccessResponse"])} withErrorResponse=${String(counts["withErrorResponse"])} emptyResponse=${String(counts["emptyResponse"])} withoutResponse=${String(counts["withoutResponse"])} clean=${String(counts["clean"])}\n`,
     );
   }
 }

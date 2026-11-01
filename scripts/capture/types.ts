@@ -158,8 +158,28 @@ export interface CaptureManifest {
     total: number;
     live: number;
     mock: number;
+    /**
+     * Any HTTP response at all (`responseStatus !== null`), including error and
+     * empty-body responses. Kept for backward compatibility and unchanged in
+     * meaning; `withSuccessResponse` is the strict count.
+     */
     withResponse: number;
+    /** No HTTP response was ever observed (`responseStatus === null`). */
     withoutResponse: number;
+    /** A response arrived with a 2xx `responseStatus`. */
+    withSuccessResponse: number;
+    /**
+     * A response arrived with a non-2xx `responseStatus` (e.g. 500). Success
+     * and error partition `withResponse`.
+     */
+    withErrorResponse: number;
+    /**
+     * A response arrived and the recorded body was empty (`responseBytes === 0`).
+     * Body content is never persisted (only its sha256, skeleton and byte
+     * count), so emptiness is byte-count based. This is an axis independent of
+     * success/error: an empty 200 counts in both `withSuccessResponse` and here.
+     */
+    emptyResponse: number;
     clean: number;
     operations: string[];
   };

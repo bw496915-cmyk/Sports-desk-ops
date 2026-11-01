@@ -44,6 +44,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # audit:release compares docs/releases.json against the tags that exist.
+          fetch-tags: true
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.4"
@@ -65,6 +68,9 @@ jobs:
       - name: "Docs gates (verify_docs: fabricated-contract, freshness, headers, dist)"
         timeout-minutes: 5
         run: bun run verify:docs
+      - name: "Ops audit (release registry, archive provenance)"
+        timeout-minutes: 2
+        run: bun run audit:ops
       - name: Token SSOT Zero-Drift Gate
         timeout-minutes: 3
         run: bun run gen:tokens:gate

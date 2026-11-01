@@ -265,6 +265,52 @@ export function manifestEntryFor(
   };
 }
 
+/** True when a manifest entry recorded a 2xx HTTP response. */
+export function isSuccessResponseStatus(status: number): boolean {
+  return status >= 200 && status <= 299;
+}
+
+/** Response accounting split out for the manifest `counts` block. */
+export interface ResponseAccounting {
+  /** Any HTTP response; `withSuccessResponse + withErrorResponse`. */
+  withResponse: number;
+  withoutResponse: number;
+  withSuccessResponse: number;
+  withErrorResponse: number;
+  /**
+   * Responses whose recorded body had zero bytes. Independent of the
+   * success/error axis (body content itself is never persisted).
+   */
+  emptyResponse: number;
+}
+
+/**
+ * Split manifest entries on two independent axes: whether a response arrived
+ * (and whether its status is 2xx), and whether its recorded body was empty.
+ */
+export function responseAccounting(
+  entries: readonly ManifestCaptureEntry[],
+): ResponseAccounting {
+  let withSuccessResponse = 0;
+  let withErrorResponse = 0;
+  let emptyResponse = 0;
+  for (const entry of entries) {
+    const status = entry.responseStatus;
+    if (status === null) continue;
+    if (isSuccessResponseStatus(status)) withSuccessResponse += 1;
+    else withErrorResponse += 1;
+    if (entry.responseBytes === 0) emptyResponse += 1;
+  }
+  const withResponse = withSuccessResponse + withErrorResponse;
+  return {
+    withResponse,
+    withoutResponse: entries.length - withResponse,
+    withSuccessResponse,
+    withErrorResponse,
+    emptyResponse,
+  };
+}
+
 /** sha256 of the canonical manifest document (for audit/idempotency checks). */
 export function manifestHash(manifest: CaptureManifest): string {
   return sha256Hex(canonicalJson(manifest));
@@ -342,11 +388,9 @@ export class CaptureStore {
         total: captures.length,
         live: captures.filter((entry) => entry.mode === "live").length,
         mock: captures.filter((entry) => entry.mode === "mock").length,
-        withResponse: captures.filter((entry) => entry.responseStatus !== null)
-          .length,
-        withoutResponse: captures.filter(
-          (entry) => entry.responseStatus === null,
-        ).length,
+        // withResponse stays "any HTTP response" for backward compatibility;
+        // the success/error/empty split is the strict view.
+        ...responseAccounting(captures),
         clean: captures.filter((entry) => entry.redaction.clean).length,
         operations: [
           ...new Set(captures.map((entry) => entry.operation.path)),
@@ -736,20 +780,52 @@ export function assertCaptureManifest(value: unknown): CaptureManifest {
     },
   );
   const counts = expectObject(manifest["counts"], "manifest.counts");
+  const total = expectNumber(counts["total"], "counts.total");
+  const withResponse = expectNumber(
+    counts["withResponse"],
+    "counts.withResponse",
+  );
+  const withoutResponse = expectNumber(
+    counts["withoutResponse"],
+    "counts.withoutResponse",
+  );
+  const withSuccessResponse = expectNumber(
+    counts["withSuccessResponse"],
+    "counts.withSuccessResponse",
+  );
+  const withErrorResponse = expectNumber(
+    counts["withErrorResponse"],
+    "counts.withErrorResponse",
+  );
+  const emptyResponse = expectNumber(
+    counts["emptyResponse"],
+    "counts.emptyResponse",
+  );
+  // Success and error partition `withResponse`; a body can only be empty when
+  // a response was actually recorded.
+  if (withSuccessResponse + withErrorResponse !== withResponse) {
+    fail("counts.withResponse", "withSuccessResponse + withErrorResponse");
+  }
+  if (withResponse + withoutResponse !== total) {
+    fail("counts.total", "withResponse + withoutResponse");
+  }
+  if (emptyResponse > withResponse) {
+    fail("counts.emptyResponse", "no greater than counts.withResponse");
+  }
   return {
     schemaVersion: CAPTURE_SCHEMA_VERSION,
     store: CAPTURE_STORE_NAME,
     generatedAt: expectString(manifest["generatedAt"], "generatedAt"),
     policyVersion: REDACTION_POLICY_VERSION,
     counts: {
-      total: expectNumber(counts["total"], "counts.total"),
+      total,
       live: expectNumber(counts["live"], "counts.live"),
       mock: expectNumber(counts["mock"], "counts.mock"),
-      withResponse: expectNumber(counts["withResponse"], "counts.withResponse"),
-      withoutResponse: expectNumber(
-        counts["withoutResponse"],
-        "counts.withoutResponse",
-      ),
+      withResponse,
+      withoutResponse,
+      withSuccessResponse,
+      withErrorResponse,
+      emptyResponse,
       clean: expectNumber(counts["clean"], "counts.clean"),
       operations: expectStringArray(counts["operations"], "counts.operations"),
     },

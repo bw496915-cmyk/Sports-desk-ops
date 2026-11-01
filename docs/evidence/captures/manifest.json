@@ -9,6 +9,9 @@
     "mock": 0,
     "withResponse": 8,
     "withoutResponse": 0,
+    "withSuccessResponse": 5,
+    "withErrorResponse": 3,
+    "emptyResponse": 3,
     "clean": 8,
     "operations": [
       "/cloud/api/Manager/getBetTicker",
