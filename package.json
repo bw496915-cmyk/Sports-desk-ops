@@ -1,7 +1,11 @@
 {
-  "name": "sportsdesk-workspace",
+  "name": "@tennis-hq/sportsdesk-workspace",
   "version": "1.0.0",
   "private": true,
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "http://127.0.0.1:50851/"
+  },
   "description": "SportsDesk & Fantasy402 Downline Risk Surveillance, Bettor Churn Simulation, and Cloudflare R2 Sync Suite",
   "workspaces": [
     "packages/*"
@@ -97,6 +101,7 @@
     "proxy:record": "bun run scripts/net/record_proxy.ts",
     "r2:verify:local": "bun run scripts/r2_verify.ts",
     "env:audit": "bun run scripts/env_audit.ts",
+    "registry:check": "bun run scripts/registry_check.ts",
     "artifacts:cron": "bun --no-orphans run scripts/artifacts_cron.ts",
     "probes:index": "bun run scripts/capture/probe_index.ts",
     "probes:prune": "bun run scripts/capture/probes_prune.ts",
