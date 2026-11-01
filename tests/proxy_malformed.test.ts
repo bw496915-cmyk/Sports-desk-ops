@@ -14,7 +14,7 @@ test("fetch rejects with Malformed_HTTP_Response on bad CONNECT reply", async ()
   });
 
   const proxyUrl = `http://127.0.0.1:${server.port}`;
-  let err: any;
+  let err: unknown;
   try {
     await fetch("https://example.com/", { proxy: proxyUrl });
   } catch (e) {
@@ -23,9 +23,10 @@ test("fetch rejects with Malformed_HTTP_Response on bad CONNECT reply", async ()
     server.stop(true);
   }
 
-  console.log("caught:", err?.name, err?.code, err?.message);
+  const caughtErr = err instanceof Error ? err : new Error(String(err));
+  const code = (err as { code?: unknown })?.code;
+  console.log("caught:", caughtErr.name, code, caughtErr.message);
   expect(err).toBeTruthy();
-  // Bun surfaces this as Malformed_HTTP_Response (message or code)
-  const text = String(err?.message ?? err?.code ?? err);
+  const text = `${caughtErr.message} ${String(code ?? "")}`;
   expect(text).toMatch(/Malformed|malformed|proxy/i);
 });
