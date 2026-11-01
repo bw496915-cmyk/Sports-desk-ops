@@ -38,7 +38,7 @@ describe("f402 probe plan", () => {
 
     const allReadOnly = selectProbeOps(false, "all");
     // 7 read-only report ops + 8 unique manager-boot ops (getListAgenstByAgent is shared) = 15
-    expect(allReadOnly).toHaveLength(22);
+    expect(allReadOnly).toHaveLength(23);
   });
 
   test("builds URLs from the observed route prefix", () => {
