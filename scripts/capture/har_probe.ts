@@ -21,7 +21,6 @@ import {
   cookiesFromHar,
   cookieHeaderFrom,
 } from "../../lib/cookie_jar.ts";
-import { summarizeBody } from "../../lib/http_body.ts";
 import { preflight } from "../../lib/preflight.ts";
 import { htmlToText } from "../../lib/ticket_html.ts";
 import {
