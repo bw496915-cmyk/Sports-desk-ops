@@ -569,11 +569,9 @@ export class ManagedWebView {
         bytes = await encodeScreenshot(pngBytes, {
           format: options.format,
           ...(options.format === "png"
-            ? {
-                ...(options.palette === undefined
-                  ? {}
-                  : { palette: options.palette }),
-              }
+            ? options.palette === undefined
+              ? {}
+              : { palette: options.palette }
             : options.format === "jpeg"
               ? {
                   ...(options.quality === undefined
