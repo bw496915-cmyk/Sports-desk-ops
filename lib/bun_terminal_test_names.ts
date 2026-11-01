@@ -10,6 +10,8 @@ export const BUN_TERMINAL_PTY_TEST_NAME = {
   meta: {
     v14BlogUrlAndSpawnSnippetPinned:
       "terminal.meta · constants · BUN_TERMINAL_V14_BLOG_URL and spawn snippet · expects pinned bun.sh anchor and Hello from PTY in example",
+    v14BlogCapabilitiesShipNote:
+      "terminal.meta · constants · BUN_TERMINAL_V14_BLOG_CAPABILITIES ship note · expects write resize colored output platforms and PR ids 25415 29522",
   },
   util: {
     stripAnsiSgr:
@@ -20,6 +22,8 @@ export const BUN_TERMINAL_PTY_TEST_NAME = {
       "terminal.pty · spawn · bun -e isTTY probe · expects exit 0 and stdout true",
     driveBashEchoCapture:
       "terminal.pty · driveBashScript · echo pty-helper then exit · expects exit 0 and stdout contains pty-helper",
+    terminalWriteResizeColored:
+      "terminal.pty · spawn.terminal · write + resize(100x30) + bash printf SGR red · expects COLUMNS/LINES after resize and raw capture contains ESC[31m",
   },
   blog: {
     bashLcEcho:

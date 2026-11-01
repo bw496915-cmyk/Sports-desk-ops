@@ -6,6 +6,7 @@ describe("bun_terminal_test_names", () => {
   test("every PTY test title follows layer · surface · action · expects pattern", () => {
     const titles = [
       BUN_TERMINAL_PTY_TEST_NAME.meta.v14BlogUrlAndSpawnSnippetPinned,
+      BUN_TERMINAL_PTY_TEST_NAME.meta.v14BlogCapabilitiesShipNote,
       BUN_TERMINAL_PTY_TEST_NAME.util.stripAnsiSgr,
       BUN_TERMINAL_PTY_TEST_NAME.spawn.childReportsIsTty,
       BUN_TERMINAL_PTY_TEST_NAME.spawn.driveBashEchoCapture,
