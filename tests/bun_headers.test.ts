@@ -1,0 +1,54 @@
+import { describe, expect, test } from "bun:test";
+
+/**
+ * Bun's `Headers` extends the global class with `count`, `getAll()` and `toJSON()`
+ * (`Bun.__internal.BunHeadersOverride`). `BunRequest.headers` and `Response.headers` are this type,
+ * so route handlers and response builders get them.
+ *
+ * The 1.4.4 reference says `getAll()` with any name other than `set-cookie` returns an empty array.
+ * It throws instead; the test pins the runtime, not the page.
+ */
+describe("Bun Headers extensions", () => {
+  test("it is the global Headers class, not a wrapper", () => {
+    const headers = new Headers({ "x-a": "1" });
+    expect(headers instanceof Headers).toBe(true);
+    expect(typeof headers.count).toBe("number");
+    expect(typeof headers.getAll).toBe("function");
+    expect(typeof headers.toJSON).toBe("function");
+  });
+
+  test("getAll reads every Set-Cookie value", () => {
+    const headers = new Headers();
+    headers.append("Set-Cookie", "a=1");
+    headers.append("Set-Cookie", "b=2");
+    expect(headers.getAll("set-cookie")).toEqual(["a=1", "b=2"]);
+    // get() joins them, which is lossy — that is why getAll exists.
+    expect(headers.get("set-cookie")).toBe("a=1, b=2");
+  });
+
+  test("getAll throws for other names, despite the documented empty array", () => {
+    const headers = new Headers({ "content-type": "text/html" });
+    expect(() => headers.getAll("content-type" as "set-cookie")).toThrow(
+      'Only "set-cookie" is supported.',
+    );
+  });
+
+  test("count and toJSON match JSON.stringify(headers)", () => {
+    const headers = new Headers({
+      "Content-Type": "text/html",
+      "X-Custom": "1",
+    });
+    headers.append("set-cookie", "a=1");
+    headers.append("set-cookie", "b=2");
+
+    expect(headers.count).toBe(4);
+    const json = headers.toJSON();
+    // Names arrive lowercased. The reference says only well-known names are lowercased, but Headers
+    // normalizes at insertion, so a custom "X-Custom" is stored and returned as "x-custom".
+    expect(json["content-type"]).toBe("text/html");
+    expect(json["x-custom"]).toBe("1");
+    expect(Object.keys(json)).not.toContain("X-Custom");
+    expect(json["set-cookie"]).toEqual(["a=1", "b=2"]);
+    expect(JSON.stringify(headers)).toBe(JSON.stringify(json));
+  });
+});
