@@ -23,9 +23,26 @@ declare module "bun" {
     // Fantasy402 Portal Gateway
     readonly F402_BASE_URL?: string;
     readonly F402_AGENT_ID?: string;
+    /** @deprecated Use secrets:f402 or TTY; only if F402_ALLOW_ENV_CREDENTIALS=1 */
     readonly F402_PASSWORD?: string;
+    readonly F402_ALLOW_ENV_CREDENTIALS?: string;
     readonly F402_OFFLINE_ONLY?: string;
     readonly F402_INITIAL_WATERMARK?: string;
+    /** `off` | `projected` | `full` — default `off` for getListAgenstByAgent PLAYERS */
+    readonly F402_PLAYERS_MODE?: string;
+    readonly F402_PROBE_HOST?: string;
+    readonly F402_RRO?: string;
+    readonly RRO?: string;
+    readonly F402_CAPTURE_LOG?: string;
+    readonly F402_AUDIT_DB?: string;
+    readonly F402_PINNED_MANAGER_BUST?: string;
+    /** @deprecated Use F402_WEBVIEW_PROFILE + WebView login or F402_SESSION_FILE. */
+    readonly F402_COOKIE?: string;
+    readonly F402_WEBVIEW_PROFILE?: string;
+    readonly F402_REPLAY_PROXY_URL?: string;
+    readonly F402_PORTAL_DRIFT_CRON?: string;
+    readonly PRETEST_SKIP?: string;
+    readonly DEBUG_TRACE?: string;
 
     // Cloudflare API & R2 Storage
     readonly CLOUDFLARE_ACCOUNT_ID?: string;

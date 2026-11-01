@@ -39,13 +39,13 @@ export type Brand<BasePrimitive, BrandToken extends string> = BasePrimitive & {
 // 1b. DIGEST & UTC INSTANT BRANDS (audit / provenance) — SSOT in lib/brand.ts
 // ============================================================================
 
-export type { IsoTime as IsoDateTimeUtc, Sha256Hex } from "./lib/brand.ts";
+export type { IsoTime as IsoDateTimeUtc, Sha256Hex } from "../lib/brand.ts";
 export {
   isoTime as isoDateTimeUtc,
   isIsoTime as isIsoDateTimeUtc,
   isSha256Hex,
   sha256FromDigest as sha256HexFromDigest,
-} from "./lib/brand.ts";
+} from "../lib/brand.ts";
 
 // ============================================================================
 // 2. MONETARY & VALUATION BRANDED PRIMITIVES

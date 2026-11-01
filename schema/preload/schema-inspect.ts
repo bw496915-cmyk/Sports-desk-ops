@@ -12,8 +12,8 @@
  *   # then: console.log(__schemaReport)
  */
 
-import { buildSqliteSchemaReport } from "../lib/schema_report.ts";
-import { inspectColumns, inspectKeys, inspectSummary } from "../lib/inspect.ts";
+import { buildSqliteSchemaReport } from "../../lib/schema_report.ts";
+import { inspectColumns, inspectKeys, inspectSummary } from "../../lib/inspect.ts";
 
 const report = buildSqliteSchemaReport();
 
