@@ -27,11 +27,15 @@ export const ARTIFACT_PATHS = [
   "docs/cross-domain-bridge.json",
 ] as const;
 
-/** Source files whose changes can alter either artifact. */
+/** Source files (including transitive modules) whose changes can alter either artifact. */
 export const INPUT_PATHS = [
+  "lib/combo_identity.ts",
   "lib/combo_uniqueness.ts",
   "lib/customer_poly_bridge.ts",
+  "lib/layoff_risk_engine.ts",
   "lib/parlay_combo_backtest_engine.ts",
+  "lib/polymarket_combo.ts",
+  "lib/polymarket_profile.ts",
   "scripts/generate_value_artifacts.ts",
 ] as const;
 

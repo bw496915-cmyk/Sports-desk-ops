@@ -174,6 +174,9 @@ so an id resolves without guessing which artifact it came from.
   - **Done when:** a documented cadence (or cron job) regenerates and deploys them, with a freshness check.
   - **Cadence in place:** the daily `schedule:` run in `.github/workflows/ci.yml` re-checks
     `artifacts:lock` and `audit:ops`, so drift surfaces within a day even when nothing is pushed.
+    `bun run artifacts:cron` is the host that can actually rebuild: an in-process `Bun.cron` job runs
+    `artifacts:value` (`--offline` by default) then refreshes the lock, and journals each run to
+    `scratch/artifacts-cron.jsonl` (`--history` reads it with `Bun.JSONL`). Deployment stays manual.
   - **Guard:** `bun run artifacts:lock` fails when an artifact or one of its generator inputs changed
     since `docs/artifacts.lock.json` was written. It proves nothing changed since the lock, not that the
     lock was taken right after a regeneration — so pair `artifacts:value` with `artifacts:lock --update`.
