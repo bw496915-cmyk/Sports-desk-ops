@@ -13,9 +13,24 @@ import {
 } from "./bun_terminal.ts";
 import { BUN_TERMINAL_PTY_TEST_NAME } from "./bun_terminal_test_names.ts";
 
+const BUN_V14_BLOG_SPAWN_PTY_EXAMPLE_VERBATIM = `const proc = Bun.spawn(["bash"], {
+  terminal: {
+    cols: 80,
+    rows: 24,
+    data(term, data) {
+      process.stdout.write(data);
+    },
+  },
+});
+
+proc.terminal.write("echo Hello from PTY!\\n");`;
+
 test(BUN_TERMINAL_PTY_TEST_NAME.meta.v14BlogUrlAndSpawnSnippetPinned, () => {
   expect(BUN_TERMINAL_V14_BLOG_URL).toBe(
     "https://bun.sh/blog/bun-v1.4#bun-terminal",
+  );
+  expect(BUN_TERMINAL_SPAWN_PTY_EXAMPLE).toBe(
+    BUN_V14_BLOG_SPAWN_PTY_EXAMPLE_VERBATIM,
   );
   expect(BUN_TERMINAL_SPAWN_PTY_EXAMPLE).not.toContain("terminal:const proc");
   expect(BUN_TERMINAL_SPAWN_PTY_EXAMPLE.match(/Bun\.spawn/g)?.length).toBe(1);
