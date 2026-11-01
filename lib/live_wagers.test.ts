@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
   parseShortDesc,
   readWagerList,
+  readWagerListArtifact,
   summarizeLiveWagers,
   toLiveWager,
   writerOf,
@@ -217,5 +218,68 @@ describe("summarizeLiveWagers", () => {
       bySport: {},
       legs: 0,
     });
+  });
+});
+
+describe("readWagerListArtifact", () => {
+  test("carries the file's own account of its completeness", () => {
+    const artifact = readWagerListArtifact({
+      schemaVersion: 1,
+      source: "paste:clipboard-ticker",
+      observedAt: null,
+      partial: true,
+      captureNote: "Salvaged from a partial paste.",
+      LIST: [{ WagerNumber: 1, WagerType: "S", AmountWagered: 100 }],
+    });
+
+    expect(artifact.wagers).toHaveLength(1);
+    expect(artifact.provenance).toEqual({
+      source: "paste:clipboard-ticker",
+      observedAt: null,
+      captureNote: "Salvaged from a partial paste.",
+      partial: true,
+    });
+  });
+
+  test("an explicit partial flag beats inferring it from the note", () => {
+    const artifact = readWagerListArtifact({
+      source: "capture:/cloud/api/Report/getWagers@2026-11-01T18:00:00Z",
+      observedAt: "2026-11-01T18:00:00Z",
+      partial: false,
+      captureNote:
+        "Rows older than four weeks are pruned by the portal, not by us.",
+      LIST: [],
+    });
+
+    expect(artifact.provenance.partial).toBe(false);
+    expect(artifact.provenance.source).toStartWith("capture:");
+  });
+
+  test("a note without a flag marks the list partial", () => {
+    // A file that needed a caveat is not a clean capture; the safe reading is the honest one.
+    const artifact = readWagerListArtifact({
+      captureNote: "partial paste",
+      LIST: [],
+    });
+
+    expect(artifact.provenance.partial).toBe(true);
+  });
+
+  test("says unlabelled rather than inventing a source", () => {
+    const artifact = readWagerListArtifact({ LIST: [] });
+
+    expect(artifact.provenance).toEqual({
+      source: "unlabelled",
+      observedAt: null,
+      captureNote: null,
+      partial: false,
+    });
+  });
+
+  test("readWagerList still returns bare rows for existing callers", () => {
+    expect(readWagerList({ LIST: [{ WagerNumber: 7 }] })).toHaveLength(1);
+    expect(
+      readWagerListArtifact({ LIST: [{ WagerNumber: 7 }] }).wagers,
+    ).toHaveLength(1);
   });
 });

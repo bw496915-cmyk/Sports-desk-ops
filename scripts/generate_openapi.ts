@@ -1990,16 +1990,20 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Live wager ticker list with parsed legs",
       description:
-        "The {LIST: [...]} bet-ticker feed, which differs from Report/Pending: WagerNumber is the ticket id and ShortDesc carries one line per leg (sportsdesk_webview_server.ts:658-701). Both ShortDesc grammars are parsed and the compact one is flagged; VolumeAmount differing from AmountWagered is reported, not reconciled. Loopback-gated. Surface: surface.daemon-live-wagers (tier D).",
+        "The {LIST: [...]} bet-ticker feed, which differs from Report/Pending: WagerNumber is the ticket id and ShortDesc carries one line per leg (sportsdesk_webview_server.ts:658-708). Both ShortDesc grammars are parsed and the compact one is flagged; VolumeAmount differing from AmountWagered is reported, not reconciled. The response carries the file's own provenance — source, observedAt and captureNote — so a partial list reads as partial instead of as the whole ticker. Loopback-gated. Surface: surface.daemon-live-wagers (tier D).",
       requiredCapture:
-        "A full ticker capture. data/live-wagers.json currently holds 17 rows salvaged from a partial clipboard paste and says so.",
+        "A full ticker capture. data/live-wagers.json currently holds 17 rows salvaged from a partial clipboard paste, and both its `partial: true` flag and its captureNote say so.",
       responses: {
-        "200": jsonSurfaceResponse("Wagers with aggregates.", {
-          success: { type: "boolean" },
-          summary: { type: "object" },
-          all: { type: "object" },
-          wagers: { type: "array", items: { type: "object" } },
-        }),
+        "200": jsonSurfaceResponse(
+          "Wagers with aggregates and their provenance.",
+          {
+            success: { type: "boolean" },
+            summary: { type: "object" },
+            all: { type: "object" },
+            provenance: { type: "object" },
+            wagers: { type: "array", items: { type: "object" } },
+          },
+        ),
         "404": jsonSurfaceResponse("No live wager capture.", {
           error: { type: "string" },
         }),

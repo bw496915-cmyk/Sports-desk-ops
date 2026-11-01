@@ -2196,16 +2196,16 @@
       "tier": "D",
       "category": "local-route",
       "missingFromSpec": false,
-      "what": "The {LIST: [...]} bet-ticker feed, which is a different shape from Report/Pending: WagerNumber is the ticket id, ShortDesc carries one line per leg, and VolumeAmount can differ from AmountWagered. Both grammars of ShortDesc are parsed; the compact one is flagged.",
+      "what": "The {LIST: [...]} bet-ticker feed, which is a different shape from Report/Pending: WagerNumber is the ticket id, ShortDesc carries one line per leg, and VolumeAmount can differ from AmountWagered. Both grammars of ShortDesc are parsed; the compact one is flagged. The response also carries the file's own provenance (source, observedAt, captureNote, partial), so a salvaged subset cannot be read as the whole ticker.",
       "members": ["GET /api/live-wagers"],
       "evidence": [
         {
-          "source": "services/sportsdesk_webview_server.ts:658-701",
+          "source": "services/sportsdesk_webview_server.ts:658-708",
           "kind": "implementation",
-          "note": "lib/live_wagers.ts parses legs, classifies TicketWriter (GSLIVE/GSBUILDER/Internet/ALERT), flags volume mismatches, and gates on piiRejection."
+          "note": "lib/live_wagers.ts parses legs, classifies TicketWriter (GSLIVE/GSBUILDER/Internet/ALERT), flags volume mismatches, reads the file's provenance via readWagerListArtifact, and gates on piiRejection."
         }
       ],
-      "requiredCapture": "A full ticker capture. data/live-wagers.json currently holds 17 rows salvaged from a partial clipboard paste, and says so."
+      "requiredCapture": "A full ticker capture. data/live-wagers.json currently holds 17 rows salvaged from a partial clipboard paste, and both its `partial: true` flag and its captureNote say so."
     }
   ]
 }

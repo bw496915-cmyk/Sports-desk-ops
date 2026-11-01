@@ -287,13 +287,18 @@ Asset names are validated (separators, control characters, `..`) and traversal i
 ## D-19. `surface.daemon-live-wagers`
 
 - `GET /api/live-wagers` serves the `{LIST: [...]}` ticker feed
-  (`sportsdesk_webview_server.ts:658-701`), which is **not** the Pending shape: `WagerNumber` is the
+  (`sportsdesk_webview_server.ts:658-708`), which is **not** the Pending shape: `WagerNumber` is the
   ticket id and `ShortDesc` carries one line per leg.
 - Both `ShortDesc` grammars are parsed; a leg with no `/ Period / Market / Pick` segments is flagged
   `compact` and its sport is matched against the known sport names.
 - `VolumeAmount` differing from `AmountWagered` is reported (`volumeDiffers`), not reconciled.
 - `data/live-wagers.json` holds 17 rows salvaged from a partial clipboard paste and records that
   provenance in `captureNote`.
+- Every response carries that provenance back: `provenance.source` (`paste:clipboard-ticker`),
+  `observedAt` (null — the paste carries no timestamp), `captureNote` verbatim and `partial: true`.
+  The dashboard renders the list as `17 WAGERS · PARTIAL` and shows the file's own note, so a count
+  of 17 cannot be mistaken for the whole ticker. An explicit `partial` flag in the file wins over
+  inferring it from the note.
 
 ---
 

@@ -3442,11 +3442,11 @@
       "get": {
         "tags": ["Local Desk & Telegram Gateway"],
         "summary": "Live wager ticker list with parsed legs",
-        "description": "The {LIST: [...]} bet-ticker feed, which differs from Report/Pending: WagerNumber is the ticket id and ShortDesc carries one line per leg (sportsdesk_webview_server.ts:658-701). Both ShortDesc grammars are parsed and the compact one is flagged; VolumeAmount differing from AmountWagered is reported, not reconciled. Loopback-gated. Surface: surface.daemon-live-wagers (tier D).",
+        "description": "The {LIST: [...]} bet-ticker feed, which differs from Report/Pending: WagerNumber is the ticket id and ShortDesc carries one line per leg (sportsdesk_webview_server.ts:658-708). Both ShortDesc grammars are parsed and the compact one is flagged; VolumeAmount differing from AmountWagered is reported, not reconciled. The response carries the file's own provenance — source, observedAt and captureNote — so a partial list reads as partial instead of as the whole ticker. Loopback-gated. Surface: surface.daemon-live-wagers (tier D).",
         "operationId": "getApiLiveWagers",
         "responses": {
           "200": {
-            "description": "Wagers with aggregates.",
+            "description": "Wagers with aggregates and their provenance.",
             "headers": {
               "Content-Security-Policy": {
                 "$ref": "#/components/headers/CSPHeader"
@@ -3470,6 +3470,9 @@
                       "type": "object"
                     },
                     "all": {
+                      "type": "object"
+                    },
+                    "provenance": {
                       "type": "object"
                     },
                     "wagers": {
@@ -3512,9 +3515,9 @@
         },
         "x-evidence": {
           "tier": "D",
-          "sources": ["services/sportsdesk_webview_server.ts:658-701"],
+          "sources": ["services/sportsdesk_webview_server.ts:658-708"],
           "capturedResponse": false,
-          "requiredCapture": "A full ticker capture. data/live-wagers.json currently holds 17 rows salvaged from a partial clipboard paste and says so."
+          "requiredCapture": "A full ticker capture. data/live-wagers.json currently holds 17 rows salvaged from a partial clipboard paste, and both its `partial: true` flag and its captureNote say so."
         },
         "x-surface-id": "surface.daemon-live-wagers"
       }

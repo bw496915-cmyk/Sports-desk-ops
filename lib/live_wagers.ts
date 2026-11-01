@@ -69,6 +69,30 @@ export interface WagerListFile {
   readonly wagers: readonly LiveWager[] | readonly Record<string, unknown>[];
 }
 
+/**
+ * What the committed file says about itself. Served alongside the rows so a count of 17 can
+ * never be read as "the ticker showed 17".
+ */
+export interface WagerListProvenance {
+  /** `capture:<operation>@<id>`, `paste:…`, or `unlabelled` when the file declares nothing. */
+  readonly source: string;
+  /** When the rows were observed, or null when the file does not say. */
+  readonly observedAt: string | null;
+  /** The file's own note about how it was obtained, verbatim. */
+  readonly captureNote: string | null;
+  /**
+   * True when the list is a subset of what the portal showed. An explicit `partial` flag wins;
+   * otherwise the presence of any capture note is enough, because a file that needed a caveat
+   * is not a clean capture.
+   */
+  readonly partial: boolean;
+}
+
+export interface WagerListArtifact {
+  readonly wagers: readonly LiveWager[];
+  readonly provenance: WagerListProvenance;
+}
+
 const WRITERS: Readonly<Record<string, LiveWager["writer"]>> = {
   gslive: "gslive",
   gsbuilder: "gsbuilder",
@@ -226,6 +250,11 @@ export function toLiveWager(row: Record<string, unknown>): LiveWager {
 
 /** Accepts the `{LIST: [...]}` envelope, a bare array, or already-mapped wagers. */
 export function readWagerList(payload: unknown): LiveWager[] {
+  return [...readWagerListArtifact(payload).wagers];
+}
+
+/** The rows plus whatever the file admits about its own completeness. */
+export function readWagerListArtifact(payload: unknown): WagerListArtifact {
   const rows = Array.isArray(payload)
     ? payload
     : typeof payload === "object" &&
@@ -234,12 +263,30 @@ export function readWagerList(payload: unknown): LiveWager[] {
       ? ((payload as { LIST: unknown[] }).LIST ?? [])
       : [];
 
-  return rows
+  const wagers = rows
     .filter(
       (row): row is Record<string, unknown> =>
         typeof row === "object" && row !== null && "WagerNumber" in row,
     )
     .map(toLiveWager);
+
+  const meta = (payload ?? {}) as Record<string, unknown>;
+  const captureNote = text(
+    meta.captureNote === undefined ? null : meta.captureNote,
+  );
+  const source = text(meta.source ?? meta.dataSource);
+  const observedAt = text(meta.observedAt ?? meta.capturedAt);
+
+  return {
+    wagers,
+    provenance: {
+      source: source === "" ? "unlabelled" : source,
+      observedAt: observedAt === "" ? null : observedAt,
+      captureNote: captureNote === "" ? null : captureNote,
+      partial:
+        typeof meta.partial === "boolean" ? meta.partial : captureNote !== "",
+    },
+  };
 }
 
 export interface LiveWagerSummary {

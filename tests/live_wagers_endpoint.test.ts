@@ -63,4 +63,28 @@ describe("GET /api/live-wagers", () => {
     };
     expect(none.summary.count).toBe(0);
   });
+
+  test("states where the rows came from and whether the list is complete", async () => {
+    const res = await get("api/live-wagers");
+    if (res.status === 404) return; // no capture in this checkout
+    const body = (await res.json()) as {
+      provenance?: {
+        source: string;
+        observedAt: string | null;
+        captureNote: string | null;
+        partial: boolean;
+      };
+    };
+
+    // Never absent: a count without provenance reads as "the ticker showed this many".
+    expect(body.provenance).toBeDefined();
+    expect(typeof body.provenance?.source).toBe("string");
+    expect(body.provenance?.source.length).toBeGreaterThan(0);
+    expect(typeof body.provenance?.partial).toBe("boolean");
+
+    // The committed salvage says it is a subset, both in the flag and in its own note.
+    expect(body.provenance?.partial).toBe(true);
+    expect(body.provenance?.captureNote ?? "").toContain("subset");
+    expect(body.provenance?.observedAt).toBeNull();
+  });
 });

@@ -3810,6 +3810,12 @@
 
         let all = [];
         let summaryData = { count: 0, byWriter: {}, byType: {} };
+        let provenance = {
+          source: "unlabelled",
+          observedAt: null,
+          captureNote: null,
+          partial: false,
+        };
         let writer = "";
         let type = "";
 
@@ -3938,6 +3944,7 @@
             const body = await res.json();
             all = body.wagers ?? [];
             summaryData = body.summary ?? summaryData;
+            provenance = body.provenance ?? provenance;
 
             document.getElementById("lw-count").textContent = String(
               summaryData.count ?? 0,
@@ -3959,8 +3966,28 @@
             );
             stats.hidden = false;
 
-            badge.textContent = `${summaryData.count ?? 0} WAGERS`;
-            badge.className = "badge badge-accent";
+            badge.textContent = provenance.partial
+              ? `${summaryData.count ?? 0} WAGERS · PARTIAL`
+              : `${summaryData.count ?? 0} WAGERS`;
+            badge.className = provenance.partial
+              ? "badge badge-warning"
+              : "badge badge-accent";
+
+            // The file's own words about its completeness, not a sentence invented here.
+            const caveat = provenance.captureNote;
+            const origin =
+              provenance.source === "unlabelled"
+                ? ""
+                : ` Source: ${provenance.source}${
+                    provenance.observedAt === null
+                      ? " (no observation time)"
+                      : ` at ${sdFormatTs(provenance.observedAt)}`
+                  }.`;
+            if (caveat !== null || origin !== "") {
+              note.textContent = [caveat ?? "", origin]
+                .filter((part) => part !== "")
+                .join(" ");
+            }
             render();
           } catch (err) {
             badge.textContent = "UNAVAILABLE";

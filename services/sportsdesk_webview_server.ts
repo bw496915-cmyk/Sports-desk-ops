@@ -51,7 +51,10 @@ import {
   readAnalysisReport,
   recomputeTotals,
 } from "../lib/analysis_report.ts";
-import { readWagerList, summarizeLiveWagers } from "../lib/live_wagers.ts";
+import {
+  readWagerListArtifact,
+  summarizeLiveWagers,
+} from "../lib/live_wagers.ts";
 import {
   BOARD_WINDOWS,
   biggestSide,
@@ -202,10 +205,11 @@ async function loadLiveBets(): Promise<{
 }
 
 /** The live wager list ({LIST: [...]}), when a capture has been saved. */
+/** The live wager list ({LIST: [...]}) plus the file's own account of its completeness. */
 async function loadLiveWagerList() {
   const file = Bun.file(resolve(repoRoot, "data/live-wagers.json"));
   if (!(await file.exists())) return null;
-  return readWagerList(await file.json());
+  return readWagerListArtifact(await file.json());
 }
 
 /** A stored Analysis report result, when one has been transcribed. */
@@ -664,8 +668,8 @@ export function startServer(options?: ServerOptions) {
           );
         }
 
-        const wagers = await loadLiveWagerList();
-        if (wagers === null) {
+        const artifact = await loadLiveWagerList();
+        if (artifact === null) {
           return Response.json(
             {
               error: "no live wager list",
@@ -674,6 +678,7 @@ export function startServer(options?: ServerOptions) {
             { status: 404, headers: corsHeaders },
           );
         }
+        const wagers = artifact.wagers;
 
         const writer = (url.searchParams.get("writer") ?? "")
           .trim()
@@ -692,6 +697,8 @@ export function startServer(options?: ServerOptions) {
             all: summarizeLiveWagers(wagers),
             writer: writer === "" ? null : writer,
             type: type === "" ? null : type,
+            // The file's own account of itself: a 17-row subset reads as 17 rows, not as the list.
+            provenance: artifact.provenance,
             wagers: filtered,
           },
           { headers: { ...corsHeaders, "Cache-Control": "no-store" } },

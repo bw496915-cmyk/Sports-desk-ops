@@ -389,4 +389,14 @@ describe("Live wager ticker panel", () => {
     expect(panel).toContain("byWriter");
     expect(panel).toContain("byType");
   });
+
+  test("labels a partial list as partial, in the file's own words", () => {
+    // A count of 17 must not read as "the ticker showed 17".
+    expect(panel).toContain("PARTIAL");
+    expect(panel).toContain("provenance.partial");
+    expect(panel).toContain("provenance.captureNote");
+    expect(panel).toContain("provenance.source");
+    // The note comes from the server, not from a sentence invented in the browser.
+    expect(panel).not.toContain("subset of the shown list");
+  });
 });

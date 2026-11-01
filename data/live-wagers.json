@@ -1,4 +1,8 @@
 {
+  "schemaVersion": 1,
+  "source": "paste:clipboard-ticker",
+  "observedAt": null,
+  "partial": true,
   "LIST": [
     {
       "WagerNumber": 767126203,
