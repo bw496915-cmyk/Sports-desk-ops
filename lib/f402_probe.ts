@@ -127,13 +127,16 @@ export function buildProbeExpression(
     headers,
     body: resolvedBody,
   });
-  const text = await response.text();
+  // Read bytes once: text.length counts characters, and re-encoding the whole body just to measure it
+  // is wasted work. The preview decodes a prefix; bodyText stays for the promote path.
+  const buffer = new Uint8Array(await response.arrayBuffer());
+  const decoder = new TextDecoder();
   return {
     status: response.status,
     contentType: response.headers.get("content-type") ?? "",
-    bytes: new TextEncoder().encode(text).byteLength,
-    preview: text.slice(0, ${preview}),
-    bodyText: text,
+    bytes: buffer.byteLength,
+    preview: decoder.decode(buffer.subarray(0, ${preview})),
+    bodyText: decoder.decode(buffer),
     dateUsed: mdy,
   };
 })()`;
