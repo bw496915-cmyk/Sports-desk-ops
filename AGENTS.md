@@ -34,6 +34,13 @@ green badge does not exist; the local chain _is_ the proof.
 
 ## Hard rules
 
+### ⚠️ SECURITY WARNING (Fantasy402 session)
+
+Never paste **Bearer JWTs**, live cookies, or portal passwords into chat, commits, or scripts.
+Revoke any token that was exposed. Live manager API calls must use **`createF402ReplayTransport()`**
+(WebView profile / session file / replay proxy) — see `lib/f402_agent_policy.ts` and
+`docs/evidence/agent-graph-operator.md`. Agent graph CLI: **`bun run graph:agent`** (no `--token` flags).
+
 - **Production is read-only unless the task is explicitly a deploy.** Probe with `./bin/dx`, never
   mutate live data to make a number look right.
 - **Evidence labelling:** any claim in docs or commits states what was measured and when. The docs
