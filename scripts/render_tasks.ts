@@ -3,21 +3,30 @@
  * @file scripts/render_tasks.ts
  * @description Render `docs/REMAINING_TASKS.md` with Bun's native Markdown renderer.
  *
- * Default output is ANSI for the terminal, with colour and OSC 8 links only on a TTY:
- *   bun run tasks:render
- *   bun run tasks:render --no-color --columns 100
- *   bun run tasks:render --format html --out scratch/remaining-tasks.html
+ * For reading in a terminal, prefer the zero-code loader:
+ *   bun ./docs/REMAINING_TASKS.md
+ * It renders ANSI without booting the JS VM and honours NO_COLOR/FORCE_COLOR/COLUMNS.
  *
- * Usage:
- *   bun run scripts/render_tasks.ts [--format ansi|html] [--out <path>] [--no-color]
- *                                   [--columns N] [--source <path>]
+ * This script exists for the HTML artifact and the checkbox gate:
+ *   bun run tasks:render --format html --out scratch/remaining-tasks.html
+ *   bun run tasks:render --no-color --columns 0
+ *   bun run tasks:render --color --columns 100
+ *
+ * `Bun.markdown.ansi` takes an ANSI theme only (no parser options); parser options go to `html()`.
  */
 
-const GFM = {
+const MAX_BYTES = 1_000_000;
+
+const PARSER_OPTIONS = {
   tables: true,
   strikethrough: true,
   tasklists: true,
   autolinks: true,
+  // Sanitize untrusted HTML and give each heading an anchor; `true` would also add autolinks.
+  tagFilter: true,
+  headings: { ids: true },
+  // Stable HTML for artifact diffs.
+  collapseWhitespace: true,
 } as const;
 
 function flag(
@@ -36,31 +45,82 @@ const args = process.argv.slice(2);
 const source = flag(args, ["--source"], "docs/REMAINING_TASKS.md");
 const format = flag(args, ["--format"], "ansi");
 const outPath = flag(args, ["--out"], "");
-const columns = Math.max(
-  0,
-  Number(flag(args, ["--columns"], String(process.stdout.columns || 80))),
-);
+const columnsFlag = flag(args, ["--columns"], "");
 const noColor = args.includes("--no-color");
+const wantColor = args.includes("--color");
 
 if (format !== "ansi" && format !== "html") {
   console.error(`tasks: unknown format "${format}" (ansi|html)`);
   process.exit(2);
 }
+if (typeof Bun.markdown?.html !== "function") {
+  console.error(
+    "tasks: Bun.markdown is unavailable (API is unstable; check the Bun version)",
+  );
+  process.exit(2);
+}
 
-const markdown = await Bun.file(source).text();
-const unchecked = (markdown.match(/^- \[ \]/gm) ?? []).length;
-const checked = (markdown.match(/^- \[x\]/gm) ?? []).length;
+const buffer = await Bun.file(source).arrayBuffer();
+if (buffer.byteLength > MAX_BYTES) {
+  console.error(
+    `tasks: ${source} is ${buffer.byteLength} bytes (limit ${MAX_BYTES}); refusing to parse`,
+  );
+  process.exit(2);
+}
+const markdown = new TextDecoder().decode(buffer);
+
+const mdOpen = (markdown.match(/^- \[ \]/gm) ?? []).length;
+const mdDone = (markdown.match(/^- \[x\]/gim) ?? []).length;
+
+// The gate runs on HTML regardless of the requested output: CSS/marker changes in ANSI cannot
+// hide a task-count drift.
+const html = Bun.markdown.html(buffer, PARSER_OPTIONS);
+const htmlOpen = (html.match(/type="checkbox"(?![^>]*checked)/g) ?? []).length;
+const htmlDone = (html.match(/type="checkbox"[^>]*checked/g) ?? []).length;
+
+if (mdOpen !== htmlOpen || mdDone !== htmlDone) {
+  console.error(
+    `checkbox drift: md ${mdOpen}/${mdDone} vs html ${htmlOpen}/${htmlDone}`,
+  );
+  process.exit(1);
+}
+
+const outIsTTY = process.stdout.isTTY === true;
+const forceColor = process.env.FORCE_COLOR;
+const forcedColor =
+  forceColor === "1" ||
+  forceColor === "true" ||
+  forceColor === "2" ||
+  forceColor === "3"
+    ? true
+    : forceColor === "0"
+      ? false
+      : undefined;
+const color =
+  forcedColor ??
+  ("NO_COLOR" in process.env
+    ? false
+    : wantColor || (outPath === "" && outIsTTY && Bun.enableANSIColors));
+const columns =
+  columnsFlag !== ""
+    ? Math.max(0, Number(columnsFlag))
+    : outIsTTY
+      ? (process.stdout.columns ?? 80)
+      : 0;
 
 const rendered =
   format === "html"
-    ? Bun.markdown.html(markdown, GFM)
+    ? html
     : (() => {
-        const isTTY = process.stdout.isTTY === true;
+        if (typeof Bun.markdown.ansi !== "function") {
+          console.error("tasks: Bun.markdown.ansi is unavailable");
+          process.exit(2);
+        }
         const light = process.env.COLORFGBG?.endsWith(";15");
-        return Bun.markdown.ansi(markdown, {
-          colors: !noColor && isTTY && Bun.enableANSIColors,
-          hyperlinks: isTTY,
+        return Bun.markdown.ansi(buffer, {
+          colors: !noColor && color,
           columns,
+          hyperlinks: outIsTTY,
           kittyGraphics: false,
           ...(light === undefined ? {} : { light }),
         });
@@ -73,17 +133,8 @@ if (outPath !== "") {
   process.stdout.write(rendered);
   console.error(`render: ${format} (${rendered.length} bytes)`);
 }
-console.error(`tasks: ${unchecked} open, ${checked} done`);
 
-const renderedCheckboxes =
-  format === "html"
-    ? (rendered.match(/type="checkbox"/g) ?? []).length
-    : (
-        Bun.markdown
-          .ansi(markdown, { colors: false, columns })
-          .match(/\[[ x]\]/g) ?? []
-      ).length;
-if (renderedCheckboxes !== unchecked + checked) {
-  console.error("checkboxes do not match markdown task count");
-  process.exitCode = 1;
-}
+const pad = (label: string, width: number): string =>
+  label + " ".repeat(Math.max(0, width - Bun.stringWidth(label)));
+const summary = `${pad("open", 5)} ${mdOpen}   ${pad("done", 5)} ${mdDone}   (${mdOpen + mdDone} checkboxes)`;
+console.error(Bun.wrapAnsi(summary, columns || 80));

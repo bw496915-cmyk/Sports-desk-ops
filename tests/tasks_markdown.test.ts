@@ -5,6 +5,8 @@ const GFM = {
   strikethrough: true,
   tasklists: true,
   autolinks: true,
+  tagFilter: true,
+  headings: { ids: true },
 } as const;
 
 const markdown = await Bun.file("docs/REMAINING_TASKS.md").text();
