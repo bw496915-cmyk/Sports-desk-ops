@@ -4,6 +4,7 @@ import {
   DOCS_RENDER_OPTIONS,
   MAX_MARKDOWN_BYTES,
   MarkdownTooLargeError,
+  buildDocsManifest,
   docsCacheKey,
   renderDocsTree,
 } from "../lib/docs_render_cache.ts";
@@ -102,5 +103,56 @@ describe("docs render cache", () => {
     const entriesAfter = [...new Bun.Glob("*").scanSync({ cwd: CACHE })].length;
     expect(entriesAfter).toBe(entriesBefore);
     await Bun.file(`${DIR}/big.md`).delete();
+  });
+
+  test("the manifest is deterministic and merges identical content", () => {
+    const rendered = [
+      {
+        key: "b",
+        rel: "z.md",
+        sourceBytes: 1,
+        htmlBytes: 10,
+        zstdBytes: 5,
+        cached: true,
+      },
+      {
+        key: "a",
+        rel: "b.md",
+        sourceBytes: 1,
+        htmlBytes: 20,
+        zstdBytes: 6,
+        cached: true,
+      },
+      {
+        key: "a",
+        rel: "a.md",
+        sourceBytes: 1,
+        htmlBytes: 20,
+        zstdBytes: 6,
+        cached: true,
+      },
+    ];
+    const first = buildDocsManifest(rendered);
+    const second = buildDocsManifest([...rendered].reverse());
+    expect(first.buildId).toBe(second.buildId);
+    expect(Object.keys(first.entries)).toEqual(["a", "b"]);
+    expect(first.entries["a"]?.sources).toEqual(["a.md", "b.md"]);
+    expect(first.buildId).toHaveLength(64);
+  });
+
+  test("dryRun computes without writing", async () => {
+    const dir = `${ROOT}/dry/docs`;
+    const cache = `${ROOT}/dry/cache`;
+    await Bun.write(`${dir}/x.md`, "# X\n");
+    const [entry] = await renderDocsTree({
+      dir,
+      cacheDir: cache,
+      dryRun: true,
+    });
+    expect(entry?.cached).toBe(false);
+    expect(await Bun.file(`${cache}/${entry?.key}.html`).exists()).toBe(false);
+    expect(await Bun.file(`${cache}/${entry?.key}.html.zst`).exists()).toBe(
+      false,
+    );
   });
 });
