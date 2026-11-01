@@ -22,6 +22,8 @@ ignorePatterns = [
   "docs/assets/pipeline-artifacts-metadata.json",
   "docs/combo-uniqueness.json",
   "docs/cross-domain-bridge.json",
+  # Compact on purpose: 2.2k agents stay ~94 KB instead of ~220 KB pretty-printed.
+  "data/agent-tree.json",
 ]
 
 # Install keys (linker, globalStore, cache.dir, frozenLockfile, minimumReleaseAge) are owned by the
