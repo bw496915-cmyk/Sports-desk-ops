@@ -312,18 +312,21 @@ async function main(): Promise<number> {
       : (op.wireContentType ??
         "application/x-www-form-urlencoded; charset=UTF-8");
 
+  // Pure: CLI flag values in, body options out. Shared by bodyFor and the week-sweep path
+  // so the two can never diverge on which overrides exist.
+  const probeBodyOpts = () => ({
+    ...(ticketValue === "" ? {} : { ticketNumber: ticketValue }),
+    ...(wagerValue === "" ? {} : { wagerNumber: wagerValue }),
+    ...(flagValue_ === "" ? {} : { flag: flagValue_ }),
+  });
+
   const bodyFor = (op: (typeof ops)[number]): string => {
     if (explicitBody !== "") return explicitBody;
     if (agentId === "") return "";
-    const bodyOpts = {
-      ...(ticketValue === "" ? {} : { ticketNumber: ticketValue }),
-      ...(wagerValue === "" ? {} : { wagerNumber: wagerValue }),
-      ...(flagValue_ === "" ? {} : { flag: flagValue_ }),
-    };
     const cid = process.env.F402_CUSTOMER_ID?.trim() || "__CUSTOMER_ID__";
     return contentTypeFor(op) === "application/json"
-      ? buildJsonProbeBody(op, agentId, cid, bodyOpts)
-      : buildProbeBody(op, agentId, cid, bodyOpts);
+      ? buildJsonProbeBody(op, agentId, cid, probeBodyOpts())
+      : buildProbeBody(op, agentId, cid, probeBodyOpts());
   };
 
   if (dryRun) {
@@ -649,11 +652,7 @@ async function main(): Promise<number> {
                 op,
                 agentId,
                 process.env.F402_CUSTOMER_ID?.trim() || "__CUSTOMER_ID__",
-                {
-                  ...(ticketValue === "" ? {} : { ticketNumber: ticketValue }),
-                  ...(wagerValue === "" ? {} : { wagerNumber: wagerValue }),
-                  ...(flagValue_ === "" ? {} : { flag: flagValue_ }),
-                },
+                probeBodyOpts(),
               );
         const outFile =
           weekIdx === null
