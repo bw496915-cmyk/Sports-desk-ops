@@ -57,6 +57,22 @@ SportsDesk categorizes automated workloads across three distinct scheduling para
 | **Resource Disposal**       | `crontab -r` / File deletion      | `Bun.cron.remove(title)`           | **Explicit Resource Management (`using`)**      |
 | **Process Control**         | External init (`systemd`)         | External init (`launchd`/`cron`)   | **`.ref()` and `.unref()` controls**            |
 
+### 2.2 Repo helper surface (`lib/bun_cron.ts`)
+
+Fleet scripts should not call raw `Bun.cron` except inside this module. Wrappers mirror the three Bun entry points:
+
+| Helper | Maps to |
+| :----- | :------ |
+| `startInProcessCron(schedule, handler, { tz? })` | In-process `Bun.cron(schedule, fn, { tz })` |
+| `wireInProcessCronLifecycle(job, { onShutdown? })` | `job.ref()` + SIGINT/SIGTERM → `job.stop()` |
+| `previewCronSchedule` / `formatCronScheduleLine` | `Bun.cron.parse` for operator logs (`nextFire`) |
+| `parseCronSchedule` / `parseCronScheduleOrNull` | Strict vs nullable next-fire |
+| `installOsCronJob` / `removeOsCronJob` | OS path + title; **install refuses `{ tz }`** (launchd/crontab have no IANA pin) |
+| `isBunOsCronInvocation` / `osCronWorkerPath` | Detect `--cron-title=` argv; absolute worker path |
+| `CronScheduledWorker` | `export default { scheduled(controller) }` for Tier 2 workers |
+
+Canonical consumers: `scripts/artifacts_cron.ts`, `scripts/f402_portal_drift_cron.ts`, `scripts/graph_feed_poller_daemon.ts`, `scripts/audit_docs_webview_cron.ts`, `services/reporting_scheduler_service.ts`.
+
 ---
 
 ## 3. In-Process `Bun.cron()` Engine (v1.4+ Callback Overload)
