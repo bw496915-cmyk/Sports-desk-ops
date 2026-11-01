@@ -265,6 +265,8 @@ Asset names are validated (separators, control characters, `..`) and traversal i
   `app/manager/module/agent-performance.js?bust=1.0.280` (`getSubsport()` → jQuery `$.ajax`). The
   module name is the strongest evidence yet that the CP grid is the `getAgentPerformance` screen, but
   it is a trace of the _sub-sport_ call, not of the report call, so the report's URL stays unproven.
+- The padding is confirmed by three observations, not inferred from one: `Football`, `Auto Racing` and
+  `Tennis` all pad to the same 20 characters, so the width is a property of the field, not of a name.
 - `lib/f402_agent_performance_request.ts` builds the observed body from a typed selection and is pinned
   byte-for-byte to both recorded calls. It pads `sport` to 20 characters, validates `subsport` and
   `period` against the captured catalog, always emits the three filter fields (empty when unfiltered)

@@ -18,7 +18,7 @@
         "module": "app/manager/module/agent-performance.js?bust=1.0.280",
         "function": "getSubsport",
         "transport": "jQuery $.ajax",
-        "observedFrom": "browser stack trace, 2026-11-01 — send -> ajax -> getSubsport -> agent-performance.js"
+        "observedFrom": "browser stack trace, 2026-11-01 \u2014 send -> ajax -> getSubsport -> agent-performance.js"
       },
       "fields": {
         "customerID": "<agent>",
@@ -27,7 +27,25 @@
         "RRO": "1",
         "agentID": "<agent>",
         "agentOwner": "<agent>"
-      }
+      },
+      "sportVariants": [
+        {
+          "sport": "Football            ",
+          "sportTrimmed": "Football",
+          "paddedLength": 20
+        },
+        {
+          "sport": "Auto Racing         ",
+          "sportTrimmed": "Auto Racing",
+          "paddedLength": 20
+        },
+        {
+          "sport": "Tennis              ",
+          "sportTrimmed": "Tennis",
+          "paddedLength": 20
+        }
+      ],
+      "sportVariantsNote": "three observations of the same call: one single-word sport, one two-word sport and one short name; all pad to 20 characters, so the width is not a property of a particular name"
     },
     {
       "operation": "getAgentPerformance",

@@ -248,7 +248,10 @@ of hand-building a curl.
 **Observed request, still unledgered: `getSubSportByReport`.** A 2026-11-01 operator paste shows
 `POST /cloud/api/Manager/getSubSportByReport`, form-urlencoded, with
 `customerID`, `sport` (padded to 20 characters — `Football` plus 12 spaces), `operation`, `RRO=1`,
-`agentID`, `agentOwner`. A browser stack trace from the same session names the caller:
+`agentID`, `agentOwner`. Two further observations send `sport=Auto+Racing+++++++++` and
+`sport=Tennis++++++++++++++` — a two-word sport and a short one, both padded to the same 20
+characters — so the field width is pinned across name lengths rather than from one sample. A browser
+stack trace from the same session names the caller:
 `getSubsport()` in `app/manager/module/agent-performance.js?bust=1.0.280`, through jQuery `$.ajax` —
 which is also why the request is form-encoded with `X-Requested-With`. That module is the screen whose
 report is `getAgentPerformance`, so the two observed requests belong to one page. It is the call that

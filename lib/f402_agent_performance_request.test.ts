@@ -225,3 +225,25 @@ describe("buildAgentPerformanceRequest", () => {
     }
   });
 });
+
+describe("sport padding, from both observed calls", () => {
+  test("a two-word sport pads after both words", () => {
+    // Second observation: sport=Auto+Racing+++++++++ — "Auto Racing" plus 9 spaces, still 20.
+    const built = buildAgentPerformanceRequest(
+      { ...base, sport: "Auto Racing" },
+      { catalog },
+    );
+    expect(built.sportPadded).toBe("Auto Racing".padEnd(20, " "));
+    expect(built.body).toContain("sport=Auto+Racing+++++++++");
+  });
+
+  test("wider sports still fit, and the field never exceeds 20", () => {
+    for (const entry of catalog.sports) {
+      if (entry.sport.trim().length > SPORT_FIELD_WIDTH) {
+        expect(() => padSportField(entry.sport)).toThrow(/holds 20/);
+      } else {
+        expect(padSportField(entry.sport)).toHaveLength(SPORT_FIELD_WIDTH);
+      }
+    }
+  });
+});

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ANALYSIS_REPORTS } from "../lib/analysis_filters.ts";
+import { padSportField } from "../lib/f402_agent_performance_request.ts";
 import {
   findSubSport,
   loadSportCatalog,
@@ -32,6 +33,11 @@ const fixture = JSON.parse(
     pathObserved: string | null;
     pathStatus: string;
     contentType: string;
+    sportVariants?: Array<{
+      sport: string;
+      sportTrimmed: string;
+      paddedLength: number;
+    }>;
     caller?: {
       module: string;
       function: string;
@@ -259,5 +265,50 @@ describe("who calls getSubSportByReport", () => {
     const caller = byOperation("getSubSportByReport").caller;
     expect(caller?.observedFrom).toContain("2026-11-01");
     expect(caller?.observedFrom).toContain("stack trace");
+  });
+});
+
+describe("the sport field, from two observations", () => {
+  const variants = byOperation("getSubSportByReport").sportVariants ?? [];
+
+  test("every observed sport pads to 20 characters", () => {
+    // Football, Auto Racing, Tennis — three names of different lengths, one width.
+    expect(variants.length).toBeGreaterThanOrEqual(2);
+    for (const variant of variants) {
+      expect(variant.paddedLength).toBe(20);
+      expect(variant.sport).toHaveLength(20);
+      expect(variant.sport.trim()).toBe(variant.sportTrimmed);
+    }
+  });
+
+  test("a two-word sport pads after both words", () => {
+    // "Auto Racing" + 9 spaces, so the encoded segment is Auto+Racing followed by nine "+".
+    const autoRacing = variants.find(
+      (variant) => variant.sportTrimmed === "Auto Racing",
+    );
+    expect(autoRacing).toBeDefined();
+    expect(autoRacing?.sport).toBe("Auto Racing".padEnd(20, " "));
+    // Two words plus 9 trailing spaces: encoded, that is one "+" between the words and nine after.
+    expect(autoRacing?.sport.slice("Auto Racing".length)).toBe(" ".repeat(9));
+    expect(
+      new URLSearchParams([["sport", autoRacing?.sport ?? ""]]).toString(),
+    ).toBe("sport=Auto+Racing+++++++++");
+  });
+
+  test("a five-character name is padded to the same width", () => {
+    const tennis = variants.find(
+      (variant) => variant.sportTrimmed === "Tennis",
+    );
+    expect(tennis).toBeDefined();
+    expect(tennis?.sport).toBe("Tennis".padEnd(20, " "));
+    expect(
+      new URLSearchParams([["sport", tennis?.sport ?? ""]]).toString(),
+    ).toBe("sport=Tennis++++++++++++++");
+  });
+
+  test("padSportField reproduces every observed sport segment", () => {
+    for (const variant of variants) {
+      expect(padSportField(variant.sportTrimmed)).toBe(variant.sport);
+    }
   });
 });
