@@ -113,7 +113,7 @@ export function buildProbeExpression(
   return {
     status: response.status,
     contentType: response.headers.get("content-type") ?? "",
-    bytes: text.length,
+    bytes: new TextEncoder().encode(text).byteLength,
     preview: text.slice(0, ${preview}),
   };
 })()`;

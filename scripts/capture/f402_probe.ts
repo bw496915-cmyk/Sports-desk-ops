@@ -3,21 +3,22 @@
  * @file scripts/capture/f402_probe.ts
  * @description Probe the F402 report reads from inside a signed-in WebKit page.
  *
- *   bun run capture:f402 --dry-run
- *   bun run capture:f402 --login                 # unattended, needs F402_AGENT_ID / F402_PASSWORD
- *   bun run capture:f402 --wait-for 'a[href*="logout"]'
- *   bun run capture:f402                         # interactive: sign in, press Enter
+ * The session cookie is HttpOnly, so the request must come from the page. The profile directory
+ * persists the sign-in, which means later runs start authenticated.
  *
- * The session cookie is HttpOnly, so the request has to come from the page. The profile directory
- * persists the sign-in, which means later runs start already authenticated.
- *
- * What this produces is a probe, not a promoted capture: status, content type and a body preview per
- * operation, written under scratch/ (gitignored). Headers are not observed, and nothing is written to
- * docs/ until the shape is confirmed — a 404/405 here is a finding, not a failure.
+ * Probes are evidence, not promoted captures: status, content type and a body preview per operation
+ * under scratch/ (gitignored). A 404/405/401 is a finding, not a failure.
  */
 
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import {
+  flagValue,
+  hasFlag,
+  parseCliArgs,
+  printHelp,
+  wantsHelp,
+} from "../../lib/cli_args.ts";
 import {
   PROBE_PREFIXES,
   buildProbeBody,
@@ -30,30 +31,69 @@ import {
 import { loginF402, MissingF402CredentialsError } from "./f402_login.ts";
 import { ManagedWebView } from "./webview.ts";
 
-function flag(args: readonly string[], name: string, fallback: string): string {
-  const index = args.indexOf(name);
-  return index !== -1 && index + 1 < args.length ? args[index + 1]! : fallback;
-}
+const VALUE_FLAGS = [
+  "--base",
+  "--profile",
+  "--out",
+  "--wait-for",
+  "--body",
+  "--prefix",
+  "--ops",
+  "--login-wait-ms",
+] as const;
+
+const HELP = `
+capture:f402 — probe the F402 report reads from a signed-in WebKit page
+
+Options:
+  --login                 Sign in with F402_AGENT_ID / F402_PASSWORD (or the OS credential store)
+  --base <url>            Portal origin (default: F402_BASE_URL or https://fantasy402.com)
+  --prefix <path>         Route prefix (default: /cloud/api/Manager)
+  --ops <a,b>             Only these operations (default: every confirmed read)
+  --body <form>           Override the form body; {customerID} is resolved in-page
+  --profile <dir>         Persistent WebKit profile (default: scratch/webview-profile)
+  --out <dir>             Probe output root (default: scratch/f402-probes)
+  --wait-for <selector>   Unattended: wait for this selector instead of pressing Enter
+  --login-wait-ms <ms>    Login timeout (default: 180000)
+  --dry-run               Print the plan; launch nothing
+  --include-unconfirmed   Include PendingDelete (also needs --i-understand-mutations)
+  -h, --help              This text
+
+Examples:
+  bun run capture:f402 --dry-run
+  bun run capture:f402 --login
+  bun run capture:f402 --login --ops Pending --prefix /cloud/api/Report
+  bun run capture:f402 --login --body 'agentID=118&agentOwner=118&customerID={customerID}&operation=Pending&RRO=1'
+
+Every probe records the body it sent and sets headersObserved:false. Nothing is written to docs/.
+`.trim();
 
 async function main(): Promise<number> {
-  const args = process.argv.slice(2);
-  const base = flag(
-    args,
-    "--base",
-    process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com",
-  );
-  const profile = flag(args, "--profile", "scratch/webview-profile");
-  const outRoot = flag(args, "--out", "scratch/f402-probes");
-  const waitFor = flag(args, "--wait-for", "");
-  const explicitBody = flag(args, "--body", "");
-  const prefix = flag(args, "--prefix", PROBE_PREFIXES[0]!);
-  const opsArg = flag(args, "--ops", "");
-  const loginWaitMs = Number(flag(args, "--login-wait-ms", "180000"));
-  const autoLogin = args.includes("--login");
-  const includeUnconfirmed = args.includes("--include-unconfirmed");
-  const dryRun = args.includes("--dry-run");
+  const parsed = parseCliArgs(process.argv.slice(2), {
+    valueFlags: VALUE_FLAGS,
+  });
+  if (wantsHelp(parsed)) {
+    printHelp(HELP);
+    return 0;
+  }
 
-  if (includeUnconfirmed && !args.includes("--i-understand-mutations")) {
+  const base = flagValue(
+    parsed,
+    "--base",
+    process.env.F402_BASE_URL?.trim() || "https://fantasy402.com",
+  );
+  const profile = flagValue(parsed, "--profile", "scratch/webview-profile");
+  const outRoot = flagValue(parsed, "--out", "scratch/f402-probes");
+  const waitFor = flagValue(parsed, "--wait-for", "");
+  const explicitBody = flagValue(parsed, "--body", "");
+  const prefix = flagValue(parsed, "--prefix", PROBE_PREFIXES[0]!);
+  const opsArg = flagValue(parsed, "--ops", "");
+  const loginWaitMs = Number(flagValue(parsed, "--login-wait-ms", "180000"));
+  const autoLogin = hasFlag(parsed, "--login");
+  const includeUnconfirmed = hasFlag(parsed, "--include-unconfirmed");
+  const dryRun = hasFlag(parsed, "--dry-run");
+
+  if (includeUnconfirmed && !hasFlag(parsed, "--i-understand-mutations")) {
     console.error(
       "capture:f402: --include-unconfirmed also needs --i-understand-mutations; PendingDelete is not confirmed read-only",
     );
@@ -71,23 +111,37 @@ async function main(): Promise<number> {
       : selected.filter((op) => wanted.has(op.operation));
   if (ops.length === 0) {
     console.error(
-      `capture:f402: --ops matched nothing (available: ${selected.map((op) => op.operation).join(", ")})`,
+      `capture:f402: --ops matched nothing. Available: ${selected.map((op) => op.operation).join(", ")}`,
+    );
+    console.error(
+      "  bun run capture:f402 --ops Pending --prefix /cloud/api/Report",
     );
     return 2;
   }
+
   const agentId = process.env.F402_AGENT_ID?.trim() ?? "";
   const bodyFor = (op: (typeof ops)[number]): string =>
     explicitBody !== ""
       ? explicitBody
       : agentId === ""
         ? ""
-        : buildProbeBody(op, agentId, process.env.F402_CUSTOMER_ID?.trim());
+        : buildProbeBody(
+            op,
+            agentId,
+            process.env.F402_CUSTOMER_ID?.trim() || "{customerID}",
+          );
 
   if (dryRun) {
-    console.error(`capture:f402: plan for ${base} (${ops.length} operations)`);
+    console.error(
+      `capture:f402: plan for ${base} (${ops.length} operations, prefix ${prefix})`,
+    );
     for (const op of ops) {
+      const shown =
+        agentId === ""
+          ? bodyFor(op)
+          : bodyFor(op).replaceAll(agentId, "<agent>");
       console.log(
-        `${op.operation.padEnd(30)} ${op.method.padEnd(4)} ${probeUrl(base, op, prefix)}  body=${bodyFor(op).replaceAll(agentId === "" ? "\u0000" : agentId, "<agent>")}  ${op.readOnly ? "" : "[unconfirmed]"}`,
+        `${op.operation.padEnd(30)} ${op.method.padEnd(4)} ${probeUrl(base, op, prefix)}  body=${shown}  ${op.readOnly ? "" : "[unconfirmed]"}`,
       );
     }
     console.error("capture:f402: dry run; nothing launched");
@@ -131,8 +185,12 @@ async function main(): Promise<number> {
         );
         authMode = "interactive";
       } else {
+        console.error("capture:f402: no TTY and no --wait-for selector.");
         console.error(
-          "capture:f402: no TTY and no --wait-for selector; pass --login with F402_AGENT_ID/F402_PASSWORD, or --wait-for",
+          "  bun run capture:f402 --login          # F402_AGENT_ID / F402_PASSWORD",
+        );
+        console.error(
+          "  bun run capture:f402 --wait-for 'a[href*=\"logout\"]'",
         );
         return 2;
       }
@@ -184,6 +242,9 @@ async function main(): Promise<number> {
   } catch (error) {
     if (error instanceof MissingF402CredentialsError) {
       console.error(`capture:f402: ${error.message}`);
+      console.error(
+        "  bun run secrets:f402 set --agent-id <id>   # then pipe the password on stdin",
+      );
       return 2;
     }
     throw error;
