@@ -367,6 +367,20 @@ Asset names are validated (separators, control characters, `..`) and traversal i
 - `VolumeAmount` differing from `AmountWagered` is reported (`volumeDiffers`), not reconciled.
 - `data/live-wagers.json` holds 17 rows salvaged from a partial clipboard paste and records that
   provenance in `captureNote`.
+- **The ticker's configuration names its buckets two different ways.** The write
+  (`POST /cloud/api/Manager/updateBetTickerConfig`, form-encoded, a mutation this repo never sends)
+  uses upper bounds — `play499`, `color499` — while the read's `INFO` object uses ranges —
+  `play1-499`, `color1-499`. Six buckets span 1-499, 500-999, 1000-1999, 2000-4999, 5000-9999 and
+  10000-100000, contiguous; a round-trip has to translate between the two namings
+  (`tests/fixtures/f402-bet-ticker-config-2026-11-01.json`).
+- **The values are padded asymmetrically.** An enabled bucket reads `"on "` — trailing space — and a
+  disabled one reads `"off"` with none. So `value === "on"` is false for every enabled bucket while
+  `value === "off"` is true, which makes a naive parser look half-right and report the whole ticker
+  as disabled. Trim before comparing; the tests state the bug and its fix.
+- **`AgentID` changes width between the two calls**: unpadded in the request, padded to 50
+  characters in the response. Same field, two widths.
+- The pasted read is the healthy `INFO` object. The `INFO:false` shape the capture request asks for
+  was not observed, so the two must not be conflated.
 - Every response carries that provenance back: `provenance.source` (`paste:clipboard-ticker`),
   `observedAt` (null — the paste carries no timestamp), `captureNote` verbatim and `partial: true`.
   The dashboard renders the list as `17 WAGERS · PARTIAL` and shows the file's own note, so a count
