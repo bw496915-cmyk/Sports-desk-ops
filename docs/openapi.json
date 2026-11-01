@@ -688,7 +688,7 @@
         },
         "x-evidence": {
           "tier": "C",
-          "sources": ["none", "docs/openapi.json"],
+          "sources": ["none", "tests/fixtures/portal-left-menu-actions.html"],
           "capturedResponse": false,
           "requiredCapture": "On manager.html (v1.0.280) boot, weekly figures are fetched via POST /cloud/api/Manager/getWeeklyFigureByAgentLite ({agentID, week: 0, type: \"A\", layout: \"byDay\", operation: \"getWeeklyFigureByAgentLite\", RRO: 1} at manager.js:52703) and POST /cloud/api/Manager/getMasterSheet (manager.js:43955). Capture getWeeklyFigureByAgentLite and reconcile."
         }

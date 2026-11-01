@@ -543,9 +543,9 @@
           "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
         },
         {
-          "source": "docs/openapi.json",
-          "kind": "spec-claim",
-          "note": "Spec claims it is triggered by data-action='get-weekly-figure'; that string appears in no capture, test or code artifact in either tree."
+          "source": "tests/fixtures/portal-left-menu-actions.html",
+          "kind": "ui-observation",
+          "note": "Corrected 2026-11-01: data-action=\"get-weekly-figure\" IS real — an operator paste of the manager page's mobile left menu contains it (with data-type=\"heavy\"), beside go-home-menu, get-pending, get-game-admin and get-messaging. The earlier note that the string appeared in no artifact was wrong. What remains unproven is that this action posts to Report/getWeeklyFigure; the boot path calls Manager/getWeeklyFigureByAgentLite instead."
         }
       ],
       "requiredCapture": "On manager.html (v1.0.280) boot, weekly figures are fetched via POST /cloud/api/Manager/getWeeklyFigureByAgentLite ({agentID, week: 0, type: \"A\", layout: \"byDay\", operation: \"getWeeklyFigureByAgentLite\", RRO: 1} at manager.js:52703) and POST /cloud/api/Manager/getMasterSheet (manager.js:43955). Capture getWeeklyFigureByAgentLite and reconcile.",
