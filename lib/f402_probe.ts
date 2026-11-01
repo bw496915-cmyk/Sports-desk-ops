@@ -242,7 +242,7 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     operation: "getGames",
     method: "POST",
     readOnly: true,
-    note: "UNVERIFIED: games list (Manager envelope); captured body uses sportTypeIn/sportSubTypeIn/periodDescriptionIn/periodNumberIn/storeIn/numberStart/numberEnd/filtro. Token expired on capture (401) — needs re-run.",
+    note: "games list (Manager envelope); captured body: sportTypeIn, sportSubTypeIn, periodDescriptionIn, periodNumberIn, storeIn, agentID, numberStart, numberEnd, filtro, operation, RRO, agentOwner. Verified 200 (empty array).",
     params: [
       "sportTypeIn",
       "sportSubTypeIn",
