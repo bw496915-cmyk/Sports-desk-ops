@@ -252,6 +252,7 @@ describe("probe expression", () => {
       blobSize: 1536,
     });
     expect(parsed.isBinary).toBe(true);
+    if (parsed.isBinary !== true) throw new Error("expected binary variant");
     expect(parsed.blobType).toBe("image/png");
     expect(parsed.blobSize).toBe(1536);
   });
