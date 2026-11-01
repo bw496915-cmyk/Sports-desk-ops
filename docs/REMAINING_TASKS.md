@@ -118,7 +118,10 @@ so an id resolves without guessing which artifact it came from.
       `/cloud/api/Report` without `date`, **200 `{"LIST":""}`** (11 B) on `/cloud/api/Manager/getTransactions`, and
       **200 `{"LIST":[]}`** on `/cloud/api/Report/getTransactions` when `date=MM/DD/YYYY` for a settled day is supplied.
       Both empty shapes (`""` and `[]`) are handled by `parseF402ListEnvelope()`.
-    - **`[prefix-identical]` (`getDailyFiguresByCustomer`, `getGradedWagerByCustomer`, `getTicketDetailPrint` — last observed 500 (0 B) on both prefixes on 2026-11-01):**
+    - **`[prefix-identical]` (`getGradedWagerByCustomer`, `getTicketDetailPrint` — last observed 500 (0 B) on both prefixes on 2026-11-01):**
+      `getDailyFiguresByCustomer` is now **resolved**: with `week` as an integer (0..ShowHowManyWeeks) it returns **200**
+      with real figure data (verified against customers CLL118, NNC128). The original 500 was caused by sending a date
+      string where the server expected an integer week index.
       Both `/cloud/api/Manager` and `/cloud/api/Report` returned **500 (0 B)** on `2026-11-01`. Because both prefixes
       fail identically with zero bytes, prefix routing and 4xx parameter validation are ruled out — the shared handler
       threw before response serialization. Client JS (`customer/report/report.js:25633`) also reveals that
