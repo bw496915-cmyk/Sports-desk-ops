@@ -170,6 +170,22 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     params: ["agentID", "operation", "RRO", "agentOwner"],
   },
   {
+    operation: "write",
+    method: "POST",
+    readOnly: false,
+    note: "MUTATION: writes a log entry (Log prefix, JSON body); gated behind --include-unconfirmed",
+    params: [
+      "customerID",
+      "description",
+      "additional",
+      "operation",
+      "agentID",
+      "agentOwner",
+    ],
+    wireContentType: "application/json",
+    defaultPrefix: "/cloud/api/Log",
+  },
+  {
     operation: "PendingDelete",
     method: "POST",
     readOnly: false,
@@ -551,6 +567,9 @@ export interface ProbeBodyOptions {
   readonly flag?: string;
   readonly type?: string;
   readonly layout?: string;
+  readonly days?: string;
+  readonly description?: string;
+  readonly additional?: string;
 }
 
 function resolveParamMap(
@@ -597,6 +616,12 @@ function resolveParamMap(
       out[name] = options.layout ?? "byDay";
     } else if (name === "RRO") {
       out[name] = "1";
+    } else if (name === "days") {
+      out[name] = options.days ?? "7";
+    } else if (name === "description") {
+      out[name] = options.description ?? "probe";
+    } else if (name === "additional") {
+      out[name] = options.additional ?? "";
     }
   }
   return out;
