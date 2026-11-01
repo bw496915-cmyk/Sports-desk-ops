@@ -115,11 +115,13 @@ so an id resolves without guessing which artifact it came from.
 
 - [ ] **P0.3 Resolve the Authorization-header contradiction**
   - **Ref:** `RT-AUTH-HEADER`
-  - **Basis:** `[OBSERVED]` 2026-10-28 HAR sent none; `[OBSERVED]` 2026-10-31 captures record a redacted
-    `authorization` key; `[UNVERIFIED]` whether a bearer token is sent.
-  - **Done when:** an unredacted (or explicitly absent) header capture settles it, and `fantasy402Cookie` /
-    `daemonBearer` descriptions cite that capture.
-  - **Blocked by:** a capture environment that keeps the header value without redaction.
+  - **Basis:** `[OBSERVED]` every 2026-10-31 live capture (e.g.
+    `docs/evidence/captures/2026-10-31/getInfoPlayer.post.json`) carries `authorization: "<redacted>"`.
+    `redactHeaders` only emits header names that were actually present, so an Authorization header **was
+    sent**; `[UNVERIFIED]` its scheme and value, and why the 2026-10-28 HAR recorded none.
+  - **Done when:** a capture that keeps the scheme (for example `Bearer …`) settles whether it is a bearer
+    token, and the `fantasy402Cookie` / `daemonBearer` descriptions cite that capture.
+  - **Blocked by:** a capture environment that keeps the header scheme while redacting the secret.
 
 ## P1 — coverage and data quality
 
@@ -149,11 +151,15 @@ so an id resolves without guessing which artifact it came from.
 
 - [ ] **P2.1 Resolve the untracked `gs-manager-cli.zip`**
   - **Ref:** `RT-CLI-ZIP`
-  - **Basis:** `[OBSERVED]` 31 KB archive, no provenance or license trail.
+  - **Basis:** `[OBSERVED]` 31 KB, 18 files, `package.json` says `gs-manager-cli 0.2.0`, `"private": true`,
+    and declares **no licence**; README describes a dependency-free Bun CLI whose live acquisition is
+    deliberately blocked. The contents are self-describing enough for a checksum sidecar, but not for a
+    redistribution grant.
   - **Done when:** it is either documented and committed with provenance, or deleted.
   - **Guard:** `bun run audit:archives` fails on any tracked archive without a matching
     `provenance/<name>.json` (checksum, origin, licence), so it cannot be committed by accident.
-  - **Blocked by:** the owner’s decision.
+  - **Blocked by:** a licence statement (or a delete). With `private: true` and no licence file, committing
+    it would assert a redistribution right nobody has recorded.
 
 - [ ] **P2.3 Schedule artifact regeneration**
   - **Ref:** `RT-ARTIFACT-CADENCE`
@@ -162,10 +168,13 @@ so an id resolves without guessing which artifact it came from.
     CFB event index, but the bridge half still needs `scratch/bridge-live-all.json` or the demo book, so a
     clean CI checkout cannot regenerate either artifact.
   - **Done when:** a documented cadence (or cron job) regenerates and deploys them, with a freshness check.
+  - **Cadence in place:** the daily `schedule:` run in `.github/workflows/ci.yml` re-checks
+    `artifacts:lock` and `audit:ops`, so drift surfaces within a day even when nothing is pushed.
   - **Guard:** `bun run artifacts:lock` fails when an artifact or one of its generator inputs changed
     since `docs/artifacts.lock.json` was written. It proves nothing changed since the lock, not that the
     lock was taken right after a regeneration — so pair `artifacts:value` with `artifacts:lock --update`.
-  - **Blocked by:** a host for the scheduled run.
+  - **Blocked by:** regeneration itself needs live inputs (the Gamma fetch and the bridge capture), which a
+    clean CI checkout does not have; the schedule can detect drift but not rebuild.
 
 ## Done (for context)
 

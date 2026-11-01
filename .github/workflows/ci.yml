@@ -29,6 +29,10 @@ on:
       - "package.json"
       - "bun.lock"
       - ".github/workflows/**"
+  # Freshness cadence: the value artifacts cannot be rebuilt in CI (live inputs), but a daily run
+  # still fails if the generator inputs drifted or a release tag is unregistered.
+  schedule:
+    - cron: "17 7 * * *"
   workflow_dispatch:
 
 permissions:
