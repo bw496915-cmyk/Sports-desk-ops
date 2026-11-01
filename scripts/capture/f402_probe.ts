@@ -116,6 +116,8 @@ Options:
   --wait-for <selector>         Unattended: wait for this selector instead of pressing Enter
   --login-wait-ms <ms>          Login timeout (default: 180000)
   --dry-run                     Print the plan; launch nothing
+  --jsonl                       Write probe results as JSONL (one JSON object per line) to <out>/probes.jsonl
+  --no-screenshot               Disable the automatic proof screenshot (on by default)
   --list-ops                    Print the available ProbeOps and their form keys, then exit
   --no-preflight                Skip the DNS/TLS preflight
   --include-unconfirmed         Include PendingDelete (also needs --i-understand-mutations)
@@ -217,7 +219,11 @@ async function main(): Promise<number> {
   ).toLowerCase();
   const screenshotResizeRaw = flagValue(parsed, "--screenshot-resize", "");
   const screenshotQualityRaw = flagValue(parsed, "--screenshot-quality", "82");
+  const jsonl = hasFlag(parsed, "--jsonl");
+  const noScreenshot = hasFlag(parsed, "--no-screenshot");
+  const autoScreenshot = !noScreenshot;
   const wantScreenshot =
+    autoScreenshot ||
     hasFlag(parsed, "--screenshot") ||
     screenshotFormatRaw !== "" ||
     screenshotResizeRaw !== "";
@@ -623,6 +629,7 @@ async function main(): Promise<number> {
     const promotedDates = new Set<string>();
     let transportErrors = 0;
     const portalHost = new URL(base).host;
+    const jsonlLines: string[] = [];
 
     for (const op of ops) {
       const url = probeUrl(base, op, prefix);
@@ -693,6 +700,7 @@ async function main(): Promise<number> {
             join(outDir, outFile),
             `${JSON.stringify(record, null, 2)}\n`,
           );
+          if (jsonl) jsonlLines.push(JSON.stringify(record));
 
           if (
             promoteStore !== null &&
@@ -751,6 +759,16 @@ async function main(): Promise<number> {
           );
         }
       } // end week sweep
+    }
+
+    if (jsonl && jsonlLines.length > 0) {
+      await Bun.write(
+        join(outDir, "probes.jsonl"),
+        `${jsonlLines.join("\n")}\n`,
+      );
+      console.error(
+        `capture:f402: wrote ${jsonlLines.length} JSONL row(s) -> ${join(outDir, "probes.jsonl")}`,
+      );
     }
 
     if (wantScreenshot) {

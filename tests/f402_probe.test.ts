@@ -203,6 +203,35 @@ describe("probe expression", () => {
     expect(expression).toContain("const mdy =");
   });
 
+  test("wraps binary responses in a Blob instead of decoding garbage", () => {
+    const expression = buildProbeExpression({
+      operation: "getTicketDetailPrint",
+      url: "https://fantasy402.com/cloud/api/Report/getTicketDetailPrint",
+      body: "token=&operation=getTicketDetailPrint",
+    });
+    expect(expression).toContain("new Blob([buffer]");
+    expect(expression).toContain("isBinaryResp");
+    expect(expression).toContain("isBinary: isBinaryResp");
+    expect(expression).toContain("blobType: blobTypeOut");
+    expect(expression).toContain("blobSize: blobSizeOut");
+  });
+
+  test("accepts blob metadata on the page result", () => {
+    const parsed = parseProbePageResult({
+      status: 200,
+      contentType: "image/png",
+      bytes: 1536,
+      preview: "",
+      bodyText: "",
+      isBinary: true,
+      blobType: "image/png",
+      blobSize: 1536,
+    });
+    expect(parsed.isBinary).toBe(true);
+    expect(parsed.blobType).toBe("image/png");
+    expect(parsed.blobSize).toBe(1536);
+  });
+
   test("an empty week value keeps the default '0' index", () => {
     const expression = buildProbeExpression(
       {

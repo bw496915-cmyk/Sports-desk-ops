@@ -463,18 +463,35 @@ export function buildProbeExpression(
     headers,
     body: resolvedBody,
   });
-  // Read bytes once: text.length counts characters, and re-encoding the whole body just to measure it
-  // is wasted work. The preview decodes a prefix; bodyText stays for the promote path.
+  // Read bytes once. Binary responses (image/pdf/octet-stream) are wrapped in a Blob so callers
+  // can inspect type/size without decoding garbage as text; preview/bodyText stay empty.
   const buffer = new Uint8Array(await response.arrayBuffer());
-  const decoder = new TextDecoder();
+  const respContentType = response.headers.get("content-type") ?? "";
+  const isBinaryResp = /^(image\/|audio\/|video\/|application\/(pdf|octet-stream|zip|gzip))/i.test(respContentType);
+  let previewText = "";
+  let bodyTextOut = "";
+  let blobTypeOut = "";
+  let blobSizeOut = 0;
+  if (isBinaryResp) {
+    const blob = new Blob([buffer], { type: respContentType.split(";")[0].trim() });
+    blobTypeOut = blob.type;
+    blobSizeOut = blob.size;
+  } else {
+    const decoder = new TextDecoder();
+    previewText = decoder.decode(buffer.subarray(0, ${preview}));
+    bodyTextOut = decoder.decode(buffer);
+  }
   return {
     status: response.status,
-    contentType: response.headers.get("content-type") ?? "",
+    contentType: respContentType,
     bytes: buffer.byteLength,
-    preview: decoder.decode(buffer.subarray(0, ${preview})),
-    bodyText: decoder.decode(buffer),
+    preview: previewText,
+    bodyText: bodyTextOut,
     dateUsed: mdy,
     weekUsed: weekValueResolved,
+    isBinary: isBinaryResp,
+    blobType: blobTypeOut,
+    blobSize: blobSizeOut,
   };
 })()`;
 }
@@ -597,6 +614,12 @@ export interface ProbePageResult {
   readonly bodyText?: string;
   readonly dateUsed?: string;
   readonly weekUsed?: string;
+  /** True when the response is binary (image/pdf/octet-stream); preview/bodyText are empty. */
+  readonly isBinary?: boolean;
+  /** Blob MIME type when isBinary, from the response content-type. */
+  readonly blobType?: string;
+  /** Blob byte size when isBinary (equals bytes). */
+  readonly blobSize?: number;
 }
 
 /** Validate what came back from the page before it is written as evidence. */
@@ -621,6 +644,9 @@ export function parseProbePageResult(raw: unknown): ProbePageResult {
     throw new Error("probe result has no body preview");
   const dateUsed = candidate["dateUsed"];
   const weekUsed = candidate["weekUsed"];
+  const isBinary = candidate["isBinary"];
+  const blobType = candidate["blobType"];
+  const blobSize = candidate["blobSize"];
   return {
     status,
     contentType,
@@ -629,6 +655,11 @@ export function parseProbePageResult(raw: unknown): ProbePageResult {
     ...(typeof bodyText === "string" ? { bodyText } : {}),
     ...(typeof dateUsed === "string" ? { dateUsed } : {}),
     ...(typeof weekUsed === "string" ? { weekUsed } : {}),
+    ...(typeof isBinary === "boolean" ? { isBinary } : {}),
+    ...(typeof blobType === "string" ? { blobType } : {}),
+    ...(typeof blobSize === "number" && Number.isInteger(blobSize)
+      ? { blobSize }
+      : {}),
   };
 }
 
