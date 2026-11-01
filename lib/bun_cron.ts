@@ -20,12 +20,22 @@
  *
  * **Syntax:** standard 5-field cron, named days/months, nicknames (`@daily`, …). #26999
  *
+ * **Ship note (Bun v1.4 blog):** {@link BUN_CRON_V14_BLOG_LOCAL_TZ_SHIP_NOTE} — {@link BUN_CRON_V14_BLOG_LOCAL_TZ_URL}
+ *
  * @see https://bun.com/docs/runtime/cron
  * @see lib/bun_cron.test.ts
  * @see docs/runbooks/os_bun_cron_integration_guide.md
  */
 
 import { fileURLToPath } from "node:url";
+
+/** Deep link — local time default, `{ tz }`, parse `from` range (#35122, #29282). */
+export const BUN_CRON_V14_BLOG_LOCAL_TZ_URL =
+  "https://bun.sh/blog/bun-v1.4#bun-markdown:~:text=Bun.cron%20schedules%20run%20in%20local%20time%20by%20default%2C%20with%20a%20new%20%7B%20tz%20%7D%20option%20for%20explicit%20timezones%3B%20parse()%20rejects%20from%20timestamps%20outside%20the%20ECMAScript%20Date%20range.%20%2335122%20%2329282" as const;
+
+/** Verbatim v1.4 blog fragment (must stay aligned with {@link BUN_CRON_V14_BLOG_LOCAL_TZ_URL}). */
+export const BUN_CRON_V14_BLOG_LOCAL_TZ_SHIP_NOTE =
+  "Bun.cron schedules run in local time by default, with a new { tz } option for explicit timezones; parse() rejects from timestamps outside the ECMAScript Date range. #35122 #29282" as const;
 
 /** True when Bun invokes a worker via `bun run --cron-title=… --cron-period=…`. */
 export function isBunOsCronInvocation(

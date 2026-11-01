@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  BUN_CRON_V14_BLOG_LOCAL_TZ_SHIP_NOTE,
+  BUN_CRON_V14_BLOG_LOCAL_TZ_URL,
   BUN_CRON_OS_REGISTER_EXAMPLE,
   BUN_CRON_OS_WORKER_SCHEDULED_EXAMPLE,
   BUN_CRON_PARSE_EXAMPLE,
@@ -95,6 +97,13 @@ describe("bun_cron", () => {
     });
     expect(job.cron).toBe("*/5 * * * *");
     job.stop();
+  });
+
+  test("v1.4 blog local-tz ship note URL is pinned", () => {
+    expect(BUN_CRON_V14_BLOG_LOCAL_TZ_URL).toContain("bun.sh/blog/bun-v1.4");
+    expect(BUN_CRON_V14_BLOG_LOCAL_TZ_URL).toContain("35122");
+    expect(BUN_CRON_V14_BLOG_LOCAL_TZ_SHIP_NOTE).toContain("{ tz }");
+    expect(BUN_CRON_V14_BLOG_LOCAL_TZ_SHIP_NOTE).toContain("ECMAScript Date range");
   });
 
   test("OS-level doc examples exported", () => {

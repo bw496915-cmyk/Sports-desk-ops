@@ -79,7 +79,8 @@ Canonical consumers: `scripts/artifacts_cron.ts`, `scripts/f402_portal_drift_cro
 // Register an OS-level cron job
 await Bun.cron("./worker.ts", "30 2 * * MON", "weekly-report");
 
-// Parse a cron expression → next matching Date (system local TZ; not UTC unless { tz: "UTC" })
+// Parse → next matching Date (local wall clock by default; { tz: "UTC" } to pin)
+// parse() rejects `from` outside the ECMAScript Date range (#35122 #29282)
 const next = Bun.cron.parse("*/15 * * * *");
 
 // worker.ts
@@ -93,6 +94,8 @@ export default {
 ```
 
 Repo install/remove: `bun run artifacts:cron --install-os --schedule "0 6 * * *"` (uses `installOsCronJob` + absolute worker path). Reference worker: `scripts/artifacts_cron.ts` `export default { scheduled(controller) }`.
+
+**Bun v1.4 ship note:** in-process schedules and `parse()` default to **local time**; pass `{ tz }` on in-process `Bun.cron(schedule, handler, { tz })` or `Bun.cron.parse(expr, from, { tz })`. Constants: `BUN_CRON_V14_BLOG_LOCAL_TZ_URL` / `BUN_CRON_V14_BLOG_LOCAL_TZ_SHIP_NOTE` in `lib/bun_cron.ts`.
 
 ---
 
