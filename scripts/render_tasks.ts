@@ -10,11 +10,32 @@
  *
  * This script exists for the HTML artifact and the checkbox gate:
  *   bun run tasks:render --format html --out scratch/remaining-tasks.html
+ *   bun run tasks:render --format iframe --out scratch/remaining-tasks.iframe.html
  *   bun run tasks:render --no-color --columns 0
  *   bun run tasks:render --color --columns 100
  *
  * `Bun.markdown.ansi` takes an ANSI theme only (no parser options); parser options go to `html()`.
+ *
+ * `srcdoc` is decoded once by the HTML parser before its contents are parsed, so escaping only `"`
+ * turns the `&lt;img …&gt;` that `noHtml*` produced back into live markup. Always escape `&` first.
  */
+
+const IFRAME_TITLE = "Remaining tasks — SportsDesk ops";
+
+/**
+ * Escape HTML for an iframe `srcdoc` attribute.
+ *
+ * Order matters. The attribute value is entity-decoded before it is parsed as a document, so the
+ * `&lt;` sequences that `noHtmlBlocks`/`noHtmlSpans` emit would be decoded back to `<` and become
+ * live markup. Escaping `&` first keeps one decode level in place; escaping only `"` does not.
+ */
+function escapeSrcdoc(html: string): string {
+  return html.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+}
+
+function iframeEmbed(html: string): string {
+  return `<iframe title="${IFRAME_TITLE}" sandbox srcdoc="${escapeSrcdoc(html)}" style="width:100%;height:80vh;border:0"></iframe>`;
+}
 
 const MAX_BYTES = 1_000_000;
 
@@ -54,8 +75,8 @@ const columnsFlag = flag(args, ["--columns"], "");
 const noColor = args.includes("--no-color");
 const wantColor = args.includes("--color");
 
-if (format !== "ansi" && format !== "html") {
-  console.error(`tasks: unknown format "${format}" (ansi|html)`);
+if (format !== "ansi" && format !== "html" && format !== "iframe") {
+  console.error(`tasks: unknown format "${format}" (ansi|html|iframe)`);
   process.exit(2);
 }
 if (typeof Bun.markdown?.html !== "function") {
@@ -114,22 +135,24 @@ const columns =
       : 0;
 
 const rendered =
-  format === "html"
-    ? html
-    : (() => {
-        if (typeof Bun.markdown.ansi !== "function") {
-          console.error("tasks: Bun.markdown.ansi is unavailable");
-          process.exit(2);
-        }
-        const light = process.env.COLORFGBG?.endsWith(";15");
-        return Bun.markdown.ansi(buffer, {
-          colors: !noColor && color,
-          columns,
-          hyperlinks: outIsTTY,
-          kittyGraphics: false,
-          ...(light === undefined ? {} : { light }),
-        });
-      })();
+  format === "iframe"
+    ? iframeEmbed(html)
+    : format === "html"
+      ? html
+      : (() => {
+          if (typeof Bun.markdown.ansi !== "function") {
+            console.error("tasks: Bun.markdown.ansi is unavailable");
+            process.exit(2);
+          }
+          const light = process.env.COLORFGBG?.endsWith(";15");
+          return Bun.markdown.ansi(buffer, {
+            colors: !noColor && color,
+            columns,
+            hyperlinks: outIsTTY,
+            kittyGraphics: false,
+            ...(light === undefined ? {} : { light }),
+          });
+        })();
 
 if (outPath !== "") {
   await Bun.write(outPath, rendered);

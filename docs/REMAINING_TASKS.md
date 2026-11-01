@@ -4,7 +4,18 @@ Read it: `bun ./docs/REMAINING_TASKS.md` (zero-code ANSI renderer, no JS VM; hon
 `FORCE_COLOR` and `COLUMNS`).
 
 Artifact/gate: `bun run tasks:render` (ANSI; colour and OSC 8 links only on a TTY),
-`--no-color --columns 0` for logs, `--format html --out scratch/remaining-tasks.html` for HTML.
+`--no-color --columns 0` for logs, `--format html --out scratch/remaining-tasks.html` for HTML,
+`--format iframe` for an embeddable `<iframe srcdoc>` wrapper.
+
+### Embedding
+
+`srcdoc` is entity-decoded once by the HTML parser before its contents are parsed. Escaping only `"`
+therefore turns the `&lt;img …&gt;` that `noHtml*` emitted back into live markup; escaping `&` first keeps
+one decode level in place. The renderer escapes `&` then `"`, adds `sandbox` and a `title`, and a test
+asserts that one decode restores the HTML exactly and that no `<img` survives.
+
+`[OBSERVED]` 2026-10-31, local headless Chrome on a scratch page: the `"`-only form executed
+`onerror` and retitled the parent document; the `&`-first form did not. The probe was not committed.
 
 ### Renderer parity
 

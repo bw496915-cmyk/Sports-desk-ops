@@ -144,6 +144,61 @@ describe("remaining-tasks markdown", () => {
     expect(markdown).toContain("ansi(input, theme?: AnsiTheme): string");
   });
 
+  test("srcdoc escaping survives the parser's entity decode", async () => {
+    // A stock `srcdoc` attribute is entity-decoded once before its contents are parsed, so a
+    // `"`-only escape decodes the `&lt;img …&gt;` that noHtml* produced straight back to markup.
+    const payload = `<img src=x onerror="parent.document.title='XSS'">`;
+    const rendered = Bun.markdown.html(payload, {
+      noHtmlBlocks: true,
+      noHtmlSpans: true,
+    });
+    const ENTITIES = {
+      "&amp;": "&",
+      "&quot;": '"',
+      "&lt;": "<",
+      "&gt;": ">",
+    } as const;
+    // One pass, no re-scan: that is what the HTML parser does with an attribute value.
+    const decodeOnce = (s: string): string =>
+      s.replace(
+        /&(?:amp|quot|lt|gt);/g,
+        (entity) => ENTITIES[entity as keyof typeof ENTITIES],
+      );
+    expect(decodeOnce(rendered.replaceAll('"', "&quot;"))).toContain("<img");
+
+    const fixture = "scratch/iframe-fixture.md";
+    const out = "scratch/iframe-fixture.html";
+    await Bun.write(fixture, payload);
+    try {
+      const proc = Bun.spawn(
+        [
+          "bun",
+          "run",
+          "scripts/render_tasks.ts",
+          "--source",
+          fixture,
+          "--format",
+          "iframe",
+          "--out",
+          out,
+        ],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      expect(await proc.exited).toBe(0);
+      const page = await Bun.file(out).text();
+      expect(page).toContain("sandbox");
+      expect(page).toContain('title="Remaining tasks');
+      const attr = /srcdoc="([^"]*)"/.exec(page)?.[1] ?? "";
+      expect(attr).not.toBe("");
+      const decoded = decodeOnce(attr);
+      expect(decoded).toBe(rendered);
+      expect(decoded).not.toContain("<img");
+    } finally {
+      await Bun.file(fixture).delete();
+      await Bun.file(out).delete();
+    }
+  });
+
   test("the zero-code CLI loader renders the document", async () => {
     const proc = Bun.spawn(["bun", "docs/REMAINING_TASKS.md"], {
       stdout: "pipe",
