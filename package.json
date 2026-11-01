@@ -91,6 +91,7 @@
     "capture:f402": "bun run scripts/capture/f402_probe.ts",
     "secrets:f402": "bun run scripts/secrets_f402.ts",
     "capture:har": "bun run scripts/capture/har_probe.ts",
+    "capture:discover": "bun run scripts/capture/discover_customers.ts",
     "artifacts:cron": "bun run scripts/artifacts_cron.ts",
     "probes:index": "bun run scripts/capture/probe_index.ts",
     "customers": "bun run scripts/customer_lookup.ts",

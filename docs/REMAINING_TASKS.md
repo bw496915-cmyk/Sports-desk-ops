@@ -78,8 +78,6 @@ id that appears on a task but not in this table is a defect, and a test enforces
 | :-------------------- | :------- | :---------------------------------------- | :---------------- |
 | `RT-F402-CAPTURE`     | P0.1     | `[UNVERIFIED]` combo_identity.ts:24       | ledger row        |
 | `RT-PREFEE-PNL`       | P0.2     | `[UNVERIFIED]` third-party toolkit        | one wallet        |
-| `RT-CHANNEL-MODEL`    | P1.2     | `[CODE]` tokens.toml lanes                | writer capture    |
-| `RT-DUP-WAGERS`       | P1.3     | `[CODE]` audit_customer_book.ts           | audit output      |
 | `RT-GSLIVE-LINKS`     | P1.6     | `[OBSERVED]` three GSLive surfaces        | three captures    |
 | `RT-CLI-ZIP`          | P2.1     | `[OBSERVED]` gs-manager-cli.zip           | provenance note   |
 | `RT-ARTIFACT-CADENCE` | P2.3     | `[CODE]` package.json:76                  | cadence + check   |
@@ -107,9 +105,9 @@ so an id resolves without guessing which artifact it came from.
     reject them; a `capture` source appears only when a capture keeps a real id.
   - **Observed 2026-11-01** (`[OBSERVED]`, `scratch/f402-probes/`): the working envelope is
     `/cloud/api/<Manager|Report>/<op>` with `Authorization: Bearer <sessionStorage.credentials.code>`.
-    `getGrading` (Report) and `getTransactions` (Manager) answer 200 `{"LIST":""}`; `Pending` (Report)
-    answers 400 `{"status":"Failed","msg":"Invalid CustomerID"}`; the rest answer 500 with 0 B. Without
-    the header every call is 401 at openresty, so auth is settled and only parameters remain.
+    With a customer id discovered from `getBetTicker`, `Pending` answers **200 with 46 KB** and
+    `getGrading` **200 `{"LIST":""}`** (no date filter). The other four still answer 500 with 0 B and
+    need their required parameters (date range, wager number). Without the header every call is 401.
   - **Safety:** `PendingDelete` is named like a mutation. The capture allowlist refuses mutation ops by
     construction, so that endpoint needs an explicit read-only confirmation before it is added.
   - **Automation:** `bun run capture:f402 --dry-run` prints the six-op plan without launching anything.
@@ -130,21 +128,6 @@ so an id resolves without guessing which artifact it came from.
   - **Blocked by:** activity rows that carry `size` and `price` for every fill.
 
 ## P1 — coverage and data quality
-
-- [ ] **P1.2 Reconcile the channel model**
-  - **Ref:** `RT-CHANNEL-MODEL`
-  - **Basis:** `[CODE]` 7 lane codes in `tokens.toml`, 6 writer labels in the simulation union, `WEB`/`PHONE` only
-    in fixtures, `GATEWAY` in neither writer union.
-  - **Done when:** a `getGrading`/`getPending` capture lists distinct `TicketWriter` values, and either the union
-    is extended or an explicit mapping is published.
-  - **Blocked by:** P0.1 (report capture).
-
-- [ ] **P1.3 Decide the duplicate wager numbers**
-  - **Ref:** `RT-DUP-WAGERS`
-  - **Basis:** `[CODE]` 48 warning rows across 44 distinct numbers in the demo book.
-  - **Done when:** the numbering scope is documented (per agent vs per book) and the audit treats collisions
-    accordingly, or the generator is fixed.
-  - **Blocked by:** an F402 numbering reference.
 
 - [ ] **P1.6 Capture GSLive deep-link behaviour**
   - **Ref:** `RT-GSLIVE-LINKS`
@@ -187,6 +170,11 @@ so an id resolves without guessing which artifact it came from.
 
 ## Done (for context)
 
+- [x] `[OBSERVED]` Channel model: 955 live `getBetTicker` rows carry `TicketWriter` = Internet, ALERT,
+      GSLIVE, GSBUILDER, plus one dirty `WILBANKS.` value that is an agent login. `GATEWAY`, `BLOCKED` and
+      `CSLEVEL2` never appear, so the lane table describes configuration, not observed traffic.
+- [x] `[OBSERVED]` Wager numbers: 0 duplicates across 955 live rows; the 48 collisions are confined to
+      the demo generator, and the audit keeps warning on fixtures rather than on live data.
 - [x] `[OBSERVED]` Manager auth is `Authorization: Bearer <sessionStorage.credentials.code>`; without it
       openresty answers 401. The `fantasy402Cookie` security scheme now says so.
 - [x] `[CODE]` Claim labels and citation tests (`[CODE]` / `[OBSERVED]` / `[UNVERIFIED]` / `[ASSUMPTION]`).
