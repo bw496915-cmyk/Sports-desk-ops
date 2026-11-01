@@ -1,0 +1,302 @@
+/**
+ * @file live_wagers.ts
+ * @description The live wager list (`{LIST: [...]}`) — the bet-ticker shape, which is a
+ * different feed from `Report/Pending`.
+ *
+ * Field notes that matter, all evidenced by the paste this was built from:
+ *  - `WagerNumber` is the ticket id here; `Report/Pending` calls the same concept `TicketNumber`.
+ *  - `ShortDesc` carries one line per leg. A straight bet is one line; a parlay is several, one
+ *    per selection. Each line reads:
+ *      `M.G319748909\r\nFootball - Rams vs Chargers / Game / Winner (2 way) / Rams -140`
+ *    with an optional leading code (`S.`, `M.G…`, `P.G…`) before the first newline.
+ *  - `WagerType` uses codes `S`, `P` and `M` in this feed. `M` has no documented meaning in this
+ *    repository, so it is carried as a raw code rather than guessed into a name.
+ *  - `VolumeAmount` is sometimes far below `AmountWagered` (a $3,500 wager with $2,188 volume),
+ *    so both are kept and the difference is reported instead of one being treated as a typo.
+ *  - `TicketWriter` names the channel: `GSLIVE`, `GSBUILDER`, `Internet`, `ALERT`.
+ */
+
+import { SPORT_CATEGORIES } from "./sport_taxonomy.ts";
+
+export interface LiveWagerLeg {
+  /** `Football`, `Basketball`, `Soccer`, `Tennis`, `Hockey`, … as printed. */
+  readonly sport: string;
+  /** `"Los Angeles Rams vs Los Angeles Chargers"`. */
+  readonly game: string;
+  /** `Game`, `1st Half`, `Match`, … */
+  readonly period: string;
+  /** `Winner (2 way)`, `Point spread`, `Total`, … */
+  readonly market: string;
+  /** `"Los Angeles Rams -140"`; empty when the line had no pick segment. */
+  readonly pick: string;
+  /** The raw line as printed, for anything the split above loses. */
+  readonly raw: string;
+  /**
+   * True for the portal's compact grammar (`S:Basketball #540 Warriors -2 -110 - For Game`),
+   * which has no `/ Period / Market / Pick` segments. Sport is still recognised; the rest of
+   * the line lands in `pick` rather than being guessed into fields it does not have.
+   */
+  readonly compact: boolean;
+}
+
+export interface LiveWager {
+  readonly wagerNumber: number;
+  readonly agentId: string;
+  readonly agentLogin: string;
+  readonly customerId: string;
+  readonly login: string;
+  /** Raw `WagerType`: `S`, `P`, `M`, … — never renamed here. */
+  readonly wagerType: string;
+  readonly amountWagered: number;
+  readonly toWinAmount: number;
+  readonly volumeAmount: number;
+  /** True when `volumeAmount` is not equal to `amountWagered`. */
+  readonly volumeDiffers: boolean;
+  readonly ticketWriter: string;
+  /** Channel family inferred from `TicketWriter`; `other` for anything unrecognised. */
+  readonly writer: "gslive" | "gsbuilder" | "internet" | "alert" | "other";
+  readonly insertedAt: string;
+  readonly vip: boolean;
+  readonly legs: readonly LiveWagerLeg[];
+  /** Leading code before the first newline (`S`, `M.G319748909`, `P.G14580595`). */
+  readonly descCode: string | null;
+}
+
+export interface WagerListFile {
+  readonly schemaVersion: 1;
+  readonly source: string;
+  readonly observedAt: string | null;
+  readonly wagers: readonly LiveWager[] | readonly Record<string, unknown>[];
+}
+
+const WRITERS: Readonly<Record<string, LiveWager["writer"]>> = {
+  gslive: "gslive",
+  gsbuilder: "gsbuilder",
+  internet: "internet",
+  alert: "alert",
+};
+
+function text(value: unknown): string {
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function number(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** `GSLIVE   ` → `gslive`; anything unknown → `other`. */
+export function writerOf(ticketWriter: unknown): LiveWager["writer"] {
+  return WRITERS[text(ticketWriter).toLowerCase()] ?? "other";
+}
+
+/** Longest-first so multi-word sports ("Auto Racing") win over a shorter prefix. */
+const SPORT_PREFIXES = [...SPORT_CATEGORIES]
+  .filter((name) => name !== "Other")
+  .sort((a, b) => b.length - a.length);
+
+/** Splits `"Football #263 Eagles 8 -160 …"` into its sport and the remainder. */
+export function splitSportPrefix(header: string): {
+  sport: string;
+  rest: string;
+} {
+  const trimmed = header.trim();
+  for (const sport of SPORT_PREFIXES) {
+    if (trimmed.toLowerCase().startsWith(sport.toLowerCase())) {
+      const rest = trimmed
+        .slice(sport.length)
+        .replace(/^[\s:,-]+/, "")
+        .trim();
+      return { sport, rest };
+    }
+  }
+  return { sport: trimmed, rest: "" };
+}
+
+/**
+ * Splits `ShortDesc` into legs and each leg into sport / game / period / market / pick.
+ *
+ * Lines are separated by `\r\n` (and stray `&#x0D;\n` artefacts); a leg is
+ * `"Sport - Game / Period / Market / Pick"`. Segments are taken positionally, and a leg with
+ * fewer segments keeps what it has rather than inventing the rest.
+ */
+export function parseShortDesc(shortDesc: unknown): {
+  legs: LiveWagerLeg[];
+  descCode: string | null;
+} {
+  const raw = String(shortDesc ?? "")
+    .replace(/&#x0D;?/gi, "\n")
+    .replace(/\\r\\n|\\n/g, "\n");
+
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+
+  if (lines.length === 0) return { legs: [], descCode: null };
+
+  // A code line looks like `M.G319748909` or `S.` and is alone on its first line.
+  let descCode: string | null = null;
+  let start = 0;
+  const first = lines[0] as string;
+  if (/^[A-Z]\.(?:[A-Z]\d+)?$/.test(first)) {
+    descCode = first;
+    start = 1;
+  } else if (first.startsWith("S:") || first.startsWith("P:")) {
+    // `S:Basketball #540 …` — the code is a prefix of the leg itself, not its own line.
+    descCode = first.slice(0, 1);
+  }
+
+  const legs: LiveWagerLeg[] = [];
+  for (const line of lines.slice(start)) {
+    const [head, ...rest] = line.split(" / ");
+    let header = head ?? "";
+    // A leg may carry its own code prefix (`S:Basketball #540 …`), even when the description
+    // had no separate code line. Strip it before splitting so the sport is not `S:Basketball`.
+    if (/^[SPM][.:]/.test(header)) {
+      descCode ??= header.slice(0, 1);
+      header = header.slice(2).trim();
+    }
+
+    if (rest.length === 0) {
+      // Compact grammar: no `/ Period / Market / Pick` segments to read.
+      const { sport, rest: remainder } = splitSportPrefix(header);
+      legs.push({
+        sport,
+        game: "",
+        period: "",
+        market: "",
+        pick: remainder,
+        raw: line,
+        compact: true,
+      });
+      continue;
+    }
+
+    const dash = header.indexOf(" - ");
+    let sport = dash >= 0 ? header.slice(0, dash).trim() : header.trim();
+    const game = dash >= 0 ? header.slice(dash + 3).trim() : "";
+
+    // Sport names arrive as `Football`, but guard against pads and stray codes anyway.
+    if (
+      !SPORT_PREFIXES.some((name) => name.toLowerCase() === sport.toLowerCase())
+    ) {
+      sport = splitSportPrefix(sport).sport;
+    }
+
+    legs.push({
+      sport,
+      game,
+      period: (rest[0] ?? "").trim(),
+      market: (rest[1] ?? "").trim(),
+      pick: rest.slice(2).join(" / ").trim(),
+      raw: line,
+      compact: false,
+    });
+  }
+
+  return { legs, descCode };
+}
+
+export function toLiveWager(row: Record<string, unknown>): LiveWager {
+  const { legs, descCode } = parseShortDesc(row.ShortDesc);
+  const amountWagered = number(row.AmountWagered);
+  const volumeAmount = number(row.VolumeAmount);
+  const ticketWriter = text(row.TicketWriter);
+
+  return {
+    wagerNumber: number(row.WagerNumber),
+    agentId: text(row.AgentID),
+    agentLogin: text(row.AgentLogin),
+    customerId: text(row.CustomerID),
+    login: text(row.Login),
+    wagerType: text(row.WagerType),
+    amountWagered,
+    toWinAmount: number(row.ToWinAmount),
+    volumeAmount,
+    volumeDiffers: amountWagered !== volumeAmount,
+    ticketWriter,
+    writer: writerOf(ticketWriter),
+    insertedAt: text(row.InsertDateTime),
+    vip: text(row.VIP) !== "" && text(row.VIP) !== "0",
+    legs,
+    descCode,
+  };
+}
+
+/** Accepts the `{LIST: [...]}` envelope, a bare array, or already-mapped wagers. */
+export function readWagerList(payload: unknown): LiveWager[] {
+  const rows = Array.isArray(payload)
+    ? payload
+    : typeof payload === "object" &&
+        payload !== null &&
+        Array.isArray((payload as { LIST?: unknown }).LIST)
+      ? ((payload as { LIST: unknown[] }).LIST ?? [])
+      : [];
+
+  return rows
+    .filter(
+      (row): row is Record<string, unknown> =>
+        typeof row === "object" && row !== null && "WagerNumber" in row,
+    )
+    .map(toLiveWager);
+}
+
+export interface LiveWagerSummary {
+  readonly count: number;
+  readonly risk: number;
+  readonly toWin: number;
+  readonly volume: number;
+  readonly vip: number;
+  readonly volumeMismatches: number;
+  readonly byWriter: Record<string, number>;
+  readonly byType: Record<string, number>;
+  readonly bySport: Record<string, number>;
+  readonly legs: number;
+}
+
+/** Aggregates over the parsed rows; sports come from the legs, so parlays count each leg. */
+export function summarizeLiveWagers(
+  wagers: readonly LiveWager[],
+): LiveWagerSummary {
+  const byWriter: Record<string, number> = {};
+  const byType: Record<string, number> = {};
+  const bySport: Record<string, number> = {};
+  let risk = 0;
+  let toWin = 0;
+  let volume = 0;
+  let vip = 0;
+  let volumeMismatches = 0;
+  let legs = 0;
+
+  for (const wager of wagers) {
+    risk += wager.amountWagered;
+    toWin += wager.toWinAmount;
+    volume += wager.volumeAmount;
+    if (wager.vip) vip += 1;
+    if (wager.volumeDiffers) volumeMismatches += 1;
+
+    byWriter[wager.writer] = (byWriter[wager.writer] ?? 0) + 1;
+    const type = wager.wagerType === "" ? "unknown" : wager.wagerType;
+    byType[type] = (byType[type] ?? 0) + 1;
+
+    for (const leg of wager.legs) {
+      legs += 1;
+      const sport = leg.sport === "" ? "unknown" : leg.sport;
+      bySport[sport] = (bySport[sport] ?? 0) + 1;
+    }
+  }
+
+  return {
+    count: wagers.length,
+    risk,
+    toWin,
+    volume,
+    vip,
+    volumeMismatches,
+    byWriter,
+    byType,
+    bySport,
+    legs,
+  };
+}
