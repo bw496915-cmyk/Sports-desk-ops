@@ -9,8 +9,9 @@
  *      on 338/1,100 rows and its `hold_pct` never equals net/volume; the engine derives holds from the
  *      money fields and never trusts `hold_pct`. Audit with `bun run audit:customer-book`; repair with
  *      `bun run normalize:customer-book --write`.
- *   2. Master Downline & Open Book (`sportsdesk_downline_data.json`: 9,435 provisioned accounts / 2,236 active sports bettors / 57,755 master book)
- *   3. 39 Bridged Polymarket `0x` Proxy Wallets (`wallet_customer_attributions` + Off-Tracker CTF Combo Tokens)
+ *   2. Master Downline & Open Book (`sportsdesk_downline_data.json`: 9,435 provisioned accounts / 2,236 active sports bettors; the 4-week ticket/handle totals are scenario constants (see `dataBasis`))
+ *   3. Bridged Polymarket `0x` proxy wallets: 34 mapped rows -> 26 valid links -> 22 distinct valid addresses
+ *      (10 placeholders quarantined); `wallet_customer_attributions` + off-tracker CTF combo tokens
  *
  * Backtest Horizon:
  *   - Week 1 (`2026-10-03` to `2026-10-09`): CFB Week 6 + NBA Preseason Week 1
@@ -163,6 +164,14 @@ export interface FourWeekParlayBacktestReport {
   readonly protectedTotalHoldPct4Wk: number;
   readonly totalCounterfactualSavingsUsd4Wk: number;
   readonly recreationalRetentionPct: number;
+  /** Provenance for the headline counts that are not ticket aggregates. */
+  readonly dataBasis: {
+    readonly provisionedSource: "downline-meta" | "snapshot";
+    readonly sampledTickets: number;
+    readonly sampledWindowIso: readonly [string, string] | null;
+    /** The 4-week ticket/handle totals are scenario constants, not sums over `sampledTickets`. */
+    readonly scenarioTicketTotals: true;
+  };
   readonly weeklyBreakdown: readonly WeeklySportBacktestRow[];
   readonly comboFamilyBreakdown: readonly ComboFamilyBacktestRow[];
   readonly guardAttribution: readonly GuardAttributionRow[];
@@ -273,6 +282,48 @@ export function runFourWeekParlayComboBacktest(
   const rawCustomers: RawEnrichedCustomer[] = fs.existsSync(enrichedPath)
     ? JSON.parse(fs.readFileSync(enrichedPath, "utf8"))
     : [];
+
+  // Headline counts come from the downline meta when present; the snapshot is the last known
+  // values from `sportsdesk_downline_data.json` and is labelled as such.
+  const downlinePath = path.join(repoRoot, "sportsdesk_downline_data.json");
+  let provisionedCustomers = 9_435;
+  let activeSportsBettors = 2_236;
+  let provisionedSource: "downline-meta" | "snapshot" = "snapshot";
+  if (fs.existsSync(downlinePath)) {
+    try {
+      const downline = JSON.parse(fs.readFileSync(downlinePath, "utf8")) as {
+        meta?: Record<string, unknown>;
+      };
+      const provisioned = Number(downline.meta?.total_provisioned_accounts);
+      const active = Number(downline.meta?.active_sports_bettors);
+      if (Number.isFinite(provisioned) && provisioned > 0) {
+        provisionedCustomers = provisioned;
+        provisionedSource = "downline-meta";
+      }
+      if (Number.isFinite(active) && active >= 0) activeSportsBettors = active;
+    } catch {
+      // keep the snapshot
+    }
+  }
+
+  const validWalletCount = new Set(
+    Object.values(CUSTOMER_TO_POLY_WALLET)
+      .map((wallet) => wallet.toLowerCase())
+      .filter((wallet) => /^0x[0-9a-f]{40}$/.test(wallet)),
+  ).size;
+  const sampledTickets = rawCustomers.flatMap(
+    (customer) => customer.recent_tickets ?? [],
+  );
+  const sampledTimes = sampledTickets
+    .map((ticket) => ticket.placed_at)
+    .filter(
+      (value): value is string => typeof value === "string" && value !== "",
+    )
+    .sort();
+  const sampledWindowIso: readonly [string, string] | null =
+    sampledTimes.length > 0
+      ? [sampledTimes[0]!, sampledTimes[sampledTimes.length - 1]!]
+      : null;
 
   const weeklyBreakdown: WeeklySportBacktestRow[] = [
     {
@@ -1343,10 +1394,10 @@ export function runFourWeekParlayComboBacktest(
     generatedAtCdt: formatCdt(now),
     windowStartIso: "2026-10-03T00:00:00.000Z",
     windowEndIso: "2026-10-31T16:40:00.000Z",
-    totalProvisionedCustomers: 57755,
-    totalActiveSportsBettors: 2236,
+    totalProvisionedCustomers: provisionedCustomers,
+    totalActiveSportsBettors: activeSportsBettors,
     totalEnrichedProfilesScanned: rawCustomers.length || 220,
-    totalBridgedPolymarketWallets: 39,
+    totalBridgedPolymarketWallets: validWalletCount,
     totalParlayTickets4Wk,
     totalParlayLegs4Wk,
     totalParlayHandleUsd4Wk,
@@ -1372,6 +1423,12 @@ export function runFourWeekParlayComboBacktest(
     ),
     totalCounterfactualSavingsUsd4Wk,
     recreationalRetentionPct: 99.4,
+    dataBasis: {
+      provisionedSource,
+      sampledTickets: sampledTickets.length,
+      sampledWindowIso,
+      scenarioTicketTotals: true,
+    },
     weeklyBreakdown,
     comboFamilyBreakdown,
     guardAttribution,

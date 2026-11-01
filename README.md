@@ -23,7 +23,7 @@ Always use **`./bin/dx`** as your primary entrypoint—it automatically configur
 # 3. Audit all 13 Per-Office (type="B" customerID=<Office>) & Cross-Office (customerID="0") IP-Tracker Clusters
 ./bin/dx iptracker
 
-# 4. Run the 4-Week Full-Customer (57,755 accounts) CFB & NBA Parlay/Combo Backtest
+# 4. Run the 4-Week Full-Customer (9,435 accounts) CFB & NBA Parlay/Combo Backtest
 ./bin/dx backtest
 
 # 5. Poll configured Polymarket wallets (23 valid), stage the 6-Tab Portal and publish to R2

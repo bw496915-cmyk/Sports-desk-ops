@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "generatedAtIso": "2026-11-01T00:01:08.864Z",
-  "generatedAtCdt": "10/31/2026, 19:01:08 CDT",
+  "generatedAtIso": "2026-11-01T00:04:05.655Z",
+  "generatedAtCdt": "10/31/2026, 19:04:05 CDT",
   "windowStartIso": "2026-10-03T00:00:00.000Z",
   "windowEndIso": "2026-10-31T16:40:00.000Z",
-  "totalProvisionedCustomers": 57755,
+  "totalProvisionedCustomers": 9435,
   "totalActiveSportsBettors": 2236,
   "totalEnrichedProfilesScanned": 220,
-  "totalBridgedPolymarketWallets": 39,
+  "totalBridgedPolymarketWallets": 22,
   "totalParlayTickets4Wk": 7663,
   "totalParlayLegs4Wk": 17455,
   "totalParlayHandleUsd4Wk": 4716200,
@@ -27,6 +27,15 @@
   "protectedTotalHoldPct4Wk": 16.16,
   "totalCounterfactualSavingsUsd4Wk": 1174660,
   "recreationalRetentionPct": 99.4,
+  "dataBasis": {
+    "provisionedSource": "downline-meta",
+    "sampledTickets": 1100,
+    "sampledWindowIso": [
+      "2026-10-26T10:30:00Z",
+      "2026-10-27T21:15:00Z"
+    ],
+    "scenarioTicketTotals": true
+  },
   "weeklyBreakdown": [
     {
       "weekCode": "W1",

@@ -5,13 +5,22 @@ import { runFourWeekParlayComboBacktest } from "../lib/parlay_combo_backtest_eng
 describe("4-Week Full-Customer CFB & NBA Parlay & Combo Backtest Engine", () => {
   const report = runFourWeekParlayComboBacktest();
 
-  test("scans the full 57,755 customer universe, 220 enriched profiles, and 39 bridged Polymarket wallets across 4 weeks", () => {
+  test("scans the 9,435-account downline, 220 enriched profiles, and 22 valid Polymarket wallets across 4 weeks", () => {
     expect(report.schemaVersion).toBe(1);
-    expect(report.totalProvisionedCustomers).toBe(57755);
+    expect(report.totalProvisionedCustomers).toBe(9435);
     expect(report.totalActiveSportsBettors).toBe(2236);
     expect(report.totalEnrichedProfilesScanned).toBeGreaterThanOrEqual(220);
-    expect(report.totalBridgedPolymarketWallets).toBe(39);
+    expect(report.totalBridgedPolymarketWallets).toBe(22);
     expect(report.weeklyBreakdown.length).toBe(4);
+    expect(report.dataBasis.scenarioTicketTotals).toBe(true);
+    expect(report.dataBasis.provisionedSource).toBe(
+      existsSync("sportsdesk_downline_data.json")
+        ? "downline-meta"
+        : "snapshot",
+    );
+    expect(report.dataBasis.sampledTickets).toBe(
+      existsSync("enriched_customers_full.json") ? 1100 : 0,
+    );
   });
 
   test("reconciles CFB and NBA 4-week ticket, leg, handle, and counterfactual P&L totals", () => {
