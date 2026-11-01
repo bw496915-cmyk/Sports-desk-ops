@@ -2,6 +2,7 @@
   "name": "@tennis-hq/sportsdesk-workspace",
   "version": "1.0.0",
   "private": true,
+  "trustedDependencies": [],
   "publishConfig": {
     "access": "restricted",
     "registry": "http://127.0.0.1:50851/"

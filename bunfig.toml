@@ -19,3 +19,11 @@ ignorePatterns = [
   "docs/combo-uniqueness.json",
   "docs/cross-domain-bridge.json",
 ]
+
+# Install keys (linker, globalStore, cache.dir, frozenLockfile, minimumReleaseAge) are owned by the
+# machine config at ~/.bunfig.toml. Setting them here would override that SSOT, so they stay out.
+
+[run]
+# Exit automatically when the parent process dies (macOS kqueue EVFILT_PROC/NOTE_EXIT)
+# and stop-verify-kill all spawned descendants (including headless Bun.WebView).
+noOrphans = true
