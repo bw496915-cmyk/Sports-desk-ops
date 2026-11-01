@@ -149,6 +149,7 @@ describe("f402 probe plan", () => {
         contentType: "text/html",
         bytes: 0,
         preview: "",
+        isBinary: false,
       }),
     ).toEqual({
       operation: "Pending",
