@@ -8,7 +8,7 @@
  * `--mode live` fetches. Each run appends one JSON line to the journal; `--history` reads it back
  * with `Bun.JSONL.parseChunk`, which tolerates a partially written final line (even on line 1).
  *
- * Canonical `Bun.cron` contract (`docs/runtime/cron.mdx` & `bun.d.ts`):
+ * Helpers: `lib/bun_cron.ts`. Canonical `Bun.cron` contract (`https://bun.com/docs/runtime/cron`):
  * - `Bun.cron.parse(expression, relativeDate?, { tz })` returns the next `Date` or `null` (if no
  *   match within 8 years).
  * - `Bun.cron(schedule, handler, { tz })` runs in-process with a no-overlap guarantee (computes the
@@ -29,6 +29,12 @@ import {
   printHelp,
   wantsHelp,
 } from "../lib/cli_args.ts";
+import {
+  isBunOsCronInvocation,
+  osCronWorkerPath,
+  parseCronSchedule,
+  startInProcessCron,
+} from "../lib/bun_cron.ts";
 import {
   formatRun,
   parseCronJournal,
@@ -133,19 +139,24 @@ export async function recordCronRun(
  * module as an OS-level scheduled job (`launchd` on macOS, `crontab` on Linux, Task Scheduler on Windows).
  */
 export default {
-  async scheduled(_controller: Bun.CronController): Promise<void> {
+  async scheduled(controller: Bun.CronController): Promise<void> {
     const modeEnv =
       process.env.ARTIFACTS_CRON_MODE === "live" ? "live" : "offline";
     const journalPath = process.env.ARTIFACTS_CRON_JOURNAL ?? DEFAULT_JOURNAL;
+    console.error(
+      JSON.stringify({
+        signal: "ARTIFACTS_CRON_OS_FIRE",
+        cron: controller.cron,
+        scheduledTime: controller.scheduledTime,
+        mode: modeEnv,
+      }),
+    );
     const run = await runArtifactRebuild(modeEnv);
     await recordCronRun(run, journalPath);
   },
 };
 
-if (
-  import.meta.main &&
-  !process.argv.some((arg) => arg.startsWith("--cron-"))
-) {
+if (import.meta.main && !isBunOsCronInvocation(process.argv)) {
   const parsed = parseCliArgs(process.argv.slice(2), {
     valueFlags: VALUE_FLAGS,
   });
@@ -177,17 +188,12 @@ if (
     process.exit(2);
   }
 
-  const cronOptions = tz !== "" ? { tz } : undefined;
-  let nextFire: Date | null = null;
+  let nextFire: Date;
   try {
-    nextFire =
-      cronOptions === undefined
-        ? Bun.cron.parse(schedule)
-        : Bun.cron.parse(schedule, new Date(), cronOptions);
+    nextFire = parseCronSchedule(schedule, {
+      tz: tz !== "" ? tz : undefined,
+    });
   } catch {
-    nextFire = null;
-  }
-  if (nextFire === null || !(nextFire instanceof Date)) {
     console.error(
       `artifacts:cron: invalid schedule "${schedule}"${tz ? ` (tz=${tz})` : ""}.`,
     );
@@ -209,7 +215,7 @@ if (
       );
       process.exit(2);
     }
-    await Bun.cron("./scripts/artifacts_cron.ts", schedule, title);
+    await Bun.cron(osCronWorkerPath(import.meta.url), schedule, title);
     console.error(
       `artifacts:cron: installed OS-level job "${title}" (${schedule}) · next ${nextFire.toISOString()}`,
     );
@@ -245,18 +251,14 @@ if (
     process.exit(0);
   }
 
-  const job =
-    cronOptions === undefined
-      ? Bun.cron(schedule, async () => {
-          await recordCronRun(await runArtifactRebuild(mode), journal);
-        })
-      : Bun.cron(
-          schedule,
-          async () => {
-            await recordCronRun(await runArtifactRebuild(mode), journal);
-          },
-          cronOptions,
-        );
+  const job = startInProcessCron(
+    schedule,
+    async () => {
+      await recordCronRun(await runArtifactRebuild(mode), journal);
+    },
+    tz !== "" ? { tz } : undefined,
+  );
+  job.ref();
 
   const shutdown = (): void => {
     job.stop();

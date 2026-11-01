@@ -29,6 +29,11 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
+import {
+  startInProcessCron,
+  type InProcessCronJob,
+} from "../lib/bun_cron.ts";
+
 const SCRIPT_DIR = import.meta.dir;
 const DEFAULT_ROOT_DIR = resolve(SCRIPT_DIR, "..");
 const DEFAULT_PORTAL_URL = "https://fantasy402-docs-4ay.pages.dev";
@@ -1402,24 +1407,6 @@ function printAuditSummary(summary: AuditSummary, json: boolean): void {
   }
 }
 
-function getCronFunction():
-  | ((schedule: string, callback: () => void | Promise<void>) => CronHandle)
-  | undefined {
-  const cron = (Bun as unknown as { cron?: unknown }).cron;
-  return typeof cron === "function"
-    ? (cron as (
-        schedule: string,
-        callback: () => void | Promise<void>,
-      ) => CronHandle)
-    : undefined;
-}
-
-interface CronHandle {
-  ref(): void;
-  stop(): void;
-  unref(): void;
-}
-
 async function runAuditCliPass(options: {
   readonly rootDir: string;
   readonly outDir: string;
@@ -1470,8 +1457,7 @@ async function runOnceCli(cli: AuditCliOptions): Promise<number> {
 }
 
 async function runWatchCli(cli: AuditCliOptions): Promise<number> {
-  const cron = getCronFunction();
-  if (cron === undefined) {
+  if (typeof Bun.cron !== "function") {
     console.error(
       "[Doc Auditor] --watch requires in-process Bun.cron (Bun >= 1.4)",
     );
@@ -1488,7 +1474,7 @@ async function runWatchCli(cli: AuditCliOptions): Promise<number> {
     return 1;
   }
 
-  let job: CronHandle | undefined;
+  let job: InProcessCronJob | undefined;
   let stopped = false;
   let resolveStopped: () => void = () => {};
   const stoppedPromise = new Promise<void>((resolvePromise) => {
@@ -1523,7 +1509,7 @@ async function runWatchCli(cli: AuditCliOptions): Promise<number> {
       json: cli.json,
     });
     if (stopped) return 0;
-    job = cron(cli.schedule, async () => {
+    job = startInProcessCron(cli.schedule, async () => {
       try {
         await runAuditCliPass({
           rootDir,

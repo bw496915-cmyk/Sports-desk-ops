@@ -176,7 +176,7 @@ steamJob.ref();
 
 ### 4.3 Automated Documentation Error Audit Daemon (`Bun.cron` + `Bun.WebView` + `Bun.FetchSession`)
 
-The documentation error finding daemon (`scripts/audit_docs_webview_cron.ts`) combines an in-process `Bun.cron` UTC hourly schedule with native `Bun.WebView` DOM navigation and `Bun.FetchSession` connection pooling to continuously audit the live documentation portal (`https://fantasy402-docs-4ay.pages.dev`):
+The documentation error finding daemon (`scripts/audit_docs_webview_cron.ts`) combines an in-process `Bun.cron` schedule (default `0 * * * *` in **local time**; pass `{ tz }` via `lib/bun_cron.ts` when you need an explicit IANA zone) with native `Bun.WebView` DOM navigation and `Bun.FetchSession` connection pooling to continuously audit the live documentation portal (`https://fantasy402-docs-4ay.pages.dev`):
 
 ```typescript
 import {

@@ -1357,8 +1357,9 @@ if (import.meta.main) {
     console.log(
       `[GraphPoller] Starting continuous 60s schedule (in-process Bun.cron, live=${live}, liveF402=${liveF402}, syncR2=${syncR2})...`,
     );
-    Bun.cron("* * * * *", () => {
-      void run();
+    const job = Bun.cron("* * * * *", async () => {
+      await run();
     });
+    job.ref();
   }
 }
