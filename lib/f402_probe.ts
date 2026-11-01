@@ -118,6 +118,20 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     params: ["agentID", "agentOwner", "operation", "RRO"],
   },
   {
+    operation: "getConfigWebReports",
+    method: "POST",
+    readOnly: true,
+    note: "web reports config (Manager envelope); form: agentID, operation, RRO, agentOwner",
+    params: ["agentID", "operation", "RRO", "agentOwner"],
+  },
+  {
+    operation: "getConfigWebReportsPending",
+    method: "POST",
+    readOnly: true,
+    note: "pending web reports config (Manager envelope); form: agentID, operation, RRO, agentOwner",
+    params: ["agentID", "operation", "RRO", "agentOwner"],
+  },
+  {
     operation: "PendingDelete",
     method: "POST",
     readOnly: false,
