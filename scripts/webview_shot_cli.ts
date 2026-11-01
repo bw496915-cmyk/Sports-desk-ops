@@ -13,7 +13,9 @@
 
 import { join } from "node:path";
 import { ManagedWebView } from "./capture/webview.ts";
+import { encodeScreenshot, parseResize } from "../lib/screenshot_encode.ts";
 import { loginF402 } from "./capture/f402_login.ts";
+import { sha256Hex } from "./capture/json.ts";
 
 const HELP = `Bun.WebView screenshot tool
 
@@ -26,7 +28,8 @@ Options:
   --width <px>            Viewport width (default 1440)
   --height <px>           Viewport height (default 900)
   --backend <name>        webkit (macOS default/zero deps) or chrome
-  --format <name>         png | jpeg | webp (webp requires chrome)
+  --format <name>         png | jpeg | webp (webp is re-encoded via Bun.Image on webkit)
+  --resize <WxH|W>        Resize with Bun.Image after capture
   --quality <1-100>       jpeg/webp quality (default 82)
   --wait-selector <css>   Wait for this selector before the screenshot
   --wait-ms <ms>          Extra settle delay (default 250)
@@ -46,6 +49,7 @@ interface Options {
   backend: "webkit" | "chrome";
   format: "png" | "jpeg" | "webp";
   quality: number;
+  resize: { width: number; height?: number } | null;
   waitSelector: string | null;
   waitMs: number;
   timeoutMs: number;
@@ -98,8 +102,10 @@ function parseArgs(args: readonly string[]): Options {
     ["--backend"],
     process.platform === "darwin" ? "webkit" : "chrome",
   );
+  // webp no longer forces Chrome: Bun.Image re-encodes the PNG on webkit.
   const backend: Options["backend"] =
-    backendRaw === "chrome" || format === "webp" ? "chrome" : "webkit";
+    backendRaw === "chrome" ? "chrome" : "webkit";
+  const resizeRaw = flag(args, ["--resize"], "");
 
   const width = Number(flag(args, ["--width"], "1440"));
   const height = Number(flag(args, ["--height"], "900"));
@@ -121,6 +127,7 @@ function parseArgs(args: readonly string[]): Options {
     quality: Number.isFinite(quality)
       ? Math.min(Math.max(quality, 1), 100)
       : 82,
+    resize: resizeRaw === "" ? null : parseResize(resizeRaw),
     waitSelector: flag(args, ["--wait-selector"], "") || null,
     waitMs: Number.isFinite(waitMs) ? Math.max(0, waitMs) : 250,
     timeoutMs: Number.isFinite(timeoutMs) ? Math.max(1000, timeoutMs) : 20_000,
@@ -185,12 +192,34 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
     }
     if (options.waitMs > 0) await Bun.sleep(options.waitMs);
 
-    const screenshot = await view.screenshotToFile(
-      out,
-      options.format === "png"
-        ? { format: "png" }
-        : { format: options.format, quality: options.quality },
-    );
+    const needsEncode =
+      options.resize !== null ||
+      (options.format === "webp" && options.backend === "webkit");
+    let screenshot: { path: string; bytes: number; sha256: string };
+    if (!needsEncode) {
+      screenshot = await view.screenshotToFile(
+        out,
+        options.format === "png"
+          ? { format: "png" }
+          : { format: options.format, quality: options.quality },
+      );
+    } else {
+      const source = `${out}.src.png`;
+      await view.screenshotToFile(source, { format: "png" });
+      const png = new Uint8Array(await Bun.file(source).arrayBuffer());
+      await Bun.file(source).delete();
+      const encoded = await encodeScreenshot(png, {
+        format: options.format,
+        quality: options.quality,
+        ...(options.resize === null ? {} : { resize: options.resize }),
+      });
+      await Bun.write(out, encoded);
+      screenshot = {
+        path: out,
+        bytes: encoded.byteLength,
+        sha256: sha256Hex(encoded),
+      };
+    }
     const title = String((await view.evaluate("document.title")) ?? "");
     const url = String((await view.evaluate("location.href")) ?? "");
     console.log(
