@@ -27,6 +27,14 @@
     "probe:parse-tree": "bun run scripts/probe/parse-tree-only.ts",
     "probe:ingest-tree": "bun run scripts/probe/ingest-parsed-tree.ts",
     "manager:ingest-hierarchy": "bun run cli/f402_manager_hierarchy_ingest_cli.ts",
+    "graph:agent": "bun run scripts/build_agent_graph.ts",
+    "graph:agent:view": "bun run scripts/serve_agent_graph_view.ts",
+    "graph:agent:image": "bun run scripts/build_agent_graph_image.ts",
+    "graph:agent:views": "bun run scripts/build_agent_graph_views.ts",
+    "graph:agent:readability": "bun run scripts/agent_graph_readability.ts",
+    "graph:agent:judge": "bun run scripts/agent_graph_judge.ts",
+    "verify:agent-graph": "bun run scripts/verify_agent_graph_pipeline.ts",
+    "verify:agent-graph:strict": "bun run scripts/verify_agent_graph_pipeline.ts -- --strict",
     "manager-boot:runbook": "bun run scripts/manager_boot_runbook_cli.ts",
     "portal:drift:cron": "bun run scripts/f402_portal_drift_cron.ts",
     "test:manager-oracle-readonly": "PRETEST_SKIP=1 bun test --parallel lib/f402_portal_oracle_slice.test.ts lib/f402_production_fixture_redaction.test.ts lib/f402_portal_runtime_pin.test.ts",
@@ -179,6 +187,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/bun": "1.4.4",
+    "cytoscape": "3.30.2",
     "oxlint": "1.90.0",
     "pele": "1.9.0",
     "typescript": "5.9.3"
@@ -194,5 +203,9 @@
   "packageManager": "bun@1.4.4",
   "engines": {
     "bun": "1.4.4"
+  },
+  "dependencies": {
+    "cytoscape-elk": "2.3.0",
+    "elkjs": "0.12.1"
   }
 }
