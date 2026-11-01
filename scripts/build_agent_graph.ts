@@ -22,6 +22,7 @@ import {
 } from "../lib/f402_agent_policy.ts";
 import {
   buildAgentGraph,
+  fetchHierarchyEnvelopeForGraph,
   loadAccountFixtureFromFile,
 } from "../lib/f402_agent_graph.ts";
 import type { ListAgentsByAgentEnvelope } from "../lib/f402_list_agents_by_agent.ts";
@@ -55,7 +56,9 @@ ${F402_AGENT_SECURITY_WARNING_MARKDOWN}
 
 Options:
   --envelope <path>   Offline envelope (default: F402_RAW_ENVELOPE or scratch/raw-f402-list-agents.json)
-  --live              Live: FetchSession / WebView profile (requires --account fixture)
+  --live              Live: FetchSession / WebView profile (requires --account fixture). Saves the
+                      response to the --envelope default path (previous copy kept as .prev) and
+                      writes the manifest from it, so views/image/verify check live data too
   --account <path>    getAccountInfoOwner-shaped JSON (agentID + accountInfo.AgentType)
   --db <path>         SQLite (default scratch/agent-graph.sqlite)
   --out <path>        Graph JSON (default scratch/agent-graph.json)
@@ -89,6 +92,20 @@ const parserContext = {
   masterId: values["master-id"] ?? "MASTER1",
   masterLogin: values["master-login"] ?? "MASTER1",
 };
+
+/**
+ * A live envelope goes where offline runs and every downstream script read it, so their SHA
+ * checks cover live data too. A differing previous file is kept as `<path>.prev`.
+ */
+async function saveLiveEnvelope(text: string): Promise<string> {
+  const dest = resolveDefaultAgentGraphEnvelope(REPO);
+  const previous = Bun.file(dest);
+  if ((await previous.exists()) && (await previous.text()) !== text) {
+    await atomicWrite(`${dest}.prev`, previous);
+  }
+  await atomicWrite(dest, text);
+  return dest;
+}
 
 async function main(): Promise<void> {
   const live = values.live === true;
@@ -134,28 +151,39 @@ async function main(): Promise<void> {
   let envelopeGeneralRows = 0;
   let resolvedEnvelopePath = envelopePath ?? "";
 
-  if (live) {
-    accountFixture = await loadAccountFixtureFromFile(accountPath!);
-    rootAgentId = accountFixture.agentID;
-    transport = await createF402ReplayTransport({});
-    console.error(
-      `[graph:agent] live transport=${transport.label} agentID=${rootAgentId}`,
+  try {
+    if (live) {
+      accountFixture = await loadAccountFixtureFromFile(accountPath!);
+      rootAgentId = accountFixture.agentID;
+      transport = await createF402ReplayTransport({});
+      console.error(
+        `[graph:agent] live transport=${transport.label} agentID=${rootAgentId}`,
+      );
+      const { envelopeText } = await fetchHierarchyEnvelopeForGraph(
+        transport,
+        accountFixture,
+        { agentOwner: rootAgentId },
+      );
+      resolvedEnvelopePath = await saveLiveEnvelope(envelopeText);
+      envelopeSha256 = await sha256HexFile(resolvedEnvelopePath);
+    }
+
+    // Live and offline both build from the envelope file, so the manifest SHA names what was built.
+    const envelope = parseListAgentsByAgentWireText(
+      await Bun.file(resolvedEnvelopePath).text(),
     );
-  } else {
-    const text = await Bun.file(envelopePath!).text();
-    const envelope = parseListAgentsByAgentWireText(text);
     envelopeGeneralRows = envelope.GENERAL.length;
-    rootAgentId =
-      String(
-        envelope.GENERAL[0]?.AgentID ?? Bun.env.F402_GRAPH_ROOT_AGENT_ID ?? "",
-      ).trim() || "UNKNOWN_ROOT";
+    if (!live) {
+      rootAgentId =
+        String(
+          envelope.GENERAL[0]?.AgentID ?? Bun.env.F402_GRAPH_ROOT_AGENT_ID ?? "",
+        ).trim() || "UNKNOWN_ROOT";
+    }
     envelopeGeneral = { GENERAL: envelope.GENERAL };
     console.error(
-      `[graph:agent] offline envelope=${envelopePath} generalRows=${envelopeGeneralRows}`,
+      `[graph:agent] ${live ? "live" : "offline"} envelope=${resolvedEnvelopePath} sha256=${envelopeSha256.slice(0, 12)}… generalRows=${envelopeGeneralRows}`,
     );
-  }
 
-  try {
     const result = await buildAgentGraph({
       dbPath,
       parserContext,
@@ -188,29 +216,25 @@ async function main(): Promise<void> {
       renderAgentGraphCapturePage(JSON.stringify(result.graph, null, 2)),
     );
 
-    if (!live) {
-      await writeAgentGraphBuildManifest(artifactPaths.manifest, {
-        version: 1,
-        envelopePath: resolvedEnvelopePath,
-        envelopeSha256,
-        envelopeGeneralRows,
-        ingestedRowCount: result.ingest.rowCount,
-        skippedOverflowCount: result.ingest.skippedOverflow.length,
-        nodeCount: result.graph.nodes.length,
-        edgeCount: result.graph.edges.length,
-        builtAt: new Date().toISOString(),
-      });
-    }
+    await writeAgentGraphBuildManifest(artifactPaths.manifest, {
+      version: 1,
+      envelopePath: resolvedEnvelopePath,
+      envelopeSha256,
+      envelopeGeneralRows,
+      ingestedRowCount: result.ingest.rowCount,
+      skippedOverflowCount: result.ingest.skippedOverflow.length,
+      nodeCount: result.graph.nodes.length,
+      edgeCount: result.graph.edges.length,
+      builtAt: new Date().toISOString(),
+    });
 
     console.error(
       `[graph:agent] ingested=${result.ingest.rowCount} skippedOverflow=${result.ingest.skippedOverflow.length} nodes=${result.graph.nodes.length} edges=${result.graph.edges.length}`,
     );
     console.error(`[graph:agent] wrote ${outPath}`);
-    if (!live) {
-      console.error(
-        `[graph:agent] manifest ${artifactPaths.manifest} (webp stale until graph:agent:image)`,
-      );
-    }
+    console.error(
+      `[graph:agent] manifest ${artifactPaths.manifest} (views and webp stale until graph:agent:views + graph:agent:image)`,
+    );
   } finally {
     await transport?.close();
   }

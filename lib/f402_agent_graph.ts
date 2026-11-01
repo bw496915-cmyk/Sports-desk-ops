@@ -85,13 +85,19 @@ export async function fetchHierarchyEnvelopeForGraph(
   transport: F402ReplayTransport,
   account: AccountInfoOwnerFixture,
   bodyFixture?: ListAgentsRequestFixture,
-): Promise<ListAgentsByAgentEnvelope> {
+): Promise<{
+  readonly envelope: ListAgentsByAgentEnvelope;
+  readonly envelopeText: string;
+}> {
   const plan = buildListAgentsReplayPlan(account, {
     agentOwner: bodyFixture?.agentOwner ?? account.agentID,
     ...bodyFixture,
   });
-  const { envelope } = await fetchListAgentsEnvelope(plan, transport);
-  return envelope;
+  const { envelope, envelopeText } = await fetchListAgentsEnvelope(
+    plan,
+    transport,
+  );
+  return { envelope, envelopeText };
 }
 
 export interface BuildAgentGraphOptions {
@@ -121,7 +127,7 @@ export async function buildAgentGraph(
     options.transport !== undefined &&
     options.account !== undefined
   ) {
-    const full = await fetchHierarchyEnvelopeForGraph(
+    const { envelope: full } = await fetchHierarchyEnvelopeForGraph(
       options.transport,
       options.account,
       options.bodyFixture,
