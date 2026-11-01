@@ -3,7 +3,7 @@
  * Always-on portal bundle drift signal via in-process Bun.cron.
  *
  *   bun run portal:drift:cron --watch
- *   F402_PORTAL_DRIFT_CRON="0 */6 * * *" bun run portal:drift:cron --watch
+ *   F402_PORTAL_DRIFT_CRON="0 0,6,12,18 * * *" bun run portal:drift:cron --watch
  *   F402_PORTAL_DRIFT_CRON_TZ=America/Chicago bun run portal:drift:cron --watch
  */
 import { join } from "node:path";
