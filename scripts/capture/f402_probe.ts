@@ -78,6 +78,7 @@ const VALUE_FLAGS = [
   "--wait-for",
   "--body",
   "--week",
+  "--week-sweep",
   "--ticket",
   "--wager",
   "--flag",
@@ -239,6 +240,9 @@ async function main(): Promise<number> {
   const waitFor = flagValue(parsed, "--wait-for", "");
   const explicitBody = flagValue(parsed, "--body", "");
   const weekValue = flagValue(parsed, "--week", "");
+  const weekSweepRaw = flagValue(parsed, "--week-sweep", "");
+  const weekSweep =
+    weekSweepRaw === "" ? 0 : Math.max(0, Number(weekSweepRaw) || 0);
   const ticketValue = flagValue(parsed, "--ticket", "");
   const wagerValue = flagValue(parsed, "--wager", "");
   const flagValue_ = flagValue(parsed, "--flag", "");
@@ -623,103 +627,130 @@ async function main(): Promise<number> {
     for (const op of ops) {
       const url = probeUrl(base, op, prefix);
       const reqContentType = contentTypeFor(op);
-      const body = bodyFor(op);
-      try {
-        const raw = await view.evaluate(
-          buildProbeExpression(
-            {
-              operation: op.operation,
-              url,
-              body,
-              contentType: reqContentType,
-            },
-            2_000,
-            weekValue === "" ? undefined : weekValue,
-          ),
-        );
-        const result = parseProbePageResult(raw);
-        const { bodyText, ...scratchResult } = result;
-        const capturedAt = new Date().toISOString();
-        const record = {
-          schemaVersion: 1,
-          kind: "webview-probe",
-          backend,
-          capturedAt,
-          operation: op.operation,
-          url,
-          method: op.method,
-          requestContentType: reqContentType,
-          body,
-          dateUsed: result.dateUsed ?? null,
-          weekUsed: result.weekUsed ?? null,
-          authMode,
-          readOnlyConfirmed: op.readOnly,
-          headersObserved: false,
-          result: scratchResult,
-          extractedText: scratchResult.contentType.includes("text/html")
-            ? htmlToText(scratchResult.preview).slice(0, 2_000)
-            : null,
-          note: op.note,
-        };
-        await Bun.write(
-          join(outDir, `${op.operation}.json`),
-          `${JSON.stringify(record, null, 2)}\n`,
-        );
-
-        if (
-          promoteStore !== null &&
-          op.readOnly &&
-          result.status >= 200 &&
-          result.status <= 299
-        ) {
-          const opPath = `${prefix.replace(/\/$/, "")}/${op.operation}`;
-          const wireText = bodyText ?? result.preview;
-          const captureRecord = buildCaptureRecord({
-            mode: "live",
-            capturedAt,
-            operation: {
-              path: opPath,
-              method: "POST",
-            },
-            request: {
-              url,
-              method: "POST",
-              headers: {
-                "content-type": reqContentType,
-                "x-requested-with": "XMLHttpRequest",
-                authorization: "Bearer <redacted>",
+      const hasWeek = op.params.includes("week");
+      const sweepValues =
+        weekSweep > 0 && hasWeek
+          ? Array.from({ length: weekSweep + 1 }, (_, i) => i)
+          : [null];
+      for (const weekIdx of sweepValues) {
+        const effectiveWeekValue =
+          weekIdx === null ? weekValue : String(weekIdx);
+        const body =
+          weekIdx === null || explicitBody !== ""
+            ? bodyFor(op)
+            : buildProbeBody(
+                op,
+                agentId,
+                process.env.F402_CUSTOMER_ID?.trim() || "__CUSTOMER_ID__",
+                {
+                  ...(ticketValue === "" ? {} : { ticketNumber: ticketValue }),
+                  ...(wagerValue === "" ? {} : { wagerNumber: wagerValue }),
+                  ...(flagValue_ === "" ? {} : { flag: flagValue_ }),
+                },
+              );
+        const outFile =
+          weekIdx === null
+            ? `${op.operation}.json`
+            : `${op.operation}.week${weekIdx}.json`;
+        try {
+          const raw = await view.evaluate(
+            buildProbeExpression(
+              {
+                operation: op.operation,
+                url,
+                body,
+                contentType: reqContentType,
               },
-              contentType: reqContentType,
-              body,
-            },
-            response: {
-              status: result.status,
-              headers: { "content-type": result.contentType },
-              contentType: result.contentType,
-              bytes: new TextEncoder().encode(wireText),
-            },
-            provenance: {
-              portalHost,
-              proxy: "none",
-              auth: "cookie",
-              bunVersion: Bun.version,
-            },
-            samples: 1,
-          });
-          await promoteStore.write(captureRecord);
-          promotedCount += 1;
-          promotedOps.push(opPath);
-          promotedDates.add(capturedAt.slice(0, 10));
-        }
+              2_000,
+              effectiveWeekValue === "" ? undefined : effectiveWeekValue,
+            ),
+          );
+          const result = parseProbePageResult(raw);
+          const { bodyText, ...scratchResult } = result;
+          const capturedAt = new Date().toISOString();
+          const record = {
+            schemaVersion: 1,
+            kind: "webview-probe",
+            backend,
+            capturedAt,
+            operation: op.operation,
+            url,
+            method: op.method,
+            requestContentType: reqContentType,
+            body,
+            dateUsed: result.dateUsed ?? null,
+            weekUsed: result.weekUsed ?? null,
+            authMode,
+            readOnlyConfirmed: op.readOnly,
+            headersObserved: false,
+            result: scratchResult,
+            extractedText: scratchResult.contentType.includes("text/html")
+              ? htmlToText(scratchResult.preview).slice(0, 2_000)
+              : null,
+            note: op.note,
+          };
+          await Bun.write(
+            join(outDir, outFile),
+            `${JSON.stringify(record, null, 2)}\n`,
+          );
 
-        const summary = probeSummary(op, result);
-        console.log(
-          `${summary.operation.padEnd(30)} ${String(summary.status).padEnd(5)} ${summary.verdict.padEnd(8)} ${summary.bytes} B`,
-        );
-      } catch (error) {
-        transportErrors += 1;
-        console.error(`${op.operation}: ${(error as Error).message}`);
-      }
+          if (
+            promoteStore !== null &&
+            op.readOnly &&
+            result.status >= 200 &&
+            result.status <= 299
+          ) {
+            const opPath = `${prefix.replace(/\/$/, "")}/${op.operation}`;
+            const wireText = bodyText ?? result.preview;
+            const captureRecord = buildCaptureRecord({
+              mode: "live",
+              capturedAt,
+              operation: {
+                path: opPath,
+                method: "POST",
+              },
+              request: {
+                url,
+                method: "POST",
+                headers: {
+                  "content-type": reqContentType,
+                  "x-requested-with": "XMLHttpRequest",
+                  authorization: "Bearer <redacted>",
+                },
+                contentType: reqContentType,
+                body,
+              },
+              response: {
+                status: result.status,
+                headers: { "content-type": result.contentType },
+                contentType: result.contentType,
+                bytes: new TextEncoder().encode(wireText),
+              },
+              provenance: {
+                portalHost,
+                proxy: "none",
+                auth: "cookie",
+                bunVersion: Bun.version,
+              },
+              samples: 1,
+            });
+            await promoteStore.write(captureRecord);
+            promotedCount += 1;
+            promotedOps.push(opPath);
+            promotedDates.add(capturedAt.slice(0, 10));
+          }
+
+          const summary = probeSummary(op, result);
+          console.log(
+            `${summary.operation.padEnd(30)} ${String(summary.status).padEnd(5)} ${summary.verdict.padEnd(8)} ${summary.bytes} B`,
+          );
+        } catch (error) {
+          transportErrors += 1;
+          console.error(
+            `${op.operation} (week=${weekIdx ?? "default"}): ${(error as Error).message}`,
+          );
+        }
+      } // end week sweep
     }
 
     if (wantScreenshot) {
