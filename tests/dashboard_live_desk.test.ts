@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  DEFAULT_SETTINGS,
+  LANGUAGES,
+  TIMEZONES,
+} from "../lib/settings_prefs.ts";
 
 /**
  * Static checks for the executive dashboard's Live Desk panel. No DOM in `bun:test`, so these
@@ -398,5 +403,60 @@ describe("Live wager ticker panel", () => {
     expect(panel).toContain("provenance.source");
     // The note comes from the server, not from a sentence invented in the browser.
     expect(panel).not.toContain("subset of the shown list");
+  });
+});
+
+describe("Settings vocabulary drift", () => {
+  const html = readFileSync(
+    resolve(
+      import.meta.dir,
+      "../static/customer-churn-simulation-dashboard.html",
+    ),
+    "utf8",
+  );
+
+  /** Pulls `const NAME = { ... };` out of the inline script and evaluates the literal. */
+  const literal = (name: string): unknown => {
+    const start = html.indexOf(`const ${name} = {`);
+    if (start === -1) throw new Error(`settings literal ${name} not found`);
+    const open = html.indexOf("{", start);
+    let depth = 0;
+    for (let i = open; i < html.length; i++) {
+      if (html[i] === "{") depth += 1;
+      else if (html[i] === "}") {
+        depth -= 1;
+        if (depth === 0)
+          return new Function(`return ${html.slice(open, i + 1)}`)();
+      }
+    }
+    throw new Error(`settings literal ${name} is unterminated`);
+  };
+
+  test("the panel's timezone table matches lib/settings_prefs.ts", () => {
+    // The dashboard carries its own copy because the page cannot import the module; this pins
+    // the copy to the tested vocabulary so the two cannot drift apart silently.
+    const inline = literal("ZONES") as Record<
+      string,
+      { label: string; offset: number }
+    >;
+    const expected = Object.fromEntries(
+      TIMEZONES.map((zone) => [
+        zone.value,
+        { label: zone.label, offset: zone.offsetHours },
+      ]),
+    );
+    expect(inline).toEqual(expected);
+  });
+
+  test("the panel's language table matches lib/settings_prefs.ts", () => {
+    const inline = literal("LANGS") as Record<string, string>;
+    const expected = Object.fromEntries(
+      LANGUAGES.map((language) => [language.value, language.lang]),
+    );
+    expect(inline).toEqual(expected);
+  });
+
+  test("the panel's defaults match lib/settings_prefs.ts", () => {
+    expect(literal("DEFAULTS")).toEqual({ ...DEFAULT_SETTINGS });
   });
 });

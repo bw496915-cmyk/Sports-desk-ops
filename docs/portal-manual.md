@@ -4,14 +4,15 @@ Our own structured digest of the vendor manual, kept in the repo so the surfaces
 be checked against the code. The manual itself is third-party documentation and is **not** copied
 here; only short UI labels (`Game Admin`, `Position`, `Vig Setup`) and paraphrased behaviour appear.
 
-| Field           | Value                                                                                          |
-| --------------- | ---------------------------------------------------------------------------------------------- |
-| Source          | `https://fantasy402.com/doc/FAQ.pdf` (linked from manager.html → F.A.Q. → User Manual)         |
-| Version         | 1.0.280                                                                                        |
-| Format          | PDF, 226,538 bytes, 6 pages, 13 questions, text layer (no OCR needed)                          |
-| SHA-256         | `e6a325bd14d904c5a300e9900ab961059caacc99e1931eb8e6ae9e60410b7aaa`                             |
-| First retrieved | 2026-11-01                                                                                     |
-| Raw text        | `scratch/portal-manual/manual-<sha8>.txt` — gitignored, regenerate with `bun run manual:fetch` |
+| Field           | Value                                                                                                                                   |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Source          | `https://fantasy402.com/doc/FAQ.pdf` (linked from manager.html → F.A.Q. → User Manual)                                                  |
+| Version         | 1.0.280                                                                                                                                 |
+| Format          | PDF, 226,538 bytes, 6 pages, 13 questions, text layer (no OCR needed)                                                                   |
+| SHA-256         | `e6a325bd14d904c5a300e9900ab961059caacc99e1931eb8e6ae9e60410b7aaa`                                                                      |
+| First retrieved | 2026-11-01                                                                                                                              |
+| Re-verified     | 2026-11-01 — `bun run manual:fetch` returned the same 226,538 bytes and SHA-256, so the digest below still describes the current manual |
+| Raw text        | `scratch/portal-manual/manual-<sha8>.txt` — gitignored, regenerate with `bun run manual:fetch`                                          |
 
 If `bun run manual:fetch` reports a different SHA-256, the vendor updated the manual: re-read this
 digest against the new text before trusting the "status" column below.
