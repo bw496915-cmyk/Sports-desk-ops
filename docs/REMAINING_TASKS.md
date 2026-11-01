@@ -106,11 +106,15 @@ so an id resolves without guessing which artifact it came from.
     "Invalid CustomerID" — plus each report's date filter. `bun run customers` indexes the local cohorts
     (artifact 49, demo-book 220, fixture 6) for lookup, but those are demo ids and the live endpoints
     reject them; a `capture` source appears only when a capture keeps a real id.
-  - **Observed 2026-11-01** (`[OBSERVED]`, `scratch/f402-probes/`): the working envelope is
-    `/cloud/api/<Manager|Report>/<op>` with `Authorization: Bearer <sessionStorage.credentials.code>`.
-    With a customer id discovered from `getBetTicker`, `Pending` answers **200 with 46 KB** and
-    `getGrading` **200 `{"LIST":""}`** (no date filter). The other four still answer 500 with 0 B and
-    need their required parameters (date range, wager number). Without the header every call is 401.
+  - **Observed 2026-11-01** (`[OBSERVED]`, `scratch/f402-probes/`): the portal's own client at
+    `/app/customer/report/report.js` builds every report from `customerID`, `token` (empty in the browser
+    session; the edge accepts the bearer instead) and `operation`, plus `week` for the daily-figures and
+    graded-wager reports, `date` (MM/DD/YYYY) for transactions, and `agentID` for daily figures. With that
+    envelope `Pending` answers **200 with 41 KB**, `getTransactions` **200 `{"LIST":[]}`** and `getGrading`
+    **200 `{"LIST":[]}`**. `getDailyFiguresByCustomer` and `getGradedWagerByCustomer` still answer 500 on
+    the `week` value, and `getTicketDetailPrint` needs a ticket/wager number.
+  - **Privacy:** the `Pending` payload includes customer names and a `Password` field, so probe records
+    keep only a 2 KB preview under `scratch/` and nothing is promoted to `docs/`.
   - **Safety:** `PendingDelete` is named like a mutation. The capture allowlist refuses mutation ops by
     construction, so that endpoint needs an explicit read-only confirmation before it is added.
   - **Automation:** `bun run capture:f402 --dry-run` prints the six-op plan without launching anything.

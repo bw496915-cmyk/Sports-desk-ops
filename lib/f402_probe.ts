@@ -10,12 +10,17 @@
  * refuses mutations by construction.
  */
 
+export type ProbeParam =
+  "agentID" | "customerID" | "week" | "date" | "token" | "operation";
+
 export interface ProbeOp {
   readonly operation: string;
   readonly method: "POST";
   /** False for operations whose read-only nature has not been confirmed. */
   readonly readOnly: boolean;
   readonly note: string;
+  /** Form fields the client sends, read from `customer/report/report.js`. */
+  readonly params: readonly ProbeParam[];
 }
 
 export const PROBE_OPS: readonly ProbeOp[] = [
@@ -24,42 +29,49 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     method: "POST",
     readOnly: true,
     note: "already in the capture allowlist as getPending",
+    params: ["customerID", "token", "operation"],
   },
   {
     operation: "getDailyFiguresByCustomer",
     method: "POST",
     readOnly: true,
     note: "daily figure report read",
+    params: ["agentID", "customerID", "week", "token", "operation"],
   },
   {
     operation: "getGradedWagerByCustomer",
     method: "POST",
     readOnly: true,
     note: "graded wager report read",
+    params: ["customerID", "week", "token", "operation"],
   },
   {
     operation: "getTransactions",
     method: "POST",
     readOnly: true,
-    note: "transaction report read",
+    note: "transaction report read; `date` is MM/DD/YYYY",
+    params: ["customerID", "date", "token", "operation"],
   },
   {
     operation: "getGrading",
     method: "POST",
     readOnly: true,
     note: "grading report read; also settles the channel model",
+    params: ["customerID", "token", "operation"],
   },
   {
     operation: "getTicketDetailPrint",
     method: "POST",
     readOnly: true,
-    note: "ticket detail read",
+    note: "ticket detail read; needs a ticket/wager number",
+    params: ["token", "operation"],
   },
   {
     operation: "PendingDelete",
     method: "POST",
     readOnly: false,
     note: "name reads like a mutation; confirm before probing",
+    params: ["customerID", "token", "operation"],
   },
 ] as const;
 
@@ -102,7 +114,13 @@ export function buildProbeExpression(
     "x-requested-with": "XMLHttpRequest",
   };
   if (token) headers.authorization = "Bearer " + token;
-  const resolvedBody = ${body}.replaceAll("{customerID}", encodeURIComponent(customerID));
+  // Yesterday: today's date is not a settled day for this endpoint (it answers 500).
+  const now = new Date(Date.now() - 86_400_000);
+  const mdy = String(now.getMonth() + 1).padStart(2, "0") + "/" + String(now.getDate()).padStart(2, "0") + "/" + now.getFullYear();
+  const resolvedBody = ${body}
+    .replaceAll("__CUSTOMER_ID__", encodeURIComponent(customerID))
+    .replaceAll("__DATE__", encodeURIComponent(mdy))
+    .replaceAll("__WEEK__", encodeURIComponent(mdy));
   const response = await fetch(${url}, {
     method: "POST",
     credentials: "include",
@@ -115,8 +133,111 @@ export function buildProbeExpression(
     contentType: response.headers.get("content-type") ?? "",
     bytes: new TextEncoder().encode(text).byteLength,
     preview: text.slice(0, ${preview}),
+    bodyText: text,
+    dateUsed: mdy,
   };
 })()`;
+}
+
+export interface SniffedFormTemplate {
+  readonly path: string;
+  readonly method: string;
+  readonly formKeys: readonly string[];
+}
+
+/**
+ * In-page `XMLHttpRequest` + `fetch` sniffer expression for WebKit and Chrome.
+ *
+ * Because `backend: "webkit"` (`WKWebView`) has no CDP bridge, this hook intercepts outbound
+ * `/cloud/api/` calls directly inside the page and records **only** the URL pathname, HTTP method,
+ * and sorted URL-encoded form parameter names (`formKeys`) — parameter values never leave the page.
+ */
+export function buildInstallRequestSnifferExpression(): string {
+  return `(() => {
+  if (window.__f402SnifferInstalled) return true;
+  window.__f402SnifferInstalled = true;
+  window.__f402SniffedRequests = window.__f402SniffedRequests || [];
+  const parseKeys = (raw) => {
+    if (typeof raw !== "string" || raw.trim() === "") return [];
+    const out = new Set();
+    for (const [k] of new URLSearchParams(raw)) {
+      if (k.trim() !== "") out.add(k.trim());
+    }
+    return Array.from(out).sort();
+  };
+  const record = (rawUrl, rawMethod, rawBody) => {
+    try {
+      const parsed = new URL(String(rawUrl), location.origin);
+      if (!parsed.pathname.includes("/cloud/api/")) return;
+      window.__f402SniffedRequests.push({
+        path: parsed.pathname,
+        method: String(rawMethod || "POST").toUpperCase(),
+        formKeys: parseKeys(rawBody),
+      });
+    } catch {}
+  };
+  const proto = XMLHttpRequest.prototype;
+  const origOpen = proto.open;
+  const origSend = proto.send;
+  proto.open = function (method, url) {
+    this.__f402Method = method;
+    this.__f402Url = url;
+    return origOpen.apply(this, arguments);
+  };
+  proto.send = function (body) {
+    record(this.__f402Url, this.__f402Method, typeof body === "string" ? body : "");
+    return origSend.apply(this, arguments);
+  };
+  if (typeof window.fetch === "function") {
+    const origFetch = window.fetch;
+    window.fetch = function (input, init) {
+      const url = typeof input === "string" ? input : (input && input.url) || "";
+      const method = (init && init.method) || (input && input.method) || "GET";
+      const body = init && typeof init.body === "string" ? init.body : "";
+      record(url, method, body);
+      return origFetch.apply(this, arguments);
+    };
+  }
+  return true;
+})()`;
+}
+
+/** Read the in-page sniffed `/cloud/api/` request templates collected on WebKit or Chrome. */
+export function buildReadRequestSnifferExpression(): string {
+  return `(() => Array.isArray(window.__f402SniffedRequests) ? window.__f402SniffedRequests : [])()`;
+}
+
+/** Validate and deduplicate sniffed form templates returned from the page or CDP. */
+export function parseSniffedTemplates(raw: unknown): SniffedFormTemplate[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: SniffedFormTemplate[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const candidate = item as Record<string, unknown>;
+    const path = candidate["path"];
+    const method = candidate["method"];
+    const formKeys = candidate["formKeys"];
+    if (
+      typeof path !== "string" ||
+      !path.startsWith("/") ||
+      typeof method !== "string" ||
+      !Array.isArray(formKeys) ||
+      !formKeys.every((key) => typeof key === "string")
+    ) {
+      continue;
+    }
+    const sortedKeys = [...(formKeys as string[])].sort();
+    const signature = `${method.toUpperCase()} ${path} ${sortedKeys.join(",")}`;
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    out.push({
+      path,
+      method: method.toUpperCase(),
+      formKeys: sortedKeys,
+    });
+  }
+  return out;
 }
 
 export interface ProbePageResult {
@@ -124,6 +245,8 @@ export interface ProbePageResult {
   readonly contentType: string;
   readonly bytes: number;
   readonly preview: string;
+  readonly bodyText?: string;
+  readonly dateUsed?: string;
 }
 
 /** Validate what came back from the page before it is written as evidence. */
@@ -135,6 +258,7 @@ export function parseProbePageResult(raw: unknown): ProbePageResult {
   const contentType = candidate["contentType"];
   const bytes = candidate["bytes"];
   const preview = candidate["preview"];
+  const bodyText = candidate["bodyText"];
   if (typeof status !== "number" || !Number.isInteger(status) || status < 100) {
     throw new Error("probe result has no HTTP status");
   }
@@ -145,7 +269,15 @@ export function parseProbePageResult(raw: unknown): ProbePageResult {
   }
   if (typeof preview !== "string")
     throw new Error("probe result has no body preview");
-  return { status, contentType, bytes, preview };
+  const dateUsed = candidate["dateUsed"];
+  return {
+    status,
+    contentType,
+    bytes,
+    preview,
+    ...(typeof bodyText === "string" ? { bodyText } : {}),
+    ...(typeof dateUsed === "string" ? { dateUsed } : {}),
+  };
 }
 
 export type ProbeVerdict = "exists" | "denied" | "missing" | "error";
@@ -179,19 +311,39 @@ export const PROBE_PREFIXES = [
   "/cloud/api/Report",
 ] as const;
 
-/** The form body every observed Manager call uses; `agentOwner` defaults to the same agent. */
+/**
+ * Build the form body from the fields the client actually sends.
+ *
+ * `customerID`, `date` and `week` stay as placeholders: the page resolves them from sessionStorage and
+ * the local date, so the value never has to cross into Bun. `token` is empty because `Security.token`
+ * is empty in the browser session — the edge accepts the bearer instead.
+ */
 export function buildProbeBody(
   op: ProbeOp,
   agentId: string,
   customerId?: string,
 ): string {
   const params = new URLSearchParams();
-  params.set("agentID", agentId);
-  params.set("agentOwner", agentId);
-  if (customerId !== undefined && customerId !== "")
-    params.set("customerID", customerId);
-  params.set("operation", op.operation);
-  params.set("RRO", "1");
+  for (const name of op.params) {
+    if (name === "operation") {
+      params.set("operation", op.operation);
+    } else if (name === "agentID") {
+      params.set("agentID", agentId);
+    } else if (name === "token") {
+      params.set("token", "");
+    } else if (name === "customerID") {
+      params.set(
+        "customerID",
+        customerId !== undefined && customerId !== ""
+          ? customerId
+          : "__CUSTOMER_ID__",
+      );
+    } else if (name === "date") {
+      params.set("date", "__DATE__");
+    } else if (name === "week") {
+      params.set("week", "__WEEK__");
+    }
+  }
   return params.toString();
 }
 

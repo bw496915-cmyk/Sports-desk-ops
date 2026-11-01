@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
   PROBE_OPS,
+  buildInstallRequestSnifferExpression,
   buildProbeBody,
   buildProbeExpression,
+  buildReadRequestSnifferExpression,
   parseProbePageResult,
+  parseSniffedTemplates,
   probeSummary,
   probeUrl,
   probeVerdict,
@@ -35,33 +38,30 @@ describe("f402 probe plan", () => {
     );
   });
 
-  test("builds the observed form envelope without leaking values", () => {
-    const body = buildProbeBody(PROBE_OPS[0]!, "agent-118", "cust-9");
-    const params = new URLSearchParams(body);
-    expect(params.get("operation")).toBe("Pending");
-    expect(params.get("RRO")).toBe("1");
-    expect(params.get("agentID")).toBe("agent-118");
-    expect(params.get("agentOwner")).toBe("agent-118");
-    expect(params.get("customerID")).toBe("cust-9");
-    expect(buildProbeBody(PROBE_OPS[0]!, "agent-118")).not.toContain(
-      "customerID",
+  test("builds the client envelope from customer/report/report.js", () => {
+    const pending = new URLSearchParams(
+      buildProbeBody(PROBE_OPS[0]!, "agent-118", "cust-9"),
     );
-  });
+    expect([...pending.keys()]).toEqual(["customerID", "token", "operation"]);
+    expect(pending.get("customerID")).toBe("cust-9");
+    // Security.token is empty in the browser session; the edge accepts the bearer instead.
+    expect(pending.get("token")).toBe("");
+    expect(pending.get("operation")).toBe("Pending");
 
-  test("the expression carries credentials and cannot be broken by quotes", () => {
-    const expression = buildProbeExpression({
-      operation: "Pending",
-      url: "https://www.fantasy402.com/api/Report/Pending",
-      body: `partner=118&note="x"'\n&next=1`,
-    });
-    expect(expression).toContain('credentials: "include"');
-    expect(expression).toContain("x-requested-with");
-    expect(expression).toContain(
-      "https://www.fantasy402.com/api/Report/Pending",
+    const tx = new URLSearchParams(
+      buildProbeBody(
+        PROBE_OPS.find((op) => op.operation === "getTransactions")!,
+        "agent-118",
+      ),
     );
-    // JSON.stringify keeps the newline inside the literal rather than ending the statement.
-    expect(expression).toContain("\\n");
-    expect(expression.startsWith("(async () => {")).toBe(true);
+    expect([...tx.keys()]).toEqual([
+      "customerID",
+      "date",
+      "token",
+      "operation",
+    ]);
+    expect(tx.get("customerID")).toBe("__CUSTOMER_ID__");
+    expect(tx.get("date")).toBe("__DATE__");
   });
 
   test("validates the page result before it is treated as evidence", () => {
@@ -102,5 +102,46 @@ describe("f402 probe plan", () => {
       status: 404,
       bytes: 0,
     });
+  });
+});
+
+describe("request sniffer", () => {
+  test("installs XHR and fetch hooks scoped to /cloud/api/", () => {
+    const expression = buildInstallRequestSnifferExpression();
+    expect(expression).toContain("XMLHttpRequest.prototype");
+    expect(expression).toContain("window.fetch");
+    expect(expression).toContain("/cloud/api/");
+    // Only parameter names are recorded, never values.
+    expect(expression).toContain("formKeys");
+  });
+
+  test("reads back the sniffed array", () => {
+    expect(buildReadRequestSnifferExpression()).toContain(
+      "__f402SniffedRequests",
+    );
+  });
+
+  test("parseSniffedTemplates dedupes by path, method and sorted keys", () => {
+    const parsed = parseSniffedTemplates([
+      {
+        path: "/cloud/api/Manager/getInfoPlayer",
+        method: "post",
+        formKeys: ["agentID", "RRO"],
+      },
+      {
+        path: "/cloud/api/Manager/getInfoPlayer",
+        method: "POST",
+        formKeys: ["RRO", "agentID"],
+      },
+      { path: "not-a-path", method: "POST", formKeys: [] },
+      { path: "/cloud/api/Manager/x", method: "POST", formKeys: [1] },
+    ]);
+    expect(parsed).toEqual([
+      {
+        path: "/cloud/api/Manager/getInfoPlayer",
+        method: "POST",
+        formKeys: ["RRO", "agentID"],
+      },
+    ]);
   });
 });
