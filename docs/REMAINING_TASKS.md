@@ -35,10 +35,13 @@ The JS API and the `bun ./file.md` loader are both documented as Rust-based. The
 widths and `COLUMNS` detection, not a different parser core; still diff both after a Bun upgrade before
 snapshotting either output.
 
-`Bun.markdown.ansi()` takes an `AnsiTheme` only — `tagFilter`/`headings` belong to `html()`. It also
-enables `wikiLinks`, `underline` and `latexMath` by default and offers no `Options` to disable them, so
-this doc deliberately avoids wiki brackets, double underscores and dollar math (test-enforced). Per-task colouring requires `render()`,
-where `listItem.checked` is `undefined` for a plain bullet, `false` for `- [ ]`, and `true` for `- [x]`.
+`Bun.markdown.ansi()` takes an `AnsiTheme` only — `tagFilter`/`headings` belong to `html()`. The 1.4.3
+guide says it enables `wikiLinks`, `underline` and `latexMath` by default; measured on 1.4.4, `ansi()`
+leaves wiki brackets, double underscores and dollar math literal, and only `html({ wikiLinks: true })`
+changes output to an `x-wikilink` element. `underline` and `latexMath` had no effect on these inputs
+either way. This doc still avoids all three (test-enforced) so the artifact cannot opt into a link the
+terminal view does not render. Per-task colouring requires `render()`, where `listItem.checked` is `undefined` for a plain
+bullet, `false` for `- [ ]`, and `true` for `- [x]`.
 
 `tagFilter` is a GFM compatibility filter, not a sanitizer: it escapes a specific tag list but leaves
 event-handler attributes alone. The HTML artifact therefore also sets `noHtmlBlocks`/`noHtmlSpans`;

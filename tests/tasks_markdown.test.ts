@@ -77,8 +77,10 @@ describe("remaining-tasks markdown", () => {
     expect(noTasks).not.toContain('type="checkbox"');
   });
 
-  test("the task doc avoids constructs ansi() forces on", () => {
-    // ansi() enables wikiLinks, underline and latexMath with no Options to disable them.
+  test("the task doc avoids constructs that can diverge", () => {
+    // Measured on 1.4.4: only wikiLinks changes HTML output; underline/latexMath are inert and ansi()
+    // leaves all three literal. Wiki brackets stay banned so the artifact cannot opt into a link the
+    // terminal view does not render (see tests/markdown_modes.test.ts).
     expect(markdown).not.toContain("[[");
     expect(markdown).not.toMatch(/__/);
     expect(markdown).not.toMatch(/\$/);
