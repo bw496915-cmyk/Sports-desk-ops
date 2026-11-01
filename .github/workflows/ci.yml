@@ -45,8 +45,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # audit:release compares docs/releases.json against the tags that exist.
-          fetch-tags: true
+          # audit:release compares docs/releases.json against the tags that exist. A shallow
+          # clone does not carry the older docs-v* tags, even with fetch-tags, and the repo is
+          # small enough that full history is cheaper than a false failure.
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.4"
