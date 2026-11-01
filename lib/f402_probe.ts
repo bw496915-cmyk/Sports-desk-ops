@@ -19,7 +19,10 @@ export type ProbeParam =
   | "operation"
   | "ticketNumber"
   | "wagerNumber"
-  | "flag";
+  | "flag"
+  | "agentType"
+  | "RRO"
+  | "agentOwner";
 
 export interface ProbeOp {
   readonly operation: string;
