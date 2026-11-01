@@ -6,6 +6,7 @@ import {
   indexProbeRecords,
   latestPerOperation,
   openProbeIndex,
+  pruneMissingProbes,
 } from "../lib/probe_index.ts";
 
 function record(overrides: Partial<ProbeRecord>): ProbeRecord {
@@ -75,6 +76,31 @@ describe("probe index", () => {
         200,
       );
       expect(again).toHaveLength(2);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test("pruning deleted files removes their index rows", async () => {
+    const db = openProbeIndex();
+    try {
+      await ensureProbeSchema(db);
+      await indexProbeRecords(db, [
+        record({
+          path: "keep.json",
+          operation: "Pending",
+          capturedAt: "2026-11-01T01:00:00Z",
+        }),
+        record({
+          path: "drop.json",
+          operation: "getGrading",
+          capturedAt: "2026-11-01T01:00:00Z",
+        }),
+      ]);
+      const removed = await pruneMissingProbes(db, new Set(["keep.json"]));
+      expect(removed).toBe(1);
+      const rows = await latestPerOperation(db);
+      expect(rows.map((row) => row.operation)).toEqual(["Pending"]);
     } finally {
       await db.close();
     }

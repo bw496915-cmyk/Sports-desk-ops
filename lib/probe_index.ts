@@ -134,3 +134,24 @@ export async function bestPerOperation(db: ProbeDatabase): Promise<
     };
   });
 }
+
+/**
+ * Drop index rows whose file no longer exists.
+ *
+ * The index was append-only, so pruning runs left the counts and `best` view reporting attempts that had
+ * been deleted from disk.
+ */
+export async function pruneMissingProbes(
+  db: ProbeDatabase,
+  paths: ReadonlySet<string>,
+): Promise<number> {
+  const rows = (await db`SELECT path FROM probes`) as Record<string, unknown>[];
+  let removed = 0;
+  for (const row of rows) {
+    const path = String(row["path"]);
+    if (paths.has(path)) continue;
+    await db`DELETE FROM probes WHERE path = ${path}`;
+    removed += 1;
+  }
+  return removed;
+}

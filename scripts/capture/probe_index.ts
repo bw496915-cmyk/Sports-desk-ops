@@ -28,6 +28,7 @@ import {
   indexProbeRecords,
   latestPerOperation,
   openProbeIndex,
+  pruneMissingProbes,
 } from "../../lib/probe_index.ts";
 
 const HELP = `
@@ -74,8 +75,11 @@ try {
       cwd: dir,
       onlyFiles: true,
     })) {
+      const baseName = rel.split("/").pop() ?? rel;
+      if (baseName === "run.json" || baseName.startsWith("_")) continue;
       const path = join(dir, rel);
       const raw = (await Bun.file(path).json()) as Record<string, unknown>;
+      if (raw["kind"] === "probe-run") continue;
       const result = raw["result"] as Record<string, unknown> | undefined;
       const operation = raw["operation"];
       const capturedAt = raw["capturedAt"];
@@ -102,8 +106,13 @@ try {
       });
     }
     const written = await indexProbeRecords(db, records);
+    const removed = await pruneMissingProbes(
+      db,
+      new Set(records.map((record) => record.path)),
+    );
     console.error(
-      `probes:index: indexed ${written} record(s) from ${dir} into ${dbPath}`,
+      `probes:index: indexed ${written} record(s) from ${dir} into ${dbPath}` +
+        (removed > 0 ? `, removed ${removed} stale row(s)` : ""),
     );
   } else if (command === "list") {
     const rows = (await latestPerOperation(db)).filter(

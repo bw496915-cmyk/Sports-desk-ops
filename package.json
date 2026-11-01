@@ -99,6 +99,7 @@
     "env:audit": "bun run scripts/env_audit.ts",
     "artifacts:cron": "bun run scripts/artifacts_cron.ts",
     "probes:index": "bun run scripts/capture/probe_index.ts",
+    "probes:prune": "bun run scripts/capture/probes_prune.ts",
     "customers": "bun run scripts/customer_lookup.ts",
     "capture:evidence:live": "bun run scripts/evidence_capture.ts --mode live",
     "apply:captures": "bun run scripts/apply_captures.ts",
