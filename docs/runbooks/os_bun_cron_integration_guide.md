@@ -79,6 +79,19 @@ Canonical consumers: `scripts/artifacts_cron.ts`, `scripts/f402_portal_drift_cro
 
 The in-process callback overload of `Bun.cron` provides lightweight, shared-memory job scheduling for long-running surveillance daemons and web servers.
 
+**CronJob handle (Bun docs):**
+
+```ts
+using job = Bun.cron("*/5 * * * *", async () => {
+  await cleanupTempFiles();
+});
+job.cron; // "*/5 * * * *"
+job.unref(); // allow process exit
+job.stop(); // cancel (or let `using` dispose)
+```
+
+Repo code uses `startInProcessCron(...)` (same handle). Long-running CLIs call `wireInProcessCronLifecycle(job)` (`ref` + signals). Optional `startInProcessCron(..., { keepAlive: false })` calls `unref()` for hosts that should not pin the event loop.
+
 ### 3.1 Core Invariants & Runtime Mechanics
 
 1. **Guaranteed Zero-Overlap Execution**:

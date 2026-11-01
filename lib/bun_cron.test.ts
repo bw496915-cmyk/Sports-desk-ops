@@ -72,6 +72,26 @@ describe("bun_cron", () => {
     job.stop();
   });
 
+  test("CronJob handle matches docs (cron, unref, stop, using dispose)", () => {
+    const job = startInProcessCron("*/5 * * * *", async () => {});
+    expect(job.cron).toBe("*/5 * * * *");
+    expect(job.unref()).toBe(job);
+    expect(job.stop()).toBe(job);
+
+    {
+      using scoped = startInProcessCron("0 0 1 1 *", () => {});
+      expect(scoped.cron).toBe("0 0 1 1 *");
+    }
+  });
+
+  test("startInProcessCron keepAlive false unrefs", () => {
+    const job = startInProcessCron("*/5 * * * *", () => {}, {
+      keepAlive: false,
+    });
+    expect(job.cron).toBe("*/5 * * * *");
+    job.stop();
+  });
+
   test("installOsCronJob refuses tz", async () => {
     await expect(
       installOsCronJob({

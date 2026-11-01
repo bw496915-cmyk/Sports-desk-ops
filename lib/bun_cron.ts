@@ -9,7 +9,10 @@
  *   `controller.cron`, `controller.scheduledTime`, `controller.type`).
  * - `Bun.cron(schedule, handler, { tz? })` — in-process on the event loop; returns a
  *   `CronJob` (`job.cron`, `ref`/`unref`, `stop`, `[Symbol.dispose]`). Jobs never
- *   overlap (next fire after handler + Promise settle). `using job = Bun.cron(...)` disposes.
+ *   overlap (next fire after handler + Promise settle). CronJob handle: `.cron`, `.ref()` /
+ *   `.unref()`, `.stop()`, `[Symbol.dispose]` — see {@link BUN_CRON_IN_PROCESS_HANDLE_EXAMPLE}.
+ *   {@link startInProcessCron} returns the same handle; daemons use
+ *   {@link wireInProcessCronLifecycle} (`ref` + SIGINT/SIGTERM).
  * - `Bun.cron.parse(expression, from?, { tz? })` — next matching `Date` in local time by
  *   default, or `{ tz: "IANA" }`; `null` if no match within 8 years; invalid `from` outside
  *   the ECMAScript Date range throws `TypeError`.
@@ -48,16 +51,38 @@ export interface CronSchedulePreview {
   readonly next: Date;
 }
 
+export interface StartInProcessCronOptions {
+  readonly tz?: string;
+  /**
+   * When `false`, calls `job.unref()` so a short-lived host process may exit without waiting
+   * on the schedule. Default keeps the Bun default (`ref` — process stays alive).
+   */
+  readonly keepAlive?: boolean;
+}
+
+/** Verbatim Bun docs — {@link startInProcessCron} returns this same `CronJob` handle. */
+export const BUN_CRON_IN_PROCESS_HANDLE_EXAMPLE =
+  `using job = Bun.cron("*/5 * * * *", async () => {
+  await cleanupTempFiles();
+});
+job.cron; // "*/5 * * * *"
+job.unref(); // allow process exit
+job.stop(); // cancel (or let \`using\` dispose)` as const;
+
 export function startInProcessCron(
   schedule: string,
   handler: () => void | Promise<void>,
-  options?: { readonly tz?: string },
+  options?: StartInProcessCronOptions,
 ): InProcessCronJob {
   const tz = options?.tz?.trim();
-  if (tz !== undefined && tz !== "") {
-    return Bun.cron(schedule, handler, { tz });
+  const job =
+    tz !== undefined && tz !== ""
+      ? Bun.cron(schedule, handler, { tz })
+      : Bun.cron(schedule, handler);
+  if (options?.keepAlive === false) {
+    job.unref();
   }
-  return Bun.cron(schedule, handler);
+  return job;
 }
 
 export function parseCronScheduleOrNull(
