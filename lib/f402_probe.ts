@@ -31,7 +31,11 @@ export type ProbeParam =
   | "flag"
   | "days"
   | "description"
-  | "additional";
+  | "additional"
+  | "store"
+  | "office"
+  | "showGraded"
+  | "sportType";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -189,6 +193,42 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     ],
     wireContentType: "application/json",
     defaultPrefix: "/cloud/api/Log",
+  },
+  {
+    operation: "getColorsSelections",
+    method: "POST",
+    readOnly: true,
+    note: "color selections (Manager envelope); form: agentID, operation, RRO, agentOwner",
+    params: ["agentID", "operation", "RRO", "agentOwner"],
+  },
+  {
+    operation: "getSportsTypesLive",
+    method: "POST",
+    readOnly: true,
+    note: "live sports types (Manager envelope); form: store, agentID, agentOwner, office, showGraded, operation, RRO",
+    params: [
+      "store",
+      "agentID",
+      "agentOwner",
+      "office",
+      "showGraded",
+      "operation",
+      "RRO",
+    ],
+  },
+  {
+    operation: "getPeriodsBySport",
+    method: "POST",
+    readOnly: true,
+    note: "periods by sport (Manager envelope); form: sportType, operation, RRO, agentID, agentOwner",
+    params: ["sportType", "operation", "RRO", "agentID", "agentOwner"],
+  },
+  {
+    operation: "getProps",
+    method: "POST",
+    readOnly: true,
+    note: "props list (Manager envelope); form: store, operation, RRO, agentID, agentOwner",
+    params: ["store", "operation", "RRO", "agentID", "agentOwner"],
   },
   {
     operation: "PendingDelete",
@@ -627,6 +667,14 @@ function resolveParamMap(
       out[name] = options.description ?? "probe";
     } else if (name === "additional") {
       out[name] = options.additional ?? "";
+    } else if (name === "store") {
+      out[name] = "Master";
+    } else if (name === "office") {
+      out[name] = agentId;
+    } else if (name === "showGraded") {
+      out[name] = "false";
+    } else if (name === "sportType") {
+      out[name] = "Football";
     }
   }
   return out;
