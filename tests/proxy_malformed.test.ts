@@ -10,9 +10,6 @@ test("fetch rejects with Malformed_HTTP_Response on bad CONNECT reply", async ()
         socket.write("THIS IS NOT HTTP\r\n\r\n");
         socket.end();
       },
-      open(socket) {
-        socket.data = {};
-      },
     },
   });
 
