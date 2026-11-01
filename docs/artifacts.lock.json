@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "artifacts": {
+    "docs/combo-uniqueness.json": {
+      "sha256": "69fafb41871037dab94782429c7e5c3f2ef5d516a70d6c211dd72510afa43d33",
+      "bytes": 3256
+    },
+    "docs/cross-domain-bridge.json": {
+      "sha256": "73758b62a6eae193365a9f3046b5dac6e4eef22674e1e6f11e610034f797eaec",
+      "bytes": 3597
+    }
+  },
+  "inputs": {
+    "lib/combo_uniqueness.ts": "6cfe0d9870d61ee9968f89e74b1d0e2c65b5446e87d36f9e843bb203899e6ac4",
+    "lib/customer_poly_bridge.ts": "8a70dcc91b48d082022c0ed0b4d4e4569dd4235b5e25288a1c1cc725064d3858",
+    "lib/parlay_combo_backtest_engine.ts": "2a7c04380d2bded058dfde94a1fbce79bd06ba4983fda18cd4189afa8aacec5f",
+    "scripts/generate_value_artifacts.ts": "0e1f1c4bbfc1e6e4d66b4a1152aafc44b79e567423550d1bce00df01c166dcb5"
+  }
+}

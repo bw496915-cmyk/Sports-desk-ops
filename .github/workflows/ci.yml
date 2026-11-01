@@ -73,6 +73,9 @@ jobs:
       - name: "Ops audit (release registry, archive provenance)"
         timeout-minutes: 2
         run: bun run audit:ops
+      - name: "Artifact freshness (generator inputs unchanged since regeneration)"
+        timeout-minutes: 2
+        run: bun run artifacts:lock
       - name: Token SSOT Zero-Drift Gate
         timeout-minutes: 3
         run: bun run gen:tokens:gate
