@@ -63,6 +63,10 @@ echo "✓ All schema and documentation assertions passed cleanly."
 bun run scripts/verify_docs.ts
 echo "✓ Evidence, freshness and portal gates passed."
 
+# Step 1c: Release registry — refuse to deploy while a superseded tag is current
+bun run audit:release
+echo "✓ Release registry is current."
+
 if [[ "${TEST_ONLY}" == true ]]; then
   echo ""
   echo "Test-only mode enabled. Exiting cleanly without deployment."
