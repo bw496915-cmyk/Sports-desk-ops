@@ -2,6 +2,7 @@
  * Bun.Terminal PTY helpers — spawn-scoped and reusable terminals.
  *
  * @see {@link BUN_TERMINAL_V14_BLOG_URL}
+ * @see {@link BUN_TERMINAL_V14_BLOG_CAPABILITIES_URL} (write · resize · colored output · #25415 #29522)
  * @see {@link BUN_TERMINAL_DOCS}
  * @see tests/cli_terminal_automation.test.ts
  */
