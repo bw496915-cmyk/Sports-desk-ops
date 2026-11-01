@@ -141,7 +141,7 @@ export function renderManagerBootRunbookHtml(markdown: string): string {
 
 export async function loadManagerBootRunbookMarkdown(options?: {
   readonly includeOperatorAppendix?: boolean;
-  readonly docPath?: string;
+  readonly docPath?: string | undefined;
 }): Promise<string> {
   const path = options?.docPath ?? MANAGER_BOOT_RUNBOOK_DOC;
   const body = await Bun.file(path).text();

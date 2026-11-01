@@ -35,8 +35,8 @@ export interface F402ReplayTransport {
 }
 
 export async function createF402ReplayTransport(options?: {
-  readonly profileDir?: string;
-  readonly proxyUrl?: string;
+  readonly profileDir?: string | undefined;
+  readonly proxyUrl?: string | undefined;
   readonly env?: NodeJS.ProcessEnv;
 }): Promise<F402ReplayTransport> {
   const env = options?.env ?? Bun.env;

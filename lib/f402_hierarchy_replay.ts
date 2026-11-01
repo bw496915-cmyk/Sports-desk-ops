@@ -80,7 +80,7 @@ export function loadListAgentsRequestFixture(
 export function buildListAgentsReplayPlan(
   account: AccountInfoOwnerFixture,
   bodyFixture: ListAgentsRequestFixture = {},
-  options?: { readonly host?: string; readonly rro?: number },
+  options?: { readonly host?: string | undefined; readonly rro?: number },
 ): HierarchyReplayPlan {
   const host = (options?.host ?? PROBE_HOST).replace(/\/$/, "");
   const rro = bodyFixture.RRO ?? options?.rro ?? MANAGER_RRO;
@@ -209,9 +209,9 @@ export async function runHierarchyReplay(options: {
   readonly mode: HierarchyReplayMode;
   readonly account: AccountInfoOwnerFixture;
   readonly bodyFixture?: ListAgentsRequestFixture;
-  readonly host?: string;
-  readonly profileDir?: string;
-  readonly proxyUrl?: string;
+  readonly host?: string | undefined;
+  readonly profileDir?: string | undefined;
+  readonly proxyUrl?: string | undefined;
 }): Promise<HierarchyReplayOutcome> {
   const plan = buildListAgentsReplayPlan(options.account, options.bodyFixture, {
     host: options.host,

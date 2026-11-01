@@ -36,9 +36,9 @@ export function generalProbeFromWireText(text: string): ListAgentsGeneralProbe {
 
 export async function fetchListAgentsGeneralProbe(options: {
   readonly account: AccountInfoOwnerFixture;
-  readonly profileDir?: string;
-  readonly proxyUrl?: string;
-  readonly host?: string;
+  readonly profileDir?: string | undefined;
+  readonly proxyUrl?: string | undefined;
+  readonly host?: string | undefined;
 }): Promise<ListAgentsGeneralProbe> {
   const plan = buildListAgentsReplayPlan(
     options.account,
