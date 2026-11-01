@@ -51,6 +51,8 @@ export interface WebViewLaunchOptions {
   height?: number;
   /** CDP requires the Chrome backend; webkit has no `cdp()`. */
   backend?: "chrome" | "webkit";
+  /** Persist cookies/storage across runs. WebKit needs macOS 15.2+. */
+  dataStoreDir?: string;
   navigateTimeoutMs?: number;
   pollMs?: number;
   consoleLimit?: number;
@@ -241,6 +243,9 @@ export class ManagedWebView {
         width: options.width ?? 1440,
         height: options.height ?? 900,
         backend,
+        ...(options.dataStoreDir === undefined
+          ? {}
+          : { dataStore: { directory: options.dataStoreDir } }),
         console: (...args: unknown[]) => {
           if (consoleLines.length >= consoleLimit) return;
           consoleLines.push({
