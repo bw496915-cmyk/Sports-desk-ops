@@ -5,7 +5,8 @@
  *
  * For reading in a terminal, prefer the zero-code loader:
  *   bun ./docs/REMAINING_TASKS.md
- * It renders ANSI without booting the JS VM and honours NO_COLOR/FORCE_COLOR/COLUMNS.
+ * It renders ANSI without booting the JS VM and honours NO_COLOR/FORCE_COLOR/COLUMNS. The CLI
+ * (Rust) and Bun.markdown.ansi() (JS) are separate implementations; do not assume byte parity.
  *
  * This script exists for the HTML artifact and the checkbox gate:
  *   bun run tasks:render --format html --out scratch/remaining-tasks.html

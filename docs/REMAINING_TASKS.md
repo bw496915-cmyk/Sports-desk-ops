@@ -6,6 +6,16 @@ Read it: `bun ./docs/REMAINING_TASKS.md` (zero-code ANSI renderer, no JS VM; hon
 Artifact/gate: `bun run tasks:render` (ANSI; colour and OSC 8 links only on a TTY),
 `--no-color --columns 0` for logs, `--format html --out scratch/remaining-tasks.html` for HTML.
 
+### Renderer parity
+
+`bun ./docs/REMAINING_TASKS.md` is the CLI `.md` loader (Rust/pulldown-cmark) and is **not** the same
+renderer as `Bun.markdown.ansi()` (JS). The CLI adds syntax highlighting and global table widths; do not
+assume byte-identical output. Pin Bun (1.4.4) and diff both after upgrades if you snapshot either output.
+
+`Bun.markdown.ansi()` takes an `AnsiTheme` only — `tagFilter`/`headings` belong to `html()`. Per-task
+colouring requires `render()`, where `listItem.checked` is `undefined` for a plain bullet, `false` for
+`- [ ]`, and `true` for `- [x]`.
+
 Meta task list. Every item carries a **basis** (`[CODE]`, `[OBSERVED]`, `[UNVERIFIED]`, `[ASSUMPTION]`),
 a **done when** condition you can check against an artifact, and the **blocked by** dependency.
 

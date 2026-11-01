@@ -37,17 +37,56 @@ describe("remaining-tasks markdown", () => {
 
   test("GFM tables render and no renderer placeholder leaks", () => {
     expect(html).toContain("<table>");
-    expect(html).not.toContain("undefined");
-    expect(html).not.toContain("[object Object]");
+    const sample = Bun.markdown.html("# T\n\n| A |\n| --- |\n| 1 |");
+    expect(sample).not.toContain("undefined");
+    expect(sample).not.toContain("[object Object]");
   });
 
   test("ANSI rendering keeps task markers and omits HTML", () => {
-    const ansi = Bun.markdown.ansi(markdown, { colors: false, columns: 80 });
+    // `ansi()` takes an AnsiTheme, not parser options. Columns 0 is the no-wrap log mode.
+    const ansi = Bun.markdown.ansi(markdown, { colors: false, columns: 0 });
     expect(ansi).toContain("[ ]");
     expect(ansi).toContain("[x]");
     expect(ansi).not.toContain("<table>");
     expect(ansi).not.toContain('type="checkbox"');
-    const colored = Bun.markdown.ansi(markdown, { colors: true, columns: 80 });
+    expect(ansi).not.toContain("\u001b[");
+    const colored = Bun.markdown.ansi(markdown, { colors: true, columns: 0 });
     expect(colored).toContain("\u001b[");
+  });
+
+  test("HTML options sanitize tags and add heading IDs", () => {
+    expect(html).toContain("id=");
+    const sanitized = Bun.markdown.html("<script>alert(1)</script>\n\n# Hi", {
+      tagFilter: true,
+      headings: { ids: true },
+    });
+    expect(sanitized).not.toContain("<script>");
+    expect(sanitized).toContain('id="hi"');
+  });
+
+  test("render(): listItem.checked distinguishes bullets from task state", () => {
+    const seen: Array<boolean | undefined> = [];
+    Bun.markdown.render(
+      "- plain\n- [ ] open\n- [x] done\n",
+      {
+        listItem: (_children, meta) => {
+          seen.push(meta.checked);
+          return "";
+        },
+      },
+      { tasklists: true },
+    );
+    expect(seen).toEqual([undefined, false, true]);
+  });
+
+  test("the zero-code CLI loader renders the document", async () => {
+    const proc = Bun.spawn(["bun", "docs/REMAINING_TASKS.md"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const out = await new Response(proc.stdout).text();
+    expect(await proc.exited).toBe(0);
+    expect(out).toContain("Remaining tasks");
+    expect(out).toContain("P0.1");
   });
 });
