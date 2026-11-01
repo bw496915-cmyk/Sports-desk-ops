@@ -191,17 +191,9 @@ export async function expectOracleThrows(
 /** Portal returns sparse arrays; copy own keys for stable JSON. */
 export function normalizeNested(raw: unknown): unknown {
   if (raw === null || typeof raw !== "object") return raw;
-  if (Array.isArray(raw)) {
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(raw)) {
-      out[key] = normalizeNested((raw as Record<string, unknown>)[key]);
-    }
-    return out;
-  }
-  const obj = raw as Record<string, unknown>;
   const out: Record<string, unknown> = {};
-  for (const key of Object.keys(obj)) {
-    out[key] = normalizeNested(obj[key]);
+  for (const [key, value] of Object.entries(raw)) {
+    out[key] = normalizeNested(value);
   }
   return out;
 }
