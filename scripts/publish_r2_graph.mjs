@@ -22,13 +22,20 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-const accessKeyId =
-  process.env.R2_ACCESS_KEY_ID || "6811c91e1bbb1542f44889a3ef74af7e";
-const secretAccessKey =
-  process.env.R2_SECRET_ACCESS_KEY ||
-  "776264a6ab9e4ee81e933481fd77a7a21599256fe7252c2708efb8296dce0974";
-const accountId =
-  process.env.CLOUDFLARE_ACCOUNT_ID || "7a470541a704caaf91e71efccc78fd36";
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    console.error(
+      `publish_r2_graph: ${name} is required (set it in .env or the environment)`,
+    );
+    process.exit(2);
+  }
+  return value;
+}
+
+const accessKeyId = requireEnv("R2_ACCESS_KEY_ID");
+const secretAccessKey = requireEnv("R2_SECRET_ACCESS_KEY");
+const accountId = requireEnv("CLOUDFLARE_ACCOUNT_ID");
 const bucket = process.env.R2_BUCKET_NAME || "sportsdesk-ops-reports";
 const publicBase =
   process.env.R2_PUBLIC_URL ||
