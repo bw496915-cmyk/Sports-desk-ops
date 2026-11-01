@@ -28,7 +28,8 @@ export type ProbeParam =
   | "operation"
   | "ticketNumber"
   | "wagerNumber"
-  | "flag";
+  | "flag"
+  | "days";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -129,6 +130,27 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     method: "POST",
     readOnly: true,
     note: "pending web reports config (Manager envelope); form: agentID, operation, RRO, agentOwner",
+    params: ["agentID", "operation", "RRO", "agentOwner"],
+  },
+  {
+    operation: "getNewUsersInfo",
+    method: "POST",
+    readOnly: true,
+    note: "new users info (Manager envelope); form: agentID, days, operation, RRO, agentOwner",
+    params: ["agentID", "days", "operation", "RRO", "agentOwner"],
+  },
+  {
+    operation: "getConfigWebReportsCustomerAdmin",
+    method: "POST",
+    readOnly: true,
+    note: "customer-admin web reports config (Manager envelope); form: agentID, operation, RRO, agentOwner",
+    params: ["agentID", "operation", "RRO", "agentOwner"],
+  },
+  {
+    operation: "updateReportConfigCustomerAdmin",
+    method: "POST",
+    readOnly: false,
+    note: "MUTATION: persists customer-admin report config; requires --include-unconfirmed --i-understand-mutations",
     params: ["agentID", "operation", "RRO", "agentOwner"],
   },
   {
