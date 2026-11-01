@@ -35,7 +35,15 @@ export type ProbeParam =
   | "store"
   | "office"
   | "showGraded"
-  | "sportType";
+  | "sportType"
+  | "sportTypeIn"
+  | "sportSubTypeIn"
+  | "periodDescriptionIn"
+  | "periodNumberIn"
+  | "storeIn"
+  | "numberStart"
+  | "numberEnd"
+  | "filtro";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -229,6 +237,26 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     readOnly: true,
     note: "props list (Manager envelope); form: store, operation, RRO, agentID, agentOwner",
     params: ["store", "operation", "RRO", "agentID", "agentOwner"],
+  },
+  {
+    operation: "getGames",
+    method: "POST",
+    readOnly: true,
+    note: "UNVERIFIED: games list (Manager envelope); captured body uses sportTypeIn/sportSubTypeIn/periodDescriptionIn/periodNumberIn/storeIn/numberStart/numberEnd/filtro. Token expired on capture (401) — needs re-run.",
+    params: [
+      "sportTypeIn",
+      "sportSubTypeIn",
+      "periodDescriptionIn",
+      "periodNumberIn",
+      "storeIn",
+      "agentID",
+      "numberStart",
+      "numberEnd",
+      "filtro",
+      "operation",
+      "RRO",
+      "agentOwner",
+    ],
   },
   {
     operation: "PendingDelete",
@@ -675,6 +703,22 @@ function resolveParamMap(
       out[name] = "false";
     } else if (name === "sportType") {
       out[name] = "Football";
+    } else if (name === "sportTypeIn") {
+      out[name] = "Football";
+    } else if (name === "sportSubTypeIn") {
+      out[name] = "NFL";
+    } else if (name === "periodDescriptionIn") {
+      out[name] = "Game";
+    } else if (name === "periodNumberIn") {
+      out[name] = "0";
+    } else if (name === "storeIn") {
+      out[name] = "Master";
+    } else if (name === "numberStart") {
+      out[name] = "24";
+    } else if (name === "numberEnd") {
+      out[name] = "24";
+    } else if (name === "filtro") {
+      out[name] = "O,I,H";
     }
   }
   return out;
