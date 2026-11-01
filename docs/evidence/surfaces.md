@@ -203,6 +203,16 @@ present these as callable routes in the docs release.
 - A key owned by more than one `AgentID` keeps its node but is flagged `a: true` and never given a
   level; the real capture has one (`BRANDON`, two agents at levels 6 and 10).
 - Non-loopback peers must present `SPORTSDESK_ADMIN_TOKEN` (`piiRejection`).
+- **`roots` means "no parent in the capture", not "top of the hierarchy".** The portal's sidebar
+  renders one root — the account you are logged in as — with four children at `data-level="1"`
+  (`tests/fixtures/portal-agent-tree-sidebar-2026-11-01.html`). `listAgenstByAgent` returns a
+  _downline_, so the master row does not exist in the response and cannot be a node here: the page
+  injects it from the session. Every report call carries it as `agentID`/`agentOwner` while the tree
+  does not contain it, and that is correct rather than a lost node.
+- The rendered rows confirm the levels and types: `BILLY667`/`RTEST5` are `A` and
+  `NOLAWOLF`/`SAINTS2009` are `M` in both the DOM and `data/agent-tree.json`.
+- Collapsed nodes ship an empty `<ul class="master-ul hide">`, so the tree is loaded lazily; the
+  sidebar is agents-only (`data-players="false"`).
 
 ## D-10. `surface.daemon-scoreboard`
 
@@ -290,6 +300,10 @@ Asset names are validated (separators, control characters, `..`) and traversal i
   records the shape of the workbook the export produced (Customer, Ticket Number, Accepted,
   Description, Amount; 9,387 rows), while the Analysis grid renders seven aggregate columns per
   agent. The workbook itself is not committed: every row carries a login and a ticket number.
+- **The rendered report names itself.** The table container carries
+  `class="TYPE-REPORT-Customer-Volume"`, i.e. the report kind's label with spaces hyphenated. That is
+  the DOM's own statement of which report is loaded, alongside the `#btnPerformance` label and the
+  `data-value` selection — three places that must agree before a screen is read as a given report.
 - **The grid's column headers are known; the response keys are not.** The rendered table names
   All Players and Agents · Won · Lost · # of Bets · Risk · Net · Hold %age. That is markup, not a
   response, so no JSON schema follows from it, and the fixture asserts that distinction.

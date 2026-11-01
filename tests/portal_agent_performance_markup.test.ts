@@ -271,3 +271,16 @@ describe("the grading panel, which serves the export", () => {
     expect(exports.filter((tag) => !/\bhide\b/.test(tag))).toHaveLength(1);
   });
 });
+
+describe("the report-kind marker", () => {
+  test("the table container names the report that is loaded", () => {
+    // The screen stamps TYPE-REPORT-<label> on the container, so the rendered report is readable
+    // from the DOM without inferring it from the selected button.
+    const match = /class="TYPE-REPORT-([A-Za-z-]+)"/.exec(live);
+    expect(match?.[1]).toBe("Customer-Volume");
+    const label = ANALYSIS_REPORTS.find(
+      (entry) => entry.value === "CPV",
+    )?.label;
+    expect(label?.replaceAll(" ", "-")).toBe(match?.[1]);
+  });
+});
