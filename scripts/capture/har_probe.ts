@@ -17,6 +17,7 @@ import {
   wantsHelp,
 } from "../../lib/cli_args.ts";
 import { cookiesFromHar, cookieHeaderFrom } from "../../lib/cookie_jar.ts";
+import { htmlToText } from "../../lib/ticket_html.ts";
 import {
   PROBE_PREFIXES,
   buildProbeBody,
@@ -177,6 +178,9 @@ for (const op of ops) {
       headersObserved: false,
       cookieNames: cookies.map((cookie) => cookie.name),
       result,
+      extractedText: result.contentType.includes("text/html")
+        ? htmlToText(result.preview).slice(0, 2_000)
+        : null,
       note: op.note,
     };
     await Bun.write(

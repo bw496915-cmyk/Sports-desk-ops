@@ -28,6 +28,7 @@ import {
   probeUrl,
   selectProbeOps,
 } from "../../lib/f402_probe.ts";
+import { htmlToText } from "../../lib/ticket_html.ts";
 import { loginF402, MissingF402CredentialsError } from "./f402_login.ts";
 import { ManagedWebView } from "./webview.ts";
 
@@ -219,6 +220,10 @@ async function main(): Promise<number> {
           readOnlyConfirmed: op.readOnly,
           headersObserved: false,
           result,
+          // Printable endpoints answer HTML; keep a readable excerpt beside the raw preview.
+          extractedText: result.contentType.includes("text/html")
+            ? htmlToText(result.preview).slice(0, 2_000)
+            : null,
           note: op.note,
         };
         await Bun.write(
