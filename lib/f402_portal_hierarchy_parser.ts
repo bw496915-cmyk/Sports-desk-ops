@@ -12,6 +12,18 @@ export interface PortalHierarchyParserContext {
   readonly masterLogin: string;
 }
 
+export interface PortalHierarchyAgentMapEntry {
+  readonly AgentID: string;
+  readonly AgentType: string;
+  readonly Login: string;
+  readonly Master: string;
+}
+
+export interface PortalHierarchyParserResult {
+  readonly nested: unknown;
+  readonly agentMap: Readonly<Record<string, PortalHierarchyAgentMapEntry>>;
+}
+
 type SparseNode = Record<string, unknown>;
 
 /** Mirrors extracted `baseHeriarchy:function(e){…}` (levels 1–12, trim + uppercase keys). */
@@ -19,6 +31,13 @@ export function runBaseHeriarchyParser(
   general: readonly PortalGeneralRow[],
   ctx: PortalHierarchyParserContext,
 ): unknown {
+  return runBaseHeriarchyParserWithAgentMap(general, ctx).nested;
+}
+
+export function runBaseHeriarchyParserWithAgentMap(
+  general: readonly PortalGeneralRow[],
+  ctx: PortalHierarchyParserContext,
+): PortalHierarchyParserResult {
   let t = "";
   let a = "";
   let o = "";
@@ -146,12 +165,28 @@ export function runBaseHeriarchyParser(
         ),
         u,
       )[A] = v;
+      const masterL11 = u;
       u = A;
-      fSet(agentMap, A, { AgentID: A, AgentType: v.AgentType, Login: v.Login, Master: u });
+      fSet(agentMap, A, {
+        AgentID: A,
+        AgentType: v.AgentType,
+        Login: v.Login,
+        Master: masterL11,
+      });
     }
   }
 
-  return p;
+  const mapOut: Record<string, PortalHierarchyAgentMapEntry> = {};
+  for (const [key, value] of Object.entries(agentMap)) {
+    const row = value as PortalHierarchyAgentMapEntry;
+    mapOut[key] = {
+      AgentID: row.AgentID,
+      AgentType: row.AgentType,
+      Login: row.Login,
+      Master: row.Master,
+    };
+  }
+  return { nested: p, agentMap: mapOut };
 }
 
 function fSet(map: SparseNode, key: string, value: unknown): void {

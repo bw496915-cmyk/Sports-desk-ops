@@ -25,7 +25,6 @@
     "redact:f402-envelope": "bun run scripts/redact/f402_list_agents_envelope.ts",
     "pin:manager-oracle-snapshot": "bun run verification/manager-boot-oracle/run-oracle-snapshot-pin.ts",
     "probe:parse-tree": "bun run scripts/probe/parse-tree-only.ts",
-    "probe:ingest-tree": "bun run scripts/probe/ingest-parsed-tree.ts",
     "portal:drift:cron": "bun run scripts/f402_portal_drift_cron.ts",
     "test:manager-oracle-readonly": "PRETEST_SKIP=1 bun test --parallel lib/f402_portal_oracle_slice.test.ts lib/f402_production_fixture_redaction.test.ts lib/f402_portal_runtime_pin.test.ts",
     "verify:manager-har-redaction-proof": "bun run verification/manager-boot-oracle/run-har-redaction-proof-gate.ts",
