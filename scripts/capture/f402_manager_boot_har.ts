@@ -1,0 +1,215 @@
+#!/usr/bin/env bun
+/**
+ * Chrome WebView manager-boot HAR capture (CDP Network.*).
+ * Redact → sentinel sweep → write HAR + redaction proof (never raw response on disk).
+ *
+ *   bun run capture:f402-har -- --login --profile scratch/f402-manager-webview-profile
+ */
+import { mkdir } from "node:fs/promises";
+import { dirname, join, relative } from "node:path";
+import { parseArgs } from "node:util";
+
+import { GATE_EXIT_FAILED } from "../../lib/f402_gate_exit.ts";
+import { buildHarRedactionProof } from "../../lib/f402_har_redaction_sweep.ts";
+import { writeRedactedHarFile } from "../../lib/f402_har_redact_stream.ts";
+import { resolveF402WebViewProfileDir } from "../../lib/f402_replay_transport.ts";
+import { loginF402 } from "./f402_login.ts";
+import { ManagedWebView } from "./webview.ts";
+
+const REPO_ROOT = join(import.meta.dir, "../..");
+
+const { values } = parseArgs({
+  args: Bun.argv.slice(2),
+  options: {
+    profile: { type: "string" },
+    out: { type: "string" },
+    proof: { type: "string" },
+    url: { type: "string" },
+    login: { type: "boolean" },
+    waitMs: { type: "string", default: "45000" },
+    help: { type: "boolean", short: "h" },
+  },
+});
+
+if (values.help) {
+  console.log(`f402_manager_boot_har — Chrome CDP capture + redaction proof
+
+  --login     Refresh session via keychain or TTY (never env password by default)
+  --profile   WebView dataStore (default F402_WEBVIEW_PROFILE)
+  --out       Redacted HAR path (default: manifest pipeline HAR)
+  --proof     Redaction proof JSON (default: sibling of --out)
+  --waitMs    Wait after navigate for hierarchy XHR (default 45000)
+`);
+  process.exit(0);
+}
+
+const base = (Bun.env.F402_BASE_URL ?? "https://www.fantasy402.com").replace(
+  /\/$/,
+  "",
+);
+const startUrl =
+  values.url?.trim() || `${base}/manager/manager.html`;
+const profile = values.profile?.trim() || resolveF402WebViewProfileDir();
+const defaultHar = join(
+  REPO_ROOT,
+  "docs/evidence/captures/har/manager-boot-pipeline-proven.redacted.har.json",
+);
+const outPath = values.out?.trim() || defaultHar;
+const proofPath =
+  values.proof?.trim() || `${outPath.replace(/\.har\.json$/i, "")}.redaction-proof.json`;
+const waitMs = Number(values.waitMs ?? "45000");
+
+interface HarEntry {
+  startedDateTime: string;
+  request: {
+    method: string;
+    url: string;
+    headers: { name: string; value: string }[];
+    postData?: { mimeType: string; text: string };
+  };
+  response: {
+    status: number;
+    headers: { name: string; value: string }[];
+    content: { mimeType: string; text?: string };
+  };
+}
+
+const entries: HarEntry[] = [];
+let listAgentsCaptured = false;
+
+await using view = ManagedWebView.launch({
+  backend: "chrome",
+  dataStoreDir: profile,
+  width: 1440,
+  height: 900,
+});
+
+await view.cdp("Network.enable");
+
+view.onCdpEvent<{
+  requestId: string;
+  response: { url: string; status: number; mimeType: string };
+}>("Network.responseReceived", (event) => {
+  const url = event.response?.url ?? "";
+  if (!url.includes("/cloud/api/Manager/")) return;
+  if (url.includes("getListAgenstByAgent") || url.includes("getListAgentByAgent")) {
+    listAgentsCaptured = true;
+  }
+  void (async () => {
+    try {
+      const body = (await view.cdp("Network.getResponseBody", {
+        requestId: event.requestId,
+      })) as { body?: string; base64Encoded?: boolean };
+      let text = body.body ?? "";
+      if (body.base64Encoded === true) {
+        text = Buffer.from(text, "base64").toString("utf8");
+      }
+      let postText = "";
+      try {
+        const post = (await view.cdp("Network.getRequestPostData", {
+          requestId: event.requestId,
+        })) as { postData?: string };
+        postText = post.postData ?? "";
+      } catch {
+        // Post body unavailable (evicted).
+      }
+      entries.push({
+        startedDateTime: new Date().toISOString(),
+        request: {
+          method: "POST",
+          url,
+          headers: [{ name: "x-requested-with", value: "XMLHttpRequest" }],
+          ...(postText !== ""
+            ? {
+                postData: {
+                  mimeType: "application/x-www-form-urlencoded",
+                  text: postText,
+                },
+              }
+            : {}),
+        },
+        response: {
+          status: event.response.status,
+          headers: [{ name: "content-type", value: event.response.mimeType }],
+          content: { mimeType: event.response.mimeType, text },
+        },
+      });
+    } catch {
+      // Body evicted.
+    }
+  })();
+});
+
+if (values.login === true) {
+  console.error(
+    "capture:f402-har --login (keychain secrets:f402 or TTY; MFA/CAPTCHA → bootstrap profile manually)",
+  );
+  await loginF402(view, { baseUrl: base, timeoutMs: 120_000 });
+}
+
+console.error(`capture:f402-har navigate ${startUrl} profile=${profile}`);
+await view.navigate(startUrl);
+await Bun.sleep(Number.isFinite(waitMs) ? waitMs : 45_000);
+
+const managerEntries = entries.filter((e) =>
+  e.request.url.includes("/cloud/api/Manager/"),
+);
+
+if (managerEntries.length === 0) {
+  console.error(
+    JSON.stringify({
+      signal: "F402_HAR_CAPTURE_EMPTY",
+      gateOutcome: "FAILED",
+      hint: "No Manager API entries — sign in (--login) or use a profile with an active session",
+    }),
+  );
+  process.exit(GATE_EXIT_FAILED);
+}
+
+const har = {
+  log: {
+    version: "1.2",
+    creator: { name: "f402_manager_boot_har", redacted: true },
+    entries,
+  },
+};
+
+await mkdir(dirname(outPath), { recursive: true });
+
+let prepared;
+try {
+  prepared = await writeRedactedHarFile(outPath, har);
+} catch (e) {
+  console.error(
+    JSON.stringify({
+      signal: "F402_HAR_REDACTION_SWEEP_FAILED",
+      gateOutcome: "FAILED",
+      error: String(e),
+    }),
+  );
+  process.exit(GATE_EXIT_FAILED);
+}
+
+const proof = await buildHarRedactionProof({
+  harPath: relative(REPO_ROOT, outPath),
+  redactedText: prepared.redactedText,
+  entryCount: entries.length,
+  managerApiEntries: managerEntries.length,
+  listAgentsCaptured,
+});
+
+if (!proof.sweep.ok) {
+  console.error(JSON.stringify({ gateOutcome: "FAILED", proof }));
+  process.exit(GATE_EXIT_FAILED);
+}
+
+await Bun.write(proofPath, `${JSON.stringify(proof, null, 2)}\n`);
+console.error(
+  JSON.stringify({
+    signal: "F402_HAR_CAPTURE_OK",
+    har: relative(REPO_ROOT, outPath),
+    proof: relative(REPO_ROOT, proofPath),
+    listAgentsCaptured,
+    managerApiEntries: managerEntries.length,
+  }),
+);

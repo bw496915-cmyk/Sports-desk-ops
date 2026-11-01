@@ -10,10 +10,12 @@ on:
       - "**.jsonl"
       - "**.html"
       - "docs/**"
-      - "functions/**"
-      - "tokens.toml"
+      - "infra/**"
+      - "design/**"
+      - "design/tokens.toml"
       - "package.json"
       - "bun.lock"
+      - "verification/**"
       - ".github/workflows/**"
   pull_request:
     branches: [main]
@@ -24,10 +26,12 @@ on:
       - "**.jsonl"
       - "**.html"
       - "docs/**"
-      - "functions/**"
-      - "tokens.toml"
+      - "infra/**"
+      - "design/**"
+      - "design/tokens.toml"
       - "package.json"
       - "bun.lock"
+      - "verification/**"
       - ".github/workflows/**"
   # Freshness cadence: the value artifacts cannot be rebuilt in CI (live inputs), but a daily run
   # still fails if the generator inputs drifted or a release tag is unregistered.
@@ -59,6 +63,15 @@ jobs:
       - name: Install dependencies
         timeout-minutes: 5
         run: bun install --frozen-lockfile
+      - name: Manager boot oracle runtime + slice guard
+        timeout-minutes: 2
+        run: bun run verify:manager-oracle-slices
+      - name: Manager oracle gates (exit 10 BLOCKED ok, 1 FAILED)
+        timeout-minutes: 2
+        run: bash scripts/ci/run-manager-oracle-gates.sh
+      - name: HAR redaction verifier (synthetic green/red)
+        timeout-minutes: 2
+        run: bun test lib/f402_har_redaction_proof_verify.test.ts
       - name: Check formatting
         timeout-minutes: 3
         run: bun run format:check

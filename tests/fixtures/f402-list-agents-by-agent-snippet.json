@@ -1,0 +1,56 @@
+{
+  "EXTRA": false,
+  "GENERAL": [
+    {
+      "AgentID": "BILLY667  ",
+      "SeqNumber": 5183,
+      "Level": 1,
+      "AgentType": "A",
+      "Login": "BILLY667  ",
+      "AmigoTechRate": 0,
+      "BetBuilderRate": 0,
+      "CasinoHeadCountRateM": 0,
+      "CrashRate": 0,
+      "ExtPropsRate": 0,
+      "FantasyRate": 0,
+      "FlashBetsRate": 0,
+      "GitCasinoRate": 0,
+      "HeadCountRateM": 1,
+      "InetHeadCountRateM": 0,
+      "LiveBetting2RateM": 0,
+      "LiveBettingRateM": 0,
+      "LiveCasinoRateM": 0,
+      "PropBuilderRateM": 0
+    },
+    {
+      "AgentID": "NOLAWOLF ",
+      "SeqNumber": 5184,
+      "Level": 1,
+      "AgentType": "M",
+      "Login": "NOLAWOLF "
+    },
+    {
+      "AgentID": "BOTMASTER ",
+      "SeqNumber": 5185,
+      "Level": 2,
+      "AgentType": "M",
+      "Login": "BOTMASTER"
+    },
+    {
+      "AgentID": "CASH777 ",
+      "SeqNumber": 5250,
+      "Level": 7,
+      "AgentType": "A",
+      "Login": "CASH777 "
+    }
+  ],
+  "PLAYERS": [
+    {
+      "customerID": "1_0 ",
+      "Login": "1",
+      "NameFirst": "Dummy",
+      "Password": "fixture-only",
+      "Agent": "JKN"
+    }
+  ]
+}

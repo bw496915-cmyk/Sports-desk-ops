@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "captures": [
+    {
+      "id": "2026-11-01-production-i-prime",
+      "kind": "live-redacted",
+      "harPath": "docs/evidence/captures/har/manager-boot-pipeline-proven.redacted.har.json",
+      "generalFixture": "tests/fixtures/f402-general-oracle-production.json",
+      "generalCount": 2466,
+      "playersCountSource": 57763,
+      "maxLevel": 12,
+      "extra": false,
+      "notes": "WebInspector HAR + envelope from operator export (textutil recovery)"
+    },
+    {
+      "id": "synthetic-oracle-l13-silent-drop",
+      "kind": "synthetic-oracle",
+      "oracleCase": "lib/f402_portal_hierarchy_oracle.test.ts Level 13 drop",
+      "notes": "Pinned bundle compat — L13 absent from nested map"
+    },
+    {
+      "id": "synthetic-oracle-l2-orphan-empty-parent",
+      "kind": "synthetic-oracle",
+      "oracleCase": "lib/f402_portal_hierarchy_oracle.test.ts L2 orphan under empty key",
+      "notes": "Pinned bundle compat — p[t] not p[t][a]"
+    }
+  ]
+}

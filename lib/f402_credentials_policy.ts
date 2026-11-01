@@ -1,0 +1,183 @@
+/**
+ * F402 login credentials — never from shell env by default (no ps/history inheritance).
+ *
+ * **Bun 1.4.4 has no OS-keychain API.** `Bun.password` is bcrypt/argon2 *hashing*, not secret
+ * storage — do not use it for capture credentials. This module reads the keychain by shelling to
+ * the platform tool (macOS `security`) or `Bun.secrets` when injected in tests.
+ *
+ * **Child-process rules (the only places a plaintext password crosses a process boundary):**
+ * 1. **Keychain read** — `Bun.spawn(["security","find-generic-password",…])` with an **argv array**
+ *    (no shell). Never `Bun.$` — interpolation routes bytes through a shell parser.
+ * 2. **TTY hidden read** — no native no-echo on `Bun.stdin`; uses `Bun.spawn(["bash","-c",
+ *    "read -rs …"])` with stdin inherited from the TTY (same constraint: named spawn, not `$`).
+ * 3. **Keychain store** (`secrets:f402 set`) — password only via **stdin**; the macOS write path
+ *    may use `security add-generic-password -w` and remains the sole argv-leak surface on store.
+ */
+
+import * as readline from "node:readline/promises";
+import { stdin as input, stdout as output } from "node:process";
+
+import {
+  MissingF402CredentialsError,
+  SECRET_NAMES,
+  SECRETS_SERVICE,
+  type F402Credentials,
+  type SecretsReader,
+} from "../scripts/capture/f402_login.ts";
+
+export const DEPRECATED_ENV_CREDENTIALS_FLAG = "F402_ALLOW_ENV_CREDENTIALS";
+
+export type F402CredentialSource =
+  | "keychain"
+  | "tty"
+  | "deprecated-env"
+  | "injected";
+
+export type SecureF402Credentials = F402Credentials & {
+  readonly credentialSource: F402CredentialSource;
+};
+
+type Env = Record<string, string | undefined>;
+
+function warnDeprecatedEnvCredentials(): void {
+  console.warn(
+    `[deprecated] ${DEPRECATED_ENV_CREDENTIALS_FLAG}=1 — remove F402_PASSWORD from env; use OS keychain (secrets:f402) or TTY prompt`,
+  );
+}
+
+/** Inspect-safe wrapper; `#password` is omitted from `Bun.inspect`. */
+export class SecureF402CredentialHandle implements SecureF402Credentials {
+  readonly agentId: string;
+  readonly credentialSource: F402CredentialSource;
+  #password: string;
+
+  constructor(creds: F402Credentials, source: F402CredentialSource) {
+    this.agentId = creds.agentId;
+    this.#password = creds.password;
+    this.credentialSource = source;
+  }
+
+  get password(): string {
+    return this.#password;
+  }
+
+  [Bun.inspect.custom](): { readonly source: F402CredentialSource } {
+    return { source: this.credentialSource };
+  }
+}
+
+export function wrapF402Credentials(
+  creds: F402Credentials,
+  source: F402CredentialSource,
+): SecureF402Credentials {
+  return new SecureF402CredentialHandle(creds, source);
+}
+
+async function readMacOsKeychainValue(account: string): Promise<string> {
+  const proc = Bun.spawn(
+    [
+      "security",
+      "find-generic-password",
+      "-s",
+      SECRETS_SERVICE,
+      "-a",
+      account,
+      "-w",
+    ],
+    { stdout: "pipe", stderr: "pipe" },
+  );
+  const out = await new Response(proc.stdout).text();
+  const exit = await proc.exited;
+  if (exit !== 0) return "";
+  return out.trim();
+}
+
+async function readKeychainViaPlatform(account: string): Promise<string> {
+  if (process.platform === "darwin") {
+    return readMacOsKeychainValue(account);
+  }
+  return "";
+}
+
+async function readKeychain(
+  secrets: SecretsReader | null,
+  name: string,
+): Promise<string> {
+  const fromPlatform = await readKeychainViaPlatform(name);
+  if (fromPlatform !== "") return fromPlatform;
+  if (secrets === null) return "";
+  try {
+    return (await secrets.get({ service: SECRETS_SERVICE, name }))?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Hidden password via TTY — see module header (spawn bash read -rs; no Bun stdin no-echo API).
+ */
+async function readPasswordHidden(): Promise<string> {
+  output.write("F402 password (hidden): ");
+  const proc = Bun.spawn(
+    ["bash", "-c", 'read -rs _P < /dev/tty && printf "%s" "$_P"'],
+    { stdin: "inherit", stdout: "pipe", stderr: "inherit" },
+  );
+  const bytes = await new Response(proc.stdout).arrayBuffer();
+  await proc.exited;
+  output.write("\n");
+  return new TextDecoder().decode(bytes);
+}
+
+export async function promptF402CredentialsTTY(): Promise<SecureF402Credentials> {
+  if (!input.isTTY) {
+    throw new MissingF402CredentialsError();
+  }
+  const rl = readline.createInterface({ input, output });
+  let agentId = "";
+  try {
+    agentId = (await rl.question("F402 agent ID: ")).trim();
+  } finally {
+    rl.close();
+  }
+  const password = await readPasswordHidden();
+  if (agentId === "" || password === "") {
+    throw new MissingF402CredentialsError();
+  }
+  return wrapF402Credentials({ agentId, password }, "tty");
+}
+
+/**
+ * Keychain → TTY → (deprecated) env when F402_ALLOW_ENV_CREDENTIALS=1.
+ * Never reads F402_PASSWORD from env otherwise.
+ */
+export async function loadF402CredentialsSecure(
+  env: Env = process.env,
+  secrets: SecretsReader | null = Bun.secrets as SecretsReader,
+): Promise<SecureF402Credentials> {
+  const agentId = await readKeychain(secrets, SECRET_NAMES.agentId);
+  const password = await readKeychain(secrets, SECRET_NAMES.password);
+  if (agentId !== "" && password !== "") {
+    return wrapF402Credentials({ agentId, password }, "keychain");
+  }
+
+  if (input.isTTY) {
+    return promptF402CredentialsTTY();
+  }
+
+  if (env[DEPRECATED_ENV_CREDENTIALS_FLAG]?.trim() === "1") {
+    const envAgent = env["F402_AGENT_ID"]?.trim() ?? "";
+    const envPassword = env["F402_PASSWORD"]?.trim() ?? "";
+    if (envAgent !== "" && envPassword !== "") {
+      warnDeprecatedEnvCredentials();
+      return wrapF402Credentials(
+        { agentId: envAgent, password: envPassword },
+        "deprecated-env",
+      );
+    }
+  }
+
+  throw new MissingF402CredentialsError();
+}
+
+export const F402_PROFILE_BOOTSTRAP_HINT =
+  "Bootstrap: sign in once in Chrome WebView with --profile (MFA/CAPTCHA may require manual login), then re-run without --login. Store refresh credentials with `bun run secrets:f402 set`.";

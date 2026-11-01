@@ -7,6 +7,8 @@ useTabs = false
 semi = true
 singleQuote = false
 ignorePatterns = [
+  # Minified portal oracle slices — never `bun fmt` (collides with slicer output).
+  "verification/manager-boot-oracle/extracted/**/*.min.js",
   "tests/fixtures/**/*.golden.ast.json5",
   "tests/fixtures/**/*.golden.json",
   "tests/fixtures/fantasy402-sport-catalog-*.json",

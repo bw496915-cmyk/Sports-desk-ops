@@ -1,0 +1,67 @@
+{
+  "EXTRA": false,
+  "GENERAL": [
+    {
+      "AgentID": "FAKEMONEY ",
+      "SeqNumber": 7643,
+      "Level": 6,
+      "AgentType": "A",
+      "Login": "FAKEMONEY",
+      "HeadCountRateM": 0
+    },
+    {
+      "AgentID": "HRGROUP ",
+      "SeqNumber": 7644,
+      "Level": 6,
+      "AgentType": "A",
+      "Login": "HRGROUP",
+      "HeadCountRateM": 0
+    },
+    {
+      "AgentID": "VIPALERTS ",
+      "SeqNumber": 7645,
+      "Level": 6,
+      "AgentType": "M",
+      "Login": "VIPALERTS ",
+      "AmigoTechRate": 0,
+      "BetBuilderRate": 0,
+      "CasinoHeadCountRateM": 0,
+      "CrashRate": 0,
+      "ExtPropsRate": 0,
+      "FantasyRate": 0,
+      "FlashBetsRate": 0,
+      "GitCasinoRate": 0,
+      "HeadCountRateM": 0,
+      "InetHeadCountRateM": 0,
+      "LiveBetting2RateM": 0,
+      "LiveBettingRateM": 0,
+      "LiveCasinoRateM": 0,
+      "PropBuilderRateM": 0
+    },
+    {
+      "AgentID": "JRREF ",
+      "SeqNumber": 7646,
+      "Level": 7,
+      "AgentType": "M",
+      "Login": "JRREF     ",
+      "HeadCountRateM": 0
+    },
+    {
+      "AgentID": "RTEST5 ",
+      "SeqNumber": 7647,
+      "Level": 1,
+      "AgentType": "A",
+      "Login": "RTEST5    ",
+      "HeadCountRateM": 0
+    },
+    {
+      "AgentID": "SAINTS2009",
+      "SeqNumber": 7648,
+      "Level": 1,
+      "AgentType": "M",
+      "Login": "SAINTS2009",
+      "HeadCountRateM": 0
+    }
+  ],
+  "PLAYERS": []
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "list-agents-envelope",
+  "payloadSha256": "ec382cef90d2d70eaceb01719a54e057d4ef78b9d00f59d0f39f0aedb4627eb3",
+  "generalRowCount": 2466,
+  "playersRowCount": 57763,
+  "extra": false,
+  "sweep": {
+    "ok": true
+  }
+}

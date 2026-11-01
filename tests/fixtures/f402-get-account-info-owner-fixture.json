@@ -1,0 +1,8 @@
+{
+  "agentID": "FIXTURE_AGENT_ID",
+  "accountInfo": {
+    "AgentType": "M",
+    "AgentMenuStyle": "Standard",
+    "Login": "FIXTURE_LOGIN"
+  }
+}

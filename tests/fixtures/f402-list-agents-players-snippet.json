@@ -1,0 +1,44 @@
+[
+  {
+    "customerID": "1_0       ",
+    "Login": "1",
+    "NameFirst": "Dummy",
+    "Password": "fixture-only",
+    "Agent": "JKN"
+  },
+  {
+    "customerID": "1001..    ",
+    "Login": "1001    ",
+    "NameFirst": "OILEG     ",
+    "Password": "fixture-only",
+    "Agent": "GUNNER81"
+  },
+  {
+    "customerID": "1005..    ",
+    "Login": "1005    ",
+    "NameFirst": "          ",
+    "Password": "fixture-only",
+    "Agent": "GUNNER81"
+  },
+  {
+    "customerID": "10502_1 ",
+    "Login": "10502",
+    "NameFirst": "Sample Player",
+    "Password": "fixture-only",
+    "Agent": "JKN"
+  },
+  {
+    "customerID": "11101_6 ",
+    "Login": "11101",
+    "NameFirst": " ",
+    "Password": " ",
+    "Agent": "DIEG50"
+  },
+  {
+    "customerID": "ZZWAN7    ",
+    "Login": "ZZWAN7    ",
+    "NameFirst": "",
+    "Password": "fixture-only",
+    "Agent": "JMBOOK"
+  }
+]

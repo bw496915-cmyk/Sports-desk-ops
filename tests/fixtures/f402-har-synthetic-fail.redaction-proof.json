@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "spec": "docs/evidence/manager-boot-har-redaction.md",
+  "harPath": "tests/fixtures/f402-har-synthetic-fail.redacted.har.json",
+  "harSha256": "deadbeef",
+  "capturedAt": "2026-11-01T00:00:00.000Z",
+  "entryCount": 1,
+  "managerApiEntries": 1,
+  "listAgentsCaptured": true,
+  "sweep": {
+    "ok": true,
+    "violationCount": 0
+  },
+  "synthetic": true
+}

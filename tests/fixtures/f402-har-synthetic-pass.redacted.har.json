@@ -1,0 +1,22 @@
+{
+  "log": {
+    "version": "1.2",
+    "entries": [
+      {
+        "request": {
+          "url": "https://example.com/cloud/api/Manager/getListAgenstByAgent",
+          "method": "POST",
+          "headers": []
+        },
+        "response": {
+          "status": 200,
+          "headers": [],
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"GENERAL\":[],\"PLAYERS\":[{\"Password\":\"leak\"}],\"EXTRA\":true}"
+          }
+        }
+      }
+    ]
+  }
+}

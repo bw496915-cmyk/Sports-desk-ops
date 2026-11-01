@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "host": "https://www.fantasy402.com",
+  "pinnedAt": "2026-11-01",
+  "runtime": {
+    "bunVersion": "1.4.4",
+    "bunRevision": "38afee6c84fcf48c0edb2466aa4b27d287a59c30",
+    "jscRevision": "d6375c72affe0f70222cdcb45012b10f0bf3a9d5",
+    "bunExecutablePath": "/Users/nolarose/.bun/bin/bun"
+  },
+  "artifacts": {
+    "app/setting/version.js": {
+      "sha256": "81230819032c493d7f24c7972d2da294872634724895a99a71e45afb10a0c97f",
+      "note": "define({version:\"1.0.280\",use_dinamic:!1})"
+    },
+    "app/manager/manager.js": {
+      "bustQuery": "1.0.280",
+      "sha256": "82c3d4ec9b5d0531b06219761f0b40db20bf07f4f4250eacdabf527e90e01937",
+      "bytes": 100121
+    },
+    "app/util/util.js": {
+      "bustQuery": "1.0.280",
+      "sha256": "fba79858f48951d827b4fbb6db27531bb15cc519ae55d47e29848e066adf2ec0"
+    },
+    "app/system/security.js": {
+      "bustQuery": "1.0.280",
+      "sha256": "056c0fc2bc075017ed93ba7a3cd9d301c8144f3dee9d56347673d098d6f84e1b"
+    },
+    "extracted/baseHeriarchy.body.min.js": {
+      "sha256": "6e63ab3439f97961d9a0598e0b1d113120979a5e4ce63de1869b1b3f00fd49ec",
+      "slicedFrom": "app/manager/manager.js"
+    },
+    "extracted/buildTree.body.min.js": {
+      "sha256": "d29740ecbe55ca96c517d23cb0c0200d2915be53055d977815f36f1de29d8868",
+      "slicedFrom": "app/manager/manager.js"
+    },
+    "extracted/findInTree.body.min.js": {
+      "sha256": "0557884a97d3a530190a642be78a5cc4523f297fe502351d5ad2feafd53fb828",
+      "slicedFrom": "app/manager/manager.js"
+    },
+    "extracted/setCompleteHeriarchy.body.min.js": {
+      "sha256": "402ef73ec7b8eb6cc0dfe7cc9b8e0ee088f579c68a6f0a56a9a29283fe15550c",
+      "slicedFrom": "app/manager/manager.js"
+    }
+  },
+  "harRedactionProofGate": {
+    "status": "ready",
+    "ownerRole": "operator",
+    "harPath": "docs/evidence/captures/har/manager-boot-pipeline-proven.redacted.har.json",
+    "proofPath": "docs/evidence/captures/har/manager-boot-pipeline-proven.redaction-proof.json",
+    "requires": "Once: capture:f402-har → commit HAR + proof → verify:manager-har-redaction-proof → set status ready only via verify:manifest-consistency (derived, not hand-flip)."
+  },
+  "productionOracleGate": {
+    "status": "ready",
+    "ownerRole": "operator",
+    "captureActor": "Desk engagement owner (Fantasy402 manager-boot authenticated capture)",
+    "generalFixture": "tests/fixtures/f402-general-oracle-production.json",
+    "nestedSnapshotSha256": "1e88babb5e9be02c1a613d4379a714015e7c3e083cc28e0a3839b56076abe8a6",
+    "requires": "proof-verified HAR → extract:f402-oracle-fixture (--proof) → pin nestedSnapshotSha256 → verify:manifest-consistency (derived status)."
+  },
+  "varianceGate": {
+    "status": "ready",
+    "ownerRole": "operator",
+    "minimumCaptures": 3,
+    "indexPath": "docs/evidence/captures/har/manager-boot-variance-index.json",
+    "requires": "N≥3 redacted manager-boot HARs indexed; characterize variance before parser hardening (manager-boot-variance-gate.md)."
+  }
+}
