@@ -94,11 +94,10 @@ export function renderManagerBootRunbookTerminal(
     markdown,
     {
       heading: (children, meta) => {
-        const level = meta.depth ?? 1;
         const prefix =
-          level === 1
+          meta.level === 1
             ? `${bold}${cyan}`
-            : level === 2
+            : meta.level === 2
               ? `${bold}${underline}`
               : bold;
         return `${prefix}${children}${reset}\n\n`;
@@ -110,7 +109,7 @@ export function renderManagerBootRunbookTerminal(
       code: (children) => `${dim}${children}${reset}\n`,
       blockquote: (children) => `${dim}│ ${children}${reset}\n`,
       link: (children, meta) => {
-        const href = meta.url ?? String(children);
+        const { href } = meta;
         if (href.startsWith("http://") || href.startsWith("https://")) {
           return colors ? osc8Link(String(children), href) : String(children);
         }
