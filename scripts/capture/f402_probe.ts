@@ -19,6 +19,8 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  PROBE_PREFIXES,
+  buildProbeBody,
   buildProbeExpression,
   parseProbePageResult,
   probeSummary,
@@ -43,7 +45,9 @@ async function main(): Promise<number> {
   const profile = flag(args, "--profile", "scratch/webview-profile");
   const outRoot = flag(args, "--out", "scratch/f402-probes");
   const waitFor = flag(args, "--wait-for", "");
-  const body = flag(args, "--body", "");
+  const explicitBody = flag(args, "--body", "");
+  const prefix = flag(args, "--prefix", PROBE_PREFIXES[0]!);
+  const opsArg = flag(args, "--ops", "");
   const loginWaitMs = Number(flag(args, "--login-wait-ms", "180000"));
   const autoLogin = args.includes("--login");
   const includeUnconfirmed = args.includes("--include-unconfirmed");
@@ -56,13 +60,34 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  const ops = selectProbeOps(includeUnconfirmed);
+  const selected = selectProbeOps(includeUnconfirmed);
+  const wanted =
+    opsArg === ""
+      ? null
+      : new Set(opsArg.split(",").map((name) => name.trim()));
+  const ops =
+    wanted === null
+      ? selected
+      : selected.filter((op) => wanted.has(op.operation));
+  if (ops.length === 0) {
+    console.error(
+      `capture:f402: --ops matched nothing (available: ${selected.map((op) => op.operation).join(", ")})`,
+    );
+    return 2;
+  }
+  const agentId = process.env.F402_AGENT_ID?.trim() ?? "";
+  const bodyFor = (op: (typeof ops)[number]): string =>
+    explicitBody !== ""
+      ? explicitBody
+      : agentId === ""
+        ? ""
+        : buildProbeBody(op, agentId, process.env.F402_CUSTOMER_ID?.trim());
 
   if (dryRun) {
     console.error(`capture:f402: plan for ${base} (${ops.length} operations)`);
     for (const op of ops) {
       console.log(
-        `${op.operation.padEnd(30)} ${op.method.padEnd(4)} ${probeUrl(base, op)}  ${op.readOnly ? "" : "[unconfirmed]"}`,
+        `${op.operation.padEnd(30)} ${op.method.padEnd(4)} ${probeUrl(base, op, prefix)}  body=${bodyFor(op).replaceAll(agentId === "" ? "\u0000" : agentId, "<agent>")}  ${op.readOnly ? "" : "[unconfirmed]"}`,
       );
     }
     console.error("capture:f402: dry run; nothing launched");
@@ -117,7 +142,8 @@ async function main(): Promise<number> {
     let transportErrors = 0;
 
     for (const op of ops) {
-      const url = probeUrl(base, op);
+      const url = probeUrl(base, op, prefix);
+      const body = bodyFor(op);
       try {
         const raw = await view.evaluate(
           buildProbeExpression({ operation: op.operation, url, body }),

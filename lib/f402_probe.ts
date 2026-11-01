@@ -12,7 +12,6 @@
 
 export interface ProbeOp {
   readonly operation: string;
-  readonly path: string;
   readonly method: "POST";
   /** False for operations whose read-only nature has not been confirmed. */
   readonly readOnly: boolean;
@@ -22,49 +21,42 @@ export interface ProbeOp {
 export const PROBE_OPS: readonly ProbeOp[] = [
   {
     operation: "Pending",
-    path: "api/Report/Pending",
     method: "POST",
     readOnly: true,
     note: "already in the capture allowlist as getPending",
   },
   {
     operation: "getDailyFiguresByCustomer",
-    path: "api/Report/getDailyFiguresByCustomer",
     method: "POST",
     readOnly: true,
     note: "daily figure report read",
   },
   {
     operation: "getGradedWagerByCustomer",
-    path: "api/Report/getGradedWagerByCustomer",
     method: "POST",
     readOnly: true,
     note: "graded wager report read",
   },
   {
     operation: "getTransactions",
-    path: "api/Report/getTransactions",
     method: "POST",
     readOnly: true,
     note: "transaction report read",
   },
   {
     operation: "getGrading",
-    path: "api/Report/getGrading",
     method: "POST",
     readOnly: true,
     note: "grading report read; also settles the channel model",
   },
   {
     operation: "getTicketDetailPrint",
-    path: "api/Report/getTicketDetailPrint",
     method: "POST",
     readOnly: true,
     note: "ticket detail read",
   },
   {
     operation: "PendingDelete",
-    path: "api/Report/PendingDelete",
     method: "POST",
     readOnly: false,
     note: "name reads like a mutation; confirm before probing",
@@ -166,12 +158,44 @@ export function probeSummary(
   };
 }
 
-/** Absolute probe URL from a portal base; rejects anything that is not http(s). */
-export function probeUrl(base: string, op: ProbeOp): string {
+/**
+ * Observed envelope from the 2026-10-31 captures: every Manager call is
+ * `/cloud/api/Manager/<operation>`. The report names came from a third-party toolkit without that
+ * prefix, so `/cloud/api/Report/<operation>` is the second candidate to test.
+ */
+export const PROBE_PREFIXES = [
+  "/cloud/api/Manager",
+  "/cloud/api/Report",
+] as const;
+
+/** The form body every observed Manager call uses; `agentOwner` defaults to the same agent. */
+export function buildProbeBody(
+  op: ProbeOp,
+  agentId: string,
+  customerId?: string,
+): string {
+  const params = new URLSearchParams();
+  params.set("agentID", agentId);
+  params.set("agentOwner", agentId);
+  if (customerId !== undefined && customerId !== "")
+    params.set("customerID", customerId);
+  params.set("operation", op.operation);
+  params.set("RRO", "1");
+  return params.toString();
+}
+
+/** Absolute probe URL from a portal base and a route prefix; rejects non-http(s) bases. */
+export function probeUrl(
+  base: string,
+  op: ProbeOp,
+  prefix: string = PROBE_PREFIXES[0],
+): string {
   const parsed = new URL(base);
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
     throw new Error(`probe base must be http(s), got ${parsed.protocol}`);
   }
+  if (!prefix.startsWith("/"))
+    throw new Error(`probe prefix must start with /, got ${prefix}`);
   const root = `${parsed.origin}${parsed.pathname.replace(/\/$/, "")}`;
-  return `${root}/${op.path.replace(/^\//, "")}`;
+  return `${root}${prefix.replace(/\/$/, "")}/${op.operation}`;
 }

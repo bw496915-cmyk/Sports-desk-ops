@@ -102,7 +102,13 @@ so an id resolves without guessing which artifact it came from.
   - **Done when:** each of `Pending`, `PendingDelete`, `getDailyFiguresByCustomer`, `getGradedWagerByCustomer`,
     `getTransactions`, `getGrading`, `getTicketDetailPrint` has a 2xx request **and** response capture, and
     `apply_captures` upgrades its ledger row.
-  - **Blocked by:** an authenticated Manager session and a safe test account.
+  - **Blocked by:** the app's OAuth code exchange: the post-login page stores
+    `credentials` = `{code, redirect_uri, password, customerID}` and a 1-character `token`, and a plain
+    in-page fetch is refused at the edge.
+  - **Observed 2026-11-01** (`[OBSERVED]`, `scratch/f402-probes/`): `api/Report/<op>` answers **404**
+    (openresty) — the toolkit names are not routes. `/cloud/api/Manager/<op>` answers **401** (openresty)
+    even from inside the signed-in page, so the route exists and the guard is in front of it. The login
+    itself succeeds unattended with `.env` credentials.
   - **Safety:** `PendingDelete` is named like a mutation. The capture allowlist refuses mutation ops by
     construction, so that endpoint needs an explicit read-only confirmation before it is added.
   - **Automation:** `bun run capture:f402 --dry-run` prints the six-op plan without launching anything.
@@ -126,7 +132,9 @@ so an id resolves without guessing which artifact it came from.
   - **Basis:** `[OBSERVED]` every 2026-10-31 live capture (e.g.
     `docs/evidence/captures/2026-10-31/getInfoPlayer.post.json`) carries `authorization: "<redacted>"`.
     `redactHeaders` only emits header names that were actually present, so an Authorization header **was
-    sent**; `[UNVERIFIED]` its scheme and value, and why the 2026-10-28 HAR recorded none.
+    sent**. `[OBSERVED]` 2026-11-01: a logged-in page's own `fetch` to `/cloud/api/Manager/<op>` is refused
+    with 401 by openresty, so the header is produced by the app's OAuth exchange rather than stored as a
+    usable token. `[UNVERIFIED]` its scheme and value.
   - **Done when:** a capture that keeps the scheme (for example `Bearer …`) settles whether it is a bearer
     token, and the `fantasy402Cookie` / `daemonBearer` descriptions cite that capture.
   - **Blocked by:** a capture environment that keeps the header scheme while redacting the secret.

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   PROBE_OPS,
+  buildProbeBody,
   buildProbeExpression,
   parseProbePageResult,
   probeSummary,
@@ -17,15 +18,34 @@ describe("f402 probe plan", () => {
     expect(selectProbeOps(true)).toHaveLength(PROBE_OPS.length);
   });
 
-  test("builds absolute URLs and rejects non-http bases", () => {
+  test("builds URLs from the observed route prefix", () => {
     const op = PROBE_OPS[0]!;
-    expect(probeUrl("https://www.fantasy402.com", op)).toBe(
-      "https://www.fantasy402.com/api/Report/Pending",
+    expect(probeUrl("https://fantasy402.com", op)).toBe(
+      "https://fantasy402.com/cloud/api/Manager/Pending",
     );
-    expect(probeUrl("https://www.fantasy402.com/manager/", op)).toBe(
-      "https://www.fantasy402.com/manager/api/Report/Pending",
+    expect(probeUrl("https://fantasy402.com", op, "/cloud/api/Report")).toBe(
+      "https://fantasy402.com/cloud/api/Report/Pending",
+    );
+    expect(probeUrl("https://fantasy402.com/base/", op)).toBe(
+      "https://fantasy402.com/base/cloud/api/Manager/Pending",
     );
     expect(() => probeUrl("file:///tmp/x", op)).toThrow("http(s)");
+    expect(() => probeUrl("https://fantasy402.com", op, "cloud")).toThrow(
+      "start with /",
+    );
+  });
+
+  test("builds the observed form envelope without leaking values", () => {
+    const body = buildProbeBody(PROBE_OPS[0]!, "agent-118", "cust-9");
+    const params = new URLSearchParams(body);
+    expect(params.get("operation")).toBe("Pending");
+    expect(params.get("RRO")).toBe("1");
+    expect(params.get("agentID")).toBe("agent-118");
+    expect(params.get("agentOwner")).toBe("agent-118");
+    expect(params.get("customerID")).toBe("cust-9");
+    expect(buildProbeBody(PROBE_OPS[0]!, "agent-118")).not.toContain(
+      "customerID",
+    );
   });
 
   test("the expression carries credentials and cannot be broken by quotes", () => {
