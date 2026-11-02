@@ -3742,7 +3742,7 @@
     "schemas": {
       "Fantasy402SportCatalog": {
         "type": "object",
-        "description": "Fantasy402 desk navigation catalog (sub-sport lanes plus per-sport period menus). Reference metadata only, not an ingestion audit record. Surface: surface.fantasy402-sport-catalog (tier D). Parsed from fantasy402_sport_catalog.ts:41-54.",
+        "description": "Fantasy402 desk navigation catalog (sub-sport lanes plus per-sport period menus). Reference metadata only, not an ingestion audit record. Surface: surface.fantasy402-sport-catalog (tier D). Parsed from fantasy402_sport_catalog.ts#Fantasy402SportCatalog.",
         "properties": {
           "provider": {
             "type": "string"
@@ -3809,7 +3809,7 @@
       },
       "SubSport": {
         "type": "object",
-        "description": "Sub-sport lane inside one sport (code plus display name). Parsed from fantasy402_sport_catalog.ts:8-11.",
+        "description": "Sub-sport lane inside one sport (code plus display name). Parsed from fantasy402_sport_catalog.ts#Fantasy402SubSport.",
         "properties": {
           "code": {
             "type": "string"
@@ -3822,7 +3822,7 @@
       },
       "Period": {
         "type": "object",
-        "description": "Period menu entry for one sport; period 0 is named Game. Parsed from fantasy402_sport_catalog.ts:13-16.",
+        "description": "Period menu entry for one sport; period 0 is named Game. Parsed from fantasy402_sport_catalog.ts#Fantasy402Period.",
         "properties": {
           "name": {
             "type": "string"
@@ -3835,7 +3835,7 @@
       },
       "SportEntry": {
         "type": "object",
-        "description": "Per-sport lane: the sub-sport tree plus the period menu. Parsed from fantasy402_sport_catalog.ts:18-22.",
+        "description": "Per-sport lane: the sub-sport tree plus the period menu. Parsed from fantasy402_sport_catalog.ts#Fantasy402SportEntry.",
         "properties": {
           "sport": {
             "type": "string"
@@ -3857,7 +3857,7 @@
       },
       "CollisionEntry": {
         "type": "object",
-        "description": "Desk-link code shared across sports (Arena, NCAA Extra). makeDeskLinkId rewrites these to <Sport>|<code>; the collision silently breaks scoped ingestion if it is not represented. Parsed from fantasy402_sport_catalog.ts:24-27.",
+        "description": "Desk-link code shared across sports (Arena, NCAA Extra). makeDeskLinkId rewrites these to <Sport>|<code>; the collision silently breaks scoped ingestion if it is not represented. Parsed from fantasy402_sport_catalog.ts#Fantasy402CollisionEntry.",
         "properties": {
           "code": {
             "type": "string"
@@ -3873,7 +3873,7 @@
       },
       "ExpectedEmptySubSportPaths": {
         "type": "object",
-        "description": "Domain-correct structural empties (sport/code paths) split into stable and volatile LIVE surfaces; not quality defects. Parsed from fantasy402_sport_catalog.ts:29-32.",
+        "description": "Domain-correct structural empties (sport/code paths) split into stable and volatile LIVE surfaces; not quality defects. Parsed from fantasy402_sport_catalog.ts#ExpectedEmptySubSportPaths.",
         "properties": {
           "stable": {
             "type": "array",
@@ -3892,7 +3892,7 @@
       },
       "CatalogMigrationRisk": {
         "type": "object",
-        "description": "Migration hazard note attached to catalogue entries that need coordinated link_id migration. Parsed from fantasy402_sport_catalog.ts:34-39.",
+        "description": "Migration hazard note attached to catalogue entries that need coordinated link_id migration. Parsed from fantasy402_sport_catalog.ts#CatalogMigrationRisk.",
         "properties": {
           "kind": {
             "type": "string"
@@ -3914,7 +3914,7 @@
       },
       "RawBetTickerTick": {
         "type": "object",
-        "description": "Consumer wire type for one bet-ticker row. Field names and number types only. The getBetTicker operation is now tier A: its response schema is derived from the live capture skeleton, while this component remains a consumer type declaration. Parsed from simulate_bettor_churn_suite.ts:119-128.",
+        "description": "Consumer wire type for one bet-ticker row. Field names and number types only. The getBetTicker operation is now tier A: its response schema is derived from the live capture skeleton, while this component remains a consumer type declaration. Parsed from simulate_bettor_churn_suite.ts#RawBetTickerTick.",
         "properties": {
           "wagerNumber": {
             "type": "number"
@@ -3958,7 +3958,7 @@
       },
       "RawPendingLeg": {
         "type": "object",
-        "description": "Consumer wire type for one pending wager leg. Risk and ToWin are cents and repeat identically across parlay legs. This is a type declaration, not a captured response; no pending-leg fixture or capture exists, so the getPending operation (tier C) publishes no response schema. Parsed from simulate_bettor_churn_suite.ts:104-117.",
+        "description": "Consumer wire type for one pending wager leg. Risk and ToWin are cents and repeat identically across parlay legs. This is a type declaration, not a captured response; no pending-leg fixture or capture exists, so the getPending operation (tier C) publishes no response schema. Parsed from simulate_bettor_churn_suite.ts#RawPendingLegRow.",
         "properties": {
           "Login": {
             "type": "string"
@@ -4018,7 +4018,7 @@
       },
       "WeblogEntry": {
         "type": "object",
-        "description": "Consumer type that declares the four fields the old spec published as the getWebLog response row (customerID, ipAddress, timestamp, agentOwner). The getWebLog operation is now tier A and derives its response schema from the live capture skeleton; this component remains a consumer type declaration and is not used for that schema. Parsed from simulate_bettor_churn_suite.ts:130-136.",
+        "description": "Consumer type that declares the four fields the old spec published as the getWebLog response row (customerID, ipAddress, timestamp, agentOwner). The getWebLog operation is now tier A and derives its response schema from the live capture skeleton; this component remains a consumer type declaration and is not used for that schema. Parsed from simulate_bettor_churn_suite.ts#RawWebLogEntry.",
         "properties": {
           "customerID": {
             "type": "string"

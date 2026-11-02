@@ -873,9 +873,11 @@ function buildSchemaFromType(
     properties[field.name] = schema;
     if (!field.optional) required.push(field.name);
   }
+  // Cite the declaration, not a line range: a line citation is invalidated by any edit above
+  // the type, and this file's own regeneration then churns for no semantic reason.
   const schema: JsonObject = {
     type: "object",
-    description: `${spec.description} Parsed from ${spec.fileName}:${parsed.startLine}-${parsed.endLine}.`,
+    description: `${spec.description} Parsed from ${spec.fileName}#${spec.sourceType}.`,
     properties,
   };
   if (required.length > 0) schema.required = required;
@@ -1202,7 +1204,7 @@ function getWebLogOperation(operation: LedgerOperation): JsonObject {
     summary:
       "Manager getWebLog (mode B request observed; response not captured)",
     description:
-      "The forensic IP-investigation endpoint (operational_guardrails_runbook.md §5.1.1). Request side: a 2026-10-28 Manager HAR (portal v1.0.279) captured one mode-B POST with a form-urlencoded body and no Authorization header, so the 2026-10-28 session was cookie-based. Only mode B was captured; modes A, C and I are inferred from the portal form and still need a capture. Response side: no response body was captured, so the row schema is undocumented and none is published here. The WeblogEntry component (simulate_bettor_churn_suite.ts:117-123) records the four fields the old spec published, but a consumer type is not a capture, so it is not used as a response schema.",
+      "The forensic IP-investigation endpoint (operational_guardrails_runbook.md §5.1.1). Request side: a 2026-10-28 Manager HAR (portal v1.0.279) captured one mode-B POST with a form-urlencoded body and no Authorization header, so the 2026-10-28 session was cookie-based. Only mode B was captured; modes A, C and I are inferred from the portal form and still need a capture. Response side: no response body was captured, so the row schema is undocumented and none is published here. The WeblogEntry component (simulate_bettor_churn_suite.ts#RawWebLogEntry) records the four fields the old spec published, but a consumer type is not a capture, so it is not used as a response schema.",
     operationId: operationIdFor(operation.method, operation.path),
     parameters: [{ $ref: "#/components/parameters/XRequestedWith" }],
     requestBody: {
