@@ -188,7 +188,7 @@ Live-captured contract: 2026-10-31/getInfoPlayer.post.json (schemaVersion 1, mod
 
 **Agent hierarchy joined with the wager rollup**
 
-Serves data/agent-tree.json plus per-agent exposure (sportsdesk_webview_server.ts:610-634). The tree is built by scripts/build_agent_tree.ts from the portal's own baseHeriarchy parent pointers; keys are canonical agentLoginKey values, and keys owned by more than one AgentID are flagged rather than levelled. Non-loopback peers must present SPORTSDESK_ADMIN_TOKEN. Surface: surface.daemon-agent-tree (tier D).
+Serves data/agent-tree.json plus per-agent exposure (sportsdesk_webview_server.ts#GET /api/agent-tree). The tree is built by scripts/build_agent_tree.ts from the portal's own baseHeriarchy parent pointers; keys are canonical agentLoginKey values, and keys owned by more than one AgentID are flagged rather than levelled. Non-loopback peers must present SPORTSDESK_ADMIN_TOKEN. Surface: surface.daemon-agent-tree (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiAgentTree`
 - **Required capture:** HTTP capture of GET /api/agent-tree (handler-verified only; no HTTP response was captured).
@@ -356,7 +356,7 @@ Every contest the nav links, keyed by contestNum with sport, market and subject 
 
 **Exposure per fixture with a Straight/Parlay/Teaser split**
 
-The portal manual's Game Admin report (v1.0.280, F.A.Q. #4) reduced to exposure per fixture and position (sportsdesk_webview_server.ts:550-566). preGame is computed from gameDateTime against the request clock and is a fact about the fixture, not a claim about the operator's delete permission. Surface: surface.daemon-game-admin (tier D).
+The portal manual's Game Admin report (v1.0.280, F.A.Q. #4) reduced to exposure per fixture and position (sportsdesk_webview_server.ts#GET /api/game-admin). preGame is computed from gameDateTime against the request clock and is a fact about the fixture, not a claim about the operator's delete permission. Surface: surface.daemon-game-admin (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiGameAdmin`
 - **Required capture:** HTTP capture of GET /api/game-admin (handler-verified only; no HTTP response was captured).
@@ -408,7 +408,7 @@ Serves the transcribed Admin module: spread, moneyline, total and team-total sid
 
 **Live bets derived from captured Report/Pending rows**
 
-Derives the scoreboard payload from real wager rows (sportsdesk_webview_server.ts:294-345) using lib/live_bets.ts, which strips Password/NameFirst/Login by name and keeps amounts in integer cents. Non-loopback peers must present SPORTSDESK_ADMIN_TOKEN (piiRejection, sportsdesk_webview_server.ts:76-90). Scores are joined from the transcribed scoreboard, the sport category from lib/sport_taxonomy.ts, and the position label from lib/game_admin.ts. Surface: surface.daemon-live-bets (tier D).
+Derives the scoreboard payload from real wager rows (sportsdesk_webview_server.ts#GET /api/live-bets) using lib/live_bets.ts, which strips Password/NameFirst/Login by name and keeps amounts in integer cents. Non-loopback peers must present SPORTSDESK_ADMIN_TOKEN (piiRejection, sportsdesk_webview_server.ts:76-90). Scores are joined from the transcribed scoreboard, the sport category from lib/sport_taxonomy.ts, and the position label from lib/game_admin.ts. Surface: surface.daemon-live-bets (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiLiveBets`
 - **Required capture:** HTTP capture of GET /api/live-bets against a real Report/Pending capture (the route is handler-verified only; no HTTP response was captured).
@@ -434,7 +434,7 @@ Derives the scoreboard payload from real wager rows (sportsdesk_webview_server.t
 
 **Aggregates only, without the game list**
 
-Same aggregates as GET /api/live-bets, computed from the same rows in the same request (sportsdesk_webview_server.ts:320-326), so the two responses cannot disagree. Totals are derived, never stored. Surface: surface.daemon-live-bets (tier D).
+Same aggregates as GET /api/live-bets, computed from the same rows in the same request (sportsdesk_webview_server.ts#GET /api/live-bets/summary), so the two responses cannot disagree. Totals are derived, never stored. Surface: surface.daemon-live-bets (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiLiveBetsSummary`
 - **Required capture:** HTTP capture of GET /api/live-bets/summary (handler-verified only; no HTTP response was captured).
@@ -486,7 +486,7 @@ The {LIST: [...]} bet-ticker feed, which differs from Report/Pending: WagerNumbe
 
 **Transcribed portal scoreboard (games, scores, status)**
 
-Serves data/scoreboard.json with a status summary (sportsdesk_webview_server.ts:595-608). The games are transcribed from the manager page, not captured from an API, so the payload carries source and observedAt. Surface: surface.daemon-scoreboard (tier D).
+Serves data/scoreboard.json with a status summary (sportsdesk_webview_server.ts#GET /api/scoreboard). The games are transcribed from the manager page, not captured from an API, so the payload carries source and observedAt. Surface: surface.daemon-scoreboard (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiScoreboard`
 - **Required capture:** HTTP capture of GET /api/scoreboard (handler-verified only; no HTTP response was captured).
@@ -517,7 +517,7 @@ Serves data/scoreboard.json with a status summary (sportsdesk_webview_server.ts:
 
 **Portal sport taxonomy with counts per category**
 
-Returns the 18 portal categories plus counts for the loaded wagers and the scoreboard (sportsdesk_webview_server.ts:568-593). All Sports is the absence of a filter and LIVE is a state, so neither is a category. Surface: surface.daemon-sports-taxonomy (tier D).
+Returns the 18 portal categories plus counts for the loaded wagers and the scoreboard (sportsdesk_webview_server.ts#GET /api/sports). All Sports is the absence of a filter and LIVE is a state, so neither is a category. Surface: surface.daemon-sports-taxonomy (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiSports`
 - **Required capture:** HTTP capture of GET /api/sports (handler-verified only; no HTTP response was captured).

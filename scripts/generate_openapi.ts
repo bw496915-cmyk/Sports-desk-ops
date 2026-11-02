@@ -1796,7 +1796,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Live bets derived from captured Report/Pending rows",
       description:
-        "Derives the scoreboard payload from real wager rows (sportsdesk_webview_server.ts:294-345) using lib/live_bets.ts, which strips Password/NameFirst/Login by name and keeps amounts in integer cents. Non-loopback peers must present SPORTSDESK_ADMIN_TOKEN (piiRejection, sportsdesk_webview_server.ts:76-90). Scores are joined from the transcribed scoreboard, the sport category from lib/sport_taxonomy.ts, and the position label from lib/game_admin.ts. Surface: surface.daemon-live-bets (tier D).",
+        "Derives the scoreboard payload from real wager rows (sportsdesk_webview_server.ts#GET /api/live-bets) using lib/live_bets.ts, which strips Password/NameFirst/Login by name and keeps amounts in integer cents. Non-loopback peers must present SPORTSDESK_ADMIN_TOKEN (piiRejection, sportsdesk_webview_server.ts:76-90). Scores are joined from the transcribed scoreboard, the sport category from lib/sport_taxonomy.ts, and the position label from lib/game_admin.ts. Surface: surface.daemon-live-bets (tier D).",
       requiredCapture:
         "HTTP capture of GET /api/live-bets against a real Report/Pending capture (the route is handler-verified only; no HTTP response was captured).",
       responses: {
@@ -1821,7 +1821,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Aggregates only, without the game list",
       description:
-        "Same aggregates as GET /api/live-bets, computed from the same rows in the same request (sportsdesk_webview_server.ts:320-326), so the two responses cannot disagree. Totals are derived, never stored. Surface: surface.daemon-live-bets (tier D).",
+        "Same aggregates as GET /api/live-bets, computed from the same rows in the same request (sportsdesk_webview_server.ts#GET /api/live-bets/summary), so the two responses cannot disagree. Totals are derived, never stored. Surface: surface.daemon-live-bets (tier D).",
       requiredCapture:
         "HTTP capture of GET /api/live-bets/summary (handler-verified only; no HTTP response was captured).",
       responses: {
@@ -1839,7 +1839,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Agent hierarchy joined with the wager rollup",
       description:
-        "Serves data/agent-tree.json plus per-agent exposure (sportsdesk_webview_server.ts:610-634). The tree is built by scripts/build_agent_tree.ts from the portal's own baseHeriarchy parent pointers; keys are canonical agentLoginKey values, and keys owned by more than one AgentID are flagged rather than levelled. Non-loopback peers must present SPORTSDESK_ADMIN_TOKEN. Surface: surface.daemon-agent-tree (tier D).",
+        "Serves data/agent-tree.json plus per-agent exposure (sportsdesk_webview_server.ts#GET /api/agent-tree). The tree is built by scripts/build_agent_tree.ts from the portal's own baseHeriarchy parent pointers; keys are canonical agentLoginKey values, and keys owned by more than one AgentID are flagged rather than levelled. Non-loopback peers must present SPORTSDESK_ADMIN_TOKEN. Surface: surface.daemon-agent-tree (tier D).",
       requiredCapture:
         "HTTP capture of GET /api/agent-tree (handler-verified only; no HTTP response was captured).",
       responses: {
@@ -1868,7 +1868,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Transcribed portal scoreboard (games, scores, status)",
       description:
-        "Serves data/scoreboard.json with a status summary (sportsdesk_webview_server.ts:595-608). The games are transcribed from the manager page, not captured from an API, so the payload carries source and observedAt. Surface: surface.daemon-scoreboard (tier D).",
+        "Serves data/scoreboard.json with a status summary (sportsdesk_webview_server.ts#GET /api/scoreboard). The games are transcribed from the manager page, not captured from an API, so the payload carries source and observedAt. Surface: surface.daemon-scoreboard (tier D).",
       requiredCapture:
         "HTTP capture of GET /api/scoreboard (handler-verified only; no HTTP response was captured).",
       responses: {
@@ -1892,7 +1892,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Portal sport taxonomy with counts per category",
       description:
-        "Returns the 18 portal categories plus counts for the loaded wagers and the scoreboard (sportsdesk_webview_server.ts:568-593). All Sports is the absence of a filter and LIVE is a state, so neither is a category. Surface: surface.daemon-sports-taxonomy (tier D).",
+        "Returns the 18 portal categories plus counts for the loaded wagers and the scoreboard (sportsdesk_webview_server.ts#GET /api/sports). All Sports is the absence of a filter and LIVE is a state, so neither is a category. Surface: surface.daemon-sports-taxonomy (tier D).",
       requiredCapture:
         "HTTP capture of GET /api/sports (handler-verified only; no HTTP response was captured).",
       responses: {
@@ -1915,7 +1915,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Exposure per fixture with a Straight/Parlay/Teaser split",
       description:
-        "The portal manual's Game Admin report (v1.0.280, F.A.Q. #4) reduced to exposure per fixture and position (sportsdesk_webview_server.ts:550-566). preGame is computed from gameDateTime against the request clock and is a fact about the fixture, not a claim about the operator's delete permission. Surface: surface.daemon-game-admin (tier D).",
+        "The portal manual's Game Admin report (v1.0.280, F.A.Q. #4) reduced to exposure per fixture and position (sportsdesk_webview_server.ts#GET /api/game-admin). preGame is computed from gameDateTime against the request clock and is a fact about the fixture, not a claim about the operator's delete permission. Surface: surface.daemon-game-admin (tier D).",
       requiredCapture:
         "HTTP capture of GET /api/game-admin (handler-verified only; no HTTP response was captured).",
       responses: {
