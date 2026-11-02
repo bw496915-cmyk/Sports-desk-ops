@@ -29,36 +29,7 @@ const SOURCE = readFileSync(
 );
 
 /** Identifiers known to appear in this repo's captured artifacts. */
-/**
- * Identifier detection is shape-based, with a small known list for the logins that have no digits.
- *
- * Measured over this repo's artifacts, the loose shape `\b[A-Z][A-Z0-9]{2,15}\b` does not
- * separate the classes at all — benign `data/contests.json` yields 41 distinct tokens (MLB, NBA,
- * OVER, TOTAL…) against 9 for the identifying analysis artifact. The F402 login shape does:
- *
- *   identifying: 5, 17, 49, 50, 503 distinct tokens
- *   benign:      0,  0,  0,  0
- *
- * Letters-only logins (TDFIRE, NICHOLAS, UNITED) have no digits, so they are named explicitly.
- * `MM800` is deliberately absent: it appears only in docstrings and runbook examples, never in a
- * captured artifact — including it once turned a complete 5/5 match into "5/6".
- */
-const LOGIN_SHAPE = /\b[A-Z]{2,6}\d{2,5}[A-Z]{0,3}\b/g;
-const LETTERS_ONLY_LOGINS = [
-  "BILLY666",
-  "BIGDAD",
-  "ATEAM",
-  "TDFIRE",
-  "NICHOLAS",
-  "UNITED",
-];
-
-/** Tokens in `text` that look like F402 logins. */
-function suspiciousIdentifiers(text: string): string[] {
-  const shaped = text.match(LOGIN_SHAPE) ?? [];
-  const named = LETTERS_ONLY_LOGINS.filter((login) => text.includes(login));
-  return [...new Set([...shaped, ...named])];
-}
+import { suspiciousIdentifiers } from "../lib/identifier_scan.ts";
 
 /**
  * Arm → the repo-relative file it serves, read from the source.
