@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   auditLedger,
+  countByTag,
   countTiers,
   deriveMissingFromSpec,
   memberPath,
@@ -32,10 +33,14 @@ function ledgerWith(
       surfaceFields: { missingFromSpec: "documented" },
     },
     counts: { A: 1, B: 0, C: 1, D: 0, E: 0, total: 2 },
+    countsByTag: {
+      "Tag One": { A: 1, B: 0, C: 0, D: 0, E: 0, total: 1 },
+      "Tag Two": { A: 0, B: 0, C: 1, D: 0, E: 0, total: 1 },
+    },
     surfaceCounts: { D: 1, E: 0, total: 1 },
     operations: [
-      { method: "get", path: "/a", tier: "A" },
-      { method: "get", path: "/b", tier: "C" },
+      { method: "get", path: "/a", tier: "A", tag: "Tag One" },
+      { method: "get", path: "/b", tier: "C", tag: "Tag Two" },
     ],
     surfaces: [
       {
@@ -105,6 +110,19 @@ describe("countTiers", () => {
     expect(
       countTiers([{ tier: "A" }, { tier: "A" }, { tier: "C" }, { nope: true }]),
     ).toEqual({ A: 2, C: 1 });
+  });
+});
+
+describe("countByTag", () => {
+  test("buckets rows by tag and tier", () => {
+    expect(
+      countByTag([
+        { tier: "A", tag: "X" },
+        { tier: "C", tag: "X" },
+        { tier: "C", tag: "Y" },
+        { tier: "C" },
+      ]),
+    ).toEqual({ X: { A: 1, C: 1 }, Y: { C: 1 }, "(none)": { C: 1 } });
   });
 });
 
@@ -183,6 +201,37 @@ describe("auditLedger", () => {
     const issues = auditLedger(ledgerWith({}));
     expect(issues.map((issue) => issue.code)).not.toContain(
       "SURFACE_FLAG_WRONG",
+    );
+  });
+
+  test("per-tag counts that disagree with the rows are reported per tag and tier", () => {
+    // The real instance: Manager/getAgentPerformance moved C -> B and this copy kept
+    // "Downline Accounting: C 5 / B 0" because the per-tag total was still 5.
+    const issues = auditLedger(
+      ledgerWith({
+        countsByTag: {
+          "Tag One": { A: 0, B: 1, C: 0, D: 0, E: 0, total: 1 },
+          "Tag Two": { A: 0, B: 0, C: 1, D: 0, E: 0, total: 1 },
+        },
+      }),
+      { paths: {} },
+    );
+    const stale = issues.filter((issue) => issue.code === "TAG_COUNTS_STALE");
+    expect(stale.map((issue) => issue.message)).toEqual([
+      expect.stringContaining('"Tag One"].A=0 but 1'),
+      expect.stringContaining('"Tag One"].B=1 but 0'),
+    ]);
+  });
+
+  test("a tag in the rows but absent from countsByTag is reported", () => {
+    const issues = auditLedger(
+      ledgerWith({
+        countsByTag: { "Tag One": { A: 1, B: 0, C: 0, D: 0, E: 0, total: 1 } },
+      }),
+      { paths: {} },
+    );
+    expect(issues.map((issue) => issue.message).join("\n")).toContain(
+      '"Tag Two"].total=0 but 1',
     );
   });
 });

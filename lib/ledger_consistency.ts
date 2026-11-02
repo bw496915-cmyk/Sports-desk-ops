@@ -18,6 +18,7 @@
 export type Issue = {
   readonly code:
     | "COUNTS_STALE"
+    | "TAG_COUNTS_STALE"
     | "PROSE_STALE"
     | "SURFACE_FLAG_WRONG"
     | "SURFACE_FLAG_UNDOCUMENTED"
@@ -73,6 +74,22 @@ export function countTiers(rows: readonly unknown[]): Record<string, number> {
     counts[tier] = (counts[tier] ?? 0) + 1;
   }
   return counts;
+}
+
+/** Per-tag tier counts over `operations[]`, recomputed from the rows. */
+export function countByTag(
+  rows: readonly unknown[],
+): Record<string, Record<string, number>> {
+  const byTag: Record<string, Record<string, number>> = {};
+  for (const row of rows) {
+    if (!isRecord(row)) continue;
+    const tier = typeof row["tier"] === "string" ? row["tier"] : "";
+    if (tier === "") continue;
+    const tag = typeof row["tag"] === "string" ? row["tag"] : "(none)";
+    const bucket = (byTag[tag] ??= {});
+    bucket[tier] = (bucket[tier] ?? 0) + 1;
+  }
+  return byTag;
 }
 
 function totalOf(counts: Readonly<Record<string, number>>): number {
@@ -147,6 +164,41 @@ export function auditLedger(ledger: unknown, spec?: unknown): Issue[] {
       code: "COUNTS_STALE",
       message: `surfaceCounts.total=${declaredSurfaceTotal} but surfaces[] has ${surfaces.length} row(s)`,
     });
+  }
+
+  // 2b. countsByTag is a third hand-kept copy: per-tag tier counts. It silently kept
+  //     "Downline Accounting: C 5 / B 0" after Manager/getAgentPerformance moved from C to B,
+  //     because the per-tag total still added up to the same 5.
+  const declaredByTag = isRecord(ledger["countsByTag"])
+    ? ledger["countsByTag"]
+    : {};
+  const actualByTag = countByTag(operations);
+  const tags = new Set([
+    ...Object.keys(declaredByTag),
+    ...Object.keys(actualByTag),
+  ]);
+  for (const tag of [...tags].sort()) {
+    const want = isRecord(declaredByTag[tag]) ? declaredByTag[tag] : {};
+    const have = actualByTag[tag] ?? {};
+    for (const tier of TIERS) {
+      const declaredTier = typeof want[tier] === "number" ? want[tier] : 0;
+      const actualTier = have[tier] ?? 0;
+      if (declaredTier !== actualTier) {
+        issues.push({
+          code: "TAG_COUNTS_STALE",
+          message: `countsByTag[${JSON.stringify(tag)}].${tier}=${declaredTier} but ${actualTier} operation(s) carry that tag and tier`,
+        });
+      }
+    }
+    const declaredTagTotal =
+      typeof want["total"] === "number" ? want["total"] : 0;
+    const actualTagTotal = totalOf(have);
+    if (declaredTagTotal !== actualTagTotal) {
+      issues.push({
+        code: "TAG_COUNTS_STALE",
+        message: `countsByTag[${JSON.stringify(tag)}].total=${declaredTagTotal} but ${actualTagTotal} operation(s) carry that tag`,
+      });
+    }
   }
 
   // 3. The schemaDoc prose restates the arithmetic, so it is a copy that can go stale. It said

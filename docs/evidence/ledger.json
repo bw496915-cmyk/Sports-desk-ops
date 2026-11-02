@@ -27,7 +27,7 @@
       "missingFromSpec": "true when docs/openapi.json does not publish every path this surface lists — including a surface whose members are field names or CLI commands rather than routes, which the spec cannot model at all. False therefore means fully published. The boolean was previously read both ways; four rows disagreed until scripts/check_ledger_consistency.ts derived it.",
       "what / members / evidence / note": "Inventory, member routes, citations, caveats."
     },
-    "counts": "Operation counts by tier. A+B+C+D+E = total = 55. Surface counts are in surfaceCounts and are not mixed into counts. scripts/check_ledger_consistency.ts recomputes every number here from the rows and fails when the prose drifts.",
+    "counts": "Operation counts by tier. A+B+C+D+E = total = 55. Surface counts are in surfaceCounts and are not mixed into counts. scripts/check_ledger_consistency.ts recomputes every number here — counts, surfaceCounts, countsByTag and the total below — from the rows, and `bun run verify:docs` runs it first.",
     "surfaceCounts": "Surface inventory counts by tier.",
     "countsByTag": "Operation tier counts per spec tag (convenience for P2/P3)."
   },
@@ -93,8 +93,8 @@
     },
     "Downline Accounting": {
       "A": 0,
-      "B": 0,
-      "C": 5,
+      "B": 1,
+      "C": 4,
       "D": 0,
       "E": 0,
       "total": 5
