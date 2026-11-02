@@ -52,6 +52,7 @@ import {
 } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
+import { captureRecordDigest } from "./apply_captures.ts";
 import { checkLedger, checkOpenApi } from "./verify_docs.ts";
 import type { CheckOutcome } from "./verify_docs.ts";
 import {
@@ -2263,27 +2264,6 @@ function skeletonToSchema(node: SkeletonNode): JsonObject {
   }
   if (node.truncated) schema["x-capture-truncated"] = true;
   return schema;
-}
-
-/** Canonical JSON (recursively sorted keys, compact) matching capture/json.ts. */
-function canonicalizeJsonValue(value: unknown): unknown {
-  if (value === null) return null;
-  if (Array.isArray(value)) return value.map(canonicalizeJsonValue);
-  if (!isRecord(value)) return value;
-  const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(value).sort()) {
-    const child = value[key];
-    if (child === undefined) continue;
-    sorted[key] = canonicalizeJsonValue(child);
-  }
-  return sorted;
-}
-
-/** sha256 of the canonical capture record; equals manifest captureHash. */
-function captureRecordDigest(record: unknown): string {
-  return createHash("sha256")
-    .update(JSON.stringify(canonicalizeJsonValue(record)))
-    .digest("hex");
 }
 
 function mediaTypeOf(contentType: string, fallback: string): string {

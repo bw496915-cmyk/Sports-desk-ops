@@ -26,6 +26,7 @@ export type Issue = {
     | "PROSE_STALE"
     | "SURFACE_FLAG_WRONG"
     | "SURFACE_FLAG_UNDOCUMENTED"
+    | "TIER_A_WITHOUT_CAPTURE"
     | "CAPTURE_REF_DANGLING"
     | "CITATION_DANGLING"
     | "CITATION_LINE_RANGE"
@@ -316,6 +317,31 @@ export function auditLedger(
         issues.push({
           code: "SURFACE_FLAG_WRONG",
           message: `${String(surface["id"] ?? surface["name"] ?? "surface")}: missingFromSpec=${declaredFlag} but the spec says ${derived} (${describeMembers(surface, specPaths)})`,
+        });
+      }
+    }
+  }
+
+  // 4b. Tier A means "a response was captured", so the row must cite a capture that resolves.
+  //     The eight tier-A rows each cited a capture id that named nothing; capturedResponse=true
+  //     alone was enough to make that row look proven.
+  if (options.captureFiles !== undefined) {
+    for (const row of operations) {
+      if (!isRecord(row) || row["tier"] !== "A") continue;
+      const evidence = Array.isArray(row["evidence"]) ? row["evidence"] : [];
+      const citesCapture = evidence.some(
+        (entry) =>
+          isRecord(entry) &&
+          typeof entry["source"] === "string" &&
+          entry["source"].startsWith("capture:") &&
+          options.captureFiles?.has(
+            entry["source"].slice("capture:".length),
+          ) === true,
+      );
+      if (!citesCapture) {
+        issues.push({
+          code: "TIER_A_WITHOUT_CAPTURE",
+          message: `${String(row["method"] ?? "").toUpperCase()} ${String(row["path"] ?? "")}: tier A must cite a capture that resolves in docs/evidence/captures`,
         });
       }
     }
