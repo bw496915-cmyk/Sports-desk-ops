@@ -203,7 +203,7 @@
           "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
         },
         {
-          "source": "operational_guardrails_runbook.md:153",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:153",
           "kind": "context",
           "note": "The one observed Manager session is cookie-based with no Authorization header, which is the opposite of the 'Bearer JWT minted here' model the spec assumes. No auth exchange was captured."
         },
@@ -226,7 +226,7 @@
       "capturedResponse": true,
       "evidence": [
         {
-          "source": "simulate_bettor_churn_suite.ts:106-115",
+          "source": "services/simulate_bettor_churn_suite.ts:106-115",
           "kind": "repo-type",
           "note": "RawBetTickerTick declares wagerNumber, Login, TicketWriter, Risk, ToWin, Description, InsertDateTime, ShortDesc. A consumer type declaration, not a capture."
         },
@@ -277,7 +277,7 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "simulate_bettor_churn_suite.ts:91-104",
+          "source": "services/simulate_bettor_churn_suite.ts:91-104",
           "kind": "repo-type",
           "note": "RawPendingLegRow declares Login, WagerNumber, LegNumber, Risk, ToWin, WagerType, ShortDesc, TicketWriter, InsertDateTime, VIP?, Team?, Line?. A consumer type declaration, not a capture."
         },
@@ -310,22 +310,22 @@
       "capturedResponse": true,
       "evidence": [
         {
-          "source": "operational_guardrails_runbook.md:129-140",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:129-140",
           "kind": "capture-request",
           "note": "2026-10-28 Manager HAR, portal v1.0.279, mode B only. Exact observed request: POST https://www.fantasy402.com/cloud/api/Manager/getWebLog, Content-Type application/x-www-form-urlencoded; charset=UTF-8, X-Requested-With: XMLHttpRequest, body agentID=<session>&customerID=0&start=10%2F28%2F2026&end=10%2F28%2F2026&type=B&actions=ALL&ip=&operation=getWebLog&RRO=1&agentOwner=<session>. No response body in the capture."
         },
         {
-          "source": "operational_guardrails_runbook.md:131",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:131",
           "kind": "capture-scope",
           "note": "Only mode B was observed; modes A/C/I are 'inferred from the form and still need a capture'."
         },
         {
-          "source": "operational_guardrails_runbook.md:153",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:153",
           "kind": "contradiction",
           "note": "Contradicts the spec's auth and response claims: 'The session is cookie-based (the capture has no Authorization header), and the response body was not captured, so the row schema is still undocumented.'"
         },
         {
-          "source": "simulate_bettor_churn_suite.ts:117-123",
+          "source": "services/simulate_bettor_churn_suite.ts:117-123",
           "kind": "repo-type",
           "note": "RawWebLogEntry declares exactly the four response fields the spec publishes (customerID, ipAddress, timestamp, agentOwner) and notes 'path' is omitted to avoid POISONED_PATH_500. A repo declaration, not a capture."
         },
@@ -358,12 +358,12 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "operational_guardrails_runbook.md:205-209",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:205-209",
           "kind": "ui-observation",
           "note": "Search component observed in the Manager UI: .search-component inside .input-group (6 occurrences), placeholder 'Search accounts...', data-search='true', data-type='all' (4 occurrences), autocomplete='new-password' + dummy password input."
         },
         {
-          "source": "operational_guardrails_runbook.md:214",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:214",
           "kind": "absence",
           "note": "No search request body appears in the 2026-10-28 HAR; the request fields (term/type/agentID) are inferred from the component."
         },
@@ -388,12 +388,12 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "operational_guardrails_runbook.md:215",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:215",
           "kind": "absence",
           "note": "The 2026-10-28 capture does NOT include updateByColumn: 'Padded writes ... which this capture does not include. The only padded ID observed is Log/write's customerID, padded to 10 characters. Confirm the width with an updateByColumn capture before relying on 11.'"
         },
         {
-          "source": "domain-branded-types.ts:9,140-158",
+          "source": "design/domain-branded-types.ts:9,140-158",
           "kind": "repo-type",
           "note": "PaddedCustomerId is declared as an 11-char space-padded brand for updateByColumn. Authored type, not an observation."
         },
@@ -416,17 +416,17 @@
       "capturedResponse": true,
       "evidence": [
         {
-          "source": "operational_guardrails_runbook.md:213",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:213",
           "kind": "capture-request",
           "note": "Observed read in the 2026-10-28 HAR: 'opening a player sent getInfoPlayer with a 7-character customerID' (trimmed, unpadded) - e.g. CB112_1, not the padded form."
         },
         {
-          "source": "operational_guardrails_runbook.md:214",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:214",
           "kind": "capture-request",
           "note": "agentID/agentOwner were the logged-in master on all 19 Manager calls in that capture, including getInfoPlayer; the bettor's direct parent is not in these request fields."
         },
         {
-          "source": "operational_guardrails_runbook.md:214",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:214",
           "kind": "absence",
           "note": "Response explicitly not captured ('Resolve the direct parent from ... getInfoPlayer's response (not captured yet)')."
         },
@@ -586,7 +586,7 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "operational_guardrails_runbook.md:168",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:168",
           "kind": "ui-observation",
           "note": "Reporting action 'get-settled-figure' (Collections) is an observed stage 8 action."
         },
@@ -611,7 +611,7 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "operational_guardrails_runbook.md:165",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:165",
           "kind": "ui-observation",
           "note": "Reporting action 'delete-wager' (_Deleted Wagers_) is an observed stage 5 action for VOID_HEAVY_DISGUST and line-chase cancels."
         },
@@ -636,7 +636,7 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:114-131",
+          "source": "services/sportsdesk_webview_server.ts:114-131",
           "kind": "implementation",
           "note": "Handler returns JSON {status, port, hostname, url, timestamp, uptimeSeconds, runtime, nodeEnv}. This repo serves the route, so the handler is the contract; no HTTP capture exists (hence B, not A)."
         },
@@ -646,7 +646,7 @@
           "note": "Spec omits the 'url' and 'timestamp' fields the handler returns; response schema is a subset, not a contradiction."
         }
       ],
-      "requiredCapture": "Not a capture gap: reconcile the spec to sportsdesk_webview_server.ts:114-131 (add url + timestamp). A curl capture would only confirm the handler.",
+      "requiredCapture": "Not a capture gap: reconcile the spec to services/sportsdesk_webview_server.ts:114-131 (add url + timestamp). A curl capture would only confirm the handler.",
       "contradicted": false,
       "contradictedReason": null
     },
@@ -659,14 +659,14 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:236-246",
+          "source": "services/sportsdesk_webview_server.ts:1327-1330",
           "kind": "implementation",
           "note": "Returns {success, count, data:[...]} from telegramService.getWatchList()."
         },
         {
-          "source": "sportsdesk_webview_server.ts:27-47",
+          "source": "services/sportsdesk_webview_server.ts:27-47",
           "kind": "implementation",
-          "note": "adminRejection: requires Authorization: Bearer <SPORTSDESK_ADMIN_TOKEN> compared with crypto.timingSafeEqual; 503 when the env token is unset, 401 otherwise. Applied at sportsdesk_webview_server.ts:175-186."
+          "note": "adminRejection: requires Authorization: Bearer <SPORTSDESK_ADMIN_TOKEN> compared with crypto.timingSafeEqual; 503 when the env token is unset, 401 otherwise. Applied at services/sportsdesk_webview_server.ts:175-186."
         },
         {
           "source": "docs/openapi.json",
@@ -674,7 +674,7 @@
           "note": "Spec documents the 200 shape and the bearer requirement; no 401/503 responses are documented."
         }
       ],
-      "requiredCapture": "No wire capture needed; add the 401/503 responses to the spec from adminRejection (sportsdesk_webview_server.ts:33-46).",
+      "requiredCapture": "No wire capture needed; add the 401/503 responses to the spec from adminRejection (services/sportsdesk_webview_server.ts:33-46).",
       "contradicted": false,
       "contradictedReason": null
     },
@@ -687,9 +687,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:249-274",
+          "source": "services/sportsdesk_webview_server.ts:249-274",
           "kind": "implementation",
-          "note": "Body {customerId?}; defaults to RF2003; dispatches via telegramService.dispatchTestAlert and returns {success, ok, customerId}. Admin-token gated (sportsdesk_webview_server.ts:175-186)."
+          "note": "Body {customerId?}; defaults to RF2003; dispatches via telegramService.dispatchTestAlert and returns {success, ok, customerId}. Admin-token gated (services/sportsdesk_webview_server.ts:175-186)."
         },
         {
           "source": "docs/openapi.json",
@@ -710,12 +710,12 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:277-297",
+          "source": "services/sportsdesk_webview_server.ts:277-297",
           "kind": "implementation",
           "note": "Report type is selected by the '?type=' QUERY PARAMETER (default EVENING_SETTLEMENT, validated by isReportType); returns {success, ok, reportType}. The spec has no parameter for it."
         },
         {
-          "source": "sportsdesk_telegram_bot.ts:77-81",
+          "source": "services/sportsdesk_telegram_bot.ts:77-81",
           "kind": "implementation",
           "note": "REPORT_TYPES = MORNING_BRIEFING, MIDDAY_STEAM, EVENING_SETTLEMENT."
         },
@@ -738,9 +738,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (services/sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56",
@@ -766,9 +766,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (services/sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56",
@@ -794,9 +794,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (services/sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56",
@@ -893,9 +893,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (services/sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56",
@@ -1059,9 +1059,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (services/sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56",
@@ -1087,9 +1087,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (services/sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56",
@@ -1115,9 +1115,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (services/sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56",
@@ -1143,9 +1143,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (services/sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56",
@@ -1171,9 +1171,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (services/sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56",
@@ -1199,9 +1199,9 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
+          "note": "The daemon request handler serves /health, /, /dashboard, /miniapp, /telegram/webhook, /api/telegram/status|activity|webhook, /api/watchlist, /api/telegram/alert|report, then falls through to a 404 JSON fallback (services/sportsdesk_webview_server.ts:299-307). No /api/desk/* route exists."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56",
@@ -1332,7 +1332,7 @@
           "note": "Spec row carries x-dom-tile 'Add Customer', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         },
         {
-          "source": "operational_guardrails_runbook.md:213",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:213",
           "kind": "context",
           "note": "Identity contract context: observed IDs on reads are trimmed/unpadded 7-char; createPlayer's 'password' input is the only place the spec exposes a credential field."
         }
@@ -1397,7 +1397,7 @@
           "note": "Spec row carries x-dom-tile 'Analysis', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         },
         {
-          "source": "operational_guardrails_runbook.md:166",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:166",
           "kind": "ui-observation",
           "note": "Independent UI evidence: 'get-analysis' is an observed Reporting action (stage 6, market/sport concentration). The action name is real; the URL/method are still candidates."
         }
@@ -1417,7 +1417,7 @@
       "capturedResponse": false,
       "evidence": [
         {
-          "source": "main:scripts/portal_tile_crawler.ts:107",
+          "source": "main:scripts/portal_tile_crawler.ts:55-108",
           "kind": "ui-declaration",
           "note": "Tile 'Scores' is declared in the UNMAPPED_LAUNCHER_TILES constant (tileName, clusterColor, domSelector, candidateEndpoint, candidateMethod, extractedInputs=gameID/periodIndex/homeScore/awayScore/isFinal, dataLanguageLKeys=L-1034,L-1068). The URL and method are hand-authored 'candidate' fields (typed at main:scripts/portal_tile_crawler.ts:32-33), not an observed network call."
         },
@@ -1552,7 +1552,7 @@
           "note": "Spec row carries x-dom-tile 'Transactions History', x-dom-selector, x-extracted-inputs and x-data-language-keys, publishes no requestBody, and gives only a 200 description plus 401/502. Nothing was observed on the wire."
         },
         {
-          "source": "operational_guardrails_runbook.md:167",
+          "source": "docs/runbooks/operational_guardrails_runbook.md:167",
           "kind": "ui-observation",
           "note": "Independent UI evidence: 'get-transaction-history' is an observed Reporting action (stage 7, follow the money). The action name is real; the URL/method are still candidates."
         }
@@ -1812,7 +1812,7 @@
           "note": "getGrading is declared with slice settlement_history and ingestionStatus 'wired'."
         },
         {
-          "source": "simulate_bettor_churn_suite.ts:81-89",
+          "source": "services/simulate_bettor_churn_suite.ts:81-89",
           "kind": "repo-type",
           "note": "RawGradingLegRow declares CustomerID, WagerNumber, LegNumber, Amount (cents, customer perspective), SettlementDateTime, Result WIN|LOSS|VOID|PUSH, Description."
         },
@@ -1834,7 +1834,7 @@
       "members": ["GET /", "GET /dashboard"],
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:134-141",
+          "source": "services/sportsdesk_webview_server.ts:134-141",
           "kind": "implementation",
           "note": "Both paths return the dashboard HTML file with the daemon CORS/CSP headers."
         }
@@ -1851,12 +1851,12 @@
       "members": ["GET /miniapp", "GET /miniapp/"],
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:144-151",
+          "source": "services/sportsdesk_webview_server.ts:144-151",
           "kind": "implementation",
           "note": "Returns the miniapp HTML with CSP frame-ancestors for Telegram."
         },
         {
-          "source": "sportsdesk_webview_server.ts:87-90",
+          "source": "services/sportsdesk_webview_server.ts:87-90",
           "kind": "implementation",
           "note": "CSP frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:; no X-Frame-Options."
         }
@@ -1880,17 +1880,17 @@
       ],
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:154-173",
+          "source": "services/sportsdesk_webview_server.ts:154-173",
           "kind": "implementation",
           "note": "POST /telegram/webhook validates x-telegram-bot-api-secret-token, returns 401 otherwise."
         },
         {
-          "source": "sportsdesk_webview_server.ts:188-233",
+          "source": "services/sportsdesk_webview_server.ts:188-233",
           "kind": "implementation",
           "note": "GET /api/telegram/status and /api/telegram/activity (limit 1..200) and POST /api/telegram/webhook set/delete, all behind the admin-token gate."
         },
         {
-          "source": "sportsdesk_webview_server.ts:108-111,100-106",
+          "source": "services/sportsdesk_webview_server.ts:108-111,100-106",
           "kind": "implementation",
           "note": "OPTIONS returns 204 with CORS headers; /api/test/error throws a synthetic error for the error boundary."
         }
@@ -1967,9 +1967,9 @@
       ],
       "evidence": [
         {
-          "source": "sportsdesk_webview_server.ts:96-307",
+          "source": "services/sportsdesk_webview_server.ts:96-307",
           "kind": "absence",
-          "note": "Handler dispatches the known local routes and falls through to 404 (sportsdesk_webview_server.ts:299-307); no /api/desk prefix is matched."
+          "note": "Handler dispatches the known local routes and falls through to 404 (services/sportsdesk_webview_server.ts:299-307); no /api/desk prefix is matched."
         },
         {
           "source": "main:tests/api_reference.test.ts:55-56,91-100",
@@ -2015,7 +2015,7 @@
       "members": ["GET /api/agent-tree"],
       "evidence": [
         {
-          "source": "services/sportsdesk_webview_server.ts:610-634",
+          "source": "services/sportsdesk_webview_server.ts:1190-1193",
           "kind": "implementation",
           "note": "Reads the committed tree, computes counts from loadLiveBets().agents, and gates on piiRejection for non-loopback peers."
         }
@@ -2066,7 +2066,7 @@
       "members": ["GET /api/game-admin"],
       "evidence": [
         {
-          "source": "services/sportsdesk_webview_server.ts:550-566",
+          "source": "services/sportsdesk_webview_server.ts:1067-1070",
           "kind": "implementation",
           "note": "summarizeByGame() groups the captured wagers and compactPositions() drops empty buckets; position labels come from wagerTypeLabel()."
         }
@@ -2161,7 +2161,7 @@
       "members": ["GET /api/sports/catalog"],
       "evidence": [
         {
-          "source": "services/sportsdesk_webview_server.ts:806-877",
+          "source": "services/sportsdesk_webview_server.ts:239-247",
           "kind": "implementation",
           "note": "Reads tests/fixtures/fantasy402-sport-catalog-2026-10-21.json; ?sport and ?subSport resolve an exact market, and unknown values 404 with the known list."
         }

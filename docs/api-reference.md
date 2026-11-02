@@ -75,20 +75,20 @@ https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&m
 
 ### Outbound request headers
 
-| Header             | Required    | Declared value                                                                   | Purpose                                                                                                   | Evidence                                                                                                                                                                                                                                                                      |
-| ------------------ | ----------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Authorization`    | yes         | `Bearer <token>`                                                                 | Bearer token used by the local daemon surface.                                                            | Declared for the local daemon (`daemonBearer`) and implementation-verified there (`sportsdesk_webview_server.ts:27-47`). The 2026-10-28 Manager HAR sent **no** Authorization header: the observed Manager session is cookie-based (`operational_guardrails_runbook.md:153`). |
-| `Content-Type`     | conditional | `application/x-www-form-urlencoded` or `application/json` depending on operation | Payload serialization announced by the caller.                                                            | Observed on the `getWebLog` mode-B request as `application/x-www-form-urlencoded; charset=UTF-8` (`operational_guardrails_runbook.md:129-140`); other content types are spec declarations, not captures.                                                                      |
-| `Cookie`           | yes         | `session`                                                                        | Session cookie used by the cloud Manager surface.                                                         | Observed: the 2026-10-28 Manager HAR session is cookie-based (`operational_guardrails_runbook.md:153`). Cookie name, lifetime, renewal and scope were **not** captured.                                                                                                       |
-| `X-Requested-With` | yes         | string, example `XMLHttpRequest`                                                 | Observed on the captured 2026-10-28 mode-B Manager request. Whether the portal enforces it is unverified. | Observed on the `getWebLog` mode-B request (`XMLHttpRequest`, `operational_guardrails_runbook.md:129-140`).                                                                                                                                                                   |
+| Header             | Required    | Declared value                                                                   | Purpose                                                                                                   | Evidence                                                                                                                                                                                                                                                                                             |
+| ------------------ | ----------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Authorization`    | yes         | `Bearer <token>`                                                                 | Bearer token used by the local daemon surface.                                                            | Declared for the local daemon (`daemonBearer`) and implementation-verified there (`services/sportsdesk_webview_server.ts:27-47`). The 2026-10-28 Manager HAR sent **no** Authorization header: the observed Manager session is cookie-based (`docs/runbooks/operational_guardrails_runbook.md:153`). |
+| `Content-Type`     | conditional | `application/x-www-form-urlencoded` or `application/json` depending on operation | Payload serialization announced by the caller.                                                            | Observed on the `getWebLog` mode-B request as `application/x-www-form-urlencoded; charset=UTF-8` (`docs/runbooks/operational_guardrails_runbook.md:129-140`); other content types are spec declarations, not captures.                                                                               |
+| `Cookie`           | yes         | `session`                                                                        | Session cookie used by the cloud Manager surface.                                                         | Observed: the 2026-10-28 Manager HAR session is cookie-based (`docs/runbooks/operational_guardrails_runbook.md:153`). Cookie name, lifetime, renewal and scope were **not** captured.                                                                                                                |
+| `X-Requested-With` | yes         | string, example `XMLHttpRequest`                                                 | Observed on the captured 2026-10-28 mode-B Manager request. Whether the portal enforces it is unverified. | Observed on the `getWebLog` mode-B request (`XMLHttpRequest`, `docs/runbooks/operational_guardrails_runbook.md:129-140`).                                                                                                                                                                            |
 
 ### Inbound response security headers
 
-| Header                    | Declared value                                                                     | Purpose                                                                                                                                                                     | Evidence                                                                                                                          |
-| ------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `Content-Security-Policy` | `frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:` | Content-Security-Policy applied to daemon responses: frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram: (sportsdesk_webview_server.ts:87-90). | Implemented for local daemon responses (`sportsdesk_webview_server.ts:83-91`). Upstream cloud response headers were not captured. |
-| `Referrer-Policy`         | `strict-origin-when-cross-origin`                                                  | Referrer-Policy: strict-origin-when-cross-origin (sportsdesk_webview_server.ts:90).                                                                                         | Implemented for local daemon responses (`sportsdesk_webview_server.ts:83-91`). Upstream cloud response headers were not captured. |
-| `X-Content-Type-Options`  | `nosniff`                                                                          | X-Content-Type-Options: nosniff (sportsdesk_webview_server.ts:89).                                                                                                          | Implemented for local daemon responses (`sportsdesk_webview_server.ts:83-91`). Upstream cloud response headers were not captured. |
+| Header                    | Declared value                                                                     | Purpose                                                                                                                                                                              | Evidence                                                                                                                                   |
+| ------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Content-Security-Policy` | `frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:` | Content-Security-Policy applied to daemon responses: frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram: (services/sportsdesk_webview_server.ts:87-90). | Implemented for local daemon responses (`services/sportsdesk_webview_server.ts:83-91`). Upstream cloud response headers were not captured. |
+| `Referrer-Policy`         | `strict-origin-when-cross-origin`                                                  | Referrer-Policy: strict-origin-when-cross-origin (services/sportsdesk_webview_server.ts:90).                                                                                         | Implemented for local daemon responses (`services/sportsdesk_webview_server.ts:83-91`). Upstream cloud response headers were not captured. |
+| `X-Content-Type-Options`  | `nosniff`                                                                          | X-Content-Type-Options: nosniff (services/sportsdesk_webview_server.ts:89).                                                                                                          | Implemented for local daemon responses (`services/sportsdesk_webview_server.ts:83-91`). Upstream cloud response headers were not captured. |
 
 ## Authentication & sessions
 
@@ -98,15 +98,15 @@ https://plive.sportswidgets.pro/manager-tools/#/events/bet-history?minVolume=0&m
 
 Fantasy402 Manager portal session. [OBSERVED] 2026-11-01: a Manager page sends `Authorization: Bearer &lt;token>`, where the token is `sessionStorage.credentials.code` after login. The same request without that header is refused with 401 by openresty, so the cookie alone is not sufficient. The 2026-10-28 HAR carried no Authorization header, which is now contradicted. The cookie name is unrecorded, so 'session' is a placeholder label.
 
-Observed: the 2026-10-28 Manager HAR session is cookie-based and sent no Authorization header (`operational_guardrails_runbook.md:153`). The 2026-10-31 captures record an `authorization` key with a **redacted** value, so whether the current session also sends a bearer token is **unverified — check this**. No login/`Set-Cookie` exchange was captured, so the cookie name, lifetime, renewal window and scope are **unverified**. Do not assume a JWT lifetime — the earlier “~20–25 minute” claim had no source and was removed.
+Observed: the 2026-10-28 Manager HAR session is cookie-based and sent no Authorization header (`docs/runbooks/operational_guardrails_runbook.md:153`). The 2026-10-31 captures record an `authorization` key with a **redacted** value, so whether the current session also sends a bearer token is **unverified — check this**. No login/`Set-Cookie` exchange was captured, so the cookie name, lifetime, renewal window and scope are **unverified**. Do not assume a JWT lifetime — the earlier “~20–25 minute” claim had no source and was removed.
 
 ### `daemonBearer`
 
 **Declared type:** http `bearer`.
 
-Static daemon admin token: Authorization: Bearer &lt;SPORTSDESK_ADMIN_TOKEN>, compared with crypto.timingSafeEqual (sportsdesk_webview_server.ts:27-47). The daemon answers 503 when SPORTSDESK_ADMIN_TOKEN is unset and 401 otherwise.
+Static daemon admin token: Authorization: Bearer &lt;SPORTSDESK_ADMIN_TOKEN>, compared with crypto.timingSafeEqual (services/sportsdesk_webview_server.ts:27-47). The daemon answers 503 when SPORTSDESK_ADMIN_TOKEN is unset and 401 otherwise.
 
-Implementation-verified: the local daemon compares `Authorization: Bearer <token>` against `SPORTSDESK_ADMIN_TOKEN` in constant time (`sportsdesk_webview_server.ts:27-47`), protects `/api/watchlist` and `/api/telegram/*` (`:176-183`) and returns 503 when the token is not configured.
+Implementation-verified: the local daemon compares `Authorization: Bearer <token>` against `SPORTSDESK_ADMIN_TOKEN` in constant time (`services/sportsdesk_webview_server.ts:27-47`), protects `/api/watchlist` and `/api/telegram/*` (`:176-183`) and returns 503 when the token is not configured.
 
 ### Session lifecycle
 
@@ -184,7 +184,7 @@ Live-captured contract: 2026-10-31/getInfoPlayer.post.json (schemaVersion 1, mod
 
 ### `GET /api/agent-tree`
 
-> **Evidence — tier D** · sources: `services/sportsdesk_webview_server.ts:610-634` · response not captured
+> **Evidence — tier D** · sources: `services/sportsdesk_webview_server.ts:1190-1193` · response not captured
 
 **Agent hierarchy joined with the wager rollup**
 
@@ -220,7 +220,7 @@ Serves data/agent-tree.json plus per-agent exposure (sportsdesk_webview_server.t
 
 **Agent lookup over the committed hierarchy**
 
-Case-insensitive prefix-first search over data/agent-tree.json (sportsdesk_webview_server.ts:1041-1100). Requires q of at least two characters and clamps limit to 100. Loopback-gated, because agent names are identity data. Surface: surface.daemon-agent-search (tier D).
+Case-insensitive prefix-first search over data/agent-tree.json (services/sportsdesk_webview_server.ts:1041-1100). Requires q of at least two characters and clamps limit to 100. Loopback-gated, because agent names are identity data. Surface: surface.daemon-agent-search (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiAgentsSearch`
 - **Required capture:** Not a capture gap: the tree is committed and the handler is the contract.
@@ -249,7 +249,7 @@ Case-insensitive prefix-first search over data/agent-tree.json (sportsdesk_webvi
 
 **Analysis report, or the reason it is not captured**
 
-Validates the portal's filter vocabulary (sportsdesk_webview_server.ts:878-1000) and answers 200 only when a transcribed report matches the selection; otherwise 501 with the required capture. A 200 carries the rows, the published totals, a recomputed copy and a discrepancies array, so a transcription slip is visible rather than served as fact. Surface: surface.daemon-analysis (tier D).
+Validates the portal's filter vocabulary (services/sportsdesk_webview_server.ts:878-1000) and answers 200 only when a transcribed report matches the selection; otherwise 501 with the required capture. A 200 carries the rows, the published totals, a recomputed copy and a discrepancies array, so a transcription slip is visible rather than served as fact. Surface: surface.daemon-analysis (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiAnalysis`
 - **Required capture:** Only the response of POST /cloud/api/Manager/getAgentPerformance is missing. The request is observed (2026-11-01, type=CP and CPS) and lib/f402_agent_performance_request.ts reproduces it byte for byte; no response body has ever been seen, so no column set is documented. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste.
@@ -281,7 +281,7 @@ Validates the portal's filter vocabulary (sportsdesk_webview_server.ts:878-1000)
 
 **Analysis filter vocabulary transcribed from report.js**
 
-Returns the report kinds (CP/CPS/CPV/G), the fourteen activity codes, the two group modes and the four week windows, with their provenance and the required capture (sportsdesk_webview_server.ts:878-894). Surface: surface.daemon-analysis (tier D).
+Returns the report kinds (CP/CPS/CPV/G), the fourteen activity codes, the two group modes and the four week windows, with their provenance and the required capture (services/sportsdesk_webview_server.ts:878-894). Surface: surface.daemon-analysis (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiAnalysisFilters`
 - **Required capture:** HTTP capture of GET /api/analysis/filters (handler-verified only).
@@ -306,7 +306,7 @@ Returns the report kinds (CP/CPS/CPV/G), the fourteen activity codes, the two gr
 
 **Transcribed analysis reports and their recorded context**
 
-Lists each stored result with the selection it was run under, so a client can select one instead of reconstructing the filters (sportsdesk_webview_server.ts:629-657). Surface: surface.daemon-analysis (tier D).
+Lists each stored result with the selection it was run under, so a client can select one instead of reconstructing the filters (services/sportsdesk_webview_server.ts:629-657). Surface: surface.daemon-analysis (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiAnalysisReports`
 - **Required capture:** HTTP capture of GET /api/analysis/reports (handler-verified only).
@@ -328,7 +328,7 @@ Lists each stored result with the selection it was run under, so a client can se
 
 **Contest / futures list from the sports nav**
 
-Every contest the nav links, keyed by contestNum with sport, market and subject parsed out of the padded type string (sportsdesk_webview_server.ts:702-736). The list is extracted from saved markup by scripts/extract_contests.ts. Surface: surface.daemon-contests (tier D).
+Every contest the nav links, keyed by contestNum with sport, market and subject parsed out of the padded type string (services/sportsdesk_webview_server.ts:702-736). The list is extracted from saved markup by scripts/extract_contests.ts. Surface: surface.daemon-contests (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiContests`
 - **Required capture:** A contest API capture would replace the markup extraction; none exists.
@@ -352,7 +352,7 @@ Every contest the nav links, keyed by contestNum with sport, market and subject 
 
 ### `GET /api/game-admin`
 
-> **Evidence — tier D** · sources: `services/sportsdesk_webview_server.ts:550-566` · response not captured
+> **Evidence — tier D** · sources: `services/sportsdesk_webview_server.ts:1067-1070` · response not captured
 
 **Exposure per fixture with a Straight/Parlay/Teaser split**
 
@@ -379,7 +379,7 @@ The portal manual's Game Admin report (v1.0.280, F.A.Q. #4) reduced to exposure 
 
 **Game Admin board: lines with the money on each side**
 
-Serves the transcribed Admin module: spread, moneyline, total and team-total sides with exposure (sportsdesk_webview_server.ts:737-800). Supports the portal's window selector (48 yesterday, 24 today, -1 current board). Abbreviated amounts carry amountExact null and are excluded from sums. Surface: surface.daemon-game-admin-board (tier D).
+Serves the transcribed Admin module: spread, moneyline, total and team-total sides with exposure (services/sportsdesk_webview_server.ts:737-800). Supports the portal's window selector (48 yesterday, 24 today, -1 current board). Abbreviated amounts carry amountExact null and are excluded from sums. Surface: surface.daemon-game-admin-board (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiGameAdminBoard`
 - **Required capture:** A Game Admin API capture would replace the transcription; none exists, so source and observedAt travel with the payload.
@@ -408,7 +408,7 @@ Serves the transcribed Admin module: spread, moneyline, total and team-total sid
 
 **Live bets derived from captured Report/Pending rows**
 
-Derives the scoreboard payload from real wager rows (sportsdesk_webview_server.ts#GET /api/live-bets) using lib/live_bets.ts, which strips Password/NameFirst/Login by name and keeps amounts in integer cents. Non-loopback peers must present SPORTSDESK_ADMIN_TOKEN (piiRejection, sportsdesk_webview_server.ts:76-90). Scores are joined from the transcribed scoreboard, the sport category from lib/sport_taxonomy.ts, and the position label from lib/game_admin.ts. Surface: surface.daemon-live-bets (tier D).
+Derives the scoreboard payload from real wager rows (sportsdesk_webview_server.ts#GET /api/live-bets) using lib/live_bets.ts, which strips Password/NameFirst/Login by name and keeps amounts in integer cents. Non-loopback peers must present SPORTSDESK_ADMIN_TOKEN (piiRejection, services/sportsdesk_webview_server.ts:76-90). Scores are joined from the transcribed scoreboard, the sport category from lib/sport_taxonomy.ts, and the position label from lib/game_admin.ts. Surface: surface.daemon-live-bets (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiLiveBets`
 - **Required capture:** HTTP capture of GET /api/live-bets against a real Report/Pending capture (the route is handler-verified only; no HTTP response was captured).
@@ -456,7 +456,7 @@ Same aggregates as GET /api/live-bets, computed from the same rows in the same r
 
 **Live wager ticker list with parsed legs**
 
-The {LIST: [...]} bet-ticker feed, which differs from Report/Pending: WagerNumber is the ticket id and ShortDesc carries one line per leg (sportsdesk_webview_server.ts:658-708). Both ShortDesc grammars are parsed and the compact one is flagged; VolumeAmount differing from AmountWagered is reported, not reconciled. The response carries the file's own provenance — source, observedAt and captureNote — so a partial list reads as partial instead of as the whole ticker. Loopback-gated. Surface: surface.daemon-live-wagers (tier D).
+The {LIST: [...]} bet-ticker feed, which differs from Report/Pending: WagerNumber is the ticket id and ShortDesc carries one line per leg (services/sportsdesk_webview_server.ts:658-708). Both ShortDesc grammars are parsed and the compact one is flagged; VolumeAmount differing from AmountWagered is reported, not reconciled. The response carries the file's own provenance — source, observedAt and captureNote — so a partial list reads as partial instead of as the whole ticker. Loopback-gated. Surface: surface.daemon-live-wagers (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiLiveWagers`
 - **Required capture:** A full ticker capture. data/live-wagers.json currently holds 17 rows salvaged from a partial clipboard paste, and both its `partial: true` flag and its captureNote say so.
@@ -537,11 +537,11 @@ Returns the 18 portal categories plus counts for the loaded wagers and the score
 
 ### `GET /api/sports/catalog`
 
-> **Evidence — tier D** · sources: `services/sportsdesk_webview_server.ts:806-877` · response not captured
+> **Evidence — tier D** · sources: `services/sportsdesk_webview_server.ts:239-247` · response not captured
 
 **Sub-sports and period menus with their types**
 
-19 sports, 230 sub-sports and 42 period entries from the committed catalog fixture (sportsdesk_webview_server.ts:806-877). Period numbers are sport-specific, so periodTypes reports every name a number carries and flags the ambiguous ones; sub-sport codes shared by several sports are marked. Surface: surface.daemon-sport-catalog (tier D).
+19 sports, 230 sub-sports and 42 period entries from the committed catalog fixture (services/sportsdesk_webview_server.ts:239-247). Period numbers are sport-specific, so periodTypes reports every name a number carries and flags the ambiguous ones; sub-sport codes shared by several sports are marked. Surface: surface.daemon-sport-catalog (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiSportsCatalog`
 - **Required capture:** Not a capture gap: the catalog fixture is the captured artifact.
@@ -566,11 +566,11 @@ Returns the 18 portal categories plus counts for the loaded wagers and the score
 
 ### `POST /api/telegram/alert`
 
-> **Evidence — tier B** · sources: `sportsdesk_webview_server.ts:249-274` · response not captured
+> **Evidence — tier B** · sources: `services/sportsdesk_webview_server.ts:249-274` · response not captured
 
 **Dispatch an instant Telegram alert**
 
-Request body {customerId?} defaults to RF2003; dispatches through telegramService.dispatchTestAlert and returns {success, ok, customerId} (sportsdesk_webview_server.ts:249-274). Admin-token gated (sportsdesk_webview_server.ts:175-186).
+Request body {customerId?} defaults to RF2003; dispatches through telegramService.dispatchTestAlert and returns {success, ok, customerId} (services/sportsdesk_webview_server.ts:249-274). Admin-token gated (services/sportsdesk_webview_server.ts:175-186).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `postApiTelegramAlert`
 - **Required capture:** No capture gap; document the Authorization requirement and the 401/503 paths.
@@ -591,14 +591,14 @@ Request body {customerId?} defaults to RF2003; dispatches through telegramServic
     - `success` (boolean) — no description
     - `ok` (boolean) — Whether Telegram accepted the alert.
     - `customerId` (string) — no description
-- **HTTP 401** — Missing or wrong admin token (sportsdesk_webview_server.ts:38-46).
+- **HTTP 401** — Missing or wrong admin token (services/sportsdesk_webview_server.ts:38-46).
   - response header `Content-Security-Policy`: value `frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:`
   - response header `X-Content-Type-Options`: value `nosniff`
   - response header `Referrer-Policy`: value `strict-origin-when-cross-origin`
   - content `application/json`: **authored response schema — no response body was captured**
     - `success` (boolean) — no description
     - `error` (string) — no description
-- **HTTP 500** — Dispatch threw (sportsdesk_webview_server.ts:264-273).
+- **HTTP 500** — Dispatch threw (services/sportsdesk_webview_server.ts:264-273).
   - response header `Content-Security-Policy`: value `frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:`
   - response header `X-Content-Type-Options`: value `nosniff`
   - response header `Referrer-Policy`: value `strict-origin-when-cross-origin`
@@ -606,7 +606,7 @@ Request body {customerId?} defaults to RF2003; dispatches through telegramServic
     - `success` (boolean) — no description
     - `ok` (boolean) — no description
     - `error` (string) — no description
-- **HTTP 503** — SPORTSDESK_ADMIN_TOKEN is not set on the server (sportsdesk_webview_server.ts:31-37).
+- **HTTP 503** — SPORTSDESK_ADMIN_TOKEN is not set on the server (services/sportsdesk_webview_server.ts:31-37).
   - response header `Content-Security-Policy`: value `frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:`
   - response header `X-Content-Type-Options`: value `nosniff`
   - response header `Referrer-Policy`: value `strict-origin-when-cross-origin`
@@ -616,20 +616,20 @@ Request body {customerId?} defaults to RF2003; dispatches through telegramServic
 
 ### `POST /api/telegram/report`
 
-> **Evidence — tier B** · sources: `sportsdesk_webview_server.ts:277-297`, `sportsdesk_telegram_bot.ts:77-81` · response not captured
+> **Evidence — tier B** · sources: `services/sportsdesk_webview_server.ts:277-297`, `services/sportsdesk_telegram_bot.ts:77-81` · response not captured
 
 **Trigger a scheduled Telegram report**
 
-Report type is selected by the ?type= query parameter and defaults to EVENING_SETTLEMENT; the handler validates it with isReportType and returns {success, ok, reportType} (sportsdesk_webview_server.ts:277-297). REPORT_TYPES are MORNING_BRIEFING, MIDDAY_STEAM and EVENING_SETTLEMENT (sportsdesk_telegram_bot.ts:77-81). Admin-token gated (sportsdesk_webview_server.ts:175-186).
+Report type is selected by the ?type= query parameter and defaults to EVENING_SETTLEMENT; the handler validates it with isReportType and returns {success, ok, reportType} (services/sportsdesk_webview_server.ts:277-297). REPORT_TYPES are MORNING_BRIEFING, MIDDAY_STEAM and EVENING_SETTLEMENT (services/sportsdesk_telegram_bot.ts:77-81). Admin-token gated (services/sportsdesk_webview_server.ts:175-186).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `postApiTelegramReport`
 - **Required capture:** No capture gap; add the ?type= query parameter (enum REPORT_TYPES) and 'ok' to the spec.
 
 **Parameters**
 
-| Name   | In    | Required | Type                                                                | Description                                                                                 |
-| ------ | ----- | -------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `type` | query | no       | string — one of: MORNING_BRIEFING, MIDDAY_STEAM, EVENING_SETTLEMENT | Report type; defaults to EVENING_SETTLEMENT when absent (sportsdesk_webview_server.ts:278). |
+| Name   | In    | Required | Type                                                                | Description                                                                                          |
+| ------ | ----- | -------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `type` | query | no       | string — one of: MORNING_BRIEFING, MIDDAY_STEAM, EVENING_SETTLEMENT | Report type; defaults to EVENING_SETTLEMENT when absent (services/sportsdesk_webview_server.ts:278). |
 
 **Responses**
 
@@ -641,21 +641,21 @@ Report type is selected by the ?type= query parameter and defaults to EVENING_SE
     - `success` (boolean) — no description
     - `ok` (boolean) — Whether Telegram accepted the report.
     - `reportType` (string — one of: MORNING_BRIEFING, MIDDAY_STEAM, EVENING_SETTLEMENT) — no description
-- **HTTP 400** — type is not one of REPORT_TYPES (sportsdesk_webview_server.ts:279-287).
+- **HTTP 400** — type is not one of REPORT_TYPES (services/sportsdesk_webview_server.ts:279-287).
   - response header `Content-Security-Policy`: value `frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:`
   - response header `X-Content-Type-Options`: value `nosniff`
   - response header `Referrer-Policy`: value `strict-origin-when-cross-origin`
   - content `application/json`: **authored response schema — no response body was captured**
     - `success` (boolean) — no description
     - `error` (string) — no description
-- **HTTP 401** — Missing or wrong admin token (sportsdesk_webview_server.ts:38-46).
+- **HTTP 401** — Missing or wrong admin token (services/sportsdesk_webview_server.ts:38-46).
   - response header `Content-Security-Policy`: value `frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:`
   - response header `X-Content-Type-Options`: value `nosniff`
   - response header `Referrer-Policy`: value `strict-origin-when-cross-origin`
   - content `application/json`: **authored response schema — no response body was captured**
     - `success` (boolean) — no description
     - `error` (string) — no description
-- **HTTP 503** — SPORTSDESK_ADMIN_TOKEN is not set on the server (sportsdesk_webview_server.ts:31-37).
+- **HTTP 503** — SPORTSDESK_ADMIN_TOKEN is not set on the server (services/sportsdesk_webview_server.ts:31-37).
   - response header `Content-Security-Policy`: value `frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:`
   - response header `X-Content-Type-Options`: value `nosniff`
   - response header `Referrer-Policy`: value `strict-origin-when-cross-origin`
@@ -665,14 +665,14 @@ Report type is selected by the ?type= query parameter and defaults to EVENING_SE
 
 ### `GET /api/watchlist`
 
-> **Evidence — tier B** · sources: `sportsdesk_webview_server.ts:236-246`, `sportsdesk_webview_server.ts:27-47` · response not captured
+> **Evidence — tier B** · sources: `services/sportsdesk_webview_server.ts:1327-1330`, `services/sportsdesk_webview_server.ts:27-47` · response not captured
 
 **Monitored watch-list accounts**
 
-Returns {success, count, data} from telegramService.getWatchList() (sportsdesk_webview_server.ts:236-246). Requires Authorization: Bearer &lt;SPORTSDESK_ADMIN_TOKEN>; adminRejection returns 503 when the token is unset and 401 otherwise (sportsdesk_webview_server.ts:27-47,175-186).
+Returns {success, count, data} from telegramService.getWatchList() (services/sportsdesk_webview_server.ts:1327-1330). Requires Authorization: Bearer &lt;SPORTSDESK_ADMIN_TOKEN>; adminRejection returns 503 when the token is unset and 401 otherwise (services/sportsdesk_webview_server.ts:27-47,175-186).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getApiWatchlist`
-- **Required capture:** No wire capture needed; add the 401/503 responses to the spec from adminRejection (sportsdesk_webview_server.ts:33-46).
+- **Required capture:** No wire capture needed; add the 401/503 responses to the spec from adminRejection (services/sportsdesk_webview_server.ts:33-46).
 
 **Responses**
 
@@ -684,14 +684,14 @@ Returns {success, count, data} from telegramService.getWatchList() (sportsdesk_w
     - `success` (boolean) — no description
     - `count` (integer) — no description
     - `data` (array of object) — no description
-- **HTTP 401** — Missing or wrong admin token (sportsdesk_webview_server.ts:38-46).
+- **HTTP 401** — Missing or wrong admin token (services/sportsdesk_webview_server.ts:38-46).
   - response header `Content-Security-Policy`: value `frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:`
   - response header `X-Content-Type-Options`: value `nosniff`
   - response header `Referrer-Policy`: value `strict-origin-when-cross-origin`
   - content `application/json`: **authored response schema — no response body was captured**
     - `success` (boolean) — no description
     - `error` (string) — no description
-- **HTTP 503** — SPORTSDESK_ADMIN_TOKEN is not set on the server (sportsdesk_webview_server.ts:31-37).
+- **HTTP 503** — SPORTSDESK_ADMIN_TOKEN is not set on the server (services/sportsdesk_webview_server.ts:31-37).
   - response header `Content-Security-Policy`: value `frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:`
   - response header `X-Content-Type-Options`: value `nosniff`
   - response header `Referrer-Policy`: value `strict-origin-when-cross-origin`
@@ -701,11 +701,11 @@ Returns {success, count, data} from telegramService.getWatchList() (sportsdesk_w
 
 ### `GET /dashboard`
 
-> **Evidence — tier D** · sources: `sportsdesk_webview_server.ts:134-141` · response not captured
+> **Evidence — tier D** · sources: `services/sportsdesk_webview_server.ts:134-141` · response not captured
 
 **Operator dashboard (GET /dashboard)**
 
-Serves customer-churn-simulation-dashboard.html as text/html (sportsdesk_webview_server.ts:134-141). The same handler also answers GET /; the root path is not modelled as an OpenAPI path because the ledger has no dedicated surface row for it. Surface: surface.daemon-dashboard (tier D).
+Serves customer-churn-simulation-dashboard.html as text/html (services/sportsdesk_webview_server.ts:134-141). The same handler also answers GET /; the root path is not modelled as an OpenAPI path because the ledger has no dedicated surface row for it. Surface: surface.daemon-dashboard (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getDashboard`
 - **Required capture:** HTTP capture of the served /dashboard HTML (the route is handler-verified only; no HTTP response was captured).
@@ -720,14 +720,14 @@ Serves customer-churn-simulation-dashboard.html as text/html (sportsdesk_webview
 
 ### `GET /health`
 
-> **Evidence — tier B** · sources: `sportsdesk_webview_server.ts:114-131` · response not captured
+> **Evidence — tier B** · sources: `services/sportsdesk_webview_server.ts:114-131` · response not captured
 
 **Daemon health and telemetry probe**
 
-Handler-defined contract: sportsdesk_webview_server.ts:114-131 returns the daemon's status, bound port/hostname, Bun-reported URL, timestamp, uptime, runtime and NODE_ENV. Verified against the handler source, not an HTTP capture. The daemon binds 0.0.0.0 by default (sportsdesk_webview_server.ts:9,345), so the example hostname is 0.0.0.0; the http://127.0.0.1:4020 server target is a loopback client view of that bind.
+Handler-defined contract: services/sportsdesk_webview_server.ts:114-131 returns the daemon's status, bound port/hostname, Bun-reported URL, timestamp, uptime, runtime and NODE_ENV. Verified against the handler source, not an HTTP capture. The daemon binds 0.0.0.0 by default (services/sportsdesk_webview_server.ts:9,345), so the example hostname is 0.0.0.0; the http://127.0.0.1:4020 server target is a loopback client view of that bind.
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getHealth`
-- **Required capture:** Not a capture gap: reconcile the spec to sportsdesk_webview_server.ts:114-131 (add url + timestamp). A curl capture would only confirm the handler.
+- **Required capture:** Not a capture gap: reconcile the spec to services/sportsdesk_webview_server.ts:114-131 (add url + timestamp). A curl capture would only confirm the handler.
 
 **Responses**
 
@@ -747,11 +747,11 @@ Handler-defined contract: sportsdesk_webview_server.ts:114-131 returns the daemo
 
 ### `GET /miniapp`
 
-> **Evidence — tier D** · sources: `sportsdesk_webview_server.ts:144-151`, `sportsdesk_webview_server.ts:87-90` · response not captured
+> **Evidence — tier D** · sources: `services/sportsdesk_webview_server.ts:144-151`, `services/sportsdesk_webview_server.ts:87-90` · response not captured
 
 **Telegram Mini App dashboard (GET /miniapp)**
 
-Serves telegram-miniapp-dashboard.html as text/html (sportsdesk_webview_server.ts:144-151) with Telegram frame-ancestors CSP and no X-Frame-Options (sportsdesk_webview_server.ts:87-90). GET /miniapp/ is an alias. Surface: surface.daemon-miniapp (tier D).
+Serves telegram-miniapp-dashboard.html as text/html (services/sportsdesk_webview_server.ts:144-151) with Telegram frame-ancestors CSP and no X-Frame-Options (services/sportsdesk_webview_server.ts:87-90). GET /miniapp/ is an alias. Surface: surface.daemon-miniapp (tier D).
 
 - **Tag:** Local Desk &amp; Telegram Gateway · **operationId:** `getMiniapp`
 - **Required capture:** HTTP capture of the served /miniapp HTML (the route is handler-verified only; no HTTP response was captured).
@@ -839,7 +839,7 @@ UNVERIFIED — no capture exists. The path and method are candidate values infer
 
 ### `POST /cloud/api/Manager/createPlayer`
 
-> **Evidence — tier C** · sources: `main:scripts/portal_tile_crawler.ts:74`, `main:scripts/portal_tile_crawler.ts:164-245`, `operational_guardrails_runbook.md:213` · response not captured · candidate URL+method (not observed on the wire)
+> **Evidence — tier C** · sources: `main:scripts/portal_tile_crawler.ts:74`, `main:scripts/portal_tile_crawler.ts:164-245`, `docs/runbooks/operational_guardrails_runbook.md:213` · response not captured · candidate URL+method (not observed on the wire)
 
 **Launcher tile: Add Customer**
 
@@ -994,11 +994,11 @@ UNVERIFIED — no capture exists. The path, method and any previously published 
 
 ### `POST /cloud/api/Manager/getPending`
 
-> **Evidence — tier C** · sources: `simulate_bettor_churn_suite.ts:91-104`, `lib/fantasy402_wager_universe_scope.ts:13-21`, `docs/evidence/captures/pending-500s/diagnostics.json` · response not captured · **contradicted by a concrete artifact**
+> **Evidence — tier C** · sources: `services/simulate_bettor_churn_suite.ts:91-104`, `lib/fantasy402_wager_universe_scope.ts:13-21`, `docs/evidence/captures/pending-500s/diagnostics.json` · response not captured · **contradicted by a concrete artifact**
 
 **Pending wager legs snapshot**
 
-UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: simulate_bettor_churn_suite.ts:91-104 (a consumer type declaration, not a capture). See the RawPendingLeg component; it records the field names only and is not used as a response schema here. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.
+UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: services/simulate_bettor_churn_suite.ts:91-104 (a consumer type declaration, not a capture). See the RawPendingLeg component; it records the field names only and is not used as a response schema here. The request body and the response body/status codes are unknown, so no request schema and no response content are published here.
 
 - **Tag:** Inferred (Unverified) · **operationId:** `postCloudApiManagerGetPending`
 - **Required capture:** Prefix-divergent from /cloud/api/Report/Pending (Tier A, 200 41-46 KB). In Manager report bundle (Blob A7FD1C99), Manager/getPending sends form-urlencoded {agentID, type, operation: "getPending", RRO} and reads {LIST, TOTAL}. Re-probe with {agentID, type: "", operation: "getPending", RRO: "1"} or retire in favor of /cloud/api/Report/Pending.
@@ -1029,7 +1029,7 @@ UNVERIFIED — no capture exists. The path and method are candidate values infer
 
 ### `POST /cloud/api/Manager/getScores`
 
-> **Evidence — tier C** · sources: `main:scripts/portal_tile_crawler.ts:107`, `main:scripts/portal_tile_crawler.ts:164-245` · response not captured · candidate URL+method (not observed on the wire)
+> **Evidence — tier C** · sources: `main:scripts/portal_tile_crawler.ts:55-108`, `main:scripts/portal_tile_crawler.ts:164-245` · response not captured · candidate URL+method (not observed on the wire)
 
 **Launcher tile: Scores**
 
@@ -1048,7 +1048,7 @@ UNVERIFIED — no capture exists. The path and method are candidate values infer
 
 ### `POST /cloud/api/Manager/search`
 
-> **Evidence — tier C** · sources: `operational_guardrails_runbook.md:205-209`, `operational_guardrails_runbook.md:214` · response not captured · candidate URL+method (not observed on the wire)
+> **Evidence — tier C** · sources: `docs/runbooks/operational_guardrails_runbook.md:205-209`, `docs/runbooks/operational_guardrails_runbook.md:214` · response not captured · candidate URL+method (not observed on the wire)
 
 **Global account omnisearch**
 
@@ -1063,11 +1063,11 @@ UNVERIFIED — no capture exists. The path and method are candidate values infer
 
 ### `POST /cloud/api/Manager/updateByColumn`
 
-> **Evidence — tier C** · sources: `operational_guardrails_runbook.md:215`, `domain-branded-types.ts:9,140-158` · response not captured
+> **Evidence — tier C** · sources: `docs/runbooks/operational_guardrails_runbook.md:215`, `design/domain-branded-types.ts:9,140-158` · response not captured
 
 **Padded-field customer mutation**
 
-UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: domain-branded-types.ts:9,140-158 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.
+UNVERIFIED — no capture exists. The path, method and any previously published field schema were authored in the prior hand-built spec or its generators; no request or response artifact exists in this repository. Repo type evidence: design/domain-branded-types.ts:9,140-158 (a consumer type declaration, not a capture). The request body and the response body/status codes are unknown, so no request schema and no response content are published here.
 
 - **Tag:** Inferred (Unverified) · **operationId:** `postCloudApiManagerUpdateByColumn`
 - **Required capture:** Highest-value mutation capture: one updateByColumn with a safe column (confirmationDelaySeconds) plus the getInfoPlayer read-back. Record exact form fields, content type, padding width actually required (11 vs the observed 10), sub-agent vs master scope, and the Result envelope. Upgrades C->A and is the only way to validate the SILENT_NO_OP / REJECTED_SCOPE claims.
@@ -1108,7 +1108,7 @@ UNVERIFIED — no capture exists. The path, method and any previously published 
 
 ### `POST /cloud/api/Report/delete-wager`
 
-> **Evidence — tier C** · sources: `operational_guardrails_runbook.md:165` · response not captured · candidate URL+method (not observed on the wire)
+> **Evidence — tier C** · sources: `docs/runbooks/operational_guardrails_runbook.md:165` · response not captured · candidate URL+method (not observed on the wire)
 
 **Deleted wagers report**
 
@@ -1123,7 +1123,7 @@ UNVERIFIED — no capture exists. The path and method are candidate values infer
 
 ### `POST /cloud/api/Report/getAnalysis`
 
-> **Evidence — tier C** · sources: `main:scripts/portal_tile_crawler.ts:96`, `main:scripts/portal_tile_crawler.ts:164-245`, `operational_guardrails_runbook.md:166` · response not captured · candidate URL+method (not observed on the wire)
+> **Evidence — tier C** · sources: `main:scripts/portal_tile_crawler.ts:96`, `main:scripts/portal_tile_crawler.ts:164-245`, `docs/runbooks/operational_guardrails_runbook.md:166` · response not captured · candidate URL+method (not observed on the wire)
 
 **Launcher tile: Analysis**
 
@@ -1187,7 +1187,7 @@ UNVERIFIED — no capture exists. The path, method and any previously published 
 
 ### `POST /cloud/api/Report/getFinancialReport`
 
-> **Evidence — tier C** · sources: `main:scripts/portal_tile_crawler.ts:151`, `main:scripts/portal_tile_crawler.ts:164-245`, `operational_guardrails_runbook.md:167` · response not captured · candidate URL+method (not observed on the wire)
+> **Evidence — tier C** · sources: `main:scripts/portal_tile_crawler.ts:151`, `main:scripts/portal_tile_crawler.ts:164-245`, `docs/runbooks/operational_guardrails_runbook.md:167` · response not captured · candidate URL+method (not observed on the wire)
 
 **Launcher tile: Transactions History**
 
@@ -1221,7 +1221,7 @@ UNVERIFIED — no capture exists. The path, method and any previously published 
 
 ### `POST /cloud/api/Report/getSettledFigure`
 
-> **Evidence — tier C** · sources: `operational_guardrails_runbook.md:168` · response not captured · candidate URL+method (not observed on the wire)
+> **Evidence — tier C** · sources: `docs/runbooks/operational_guardrails_runbook.md:168` · response not captured · candidate URL+method (not observed on the wire)
 
 **Settled figure / collections**
 
@@ -1281,7 +1281,7 @@ UNVERIFIED — no capture exists. The path, method and any previously published 
 
 ### `POST /cloud/api/System/authenticateCustomer`
 
-> **Evidence — tier C** · sources: `operational_guardrails_runbook.md:153` · response not captured
+> **Evidence — tier C** · sources: `docs/runbooks/operational_guardrails_runbook.md:153` · response not captured
 
 **Authenticate agent/customer session**
 
