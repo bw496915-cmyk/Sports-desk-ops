@@ -3914,7 +3914,7 @@
       },
       "RawBetTickerTick": {
         "type": "object",
-        "description": "Consumer wire type for one bet-ticker row. Field names and number types only. The getBetTicker operation is now tier A: its response schema is derived from the live capture skeleton, while this component remains a consumer type declaration. Parsed from simulate_bettor_churn_suite.ts:109-118.",
+        "description": "Consumer wire type for one bet-ticker row. Field names and number types only. The getBetTicker operation is now tier A: its response schema is derived from the live capture skeleton, while this component remains a consumer type declaration. Parsed from simulate_bettor_churn_suite.ts:119-128.",
         "properties": {
           "wagerNumber": {
             "type": "number"
@@ -3958,7 +3958,7 @@
       },
       "RawPendingLeg": {
         "type": "object",
-        "description": "Consumer wire type for one pending wager leg. Risk and ToWin are cents and repeat identically across parlay legs. This is a type declaration, not a captured response; no pending-leg fixture or capture exists, so the getPending operation (tier C) publishes no response schema. Parsed from simulate_bettor_churn_suite.ts:94-107.",
+        "description": "Consumer wire type for one pending wager leg. Risk and ToWin are cents and repeat identically across parlay legs. This is a type declaration, not a captured response; no pending-leg fixture or capture exists, so the getPending operation (tier C) publishes no response schema. Parsed from simulate_bettor_churn_suite.ts:104-117.",
         "properties": {
           "Login": {
             "type": "string"
@@ -4018,7 +4018,7 @@
       },
       "WeblogEntry": {
         "type": "object",
-        "description": "Consumer type that declares the four fields the old spec published as the getWebLog response row (customerID, ipAddress, timestamp, agentOwner). The getWebLog operation is now tier A and derives its response schema from the live capture skeleton; this component remains a consumer type declaration and is not used for that schema. Parsed from simulate_bettor_churn_suite.ts:120-126.",
+        "description": "Consumer type that declares the four fields the old spec published as the getWebLog response row (customerID, ipAddress, timestamp, agentOwner). The getWebLog operation is now tier A and derives its response schema from the live capture skeleton; this component remains a consumer type declaration and is not used for that schema. Parsed from simulate_bettor_churn_suite.ts:130-136.",
         "properties": {
           "customerID": {
             "type": "string"

@@ -57,7 +57,17 @@ export function createCanonicalCustomerId(rawIdentifier: string): CustomerId {
 export function createPaddedCustomerId(
   rawIdentifier: string,
 ): PaddedCustomerId {
-  return rawIdentifier.trim().toUpperCase().padEnd(11, " ") as PaddedCustomerId;
+  // Same contract as design/domain-branded-types.ts:padCustomerIdCanonical, because both now
+  // construct the same brand. Without this, `""` became eleven spaces and a 12-character login
+  // became a 12-character "padded" id — both branded PaddedCustomerId, both rejected by the
+  // domain's own isPaddedCustomerId guard.
+  const trimmed = rawIdentifier.trim().toUpperCase();
+  if (trimmed.length === 0 || trimmed.length > 11) {
+    throw new RangeError(
+      `PaddedCustomerId source length must be between 1 and 11 characters (got ${trimmed.length}): '${rawIdentifier}'`,
+    );
+  }
+  return trimmed.padEnd(11, " ") as PaddedCustomerId;
 }
 
 export function createCanonicalAgentId(rawIdentifier: string): AgentId {
