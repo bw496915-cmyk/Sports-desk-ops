@@ -15,11 +15,15 @@
  * @see https://bun.com/blog/bun-v1.3.9#bun-run-parallel-and-bun-run-sequential
  */
 
-export const BUN_RUN_PARALLEL_V14_BLOG_URL =
-  "https://bun.sh/blog/bun-v1.4#bun-run-parallel-since-1-3-9-improved-1-4-0" as const;
+import { bunUrl } from "./bun_urls.ts";
 
-export const BUN_RUN_PARALLEL_V139_BLOG_URL =
-  "https://bun.sh/blog/bun-v1.3.9#bun-run-parallel-and-bun-run-sequential" as const;
+export const BUN_RUN_PARALLEL_V14_BLOG_URL = bunUrl(
+  "/blog/bun-v1.4#bun-run-parallel-since-1-3-9-improved-1-4-0",
+);
+
+export const BUN_RUN_PARALLEL_V139_BLOG_URL = bunUrl(
+  "/blog/bun-v1.3.9#bun-run-parallel-and-bun-run-sequential",
+);
 
 /** v1.3.9 blog ship note — colored, padded labels. */
 export const BUN_RUN_PARALLEL_V139_BLOG_SHIP_NOTE =
