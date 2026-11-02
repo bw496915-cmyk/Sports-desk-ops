@@ -15,7 +15,8 @@
  */
 
 import { statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { parseArgs } from "node:util";
 import {
   ManagedWebView,
   WebViewError,
@@ -200,57 +201,68 @@ function f402Url(page: string): string {
   return `${f402BaseUrl()}${page.startsWith("/") ? page : `/${page}`}`;
 }
 
-function flag(
-  args: readonly string[],
-  names: readonly string[],
-  fallback: string,
-): string {
-  for (const name of names) {
-    const index = args.indexOf(name);
-    if (index !== -1 && index + 1 < args.length) return args[index + 1]!;
-  }
-  return fallback;
+const SHOT_ARG_OPTIONS = {
+  out: { type: "string" },
+  width: { type: "string" },
+  height: { type: "string" },
+  backend: { type: "string" },
+  format: { type: "string" },
+  encoding: { type: "string" },
+  kitty: { type: "boolean" },
+  "kitty-direct": { type: "boolean" },
+  resize: { type: "string" },
+  quality: { type: "string" },
+  "wait-selector": { type: "string" },
+  "wait-ms": { type: "string" },
+  "timeout-ms": { type: "string" },
+  "f402-login": { type: "boolean" },
+  "f402-page": { type: "string" },
+  profile: { type: "string" },
+  thumb: { type: "string" },
+  placeholder: { type: "boolean" },
+  console: { type: "boolean" },
+  cookies: { type: "boolean" },
+  retries: { type: "string" },
+  json: { type: "boolean" },
+  help: { type: "boolean", short: "h" },
+} as const;
+
+/** An argv the parser rejected: an unknown flag, a flag without its value, or a second URL. */
+export class ShotUsageError extends Error {
+  override readonly name = "ShotUsageError";
 }
 
-function parseArgs(args: readonly string[]): Options {
-  const flagValues = new Set([
-    "--out",
-    "--width",
-    "--height",
-    "--backend",
-    "--format",
-    "--encoding",
-    "--resize",
-    "--quality",
-    "--wait-selector",
-    "--wait-ms",
-    "--timeout-ms",
-    "--f402-page",
-    "--profile",
-    "--thumb",
-    "--retries",
-  ]);
-  let url: string | null = null;
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index]!;
-    if (flagValues.has(arg)) {
-      index += 1;
-      continue;
-    }
-    if (arg.startsWith("-")) continue;
-    url = arg;
-    break;
+/** Throws {@link ShotUsageError}; `null` means --help. */
+export function parseShotArgs(argv: readonly string[]): Options | null {
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: [...argv],
+      options: SHOT_ARG_OPTIONS,
+      strict: true,
+      allowPositionals: true,
+    });
+  } catch (error) {
+    throw new ShotUsageError(
+      error instanceof Error ? error.message : String(error),
+    );
   }
+  const { values, positionals } = parsed;
+  if (values.help === true) return null;
+  if (positionals.length > 1) {
+    throw new ShotUsageError(
+      `expected at most one URL, got ${positionals.length}: ${positionals.join(" ")}`,
+    );
+  }
+  const url = positionals[0] ?? null;
 
-  const formatRaw = flag(args, ["--format"], "png").toLowerCase();
+  const formatRaw = (values.format ?? "png").toLowerCase();
   const format: Options["format"] =
     formatRaw === "jpeg" || formatRaw === "webp" ? formatRaw : "png";
-  const kittyDirect = args.includes("--kitty-direct");
-  const kitty = kittyDirect || args.includes("--kitty");
-  const encodingRaw = flag(
-    args,
-    ["--encoding"],
-    kitty ? "shmem" : "blob",
+  const kittyDirect = values["kitty-direct"] === true;
+  const kitty = kittyDirect || values.kitty === true;
+  const encodingRaw = (
+    values.encoding ?? (kitty ? "shmem" : "blob")
   ).toLowerCase();
   const encoding: ScreenshotEncoding =
     encodingRaw === "buffer" ||
@@ -258,26 +270,23 @@ function parseArgs(args: readonly string[]): Options {
     encodingRaw === "shmem"
       ? encodingRaw
       : "blob";
-  const backendRaw = flag(
-    args,
-    ["--backend"],
-    process.platform === "darwin" ? "webkit" : "chrome",
-  );
+  const backendRaw =
+    values.backend ?? (process.platform === "darwin" ? "webkit" : "chrome");
   // webp no longer forces Chrome: Bun.Image re-encodes the PNG on webkit.
   const backend: Options["backend"] =
     backendRaw === "chrome" ? "chrome" : "webkit";
-  const resizeRaw = flag(args, ["--resize"], "");
-  const thumbRaw = flag(args, ["--thumb"], "");
+  const resizeRaw = values.resize ?? "";
+  const thumbRaw = values.thumb ?? "";
 
-  const width = Number(flag(args, ["--width"], "1440"));
-  const height = Number(flag(args, ["--height"], "900"));
-  const quality = Number(flag(args, ["--quality"], "82"));
-  const waitMs = Number(flag(args, ["--wait-ms"], "250"));
-  const timeoutMs = Number(flag(args, ["--timeout-ms"], "20000"));
+  const width = Number(values.width ?? "1440");
+  const height = Number(values.height ?? "900");
+  const quality = Number(values.quality ?? "82");
+  const waitMs = Number(values["wait-ms"] ?? "250");
+  const timeoutMs = Number(values["timeout-ms"] ?? "20000");
 
   return {
     url,
-    out: toFsPathOrNull(flag(args, ["--out"], "")),
+    out: toFsPathOrNull(values.out ?? ""),
     width: Number.isFinite(width)
       ? Math.min(Math.max(width, 320), 16384)
       : 1440,
@@ -293,18 +302,18 @@ function parseArgs(args: readonly string[]): Options {
       ? Math.min(Math.max(quality, 1), 100)
       : 82,
     resize: resizeRaw === "" ? null : parseResize(resizeRaw),
-    waitSelector: flag(args, ["--wait-selector"], "") || null,
+    waitSelector: values["wait-selector"] || null,
     waitMs: Number.isFinite(waitMs) ? Math.max(0, waitMs) : 250,
     timeoutMs: Number.isFinite(timeoutMs) ? Math.max(1000, timeoutMs) : 20_000,
-    f402Login: args.includes("--f402-login"),
-    f402Page: flag(args, ["--f402-page"], "/"),
-    profile: toFsPathOrNull(flag(args, ["--profile"], "")),
+    f402Login: values["f402-login"] === true,
+    f402Page: values["f402-page"] ?? "/",
+    profile: toFsPathOrNull(values.profile ?? ""),
     thumb: thumbRaw === "" ? null : boundedInt(thumbRaw, 16, 2048),
-    placeholder: args.includes("--placeholder"),
-    console: args.includes("--console"),
-    cookies: args.includes("--cookies"),
-    retries: boundedInt(flag(args, ["--retries"], "0"), 0, 5),
-    json: args.includes("--json"),
+    placeholder: values.placeholder === true,
+    console: values.console === true,
+    cookies: values.cookies === true,
+    retries: boundedInt(values.retries ?? "0", 0, 5),
+    json: values.json === true,
   };
 }
 
@@ -315,12 +324,20 @@ function toFsPathOrNull(raw: string): string | null {
 export const DEFAULT_SHOT_DIR = "scratch/shots";
 
 export async function runWebviewShot(argv: readonly string[]): Promise<void> {
-  const args = [...argv];
-  if (args.includes("-h") || args.includes("--help")) {
+  let options: Options | null;
+  try {
+    options = parseShotArgs(argv);
+  } catch (error) {
+    if (!(error instanceof ShotUsageError)) throw error;
+    console.error(`webview-shot: ${error.message}\n`);
+    console.error(HELP);
+    process.exitCode = 2;
+    return;
+  }
+  if (options === null) {
     console.log(HELP);
     return;
   }
-  const options = parseArgs(args);
   if (options.url !== null && !/^https?:\/\//.test(options.url)) {
     console.error("webview-shot: the URL must be http(s)\n");
     console.error(HELP);
@@ -491,6 +508,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
     thumb === null ? null : await writeThumb(screenshot.path, thumb);
   const result: ShotFileResult = {
     screenshot: screenshot.path,
+    screenshotUrl: Bun.pathToFileURL(resolve(screenshot.path)).href,
     bytes: screenshot.bytes,
     sha256: screenshot.sha256,
     mimeType: screenshot.mimeType,
@@ -523,6 +541,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
 
 interface ShotFileResult extends Partial<ProfileCheck> {
   readonly screenshot: string;
+  readonly screenshotUrl: string;
   readonly bytes: number;
   readonly sha256: string;
   readonly mimeType: string;
@@ -544,6 +563,7 @@ export function renderShotTable(
 ): string {
   const rows: { field: string; value: string }[] = [
     { field: "screenshot", value: result.screenshot },
+    { field: "screenshotUrl", value: result.screenshotUrl },
     { field: "bytes", value: String(result.bytes) },
     { field: "sha256", value: result.sha256 },
     { field: "backend", value: `${result.backend} (${result.format})` },

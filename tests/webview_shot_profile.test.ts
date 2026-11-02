@@ -7,10 +7,52 @@ import {
 import {
   boundedInt,
   navigateWithRetry,
+  parseShotArgs,
   parseSignedOutMarkers,
   renderShotTable,
+  ShotUsageError,
   toFsPath,
 } from "../scripts/webview_shot_cli.ts";
+
+describe("parseShotArgs", () => {
+  test("--flag=value and --flag value parse the same", () => {
+    const spaced = parseShotArgs([
+      "https://x",
+      "--out",
+      "a.png",
+      "--thumb",
+      "64",
+    ]);
+    const equals = parseShotArgs(["https://x", "--out=a.png", "--thumb=64"]);
+    expect(equals).toEqual(spaced);
+    expect(equals?.out).toBe("a.png");
+    expect(equals?.thumb).toBe(64);
+  });
+
+  test("an unknown or misspelled flag is a usage error, not ignored", () => {
+    for (const argv of [
+      ["https://x", "--thumbs", "64"],
+      ["https://x", "--jsno"],
+    ]) {
+      expect(() => parseShotArgs(argv)).toThrow(ShotUsageError);
+    }
+  });
+
+  test("a value flag with no value is a usage error", () => {
+    expect(() => parseShotArgs(["https://x", "--out"])).toThrow(ShotUsageError);
+  });
+
+  test("a second URL is a usage error instead of being dropped", () => {
+    expect(() => parseShotArgs(["https://a", "https://b"])).toThrow(
+      "expected at most one URL, got 2",
+    );
+  });
+
+  test("-h and --help return null", () => {
+    expect(parseShotArgs(["-h"])).toBeNull();
+    expect(parseShotArgs(["https://x", "--help"])).toBeNull();
+  });
+});
 
 describe("parseSignedOutMarkers", () => {
   test("keeps the known markers in page order", () => {
@@ -117,6 +159,7 @@ describe("navigateWithRetry", () => {
 describe("renderShotTable", () => {
   const base = {
     screenshot: "/tmp/s.png",
+    screenshotUrl: "file:///tmp/s.png",
     bytes: 10,
     sha256: "ab".repeat(32),
     mimeType: "image/png",
