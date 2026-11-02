@@ -47,6 +47,39 @@ export function bunReferenceUrl<const S extends string>(
   return bunUrl(`/reference/${symbolPath}`);
 }
 
+export interface TextDirective {
+  readonly prefix?: string;
+  readonly start: string;
+  readonly end?: string;
+  readonly suffix?: string;
+}
+
+/**
+ * `-`, `,` and `&` delimit a text directive, so each part escapes them on top of URI encoding. `/` is
+ * legal in a fragment and stays literal, as browser "copy link to highlight" output has it.
+ */
+function encodeTextPart(part: string): string {
+  if (part === "") throw new TypeError("text fragment parts must not be empty");
+  return encodeURIComponent(part).replaceAll("-", "%2D").replaceAll("%2F", "/");
+}
+
+/**
+ * A `:~:text=[prefix-,]start[,end][,-suffix]` fragment directive, appended after an optional element
+ * id: `bunUrl(\`/blog/bun-v1.4#bun-terminal${textFragment({ start })}\`)`.
+ *
+ * @see https://wicg.github.io/scroll-to-text-fragment/#syntax
+ */
+export function textFragment(directive: TextDirective): `:~:text=${string}` {
+  const { prefix, start, end, suffix } = directive;
+  const parts = [
+    ...(prefix === undefined ? [] : [`${encodeTextPart(prefix)}-`]),
+    encodeTextPart(start),
+    ...(end === undefined ? [] : [encodeTextPart(end)]),
+    ...(suffix === undefined ? [] : [`-${encodeTextPart(suffix)}`]),
+  ];
+  return `:~:text=${parts.join(",")}`;
+}
+
 /**
  * Any bun.com / bun.sh link (with or without scheme or `www.`) in canonical form; query and fragment,
  * including `:~:text=` text fragments, are kept verbatim. `null` for anything that is not Bun's site.

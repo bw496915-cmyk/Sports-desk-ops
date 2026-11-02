@@ -5,6 +5,7 @@ import {
   bunReferenceUrl,
   bunUrl,
   canonicalBunUrl,
+  textFragment,
 } from "../lib/bun_urls.ts";
 
 describe("bunUrl", () => {
@@ -41,6 +42,50 @@ describe("bunReferenceUrl", () => {
 
   test("a trailing slash on the symbol path is rejected", () => {
     expect(() => bunReferenceUrl("globals/bun/")).toThrow("must not end");
+  });
+});
+
+describe("textFragment", () => {
+  test("rebuilds the globals-reference module-list link exactly", () => {
+    expect(
+      bunUrl(
+        `/reference/globals/bun#${textFragment({
+          prefix: "node:zlib/iter",
+          start: "MODULE",
+          end: "YAML related APIs",
+          suffix: "Ask AI",
+        })}`,
+      ),
+    ).toBe(
+      "https://bun.com/reference/globals/bun#:~:text=node%3Azlib/iter-,MODULE,YAML%20related%20APIs,-Ask%20AI",
+    );
+  });
+
+  test("a start-only directive after an element id", () => {
+    expect(
+      bunUrl(`/blog/bun-v1.4#bun-terminal${textFragment({ start: "a b" })}`),
+    ).toBe("https://bun.com/blog/bun-v1.4#bun-terminal:~:text=a%20b");
+  });
+
+  test("the directive delimiters - , & are escaped inside a part", () => {
+    expect(textFragment({ start: "1-3, a&b" })).toBe(
+      ":~:text=1%2D3%2C%20a%26b",
+    );
+  });
+
+  test("an empty part is rejected", () => {
+    expect(() => textFragment({ start: "" })).toThrow("must not be empty");
+    expect(() => textFragment({ start: "x", suffix: "" })).toThrow(
+      "must not be empty",
+    );
+  });
+
+  test("canonicalBunUrl keeps a text fragment byte for byte across hosts", () => {
+    const fragment =
+      "/reference/globals/bun#:~:text=node%3Azlib/iter-,MODULE,YAML%20related%20APIs,-Ask%20AI";
+    expect(canonicalBunUrl(`https://bun.sh${fragment}`)).toBe(
+      `https://bun.com${fragment}`,
+    );
   });
 });
 
