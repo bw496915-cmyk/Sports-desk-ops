@@ -2120,7 +2120,7 @@
       ],
       "evidence": [
         {
-          "source": "services/sportsdesk_webview_server.ts:878-1000",
+          "source": "services/sportsdesk_webview_server.ts#GET /api/analysis",
           "kind": "implementation",
           "note": "parseAnalysisQuery validates the codes; matchesSelection gates the stored report; the 200 payload carries totals plus a recomputed copy and a discrepancies array."
         }
@@ -2137,7 +2137,7 @@
       "members": ["GET /api/agents/search"],
       "evidence": [
         {
-          "source": "services/sportsdesk_webview_server.ts:1041-1100",
+          "source": "services/sportsdesk_webview_server.ts#GET /api/analysis/reports",
           "kind": "implementation",
           "note": "Requires q of at least two characters, clamps limit to 1..100, reads data/agent-tree.json, and returns key/level/agentType per hit."
         }
@@ -2154,7 +2154,7 @@
       "members": ["GET /api/game-admin/board"],
       "evidence": [
         {
-          "source": "services/sportsdesk_webview_server.ts:737-800",
+          "source": "services/sportsdesk_webview_server.ts#GET /api/game-admin",
           "kind": "implementation",
           "note": "data/game-admin-board.json holds four transcribed games; filterByWindow applies the portal's 48/24/-1 window and biggestSide skips approximate figures."
         }
@@ -2188,7 +2188,7 @@
       "members": ["GET /api/contests"],
       "evidence": [
         {
-          "source": "services/sportsdesk_webview_server.ts:702-736",
+          "source": "services/sportsdesk_webview_server.ts#GET /api/contests",
           "kind": "implementation",
           "note": "data/contests.json is produced by scripts/extract_contests.ts from saved nav markup; ?group and ?q filter the list."
         }

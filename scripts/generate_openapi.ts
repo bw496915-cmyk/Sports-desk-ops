@@ -1939,7 +1939,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Analysis report, or the reason it is not captured",
       description:
-        "Validates the portal's filter vocabulary (services/sportsdesk_webview_server.ts:878-1000) and answers 200 only when a transcribed report matches the selection; otherwise 501 with the required capture. A 200 carries the rows, the published totals, a recomputed copy and a discrepancies array, so a transcription slip is visible rather than served as fact. Surface: surface.daemon-analysis (tier D).",
+        "Validates the portal's filter vocabulary (services/sportsdesk_webview_server.ts#GET /api/analysis) and answers 200 only when a transcribed report matches the selection; otherwise 501 with the required capture. A 200 carries the rows, the published totals, a recomputed copy and a discrepancies array, so a transcription slip is visible rather than served as fact. Surface: surface.daemon-analysis (tier D).",
       requiredCapture:
         "Only the response of POST /cloud/api/Manager/getAgentPerformance is missing. The request is observed (2026-11-01, type=CP and CPS) and lib/f402_agent_performance_request.ts reproduces it byte for byte; no response body has ever been seen, so no column set is documented. Today a single Customer Performance result (Baseball, agent BILLY666, 2026-11-01) is transcribed from an operator paste.",
       responses: {
@@ -1964,7 +1964,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Analysis filter vocabulary transcribed from report.js",
       description:
-        "Returns the report kinds (CP/CPS/CPV/G), the fourteen activity codes, the two group modes and the four week windows, with their provenance and the required capture (services/sportsdesk_webview_server.ts:878-894). Surface: surface.daemon-analysis (tier D).",
+        "Returns the report kinds (CP/CPS/CPV/G), the fourteen activity codes, the two group modes and the four week windows, with their provenance and the required capture (services/sportsdesk_webview_server.ts#GET /api/analysis/filters). Surface: surface.daemon-analysis (tier D).",
       requiredCapture:
         "HTTP capture of GET /api/analysis/filters (handler-verified only).",
       responses: {
@@ -2003,7 +2003,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Agent lookup over the committed hierarchy",
       description:
-        "Case-insensitive prefix-first search over data/agent-tree.json (services/sportsdesk_webview_server.ts:1041-1100). Requires q of at least two characters and clamps limit to 100. Loopback-gated, because agent names are identity data. Surface: surface.daemon-agent-search (tier D).",
+        "Case-insensitive prefix-first search over data/agent-tree.json (services/sportsdesk_webview_server.ts#GET /api/analysis/reports). Requires q of at least two characters and clamps limit to 100. Loopback-gated, because agent names are identity data. Surface: surface.daemon-agent-search (tier D).",
       requiredCapture:
         "Not a capture gap: the tree is committed and the handler is the contract.",
       responses: {
@@ -2025,7 +2025,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Game Admin board: lines with the money on each side",
       description:
-        "Serves the transcribed Admin module: spread, moneyline, total and team-total sides with exposure (services/sportsdesk_webview_server.ts:737-800). Supports the portal's window selector (48 yesterday, 24 today, -1 current board). Abbreviated amounts carry amountExact null and are excluded from sums. Surface: surface.daemon-game-admin-board (tier D).",
+        "Serves the transcribed Admin module: spread, moneyline, total and team-total sides with exposure (services/sportsdesk_webview_server.ts#GET /api/game-admin). Supports the portal's window selector (48 yesterday, 24 today, -1 current board). Abbreviated amounts carry amountExact null and are excluded from sums. Surface: surface.daemon-game-admin-board (tier D).",
       requiredCapture:
         "A Game Admin API capture would replace the transcription; none exists, so source and observedAt travel with the payload.",
       responses: {
@@ -2072,7 +2072,7 @@ function surfaceOperationSpecs(
       tag: TAG_DAEMON,
       summary: "Contest / futures list from the sports nav",
       description:
-        "Every contest the nav links, keyed by contestNum with sport, market and subject parsed out of the padded type string (services/sportsdesk_webview_server.ts:702-736). The list is extracted from saved markup by scripts/extract_contests.ts. Surface: surface.daemon-contests (tier D).",
+        "Every contest the nav links, keyed by contestNum with sport, market and subject parsed out of the padded type string (services/sportsdesk_webview_server.ts#GET /api/contests). The list is extracted from saved markup by scripts/extract_contests.ts. Surface: surface.daemon-contests (tier D).",
       requiredCapture:
         "A contest API capture would replace the markup extraction; none exists.",
       responses: {

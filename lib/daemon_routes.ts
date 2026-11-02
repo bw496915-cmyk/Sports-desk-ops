@@ -128,8 +128,8 @@ export const DAEMON_ROUTES: readonly DaemonRoute[] = [
   defineRoute({
     path: "/api/graph-feed",
     method: "ANY",
-    guard: "none",
-    dataClass: "aggregate",
+    guard: "pii",
+    dataClass: "customer-identifying",
     surface: "surface.daemon-graph-data-plane",
   }),
   defineRoute({
@@ -247,22 +247,22 @@ export const DAEMON_ROUTES: readonly DaemonRoute[] = [
   defineRoute({
     path: "/graph",
     method: "ANY",
-    guard: "none",
-    dataClass: "static",
+    guard: "pii",
+    dataClass: "customer-identifying",
     surface: null,
   }),
   defineRoute({
     path: "/graph-live-feed.json",
     method: "ANY",
-    guard: "none",
-    dataClass: "aggregate",
+    guard: "pii",
+    dataClass: "customer-identifying",
     surface: "surface.daemon-graph-data-plane",
   }),
   defineRoute({
     path: "/graph.html",
     method: "ANY",
-    guard: "none",
-    dataClass: "static",
+    guard: "pii",
+    dataClass: "customer-identifying",
     surface: null,
   }),
   defineRoute({
@@ -275,8 +275,8 @@ export const DAEMON_ROUTES: readonly DaemonRoute[] = [
   defineRoute({
     path: "/graph/",
     method: "ANY",
-    guard: "none",
-    dataClass: "static",
+    guard: "pii",
+    dataClass: "customer-identifying",
     surface: null,
   }),
   defineRoute({
@@ -338,8 +338,8 @@ export const DAEMON_ROUTES: readonly DaemonRoute[] = [
   defineRoute({
     path: "/surveillance-graph",
     method: "ANY",
-    guard: "none",
-    dataClass: "aggregate",
+    guard: "pii",
+    dataClass: "customer-identifying",
     surface: null,
   }),
   defineRoute({

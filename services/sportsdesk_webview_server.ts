@@ -660,6 +660,16 @@ export function startServer(options?: ServerOptions) {
         pathname === "/graph.html" ||
         pathname === "/surveillance-graph"
       ) {
+        // docs/graph.html carries agent logins in its dataset (BILLY666, RF2003, BGD101 in the
+        // 640 KB payload), so it is customer-identifying, not a static page. Loopback keeps
+        // working; any other peer needs the admin token, as /api/live-bets already does.
+        const rejected = piiRejection(req, server.requestIP(req)?.address);
+        if (rejected !== null) {
+          return Response.json(
+            { success: false, error: rejected.error },
+            { status: rejected.status, headers: corsHeaders },
+          );
+        }
         return new Response(Bun.file(resolve(repoRoot, "docs/graph.html")), {
           headers: {
             ...corsHeaders,
@@ -683,6 +693,14 @@ export function startServer(options?: ServerOptions) {
         pathname === "/graph-live-feed.json" ||
         pathname === "/api/graph-feed"
       ) {
+        // Same identifiers as the page: the feed is the page's dataset, so the same guard.
+        const rejected = piiRejection(req, server.requestIP(req)?.address);
+        if (rejected !== null) {
+          return Response.json(
+            { success: false, error: rejected.error },
+            { status: rejected.status, headers: corsHeaders },
+          );
+        }
         return new Response(
           Bun.file(resolve(repoRoot, "docs/graph-live-feed.json")),
           {
