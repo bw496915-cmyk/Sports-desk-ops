@@ -1831,7 +1831,14 @@
       "category": "local-route",
       "missingFromSpec": true,
       "what": "GET / and GET /dashboard serve customer-churn-simulation-dashboard.html as text/html from the Bun daemon.",
-      "members": ["GET /", "GET /dashboard"],
+      "members": [
+        "GET /",
+        "GET /dashboard",
+        "GET /status",
+        "GET /status.json",
+        "GET /api/status",
+        "POST /api/parse-formdata"
+      ],
       "evidence": [
         {
           "source": "services/sportsdesk_webview_server.ts:134-141",
@@ -1874,6 +1881,9 @@
         "POST /telegram/webhook",
         "GET /api/telegram/status",
         "GET /api/telegram/activity",
+        "GET /api/watchlist",
+        "POST /api/telegram/alert",
+        "POST /api/telegram/report",
         "POST /api/telegram/webhook",
         "OPTIONS *",
         "GET /api/test/error"
