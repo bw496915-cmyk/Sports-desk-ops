@@ -3,11 +3,25 @@
  * Sets `window.__AGENT_GRAPH_READY__` after `layoutstop`.
  */
 
+import { envPositiveInt } from "./env.ts";
+
+/**
+ * Ready timeout, read and validated once at the boundary.
+ *
+ * `Number(Bun.env.X ?? 30000)` yields NaN for a malformed value, and `Date.now() > NaN` is false
+ * forever — the promise then never rejects and the capture hangs until the outer timeout. The
+ * value is interpolated into page-evaluated JS, so it must be a number, not a raw string.
+ */
+const AGENT_GRAPH_CAPTURE_TIMEOUT_MS = envPositiveInt(
+  "F402_GRAPH_CAPTURE_TIMEOUT_MS",
+  30_000,
+);
+
 export const AGENT_GRAPH_READY_GLOBAL = "__AGENT_GRAPH_READY__" as const;
 
 /** Expression evaluated in-page; resolves when the graph layout finishes. */
 export const AGENT_GRAPH_READY_EVAL = `(new Promise((resolve, reject) => {
-  const deadline = Date.now() + 30000;
+  const deadline = Date.now() + ${AGENT_GRAPH_CAPTURE_TIMEOUT_MS};
   const check = () => {
     if (window.${AGENT_GRAPH_READY_GLOBAL}) return resolve(true);
     if (Date.now() > deadline) return reject(new Error("agent graph ready timeout"));

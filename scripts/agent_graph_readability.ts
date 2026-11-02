@@ -42,13 +42,21 @@ import {
 } from "../lib/f402_agent_tree.ts";
 import { parseListAgentsByAgentWireText } from "../lib/f402_list_agents_wire_boundary.ts";
 
+import { envPositiveInt } from "../lib/env.ts";
+
 const REPO = join(import.meta.dir, "..");
 const OUT = join(REPO, "scratch/agent-graph-readability.json");
 
 /** Current capture viewport (graph:agent:image). */
-export const FULL_RASTER: RasterFit = { width: 1920, height: 1080 };
+export const FULL_RASTER: RasterFit = {
+  width: envPositiveInt("F402_GRAPH_VIEWPORT_W", 1920),
+  height: envPositiveInt("F402_GRAPH_VIEWPORT_H", 1080),
+};
 /** Per-view raster bound for small multiples (scrollable page, WebP-safe). */
-export const VIEW_RASTER: RasterFit = { width: 2400, height: 4800 };
+export const VIEW_RASTER: RasterFit = {
+  width: envPositiveInt("F402_GRAPH_VIEW_RASTER_W", 2400),
+  height: envPositiveInt("F402_GRAPH_VIEW_RASTER_H", 4800),
+};
 
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
