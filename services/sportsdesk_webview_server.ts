@@ -401,9 +401,21 @@ export function startServer(options?: ServerOptions) {
         const headers = { ...corsHeaders, "Cache-Control": "no-store" };
 
         if (pathname.endsWith("/summary")) {
+          const etag = `"${Buffer.from(
+            `${dataSource}|${capturedAt}|${summary.totalGames}|${summary.totalWagered}|${summary.totalToWin}|${summary.totalPending}`,
+          ).toString("base64url")}"`;
+          const ifNoneMatch = req.headers.get("if-none-match");
+          const summaryHeaders = {
+            ...corsHeaders,
+            "Cache-Control": "public, max-age=30, stale-while-revalidate=60",
+            ETag: etag,
+          };
+          if (ifNoneMatch === etag) {
+            return new Response(null, { status: 304, headers: summaryHeaders });
+          }
           return Response.json(
             { success: true, summary, generatedAt },
-            { headers },
+            { headers: summaryHeaders },
           );
         }
 
@@ -540,6 +552,64 @@ export function startServer(options?: ServerOptions) {
         );
       }
 
+      if (
+        (pathname === "/api/status" || pathname === "/status.json") &&
+        req.method === "GET"
+      ) {
+        // Ask the service directly. The first version fetched itself over
+        // `http://127.0.0.1:${server.port}`: an extra round trip, and no port at all when the
+        // server listens on a unix socket (BUN_SOCKET / options.unix), which silently reported
+        // telegram as null — indistinguishable from "not configured".
+        const mem = process.memoryUsage();
+        const cpu = process.cpuUsage();
+        const checks: Record<string, "ok" | "error"> = {};
+        let telegram: unknown = null;
+        try {
+          telegram = {
+            status: await telegramService.getStatus(),
+            schedules: scheduler.getSchedules(),
+          };
+          checks.telegram = "ok";
+        } catch (error) {
+          checks.telegram = "error";
+          telegram = {
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+
+        // `ok` was a literal true and `status` the literal "healthy", so the status page's
+        // unhealthy branch was unreachable. Both are derived from the checks now.
+        const ok = Object.values(checks).every((check) => check === "ok");
+        return Response.json(
+          {
+            ok,
+            status: ok ? "serving" : "degraded",
+            checks,
+            health: {
+              // process.cpuUsage() is cumulative CPU time since start, not utilisation; the old
+              // `cpu` label invited reading it as load.
+              uptimeSeconds: Math.floor(process.uptime()),
+              runtime: `Bun v${Bun.version} (${process.arch}-${process.platform})`,
+              memory: {
+                rss: mem.rss,
+                heapTotal: mem.heapTotal,
+                heapUsed: mem.heapUsed,
+                external: mem.external,
+                arrayBuffers: mem.arrayBuffers,
+              },
+              cpuUsageSinceStartMicros: {
+                user: cpu.user,
+                system: cpu.system,
+              },
+              pid: process.pid,
+            },
+            telegram,
+            timestamp: new Date().toISOString(),
+          },
+          { headers: corsHeaders },
+        );
+      }
+
       // 7. Live bets view
       if (pathname === "/live-bets") {
         return new Response(
@@ -556,6 +626,16 @@ export function startServer(options?: ServerOptions) {
       // 8. Executive Dashboard (GET / or GET /dashboard)
       if (pathname === "/" || pathname === "/dashboard") {
         return new Response(customerDashboardFile, {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "text/html; charset=utf-8",
+          },
+        });
+      }
+
+      // 8b. Status page (GET /status)
+      if (pathname === "/status" || pathname === "/status/") {
+        return new Response(Bun.file(resolve(repoRoot, "static/status.html")), {
           headers: {
             ...corsHeaders,
             "Content-Type": "text/html; charset=utf-8",
