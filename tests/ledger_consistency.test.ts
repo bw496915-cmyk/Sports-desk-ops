@@ -1,0 +1,235 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import {
+  auditLedger,
+  countTiers,
+  deriveMissingFromSpec,
+  memberPath,
+} from "../lib/ledger_consistency.ts";
+
+/**
+ * The ledger is the SSOT the docs gate trusts, and nothing checked it against itself. Three
+ * numbers inside it were wrong at once: the schemaDoc prose said "total = 48" for 55 rows, and
+ * three `missingFromSpec` flags contradicted docs/openapi.json. A field description nobody
+ * applied is not a contract.
+ */
+
+const ROOT = resolve(import.meta.dir, "..");
+const ledger = JSON.parse(
+  readFileSync(resolve(ROOT, "docs/evidence/ledger.json"), "utf8"),
+);
+const spec = JSON.parse(
+  readFileSync(resolve(ROOT, "docs/openapi.json"), "utf8"),
+);
+
+function ledgerWith(
+  overrides: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    schemaDoc: {
+      counts: "Operation counts by tier. A+B+C+D+E = total = 2.",
+      surfaceFields: { missingFromSpec: "documented" },
+    },
+    counts: { A: 1, B: 0, C: 1, D: 0, E: 0, total: 2 },
+    surfaceCounts: { D: 1, E: 0, total: 1 },
+    operations: [
+      { method: "get", path: "/a", tier: "A" },
+      { method: "get", path: "/b", tier: "C" },
+    ],
+    surfaces: [
+      {
+        id: "surface.x",
+        tier: "D",
+        missingFromSpec: true,
+        members: ["GET /missing"],
+      },
+    ],
+    ...overrides,
+  };
+}
+
+describe("memberPath", () => {
+  test("reduces a member to a spec path", () => {
+    expect(memberPath("POST /cloud/api/Manager/getHistory")).toBe(
+      "/cloud/api/Manager/getHistory",
+    );
+    expect(memberPath("GET /assets/*")).toBe("/assets");
+    expect(memberPath("/api/live-bets")).toBe("/api/live-bets");
+  });
+
+  test("returns nothing for members that are not routes", () => {
+    // A surface may list field names or CLI verbs; those cannot be spec paths.
+    expect(memberPath("sports")).toBeUndefined();
+    expect(memberPath("gslive <LOGIN>")).toBeUndefined();
+    expect(memberPath(undefined)).toBeUndefined();
+  });
+});
+
+describe("deriveMissingFromSpec", () => {
+  const specPaths = new Set([
+    "/dashboard",
+    "/api/live-bets",
+    "/api/live-bets/summary",
+  ]);
+
+  test("fully published is false", () => {
+    const surface = { members: ["GET /dashboard"] };
+    expect(deriveMissingFromSpec(surface, specPaths)).toBe(false);
+  });
+
+  test("partially published is true — the spec does not fully model it", () => {
+    // This is the case the old prose could not decide, and daemon-live-bets was recorded as
+    // false because of it: /api/f402/get-pending has no spec row.
+    const surface = {
+      members: [
+        "GET /api/live-bets",
+        "GET /api/live-bets/summary",
+        "GET /api/f402/get-pending",
+      ],
+    };
+    expect(deriveMissingFromSpec(surface, specPaths)).toBe(true);
+  });
+
+  test("no path members is true, not false-by-vacuity", () => {
+    // A surface of field names or CLI verbs can never be in the spec.
+    expect(
+      deriveMissingFromSpec({ members: ["sports", "periods"] }, specPaths),
+    ).toBe(true);
+    expect(deriveMissingFromSpec({ members: [] }, specPaths)).toBe(true);
+  });
+});
+
+describe("countTiers", () => {
+  test("counts rows per tier and ignores rows without one", () => {
+    expect(
+      countTiers([{ tier: "A" }, { tier: "A" }, { tier: "C" }, { nope: true }]),
+    ).toEqual({ A: 2, C: 1 });
+  });
+});
+
+describe("auditLedger", () => {
+  test("a consistent ledger has no issues", () => {
+    expect(
+      auditLedger(ledgerWith({}), { paths: { "/a": {}, "/b": {} } }),
+    ).toEqual([]);
+  });
+
+  test("counts that disagree with the rows are reported per tier", () => {
+    const issues = auditLedger(
+      ledgerWith({ counts: { A: 2, B: 0, C: 0, D: 0, E: 0, total: 2 } }),
+      { paths: {} },
+    );
+    expect(issues.map((issue) => issue.code)).toContain("COUNTS_STALE");
+    expect(
+      issues.some((issue) => issue.message.includes("counts.A=2 but 1")),
+    ).toBe(true);
+  });
+
+  test("a total that disagrees with the row count is reported", () => {
+    const issues = auditLedger(
+      ledgerWith({ counts: { A: 1, B: 0, C: 1, D: 0, E: 0, total: 99 } }),
+      { paths: {} },
+    );
+    expect(
+      issues.some((issue) => issue.message.includes("counts.total=99")),
+    ).toBe(true);
+  });
+
+  test("prose that restates the total is compared against the rows", () => {
+    const issues = auditLedger(
+      ledgerWith({
+        schemaDoc: {
+          counts: "A+B+C+D+E = total = 48.",
+          surfaceFields: { missingFromSpec: "x" },
+        },
+      }),
+      { paths: {} },
+    );
+    expect(issues.map((issue) => issue.code)).toContain("PROSE_STALE");
+  });
+
+  test("an undocumented surface flag is reported even without a spec", () => {
+    const issues = auditLedger(
+      ledgerWith({ schemaDoc: { counts: "total = 2.", surfaceFields: {} } }),
+    );
+    expect(issues.map((issue) => issue.code)).toContain(
+      "SURFACE_FLAG_UNDOCUMENTED",
+    );
+  });
+
+  test("a surface flag contradicting the spec is reported by id", () => {
+    const issues = auditLedger(
+      ledgerWith({
+        surfaces: [
+          {
+            id: "surface.x",
+            tier: "D",
+            missingFromSpec: false,
+            members: ["GET /absent"],
+          },
+        ],
+      }),
+      { paths: {} },
+    );
+    const wrong = issues.find((issue) => issue.code === "SURFACE_FLAG_WRONG");
+    expect(wrong?.message).toContain("surface.x");
+    expect(wrong?.message).toContain(
+      "missingFromSpec=false but the spec says true",
+    );
+  });
+
+  test("without a spec the flag checks are skipped, not guessed", () => {
+    const issues = auditLedger(ledgerWith({}));
+    expect(issues.map((issue) => issue.code)).not.toContain(
+      "SURFACE_FLAG_WRONG",
+    );
+  });
+});
+
+describe("the committed ledger", () => {
+  test("is internally consistent and agrees with docs/openapi.json", () => {
+    // This is the regression: it fails on the ledger as it stood before the fix (4 issues).
+    expect(auditLedger(ledger, spec)).toEqual([]);
+  });
+
+  test("every surface id is unique", () => {
+    const ids = (ledger.surfaces as { id: string }[]).map(
+      (surface) => surface.id,
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  test("tier decides whether a row may be published, and contradicted rows may go either way", () => {
+    // 44 of the 55 rows are in the spec. That number is not asserted directly because it moves
+    // with the ledger; the rule behind it is what should stay true:
+    //   - a tier-E row is retired or unimplemented, so the spec must not publish it;
+    //   - a non-E row with no contradiction must be published, or the row is a phantom;
+    //   - a contradicted row may be absent (the path never existed) or present (the path exists
+    //     and the recorded request/response detail is wrong) — Manager/getPending and
+    //     Manager/getAgentPerformance are the second kind.
+    const specPaths = new Set(
+      Object.keys((spec as { paths: Record<string, unknown> }).paths),
+    );
+    const rows = ledger.operations as {
+      path: string;
+      tier: string;
+      contradicted?: boolean;
+    }[];
+
+    expect(
+      rows.filter((row) => row.tier === "E" && specPaths.has(row.path)),
+    ).toEqual([]);
+    expect(
+      rows.filter(
+        (row) =>
+          row.tier !== "E" &&
+          row.contradicted !== true &&
+          !specPaths.has(row.path),
+      ),
+    ).toEqual([]);
+    expect(
+      rows.filter((row) => specPaths.has(row.path)).length,
+    ).toBeGreaterThan(40);
+  });
+});

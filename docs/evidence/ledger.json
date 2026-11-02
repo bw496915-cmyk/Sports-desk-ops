@@ -24,10 +24,10 @@
       "name": "Human label.",
       "tier": "D = real surface missing from the spec; E = documented operation with no implementation.",
       "category": "catalog | upstream-route | local-route | blocked-contract | documented-not-implemented.",
-      "missingFromSpec": "true when docs/openapi.json has no row for this surface.",
+      "missingFromSpec": "true when docs/openapi.json does not publish every path this surface lists — including a surface whose members are field names or CLI commands rather than routes, which the spec cannot model at all. False therefore means fully published. The boolean was previously read both ways; four rows disagreed until scripts/check_ledger_consistency.ts derived it.",
       "what / members / evidence / note": "Inventory, member routes, citations, caveats."
     },
-    "counts": "Operation counts by tier. A+B+C+D+E = total = 48. Surface counts are in surfaceCounts and are not mixed into counts.",
+    "counts": "Operation counts by tier. A+B+C+D+E = total = 55. Surface counts are in surfaceCounts and are not mixed into counts. scripts/check_ledger_consistency.ts recomputes every number here from the rows and fails when the prose drifts.",
     "surfaceCounts": "Surface inventory counts by tier.",
     "countsByTag": "Operation tier counts per spec tag (convenience for P2/P3)."
   },
@@ -1775,7 +1775,7 @@
       "name": "Manager/getHistory (wired settlement-history poll)",
       "tier": "D",
       "category": "upstream-route",
-      "missingFromSpec": true,
+      "missingFromSpec": false,
       "what": "POST {SPORTSDESK_PORTAL_HTTP_BASE}/cloud/api/Manager/getHistory - append-only settlement-history poll; response is an array or {data: []}.",
       "members": ["POST /cloud/api/Manager/getHistory"],
       "evidence": [
@@ -1951,7 +1951,7 @@
       "name": "/api/desk/* routes documented with no implementation",
       "tier": "E",
       "category": "documented-not-implemented",
-      "missingFromSpec": false,
+      "missingFromSpec": true,
       "what": "9 spec paths / 10 operations under /api/desk/* (auth session POST+DELETE, auth/me, hitl approve/queue/reject, forensics audit/scores, rfq quote/hedge) have no handler, no HMAC verifier, no CookieMap session code and no queue store anywhere in the repo.",
       "members": [
         "POST /api/desk/auth/session",
@@ -1989,7 +1989,7 @@
       "name": "Live bets and its summary (GET /api/live-bets, GET /api/live-bets/summary)",
       "tier": "D",
       "category": "local-route",
-      "missingFromSpec": false,
+      "missingFromSpec": true,
       "what": "Derives a scoreboard payload from captured Report/Pending rows: games, agent rollup, and aggregates computed per request. Amounts stay in integer cents; Password/NameFirst/Login are stripped by name and the artifact builder refuses to write if any survive.",
       "members": [
         "GET /api/live-bets",
