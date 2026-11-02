@@ -2025,7 +2025,7 @@
       "members": ["GET /api/agent-tree"],
       "evidence": [
         {
-          "source": "services/sportsdesk_webview_server.ts:1190-1193",
+          "source": "services/sportsdesk_webview_server.ts#GET /api/agent-tree",
           "kind": "implementation",
           "note": "Reads the committed tree, computes counts from loadLiveBets().agents, and gates on piiRejection for non-loopback peers."
         }

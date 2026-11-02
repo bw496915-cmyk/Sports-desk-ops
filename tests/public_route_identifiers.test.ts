@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DAEMON_ROUTES } from "../lib/daemon_routes.ts";
+import { startServer } from "../services/sportsdesk_webview_server.ts";
 
 /**
  * A public route must not serve an artifact that contains identifiers.
@@ -33,10 +34,15 @@ const KNOWN_IDENTIFIERS = [
   "RF2003",
   "BGD101",
   "CUB22HR",
-  "MM800",
   "BIGDAD",
   "ATEAM",
 ] as const;
+
+/**
+ * Deliberately absent: `MM800`. It appears in `design/domain-branded-types.ts` docstrings and in
+ * runbook examples, never in a captured artifact — including it made a 5/6 match look like a
+ * filtered subset rather than the whole live set.
+ */
 
 /**
  * Arm → the repo-relative file it serves, read from the source.
@@ -114,23 +120,20 @@ describe("public routes do not serve identifiers", () => {
   });
 
   test("no guard-free route serves an artifact containing a known identifier", () => {
-    const offenders: string[] = [];
-    for (const [path, file] of arms) {
-      const route = byPath.get(path);
-      if (route === undefined || route.guard !== "none") continue;
-      let text: string;
-      try {
-        text = readFileSync(resolve(ROOT, file), "utf8");
-      } catch {
-        continue; // artifact not present in this checkout
-      }
-      const found = KNOWN_IDENTIFIERS.filter((identifier) =>
-        text.includes(identifier),
-      );
-      if (found.length > 0)
-        offenders.push(`${path} serves ${file} with ${found.join(",")}`);
-    }
-    expect(offenders).toEqual([]);
+    expect(misclassified(arms, byPath)).toEqual([]);
+  });
+
+  test("the comparison detects a public route serving identifiers", () => {
+    // Fixture for the failure this test exists for: same arms, one row flipped to public.
+    const published = new Map(byPath);
+    published.set("/graph", {
+      path: "/graph",
+      method: "ANY",
+      guard: "none",
+      dataClass: "static",
+      surface: null,
+    });
+    expect(misclassified(arms, published).length).toBeGreaterThan(0);
   });
 
   test("the graph artifacts are recorded as customer-identifying", () => {
@@ -146,5 +149,141 @@ describe("public routes do not serve identifiers", () => {
       expect(route?.dataClass).toBe("customer-identifying");
       expect(route?.guard).not.toBe("none");
     }
+  });
+});
+
+/**
+ * The table against the world.
+ *
+ * The union above only proves the table is internally consistent: a route declared `aggregate`
+ * passes even when its response carries logins. `dataClass` is a declaration, so it needs a
+ * co-validating measurement — otherwise the check is two labels agreeing about a label, the same
+ * shape as `evidenceIsConcrete()` accepting any non-empty string.
+ *
+ * This calls the route with the selection its own artifact records and looks for the logins in
+ * the response. If it finds them, the route must be classified customer-identifying and guarded.
+ */
+describe("a route's declared dataClass matches its response", () => {
+  /** `data/analysis-*.json` records the selection it was captured for, in `context`. */
+  function analysisSelection(): string | undefined {
+    const dir = resolve(ROOT, "data");
+    const files = readdirSync(dir).filter(
+      (name) => name.startsWith("analysis-") && name.endsWith(".json"),
+    );
+    const file = files[0];
+    if (file === undefined) return undefined;
+    const artifact = JSON.parse(readFileSync(resolve(dir, file), "utf8")) as {
+      report?: string;
+      context?: Record<string, string>;
+    };
+    const context = artifact.context ?? {};
+    const params = new URLSearchParams({
+      report: artifact.report ?? "CP",
+      agent: context["agent"] ?? "",
+      sport: context["sport"] ?? "all",
+      week: context["week"] ?? "-1",
+      activity: context["activity"] ?? "0",
+    });
+    return params.toString();
+  }
+
+  test("/api/analysis returns the artifact's rows only from an identifying, guarded route", async () => {
+    const query = analysisSelection();
+    expect(query).toBeDefined();
+
+    const server = startServer({ port: 0, hostname: "127.0.0.1" });
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${server.port}/api/analysis?${query ?? ""}`,
+      );
+      const body = await response.text();
+      const rowLogins = readAnalysisRowLogins();
+      expect(rowLogins.length).toBeGreaterThan(0);
+      const leaked = rowLogins.filter((login) => body.includes(login));
+
+      if (leaked.length > 0) {
+        const route = DAEMON_ROUTES.find((r) => r.path === "/api/analysis");
+        expect(route?.dataClass).toBe("customer-identifying");
+        expect(route?.guard).not.toBe("none");
+      }
+    } finally {
+      server.stop(true);
+    }
+  });
+});
+
+/** Customer logins from the stored analysis artifact's rows. */
+function readAnalysisRowLogins(): string[] {
+  const dir = resolve(ROOT, "data");
+  const file = readdirSync(dir).find(
+    (name) => name.startsWith("analysis-") && name.endsWith(".json"),
+  );
+  if (file === undefined) return [];
+  const artifact = JSON.parse(readFileSync(resolve(dir, file), "utf8")) as {
+    rows?: { customer?: string }[];
+  };
+  return (artifact.rows ?? [])
+    .map((row) => row.customer)
+    .filter(
+      (login): login is string => typeof login === "string" && login.length > 0,
+    );
+}
+
+/** Routes whose artifact contains identifiers while the table calls them public. */
+function misclassified(
+  arms: Map<string, string>,
+  byPath: Map<string, { guard: string }>,
+): string[] {
+  const offenders: string[] = [];
+  for (const [path, file] of arms) {
+    const route = byPath.get(path);
+    if (route === undefined || route.guard !== "none") continue;
+    let text: string;
+    try {
+      text = readFileSync(resolve(ROOT, file), "utf8");
+    } catch {
+      continue; // artifact not present in this checkout
+    }
+    const found = KNOWN_IDENTIFIERS.filter((identifier) =>
+      text.includes(identifier),
+    );
+    if (found.length > 0)
+      offenders.push(`${path} serves ${file} with ${found.join(",")}`);
+  }
+  return offenders;
+}
+
+/**
+ * The extractor's own failure modes, as fixtures. Each one broke this test once; adding one is how
+ * the next discovery gets closed rather than remembered.
+ */
+describe("the arm extractor's failure modes", () => {
+  test("a multi-line `if (` condition is parsed, not skipped", () => {
+    const source = [
+      "      if (",
+      '        pathname === "/api/x" ||',
+      '        pathname === "/api/y"',
+      "      ) {",
+      '        return new Response(Bun.file(resolve(repoRoot, "docs/a.json")));',
+      "      }",
+    ].join("\n");
+    const arms = fileServingArms(source);
+    expect([...arms.keys()].sort()).toEqual(["/api/x", "/api/y"]);
+  });
+
+  test("an arm that reads a file without serving it is not counted", () => {
+    // /api/analysis reads data/agent-tree.json to answer `agentKnown`; the response is a boolean.
+    const source = [
+      '      if (pathname === "/api/z") {',
+      '        const tree = Bun.file(resolve(repoRoot, "data/agent-tree.json"));',
+      "        return Response.json({ known: await tree.exists() });",
+      "      }",
+    ].join("\n");
+    expect(fileServingArms(source).size).toBe(0);
+  });
+
+  test("an empty source yields no arms — which the real test treats as a failure, not a pass", () => {
+    expect(fileServingArms("").size).toBe(0);
+    // the committed-tree test asserts the scan finds at least four, so this cannot go unnoticed
   });
 });

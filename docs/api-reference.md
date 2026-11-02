@@ -184,7 +184,7 @@ Live-captured contract: 2026-10-31/getInfoPlayer.post.json (schemaVersion 1, mod
 
 ### `GET /api/agent-tree`
 
-> **Evidence — tier D** · sources: `services/sportsdesk_webview_server.ts:1190-1193` · response not captured
+> **Evidence — tier D** · sources: `services/sportsdesk_webview_server.ts#GET /api/agent-tree` · response not captured
 
 **Agent hierarchy joined with the wager rollup**
 

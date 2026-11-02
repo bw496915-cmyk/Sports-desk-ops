@@ -998,6 +998,18 @@ export function startServer(options?: ServerOptions) {
       }
 
       if (pathname === "/api/analysis") {
+        // The stored report's rows are customer logins (EGGT3, GOLD22, … TDFIRE) and the
+        // response carries them verbatim, so this is customer-identifying, not aggregate.
+        // Measured: GET /api/analysis?report=CP&agent=BILLY666&sport=Baseball&week=-1&activity=0
+        // returned 8/8 known logins in 2,899 bytes with no credential. Same policy as /graph:
+        // loopback keeps working, any other peer needs SPORTSDESK_ADMIN_TOKEN.
+        const rejected = piiRejection(req, server.requestIP(req)?.address);
+        if (rejected !== null) {
+          return Response.json(
+            { success: false, error: rejected.error },
+            { status: rejected.status, headers: corsHeaders },
+          );
+        }
         const parsed = parseAnalysisQuery(url.searchParams);
         if (!parsed.ok || parsed.selection === undefined) {
           return Response.json(

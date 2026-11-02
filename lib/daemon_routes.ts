@@ -79,8 +79,8 @@ export const DAEMON_ROUTES: readonly DaemonRoute[] = [
   defineRoute({
     path: "/api/analysis",
     method: "ANY",
-    guard: "none",
-    dataClass: "aggregate",
+    guard: "pii",
+    dataClass: "customer-identifying",
     surface: "surface.daemon-analysis",
   }),
   defineRoute({
