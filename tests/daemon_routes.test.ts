@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { DAEMON_PATHS, DAEMON_ROUTES } from "../lib/daemon_routes.ts";
+import {
+  DAEMON_PATHS,
+  DAEMON_ROUTES,
+  type DaemonRoute,
+} from "../lib/daemon_routes.ts";
 import {
   declaredPathsFromLedger,
   servedPathsFromSource,
@@ -47,13 +51,46 @@ describe("DAEMON_ROUTES", () => {
     expect(new Set(DAEMON_PATHS).size).toBe(DAEMON_PATHS.length);
   });
 
-  test("guards name a mechanism that exists in the handler", () => {
-    // The four values correspond to: the admin policy block, piiRejection, the webhook's own
-    // header check, and no auth. Anything else is a belief, and a belief in this column would
-    // read as protection the process does not have.
-    const allowed = new Set(["none", "admin", "pii", "telegram-secret"]);
-    for (const route of DAEMON_ROUTES)
-      expect(allowed.has(route.guard)).toBe(true);
+  test("a public route with customer data is a type error, not a review finding", () => {
+    // The union makes it unrepresentable: `PublicRoute.dataClass` excludes the identifying class.
+    // @ts-expect-error — a route with guard "none" may not declare customer-identifying data
+    const illegal: DaemonRoute = {
+      path: "/api/whoever",
+      method: "ANY",
+      guard: "none",
+      dataClass: "customer-identifying",
+      surface: null,
+    };
+    expect(illegal.path).toBe("/api/whoever");
+  });
+
+  test("the table contains no public route with customer data", () => {
+    // Runtime shadow of the same rule: types are erased once the table is data, so read it back
+    // as plain strings (the literal types make this comparison unreachable at compile time).
+    const rows = JSON.parse(JSON.stringify(DAEMON_ROUTES)) as {
+      path: string;
+      guard: string;
+      dataClass: string;
+    }[];
+    expect(
+      rows.filter(
+        (row) =>
+          row.guard === "none" && row.dataClass === "customer-identifying",
+      ),
+    ).toEqual([]);
+    expect(
+      rows.filter((row) => row.dataClass === "customer-identifying").length,
+    ).toBeGreaterThan(3);
+  });
+
+  test("every customer-identifying route is guarded, by admin or pii", () => {
+    const identifying = DAEMON_ROUTES.filter(
+      (route) => route.dataClass === "customer-identifying",
+    );
+    expect(identifying.length).toBeGreaterThan(3);
+    expect(
+      [...new Set(identifying.map((route) => route.guard))].sort(),
+    ).toEqual(["admin", "pii"]);
   });
 
   test("the admin policy covers /api/watchlist and the /api/telegram/ prefix", () => {
