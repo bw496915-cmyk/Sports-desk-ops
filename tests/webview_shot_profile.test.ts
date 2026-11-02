@@ -13,7 +13,6 @@ import {
   parseShotArgs,
   renderShotTable,
   ShotUsageError,
-  toFsPath,
 } from "../scripts/webview_shot_cli.ts";
 
 describe("parseShotArgs", () => {
@@ -38,6 +37,15 @@ describe("parseShotArgs", () => {
     ]) {
       expect(() => parseShotArgs(argv)).toThrow(ShotUsageError);
     }
+  });
+
+  test("--out and --profile take a file:// URL but refuse other schemes", () => {
+    expect(
+      parseShotArgs(["https://x", "--out=file:///tmp/a%20b.png"])?.out,
+    ).toBe("/tmp/a b.png");
+    expect(() =>
+      parseShotArgs(["https://x", "--profile", "https://evil.example/p"]),
+    ).toThrow("only local paths and file:// URLs are accepted, not https:");
   });
 
   test("a value flag with no value is a usage error", () => {
@@ -74,17 +82,6 @@ describe("parseSignedOutMarkers", () => {
     for (const value of [undefined, null, "login-form", { 0: "login-form" }]) {
       expect(parseSignedOutMarkers(value)).toEqual([]);
     }
-  });
-});
-
-describe("toFsPath", () => {
-  test("file:// URLs become paths, with percent-escapes decoded", () => {
-    expect(toFsPath("file:///tmp/a%20b/shot.png")).toBe("/tmp/a b/shot.png");
-  });
-
-  test("plain paths pass through, relative ones stay relative", () => {
-    expect(toFsPath("scratch/webview-profile")).toBe("scratch/webview-profile");
-    expect(toFsPath("/tmp/x.png")).toBe("/tmp/x.png");
   });
 });
 

@@ -16,6 +16,8 @@
 
 import { statSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { toLocalPath } from "../lib/local_path.ts";
+import { UsageError } from "../lib/usage_error.ts";
 import {
   formatKittyDirectEscape,
   kittyTransmission,
@@ -113,11 +115,6 @@ interface Options {
   json: boolean;
 }
 
-/** A path or a `file://` URL, as a filesystem path. */
-export function toFsPath(raw: string): string {
-  return raw.startsWith("file:") ? Bun.fileURLToPath(raw) : raw;
-}
-
 /** An integer in [min, max]; `undefined` when the flag was given out of range or not a number. */
 export function boundedInt(
   raw: string,
@@ -161,7 +158,7 @@ const SHOT_ARG_OPTIONS = {
 } as const;
 
 /** An argv the parser rejected: an unknown flag, a flag without its value, or a second URL. */
-export class ShotUsageError extends Error {
+export class ShotUsageError extends UsageError {
   override readonly name = "ShotUsageError";
 }
 
@@ -219,7 +216,7 @@ export function parseShotArgs(argv: readonly string[]): Options | null {
 
   return {
     url,
-    out: toFsPathOrNull(values.out ?? ""),
+    out: localPathOrNull(values.out ?? ""),
     width: Number.isFinite(width)
       ? Math.min(Math.max(width, 320), 16384)
       : 1440,
@@ -240,7 +237,7 @@ export function parseShotArgs(argv: readonly string[]): Options | null {
     timeoutMs: Number.isFinite(timeoutMs) ? Math.max(1000, timeoutMs) : 20_000,
     f402Login: values["f402-login"] === true,
     f402Page: values["f402-page"] ?? "/",
-    profile: toFsPathOrNull(values.profile ?? ""),
+    profile: localPathOrNull(values.profile ?? ""),
     thumb: thumbRaw === "" ? null : boundedInt(thumbRaw, 16, 2048),
     placeholder: values.placeholder === true,
     console: values.console === true,
@@ -250,8 +247,8 @@ export function parseShotArgs(argv: readonly string[]): Options | null {
   };
 }
 
-function toFsPathOrNull(raw: string): string | null {
-  return raw === "" ? null : toFsPath(raw);
+function localPathOrNull(raw: string): string | null {
+  return raw === "" ? null : toLocalPath(raw);
 }
 
 export async function runWebviewShot(argv: readonly string[]): Promise<void> {
@@ -259,7 +256,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
   try {
     options = parseShotArgs(argv);
   } catch (error) {
-    if (!(error instanceof ShotUsageError)) throw error;
+    if (!(error instanceof UsageError)) throw error;
     console.error(`webview-shot: ${error.message}\n`);
     console.error(HELP);
     process.exitCode = 2;
