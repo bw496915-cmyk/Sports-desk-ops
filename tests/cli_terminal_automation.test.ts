@@ -47,6 +47,27 @@ describe("Bun PTY terminal automation", () => {
     expect(result.out).toContain("is not a directory");
   });
 
+  test("dx shot rejects out-of-range --thumb and --retries before launching a browser", async () => {
+    const thumb = await spawnInPty([
+      "./bin/dx",
+      "shot",
+      "https://example.com",
+      "--thumb",
+      "8",
+    ]);
+    expect(thumb.code).toBe(2);
+    expect(thumb.out).toContain("--thumb must be an integer from 16 to 2048");
+    const retries = await spawnInPty([
+      "./bin/dx",
+      "shot",
+      "https://example.com",
+      "--retries",
+      "9",
+    ]);
+    expect(retries.code).toBe(2);
+    expect(retries.out).toContain("--retries must be an integer from 0 to 5");
+  });
+
   test("dx session defaults to the read-only status report", async () => {
     const result = await spawnInPty([
       "env",

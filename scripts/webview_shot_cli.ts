@@ -16,14 +16,18 @@
 
 import { statSync } from "node:fs";
 import { join } from "node:path";
-import { ManagedWebView } from "./capture/webview.ts";
+import {
+  ManagedWebView,
+  WebViewError,
+  type ConsoleLine,
+} from "./capture/webview.ts";
 import {
   parseResize,
   type ScreenshotEncoding,
 } from "../lib/screenshot_encode.ts";
 import { loginF402 } from "./capture/f402_login.ts";
 
-const HELP = `Bun.WebView screenshot tool
+const RAW_HELP = `Bun.WebView screenshot tool
 
 Usage:
   bun run scripts/webview_shot_cli.ts <url> [options]
@@ -31,7 +35,7 @@ Usage:
   bun run scripts/webview_shot_cli.ts --profile <dir> [--f402-page /manager.html]
 
 Options:
-  --out <path>            Output file (default scratch/shots/webview-<epoch>.<ext>)
+  --out <path>            Output file or file:// URL (default scratch/shots/webview-<uuidv7>.<ext>)
   --width <px>            Viewport width (default 1440)
   --height <px>           Viewport height (default 900)
   --backend <name>        webkit (macOS default/zero deps) or chrome
@@ -45,15 +49,28 @@ Options:
   --timeout-ms <ms>       Navigation/selector timeout (default 20000)
   --f402-login            Log in with F402_AGENT_ID / F402_PASSWORD before capturing
   --f402-page <path>      Navigate to this path after login (default /)
-  --profile <dir>         Reuse an existing WebView dataStore (e.g. scratch/webview-profile). With no
-                          URL it opens --f402-page on the portal; output adds signedOutMarkers
+  --profile <dir>         Reuse an existing WebView dataStore (path or file:// URL). With no URL it
+                          opens --f402-page on the portal; output adds signedOutMarkers
                           (login-form, session-expired; empty = neither seen)
+  --thumb <px>            Also write a WebP thumbnail (fits in px x px) next to the screenshot
+  --placeholder           Include the ThumbHash data: URL of the screenshot
+  --console               Include the page console (redacted, at most 200 lines)
+  --retries <0-5>         Retry a failed navigation, waiting 500ms x attempt (default 0)
+  --json                  JSON even on a terminal (pipes always get JSON)
   -h, --help
+
+On a terminal the file result prints as a Bun.inspect.table; --json, a pipe, or --encoding
+base64/buffer/shmem prints JSON.
 
 Login is opt-in: it requires F402_LIVE_LOGIN=1 plus the credential env vars. A screenshot of a public
 page does not require login. --profile only reads a profile's cookies; it never signs in by itself.
 Chrome and WebKit keep separate cookie stores in the same directory, so --backend must match the
 backend that signed in.`;
+
+const HELP =
+  process.stdout.columns === undefined
+    ? RAW_HELP
+    : Bun.wrapAnsi(RAW_HELP, process.stdout.columns, { wordWrap: true });
 
 interface Options {
   url: string | null;
@@ -72,6 +89,12 @@ interface Options {
   f402Login: boolean;
   f402Page: string;
   profile: string | null;
+  /** `undefined` = the flag's value was out of range. */
+  thumb: number | null | undefined;
+  placeholder: boolean;
+  console: boolean;
+  retries: number | undefined;
+  json: boolean;
 }
 
 /**
@@ -99,6 +122,54 @@ export function parseSignedOutMarkers(value: unknown): SignedOutMarker[] {
     (marker): marker is SignedOutMarker =>
       marker === "login-form" || marker === "session-expired",
   );
+}
+
+/** A path or a `file://` URL, as a filesystem path. */
+export function toFsPath(raw: string): string {
+  return raw.startsWith("file:") ? Bun.fileURLToPath(raw) : raw;
+}
+
+/** An integer in [min, max]; `undefined` when the flag was given out of range or not a number. */
+export function boundedInt(
+  raw: string,
+  min: number,
+  max: number,
+): number | undefined {
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= min && value <= max
+    ? value
+    : undefined;
+}
+
+const RETRY_BACKOFF_MS = 500;
+
+function isRetryable(error: unknown): boolean {
+  return (
+    error instanceof WebViewError &&
+    (error.code === "navigate-failed" || error.code === "load-timeout")
+  );
+}
+
+/** Retries only navigation failures and load timeouts; returns the number of attempts made. */
+export async function navigateWithRetry(
+  view: Pick<ManagedWebView, "navigate">,
+  url: string,
+  options: {
+    readonly timeoutMs: number;
+    readonly retries: number;
+    readonly sleep?: (ms: number) => Promise<void>;
+  },
+): Promise<number> {
+  const sleep = options.sleep ?? ((ms: number) => Bun.sleep(ms));
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await view.navigate(url, { timeoutMs: options.timeoutMs });
+      return attempt + 1;
+    } catch (error) {
+      if (attempt >= options.retries || !isRetryable(error)) throw error;
+      await sleep(RETRY_BACKOFF_MS * (attempt + 1));
+    }
+  }
 }
 
 function isDirectory(path: string): boolean {
@@ -139,6 +210,8 @@ function parseArgs(args: readonly string[]): Options {
     "--timeout-ms",
     "--f402-page",
     "--profile",
+    "--thumb",
+    "--retries",
   ]);
   let url: string | null = null;
   for (let index = 0; index < args.length; index += 1) {
@@ -176,6 +249,7 @@ function parseArgs(args: readonly string[]): Options {
   const backend: Options["backend"] =
     backendRaw === "chrome" ? "chrome" : "webkit";
   const resizeRaw = flag(args, ["--resize"], "");
+  const thumbRaw = flag(args, ["--thumb"], "");
 
   const width = Number(flag(args, ["--width"], "1440"));
   const height = Number(flag(args, ["--height"], "900"));
@@ -185,7 +259,7 @@ function parseArgs(args: readonly string[]): Options {
 
   return {
     url,
-    out: flag(args, ["--out"], "") || null,
+    out: toFsPathOrNull(flag(args, ["--out"], "")),
     width: Number.isFinite(width)
       ? Math.min(Math.max(width, 320), 16384)
       : 1440,
@@ -205,8 +279,17 @@ function parseArgs(args: readonly string[]): Options {
     timeoutMs: Number.isFinite(timeoutMs) ? Math.max(1000, timeoutMs) : 20_000,
     f402Login: args.includes("--f402-login"),
     f402Page: flag(args, ["--f402-page"], "/"),
-    profile: flag(args, ["--profile"], "") || null,
+    profile: toFsPathOrNull(flag(args, ["--profile"], "")),
+    thumb: thumbRaw === "" ? null : boundedInt(thumbRaw, 16, 2048),
+    placeholder: args.includes("--placeholder"),
+    console: args.includes("--console"),
+    retries: boundedInt(flag(args, ["--retries"], "0"), 0, 5),
+    json: args.includes("--json"),
   };
+}
+
+function toFsPathOrNull(raw: string): string | null {
+  return raw === "" ? null : toFsPath(raw);
 }
 
 export const DEFAULT_SHOT_DIR = "scratch/shots";
@@ -239,10 +322,22 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
     process.exitCode = 2;
     return;
   }
+  if (options.thumb === undefined) {
+    console.error("webview-shot: --thumb must be an integer from 16 to 2048");
+    process.exitCode = 2;
+    return;
+  }
+  if (options.retries === undefined) {
+    console.error("webview-shot: --retries must be an integer from 0 to 5");
+    process.exitCode = 2;
+    return;
+  }
+  const { thumb, retries } = options;
 
   const extension = options.format === "jpeg" ? "jpg" : options.format;
   const out =
-    options.out ?? join(DEFAULT_SHOT_DIR, `webview-${Date.now()}.${extension}`);
+    options.out ??
+    join(DEFAULT_SHOT_DIR, `webview-${Bun.randomUUIDv7()}.${extension}`);
 
   await using view = ManagedWebView.launch({
     backend: options.backend,
@@ -257,12 +352,14 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
       throw new Error("F402 login is opt-in: set F402_LIVE_LOGIN=1");
     }
     await loginF402(view, { timeoutMs: options.timeoutMs });
-    await view.navigate(f402Url(options.f402Page), {
+    await navigateWithRetry(view, f402Url(options.f402Page), {
       timeoutMs: options.timeoutMs,
+      retries,
     });
   } else {
-    await view.navigate(options.url ?? f402Url(options.f402Page), {
+    await navigateWithRetry(view, options.url ?? f402Url(options.f402Page), {
       timeoutMs: options.timeoutMs,
+      retries,
     });
   }
 
@@ -354,26 +451,97 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
   }
 
   const screenshot = await view.screenshotToFile(out, shotOptions);
-  const title = String((await view.evaluate("document.title")) ?? "");
-  const url = String((await view.evaluate("location.href")) ?? "");
+  const thumbPath =
+    thumb === null ? null : await writeThumb(screenshot.path, thumb);
+  const result: ShotFileResult = {
+    screenshot: screenshot.path,
+    bytes: screenshot.bytes,
+    sha256: screenshot.sha256,
+    mimeType: screenshot.mimeType,
+    backend: options.backend,
+    format: options.format,
+    encoding: options.encoding,
+    title: String((await view.evaluate("document.title")) ?? ""),
+    url: String((await view.evaluate("location.href")) ?? ""),
+    ...profileCheck,
+    ...(thumbPath === null ? {} : { thumb: thumbPath }),
+    ...(options.placeholder && screenshot.placeholder !== undefined
+      ? { placeholder: screenshot.placeholder }
+      : {}),
+    ...(options.console ? { console: view.consoleLog } : {}),
+  };
   console.log(
-    JSON.stringify(
-      {
-        screenshot: screenshot.path,
-        bytes: screenshot.bytes,
-        sha256: screenshot.sha256,
-        mimeType: screenshot.mimeType,
-        backend: options.backend,
-        format: options.format,
-        encoding: options.encoding,
-        title,
-        url,
-        ...profileCheck,
-      },
-      null,
-      2,
-    ),
+    options.json || process.stdout.isTTY !== true
+      ? JSON.stringify(result, null, 2)
+      : renderShotTable(result, process.stdout.isTTY === true),
   );
+}
+
+interface ShotFileResult extends Partial<ProfileCheck> {
+  readonly screenshot: string;
+  readonly bytes: number;
+  readonly sha256: string;
+  readonly mimeType: string;
+  readonly backend: Options["backend"];
+  readonly format: Options["format"];
+  readonly encoding: ScreenshotEncoding;
+  readonly title: string;
+  readonly url: string;
+  readonly thumb?: string;
+  readonly placeholder?: string;
+  readonly console?: readonly ConsoleLine[];
+}
+
+/** One row per field: a screenshot result is one record, and a wide single row wraps badly. */
+export function renderShotTable(
+  result: ShotFileResult,
+  colors: boolean,
+): string {
+  const rows: { field: string; value: string }[] = [
+    { field: "screenshot", value: result.screenshot },
+    { field: "bytes", value: String(result.bytes) },
+    { field: "sha256", value: result.sha256 },
+    { field: "backend", value: `${result.backend} (${result.format})` },
+    { field: "title", value: result.title },
+    { field: "url", value: result.url },
+  ];
+  if (result.signedOutMarkers !== undefined) {
+    rows.push({
+      field: "signedOutMarkers",
+      value:
+        result.signedOutMarkers.length === 0
+          ? "none seen"
+          : result.signedOutMarkers.join(", "),
+    });
+  }
+  if (result.thumb !== undefined)
+    rows.push({ field: "thumb", value: result.thumb });
+  if (result.placeholder !== undefined) {
+    rows.push({
+      field: "placeholder",
+      value: `data: URL, ${result.placeholder.length} chars (--json prints it)`,
+    });
+  }
+  if (result.console !== undefined) {
+    rows.push({
+      field: "console",
+      value: `${result.console.length} line(s) (--json prints them)`,
+    });
+  }
+  return Bun.inspect.table(
+    Object.fromEntries(rows.map(({ field, value }) => [field, { value }])),
+    ["value"],
+    { colors },
+  );
+}
+
+async function writeThumb(screenshotPath: string, px: number): Promise<string> {
+  const thumbPath = `${screenshotPath.replace(/\.[^./]+$/, "")}.thumb.webp`;
+  await new Bun.Image(Bun.file(screenshotPath))
+    .resize(px, px, { fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 80 })
+    .write(thumbPath);
+  return thumbPath;
 }
 
 if (import.meta.main) {
