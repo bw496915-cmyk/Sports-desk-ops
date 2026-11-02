@@ -10,6 +10,7 @@
 
 import { resolve } from "node:path";
 import { auditLedger } from "../lib/ledger_consistency.ts";
+import { loadManifestIndex } from "./apply_captures.ts";
 
 const root = resolve(import.meta.dir, "..");
 
@@ -23,7 +24,15 @@ const specPath = resolve(root, "docs/openapi.json");
 const ledger = await readJson(ledgerPath);
 const spec = await readJson(specPath).catch(() => undefined);
 
-const issues = auditLedger(ledger, spec);
+// The capture store decides whether a `capture:` citation resolves; loadManifestIndex already
+// recomputes every captureHash from the record, so a stale manifest cannot vouch for itself.
+const manifest = await loadManifestIndex(
+  resolve(root, "docs/evidence/captures"),
+);
+const issues = auditLedger(ledger, spec, {
+  root,
+  captureFiles: new Set(manifest.hashes.keys()),
+});
 if (issues.length === 0) {
   console.log("check:ledger-consistency: ok docs/evidence/ledger.json");
   process.exit(0);

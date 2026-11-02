@@ -15,6 +15,10 @@
  * generator that silently rewrites an evidence file is worse than a failing check.
  */
 
+import { existsSync, readFileSync } from "node:fs";
+import { Glob } from "bun";
+import { join } from "node:path";
+
 export type Issue = {
   readonly code:
     | "COUNTS_STALE"
@@ -22,6 +26,9 @@ export type Issue = {
     | "PROSE_STALE"
     | "SURFACE_FLAG_WRONG"
     | "SURFACE_FLAG_UNDOCUMENTED"
+    | "CAPTURE_REF_DANGLING"
+    | "CITATION_DANGLING"
+    | "CITATION_LINE_RANGE"
     | "SHAPE";
   readonly message: string;
 };
@@ -101,13 +108,86 @@ function specPathsOf(spec: unknown): Set<string> {
   return new Set(Object.keys(spec["paths"]));
 }
 
+const SKIP_DIRS = [
+  "node_modules/",
+  "lib/.tmp",
+  "dist/",
+  ".git/",
+  "Scratch/",
+] as const;
+
+/** Where a citation may be looked up, in order. */
+const CITATION_ROOTS = [
+  "",
+  "docs/runbooks",
+  "docs/evidence",
+  "docs",
+  "services",
+  "scripts",
+  "lib",
+  "tests",
+  "bin",
+  "schema",
+  "infra",
+] as const;
+
+/** `path/to/file.ext`, optionally with `:line` or `:line-endline`. */
+const CITATION =
+  /^([\w./-]+\.(?:ts|tsx|js|json|md|yml|yaml|html|sh))(?::(\d+)(?:-(\d+))?)?$/;
+
+export type AuditOptions = {
+  /** Repository root for resolving file citations. */
+  readonly root?: string;
+  /** Capture files that exist in the store, relative POSIX paths (`2026-10-31/x.post.json`). */
+  readonly captureFiles?: ReadonlySet<string>;
+};
+
+/**
+ * Resolve a cited file: exact path, then the known roots, then a unique basename anywhere in
+ * the repo. The basename step is what makes a citation survive a directory move — 34 ledger
+ * citations pointed at `operational_guardrails_runbook.md` after it moved under `docs/runbooks/`,
+ * and none of them had become false.
+ */
+export function resolveCitation(
+  file: string,
+  root: string,
+  index?: ReadonlyMap<string, string>,
+): string | undefined {
+  for (const dir of CITATION_ROOTS) {
+    const candidate = join(root, dir, file);
+    if (existsSync(candidate)) return candidate;
+  }
+  const base = file.split("/").pop() ?? file;
+  const hit = index?.get(base);
+  return hit === undefined ? undefined : join(root, hit);
+}
+
+/** Basename → repo-relative path, for citations that outlived a directory move. */
+export function basenameIndex(root: string): Map<string, string> {
+  const index = new Map<string, string>();
+  const ambiguous = new Set<string>();
+  for (const path of new Glob("**/*").scanSync({ cwd: root, dot: false })) {
+    if (SKIP_DIRS.some((dir) => path.startsWith(dir))) continue;
+    const base = path.split("/").pop() ?? path;
+    // Two files with the same basename make the lookup a guess, so neither is returned.
+    if (index.has(base)) ambiguous.add(base);
+    else index.set(base, path);
+  }
+  for (const base of ambiguous) index.delete(base);
+  return index;
+}
+
 /**
  * Every disagreement between the ledger's declared bookkeeping and its own rows.
  *
  * `spec` may be undefined when the spec is unavailable; the surface-flag checks are then
  * skipped rather than guessed, and the caller sees fewer issues, not false ones.
  */
-export function auditLedger(ledger: unknown, spec?: unknown): Issue[] {
+export function auditLedger(
+  ledger: unknown,
+  spec?: unknown,
+  options: AuditOptions = {},
+): Issue[] {
   const issues: Issue[] = [];
   if (!isRecord(ledger)) {
     return [{ code: "SHAPE", message: "ledger is not a JSON object" }];
@@ -241,7 +321,77 @@ export function auditLedger(ledger: unknown, spec?: unknown): Issue[] {
     }
   }
 
+  // 5. Evidence citations must name artifacts that exist. The ledger cited eight capture
+  //    hashes that matched nothing in the store, and 34 file paths that had moved — the tier-A
+  //    rows were the ones affected, which are the rows everything else rests on.
+  issues.push(...auditCitations(operations, options));
+
   return issues;
+}
+
+function auditCitations(
+  operations: readonly unknown[],
+  options: AuditOptions,
+): Issue[] {
+  const issues: Issue[] = [];
+  const captureFiles = options.captureFiles;
+  const root = options.root;
+
+  for (const row of operations) {
+    if (!isRecord(row) || !Array.isArray(row["evidence"])) continue;
+    const label = `${String(row["method"] ?? "").toUpperCase()} ${String(row["path"] ?? "")}`;
+    for (const entry of row["evidence"]) {
+      if (!isRecord(entry)) continue;
+      const source = typeof entry["source"] === "string" ? entry["source"] : "";
+
+      if (source.startsWith("capture:")) {
+        if (captureFiles === undefined) continue;
+        // Canonical form matches docs/openapi.json and the generated reference:
+        //   capture:<YYYY-MM-DD>/<file>.json
+        const target = source.slice("capture:".length);
+        if (!captureFiles.has(target)) {
+          issues.push({
+            code: "CAPTURE_REF_DANGLING",
+            message: `${label}: ${source} names no capture in docs/evidence/captures (expected capture:<date>/<file>)`,
+          });
+        }
+        continue;
+      }
+
+      if (root === undefined) continue;
+      const match = CITATION.exec(source);
+      if (match === null) continue;
+      const file = match[1] ?? "";
+      const resolved = resolveCitation(file, root);
+      if (resolved === undefined) {
+        issues.push({
+          code: "CITATION_DANGLING",
+          message: `${label}: cites ${file}, which is not in the repo`,
+        });
+        continue;
+      }
+      const start = match[2];
+      if (start !== undefined) {
+        const last = Number(match[3] ?? start);
+        const lines = countLines(resolved);
+        if (last > lines) {
+          issues.push({
+            code: "CITATION_LINE_RANGE",
+            message: `${label}: cites ${file}:${match[3] ?? start} but ${file} has ${lines} line(s)`,
+          });
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+function countLines(path: string): number {
+  try {
+    return readFileSync(path, "utf8").split("\n").length;
+  } catch {
+    return 0;
+  }
 }
 
 function describeMembers(

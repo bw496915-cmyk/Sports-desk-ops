@@ -27,7 +27,7 @@
       "missingFromSpec": "true when docs/openapi.json does not publish every path this surface lists — including a surface whose members are field names or CLI commands rather than routes, which the spec cannot model at all. False therefore means fully published. The boolean was previously read both ways; four rows disagreed until scripts/check_ledger_consistency.ts derived it.",
       "what / members / evidence / note": "Inventory, member routes, citations, caveats."
     },
-    "counts": "Operation counts by tier. A+B+C+D+E = total = 55. Surface counts are in surfaceCounts and are not mixed into counts. scripts/check_ledger_consistency.ts recomputes every number here — counts, surfaceCounts, countsByTag and the total below — from the rows, and `bun run verify:docs` runs it first.",
+    "counts": "Operation counts by tier. A+B+C+D+E = total = 55. Surface counts are in surfaceCounts and are not mixed into counts. scripts/check_ledger_consistency.ts recomputes every number here — counts, surfaceCounts, countsByTag and the total below — from the rows, and `bun run verify:docs` runs it first. It also resolves every evidence citation: a capture: source must name a file in docs/evidence/captures (capture:<date>/<file>, the same form docs/openapi.json uses), and a file:line source must resolve in the repo with the line inside the file.",
     "surfaceCounts": "Surface inventory counts by tier.",
     "countsByTag": "Operation tier counts per spec tag (convenience for P2/P3)."
   },
@@ -236,7 +236,7 @@
           "note": "Spec adds the request envelope (agentID, agentOwner, wagerNumber watermark, operation, RRO), the INFO/LIST response envelope and a TickerRowRecord schema; none is captured."
         },
         {
-          "source": "capture:2026-10-31:c4e00570156af990446e3a04b0e0a83534cfe2e527f6043772689aa43f00bab9",
+          "source": "capture:2026-10-31/getBetTicker.post.json",
           "kind": "capture",
           "note": "Live capture 2026-10-31T00:19:51.608Z from a 200 response (response bodySha256 6476f3f36fde99907c849cc28e3e8ccd7b1b63de43a3f659636c9664054bff5d); request and response were captured live with redaction clean (policy v1)."
         }
@@ -259,7 +259,7 @@
           "note": "No request, response, UI observation, or repo type exists for this operation. The path/schema in docs/openapi.json is authored; treat it as a proposal, not a contract."
         },
         {
-          "source": "capture:2026-10-31:a53fafa1faf10d14b04b8623aea7e46f486a811af78e92f0ecbb3e93b136787e",
+          "source": "capture:2026-10-31/getBetTickerConfig.post.json",
           "kind": "capture",
           "note": "Live capture 2026-10-31T00:19:51.741Z from a 200 response (response bodySha256 8e8fedd17bfabe36c7753dbdf7c5e71f5748adb1fd5b13fe4d8a1993b7ff686e); request and response were captured live with redaction clean (policy v1)."
         }
@@ -335,7 +335,7 @@
           "note": "Spec requires Authorization (BearerAuth), X-Requested-With, Accept and Referrer-Policy request headers, and publishes a 4-field array response at docs/openapi.json."
         },
         {
-          "source": "capture:2026-10-31:cee3df209782a3a3a2a79337405e275fb9c721553018fb230f7cb7b91b67a712",
+          "source": "capture:2026-10-31/getWebLog.post.json",
           "kind": "capture",
           "note": "Live capture 2026-10-31T00:19:51.204Z from a 200 response (response bodySha256 979266c4b6abea5fff0de99966ece0363c5354859c92f5260870ea9507d2abaf); request and response were captured live with redaction clean (policy v1)."
         }
@@ -436,7 +436,7 @@
           "note": "Spec example sends the 11-char padded customerID 'CB112_1    ' and publishes a Result{CurrentBalance,PendingAmount,CreditLimit,confirmationDelaySeconds,wagerLimitRiskCents} response."
         },
         {
-          "source": "capture:2026-10-31:431608dd2be731ced2f80a6e440bed58117bee975a30318171555ef607818597",
+          "source": "capture:2026-10-31/getInfoPlayer.post.json",
           "kind": "capture",
           "note": "Live capture 2026-10-31T00:19:51.314Z from a 200 response (response bodySha256 3eeb9db890d90b53b1c51cf04b7d9c3a47cba5f4c64eac3b541e7f50d39a37e1); request and response were captured live with redaction clean (policy v1)."
         }
@@ -492,7 +492,7 @@
           "note": "Claim under test lives in docs/openapi.json; it has no supporting artifact."
         },
         {
-          "source": "capture:2026-10-31:25d21f67f9a02310114a597b09cd45ae286ffbc46e0ec3ac8dac4a93bb1f4606",
+          "source": "capture:2026-10-31/getSportsVigSetup.post.json",
           "kind": "capture",
           "note": "Live capture 2026-10-31T00:19:53.742Z from a 200 response (response bodySha256 9e34409b3ae72b41bea2421597ae611453b419fa9ff197ccd09ca6627fb4b677); request and response were captured live with redaction clean (policy v1)."
         }
@@ -1577,7 +1577,7 @@
           "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
         },
         {
-          "source": "capture:2026-11-01:f247cb829d114dd1b2ba10ba2a52a3c9124aa1522d9bf01c91155693589daa47",
+          "source": "capture:2026-11-01/Pending.post.json",
           "kind": "capture",
           "note": "Live capture 2026-11-01T02:22:35.774Z from a 200 response (response bodySha256 6c65708478ad70ca3286c68cb0e32e400998d7f4c9fed2f8c614084315e2c277); request and response were captured live with redaction clean (policy v1)."
         }
@@ -1669,7 +1669,7 @@
           "note": "[OBSERVED] Cross-prefix routing (2026-11-01): deobfuscated customer/report/report.js listed getTransactions alongside Report reads, but live probing showed POST /cloud/api/Report/getTransactions returns HTTP 500 (0 B) both with and without customerID=H1716, whereas POST /cloud/api/Manager/getTransactions returns HTTP 200 (11 B {\"LIST\":\"\"})."
         },
         {
-          "source": "capture:2026-11-01:f367fe25112898b2a5e654fd74e82586ae9bc41dc5415adae3d122677b937b32",
+          "source": "capture:2026-11-01/getTransactions.post.json",
           "kind": "capture",
           "note": "[A-empty] Live capture 2026-11-01T02:07:42.209Z from a 200 response (response bodySha256 b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c); request and response were captured live with redaction clean (policy v1). Envelope-only 200 response ({\"LIST\":\"\"}); item row schema is unverified beyond the outer LIST envelope until a capture with rows is recorded. Cross-prefix routing observed: POST /cloud/api/Manager/getTransactions returns 200 while POST /cloud/api/Report/getTransactions returns 500."
         }
@@ -1692,7 +1692,7 @@
           "note": "[UNVERIFIED] Endpoint name and method extracted from the deobfuscated customer/report/report.js registry; no request or response was captured. The operator runbook advertises modes on this surface. Treat as a candidate, not a contract."
         },
         {
-          "source": "capture:2026-11-01:766265b07e8a3e8d5b7f8271c99411e9b544f8c695b169b90c9a95fb2bc1c819",
+          "source": "capture:2026-11-01/getGrading.post.json",
           "kind": "capture",
           "note": "[A-empty] Live capture 2026-11-01T02:22:35.993Z from a 200 response (response bodySha256 b94c156e0df3642d4283373c789a45ccf6d7e81b9997e44517fa19ff3f09dc9c); request and response were captured live with redaction clean (policy v1). Envelope-only 200 response ({\"LIST\":\"\"}); item row schema is unverified beyond the outer LIST envelope until a capture with rows is recorded."
         }

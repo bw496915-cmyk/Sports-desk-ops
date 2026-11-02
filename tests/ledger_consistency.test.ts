@@ -7,7 +7,9 @@ import {
   countTiers,
   deriveMissingFromSpec,
   memberPath,
+  resolveCitation,
 } from "../lib/ledger_consistency.ts";
+import { loadManifestIndex } from "../scripts/apply_captures.ts";
 
 /**
  * The ledger is the SSOT the docs gate trusts, and nothing checked it against itself. Three
@@ -236,10 +238,93 @@ describe("auditLedger", () => {
   });
 });
 
+describe("citation audit", () => {
+  const captureFiles = new Set(["2026-10-31/getBetTicker.post.json"]);
+
+  // The fixture's other bookkeeping (tag counts, prose total) does not describe this single row,
+  // so these assertions look only at citation findings.
+  const citationIssues = (
+    source: string,
+    options?: Parameters<typeof auditLedger>[2],
+  ) =>
+    auditLedger(
+      ledgerWith({
+        operations: [
+          {
+            method: "get",
+            path: "/a",
+            tier: "A",
+            tag: "Tag One",
+            evidence: [{ source }],
+          },
+        ],
+      }),
+      {},
+      options,
+    ).filter(
+      (issue) =>
+        issue.code.startsWith("CAPTURE") || issue.code.startsWith("CITATION"),
+    );
+
+  test("a capture citation must name a file in the store", () => {
+    // The pre-fix ledger cited capture:<date>:<sha256> ids that matched nothing at all.
+    const issues = citationIssues("capture:2026-10-31:deadbeef", {
+      captureFiles,
+    });
+    expect(issues.map((issue) => issue.code)).toContain("CAPTURE_REF_DANGLING");
+    expect(issues[0]?.message).toContain("expected capture:<date>/<file>");
+  });
+
+  test("the canonical capture form resolves", () => {
+    expect(
+      citationIssues("capture:2026-10-31/getBetTicker.post.json", {
+        captureFiles,
+      }),
+    ).toEqual([]);
+  });
+
+  test("a cited file that is nowhere in the repo is reported", () => {
+    const issues = citationIssues("lib/does_not_exist.ts:1", { root: ROOT });
+    expect(issues.map((issue) => issue.code)).toContain("CITATION_DANGLING");
+  });
+
+  test("a citation that moved directories still resolves", () => {
+    // This is the 34-row failure mode: operational_guardrails_runbook.md moved to docs/runbooks/.
+    expect(
+      resolveCitation("operational_guardrails_runbook.md", ROOT),
+    ).toContain("docs/runbooks/operational_guardrails_runbook.md");
+  });
+
+  test("a line range past the end of the file is reported", () => {
+    const issues = citationIssues("docs/EVIDENCE.md:99999", { root: ROOT });
+    expect(issues.map((issue) => issue.code)).toContain("CITATION_LINE_RANGE");
+  });
+
+  test("a real citation with a line range is accepted", () => {
+    expect(citationIssues("docs/EVIDENCE.md:1-2", { root: ROOT })).toEqual([]);
+  });
+
+  test("without a capture store or root the citation checks are skipped", () => {
+    // Skipped, not guessed: a missing store must not turn every capture into a false finding.
+    expect(citationIssues("capture:2026-10-31:deadbeef")).toEqual([]);
+    expect(citationIssues("lib/does_not_exist.ts:1")).toEqual([]);
+  });
+});
+
 describe("the committed ledger", () => {
-  test("is internally consistent and agrees with docs/openapi.json", () => {
-    // This is the regression: it fails on the ledger as it stood before the fix (4 issues).
-    expect(auditLedger(ledger, spec)).toEqual([]);
+  test("is internally consistent, agrees with the spec, and cites artifacts that exist", async () => {
+    // The regression, at full strength: counts, tag counts, prose total, surface flags, capture
+    // references and file citations. It fails on the ledger as it stood (12 issues: 4 numbers,
+    // 8 capture ids that named no capture).
+    const manifest = await loadManifestIndex(
+      resolve(ROOT, "docs/evidence/captures"),
+    );
+    expect(
+      auditLedger(ledger, spec, {
+        root: ROOT,
+        captureFiles: new Set(manifest.hashes.keys()),
+      }),
+    ).toEqual([]);
   });
 
   test("every surface id is unique", () => {
