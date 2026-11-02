@@ -15,13 +15,7 @@
  */
 
 import { statSync } from "node:fs";
-import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import {
-  ManagedWebView,
-  WebViewError,
-  type ConsoleLine,
-} from "./capture/webview.ts";
 import {
   formatKittyDirectEscape,
   kittyTransmission,
@@ -29,11 +23,15 @@ import {
   type ScreenshotEncoding,
 } from "../lib/screenshot_encode.ts";
 import {
-  describeCookiesForHost,
-  type CookieMetadata,
-} from "./capture/cookies.ts";
-import { loginF402 } from "./capture/f402_login.ts";
-import { hostOf } from "./capture/ops.ts";
+  captureShotFile,
+  checkProfile,
+  defaultShotPath,
+  openShotView,
+  screenshotOptions,
+  type ShotBackend,
+  type ShotFileResult,
+  type ShotFormat,
+} from "./capture/shot.ts";
 
 const RAW_HELP = `Bun.WebView screenshot tool
 
@@ -90,8 +88,8 @@ interface Options {
   out: string | null;
   width: number;
   height: number;
-  backend: "webkit" | "chrome";
-  format: "png" | "jpeg" | "webp";
+  backend: ShotBackend;
+  format: ShotFormat;
   encoding: ScreenshotEncoding;
   kitty: boolean;
   kittyDirect: boolean;
@@ -112,33 +110,6 @@ interface Options {
   json: boolean;
 }
 
-/**
- * What a signed-out portal shows: the login form at `/`, and a "Your session has expired" dialog on
- * `/manager.html` (both seen 2026-11-02 with an empty WebKit profile).
- */
-export type SignedOutMarker = "login-form" | "session-expired";
-
-/** Present only with --profile: what the page showed, not a claim that the session is valid. */
-interface ProfileCheck {
-  readonly profile: string;
-  readonly signedOutMarkers: readonly SignedOutMarker[];
-}
-
-const SIGNED_OUT_MARKERS = `(() => {
-  const markers = [];
-  if (document.querySelector("input[type=password]") !== null) markers.push("login-form");
-  if (/session has expired/i.test(document.body?.innerText ?? "")) markers.push("session-expired");
-  return markers;
-})()`;
-
-export function parseSignedOutMarkers(value: unknown): SignedOutMarker[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (marker): marker is SignedOutMarker =>
-      marker === "login-form" || marker === "session-expired",
-  );
-}
-
 /** A path or a `file://` URL, as a filesystem path. */
 export function toFsPath(raw: string): string {
   return raw.startsWith("file:") ? Bun.fileURLToPath(raw) : raw;
@@ -156,49 +127,8 @@ export function boundedInt(
     : undefined;
 }
 
-const RETRY_BACKOFF_MS = 500;
-
-function isRetryable(error: unknown): boolean {
-  return (
-    error instanceof WebViewError &&
-    (error.code === "navigate-failed" || error.code === "load-timeout")
-  );
-}
-
-/** Retries only navigation failures and load timeouts; returns the number of attempts made. */
-export async function navigateWithRetry(
-  view: Pick<ManagedWebView, "navigate">,
-  url: string,
-  options: {
-    readonly timeoutMs: number;
-    readonly retries: number;
-    readonly sleep?: (ms: number) => Promise<void>;
-  },
-): Promise<number> {
-  const sleep = options.sleep ?? ((ms: number) => Bun.sleep(ms));
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      await view.navigate(url, { timeoutMs: options.timeoutMs });
-      return attempt + 1;
-    } catch (error) {
-      if (attempt >= options.retries || !isRetryable(error)) throw error;
-      await sleep(RETRY_BACKOFF_MS * (attempt + 1));
-    }
-  }
-}
-
 function isDirectory(path: string): boolean {
   return statSync(path, { throwIfNoEntry: false })?.isDirectory() === true;
-}
-
-function f402BaseUrl(): string {
-  return (
-    process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
-  ).replace(/\/$/, "");
-}
-
-function f402Url(page: string): string {
-  return `${f402BaseUrl()}${page.startsWith("/") ? page : `/${page}`}`;
 }
 
 const SHOT_ARG_OPTIONS = {
@@ -321,8 +251,6 @@ function toFsPathOrNull(raw: string): string | null {
   return raw === "" ? null : toFsPath(raw);
 }
 
-export const DEFAULT_SHOT_DIR = "scratch/shots";
-
 export async function runWebviewShot(argv: readonly string[]): Promise<void> {
   let options: Options | null;
   try {
@@ -376,77 +304,25 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
     process.exitCode = 2;
     return;
   }
-  const { thumb, retries } = options;
-
-  const extension = options.format === "jpeg" ? "jpg" : options.format;
-  const out =
-    options.out ??
-    join(DEFAULT_SHOT_DIR, `webview-${Bun.randomUUIDv7()}.${extension}`);
-
-  await using view = ManagedWebView.launch({
-    backend: options.backend,
-    width: options.width,
-    height: options.height,
-    navigateTimeoutMs: options.timeoutMs,
-    ...(options.profile === null ? {} : { dataStoreDir: options.profile }),
-  });
-
-  if (options.f402Login) {
-    if (process.env.F402_LIVE_LOGIN?.trim() !== "1") {
-      throw new Error("F402 login is opt-in: set F402_LIVE_LOGIN=1");
-    }
-    await loginF402(view, { timeoutMs: options.timeoutMs });
-    await navigateWithRetry(view, f402Url(options.f402Page), {
-      timeoutMs: options.timeoutMs,
-      retries,
-    });
-  } else {
-    await navigateWithRetry(view, options.url ?? f402Url(options.f402Page), {
-      timeoutMs: options.timeoutMs,
-      retries,
-    });
+  if (options.encoding === "shmem" && options.format !== "png") {
+    console.error(
+      `webview-shot: --encoding shmem captures a PNG shared-memory segment, so --format ${options.format} has no effect.`,
+    );
+    console.error(
+      "  Pass --format png (the default) or use --encoding blob/base64 for another format.",
+    );
+    process.exitCode = 2;
+    return;
   }
+  const request = {
+    ...options,
+    thumb: options.thumb,
+    retries: options.retries,
+  };
 
-  if (options.waitSelector !== null) {
-    await view.waitForSelector(options.waitSelector, {
-      timeoutMs: options.timeoutMs,
-    });
-  }
-  if (options.waitMs > 0) await Bun.sleep(options.waitMs);
-
-  const profileCheck: ProfileCheck | null =
-    options.profile === null
-      ? null
-      : {
-          profile: options.profile,
-          signedOutMarkers: parseSignedOutMarkers(
-            await view.evaluate(SIGNED_OUT_MARKERS),
-          ),
-        };
-
-  const shotOptions =
-    options.format === "png"
-      ? {
-          format: "png" as const,
-          ...(options.resize === null ? {} : { resize: options.resize }),
-        }
-      : {
-          format: options.format,
-          quality: options.quality,
-          ...(options.resize === null ? {} : { resize: options.resize }),
-        };
+  await using view = await openShotView(request);
 
   if (options.encoding === "shmem") {
-    if (options.format !== "png") {
-      console.error(
-        `webview-shot: --encoding shmem captures a PNG shared-memory segment, so --format ${options.format} has no effect.`,
-      );
-      console.error(
-        "  Pass --format png (the default) or use --encoding blob/base64 for another format.",
-      );
-      process.exitCode = 2;
-      return;
-    }
     if (
       options.kitty &&
       (options.kittyDirect ||
@@ -466,7 +342,8 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
   }
 
   if (options.encoding === "base64") {
-    const b64 = await view.screenshotBase64(shotOptions);
+    const profileCheck = await checkProfile(view, options.profile);
+    const b64 = await view.screenshotBase64(screenshotOptions(request));
     console.log(
       JSON.stringify(
         {
@@ -485,7 +362,8 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
   }
 
   if (options.encoding === "buffer") {
-    const blob = await view.screenshotBlob(shotOptions);
+    const profileCheck = await checkProfile(view, options.profile);
+    const blob = await view.screenshotBlob(screenshotOptions(request));
     const bytes = new Uint8Array(await blob.arrayBuffer());
     console.log(
       JSON.stringify(
@@ -503,57 +381,15 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
     return;
   }
 
-  const screenshot = await view.screenshotToFile(out, shotOptions);
-  const thumbPath =
-    thumb === null ? null : await writeThumb(screenshot.path, thumb);
-  const result: ShotFileResult = {
-    screenshot: screenshot.path,
-    screenshotUrl: Bun.pathToFileURL(resolve(screenshot.path)).href,
-    bytes: screenshot.bytes,
-    sha256: screenshot.sha256,
-    mimeType: screenshot.mimeType,
-    backend: options.backend,
-    format: options.format,
-    encoding: options.encoding,
-    title: String((await view.evaluate("document.title")) ?? ""),
-    url: String((await view.evaluate("location.href")) ?? ""),
-    ...profileCheck,
-    ...(thumbPath === null ? {} : { thumb: thumbPath }),
-    ...(options.placeholder && screenshot.placeholder !== undefined
-      ? { placeholder: screenshot.placeholder }
-      : {}),
-    ...(options.console ? { console: view.consoleLog } : {}),
-    ...(options.cookies
-      ? {
-          cookies: describeCookiesForHost(
-            await view.getAllCookies(),
-            hostOf(f402BaseUrl()),
-          ),
-        }
-      : {}),
-  };
+  const result = await captureShotFile(view, {
+    ...request,
+    out: options.out ?? defaultShotPath(options.format),
+  });
   console.log(
     options.json || process.stdout.isTTY !== true
       ? JSON.stringify(result, null, 2)
       : renderShotTable(result, process.stdout.isTTY === true),
   );
-}
-
-interface ShotFileResult extends Partial<ProfileCheck> {
-  readonly screenshot: string;
-  readonly screenshotUrl: string;
-  readonly bytes: number;
-  readonly sha256: string;
-  readonly mimeType: string;
-  readonly backend: Options["backend"];
-  readonly format: Options["format"];
-  readonly encoding: ScreenshotEncoding;
-  readonly title: string;
-  readonly url: string;
-  readonly thumb?: string;
-  readonly placeholder?: string;
-  readonly console?: readonly ConsoleLine[];
-  readonly cookies?: readonly CookieMetadata[];
 }
 
 /** One row per field: a screenshot result is one record, and a wide single row wraps badly. */
@@ -608,15 +444,6 @@ export function renderShotTable(
     ["value"],
     { colors },
   );
-}
-
-async function writeThumb(screenshotPath: string, px: number): Promise<string> {
-  const thumbPath = `${screenshotPath.replace(/\.[^./]+$/, "")}.thumb.webp`;
-  await new Bun.Image(Bun.file(screenshotPath))
-    .resize(px, px, { fit: "inside", withoutEnlargement: true })
-    .webp({ quality: 80 })
-    .write(thumbPath);
-  return thumbPath;
 }
 
 if (import.meta.main) {

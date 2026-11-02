@@ -5,10 +5,12 @@ import {
   type WebViewErrorCode,
 } from "../scripts/capture/webview.ts";
 import {
-  boundedInt,
   navigateWithRetry,
-  parseShotArgs,
   parseSignedOutMarkers,
+} from "../scripts/capture/shot.ts";
+import {
+  boundedInt,
+  parseShotArgs,
   renderShotTable,
   ShotUsageError,
   toFsPath,

@@ -74,6 +74,7 @@
     "wagers:score-coverage": "bun run scripts/wager_score_coverage.ts",
     "session:login": "bun run scripts/session_login.ts",
     "session:status": "bun run scripts/session_login.ts --status",
+    "mcp:dx": "bun run scripts/mcp_dx_server.ts",
     "cli": "bun run cli/sportsdesk_cli.ts",
     "replay": "bun run cli/sportsdesk_replay_cli.ts",
     "ingestion:enrich-xml-golden": "bun run scripts/enrich_ingestion_jsonl_xml_golden.ts",
@@ -224,8 +225,10 @@
     "bun": "1.4.4"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
     "cytoscape": "3.30.2",
     "cytoscape-elk": "2.3.0",
-    "elkjs": "0.12.1"
+    "elkjs": "0.12.1",
+    "zod": "4.6.7"
   }
 }
