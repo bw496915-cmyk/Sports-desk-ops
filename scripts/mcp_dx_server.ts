@@ -21,8 +21,11 @@ import {
   captureShotFile,
   DEFAULT_SHOT_DIR,
   defaultShotPath,
+  describeShotError,
   openShotView,
+  withView,
   type ShotFileRequest,
+  type ShotFileResult,
 } from "./capture/shot.ts";
 import { WebViewError } from "./capture/webview.ts";
 
@@ -58,6 +61,13 @@ export const SHOT_INPUT = {
     .optional()
     .describe("Include the redacted page console (at most 200 lines)"),
   retries: z.number().int().min(0).max(5).optional(),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(1000)
+    .max(120_000)
+    .optional()
+    .describe("Navigation and selector timeout (default 20000)"),
 };
 
 type ShotInput = z.infer<z.ZodObject<typeof SHOT_INPUT>>;
@@ -77,7 +87,7 @@ export function shotRequest(input: ShotInput): ShotFileRequest {
     resize: null,
     waitSelector: input.waitSelector ?? null,
     waitMs: 250,
-    timeoutMs: 20_000,
+    timeoutMs: input.timeoutMs ?? 20_000,
     retries: input.retries ?? 0,
     f402Login: false,
     f402Page: "/",
@@ -89,27 +99,59 @@ export function shotRequest(input: ShotInput): ShotFileRequest {
   };
 }
 
+/** The file result minus what {@link shotRequest} never asks for. */
+export type McpShotResult = Omit<
+  ShotFileResult,
+  "profile" | "signedOutMarkers" | "cookies"
+>;
+
+/** Keys and types are checked against {@link McpShotResult}: a field added there fails here. */
+const SHOT_OUTPUT = {
+  screenshot: z.string(),
+  screenshotUrl: z.string(),
+  bytes: z.number().int(),
+  sha256: z.string(),
+  mimeType: z.string(),
+  backend: z.enum(["webkit", "chrome"]),
+  format: z.enum(["png", "jpeg", "webp"]),
+  encoding: z.enum(["blob", "buffer", "base64", "shmem"]),
+  title: z.string(),
+  url: z.string(),
+  thumb: z.string().optional(),
+  placeholder: z.string().optional(),
+  console: z
+    .array(
+      z.object({ level: z.enum(["log", "error", "warn"]), text: z.string() }),
+    )
+    .optional(),
+} satisfies {
+  readonly [K in keyof Required<McpShotResult>]: z.ZodType<McpShotResult[K]>;
+};
+
+export function captureForMcp(
+  request: ShotFileRequest,
+): Promise<McpShotResult> {
+  return withView(
+    () => openShotView(request),
+    (view) => captureShotFile(view, request),
+  );
+}
+
 export async function runShotTool(
   input: ShotInput,
-  capture: (request: ShotFileRequest) => Promise<unknown> = async (request) => {
-    await using view = await openShotView(request);
-    // `await using` disposes on return, so the capture must settle first.
-    return await captureShotFile(view, request);
-  },
+  capture: (request: ShotFileRequest) => Promise<McpShotResult> = captureForMcp,
 ): Promise<CallToolResult> {
   try {
     const result = await capture(shotRequest(input));
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    return {
+      structuredContent: { ...result },
+      content: [{ type: "text", text: JSON.stringify(result) }],
+    };
   } catch (error) {
     if (!(error instanceof WebViewError)) throw error;
     return {
       isError: true,
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({ error: error.code, message: error.message }),
-        },
-      ],
+      content: [{ type: "text", text: describeShotError(error) }],
     };
   }
 }
@@ -125,8 +167,16 @@ export function createDxMcpServer(): McpServer {
     {
       title: "Capture a page",
       description:
-        "Open a public http(s) URL in Bun.WebView and write a screenshot under scratch/shots/. Returns the dx shot --json result: screenshot path, screenshotUrl, sha256, title, final url, and optional thumb, placeholder and console.",
+        "Open a public http(s) URL in Bun.WebView and write a new screenshot under scratch/shots/. Returns the dx shot --json result: screenshot path, screenshotUrl, sha256, title, final url, and optional thumb, placeholder and console. Each call writes a new file.",
       inputSchema: SHOT_INPUT,
+      outputSchema: SHOT_OUTPUT,
+      annotations: {
+        title: "Capture page screenshot",
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     (input) => runShotTool(input),
   );

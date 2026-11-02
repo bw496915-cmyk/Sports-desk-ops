@@ -5,7 +5,12 @@
  */
 
 import { join, resolve } from "node:path";
-import { ManagedWebView, WebViewError, type ConsoleLine } from "./webview.ts";
+import {
+  ManagedWebView,
+  WebViewError,
+  type ConsoleLine,
+  type WebViewErrorCode,
+} from "./webview.ts";
 import { describeCookiesForHost, type CookieMetadata } from "./cookies.ts";
 import { loginF402 } from "./f402_login.ts";
 import { hostOf } from "./ops.ts";
@@ -84,6 +89,33 @@ export function parseSignedOutMarkers(value: unknown): SignedOutMarker[] {
     (marker): marker is SignedOutMarker =>
       marker === "login-form" || marker === "session-expired",
   );
+}
+
+const SHOT_ERROR_HINTS: Readonly<Record<WebViewErrorCode, string>> = {
+  "launch-failed":
+    "check that the backend is installed (chrome needs a Chrome/Chromium binary)",
+  "unsupported-backend": "use backend webkit (macOS) or chrome",
+  "invalid-url": "pass an absolute http(s) URL",
+  "invalid-selector": "pass a CSS selector such as #app, not a pixel count",
+  "navigate-failed": "check the host is reachable, or retry with retries 1-5",
+  "load-timeout":
+    "retry with a higher timeout or retries 1-5, or check the host",
+  "selector-timeout":
+    "the selector never matched: check it against the page, or raise the timeout",
+  "evaluate-failed": "the page script failed; capture without the page check",
+  "fill-failed": "the field was not fillable; check the selector",
+  "click-failed": "the element was not clickable; check the selector",
+  "press-failed": "pass a key name such as Enter",
+  "scroll-failed": "the page could not scroll; capture without scrolling",
+  "screenshot-failed": "retry once; if it repeats, try the other backend",
+  "cdp-failed": "the command needs backend chrome",
+  "cookies-failed": "cookies need backend chrome",
+  closed: "the view closed before the capture finished; retry",
+};
+
+/** `code: message. hint` — the one failure line both `dx shot` and the MCP tool print. */
+export function describeShotError(error: WebViewError): string {
+  return `${error.code}: ${error.message}. Next: ${SHOT_ERROR_HINTS[error.code]}`;
 }
 
 const RETRY_BACKOFF_MS = 500;
@@ -174,8 +206,36 @@ export async function openShotView(
   }
 }
 
+/** What {@link captureShotFile} needs from a view. */
+export type ShotFileView = Pick<
+  ManagedWebView,
+  "evaluate" | "screenshotToFile" | "consoleLog" | "getAllCookies"
+>;
+
+let viewSlot: Promise<void> = Promise.resolve();
+
+/**
+ * Opens a view, runs `use`, and disposes the view only after `use` settles. One view at a time per
+ * process: Bun.WebView is not safe to drive concurrently, and the MCP SDK dispatches tool calls
+ * without waiting for the previous one. A failed call frees the slot for the next.
+ */
+export function withView<V extends AsyncDisposable, T>(
+  open: () => Promise<V>,
+  use: (view: V) => Promise<T>,
+): Promise<T> {
+  const run = viewSlot.then(async () => {
+    await using view = await open();
+    return await use(view);
+  });
+  viewSlot = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export async function checkProfile(
-  view: ManagedWebView,
+  view: Pick<ManagedWebView, "evaluate">,
   profile: string | null,
 ): Promise<ProfileCheck | null> {
   return profile === null
@@ -196,7 +256,7 @@ export function screenshotOptions(request: ShotRequest) {
 }
 
 export async function captureShotFile(
-  view: ManagedWebView,
+  view: ShotFileView,
   request: ShotFileRequest,
 ): Promise<ShotFileResult> {
   const profileCheck = await checkProfile(view, request.profile);

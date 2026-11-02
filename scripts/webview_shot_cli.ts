@@ -22,12 +22,15 @@ import {
   parseResize,
   type ScreenshotEncoding,
 } from "../lib/screenshot_encode.ts";
+import { ManagedWebView, WebViewError } from "./capture/webview.ts";
 import {
   captureShotFile,
   checkProfile,
   defaultShotPath,
+  describeShotError,
   openShotView,
   screenshotOptions,
+  withView,
   type ShotBackend,
   type ShotFileResult,
   type ShotFormat,
@@ -314,14 +317,26 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
     process.exitCode = 2;
     return;
   }
-  const request = {
+  const request: ValidOptions = {
     ...options,
     thumb: options.thumb,
     retries: options.retries,
   };
+  await withView(
+    () => openShotView(request),
+    (view) => emitShot(view, request),
+  );
+}
 
-  await using view = await openShotView(request);
+type ValidOptions = Omit<Options, "thumb" | "retries"> & {
+  readonly thumb: number | null;
+  readonly retries: number;
+};
 
+async function emitShot(
+  view: ManagedWebView,
+  options: ValidOptions,
+): Promise<void> {
   if (options.encoding === "shmem") {
     if (
       options.kitty &&
@@ -343,7 +358,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
 
   if (options.encoding === "base64") {
     const profileCheck = await checkProfile(view, options.profile);
-    const b64 = await view.screenshotBase64(screenshotOptions(request));
+    const b64 = await view.screenshotBase64(screenshotOptions(options));
     console.log(
       JSON.stringify(
         {
@@ -363,7 +378,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
 
   if (options.encoding === "buffer") {
     const profileCheck = await checkProfile(view, options.profile);
-    const blob = await view.screenshotBlob(screenshotOptions(request));
+    const blob = await view.screenshotBlob(screenshotOptions(options));
     const bytes = new Uint8Array(await blob.arrayBuffer());
     console.log(
       JSON.stringify(
@@ -382,7 +397,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
   }
 
   const result = await captureShotFile(view, {
-    ...request,
+    ...options,
     out: options.out ?? defaultShotPath(options.format),
   });
   console.log(
@@ -449,7 +464,13 @@ export function renderShotTable(
 if (import.meta.main) {
   runWebviewShot(process.argv.slice(2)).catch((error: unknown) => {
     console.error(
-      `webview-shot: ${error instanceof Error ? error.message : String(error)}`,
+      `webview-shot: ${
+        error instanceof WebViewError
+          ? describeShotError(error)
+          : error instanceof Error
+            ? error.message
+            : String(error)
+      }`,
     );
     process.exitCode = 1;
   });

@@ -7,6 +7,7 @@ import {
   createDxMcpServer,
   runShotTool,
   shotRequest,
+  type McpShotResult,
 } from "../scripts/mcp_dx_server.ts";
 
 async function connectedClient(): Promise<Client> {
@@ -17,6 +18,19 @@ async function connectedClient(): Promise<Client> {
   await client.connect(clientTransport);
   return client;
 }
+
+const RESULT: McpShotResult = {
+  screenshot: "/tmp/s.png",
+  screenshotUrl: "file:///tmp/s.png",
+  bytes: 10,
+  sha256: "ab".repeat(32),
+  mimeType: "image/png",
+  backend: "webkit",
+  format: "png",
+  encoding: "blob",
+  title: "Example Domain",
+  url: "https://example.com/",
+};
 
 describe("dx MCP server", () => {
   test("lists exactly the shot tool, with no login, profile, cookie or path input", async () => {
@@ -34,6 +48,31 @@ describe("dx MCP server", () => {
     ]) {
       expect(keys).not.toContain(forbidden);
     }
+    await client.close();
+  });
+
+  test("declares it writes files, never deletes, and is not idempotent", async () => {
+    const client = await connectedClient();
+    const [tool] = (await client.listTools()).tools;
+    expect(tool!.annotations).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    });
+    await client.close();
+  });
+
+  test("publishes an output schema for the file result", async () => {
+    const client = await connectedClient();
+    const [tool] = (await client.listTools()).tools;
+    expect(tool!.outputSchema?.type).toBe("object");
+    expect(tool!.outputSchema?.required).toEqual(
+      expect.arrayContaining(["screenshot", "screenshotUrl", "sha256", "url"]),
+    );
+    expect(Object.keys(tool!.outputSchema?.properties ?? {})).not.toContain(
+      "cookies",
+    );
     await client.close();
   });
 
@@ -68,41 +107,49 @@ describe("shotRequest", () => {
       /\/scratch\/shots\/webview-[0-9a-f-]{36}\.jpg$/,
     );
   });
+
+  test("timeoutMs passes through, defaulting to the CLI's 20000", () => {
+    expect(shotRequest({ url: "https://example.com" }).timeoutMs).toBe(20_000);
+    expect(
+      shotRequest({ url: "https://example.com", timeoutMs: 45_000 }).timeoutMs,
+    ).toBe(45_000);
+  });
 });
 
 describe("runShotTool", () => {
-  test("returns the capture result as one JSON text block", async () => {
+  test("returns structuredContent plus the same JSON as text", async () => {
     const result = await runShotTool(
       { url: "https://example.com" },
-      async () => ({
-        screenshot: "/tmp/s.png",
-      }),
+      async () => RESULT,
     );
     expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toEqual({ ...RESULT });
     expect(result.content).toEqual([
-      { type: "text", text: '{"screenshot":"/tmp/s.png"}' },
+      { type: "text", text: JSON.stringify(RESULT) },
     ]);
   });
 
-  test("a WebView failure becomes an error result carrying its code", async () => {
-    const result = await runShotTool(
-      { url: "https://example.com" },
-      async () => {
-        throw new WebViewError("load-timeout", "timed out after 20000ms");
-      },
+  test("a WebView failure is an isError result naming the code, reason and next step", async () => {
+    const result = await runShotTool({ url: "https://example.com" }, () =>
+      Promise.reject(
+        new WebViewError("load-timeout", "load did not finish in 20000ms"),
+      ),
     );
     expect(result.isError).toBe(true);
-    expect(JSON.parse((result.content[0] as { text: string }).text)).toEqual({
-      error: "load-timeout",
-      message: "timed out after 20000ms",
-    });
+    expect(result.structuredContent).toBeUndefined();
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: "load-timeout: load did not finish in 20000ms. Next: retry with a higher timeout or retries 1-5, or check the host",
+      },
+    ]);
   });
 
   test("any other error propagates to the SDK", async () => {
     await expect(
-      runShotTool({ url: "https://example.com" }, async () => {
-        throw new TypeError("bug");
-      }),
+      runShotTool({ url: "https://example.com" }, () =>
+        Promise.reject(new TypeError("bug")),
+      ),
     ).rejects.toThrow("bug");
   });
 });
