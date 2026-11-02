@@ -19,6 +19,9 @@
  */
 export type Guard = "none" | "admin" | "pii" | "telegram-secret";
 
+/** Alias kept for imports that read better as "which guard does this route have". */
+export type RouteGuard = Guard;
+
 export type DataClass =
   /** markup or assets whose data arrives from a guarded API */
   | "static"

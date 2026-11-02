@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   compareRouteSurfaces,
   declaredPathsFromLedger,
+  type DeclaredPath,
   memberPath,
   readRouteSurfaceInputs,
   servedPathsFromSource,
@@ -86,7 +87,7 @@ describe("specPathsFromDocument", () => {
 });
 
 describe("compareRouteSurfaces", () => {
-  const declared = new Map([
+  const declared: Map<string, DeclaredPath> = new Map([
     ["/api/known", { surface: "surface.local", category: "local-route" }],
     ["/api/gone", { surface: "surface.local", category: "local-route" }],
     [
@@ -127,7 +128,7 @@ describe("compareRouteSurfaces", () => {
   });
 
   test("pages are not drift — but a declared page that vanished still is", () => {
-    const withPage = new Map([
+    const withPage: Map<string, DeclaredPath> = new Map([
       ...declared,
       ["/graph", { surface: "surface.graph", category: "local-route" }],
     ]);

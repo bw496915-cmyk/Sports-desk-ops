@@ -45,11 +45,60 @@ export function servedPathsFromSource(source: string): Set<string> {
   return paths;
 }
 
+/**
+ * The ledger's surface categories, as a union rather than `string`.
+ *
+ * `category: string` compiled happily with a typo, and the comparison that decides whether a path
+ * must be served here (`category !== "local-route"`) would then silently classify a local route as
+ * something else. The ledger is the authoritative list; `"unknown"` exists only so an unrecognised
+ * value is reported rather than coerced into a real category.
+ */
+export type SurfaceCategory =
+  | "catalog"
+  | "upstream-route"
+  | "local-route"
+  | "blocked-contract"
+  | "documented-not-implemented"
+  | "unknown";
+
+const SURFACE_CATEGORIES: readonly SurfaceCategory[] = [
+  "catalog",
+  "upstream-route",
+  "local-route",
+  "blocked-contract",
+  "documented-not-implemented",
+];
+
+export function parseSurfaceCategory(value: unknown): SurfaceCategory {
+  return typeof value === "string" &&
+    (SURFACE_CATEGORIES as readonly string[]).includes(value)
+    ? (value as SurfaceCategory)
+    : "unknown";
+}
+
 export type DeclaredPath = {
   readonly surface: string;
   /** `local-route` paths are served by this daemon; `upstream-route` ones are proxied elsewhere. */
-  readonly category: string;
+  readonly category: SurfaceCategory;
 };
+
+/** One ledger surface, parsed rather than cast: the JSON is external data at this boundary. */
+export type ParsedSurface = {
+  readonly id: string;
+  readonly category: SurfaceCategory;
+  readonly members: readonly unknown[];
+};
+
+export function parseLedgerSurface(value: unknown): ParsedSurface | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const members = record["members"];
+  return {
+    id: typeof record["id"] === "string" ? record["id"] : "surface",
+    category: parseSurfaceCategory(record["category"]),
+    members: Array.isArray(members) ? members : [],
+  };
+}
 
 /** Paths declared by the ledger's surfaces[], with the surface and category that declare them. */
 export function declaredPathsFromLedger(
@@ -59,20 +108,14 @@ export function declaredPathsFromLedger(
   if (typeof ledger !== "object" || ledger === null) return declared;
   const surfaces = (ledger as { surfaces?: unknown }).surfaces;
   if (!Array.isArray(surfaces)) return declared;
-  for (const surface of surfaces) {
-    if (typeof surface !== "object" || surface === null) continue;
-    const record = surface as {
-      id?: unknown;
-      category?: unknown;
-      members?: unknown;
-    };
-    const id = typeof record.id === "string" ? record.id : "surface";
-    const category =
-      typeof record.category === "string" ? record.category : "unknown";
-    if (!Array.isArray(record.members)) continue;
-    for (const member of record.members) {
+  for (const value of surfaces) {
+    const surface = parseLedgerSurface(value);
+    if (surface === null) continue;
+    for (const member of surface.members) {
       const path = memberPath(member);
-      if (path !== undefined) declared.set(path, { surface: id, category });
+      if (path !== undefined) {
+        declared.set(path, { surface: surface.id, category: surface.category });
+      }
     }
   }
   return declared;
