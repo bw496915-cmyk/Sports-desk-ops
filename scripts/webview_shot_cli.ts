@@ -22,6 +22,8 @@ import {
   type ConsoleLine,
 } from "./capture/webview.ts";
 import {
+  formatKittyDirectEscape,
+  kittyTransmission,
   parseResize,
   type ScreenshotEncoding,
 } from "../lib/screenshot_encode.ts";
@@ -46,7 +48,10 @@ Options:
   --backend <name>        webkit (macOS default/zero deps) or chrome
   --format <name>         png | jpeg | webp (webp is re-encoded via Bun.Image on webkit)
   --encoding <name>       blob (default, mmap-backed on webkit) | buffer | base64 | shmem
-  --kitty                 Write Kitty graphics protocol t=s escape sequence (implies --encoding shmem)
+  --kitty                 Show the screenshot inline in a Kitty-protocol terminal (PNG only). Uses
+                          shared memory (t=s) locally, and direct transmission (t=d) on Windows or
+                          over SSH, where the terminal cannot read this machine's shared memory
+  --kitty-direct          --kitty, always with direct transmission
   --resize <WxH|W>        Resize with Bun.Image after capture
   --quality <1-100>       jpeg/webp quality (default 82)
   --wait-selector <css>   Wait for this selector before the screenshot
@@ -88,6 +93,7 @@ interface Options {
   format: "png" | "jpeg" | "webp";
   encoding: ScreenshotEncoding;
   kitty: boolean;
+  kittyDirect: boolean;
   quality: number;
   resize: { width: number; height?: number } | null;
   waitSelector: string | null;
@@ -239,7 +245,8 @@ function parseArgs(args: readonly string[]): Options {
   const formatRaw = flag(args, ["--format"], "png").toLowerCase();
   const format: Options["format"] =
     formatRaw === "jpeg" || formatRaw === "webp" ? formatRaw : "png";
-  const kitty = args.includes("--kitty");
+  const kittyDirect = args.includes("--kitty-direct");
+  const kitty = kittyDirect || args.includes("--kitty");
   const encodingRaw = flag(
     args,
     ["--encoding"],
@@ -281,6 +288,7 @@ function parseArgs(args: readonly string[]): Options {
     format,
     encoding,
     kitty,
+    kittyDirect,
     quality: Number.isFinite(quality)
       ? Math.min(Math.max(quality, 1), 100)
       : 82,
@@ -420,6 +428,15 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
         "  Pass --format png (the default) or use --encoding blob/base64 for another format.",
       );
       process.exitCode = 2;
+      return;
+    }
+    if (
+      options.kitty &&
+      (options.kittyDirect ||
+        kittyTransmission(process.platform, process.env) === "direct")
+    ) {
+      const png = await view.screenshotBase64({ format: "png" });
+      process.stdout.write(formatKittyDirectEscape(png.base64));
       return;
     }
     const shmem = await view.screenshotShmem();
