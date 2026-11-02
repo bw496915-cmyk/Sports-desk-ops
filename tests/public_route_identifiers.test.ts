@@ -29,20 +29,36 @@ const SOURCE = readFileSync(
 );
 
 /** Identifiers known to appear in this repo's captured artifacts. */
-const KNOWN_IDENTIFIERS = [
+/**
+ * Identifier detection is shape-based, with a small known list for the logins that have no digits.
+ *
+ * Measured over this repo's artifacts, the loose shape `\b[A-Z][A-Z0-9]{2,15}\b` does not
+ * separate the classes at all — benign `data/contests.json` yields 41 distinct tokens (MLB, NBA,
+ * OVER, TOTAL…) against 9 for the identifying analysis artifact. The F402 login shape does:
+ *
+ *   identifying: 5, 17, 49, 50, 503 distinct tokens
+ *   benign:      0,  0,  0,  0
+ *
+ * Letters-only logins (TDFIRE, NICHOLAS, UNITED) have no digits, so they are named explicitly.
+ * `MM800` is deliberately absent: it appears only in docstrings and runbook examples, never in a
+ * captured artifact — including it once turned a complete 5/5 match into "5/6".
+ */
+const LOGIN_SHAPE = /\b[A-Z]{2,6}\d{2,5}[A-Z]{0,3}\b/g;
+const LETTERS_ONLY_LOGINS = [
   "BILLY666",
-  "RF2003",
-  "BGD101",
-  "CUB22HR",
   "BIGDAD",
   "ATEAM",
-] as const;
+  "TDFIRE",
+  "NICHOLAS",
+  "UNITED",
+];
 
-/**
- * Deliberately absent: `MM800`. It appears in `design/domain-branded-types.ts` docstrings and in
- * runbook examples, never in a captured artifact — including it made a 5/6 match look like a
- * filtered subset rather than the whole live set.
- */
+/** Tokens in `text` that look like F402 logins. */
+function suspiciousIdentifiers(text: string): string[] {
+  const shaped = text.match(LOGIN_SHAPE) ?? [];
+  const named = LETTERS_ONLY_LOGINS.filter((login) => text.includes(login));
+  return [...new Set([...shaped, ...named])];
+}
 
 /**
  * Arm → the repo-relative file it serves, read from the source.
@@ -244,11 +260,12 @@ function misclassified(
     } catch {
       continue; // artifact not present in this checkout
     }
-    const found = KNOWN_IDENTIFIERS.filter((identifier) =>
-      text.includes(identifier),
-    );
-    if (found.length > 0)
-      offenders.push(`${path} serves ${file} with ${found.join(",")}`);
+    const found = suspiciousIdentifiers(text);
+    if (found.length > 0) {
+      offenders.push(
+        `${path} serves ${file} with ${found.length} identifier(s)`,
+      );
+    }
   }
   return offenders;
 }
@@ -286,4 +303,37 @@ describe("the arm extractor's failure modes", () => {
     expect(fileServingArms("").size).toBe(0);
     // the committed-tree test asserts the scan finds at least four, so this cannot go unnoticed
   });
+});
+
+/**
+ * The detector, calibrated against artifacts whose contents are known.
+ *
+ * Without this, the shape regex is an unverified belief: a pattern that matches everything would
+ * make the route checks fire on every page, and one that matches nothing would pass forever.
+ */
+describe("the identifier detector separates the two classes", () => {
+  const cases: { path: string; identifying: boolean }[] = [
+    { path: "docs/graph.html", identifying: true },
+    { path: "docs/graph-live-feed.json", identifying: true },
+    { path: "data/analysis-cp-baseball-2026-11-01.json", identifying: true },
+    { path: "data/live-wagers.json", identifying: true },
+    { path: "docs/index.html", identifying: false },
+    { path: "data/scoreboard.json", identifying: false },
+    { path: "data/sports-catalog.json", identifying: false },
+    { path: "data/contests.json", identifying: false },
+  ];
+
+  for (const item of cases) {
+    test(`${item.path} is ${item.identifying ? "identifying" : "benign"}`, () => {
+      let text: string;
+      try {
+        text = readFileSync(resolve(ROOT, item.path), "utf8");
+      } catch {
+        return; // artifact absent from this checkout
+      }
+      const found = suspiciousIdentifiers(text);
+      if (item.identifying) expect(found.length).toBeGreaterThan(0);
+      else expect(found).toEqual([]);
+    });
+  }
 });
