@@ -9,13 +9,16 @@
  */
 
 import { resolve } from "node:path";
+import { DAEMON_PATHS } from "../lib/daemon_routes.ts";
 import {
   compareRouteSurfaces,
   readRouteSurfaceInputs,
 } from "../lib/route_surface.ts";
 
 const root = resolve(import.meta.dir, "..");
-const { served, declared, spec } = readRouteSurfaceInputs(root);
+// The table is the source; the extractor in readRouteSurfaceInputs is now only a test guard.
+const { declared, spec } = readRouteSurfaceInputs(root);
+const served = new Set(DAEMON_PATHS);
 const findings = compareRouteSurfaces({ served, declared, spec });
 
 if (findings.length === 0) {
