@@ -21,13 +21,14 @@ describe("configFormat", () => {
     expect(configFormat("desk.JSON5")).toBe("json5");
     expect(configFormat(".yaml")).toBe("yaml");
     expect(configFormat("dir/.desk.yml")).toBe("yaml");
+    expect(configFormat("desk.TOML")).toBe("toml");
   });
 
   test("no extension, a dotted directory or an unknown extension is a usage error, not JSON5", () => {
     for (const [path, shown] of [
       ["config", "(none)"],
       ["conf.d/settings", "(none)"],
-      ["desk.toml", '".toml"'],
+      ["desk.ini", '".ini"'],
       ["desk.yaml.bak", '".bak"'],
     ] as const) {
       expect(() => configFormat(path)).toThrow(UsageError);
@@ -62,6 +63,34 @@ describe("parseConfig", () => {
     expect(() => parseConfig("{a:", "json5")).toThrow(
       "config: JSON5 Parse error:",
     );
+    expect(() => parseConfig("a = 1\na = 2\n", "toml", "desk.toml")).toThrow(
+      "desk.toml: TOML Parse error: Cannot redefine key 'a'",
+    );
+  });
+
+  test("TOML dates are Temporal values, which z.date() rejects and z.instanceof accepts", () => {
+    const value = parseConfig("since = 2026-11-02\n", "toml");
+    expect(() =>
+      validateConfig(value, z.strictObject({ since: z.date() }), "desk.toml"),
+    ).toThrow(
+      "desk.toml: since: Invalid input: expected date, received PlainDate",
+    );
+    // TypeScript 5.9 and bun-types 1.4.4 declare no Temporal global; the runtime has one.
+    const { Temporal } = globalThis as unknown as {
+      Temporal: { PlainDate: new () => { toString(): string } };
+    };
+    const parsed = validateConfig(
+      value,
+      z.strictObject({ since: z.instanceof(Temporal.PlainDate) }),
+    );
+    expect(parsed.since.toString()).toBe("2026-11-02");
+  });
+
+  test("TOML inf and nan fail a plain z.number()", () => {
+    const value = parseConfig("a = inf\nb = nan\n", "toml");
+    expect(() =>
+      validateConfig(value, z.strictObject({ a: z.number(), b: z.number() })),
+    ).toThrow(/a: .*; b: /);
   });
 
   test("a multi-document YAML stream comes back as an array, which an array schema cannot tell from one list", () => {
@@ -88,14 +117,17 @@ describe("readConfig", () => {
   };
   const VALID = "name: desk\ntimeoutMs: 1\nenabled: true\n";
 
-  test("reads, parses and validates; YAML and JSON5 give the same value", async () => {
+  test("reads, parses and validates; YAML, JSON5 and TOML give the same value", async () => {
     const yaml = join(dir, "desk.yaml");
     const json5 = join(dir, "desk.json5");
+    const toml = join(dir, "desk.toml");
     await Bun.write(yaml, "name: desk\ntimeoutMs: 20000\nenabled: true\n");
     await Bun.write(json5, "{name: 'desk', timeoutMs: 20000, enabled: true,}");
+    await Bun.write(toml, 'name = "desk"\ntimeoutMs = 20000\nenabled = true\n');
     const expected = { name: "desk", timeoutMs: 20_000, enabled: true };
     expect(await readConfig(yaml, Desk)).toEqual(expected);
     expect(await readConfig(json5, Desk)).toEqual(expected);
+    expect(await readConfig(toml, Desk)).toEqual(expected);
   });
 
   test("schema failures name the file and every bad field", async () => {
@@ -150,20 +182,27 @@ describe("readConfig", () => {
         `${path}: config is empty`,
       );
     }
-    const comments = await write("comments.yaml", "# nothing yet\n");
-    await expect(readConfig(comments, Desk)).rejects.toThrow(
-      `${comments}: config has no content`,
-    );
+    for (const name of ["comments.yaml", "comments.toml"]) {
+      const comments = await write(name, "# nothing yet\n");
+      await expect(readConfig(comments, Desk)).rejects.toThrow(
+        `${comments}: config has no content`,
+      );
+    }
   });
 
-  test("a UTF-8 BOM parses in both formats", async () => {
+  test("a UTF-8 BOM parses in every format", async () => {
     const yaml = await write("bom.yaml", `\uFEFF${VALID}`);
     const json5 = await write(
       "bom.json5",
       "\uFEFF{name: 'desk', timeoutMs: 1, enabled: true}",
     );
+    const toml = await write(
+      "bom.toml",
+      '\uFEFFname = "desk"\ntimeoutMs = 1\nenabled = true\n',
+    );
     expect((await readConfig(yaml, Desk)).name).toBe("desk");
     expect((await readConfig(json5, Desk)).name).toBe("desk");
+    expect((await readConfig(toml, Desk)).name).toBe("desk");
   });
 
   test("a file:// URL reads the file; other schemes are refused before any read", async () => {

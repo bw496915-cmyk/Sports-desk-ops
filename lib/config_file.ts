@@ -1,5 +1,6 @@
 /**
- * Config files as JSON5 or YAML, parsed with Bun.JSON5 / Bun.YAML and validated with a zod schema.
+ * Config files as JSON5, YAML or TOML, parsed with Bun.JSON5 / Bun.YAML / Bun.TOML and validated
+ * with a zod schema.
  *
  * Bun's parse errors carry no line or column ("YAML Parse error: Unexpected token", Bun 1.4.4), so
  * every message here leads with the file path: it is the only location the operator gets.
@@ -7,6 +8,12 @@
  * Schemas should be `z.strictObject` at every level: zod's default strips unknown keys, so a typo
  * (`thub:` for `thumb:`) would validate clean and do nothing. {@link validateConfig} refuses a
  * stripping top-level object; nested objects are the schema author's to make strict.
+ *
+ * TOML date/times parse to Temporal objects (Instant, PlainDateTime, PlainDate, PlainTime), which
+ * `z.date()` rejects; validate them with `z.instanceof(Temporal.PlainDate)` and so on (the global
+ * exists at runtime but TypeScript 5.9 and bun-types 1.4.4 do not declare it, so reach it through
+ * `globalThis`). This module only reads: `Bun.TOML.stringify` drops comments and reorders keys,
+ * so it must not back a writer for hand-edited files.
  */
 
 import { stat } from "node:fs/promises";
@@ -15,7 +22,7 @@ import { z } from "zod";
 import { toLocalPath } from "./local_path.ts";
 import { UsageError } from "./usage_error.ts";
 
-export type ConfigFormat = "json5" | "yaml";
+export type ConfigFormat = "json5" | "yaml" | "toml";
 
 /** JSON and JSONC are subsets of JSON5, so all three go through Bun.JSON5. */
 const FORMAT_BY_EXTENSION: Readonly<Record<string, ConfigFormat>> = {
@@ -24,7 +31,27 @@ const FORMAT_BY_EXTENSION: Readonly<Record<string, ConfigFormat>> = {
   ".json5": "json5",
   ".yaml": "yaml",
   ".yml": "yaml",
+  ".toml": "toml",
 };
+
+const PARSE: Readonly<Record<ConfigFormat, (raw: string) => unknown>> = {
+  json5: (raw) => Bun.JSON5.parse(raw),
+  yaml: (raw) => Bun.YAML.parse(raw),
+  toml: (raw) => Bun.TOML.parse(raw),
+};
+
+/** A comment-only document: YAML reads it as null, TOML as an empty table. */
+function hasNoContent(format: ConfigFormat, value: unknown): boolean {
+  if (format === "yaml") return value === null;
+  if (format === "toml") {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      Object.keys(value).length === 0
+    );
+  }
+  return false;
+}
 
 /** Throws {@link UsageError} for a path whose extension is not a supported config format. */
 export function configFormat(path: string): ConfigFormat {
@@ -55,12 +82,12 @@ export function parseConfig(
   if (raw.trim() === "") throw new UsageError(`${source}: config is empty`);
   let value: unknown;
   try {
-    value = format === "yaml" ? Bun.YAML.parse(raw) : Bun.JSON5.parse(raw);
+    value = PARSE[format](raw);
   } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
     throw new UsageError(`${source}: ${error.message}`, { cause: error });
   }
-  if (format === "yaml" && value === null) {
+  if (hasNoContent(format, value)) {
     throw new UsageError(
       `${source}: config has no content (only comments, or a bare null)`,
     );
