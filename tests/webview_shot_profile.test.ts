@@ -152,4 +152,32 @@ describe("renderShotTable", () => {
     expect(text).not.toContain("AAAA");
     expect(text).not.toContain("hello");
   });
+
+  test("cookies show as a count and names", () => {
+    const cookie = {
+      domain: ".fantasy402.com",
+      path: "/",
+      httpOnly: true,
+      secure: true,
+    };
+    const text = renderShotTable(
+      {
+        ...base,
+        cookies: [
+          {
+            ...cookie,
+            name: "agent",
+            expires: "2026-11-01T00:00:00.000Z",
+            expired: true,
+          },
+          { ...cookie, name: "session", expires: "session", expired: false },
+        ],
+      },
+      false,
+    );
+    expect(text).toContain("2 portal (1 expired): agent, session");
+    expect(renderShotTable({ ...base, cookies: [] }, false)).toContain(
+      "no portal cookies",
+    );
+  });
 });

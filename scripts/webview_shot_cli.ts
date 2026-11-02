@@ -25,7 +25,12 @@ import {
   parseResize,
   type ScreenshotEncoding,
 } from "../lib/screenshot_encode.ts";
+import {
+  describeCookiesForHost,
+  type CookieMetadata,
+} from "./capture/cookies.ts";
 import { loginF402 } from "./capture/f402_login.ts";
+import { hostOf } from "./capture/ops.ts";
 
 const RAW_HELP = `Bun.WebView screenshot tool
 
@@ -55,6 +60,8 @@ Options:
   --thumb <px>            Also write a WebP thumbnail (fits in px x px) next to the screenshot
   --placeholder           Include the ThumbHash data: URL of the screenshot
   --console               Include the page console (redacted, at most 200 lines)
+  --cookies               Chrome only: the portal's cookies as name, domain, path, expiry and
+                          flags. Values are never printed
   --retries <0-5>         Retry a failed navigation, waiting 500ms x attempt (default 0)
   --json                  JSON even on a terminal (pipes always get JSON)
   -h, --help
@@ -93,6 +100,7 @@ interface Options {
   thumb: number | null | undefined;
   placeholder: boolean;
   console: boolean;
+  cookies: boolean;
   retries: number | undefined;
   json: boolean;
 }
@@ -176,11 +184,14 @@ function isDirectory(path: string): boolean {
   return statSync(path, { throwIfNoEntry: false })?.isDirectory() === true;
 }
 
-function f402Url(page: string): string {
-  const baseUrl = (
+function f402BaseUrl(): string {
+  return (
     process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
   ).replace(/\/$/, "");
-  return `${baseUrl}${page.startsWith("/") ? page : `/${page}`}`;
+}
+
+function f402Url(page: string): string {
+  return `${f402BaseUrl()}${page.startsWith("/") ? page : `/${page}`}`;
 }
 
 function flag(
@@ -283,6 +294,7 @@ function parseArgs(args: readonly string[]): Options {
     thumb: thumbRaw === "" ? null : boundedInt(thumbRaw, 16, 2048),
     placeholder: args.includes("--placeholder"),
     console: args.includes("--console"),
+    cookies: args.includes("--cookies"),
     retries: boundedInt(flag(args, ["--retries"], "0"), 0, 5),
     json: args.includes("--json"),
   };
@@ -329,6 +341,13 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
   }
   if (options.retries === undefined) {
     console.error("webview-shot: --retries must be an integer from 0 to 5");
+    process.exitCode = 2;
+    return;
+  }
+  if (options.cookies && options.backend !== "chrome") {
+    console.error(
+      "webview-shot: --cookies reads cookies over CDP, which only --backend chrome has",
+    );
     process.exitCode = 2;
     return;
   }
@@ -469,6 +488,14 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
       ? { placeholder: screenshot.placeholder }
       : {}),
     ...(options.console ? { console: view.consoleLog } : {}),
+    ...(options.cookies
+      ? {
+          cookies: describeCookiesForHost(
+            await view.getAllCookies(),
+            hostOf(f402BaseUrl()),
+          ),
+        }
+      : {}),
   };
   console.log(
     options.json || process.stdout.isTTY !== true
@@ -490,6 +517,7 @@ interface ShotFileResult extends Partial<ProfileCheck> {
   readonly thumb?: string;
   readonly placeholder?: string;
   readonly console?: readonly ConsoleLine[];
+  readonly cookies?: readonly CookieMetadata[];
 }
 
 /** One row per field: a screenshot result is one record, and a wide single row wraps badly. */
@@ -526,6 +554,16 @@ export function renderShotTable(
     rows.push({
       field: "console",
       value: `${result.console.length} line(s) (--json prints them)`,
+    });
+  }
+  if (result.cookies !== undefined) {
+    const expired = result.cookies.filter((cookie) => cookie.expired).length;
+    rows.push({
+      field: "cookies",
+      value:
+        result.cookies.length === 0
+          ? "no portal cookies"
+          : `${result.cookies.length} portal (${expired} expired): ${result.cookies.map((cookie) => cookie.name).join(", ")}`,
     });
   }
   return Bun.inspect.table(

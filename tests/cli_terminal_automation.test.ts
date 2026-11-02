@@ -68,6 +68,19 @@ describe("Bun PTY terminal automation", () => {
     expect(retries.out).toContain("--retries must be an integer from 0 to 5");
   });
 
+  test("dx shot --cookies refuses WebKit before launching a browser", async () => {
+    const result = await spawnInPty([
+      "./bin/dx",
+      "shot",
+      "https://example.com",
+      "--backend",
+      "webkit",
+      "--cookies",
+    ]);
+    expect(result.code).toBe(2);
+    expect(result.out).toContain("only --backend chrome has");
+  });
+
   test("dx session defaults to the read-only status report", async () => {
     const result = await spawnInPty([
       "env",
