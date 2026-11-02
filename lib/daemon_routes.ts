@@ -1,289 +1,354 @@
 /**
- * The daemon's routes, as data.
+ * The daemon's routes, as data, with the property that matters encoded in the type.
  *
- * `services/sportsdesk_webview_server.ts` dispatches through a chain of `pathname === "…"`
- * comparisons. The chain is the implementation; this table is the surface, so the docs side
- * (ledger members, spec paths) can be compared against something stable instead of grepping the
- * source on every pass.
+ * A route either has a guard — `admin`, `pii`, `telegram-secret` — or it is public, and a
+ * public route may not carry customer-identifying data. That pairing is the whole point: the
+ * earlier sketch of this table proposed labelling `/live-bets`, `/status` and `/miniapp` as
+ * `proxy-auth`, which would have recorded protection the process does not have (each answers
+ * 200 to a wrong bearer; nothing in this repo implements proxy auth).
  *
- * tests/daemon_routes.test.ts proves the two agree in both directions: a path in this table that
- * the daemon does not serve fails, and so does a served path that is missing here.
+ * `dataClass` is what forces the question. It is not cosmetic: `/health` and `/api/status`
+ * return uptime, memory, pid, bind address and NODE_ENV, so "public" there is a deliberate
+ * operational choice rather than "static"; `/` and `/dashboard` embed book totals in the markup,
+ * so they are `aggregate`, not `static`; `/api/live-bets` and `/api/agent-tree` carry logins
+ * and are `customer-identifying`, which is why they must be `pii`.
  *
- * Two columns earn their place by being *measured*, not assumed:
- *
- * - `guard` names the mechanism, and there are exactly four: `admin` (one policy block over
- *   `/api/watchlist` and the `/api/telegram/` prefix → 401, or 503 when no token is set),
- *   `pii` (loopback allowed, other peers need the admin token), `telegram-secret` (the webhook
- *   checks its own header) and `none`. A per-route scan of arm bodies said `none` for the
- *   telegram endpoints because the gate sits above them; the running server returned 503. Do not
- *   reintroduce a label for a guard that lives outside this process — a `proxy-auth` row would
- *   assert protection the daemon does not have, and `/live-bets`, `/status` and `/miniapp`
- *   answer 200 to a wrong bearer today.
- * - `method` is `ANY` where the daemon does not check `req.method`, rather than the method a
- *   client happens to use.
- *
- * `surface` is the ledger surface that owns the path, or null where no surface declares it yet.
+ * tests/daemon_routes.test.ts keeps the table honest in both directions against the handler, and
+ * asserts the runtime shadow of the type rule — a public route whose response carries customer
+ * identifiers — because types are erased.
  */
-export type DaemonRoute = {
+export type Guard = "none" | "admin" | "pii" | "telegram-secret";
+
+export type DataClass =
+  /** markup or assets whose data arrives from a guarded API */
+  | "static"
+  /** derived totals with no identifiers */
+  | "aggregate"
+  /** process telemetry: uptime, memory, pid, bind address, env */
+  | "operational"
+  /** logins, customer ids, wagers */
+  | "customer-identifying";
+
+export type RouteBase = {
   readonly path: string;
   readonly method: "ANY" | "GET" | "POST";
-  readonly guard: "none" | "admin" | "pii" | "telegram-secret";
+  /** The ledger surface that owns this path, or null where none declares it yet. */
   readonly surface: string | null;
+  readonly dataClass: DataClass;
 };
 
+export type GuardedRoute = RouteBase & {
+  readonly guard: Exclude<Guard, "none">;
+};
+
+/** A public route may be static, aggregate or operational — never customer-identifying. */
+export type PublicRoute = RouteBase & {
+  readonly guard: "none";
+  readonly dataClass: Exclude<DataClass, "customer-identifying">;
+};
+
+export type DaemonRoute = GuardedRoute | PublicRoute;
+
+/** Identity at runtime; the value is the checking. `const` keeps the literals rather than widening. */
+export function defineRoute<const R extends DaemonRoute>(route: R): R {
+  return route;
+}
+
 export const DAEMON_ROUTES: readonly DaemonRoute[] = [
-  {
+  defineRoute({
     path: "/",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-dashboard",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/agent-tree",
     method: "ANY",
     guard: "pii",
+    dataClass: "customer-identifying",
     surface: "surface.daemon-agent-tree",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/agents/search",
     method: "ANY",
     guard: "pii",
+    dataClass: "customer-identifying",
     surface: "surface.daemon-agent-search",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/analysis",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-analysis",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/analysis/filters",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-analysis",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/analysis/reports",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-analysis",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/contests",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-contests",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/f402/get-pending",
     method: "ANY",
     guard: "none",
+    dataClass: "static",
     surface: "surface.daemon-live-bets",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/game-admin",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-game-admin",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/game-admin/board",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-game-admin-board",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/graph-feed",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-graph-data-plane",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/live-bets",
     method: "ANY",
     guard: "pii",
+    dataClass: "customer-identifying",
     surface: "surface.daemon-live-bets",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/live-bets/summary",
     method: "ANY",
     guard: "pii",
+    dataClass: "aggregate",
     surface: "surface.daemon-live-bets",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/live-wagers",
     method: "ANY",
     guard: "pii",
+    dataClass: "customer-identifying",
     surface: "surface.daemon-live-wagers",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/parse-formdata",
     method: "POST",
     guard: "none",
+    dataClass: "operational",
     surface: "surface.daemon-dashboard",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/scoreboard",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-scoreboard",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/sports",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-sports-taxonomy",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/sports/catalog",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-sport-catalog",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/status",
     method: "ANY",
     guard: "none",
+    dataClass: "operational",
     surface: "surface.daemon-dashboard",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/telegram/activity",
     method: "GET",
     guard: "admin",
+    dataClass: "operational",
     surface: "surface.daemon-telegram-admin-routes",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/telegram/alert",
     method: "POST",
     guard: "admin",
+    dataClass: "operational",
     surface: "surface.daemon-telegram-admin-routes",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/telegram/report",
     method: "POST",
     guard: "admin",
+    dataClass: "operational",
     surface: "surface.daemon-telegram-admin-routes",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/telegram/status",
     method: "GET",
     guard: "admin",
+    dataClass: "operational",
     surface: "surface.daemon-telegram-admin-routes",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/telegram/webhook",
     method: "POST",
     guard: "admin",
+    dataClass: "operational",
     surface: "surface.daemon-telegram-admin-routes",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/test/error",
     method: "ANY",
     guard: "none",
+    dataClass: "operational",
     surface: "surface.daemon-telegram-admin-routes",
-  },
-  {
+  }),
+  defineRoute({
     path: "/api/watchlist",
     method: "ANY",
     guard: "admin",
+    dataClass: "customer-identifying",
     surface: "surface.daemon-telegram-admin-routes",
-  },
-  {
+  }),
+  defineRoute({
     path: "/dashboard",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-dashboard",
-  },
-  {
+  }),
+  defineRoute({
     path: "/graph",
     method: "ANY",
     guard: "none",
+    dataClass: "static",
     surface: null,
-  },
-  {
+  }),
+  defineRoute({
     path: "/graph-live-feed.json",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: "surface.daemon-graph-data-plane",
-  },
-  {
+  }),
+  defineRoute({
     path: "/graph.html",
     method: "ANY",
     guard: "none",
+    dataClass: "static",
     surface: null,
-  },
-  {
+  }),
+  defineRoute({
     path: "/graph.js",
     method: "ANY",
     guard: "none",
+    dataClass: "static",
     surface: null,
-  },
-  {
+  }),
+  defineRoute({
     path: "/graph/",
     method: "ANY",
     guard: "none",
+    dataClass: "static",
     surface: null,
-  },
-  {
+  }),
+  defineRoute({
     path: "/health",
     method: "ANY",
     guard: "none",
+    dataClass: "operational",
     surface: null,
-  },
-  {
+  }),
+  defineRoute({
     path: "/live-bets",
     method: "ANY",
     guard: "none",
+    dataClass: "static",
     surface: null,
-  },
-  {
+  }),
+  defineRoute({
     path: "/live-bets/summary",
     method: "ANY",
-    guard: "none",
+    guard: "pii",
+    dataClass: "aggregate",
     surface: null,
-  },
-  {
+  }),
+  defineRoute({
     path: "/miniapp",
     method: "ANY",
     guard: "none",
+    dataClass: "static",
     surface: "surface.daemon-miniapp",
-  },
-  {
+  }),
+  defineRoute({
     path: "/miniapp/",
     method: "ANY",
     guard: "none",
+    dataClass: "static",
     surface: "surface.daemon-miniapp",
-  },
-  {
+  }),
+  defineRoute({
     path: "/status",
     method: "ANY",
     guard: "none",
+    dataClass: "operational",
     surface: "surface.daemon-dashboard",
-  },
-  {
+  }),
+  defineRoute({
     path: "/status.json",
     method: "ANY",
     guard: "none",
+    dataClass: "operational",
     surface: "surface.daemon-dashboard",
-  },
-  {
+  }),
+  defineRoute({
     path: "/status/",
     method: "ANY",
     guard: "none",
+    dataClass: "operational",
     surface: null,
-  },
-  {
+  }),
+  defineRoute({
     path: "/surveillance-graph",
     method: "ANY",
     guard: "none",
+    dataClass: "aggregate",
     surface: null,
-  },
-  {
+  }),
+  defineRoute({
     path: "/telegram/webhook",
     method: "POST",
     guard: "telegram-secret",
+    dataClass: "operational",
     surface: "surface.daemon-telegram-admin-routes",
-  },
+  }),
 ];
 
 /** Paths only, for the surface comparison. */
