@@ -7,12 +7,14 @@
  *   ./bin/dx shot <url> [--out scratch/shots/page.png] [--backend webkit|chrome]
  *   ./bin/dx shot <url> --encoding base64 --format webp
  *   ./bin/dx shot <url> --encoding shmem --kitty
- *   F402_LIVE_LOGIN=1 ./bin/dx shot --f402-login --f402-page /manager --out scratch/shots/f402.png
+ *   F402_LIVE_LOGIN=1 ./bin/dx shot --f402-login --f402-page /manager.html --out scratch/shots/f402.png
+ *   ./bin/dx shot --profile scratch/webview-profile --f402-page /manager.html
  *
  * The login path never prints credentials; it reuses the evidence-capture WebView wrapper and the
  * same selectors as the capture tool.
  */
 
+import { statSync } from "node:fs";
 import { join } from "node:path";
 import { ManagedWebView } from "./capture/webview.ts";
 import {
@@ -25,7 +27,8 @@ const HELP = `Bun.WebView screenshot tool
 
 Usage:
   bun run scripts/webview_shot_cli.ts <url> [options]
-  F402_LIVE_LOGIN=1 bun run scripts/webview_shot_cli.ts --f402-login [--f402-page /manager]
+  F402_LIVE_LOGIN=1 bun run scripts/webview_shot_cli.ts --f402-login [--f402-page /manager.html]
+  bun run scripts/webview_shot_cli.ts --profile <dir> [--f402-page /manager.html]
 
 Options:
   --out <path>            Output file (default scratch/shots/webview-<epoch>.<ext>)
@@ -42,10 +45,15 @@ Options:
   --timeout-ms <ms>       Navigation/selector timeout (default 20000)
   --f402-login            Log in with F402_AGENT_ID / F402_PASSWORD before capturing
   --f402-page <path>      Navigate to this path after login (default /)
+  --profile <dir>         Reuse an existing WebView dataStore (e.g. scratch/webview-profile). With no
+                          URL it opens --f402-page on the portal; output adds signedOutMarkers
+                          (login-form, session-expired; empty = neither seen)
   -h, --help
 
 Login is opt-in: it requires F402_LIVE_LOGIN=1 plus the credential env vars. A screenshot of a public
-page does not require login.`;
+page does not require login. --profile only reads a profile's cookies; it never signs in by itself.
+Chrome and WebKit keep separate cookie stores in the same directory, so --backend must match the
+backend that signed in.`;
 
 interface Options {
   url: string | null;
@@ -63,6 +71,45 @@ interface Options {
   timeoutMs: number;
   f402Login: boolean;
   f402Page: string;
+  profile: string | null;
+}
+
+/**
+ * What a signed-out portal shows: the login form at `/`, and a "Your session has expired" dialog on
+ * `/manager.html` (both seen 2026-11-02 with an empty WebKit profile).
+ */
+export type SignedOutMarker = "login-form" | "session-expired";
+
+/** Present only with --profile: what the page showed, not a claim that the session is valid. */
+interface ProfileCheck {
+  readonly profile: string;
+  readonly signedOutMarkers: readonly SignedOutMarker[];
+}
+
+const SIGNED_OUT_MARKERS = `(() => {
+  const markers = [];
+  if (document.querySelector("input[type=password]") !== null) markers.push("login-form");
+  if (/session has expired/i.test(document.body?.innerText ?? "")) markers.push("session-expired");
+  return markers;
+})()`;
+
+export function parseSignedOutMarkers(value: unknown): SignedOutMarker[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (marker): marker is SignedOutMarker =>
+      marker === "login-form" || marker === "session-expired",
+  );
+}
+
+function isDirectory(path: string): boolean {
+  return statSync(path, { throwIfNoEntry: false })?.isDirectory() === true;
+}
+
+function f402Url(page: string): string {
+  const baseUrl = (
+    process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
+  ).replace(/\/$/, "");
+  return `${baseUrl}${page.startsWith("/") ? page : `/${page}`}`;
 }
 
 function flag(
@@ -91,6 +138,7 @@ function parseArgs(args: readonly string[]): Options {
     "--wait-ms",
     "--timeout-ms",
     "--f402-page",
+    "--profile",
   ]);
   let url: string | null = null;
   for (let index = 0; index < args.length; index += 1) {
@@ -157,6 +205,7 @@ function parseArgs(args: readonly string[]): Options {
     timeoutMs: Number.isFinite(timeoutMs) ? Math.max(1000, timeoutMs) : 20_000,
     f402Login: args.includes("--f402-login"),
     f402Page: flag(args, ["--f402-page"], "/"),
+    profile: flag(args, ["--profile"], "") || null,
   };
 }
 
@@ -169,13 +218,25 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
     return;
   }
   const options = parseArgs(args);
-  if (
-    !options.f402Login &&
-    (options.url === null || !/^https?:\/\//.test(options.url))
-  ) {
-    console.error("webview-shot: provide an http(s) URL or --f402-login\n");
+  if (options.url !== null && !/^https?:\/\//.test(options.url)) {
+    console.error("webview-shot: the URL must be http(s)\n");
     console.error(HELP);
     process.exitCode = 1;
+    return;
+  }
+  if (options.url === null && !options.f402Login && options.profile === null) {
+    console.error(
+      "webview-shot: provide an http(s) URL, --f402-login or --profile\n",
+    );
+    console.error(HELP);
+    process.exitCode = 1;
+    return;
+  }
+  if (options.profile !== null && !isDirectory(options.profile)) {
+    console.error(
+      `webview-shot: --profile ${options.profile} is not a directory; a WebView would start an empty, signed-out profile there`,
+    );
+    process.exitCode = 2;
     return;
   }
 
@@ -188,6 +249,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
     width: options.width,
     height: options.height,
     navigateTimeoutMs: options.timeoutMs,
+    ...(options.profile === null ? {} : { dataStoreDir: options.profile }),
   });
 
   if (options.f402Login) {
@@ -195,17 +257,13 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
       throw new Error("F402 login is opt-in: set F402_LIVE_LOGIN=1");
     }
     await loginF402(view, { timeoutMs: options.timeoutMs });
-    const baseUrl = (
-      process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
-    ).replace(/\/$/, "");
-    const suffix = options.f402Page.startsWith("/")
-      ? options.f402Page
-      : `/${options.f402Page}`;
-    await view.navigate(`${baseUrl}${suffix}`, {
+    await view.navigate(f402Url(options.f402Page), {
       timeoutMs: options.timeoutMs,
     });
   } else {
-    await view.navigate(options.url!, { timeoutMs: options.timeoutMs });
+    await view.navigate(options.url ?? f402Url(options.f402Page), {
+      timeoutMs: options.timeoutMs,
+    });
   }
 
   if (options.waitSelector !== null) {
@@ -214,6 +272,16 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
     });
   }
   if (options.waitMs > 0) await Bun.sleep(options.waitMs);
+
+  const profileCheck: ProfileCheck | null =
+    options.profile === null
+      ? null
+      : {
+          profile: options.profile,
+          signedOutMarkers: parseSignedOutMarkers(
+            await view.evaluate(SIGNED_OUT_MARKERS),
+          ),
+        };
 
   const shotOptions =
     options.format === "png"
@@ -257,6 +325,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
           dataUri: b64.dataUri,
           backend: options.backend,
           format: options.format,
+          ...profileCheck,
         },
         null,
         2,
@@ -275,6 +344,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
           mimeType: blob.type,
           bytes: bytes.byteLength,
           base64: Buffer.from(bytes).toString("base64"),
+          ...profileCheck,
         },
         null,
         2,
@@ -298,6 +368,7 @@ export async function runWebviewShot(argv: readonly string[]): Promise<void> {
         encoding: options.encoding,
         title,
         url,
+        ...profileCheck,
       },
       null,
       2,

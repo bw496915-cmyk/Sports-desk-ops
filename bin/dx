@@ -99,7 +99,8 @@ SportsDesk DX — operator commands
   ./bin/dx combo legs|price|wallet CFB combo legs and product-of-legs pricing
   ./bin/dx bridge coverage|value|match
                                   Cross-domain customer book ↔ Polymarket wallet join
-  ./bin/dx shot <url>             Bun.WebView screenshot → scratch/shots/ (--f402-login)
+  ./bin/dx shot <url>             Bun.WebView screenshot → scratch/shots/ (--f402-login, --profile <dir>)
+  ./bin/dx session [status|login] Portal session file the replay transport reads (status is read-only)
   ./bin/dx image-meta <file>      Print image metadata via Bun.Image (or '-' for stdin)
   ./bin/dx blob-formdata <file>   Parse a blob as FormData and print JSON (or '-' for stdin)
   ./bin/dx backtest               4-week CFB + NBA parlay/combo backtest
@@ -218,6 +219,19 @@ EOF
   shot|screenshot)
     cd "$REPO_ROOT"
     exec bun run cli/sportsdesk_cli.ts shot "$@"
+    ;;
+  session)
+    cd "$REPO_ROOT"
+    sub="${1:-status}"
+    shift || true
+    case "$sub" in
+      status) exec bun run scripts/session_login.ts --status "$@" ;;
+      login) exec bun run scripts/session_login.ts "$@" ;;
+      *)
+        echo "usage: ./bin/dx session [status [--json] | login]" >&2
+        exit 2
+        ;;
+    esac
     ;;
   image-meta)
     cd "$REPO_ROOT"

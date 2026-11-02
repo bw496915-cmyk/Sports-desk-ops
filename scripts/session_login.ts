@@ -2,8 +2,8 @@
 /**
  * Mint or inspect the portal session the replay transport uses.
  *
- *   F402_LIVE_LOGIN=1 F402_AGENT_ID=… F402_PASSWORD=… bun run session:login
- *   bun run session:status [--json]
+ *   F402_LIVE_LOGIN=1 F402_AGENT_ID=… F402_PASSWORD=… ./bin/dx session login
+ *   ./bin/dx session [status] [--json]      (also: bun run session:login / session:status)
  *
  * Why this exists: `F402_WEBVIEW_PROFILE` names a WebView `dataStore` directory, and that directory
  * holds the cookies after a sign-in — but `createF402ReplayTransport()` never reads it
@@ -19,6 +19,7 @@
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
+import { inspectReport } from "../lib/cli_inspect.ts";
 import {
   describeF402Session,
   readF402Session,
@@ -49,11 +50,26 @@ const configured = {
   profile: (env.F402_WEBVIEW_PROFILE ?? "").trim() !== "",
 };
 
+type SessionTransport =
+  | "proxy (F402_REPLAY_PROXY_URL)"
+  | "session-file"
+  | "anonymous (no session file: the transport will send no cookie)";
+
+interface SessionStatusReport {
+  readonly sessionPath: string;
+  readonly session: string;
+  readonly cookieNames?: readonly string[];
+  readonly expiresAt?: string;
+  readonly transport: SessionTransport;
+  readonly env: typeof configured;
+  readonly profileNote: string | null;
+}
+
 if (values.status) {
   const session = readF402Session(
     values.out === undefined ? undefined : { path: values.out },
   );
-  const report = {
+  const report: SessionStatusReport = {
     sessionPath: values.out ?? resolveF402SessionPath(),
     session: describeF402Session(session),
     ...(session === null
@@ -66,17 +82,12 @@ if (values.status) {
         : "anonymous (no session file: the transport will send no cookie)",
     env: configured,
     profileNote: configured.profile
-      ? "F402_WEBVIEW_PROFILE is set but the transport does not read it — export its cookies with `bun run session:login`"
+      ? "F402_WEBVIEW_PROFILE is set but the transport does not read it — export its cookies with `./bin/dx session login`, or check it with `./bin/dx shot --profile <dir>`"
       : null,
   };
-  if (values.json) console.log(JSON.stringify(report, null, 2));
-  else {
-    console.log(`session:status: ${report.session}`);
-    console.log(`  file: ${report.sessionPath}`);
-    console.log(`  transport would use: ${report.transport}`);
-    if (report.profileNote !== null)
-      console.log(`  note: ${report.profileNote}`);
-  }
+  console.log(
+    values.json ? JSON.stringify(report, null, 2) : inspectReport(report),
+  );
   process.exit(session !== null || configured.proxy ? 0 : 1);
 }
 

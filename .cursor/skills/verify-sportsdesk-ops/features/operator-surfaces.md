@@ -23,6 +23,7 @@ surface rules in [`docs/report-surfaces.md`](../../../../docs/report-surfaces.md
 | `gslive-docs`        | `./bin/dx docs --json`                                                                                           | JSON has `provider: "GSLive Manager (Partner 118)"` and 3 surfaces                                     |
 | `stale-cohort`       | `./bin/dx stale -i <export.csv> --window-min 10`                                                                 | seeded event cluster lists the seed `★` and other customers                                            |
 | `webview-shot`       | `./bin/dx shot <url> --out scratch/shots/page.png`                                                               | JSON with `screenshot`, `bytes`, `sha256`, `backend`; non-zero on failure                              |
+| `dx-session`         | `./bin/dx session` (`--json` for machine output)                                                                 | `Bun.inspect` report with `sessionPath`, `transport`; exit 1 without a session file or proxy           |
 | `polymarket-profile` | `./bin/dx profile <0x\|username>`                                                                                | PnL, win rate, positions, categories, strategy                                                         |
 | `cfb-combos`         | `./bin/dx combo legs` / `price --prices …` / `uniqueness`                                                        | legs listed; fair price product; per-game unique counts                                                |
 | `poll-fixture`       | `./bin/dx poll --once`                                                                                           | feed `dataMode: "FIXTURE"`, 39 profiles                                                                |
@@ -37,7 +38,10 @@ surface rules in [`docs/report-surfaces.md`](../../../../docs/report-surfaces.md
 ./bin/dx shot https://fantasy402-docs-4ay.pages.dev/graph.html --out scratch/shots/portal.png
 
 # F402 manager after one login (opt-in; never prints credentials)
-F402_LIVE_LOGIN=1 ./bin/dx shot --f402-login --f402-page /manager --out scratch/shots/f402.png
+F402_LIVE_LOGIN=1 ./bin/dx shot --f402-login --f402-page /manager.html --out scratch/shots/f402.png
+
+# is a saved profile still signed in? (signedOutMarkers [] = no signed-out page seen)
+./bin/dx shot --profile scratch/webview-profile --f402-page /manager.html --out scratch/shots/profile.png
 
 # webp requires the chrome backend
 ./bin/dx shot <url> --format webp --quality 82 --out scratch/shots/page.webp
