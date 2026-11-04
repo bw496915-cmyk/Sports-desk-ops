@@ -62,16 +62,16 @@ describe("graph data plane", () => {
     let saved: string | undefined;
 
     beforeAll(() => {
-      saved = process.env["SPORTSDESK_ADMIN_TOKEN"];
+      saved = Bun.env["SPORTSDESK_ADMIN_TOKEN"];
     });
     afterAll(() => {
       if (saved === undefined)
-        Reflect.deleteProperty(process.env, "SPORTSDESK_ADMIN_TOKEN");
-      else Reflect.set(process.env, "SPORTSDESK_ADMIN_TOKEN", saved);
+        Reflect.deleteProperty(Bun.env, "SPORTSDESK_ADMIN_TOKEN");
+      else Reflect.set(Bun.env, "SPORTSDESK_ADMIN_TOKEN", saved);
     });
 
     test("is refused without a token, even from loopback", async () => {
-      Reflect.set(process.env, "SPORTSDESK_ADMIN_TOKEN", TOKEN);
+      Reflect.set(Bun.env, "SPORTSDESK_ADMIN_TOKEN", TOKEN);
       for (const path of FILES) {
         const none = await get(path);
         expect(none.status).toBe(401);
@@ -84,14 +84,14 @@ describe("graph data plane", () => {
     });
 
     test("is refused (503) when the server has no admin token configured", async () => {
-      Reflect.deleteProperty(process.env, "SPORTSDESK_ADMIN_TOKEN");
+      Reflect.deleteProperty(Bun.env, "SPORTSDESK_ADMIN_TOKEN");
       for (const path of FILES) {
         expect((await get(path)).status).toBe(503);
       }
     });
 
     test("is served with the admin token", async () => {
-      Reflect.set(process.env, "SPORTSDESK_ADMIN_TOKEN", TOKEN);
+      Reflect.set(Bun.env, "SPORTSDESK_ADMIN_TOKEN", TOKEN);
       for (const path of FILES) {
         const res = await fetch(`${server.url}${path}`, {
           headers: { authorization: `Bearer ${TOKEN}` },
