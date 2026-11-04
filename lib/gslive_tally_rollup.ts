@@ -429,10 +429,14 @@ export async function buildGsliveTallyRollup(
   // Group dedupe: open-addressed gid slots plus SoA columns. No Map, no per-row object.
   const groupSlots = new Uint32Array(GROUP_SLOT_COUNT);
   const groupGid = new Uint32Array(MAX_GROUPS);
-  const groupType = new Uint8Array(MAX_GROUPS);
-  const groupState = new Uint8Array(MAX_GROUPS);
-  const groupSportLabel = new Uint8Array(MAX_GROUPS);
-  const groupPeriodLabel = new Uint8Array(MAX_GROUPS);
+  // `Bun.allocUnsafe` skips ~131 KiB of zeroing per rollup (4×32,768-byte columns). Safe
+  // because only indices `0..groupCount-1` are read (see the aggregation loop below) and every
+  // new index is fully written before `groupCount` advances. See
+  // docs/bun-upstream-reference.md "When to use `Bun.allocUnsafe` (and when NOT to)".
+  const groupType = Bun.allocUnsafe(MAX_GROUPS);
+  const groupState = Bun.allocUnsafe(MAX_GROUPS);
+  const groupSportLabel = Bun.allocUnsafe(MAX_GROUPS);
+  const groupPeriodLabel = Bun.allocUnsafe(MAX_GROUPS);
   const groupLegs = new Uint16Array(MAX_GROUPS);
   const groupRisk = new BigInt64Array(MAX_GROUPS);
   const groupSettled = new BigInt64Array(MAX_GROUPS);
@@ -673,10 +677,10 @@ export async function buildGsliveTallyRollup(
   // Cell arena: packed 24-bit keys, open-addressed slots, cache-contiguous SoA columns.
   const cellSlots = new Uint16Array(CELL_SLOT_COUNT);
   const cellKey = new Uint32Array(MAX_CELLS);
-  const cellChannel = new Uint8Array(MAX_CELLS);
-  const cellSportLabel = new Uint8Array(MAX_CELLS);
-  const cellPeriodLabel = new Uint8Array(MAX_CELLS);
-  const cellState = new Uint8Array(MAX_CELLS);
+  const cellChannel = Bun.allocUnsafe(MAX_CELLS);
+  const cellSportLabel = Bun.allocUnsafe(MAX_CELLS);
+  const cellPeriodLabel = Bun.allocUnsafe(MAX_CELLS);
+  const cellState = Bun.allocUnsafe(MAX_CELLS);
   const cellTickets = new Uint32Array(MAX_CELLS);
   const cellLegs = new Uint32Array(MAX_CELLS);
   const cellRisk = new BigInt64Array(MAX_CELLS);
