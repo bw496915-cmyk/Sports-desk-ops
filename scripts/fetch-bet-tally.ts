@@ -31,7 +31,6 @@ import {
 } from "../lib/manager_session.ts";
 
 import { z } from "zod";
-import { argv, env, write } from "bun";
 
 export const AJAX_URL =
   "https://plive.sportswidgets.pro/manager-tools/ajax.php";
@@ -663,13 +662,13 @@ async function main(args: readonly string[]): Promise<void> {
 
   const webviewProfile =
     values["webview-profile"]?.trim() ??
-    (env.GSLIVE_WEBVIEW_PROFILE ?? "").trim();
+    (Bun.env.GSLIVE_WEBVIEW_PROFILE ?? "").trim();
   const session =
     webviewProfile === ""
-      ? await requireManagerSession(env)
+      ? await requireManagerSession(Bun.env)
       : await sessionFromGsliveProfile({ profileDir: webviewProfile });
   const cookieHeader = session.cookieHeader;
-  let sessionGate = sessionGateFromEnv(env);
+  let sessionGate = sessionGateFromEnv(Bun.env);
   if (values["bootstrap-session"] && sessionGate === "") {
     sessionGate = await bootstrapGanchrowSession({ cookieHeader });
   }
@@ -697,14 +696,14 @@ async function main(args: readonly string[]): Promise<void> {
 
   const out = values.out;
   if (out !== "-") {
-    await write(out, JSON.stringify(result, null, 2));
+    await Bun.write(out, JSON.stringify(result, null, 2));
     console.log(`wrote ${out}`);
   }
 }
 
 if (import.meta.main) {
   try {
-    await main(argv.slice(2));
+    await main(Bun.argv.slice(2));
   } catch (error) {
     console.error(
       `bet-tally: ${error instanceof Error ? error.message : String(error)}`,

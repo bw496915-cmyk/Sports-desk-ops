@@ -76,7 +76,7 @@
     "ensure:deep-tsconfig": "bun run scripts/ensure_deep_tsconfig.ts",
     "typecheck": "bun run ensure:deep-tsconfig && bun check --no-script -p tsconfig.json",
     "lint": "bun --bun run oxlint --fix",
-    "lint:check": "bun --bun run oxlint --deny-warnings && bun --bun run oxlint --type-aware -c .oxlintrc.type-aware.json --deny-warnings",
+    "lint:check": "bun --bun run oxlint ${GITHUB_ACTIONS:+-f github} --deny-warnings && bun --bun run oxlint --type-aware -c .oxlintrc.type-aware.json ${GITHUB_ACTIONS:+-f github} --deny-warnings",
     "gen:tokens": "bun run scripts/generate_tokens.ts",
     "build:tokens": "bun run gen:tokens",
     "build:docs": "bun run scripts/generate_docs.ts",
@@ -262,8 +262,8 @@
   "license": "MIT",
   "devDependencies": {
     "@types/bun": "1.4.4",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
     "pele": "1.9.0",
@@ -286,8 +286,8 @@
     "cytoscape": "3.30.2",
     "cytoscape-elk": "2.3.0",
     "elkjs": "0.12.1",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "zod": "4.6.7"
   }
 }

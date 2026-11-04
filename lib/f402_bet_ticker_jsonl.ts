@@ -98,6 +98,10 @@ export async function readF402TickerJsonl(
     const rows: F402TickerRow[] = [];
     let skippedLines = 0;
     let watermark = previousWatermark;
+    // Intentional hand-rolled JSONL loop on the compressed-file path: we need the per-line
+    // `skippedLines` count, which `Bun.JSONL.parse()` / `parseChunk` (used on the uncompressed
+    // byte-range path below) do not report. See
+    // `docs/bun-upstream-reference.md` "When NOT to migrate to Bun.JSONL".
     for (const line of text.split("\n")) {
       if (line.trim() === "") continue;
       let payload: unknown;
@@ -162,7 +166,13 @@ export async function readF402TickerJsonl(
   }
 
   const length = fileSize - start;
-  const buffer = new Uint8Array(length);
+  // `Bun.allocUnsafe(length)` skips the ~length-byte zeroing — a measurable win on multi-MB
+  // ticker windows. Safe here because:
+  //   1. The read loop fills `buffer[0..read]` byte-for-byte via `handle.read()`.
+  //   2. The ONLY consumer is `buffer.subarray(0, read)` below; the unfilled tail (bytes
+  //      `[read..length]` when `chunk.bytesRead === 0` hits before completion) is never read.
+  // See docs/bun-upstream-reference.md "When to use `Bun.allocUnsafe` (and when NOT to)".
+  const buffer = Bun.allocUnsafe(length);
   const handle = await open(path, "r");
   try {
     let read = 0;
