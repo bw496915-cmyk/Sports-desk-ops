@@ -45,9 +45,9 @@ const CONTENT_SETTLE_TIMEOUT_MS = 10_000;
 const CONTENT_POLL_INTERVAL_MS = 150;
 const CONTENT_SETTLED_MIN_TEXT_LENGTH = 1_000;
 const LIVE_FETCH_TIMEOUT_MS = 15_000;
-// Release contract: the committed spec must document exactly these paths. Bumped from 83 when the
-// blob/live-bets gateway routes (blobs, ws-tickets, publish, ws/live-bets) became tier-B surfaces.
-const EXPECTED_OPENAPI_PATH_COUNT = 87;
+// Release contract: the committed spec must document exactly these paths. Bumped from 91 when the
+// execution plan/mode/run reads were published as operations.
+const EXPECTED_OPENAPI_PATH_COUNT = 94;
 const REQUIRED_TITLE_PATTERN = /Wire API Reference|Scalar/i;
 const DOCUMENTED_OPERATION_MARKERS = [
   "getWebLog",
@@ -1248,7 +1248,7 @@ export async function runDocumentationAudit(
   const rootDir = options.rootDir ?? DEFAULT_ROOT_DIR;
   const outDir = options.outDir ?? join(rootDir, "reports");
   const portalUrl =
-    options.portalUrl ?? process.env["DOCS_PORTAL_URL"] ?? DEFAULT_PORTAL_URL;
+    options.portalUrl ?? Bun.env["DOCS_PORTAL_URL"] ?? DEFAULT_PORTAL_URL;
   const offline = options.offline ?? false;
   const skipLive = options.skipLive ?? false;
   const mode: AuditMode = options.mode ?? (offline ? "offline" : "once");

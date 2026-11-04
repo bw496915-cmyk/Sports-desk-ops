@@ -106,7 +106,7 @@ afterAll(() => {
 describe.skipIf(
   chromePath === null ||
     !hasChromeProfile ||
-    process.env.DSH_SESSION_ID !== undefined,
+    Bun.env.DSH_SESSION_ID !== undefined,
 )("session:login --from-profile (Chrome dataStore)", () => {
   beforeAll(() => {
     server = Bun.serve({
@@ -154,7 +154,7 @@ describe.skipIf(
         "--ttl-min",
         "5",
       ],
-      cwd: "/Users/nolarose/code/sportsdesk-ops",
+      cwd: REPO_ROOT,
       stdout: "pipe",
       stderr: "pipe",
       env: {
@@ -218,7 +218,7 @@ describe.skipIf(
           "--ttl-min",
           "5",
         ],
-        cwd: "/Users/nolarose/code/sportsdesk-ops",
+        cwd: REPO_ROOT,
         stdout: "pipe",
         stderr: "pipe",
         env: {

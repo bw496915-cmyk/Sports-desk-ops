@@ -271,7 +271,12 @@ EOF
     else
       echo "  • Home links           : $(dx_ok 'no conflicts')"
     fi
-    dx_wrangler="$(cd "$REPO_ROOT" && ./wrangler --version 2>/dev/null | head -n 1 || true)"
+    if [[ "${DX_STATUS_OFFLINE:-}" == "1" ]]; then
+      # Offline mode must not touch a tool that may bootstrap or hit the network.
+      dx_wrangler="not probed (DX_STATUS_OFFLINE=1)"
+    else
+      dx_wrangler="$(cd "$REPO_ROOT" && ./wrangler --version 2>/dev/null | head -n 1 || true)"
+    fi
     echo "  • Bun / Wrangler       : $(bun -v 2>/dev/null || echo 'bun missing') / ${dx_wrangler:-wrangler missing}"
     echo "  • Git Branch & Tip     : $(git -C "$REPO_ROOT" log -n 1 --oneline)"
     echo "  • Staged dist/ Assets  : $(ls -1 "$REPO_ROOT/dist" 2>/dev/null | tr '\n' ' ')"
