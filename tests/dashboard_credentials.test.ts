@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve, sep } from "node:path";
 
 /**
  * The dashboard reads `pii` routes, and the daemon guards them by peer.
@@ -88,5 +88,48 @@ describe("the VPS deployment keeps the guard on", () => {
     expect(install).not.toContain("|| true");
     // Installing for the host itself: a cross-platform flag here would drop its own native binaries.
     expect(install).not.toMatch(/--(os|cpu|libc)/);
+  });
+});
+
+describe("the VPS tree contains everything the daemon imports", () => {
+  const deploy = readFileSync(
+    resolve(ROOT, "scripts/deploy/deploy_to_vps.sh"),
+    "utf8",
+  );
+  const shipped = (/for dir in ([^;]+); do/.exec(deploy)?.[1] ?? "")
+    .trim()
+    .split(/\s+/);
+
+  // Bundling is the measurement: it follows static and dynamic imports from the entry points the
+  // systemd unit starts. A file that loads from a directory the script does not copy would exist
+  // here and be missing on the server (2026-11-04: `scripts/` was imported but not shipped).
+  test.each([
+    "services/supervisor.ts",
+    "services/sportsdesk_webview_server.ts",
+    "services/blob_and_live_bets_server.ts",
+  ])("%s loads only shipped directories", async (entry) => {
+    expect(shipped).toContain("services");
+    const loaded = new Set<string>();
+    const result = await Bun.build({
+      entrypoints: [resolve(ROOT, entry)],
+      target: "bun",
+      plugins: [
+        {
+          name: "record-loads",
+          setup(build) {
+            build.onLoad({ filter: /.*/ }, (args) => {
+              loaded.add(args.path);
+              return undefined;
+            });
+          },
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    const outside = [...loaded]
+      .map((path) => relative(ROOT, path))
+      .filter((rel) => !rel.split(sep).includes("node_modules"))
+      .filter((rel) => !shipped.includes(rel.split(sep)[0] ?? ""));
+    expect(outside).toEqual([]);
   });
 });
