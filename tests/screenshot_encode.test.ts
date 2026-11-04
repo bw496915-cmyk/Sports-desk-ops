@@ -128,7 +128,7 @@ describe("screenshot encoding", () => {
   });
 
   test("Kitty direct transmission fits in one escape when the PNG is small", () => {
-    const b64 = Buffer.from(PNG).toString("base64");
+    const b64 = PNG.toBase64();
     expect(formatKittyDirectEscape(b64)).toBe(
       `\x1b_Gf=100,t=d,a=T,m=0;${b64}\x1b\\`,
     );

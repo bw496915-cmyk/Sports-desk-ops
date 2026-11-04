@@ -162,7 +162,7 @@ export async function navigateWithRetry(
 
 export function f402BaseUrl(): string {
   return (
-    process.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
+    Bun.env.F402_BASE_URL?.trim() || "https://www.fantasy402.com"
   ).replace(/\/$/, "");
 }
 
@@ -191,7 +191,7 @@ export async function openShotView(
   });
   try {
     if (request.f402Login) {
-      if (process.env.F402_LIVE_LOGIN?.trim() !== "1") {
+      if (Bun.env.F402_LIVE_LOGIN?.trim() !== "1") {
         throw new Error("F402 login is opt-in: set F402_LIVE_LOGIN=1");
       }
       await loginF402(view, { timeoutMs: request.timeoutMs });

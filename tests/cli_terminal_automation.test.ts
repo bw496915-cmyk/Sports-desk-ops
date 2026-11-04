@@ -121,8 +121,8 @@ describe.skipIf(!hasPty)("Bun PTY terminal automation", () => {
     const result = await spawnInPty([
       "env",
       "-i",
-      `PATH=${process.env["PATH"] ?? ""}`,
-      `HOME=${process.env["HOME"] ?? ""}`,
+      `PATH=${Bun.env["PATH"] ?? ""}`,
+      `HOME=${Bun.env["HOME"] ?? ""}`,
       "F402_SESSION_FILE=/nonexistent/f402-session.json",
       "./bin/dx",
       "session",
