@@ -1,140 +1,23 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
- * @file scripts/publish_r2_graph.mjs
- * @description Zero-dependency AWS SigV4 uploader for Cloudflare R2 Object Storage.
- * Publishes `dist/graph.html`, `dist/graph.js`, `dist/gslive-links.js`, `dist/graph-live-feed.json`, `dist/index.html`,
- * `dist/openapi.json`, and all rich-metadata pipeline visual reference artifacts under `dist/assets/`
- * (with custom `x-amz-meta-*` headers) directly to the public Cloudflare R2 edge domain
- * (`https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/`).
+ * @file publish_r2_graph.mjs
+ * @description Publish the docs portal and rich-metadata pipeline assets to the
+ * public Cloudflare R2 edge, using the shared Bun.S3Client adapter
+ * (lib/r2_s3_client.ts) for credential resolution, presigned metadata uploads and
+ * object writes. `--list-json` prints the manifest without requiring credentials so
+ * bin/dx can fall back to Wrangler OAuth uploads.
  */
-import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
 
+import {
+  R2S3Client,
+  resolveR2CredentialsAsync,
+  resolveR2S3Options,
+} from "../lib/r2_s3_client.ts";
+
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const envPath = path.join(repoRoot, ".env");
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m && !process.env[m[1]]) {
-      process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
-    }
-  }
-}
-
-function requireEnv(name) {
-  const value = process.env[name];
-  if (!value) {
-    console.error(
-      `publish_r2_graph: ${name} is required (set it in .env or the environment)`,
-    );
-    process.exit(2);
-  }
-  return value;
-}
-
-const accessKeyId = requireEnv("R2_ACCESS_KEY_ID");
-const secretAccessKey = requireEnv("R2_SECRET_ACCESS_KEY");
-const accountId = requireEnv("CLOUDFLARE_ACCOUNT_ID");
-const bucket = process.env.R2_BUCKET_NAME || "sportsdesk-ops-reports";
-const publicBase =
-  process.env.R2_PUBLIC_URL ||
-  "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev";
-const host = `${accountId}.r2.cloudflarestorage.com`;
-const region = "auto";
-const service = "s3";
-
-function sha256Hex(buf) {
-  return crypto.createHash("sha256").update(buf).digest("hex");
-}
-
-function hmac(key, data) {
-  return crypto.createHmac("sha256", key).update(data).digest();
-}
-
-function getSignatureKey(key, dateStamp, regionName, serviceName) {
-  const kDate = hmac(`AWS4${key}`, dateStamp);
-  const kRegion = hmac(kDate, regionName);
-  const kService = hmac(kRegion, serviceName);
-  return hmac(kService, "aws4_request");
-}
-
-async function putObject(key, bodyBuf, contentType, customMeta = {}) {
-  const now = new Date();
-  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
-  const dateStamp = amzDate.slice(0, 8);
-  const payloadHash = sha256Hex(bodyBuf);
-  const canonicalUri = `/${bucket}/${key}`;
-
-  const headerMap = {
-    "content-type": contentType,
-    host: host,
-    "x-amz-content-sha256": payloadHash,
-    "x-amz-date": amzDate,
-  };
-  for (const [k, v] of Object.entries(customMeta)) {
-    if (v) {
-      headerMap[`x-amz-meta-${k.toLowerCase()}`] = String(v)
-        .replace(/[\r\n]+/g, " ")
-        .trim();
-    }
-  }
-
-  const sortedHeaderKeys = Object.keys(headerMap).sort();
-  const canonicalHeaders = sortedHeaderKeys
-    .map((k) => `${k}:${headerMap[k]}\n`)
-    .join("");
-  const signedHeaders = sortedHeaderKeys.join(";");
-
-  const canonicalRequest = [
-    "PUT",
-    canonicalUri,
-    "",
-    canonicalHeaders,
-    signedHeaders,
-    payloadHash,
-  ].join("\n");
-
-  const algorithm = "AWS4-HMAC-SHA256";
-  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-  const stringToSign = [
-    algorithm,
-    amzDate,
-    credentialScope,
-    sha256Hex(canonicalRequest),
-  ].join("\n");
-
-  const signingKey = getSignatureKey(
-    secretAccessKey,
-    dateStamp,
-    region,
-    service,
-  );
-  const signature = crypto
-    .createHmac("sha256", signingKey)
-    .update(stringToSign)
-    .digest("hex");
-
-  const authorization = `${algorithm} Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-
-  const url = `https://${host}${canonicalUri}`;
-  const fetchHeaders = { Authorization: authorization };
-  for (const k of sortedHeaderKeys) {
-    if (k !== "host") fetchHeaders[k] = headerMap[k];
-  }
-
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: fetchHeaders,
-    body: bodyBuf,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`R2 PUT ${key} failed (${res.status}): ${text}`);
-  }
-  return `${publicBase}/${key}`;
-}
+const listJson = process.argv.includes("--list-json");
+const checkCredentials = process.argv.includes("--check-credentials");
 
 const filesToPublish = [
   {
@@ -153,10 +36,27 @@ const filesToPublish = [
     meta: { surface: "graph-controller" },
   },
   {
-    file: "dist/gslive-links.js",
-    key: "gslive-links.js",
+    file: "dist/assets/gslive-links.js",
+    key: "assets/gslive-links.js",
     type: "application/javascript; charset=utf-8",
     meta: { surface: "gslive-link-hydration" },
+  },
+  {
+    // Compatibility mirror: this module used to publish at the bucket root, and a bookmarked
+    // /gslive-links.js keeps working instead of serving the stale pre-move bytes.
+    file: "dist/assets/gslive-links.js",
+    key: "gslive-links.js",
+    type: "application/javascript; charset=utf-8",
+    meta: {
+      surface: "gslive-link-hydration",
+      compatibility: "legacy-root-key",
+    },
+  },
+  {
+    file: "dist/assets/live-ops.js",
+    key: "assets/live-ops.js",
+    type: "application/javascript; charset=utf-8",
+    meta: { surface: "live-wagers-and-positions-helpers" },
   },
   {
     file: "dist/graph-live-feed.json",
@@ -347,6 +247,45 @@ const filesToPublish = [
   },
 ];
 
+if (checkCredentials) {
+  const probe = await R2S3Client.fromEnvOrSecrets();
+  process.exit(probe === null ? 2 : 0);
+}
+
+const envResolved = resolveR2S3Options(Bun.env);
+const bucket =
+  envResolved?.bucket ?? Bun.env.R2_BUCKET_NAME ?? "sportsdesk-ops-reports";
+const publicBase =
+  envResolved?.publicBase ??
+  Bun.env.R2_PUBLIC_URL ??
+  "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev";
+
+if (listJson) {
+  console.log(
+    JSON.stringify({
+      bucket,
+      publicBase,
+      files: filesToPublish.map(({ file, key, type, meta }) => ({
+        file,
+        key,
+        type,
+        metadataKeys: meta ? Object.keys(meta) : [],
+      })),
+    }),
+  );
+  process.exit(0);
+}
+
+const resolved = await resolveR2CredentialsAsync(Bun.env);
+if (resolved === null) {
+  console.error(
+    "publish_r2_graph: no S3/R2 credentials in env or Bun.secrets service com.bookdeskops.sportsdesk",
+  );
+  process.exit(2);
+}
+
+const client = R2S3Client.fromOptions(resolved);
+
 console.log(
   "================================================================================",
 );
@@ -358,18 +297,26 @@ console.log(
 );
 
 for (const item of filesToPublish) {
-  const fullPath = path.join(repoRoot, item.file);
-  if (!fs.existsSync(fullPath)) continue;
-  const buf = fs.readFileSync(fullPath);
-  const url = await putObject(item.key, buf, item.type, item.meta || {});
+  const file = Bun.file(path.join(repoRoot, item.file));
+  if (!(await file.exists())) continue;
+  const bytes = await file.bytes();
+  await client.writeWithMetadata(item.key, bytes, {
+    type: item.type,
+    metadata: item.meta ?? {},
+  });
+  const stored = await client.stat(item.key);
+  if (stored.size !== bytes.length) {
+    throw new Error(
+      `R2 stat mismatch for ${item.key}: wrote ${bytes.length}, stat ${stored.size}`,
+    );
+  }
   console.log(
-    `  ✓ Published ${item.key.padEnd(46)} (${String(buf.length).padStart(7)} B | sha256 ${sha256Hex(buf).slice(0, 12)}…) -> ${url}`,
+    `  ✓ Published ${item.key.padEnd(46)} (${String(bytes.length).padStart(7)} B | sha256 ${new Bun.CryptoHasher("sha256").update(bytes).digest("hex").slice(0, 12)}…) -> ${publicBase}/${item.key}`,
   );
 }
 
-// Verify live HTTP 200 on the public R2 edge URL
 const verifyRes = await fetch(`${publicBase}/graph.html`);
-const verifyBytes = Buffer.from(await verifyRes.arrayBuffer());
+const verifyBytes = new Uint8Array(await verifyRes.arrayBuffer());
 const feedRes = await fetch(`${publicBase}/graph-live-feed.json`);
 const feedJson = await feedRes.json();
 const metaRes = await fetch(

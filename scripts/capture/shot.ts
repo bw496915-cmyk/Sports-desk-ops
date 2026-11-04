@@ -5,6 +5,7 @@
  */
 
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   ManagedWebView,
   WebViewError,
@@ -14,9 +15,15 @@ import {
 import { describeCookiesForHost, type CookieMetadata } from "./cookies.ts";
 import { loginF402 } from "./f402_login.ts";
 import { hostOf } from "./ops.ts";
+import { redactUrlForLog } from "./redact.ts";
+import type { ScreenshotBlobUploadResult } from "../../lib/blob_upload.ts";
 import type { ScreenshotEncoding } from "../../lib/screenshot_encode.ts";
 
 export const DEFAULT_SHOT_DIR = "scratch/shots";
+
+/** CSS-pixel bounds for a viewport (and `resize` output pixels); Bun accepts up to 16384. */
+export const VIEWPORT_MIN = 1;
+export const VIEWPORT_MAX = 16_384;
 
 export type ShotBackend = "webkit" | "chrome";
 export type ShotFormat = "png" | "jpeg" | "webp";
@@ -74,6 +81,8 @@ export interface ShotFileResult extends Partial<ProfileCheck> {
   readonly placeholder?: string;
   readonly console?: readonly ConsoleLine[];
   readonly cookies?: readonly CookieMetadata[];
+  /** Present only after `--upload-blob`. */
+  readonly blob?: ScreenshotBlobUploadResult;
 }
 
 const SIGNED_OUT_MARKERS = `(() => {
@@ -110,6 +119,8 @@ const SHOT_ERROR_HINTS: Readonly<Record<WebViewErrorCode, string>> = {
   "screenshot-failed": "retry once; if it repeats, try the other backend",
   "cdp-failed": "the command needs backend chrome",
   "cookies-failed": "cookies need backend chrome",
+  "invalid-size":
+    "pass a viewport of 1..16384 CSS px; chrome must also have a live page",
   closed: "the view closed before the capture finished; retry",
 };
 
@@ -193,6 +204,13 @@ export async function openShotView(
       timeoutMs: request.timeoutMs,
       retries: request.retries,
     });
+    // Bun's Chrome backend rejects Emulation.setDeviceMetricsOverride until the CDP session exists
+    // (created by the first navigation), so the launch-time resize is a silent no-op for the first
+    // page: a 200x150 capture comes back as the constructor's outer window size. WebKit sizes the
+    // inner viewport from the constructor and needs no retry.
+    if (request.backend === "chrome") {
+      await view.resize(request.width, request.height);
+    }
     if (request.waitSelector !== null) {
       await view.waitForSelector(request.waitSelector, {
         timeoutMs: request.timeoutMs,
@@ -270,7 +288,7 @@ export async function captureShotFile(
       : await writeThumb(screenshot.path, request.thumb);
   return {
     screenshot: screenshot.path,
-    screenshotUrl: Bun.pathToFileURL(resolve(screenshot.path)).href,
+    screenshotUrl: pathToFileURL(resolve(screenshot.path)).href,
     bytes: screenshot.bytes,
     sha256: screenshot.sha256,
     mimeType: screenshot.mimeType,
@@ -278,7 +296,7 @@ export async function captureShotFile(
     format: request.format,
     encoding: request.encoding,
     title: String((await view.evaluate("document.title")) ?? ""),
-    url: String((await view.evaluate("location.href")) ?? ""),
+    url: redactUrlForLog(String((await view.evaluate("location.href")) ?? "")),
     ...profileCheck,
     ...(thumbPath === null ? {} : { thumb: thumbPath }),
     ...(request.placeholder && screenshot.placeholder !== undefined

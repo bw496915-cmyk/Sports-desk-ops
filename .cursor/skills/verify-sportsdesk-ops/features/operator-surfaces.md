@@ -43,7 +43,7 @@ F402_LIVE_LOGIN=1 ./bin/dx shot --f402-login --f402-page /manager.html --out scr
 # is a saved profile still signed in? (signedOutMarkers [] = no signed-out page seen)
 ./bin/dx shot --profile scratch/webview-profile --f402-page /manager.html --out scratch/shots/profile.png
 
-# webp requires the chrome backend
+# webp works on both backends: WebKit captures PNG and the CLI re-encodes it with Bun.Image
 ./bin/dx shot <url> --format webp --quality 82 --out scratch/shots/page.webp
 ```
 

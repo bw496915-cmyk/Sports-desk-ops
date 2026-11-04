@@ -102,7 +102,7 @@ export function shotRequest(input: ShotInput): ShotFileRequest {
 /** The file result minus what {@link shotRequest} never asks for. */
 export type McpShotResult = Omit<
   ShotFileResult,
-  "profile" | "signedOutMarkers" | "cookies"
+  "profile" | "signedOutMarkers" | "cookies" | "blob"
 >;
 
 /** Keys and types are checked against {@link McpShotResult}: a field added there fails here. */

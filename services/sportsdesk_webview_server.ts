@@ -112,6 +112,7 @@ import {
   type RawHierarchyTree,
 } from "../lib/hierarchy_view.ts";
 import { encodedResponse, negotiateEncoding } from "../lib/http_compression.ts";
+import { imageErrorCode, type ImageErrorCode } from "../lib/image_errors.ts";
 import {
   contentTypeFor,
   inspectLogo,
@@ -119,6 +120,10 @@ import {
   resizeLogo,
   type LogoMetadata,
 } from "../lib/logo_image.ts";
+import {
+  sendFrameOrClose,
+  WS_BACKPRESSURE_OPTIONS,
+} from "../lib/ws_backpressure.ts";
 
 /** `null` when the request comes from the same machine; otherwise the admin gate applies. */
 export function isLoopbackAddress(address: string | null | undefined): boolean {
@@ -553,10 +558,38 @@ interface CachedLogo {
 
 const logoCache = new Map<string, CachedLogo>();
 
+/**
+ * Codes that describe the upstream bytes. `ERR_OUT_OF_MEMORY`, `ERR_IMAGE_ENCODE_FAILED` and
+ * `ERR_INVALID_STATE` are this process's failures and must not be reported as a bad upstream image.
+ */
+type UpstreamImageFault = Extract<
+  ImageErrorCode,
+  | "ERR_IMAGE_FORMAT_UNSUPPORTED"
+  | "ERR_IMAGE_TOO_MANY_PIXELS"
+  | "ERR_IMAGE_DECODE_FAILED"
+  | "ERR_IMAGE_UNKNOWN_FORMAT"
+>;
+
+function isUpstreamImageFault(
+  code: ImageErrorCode,
+): code is UpstreamImageFault {
+  switch (code) {
+    case "ERR_IMAGE_FORMAT_UNSUPPORTED":
+    case "ERR_IMAGE_TOO_MANY_PIXELS":
+    case "ERR_IMAGE_DECODE_FAILED":
+    case "ERR_IMAGE_UNKNOWN_FORMAT":
+      return true;
+    case "ERR_IMAGE_ENCODE_FAILED":
+    case "ERR_OUT_OF_MEMORY":
+    case "ERR_INVALID_STATE":
+      return false;
+  }
+}
+
 type LogoResult =
   | ({ readonly kind: "ok" } & CachedLogo)
   | { readonly kind: "upstream"; readonly status: number }
-  | { readonly kind: "undecodable"; readonly code: string }
+  | { readonly kind: "undecodable"; readonly code: UpstreamImageFault }
   | { readonly kind: "too-large"; readonly bytes: number };
 
 function logoBaseUrl(): string {
@@ -594,10 +627,8 @@ async function fetchLogo(
   try {
     metadata = await inspectLogo(raw);
   } catch (error) {
-    const code =
-      typeof error === "object" && error !== null && "code" in error
-        ? String((error as { code: unknown }).code)
-        : "ERR_IMAGE_DECODE_FAILED";
+    const code = imageErrorCode(error);
+    if (code === undefined || !isUpstreamImageFault(code)) throw error;
     return { kind: "undecodable", code };
   }
 
@@ -675,6 +706,7 @@ export function startServer(options?: ServerOptions) {
       "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:;",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Content-Language": "en",
     // Unconditional, not conditional on an `Origin` header being present. The same URL answers
     // differently per origin (grant or refusal), and the no-`Origin` variant is the one a cache is
     // most likely to store first; without `Vary` it would then be replayed — a refusal as often as
@@ -703,7 +735,7 @@ export function startServer(options?: ServerOptions) {
     trustProxy: (Bun.env.SPORTSDESK_TRUST_PROXY ?? "") === "1",
   };
 
-  const serveConfig: Parameters<typeof Bun.serve>[0] = {
+  const serveConfig = {
     development: isDevelopment,
     // Bodies here are small JSON documents and one 1 MiB form probe. Without a cap a chunked
     // request is buffered in full by `req.json()` / `arrayBuffer()` (measured: a 6 MiB POST to
@@ -746,6 +778,178 @@ export function startServer(options?: ServerOptions) {
             else out[k] = [out[k] as string, String(v)];
           }
           return Response.json(out, { headers: cors });
+        } catch (err) {
+          return Response.json(
+            { error: String(err) },
+            { status: 400, headers: cors },
+          );
+        }
+      }
+
+      // 2d. Bet-ticker XML: parse one feed document and echo the compact tree.
+      if (pathname === "/api/parse-bet-ticker" && req.method === "POST") {
+        try {
+          const text = await req.text();
+          if (text.trim() === "") {
+            return Response.json(
+              { error: "empty body" },
+              { status: 400, headers: cors },
+            );
+          }
+          const { parseBetTickerXml } = await import("../lib/live_wagers.ts");
+          return Response.json(parseBetTickerXml(text), { headers: cors });
+        } catch (err) {
+          return Response.json(
+            { error: String(err) },
+            { status: 400, headers: cors },
+          );
+        }
+      }
+
+      // 2i. TOML parse: parse one TOML document and echo the result.
+      if (pathname === "/api/parse-toml" && req.method === "POST") {
+        try {
+          const text = await req.text();
+          if (text.trim() === "") {
+            return Response.json(
+              { error: "empty body" },
+              { status: 400, headers: cors },
+            );
+          }
+          const { parseToml } = await import("../lib/toml_parse.ts");
+          return Response.json(parseToml(text), { headers: cors });
+        } catch (err) {
+          return Response.json(
+            { error: String(err) },
+            { status: 400, headers: cors },
+          );
+        }
+      }
+
+      // 2h. Fantasy402 AJAX XML: parse one Fantasy402 AJAX XML response and echo the compact tree.
+      if (pathname === "/api/parse-fantasy402-ajax" && req.method === "POST") {
+        try {
+          const text = await req.text();
+          if (text.trim() === "") {
+            return Response.json(
+              { error: "empty body" },
+              { status: 400, headers: cors },
+            );
+          }
+          const { parseFantasy402AjaxXml } =
+            await import("../lib/customer_profile.ts");
+          return Response.json(parseFantasy402AjaxXml(text), { headers: cors });
+        } catch (err) {
+          return Response.json(
+            { error: String(err) },
+            { status: 400, headers: cors },
+          );
+        }
+      }
+
+      // 2g. AJAX XML: parse one AJAX-delivered XML response and echo the compact tree.
+      if (pathname === "/api/parse-ajax-xml" && req.method === "POST") {
+        try {
+          const text = await req.text();
+          if (text.trim() === "") {
+            return Response.json(
+              { error: "empty body" },
+              { status: 400, headers: cors },
+            );
+          }
+          const { parseAjaxXml } = await import("../lib/customer_profile.ts");
+          return Response.json(parseAjaxXml(text), { headers: cors });
+        } catch (err) {
+          return Response.json(
+            { error: String(err) },
+            { status: 400, headers: cors },
+          );
+        }
+      }
+
+      // 2f. Transactions XML: parse one transactions document and echo the compact tree.
+      if (pathname === "/api/parse-transactions" && req.method === "POST") {
+        try {
+          const text = await req.text();
+          if (text.trim() === "") {
+            return Response.json(
+              { error: "empty body" },
+              { status: 400, headers: cors },
+            );
+          }
+          const { parseTransactionsXml } =
+            await import("../lib/customer_profile.ts");
+          return Response.json(parseTransactionsXml(text), { headers: cors });
+        } catch (err) {
+          return Response.json(
+            { error: String(err) },
+            { status: 400, headers: cors },
+          );
+        }
+      }
+
+      // 2e. Customer performance XML: parse one performance document and echo the compact tree.
+      if (
+        pathname === "/api/parse-customer-performance" &&
+        req.method === "POST"
+      ) {
+        try {
+          const text = await req.text();
+          if (text.trim() === "") {
+            return Response.json(
+              { error: "empty body" },
+              { status: 400, headers: cors },
+            );
+          }
+          const { parseCustomerPerformanceXml } =
+            await import("../lib/customer_profile.ts");
+          return Response.json(parseCustomerPerformanceXml(text), {
+            headers: cors,
+          });
+        } catch (err) {
+          return Response.json(
+            { error: String(err) },
+            { status: 400, headers: cors },
+          );
+        }
+      }
+
+      // 2c. Customer profile XML: parse one profile document and echo the compact tree.
+      if (pathname === "/api/parse-customer-profile" && req.method === "POST") {
+        try {
+          const text = await req.text();
+          if (text.trim() === "") {
+            return Response.json(
+              { error: "empty body" },
+              { status: 400, headers: cors },
+            );
+          }
+          const { customerRowFromXml } =
+            await import("../lib/customer_profile.ts");
+          return Response.json(customerRowFromXml(text), { headers: cors });
+        } catch (err) {
+          return Response.json(
+            { error: String(err) },
+            { status: 400, headers: cors },
+          );
+        }
+      }
+
+      // 2b. XML parse debug: parse one XML body with Bun.XML and echo the compact tree.
+      if (pathname === "/api/parse-xml" && req.method === "POST") {
+        try {
+          const text = await req.text();
+          if (text.trim() === "") {
+            return Response.json(
+              { error: "empty body" },
+              { status: 400, headers: cors },
+            );
+          }
+          const compact = url.searchParams.get("compact") !== "false";
+          const parsed = compact
+            ? Bun.XML.parse(text)
+            : Bun.XML.parse(text, { compact: false });
+          return Response.json(parsed, { headers: cors });
         } catch (err) {
           return Response.json(
             { error: String(err) },
@@ -1722,14 +1926,14 @@ export function startServer(options?: ServerOptions) {
               };
         const now = new Date();
         return Response.json(
-          {
+          await withWeblog({
             success: true,
             kpis: deriveDeskKpis(
               { agentTree, liveBets, liveWagers, customerBook },
               now,
             ),
             generatedAt: now.toISOString(),
-          },
+          }),
           { headers: { ...cors, "Cache-Control": "no-store" } },
         );
       }
@@ -1879,9 +2083,22 @@ export function startServer(options?: ServerOptions) {
             },
           );
         }
-        return new Response(Bun.file(contained), {
-          headers: { ...cors, "Cache-Control": "public, max-age=3600" },
-        });
+        const FONT_MIME = {
+          woff: "font/woff",
+          woff2: "font/woff2",
+          ttf: "font/ttf",
+          otf: "font/otf",
+          eot: "application/vnd.ms-fontobject",
+        } as const;
+        type FontExt = keyof typeof FONT_MIME;
+        const ext = contained.split(".").pop()?.toLowerCase() ?? "";
+        const headers: Record<string, string> = {
+          ...cors,
+          "Cache-Control": "public, max-age=3600",
+        };
+        if (ext in FONT_MIME)
+          headers["Content-Type"] = FONT_MIME[ext as FontExt];
+        return new Response(Bun.file(contained), { headers });
       }
 
       // Telegram webhook: Telegram echoes the secret registered by setWebhook in this header
@@ -2001,12 +2218,12 @@ export function startServer(options?: ServerOptions) {
             },
             { headers: cors },
           );
-        } catch (err: any) {
+        } catch (err) {
           return Response.json(
             {
               success: false,
               ok: false,
-              error: err?.message || String(err),
+              error: err instanceof Error ? err.message : String(err),
             },
             { status: 500, headers: cors },
           );
@@ -2065,29 +2282,393 @@ export function startServer(options?: ServerOptions) {
         { status: 500, headers: baseHeaders },
       );
     },
-  };
+  } satisfies Parameters<typeof Bun.serve>[0];
 
-  if (unixSocket) {
-    (serveConfig as any).unix = unixSocket;
-  } else {
-    if (options?.port !== undefined) {
-      serveConfig.port = options.port;
-    }
-    if (options?.hostname !== undefined) {
-      serveConfig.hostname = options.hostname;
-    }
-  }
-
-  const server = Bun.serve(serveConfig);
+  const server: Bun.Server<undefined> = Bun.serve({
+    ...serveConfig,
+    // The dashboard's live bridge upgrades a guarded route that is already in DAEMON_ROUTES.
+    fetch: withBridgeUpgrade(serveConfig.fetch, ingress),
+    websocket: bridgeWebsocket,
+    ...(unixSocket
+      ? { unix: unixSocket }
+      : {
+          ...(options?.port !== undefined && { port: options.port }),
+          ...(options?.hostname !== undefined && {
+            hostname: options.hostname,
+          }),
+        }),
+  });
+  attachBridgeHub(server);
   return server;
 }
 
-if (import.meta.main) {
-  const server = startServer();
-  const location = server.url ? server.url.toString() : "unix domain socket";
-  console.log(`[SportsDesk Webview Server] Active on ${location}`);
-  console.log(` • Master Dashboard : ${location}`);
-  console.log(` • Mini App (TMA)   : ${location}miniapp`);
-  console.log(` • Health Probe     : ${location}health`);
-  console.log(` • Watch List API   : ${location}api/watchlist`);
+/**
+ * The webview daemon is the long-lived process, so it owns the bridge rollup schedules. The
+ * standalone Telegram bot daemon excludes them (`BRIDGE_SCHEDULE_IDS`), so running both does not
+ * publish twice or send duplicate digests.
+ */
+export function startBridgeSchedules(): () => void {
+  const scheduler = new ReportingSchedulerService();
+  const stop = scheduler.startBridgeSchedules();
+  console.log(
+    "[Bridge Cron] bridge schedules active (America/Chicago): 3a/3b/3c every 15m, weblog hourly at :07",
+  );
+  return stop;
+}
+
+if (import.meta.main)
+  queueMicrotask(() => {
+    // defer past module eval
+    const server = startServer();
+    const stopBridgeCron = startBridgeSchedules();
+    const location = server.url ? server.url.toString() : "unix domain socket";
+    console.log(`[SportsDesk Webview Server] Active on ${location}`);
+    console.log(` • Master Dashboard : ${location}`);
+    console.log(` • Mini App (TMA)   : ${location}miniapp`);
+    console.log(` • Health Probe     : ${location}health`);
+    console.log(` • Watch List API   : ${location}api/watchlist`);
+    const shutdown = (): void => {
+      stopBridgeCron();
+      server.stop(true);
+      process.exit(0);
+    };
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
+  });
+
+/**
+ * Merge the latest f402-weblog rollup and the last bridge rollup cycle into an aggregate response.
+ * The cycle state is the same file the reporting scheduler writes, so the dashboard's Review Queue
+ * and the Telegram digest can never disagree about what the last run saw.
+ */
+async function withWeblog<T extends Record<string, unknown>>(
+  value: T,
+): Promise<T & { weblog: unknown; bridge: unknown }> {
+  const mod = await import("../lib/f402_weblog_latest.ts");
+  const [latest, bridge] = await Promise.all([
+    mod.loadWeblogLatest(),
+    readBridgeRollupState(),
+  ]);
+  return {
+    ...value,
+    weblog: latest.status === "ok" ? latest.rollup : latest,
+    bridge,
+  };
+}
+
+/** Last bridge rollup cycle for the panel, verbatim. */
+/* The panel renders defensively, so the payload is not re-validated; the scheduler's digest path does. */
+export async function readBridgeRollupState(): Promise<unknown> {
+  // Dynamic import (same pattern as the WebLog loader): keeps every line above this one
+  // stable, which the docs' file:line citation pins depend on.
+  const { resolveBridgeRollupStatePath } =
+    await import("../lib/bridge_rollup_cron.ts");
+  const path = resolveBridgeRollupStatePath();
+  try {
+    return JSON.parse(await Bun.file(path).text()) as unknown;
+  } catch {
+    return { updatedAt: null, jobs: [], alerts: [] };
+  }
+}
+
+/*
+ * Dashboard live bridge: a same-origin pub/sub hub that relays the blob gateway's bridge topics.
+ *
+ * Why an upgrade on `/api/live-bets` instead of a new route: that path is already a guarded route
+ * in DAEMON_ROUTES, so reusing it keeps the route table, the OpenAPI fragment and the ledger's
+ * route counts unchanged, and unauthenticated callers still meet the route's own `piiRejection`
+ * guard. A browser cannot set headers on a WebSocket handshake, so the dashboard offers the admin
+ * token as a `bearer-<token>` subprotocol and the guard runs against a synthetic request that
+ * carries it as `authorization`. The token never appears in a URL, a log or a public response.
+ */
+
+/** Topics the dashboard subscribes to; the relay republishes exactly these. */
+export const BRIDGE_WS_TOPICS = [
+  "wagers-by-state",
+  "f402-bet-ticker",
+  "f402-pending",
+  "gslive-tally",
+  "f402-weblog",
+] as const;
+
+/** Offered first by the dashboard; the server echoes it so the browser accepts the upgrade. */
+export const BRIDGE_WS_PROTOCOL = "sportsdesk.bridge.v1";
+
+/** Browsers cannot set headers on a WebSocket, so the bearer rides in the subprotocol list. */
+const BRIDGE_WS_TOKEN_PREFIX = "bearer-";
+
+/** An already-registered guarded route: reusing it keeps DAEMON_ROUTES and the ledger unchanged. */
+const BRIDGE_WS_PATH = "/api/live-bets";
+
+const BRIDGE_WS_CHANNEL_RE = /^[a-z0-9-]{1,32}$/;
+
+type BridgeSocket = {
+  readonly subscriptions: readonly string[];
+  subscribe: (channel: string) => void;
+  unsubscribe: (channel: string) => void;
+  send: (frame: string) => number;
+  close: (code?: number, reason?: string) => void;
+};
+
+type BridgeProtocols = {
+  readonly token: string | null;
+  readonly echo: string | null;
+};
+
+let bridgeHub: Bun.Server<undefined> | null = null;
+let bridgeRelaySocket: WebSocket | null = null;
+let bridgeRelayTimer: ReturnType<typeof setTimeout> | null = null;
+let bridgeRelayBackoffMs = 1_000;
+let bridgeRelayStarted = false;
+
+/** Give the upgrade path the live server instance; `startServer` calls this after `Bun.serve`. */
+export function attachBridgeHub(server: Bun.Server<undefined>): void {
+  bridgeHub = server;
+}
+
+/** Whether this request is the dashboard's WebSocket upgrade for the reused guarded route. */
+export function isBridgeUpgrade(req: Request): boolean {
+  const upgrade = req.headers.get("upgrade");
+  if (upgrade === null || upgrade.toLowerCase() !== "websocket") return false;
+  try {
+    return new URL(req.url).pathname === BRIDGE_WS_PATH;
+  } catch {
+    return false;
+  }
+}
+
+/** The admin token and the protocol to echo, read from what the browser offered. */
+export function bridgeProtocols(req: Request): BridgeProtocols {
+  const offered = (req.headers.get("sec-websocket-protocol") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value !== "");
+  const bearer = offered.find((value) =>
+    value.startsWith(BRIDGE_WS_TOKEN_PREFIX),
+  );
+  return {
+    token:
+      bearer === undefined ? null : bearer.slice(BRIDGE_WS_TOKEN_PREFIX.length),
+    echo: offered.includes(BRIDGE_WS_PROTOCOL) ? BRIDGE_WS_PROTOCOL : null,
+  };
+}
+
+/** What the route's guard sees: same URL, with the subprotocol token as a bearer header. */
+export function bridgeUpgradeRequest(req: Request): Request {
+  const { token } = bridgeProtocols(req);
+  const headers = new Headers(req.headers);
+  headers.delete("sec-websocket-protocol");
+  if (token === null || token === "") headers.delete("authorization");
+  else headers.set("authorization", `Bearer ${token}`);
+  return new Request(req.url, { method: req.method, headers });
+}
+
+/** `null` when the request may upgrade; otherwise the guarded route's own rejection. */
+export function bridgeUpgradeRejection(
+  req: Request,
+  address: string | null | undefined,
+  ingress: Ingress,
+): { status: number; error: string } | null {
+  return piiRejection(bridgeUpgradeRequest(req), address, ingress);
+}
+
+function bridgeRefusal(status: number, error: string): Response {
+  return Response.json({ success: false, error }, { status });
+}
+
+/** Wrap the daemon fetch so only the bridge upgrade diverges; every other request is untouched. */
+export function withBridgeUpgrade(
+  inner: (req: Request) => Promise<Response>,
+  ingress: Ingress,
+): (req: Request) => Promise<Response | undefined> {
+  return async (req) => {
+    if (!isBridgeUpgrade(req)) return inner(req);
+    const server = bridgeHub;
+    if (server === null) return bridgeRefusal(503, "hub_not_ready");
+    const rejected = bridgeUpgradeRejection(
+      req,
+      server.requestIP(req)?.address,
+      ingress,
+    );
+    if (rejected !== null)
+      return bridgeRefusal(rejected.status, rejected.error);
+    const { echo } = bridgeProtocols(req);
+    const upgraded = server.upgrade(
+      req,
+      echo === null ? {} : { headers: { "Sec-WebSocket-Protocol": echo } },
+    );
+    return upgraded ? undefined : bridgeRefusal(426, "upgrade_failed");
+  };
+}
+
+function bridgeSend(socket: BridgeSocket, payload: unknown): void {
+  sendFrameOrClose(socket, JSON.stringify(payload));
+}
+
+/**
+ * Same wire protocol as the blob gateway: `PING`/`PONG`, `SUBSCRIBE`/`SUBSCRIBED` and
+ * `UNSUBSCRIBE`/`UNSUBSCRIBED`, all synchronous (Bun auto-corks `message`). The ack's
+ * `channels` and `subscriptions` both come from uWebSockets' own topic table.
+ */
+export const bridgeWebsocket = {
+  // Relayed rollups go out through `bridgeHub.publish`, which drops frames for a stalled tab
+  // while the socket stays open; the cap closes it so the page reconnects and resubscribes.
+  ...WS_BACKPRESSURE_OPTIONS,
+  open(): void {
+    startBridgeRelay();
+  },
+  message(ws: BridgeSocket, raw: string | Buffer): void {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(typeof raw === "string" ? raw : raw.toString("utf8"));
+    } catch {
+      bridgeSend(ws, { type: "ERROR", code: "invalid_json" });
+      return;
+    }
+    if (parsed === null || typeof parsed !== "object") {
+      bridgeSend(ws, { type: "ERROR", code: "invalid_message" });
+      return;
+    }
+    const msg = parsed as { type?: unknown; channel?: unknown };
+    if (msg.type === "PING") {
+      bridgeSend(ws, { type: "PONG", ts: Date.now() });
+      return;
+    }
+    if (
+      typeof msg.channel !== "string" ||
+      !BRIDGE_WS_CHANNEL_RE.test(msg.channel)
+    ) {
+      bridgeSend(ws, { type: "ERROR", code: "invalid_channel" });
+      return;
+    }
+    if (msg.type === "SUBSCRIBE") {
+      ws.subscribe(msg.channel);
+      bridgeSend(ws, {
+        type: "SUBSCRIBED",
+        channel: msg.channel,
+        channels: ws.subscriptions,
+        subscriptions: ws.subscriptions,
+      });
+      return;
+    }
+    if (msg.type !== "UNSUBSCRIBE") {
+      bridgeSend(ws, { type: "ERROR", code: "invalid_message" });
+      return;
+    }
+    ws.unsubscribe(msg.channel);
+    bridgeSend(ws, {
+      type: "UNSUBSCRIBED",
+      channel: msg.channel,
+      channels: ws.subscriptions,
+      subscriptions: ws.subscriptions,
+    });
+  },
+  close(): void {},
+};
+
+/** Connect once to the blob gateway and republish its bridge frames onto the local hub. */
+function startBridgeRelay(): void {
+  if (bridgeRelayStarted) return;
+  bridgeRelayStarted = true;
+  void connectBridgeRelay();
+}
+
+async function connectBridgeRelay(): Promise<void> {
+  const server = bridgeHub;
+  if (server === null) {
+    scheduleBridgeRelay();
+    return;
+  }
+  try {
+    const { resolveBlobApiToken, resolveBlobGatewayUrl } =
+      await import("../lib/blob_upload.ts");
+    const gateway = resolveBlobGatewayUrl();
+    const token = await resolveBlobApiToken();
+    if (token === "") {
+      scheduleBridgeRelay();
+      return;
+    }
+    const ticketResponse = await fetch(`${gateway}/api/v1/ws-tickets`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (!ticketResponse.ok) {
+      scheduleBridgeRelay();
+      return;
+    }
+    const { ticket } = (await ticketResponse.json()) as { ticket?: unknown };
+    if (typeof ticket !== "string" || ticket === "") {
+      scheduleBridgeRelay();
+      return;
+    }
+    const url = new URL(`${gateway}/ws/live-bets`);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    url.searchParams.set("ticket", ticket);
+    const socket = new WebSocket(url);
+    bridgeRelaySocket = socket;
+    socket.addEventListener("open", () => {
+      bridgeRelayBackoffMs = 1_000;
+      for (const topic of BRIDGE_WS_TOPICS) {
+        socket.send(JSON.stringify({ type: "SUBSCRIBE", channel: topic }));
+      }
+    });
+    socket.addEventListener("message", (event) => {
+      if (typeof event.data !== "string") {
+        // The gateway only sends text frames; a binary one is a protocol change worth seeing.
+        console.warn(
+          "[bridge] relay dropped a non-text frame from the gateway",
+        );
+        return;
+      }
+      const raw = event.data;
+      if (raw === "" || bridgeHub === null) return;
+      let kind: unknown;
+      try {
+        kind = (JSON.parse(raw) as { kind?: unknown }).kind;
+      } catch {
+        return;
+      }
+      if (
+        typeof kind !== "string" ||
+        !(BRIDGE_WS_TOPICS as readonly string[]).includes(kind)
+      ) {
+        return;
+      }
+      bridgeHub.publish(kind, raw);
+    });
+    socket.addEventListener("close", () => {
+      if (bridgeRelaySocket !== socket) return;
+      bridgeRelaySocket = null;
+      scheduleBridgeRelay();
+    });
+  } catch {
+    scheduleBridgeRelay();
+  }
+}
+
+function scheduleBridgeRelay(): void {
+  if (bridgeRelayTimer !== null) return;
+  const delay = bridgeRelayBackoffMs;
+  bridgeRelayBackoffMs = Math.min(bridgeRelayBackoffMs * 2, 30_000);
+  bridgeRelayTimer = setTimeout(() => {
+    bridgeRelayTimer = null;
+    void connectBridgeRelay();
+  }, delay);
+  // The relay retries in the background; it must not keep the process alive.
+  bridgeRelayTimer.unref?.();
+}
+
+/** Stop the relay and detach the hub; tests and shutdown use this. */
+export function stopBridgeHub(): void {
+  bridgeRelayStarted = false;
+  bridgeRelayBackoffMs = 1_000;
+  if (bridgeRelayTimer !== null) {
+    clearTimeout(bridgeRelayTimer);
+    bridgeRelayTimer = null;
+  }
+  const socket = bridgeRelaySocket;
+  bridgeRelaySocket = null;
+  bridgeHub = null;
+  socket?.close();
 }

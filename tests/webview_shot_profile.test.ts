@@ -48,6 +48,46 @@ describe("parseShotArgs", () => {
     ).toThrow("only local paths and file:// URLs are accepted, not https:");
   });
 
+  test("a bad enum or out-of-range number is a usage error, never a silent default", () => {
+    for (const argv of [
+      ["https://x", "--backend", "firefox"],
+      ["https://x", "--format", "gif"],
+      ["https://x", "--encoding", "hex"],
+      ["https://x", "--width", "0"],
+      ["https://x", "--height", "16385"],
+      ["https://x", "--width", "wide"],
+      ["https://x", "--quality", "101"],
+      ["https://x", "--resize", "0x10"],
+      ["https://x", "--resize", "99999"],
+    ]) {
+      expect(() => parseShotArgs(argv)).toThrow(ShotUsageError);
+    }
+  });
+
+  test("jpg is an alias for jpeg, and raw-buffer is an accepted encoding", () => {
+    expect(parseShotArgs(["https://x", "--format", "jpg"])?.format).toBe(
+      "jpeg",
+    );
+    expect(
+      parseShotArgs(["https://x", "--encoding", "raw-buffer"])?.encoding,
+    ).toBe("raw-buffer");
+    expect(parseShotArgs(["https://x", "--width", "200"])?.width).toBe(200);
+  });
+
+  test("--upload-blob, --blob-gateway and --blob-key parse", () => {
+    const options = parseShotArgs([
+      "https://x",
+      "--upload-blob",
+      "--blob-gateway",
+      "http://127.0.0.1:9",
+      "--blob-key=shots/a.png",
+    ]);
+    expect(options?.uploadBlob).toBe(true);
+    expect(options?.blobGateway).toBe("http://127.0.0.1:9");
+    expect(options?.blobKey).toBe("shots/a.png");
+    expect(parseShotArgs(["https://x"])?.uploadBlob).toBe(false);
+  });
+
   test("a value flag with no value is a usage error", () => {
     expect(() => parseShotArgs(["https://x", "--out"])).toThrow(ShotUsageError);
   });

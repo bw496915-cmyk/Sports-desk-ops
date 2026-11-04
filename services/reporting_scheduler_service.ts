@@ -5,29 +5,60 @@
  *
  * Implements:
  *  1. Automated Cron/Interval Schedules for SportsDesk Master Book (Master: BILLY666):
+ *     - 10-Minute Live Volume & Positions Pulse (every 10m): Syncs live Fantasy402 stream
+ *       (`f402-bets.jsonl` + `f402-open-export.jsonl` + `DOD6` v5.4 spine) into `data/live-wagers.json`
+ *       and `data/live-bets.json` and dispatches a live summary of total volume updates and open positions.
  *     - Morning Risk Briefing (08:00 EDT): Overnight open exposure, whale watch (RF2003), sniper alerts.
  *     - Midday Steam & Volatility Pulse (13:00 EDT): Line moves, active steam originators (GP300, AT10359).
- *     - Evening Settlement Recap (23:00 EDT): Daily settled handle ($2.79M), net hold (-$63.5k), agent 50% shares.
+ *     - Evening Settlement Recap (23:00 EDT): Daily settled handle, net hold, agent 50% shares.
  *  2. Report Generators with Markdown/HTML formatting and Telegram WebApp deep links.
- *  3. Cron Runner with native Bun interval monitoring, trigger history, and on-demand dispatch.
+ *  3. Cron Runner with native Bun.cron monitoring, trigger history, and on-demand dispatch.
  */
 
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { startInProcessCron } from "../lib/bun_cron.ts";
+import {
+  formatTelegramPulseHtml,
+  runLivePositionsPulse,
+  type LivePositionsPulseSummary,
+} from "../scripts/live_positions_cron.ts";
 import { SportsDeskTelegramService } from "./sportsdesk_telegram_bot.ts";
+import {
+  formatBridgeDigestHtml,
+  keychainCredentialProbe,
+  parseBridgeRollupState,
+  resolveBridgeRollupStatePath,
+  runBridgeRollupCycle,
+  type BridgeRollupCycleResult,
+  type BridgeRollupJobId,
+} from "../lib/bridge_rollup_cron.ts";
+
+/** The bridge schedules; the webview daemon owns them and the bot daemon must not duplicate them. */
+export const BRIDGE_SCHEDULE_IDS = [
+  "sched_bridge_rollup_15m",
+  "sched_bridge_weblog_hourly",
+] as const;
 
 export type ReportType =
   | "MORNING_BRIEFING"
   | "MIDDAY_STEAM"
   | "EVENING_SETTLEMENT"
+  | "TEN_MINUTE_POSITIONS_PULSE"
+  | "BRIDGE_ROLLUP_DIGEST"
   | "CUSTOM_HOURLY_PULSE";
 
 export interface ScheduleDefinition {
   readonly id: string;
   readonly name: string;
-  readonly scheduleTime: string; // e.g. "08:00", "13:00", "23:00"
+  readonly scheduleTime: string; // e.g. "08:00", "13:00", "23:00", or cron "*/10 * * * *"
   readonly reportType: ReportType;
   readonly description: string;
   readonly targetChatId?: string;
+  /** Cron timezone; bridge schedules run on the desk clock (America/Chicago). */
+  readonly tz?: string;
+  /** Rollup jobs a bridge schedule runs; omitted means the whole cycle. */
+  readonly bridgeJobs?: readonly BridgeRollupJobId[];
   enabled: boolean;
   lastTriggeredAt?: string;
 }
@@ -40,11 +71,44 @@ export interface GeneratedReport {
   readonly targetMiniappTab: string;
 }
 
+const SUMMARY_JSON_PATH = resolve(
+  import.meta.dir,
+  "../reports/live-positions-summary.json",
+);
+
+/** The last cycle the scheduler wrote; the digest generator and the dashboard both read it. */
+function readLatestBridgeState(): BridgeRollupCycleResult | null {
+  const path = resolveBridgeRollupStatePath();
+  if (!existsSync(path)) return null;
+  try {
+    const parsed = parseBridgeRollupState(
+      JSON.parse(readFileSync(path, "utf8")) as unknown,
+    );
+    if (parsed === null) return null;
+    return {
+      updatedAt: parsed.updatedAt,
+      jobs: parsed.jobs,
+      alerts: parsed.alerts,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readLatestLiveSummary(): LivePositionsPulseSummary | null {
+  if (!existsSync(SUMMARY_JSON_PATH)) return null;
+  try {
+    return JSON.parse(
+      readFileSync(SUMMARY_JSON_PATH, "utf8"),
+    ) as LivePositionsPulseSummary;
+  } catch {
+    return null;
+  }
+}
+
 export class ReportingSchedulerService {
   private readonly telegramService: SportsDeskTelegramService;
   private readonly schedules: Map<string, ScheduleDefinition> = new Map();
-  private timer: any = null;
-
   constructor(telegramService?: SportsDeskTelegramService) {
     this.telegramService = telegramService || new SportsDeskTelegramService();
     this.telegramService.setReportGenerator((type) =>
@@ -53,34 +117,74 @@ export class ReportingSchedulerService {
     this.initDefaultSchedules();
   }
 
-  /** Fires each enabled schedule at its `HH:MM` in America/New_York; returns a stop function. */
-  public start(): () => void {
+  /**
+   * Fires each enabled schedule (`HH:MM` or 5-field cron expression) in its own timezone (the
+   * legacy reports keep America/New_York, the bridge schedules use America/Chicago); returns a
+   * stop function. `only`/`exclude` let two processes split ownership instead of double-firing.
+   */
+  public start(
+    options: {
+      readonly only?: readonly string[];
+      readonly exclude?: readonly string[];
+    } = {},
+  ): () => void {
+    const only = options.only === undefined ? null : new Set(options.only);
+    const exclude = new Set(options.exclude ?? []);
+    const started: string[] = [];
     const jobs = this.getSchedules()
       .filter((s) => s.enabled)
+      .filter((s) => (only === null ? true : only.has(s.id)))
+      .filter((s) => !exclude.has(s.id))
       .map((s) => {
-        const [hour, minute] = s.scheduleTime.split(":").map(Number);
+        const cronExpr = s.scheduleTime.includes(" ")
+          ? s.scheduleTime
+          : (() => {
+              const [hour, minute] = s.scheduleTime.split(":").map(Number);
+              return `${minute} ${hour} * * *`;
+            })();
+        started.push(`${s.scheduleTime} (${s.tz ?? "America/New_York"})`);
         return startInProcessCron(
-          `${minute} ${hour} * * *`,
+          cronExpr,
           async () => {
             s.lastTriggeredAt = new Date().toISOString();
-            await this.dispatchReportNow(s.reportType, s.targetChatId);
+            if (s.reportType === "TEN_MINUTE_POSITIONS_PULSE") {
+              await runLivePositionsPulse({
+                schedule: cronExpr,
+                ...(s.targetChatId ? { chatIdOverride: s.targetChatId } : {}),
+              });
+            } else if (s.reportType === "BRIDGE_ROLLUP_DIGEST") {
+              await this.dispatchBridgeDigest(s.bridgeJobs, s.targetChatId);
+            } else {
+              await this.dispatchReportNow(s.reportType, s.targetChatId);
+            }
           },
-          { tz: "America/New_York" },
+          { tz: s.tz ?? "America/New_York" },
         );
       });
     console.log(
-      `[Reporting Scheduler] ${jobs.length} schedules active (America/New_York): ${this.getSchedules()
-        .filter((s) => s.enabled)
-        .map((s) => s.scheduleTime)
-        .join(", ")}`,
+      `[Reporting Scheduler] ${jobs.length} schedule(s) active: ${started.join(", ")}`,
     );
     return () => {
       for (const job of jobs) job.stop();
     };
   }
 
+  /** Start exactly the bridge schedules; the webview daemon owns them. */
+  public startBridgeSchedules(): () => void {
+    return this.start({ only: BRIDGE_SCHEDULE_IDS });
+  }
+
   private initDefaultSchedules(): void {
     const defaultList: ScheduleDefinition[] = [
+      {
+        id: "sched_10m_positions_pulse",
+        name: "10-Minute Live Volume & Positions Pulse",
+        scheduleTime: "*/10 * * * *",
+        reportType: "TEN_MINUTE_POSITIONS_PULSE",
+        description:
+          "Syncs live Fantasy402 stream into data/live-wagers.json and data/live-bets.json and sends 10-minute total volume delta & open positions summary.",
+        enabled: true,
+      },
       {
         id: "sched_morning_briefing",
         name: "Morning Risk Briefing",
@@ -105,7 +209,29 @@ export class ReportingSchedulerService {
         scheduleTime: "23:00",
         reportType: "EVENING_SETTLEMENT",
         description:
-          "Settled volume ($2.79M), customer payout/loss, net book hold (-$63.5k), and agent 50% liability shares.",
+          "Settled volume, customer payout/loss, net book hold, and agent 50% liability shares.",
+        enabled: true,
+      },
+      {
+        id: "sched_bridge_rollup_15m",
+        name: "Bridge Rollup Cycle (3a/3b/3c)",
+        scheduleTime: "*/15 * * * *",
+        reportType: "BRIDGE_ROLLUP_DIGEST",
+        description:
+          "Runs the one-shot bridge rollups (bet ticker, pending, GSLive tally), publishes them and sends an on-change digest. Overlaps are skipped.",
+        tz: "America/Chicago",
+        bridgeJobs: ["bridge3a", "bridge3b", "bridge3c"],
+        enabled: true,
+      },
+      {
+        id: "sched_bridge_weblog_hourly",
+        name: "Bridge WebLog Rollup (hourly)",
+        scheduleTime: "7 * * * *",
+        reportType: "BRIDGE_ROLLUP_DIGEST",
+        description:
+          "Runs the WebLog corpus rollup hourly at minute 7 and sends an on-change Mode 6 digest. Overlaps are skipped.",
+        tz: "America/Chicago",
+        bridgeJobs: ["weblog"],
         enabled: true,
       },
     ];
@@ -122,18 +248,46 @@ export class ReportingSchedulerService {
   public generateReport(type: ReportType): GeneratedReport {
     const nowStr =
       new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC-5";
+    const liveSummary = readLatestLiveSummary();
+
+    if (type === "TEN_MINUTE_POSITIONS_PULSE" && liveSummary !== null) {
+      return {
+        reportType: type,
+        title: "10-Minute Live Volume & Positions Pulse",
+        contentHtml: formatTelegramPulseHtml(liveSummary),
+        generatedAt: nowStr,
+        targetMiniappTab: "live",
+      };
+    }
+
+    if (type === "BRIDGE_ROLLUP_DIGEST") {
+      const latest = readLatestBridgeState();
+      return {
+        reportType: type,
+        title: "Bridge Rollup Digest",
+        contentHtml:
+          latest === null
+            ? "🛰️ <b>BRIDGE ROLLUP DIGEST</b>\n\nNo rollup cycle recorded yet. Run <code>bun run bridge3a:poll --once</code> or wait for the 15-minute cycle."
+            : formatBridgeDigestHtml(latest, { quiet: true }),
+        generatedAt: nowStr,
+        targetMiniappTab: "live",
+      };
+    }
 
     if (type === "MORNING_BRIEFING") {
+      const openInfo = liveSummary
+        ? `\n• Live 24h Open Tix : <b>${liveSummary.window24hOpenPositions.openTicketsCount.toLocaleString()}</b> ($${(liveSummary.window24hOpenPositions.openRiskCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })} Risk)`
+        : "";
       const html = `
 ☀️ <b>SPORTSDESK MORNING RISK BRIEFING</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Master Agent: <code>BILLY666</code> • Generated: <code>${nowStr}</code>
 
 📊 <b>Current Production Master Scope:</b>
-• Total Accounts    : <b>9,435</b> (Active: 2,236 • Dormant: 7,191)
+• Total Accounts    : <b>14,534</b> Canonical (Active: 2,236 • Sub-Accounts Merged: 40)
 • Sub-Agents in Tree: <b>668</b> (Active Sports: 460)
-• Total Sports Handle: <b>$2,786,199.00</b> (10,941 Settled Tickets)
-• Lifetime Net Hold : <b>+$10,487,926.00</b> (Agent 50%: <b>+$5,243,963.00</b>)
+• Total Sports Handle: <b>$2,786,199.00</b> (10,941 Settled Tickets)${openInfo}
+• Lifetime Net Hold : <b>+$35,697,418.60</b> (DOD6 v5.4 Conserved Spine)
 
 ⚠️ <b>Overnight & Morning Threat Assessment:</b>
 • <b>Whale Surveillance (RF2003):</b> Account represents <b>33.7% of total book handle</b> ($940k). Verify single-wager limit ceiling is active.
@@ -208,6 +362,24 @@ Master Agent: <code>BILLY666</code> • Generated: <code>${nowStr}</code>
     type: ReportType,
     chatId?: string,
   ): Promise<boolean> {
+    if (type === "BRIDGE_ROLLUP_DIGEST") {
+      // Manual dispatch sends what the last scheduled cycle saw; it must not run a fresh cycle
+      // inside an HTTP request (the rollups can take minutes). The cron branch runs the cycle.
+      const rep = this.generateReport(type);
+      const res = await this.telegramService.sendMessage(
+        chatId || "",
+        rep.contentHtml,
+        { parse_mode: "HTML" },
+      );
+      return res.ok;
+    }
+    if (type === "TEN_MINUTE_POSITIONS_PULSE") {
+      const summary = await runLivePositionsPulse({
+        schedule: "*/10 * * * *",
+        ...(chatId ? { chatIdOverride: chatId } : {}),
+      });
+      return summary.telegramDelivery.ok;
+    }
     const rep = this.generateReport(type);
     console.log(
       `[Reporting Scheduler] Dispatching ${rep.title} to Telegram...`,
@@ -221,13 +393,66 @@ Master Agent: <code>BILLY666</code> • Generated: <code>${nowStr}</code>
     );
     return res.ok;
   }
+
+  /**
+   * Run the bridge cycle (optionally a subset of jobs) and send its change digest. On-change
+   * semantics: when the cycle reports no new alerts (nothing fired — a clean run, or a standing
+   * failure that already paged), the Telegram send is suppressed; the state file and the JSONL
+   * history still record the run, and manual dispatch always delivers. This keeps the 15-minute
+   * schedule from becoming 96 identical pings a day.
+   */
+  public async dispatchBridgeDigest(
+    jobs?: readonly BridgeRollupJobId[],
+    chatId?: string,
+  ): Promise<boolean> {
+    const result = await bridgeCycleRunner(jobs);
+    if (result.alerts.length === 0) {
+      console.log(
+        `[Reporting Scheduler] Bridge digest ${result.updatedAt}: no changes, digest suppressed ` +
+          `(jobs=${result.jobs.map((job) => `${job.id}:${job.ok ? "ok" : "fail"}`).join(",")})`,
+      );
+      return true;
+    }
+    const res = await this.telegramService.sendMessage(
+      chatId || "",
+      formatBridgeDigestHtml(result, { quiet: true }),
+      { parse_mode: "HTML" },
+    );
+    console.log(
+      `[Reporting Scheduler] Bridge digest ${result.updatedAt}: ${result.alerts.length} alert(s), ` +
+        `jobs=${result.jobs.map((job) => `${job.id}:${job.ok ? "ok" : "fail"}`).join(",")} delivery=${res.ok}`,
+    );
+    return res.ok;
+  }
+}
+
+/** Indirection so tests can drive the scheduler without spawning the four CLIs. */
+let bridgeCycleRunner: (
+  jobs?: readonly BridgeRollupJobId[],
+) => Promise<BridgeRollupCycleResult> = (jobs) =>
+  runBridgeRollupCycle({
+    ...(jobs === undefined ? {} : { jobs }),
+    // The cron daemon is a fresh process with no shell environment: F402/GSID credentials live in
+    // the OS keychain (canonical service first, legacy fallback), so the gate must read there.
+    credentials: keychainCredentialProbe({ env: Bun.env }),
+  });
+
+/** Replace the cycle runner; tests only. */
+export function setBridgeCycleRunner(
+  runner: (
+    jobs?: readonly BridgeRollupJobId[],
+  ) => Promise<BridgeRollupCycleResult>,
+): void {
+  bridgeCycleRunner = runner;
 }
 
 /** Scheduled reports plus inbound commands; polls only when no webhook is registered. */
 export async function startBotDaemon(): Promise<void> {
   const bot = new SportsDeskTelegramService();
   const scheduler = new ReportingSchedulerService(bot);
-  const stopSchedules = scheduler.start();
+  // Bridge rollups are owned by the webview daemon (it is the long-lived process); starting them
+  // here too would publish twice and send duplicate digests.
+  const stopSchedules = scheduler.start({ exclude: BRIDGE_SCHEDULE_IDS });
   const shutdown = () => {
     stopSchedules();
     bot.stopPolling();

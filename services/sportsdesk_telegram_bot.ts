@@ -56,7 +56,6 @@ export interface TelegramInlineKeyboardButton {
   readonly callback_data?: string;
   readonly web_app?: { readonly url: string };
 }
-
 export interface TelegramSendMessageOptions {
   readonly parse_mode?: "HTML" | "Markdown" | "MarkdownV2";
   readonly disable_web_page_preview?: boolean;
@@ -68,9 +67,13 @@ export interface TelegramSendMessageOptions {
 export interface ScheduledReportTask {
   readonly id: string;
   readonly name: string;
-  readonly cronExpression: string; // e.g. "08:00", "13:00", "23:00"
+  readonly cronExpression: string; // e.g. "08:00", "13:00", "23:00", "*/10 * * * *"
   readonly reportType:
-    "MORNING_BRIEFING" | "MIDDAY_STEAM" | "EVENING_SETTLEMENT";
+    | "MORNING_BRIEFING"
+    | "MIDDAY_STEAM"
+    | "EVENING_SETTLEMENT"
+    | "TEN_MINUTE_POSITIONS_PULSE"
+    | "BRIDGE_ROLLUP_DIGEST";
   readonly description: string;
 }
 
@@ -78,6 +81,8 @@ export const REPORT_TYPES = [
   "MORNING_BRIEFING",
   "MIDDAY_STEAM",
   "EVENING_SETTLEMENT",
+  "TEN_MINUTE_POSITIONS_PULSE",
+  "BRIDGE_ROLLUP_DIGEST",
 ] as const satisfies readonly ScheduledReportTask["reportType"][];
 
 export type ReportGenerator = (type: ScheduledReportTask["reportType"]) => {

@@ -6,7 +6,9 @@
  */
 
 /** Every `Bun.inspect` option set explicitly, so a report never depends on Bun's defaults. */
-export type CliInspectOptions = Readonly<Required<Bun.BunInspectOptions>>;
+export type CliInspectOptions = Readonly<
+  Required<NonNullable<Parameters<typeof Bun.inspect>[1]>>
+>;
 
 export interface InspectTarget {
   readonly isTTY?: boolean | undefined;
