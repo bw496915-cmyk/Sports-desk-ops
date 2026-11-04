@@ -7,7 +7,6 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -276,8 +275,7 @@ describe("publishArtifactsToR2", () => {
 describe("collectLocalArtifacts", () => {
   test("loads present files and records missing ones under skipped", async () => {
     const root = await mkdtemp(join(tmpdir(), "r2-artifacts-"));
-    mkdirSync(join(root, "data"), { recursive: true });
-    writeFileSync(
+    await Bun.write(
       join(root, "data", "agent-tree.json"),
       '{"observedAt":"2026-11-04T19:10:00.000Z","nodes":{}}',
     );
@@ -309,8 +307,7 @@ describe("collectLocalArtifacts", () => {
 
   test("falls back to file mtime when observedAtFromBody is missing or returns null", async () => {
     const root = await mkdtemp(join(tmpdir(), "r2-artifacts-"));
-    mkdirSync(join(root, "data"), { recursive: true });
-    writeFileSync(join(root, "data", "scoreboard.json"), '{"games":[]}');
+    await Bun.write(join(root, "data", "scoreboard.json"), '{"games":[]}');
     const result = await collectLocalArtifacts(root, [
       {
         key: "scoreboard/latest.json",

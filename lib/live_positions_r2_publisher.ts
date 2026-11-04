@@ -13,8 +13,6 @@
  * `row-count`) can ride along per artifact.
  */
 
-import { existsSync, statSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import type { R2S3Client } from "./r2_s3_client.ts";
@@ -190,13 +188,14 @@ export async function collectLocalArtifacts(
   const skipped: { relativePath: string; reason: string }[] = [];
   for (const spec of specs) {
     const abs = resolve(repoRoot, spec.relativePath);
-    if (!existsSync(abs)) {
+    const file = Bun.file(abs);
+    if (!(await file.exists())) {
       skipped.push({ relativePath: spec.relativePath, reason: "missing" });
       continue;
     }
     let text: string;
     try {
-      text = await readFile(abs, "utf8");
+      text = await file.text();
     } catch (error) {
       skipped.push({
         relativePath: spec.relativePath,
@@ -204,7 +203,7 @@ export async function collectLocalArtifacts(
       });
       continue;
     }
-    let observedAtIso = new Date(statSync(abs).mtimeMs).toISOString();
+    let observedAtIso = new Date(file.lastModified).toISOString();
     if (spec.observedAtFromBody !== undefined) {
       try {
         const parsed: unknown = JSON.parse(text);
