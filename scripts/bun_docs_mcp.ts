@@ -17,7 +17,8 @@ import { env } from "bun";
 import { z } from "zod";
 import { BUN_SHAPES, type BunShape } from "../lib/bun_shapes.ts";
 
-export const DEFAULT_BUN_DOCS_MCP_URL = "https://bun.com/docs/mcp";
+/** Keep in sync with ~/dotfiles/lib/cli/bun-docs-mcp-url.ts */
+export const DEFAULT_BUN_DOCS_MCP_URL = "https://bun.sh/docs/mcp";
 const PROTOCOL_VERSION = "2025-06-18";
 
 export const MCP_TOOL_NAMES = [
@@ -483,9 +484,9 @@ async function main(args: readonly string[]): Promise<void> {
       const baselinePath = flagValue(rest, "--check");
       if (baselinePath !== undefined) {
         // Offline: no network, only catalog coverage of the committed baseline.
-        const baseline = JSON.parse(
-          await Bun.file(baselinePath).text(),
-        ) as BunShapeDocsBaseline;
+        const baseline = (await Bun.file(
+          baselinePath,
+        ).json()) as BunShapeDocsBaseline;
         const problems = checkBunShapeDocsBaseline(baseline);
         print(JSON.stringify({ baselinePath, problems }, null, 2));
         if (problems.length > 0) {

@@ -12,6 +12,9 @@ reports/
 tests/.tmp-*
 schema/manifest.bin
 scratch/
+# The same directory is spelled `Scratch/` by some writers; on a case-sensitive CI checkout the
+# lowercase pattern does not match it, so name both or the outputs show up as untracked.
+Scratch/
 verification/gen-tokens-zero-drift-gate/out/
 *.log
 .DS_Store
@@ -71,3 +74,8 @@ lib/.tmp-*/
 # Bun test env files. `.env.example` is tracked and intentionally not matched.
 .env.test
 .env.test.*
+
+# Cloudflare Pages credentials read by bin/dx (`cloudflare.env` in the repo root or the workspace).
+/cloudflare.env
+cloudflare.env
+pages.env

@@ -670,7 +670,7 @@ describe("--fail-on-alert exit semantics (end to end)", () => {
           stderr: "pipe",
         });
         const exitCode = await proc.exited;
-        const stderr = await new Response(proc.stderr).text();
+        const stderr = await proc.stderr.text();
         expect(exitCode).toBe(withFlag ? 1 : 0);
         expect(await Bun.file(paths.artifact).exists()).toBe(true);
         expect((await readWagersHistory(10, paths.history)).lines).toHaveLength(
@@ -750,9 +750,9 @@ describe("OS-level scheduling: plan and validate only, never install here", () =
 describe("capture paths", () => {
   test("automation documents are siblings of the artifact (contract paths by default)", () => {
     expect(automationPathsForArtifact(WAGERS_ARTIFACT_PATH)).toEqual({
-      history: "Scratch/wagers-by-state.history.jsonl",
-      tickets: "Scratch/wagers-by-state.tickets.json",
-      alerts: "Scratch/wagers-by-state.alerts.json",
+      history: "scratch/wagers-by-state.history.jsonl",
+      tickets: "scratch/wagers-by-state.tickets.json",
+      alerts: "scratch/wagers-by-state.alerts.json",
     });
     expect(automationPathsForArtifact("tmp/x/artifact.json")).toEqual({
       history: "tmp/x/wagers-by-state.history.jsonl",

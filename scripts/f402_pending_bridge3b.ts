@@ -41,9 +41,10 @@ if (values.help) {
 const threeC =
   values["three-c-rollup"] === undefined
     ? null
-    : (JSON.parse(
-        await Bun.file(values["three-c-rollup"] as string).text(),
-      ) as { kind?: string; totals?: { openExposureCents?: number } });
+    : ((await Bun.file(values["three-c-rollup"] as string).json()) as {
+        kind?: string;
+        totals?: { openExposureCents?: number };
+      });
 if (
   threeC !== null &&
   (threeC.kind !== "gslive-tally" ||
@@ -70,7 +71,7 @@ if (fetchRequested) {
   const capturePath =
     (values["save-capture"] as string | undefined) ??
     ((Bun.env.F402_PENDING_CAPTURE_PATH ?? "").trim() ||
-      `Scratch/f402-pending/capture-${date}.json`);
+      `scratch/f402-pending/capture-${date}.json`);
   const fetched = await fetchAndPersistPending({
     token,
     date,
