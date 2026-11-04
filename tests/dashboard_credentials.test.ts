@@ -75,4 +75,18 @@ describe("the VPS deployment keeps the guard on", () => {
     expect(deploy).toContain("SPORTSDESK_ADMIN_TOKEN=${ADMIN_TOKEN}");
     expect(deploy).toContain("chmod 600");
   });
+
+  test("the lockfile ships and dependencies install frozen, without swallowing failure", () => {
+    // The unit runs `bun run services/supervisor.ts`, which imports zod. Without node_modules Bun
+    // would resolve it at run time with no lockfile and no release-age gate.
+    expect(deploy).toContain('"${REPO_ROOT}/bun.lock"');
+    const install = deploy
+      .split("\n")
+      .find((line) => line.includes("ci --production"));
+    expect(install).toBeDefined();
+    expect(install).toContain('"$BUN_BIN" ci --production');
+    expect(install).not.toContain("|| true");
+    // Installing for the host itself: a cross-platform flag here would drop its own native binaries.
+    expect(install).not.toMatch(/--(os|cpu|libc)/);
+  });
 });
