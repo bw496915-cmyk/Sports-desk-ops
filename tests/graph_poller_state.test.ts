@@ -79,7 +79,7 @@ async function mount(
 
   const specifier = `../docs/graph.js?poller-state=${++instance}`;
   await import(specifier);
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+  const settle = () => Bun.sleep(20);
   await settle();
 
   return {
