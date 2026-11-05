@@ -29,24 +29,60 @@
     "write": [],
     "color": [],
     "escapeHTML": [],
-    "inspect": ["custom", "table"],
-    "markdown": ["ansi", "html", "react", "render"],
+    "inspect": [
+      "custom",
+      "table"
+    ],
+    "markdown": [
+      "ansi",
+      "html",
+      "react",
+      "render"
+    ],
     "stringWidth": [],
     "wrapAnsi": [],
-    "Cookie": ["from", "parse"],
+    "Cookie": [
+      "from",
+      "parse"
+    ],
     "CookieMap": [],
     "Glob": [],
-    "JSON5": ["parse", "stringify"],
-    "JSONC": ["parse"],
-    "JSONL": ["parse", "parseChunk"],
-    "TOML": ["parse", "stringify"],
-    "XML": ["parse", "stringify"],
-    "YAML": ["parse", "stringify"],
+    "JSON5": [
+      "parse",
+      "stringify"
+    ],
+    "JSONC": [
+      "parse"
+    ],
+    "JSONL": [
+      "parse",
+      "parseChunk"
+    ],
+    "TOML": [
+      "parse",
+      "stringify"
+    ],
+    "XML": [
+      "parse",
+      "stringify"
+    ],
+    "YAML": [
+      "parse",
+      "stringify"
+    ],
     "deepEquals": [],
-    "semver": ["order", "satisfies"],
-    "CSRF": ["generate", "verify"],
+    "semver": [
+      "order",
+      "satisfies"
+    ],
+    "CSRF": [
+      "generate",
+      "verify"
+    ],
     "sliceAnsi": [],
-    "Archive": ["write"],
+    "Archive": [
+      "write"
+    ],
     "RedisClient": [],
     "S3Client": [
       "delete",
@@ -85,11 +121,22 @@
       "toKebab",
       "toPascal"
     ],
-    "cron": ["parse", "remove"],
-    "secrets": ["delete", "get", "set"],
+    "cron": [
+      "parse",
+      "remove"
+    ],
+    "secrets": [
+      "delete",
+      "get",
+      "set"
+    ],
     "ArrayBufferSink": [],
-    "CryptoHasher": ["algorithms", "hash"],
+    "CryptoHasher": [
+      "algorithms",
+      "hash"
+    ],
     "concatArrayBuffers": [],
+    "readableStreamToArrayBuffer": [],
     "allocUnsafe": [],
     "gunzipSync": [],
     "gzipSync": [],
@@ -136,7 +183,9 @@
       "reverse",
       "setServers"
     ],
-    "fetch": ["preconnect"],
+    "fetch": [
+      "preconnect"
+    ],
     "listen": [],
     "serve": [],
     "udpSocket": [],
@@ -146,6 +195,8 @@
       "fromClipboard",
       "hasClipboardImage"
     ],
-    "WebView": ["closeAll"]
+    "WebView": [
+      "closeAll"
+    ]
   }
 }
