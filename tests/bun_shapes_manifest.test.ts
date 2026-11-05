@@ -64,8 +64,8 @@ const rules = (problems: ReturnType<typeof analyzeBunShapes>) =>
   problems.map((p) => p.rule);
 
 describe("manifest", () => {
-  test("partition is 79 shapes across the eight subsystems", () => {
-    expect(BUN_SHAPES.length).toBe(79);
+  test("partition is 80 shapes across the eight subsystems", () => {
+    expect(BUN_SHAPES.length).toBe(80);
     const counts = Object.fromEntries(SHAPE_SUBSYSTEMS.map((s) => [s, 0]));
     for (const s of BUN_SHAPES)
       counts[s.subsystem] = (counts[s.subsystem] ?? 0) + 1;
