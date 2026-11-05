@@ -50,6 +50,7 @@ const COVERAGE: Readonly<Record<string, string>> = {
   gitkeep: "placeholder",
   mmd: "Mermaid verification artifact",
   tla: "TLA+ verification artifact",
+  plist: "launchd template (macOS operator)",
 };
 
 const EXACT_FILES: Readonly<Record<string, string>> = {
@@ -105,7 +106,8 @@ describe("language coverage", () => {
     };
     const scripts = pkg.scripts ?? {};
     expect(scripts["format:check"]).toBe("bun fmt --check");
-    expect(scripts["lint:check"]).toContain("oxlint --deny-warnings");
+    expect(scripts["lint:check"]).toContain("oxlint");
+    expect(scripts["lint:check"]).toContain("--deny-warnings");
     expect(scripts["check:innerhtml"]).toBe("bun run bin/check-innerhtml.ts");
     expect(scripts["check:fetch-init"]).toBe("bun run bin/check-fetch-init.ts");
     expect(scripts["verify:docs"]).toContain("check:spec-citations");
