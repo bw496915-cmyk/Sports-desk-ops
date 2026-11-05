@@ -668,11 +668,11 @@ This invariant — "every byte the consumer may read is written first" — is no
 
 **Where this repo uses it (pinned 2026-11-04):**
 
-| File:line                            | Fill pattern                                                                                            | Why it is safe                                                                                                   |
-| :----------------------------------- | :------------------------------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------- |
-| `lib/f402_bet_ticker_jsonl.ts:169`   | `while (read < length) { chunk = await handle.read(buffer, read, length - read, …) }`                   | `const view = buffer.subarray(0, read)` — only the written prefix is ever read; the tail is never exposed        |
-| `scripts/live_positions_cron.ts:375` | `const bytesRead = readSync(fd, buf, 0, len, offset)` then `decoder.decode(buf.subarray(0, bytesRead))` | The `readSync` return is captured and used to slice the exposed prefix; migrating closed a latent short-read bug |
-| `lib/gslive_tally_rollup.ts:432-679` | Eight SoA `Uint8` columns; only indices `0..groupCount-1` / `0..cellCount-1` are read after insert paths write every field | ~131 KiB zeroing skipped per rollup; unfilled arena tail is never indexed |
+| File:line                            | Fill pattern                                                                                                               | Why it is safe                                                                                                   |
+| :----------------------------------- | :------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------- |
+| `lib/f402_bet_ticker_jsonl.ts:169`   | `while (read < length) { chunk = await handle.read(buffer, read, length - read, …) }`                                      | `const view = buffer.subarray(0, read)` — only the written prefix is ever read; the tail is never exposed        |
+| `scripts/live_positions_cron.ts:375` | `const bytesRead = readSync(fd, buf, 0, len, offset)` then `decoder.decode(buf.subarray(0, bytesRead))`                    | The `readSync` return is captured and used to slice the exposed prefix; migrating closed a latent short-read bug |
+| `lib/gslive_tally_rollup.ts:432-679` | Eight SoA `Uint8` columns; only indices `0..groupCount-1` / `0..cellCount-1` are read after insert paths write every field | ~131 KiB zeroing skipped per rollup; unfilled arena tail is never indexed                                        |
 
 **When to migrate a `new Uint8Array(n)` call site to `Bun.allocUnsafe(n)`:**
 
