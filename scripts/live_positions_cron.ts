@@ -20,6 +20,8 @@
 import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+
+import { writtenUint8Prefix } from "../lib/jsonl_stream_replay.ts";
 import {
   formatCronScheduleLine,
   installOsCronJob,
