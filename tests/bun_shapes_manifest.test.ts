@@ -74,15 +74,15 @@ describe("manifest", () => {
       text: 8,
       data: 12,
       storage: 11,
-      crypto: 12,
+      crypto: 13,
       network: 9,
       image: 2,
       meta: 5,
     });
   });
 
-  test("70 runtime values and 9 type-only declarations (one declared-only)", () => {
-    expect(BUN_SHAPES.filter((s) => s.kind === "value").length).toBe(70);
+  test("71 runtime values and 9 type-only declarations (one declared-only)", () => {
+    expect(BUN_SHAPES.filter((s) => s.kind === "value").length).toBe(71);
     expect(
       BUN_SHAPES.filter((s) => s.kind === "type")
         .map((s) => s.name)
