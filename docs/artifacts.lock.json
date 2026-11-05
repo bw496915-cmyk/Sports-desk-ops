@@ -2,12 +2,12 @@
   "version": 1,
   "artifacts": {
     "docs/combo-uniqueness.json": {
-      "sha256": "0a4292ef3053f56669f1d1ae66ab826e4b262a00d9b7b6cf9eddae4f8c1d54f2",
+      "sha256": "be5e29c05231ee13af1894d59f1643f29c24a54b03ca0652212a54d6b9785ad0",
       "bytes": 3244
     },
     "docs/cross-domain-bridge.json": {
-      "sha256": "0f833399ea7b5af92982161439ea5110d5d8b8d96513527b543b68258fe87934",
-      "bytes": 1296
+      "sha256": "db60721f1c24bb2f6b96836b74277f9e04f45b3a3d9759acb310865de63660a7",
+      "bytes": 1320
     }
   },
   "inputs": {

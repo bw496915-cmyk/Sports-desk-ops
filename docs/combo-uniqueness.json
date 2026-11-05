@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAtIso": "2026-11-05T00:06:01.068Z",
+  "generatedAtIso": "2026-11-04T16:57:06.205Z",
   "index": {
     "games": 1919,
     "activeOnly": false,
@@ -94,9 +94,9 @@
         }
       ]
     },
-    "combosWithoutAttribution": 14573,
+    "combosWithoutAttribution": 13591,
     "recordsWithoutLegs": 0,
-    "cfbTouchRatePct": 1.33,
+    "cfbTouchRatePct": 1.42,
     "suspectedComboOfComboLegKeys": 35
   },
   "dedupe": {
@@ -126,5 +126,5 @@
     "leaks": 0,
     "vacuous": false
   },
-  "walletsScanned": 227
+  "walletsScanned": 228
 }

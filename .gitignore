@@ -57,6 +57,7 @@ junit-report.xml
 
 # Large report exports (contain identifiers; never commit)
 betReport*.json
+!tests/fixtures/fraud/betreport-small.json
 
 # Agent worktrees and scratch: DSH agents create these under .agents/.
 /.agents/
