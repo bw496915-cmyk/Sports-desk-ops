@@ -55,10 +55,10 @@ describe("jsonl_stream_replay SSOT", () => {
     const fromChunks: unknown[] = [];
     await replayHistoricalJsonlStream(
       new ReadableStream({
-        start(c) {
-          void c.enqueue(full.subarray(0, splitAt));
-          void c.enqueue(full.subarray(splitAt));
-          c.close();
+        start(controller) {
+          controller.enqueue(full.subarray(0, splitAt));
+          controller.enqueue(full.subarray(splitAt));
+          controller.close();
         },
       }),
       {
