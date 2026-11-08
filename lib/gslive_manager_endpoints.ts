@@ -1,0 +1,329 @@
+/**
+ * @file gslive_manager_endpoints.ts
+ * @description Typed probes for the read-only Manager Tools endpoints the desk now uses:
+ * `live/data` catalog plus the report kinds. Every probe returns a structured status instead
+ * of throwing a string, so a caller can tell an expired session (401/302/HTML-200) from a
+ * permission gap (403 "Not permitted") and from a transport or shape failure.
+ *
+ * The cookie header is accepted only as an argument and never included in a result.
+ */
+
+export const GSLIVE_LIVE_DATA_URL =
+  "https://plive.sportswidgets.pro/live/data?countries=true&leagues=true&sports=true";
+
+export const GSLIVE_REPORTS_BASE =
+  "https://plive.sportswidgets.pro/manager-tools/reports/";
+
+export type GsliveManagerEndpointKind =
+  | "live-data"
+  | "users-report"
+  | "events-report"
+  | "summary-report"
+  | "bettor-report";
+
+export type GsliveManagerEndpointStatus =
+  | "ok"
+  | "not_permitted"
+  | "session_expired"
+  | "challenge"
+  | "forbidden"
+  | "throttled"
+  | "server_error"
+  | "unreachable"
+  | "invalid_json"
+  | "shape_error";
+
+export interface GsliveManagerWindow {
+  readonly fromEpochSec: number;
+  readonly toEpochSec: number;
+}
+
+export interface GsliveManagerProbe {
+  readonly kind: GsliveManagerEndpointKind;
+  readonly status: GsliveManagerEndpointStatus;
+  readonly httpStatus: number | null;
+  readonly latencyMs: number | null;
+  readonly checkedAt: string;
+  /** Rows for report kinds; top-level keys for the catalog; null on failure. */
+  readonly count: number | null;
+  readonly error: string | null;
+}
+
+export interface GsliveManagerProbeOptions {
+  readonly cookieHeader: string;
+  /** Optional JS-readable session id for the reports surface; never returned. */
+  readonly xGsSession?: string;
+  readonly window?: GsliveManagerWindow;
+  readonly partnerId?: number;
+  readonly timeoutMs?: number;
+  readonly now?: () => number;
+  readonly fetchImpl?: typeof fetch;
+}
+
+const DEFAULT_WINDOW_SECONDS = 7 * 24 * 60 * 60;
+
+export function defaultManagerWindow(
+  nowMs: number = Date.now(),
+): GsliveManagerWindow {
+  const toEpochSec = Math.floor(nowMs / 1000);
+  return { fromEpochSec: toEpochSec - DEFAULT_WINDOW_SECONDS, toEpochSec };
+}
+
+export function managerReportUrl(
+  kind: Exclude<GsliveManagerEndpointKind, "live-data">,
+  window: GsliveManagerWindow,
+  partnerId = 118,
+): string {
+  const url = new URL(GSLIVE_REPORTS_BASE);
+  url.searchParams.set("from", String(window.fromEpochSec));
+  url.searchParams.set("to", String(window.toEpochSec));
+  url.searchParams.set("kind", kind);
+  url.searchParams.set("partnerId", String(partnerId));
+  return url.toString();
+}
+
+/** Pure classification of an HTTP response body for the Manager endpoints. */
+export function classifyManagerEndpointResponse(input: {
+  readonly httpStatus: number;
+  readonly contentType: string;
+  readonly body: string;
+  readonly cfMitigated?: string | null;
+  readonly kind: GsliveManagerEndpointKind;
+}): { status: GsliveManagerEndpointStatus; error: string | null } {
+  if (input.httpStatus >= 300 && input.httpStatus < 400) {
+    return {
+      status: "session_expired",
+      error: "redirected to login — GSID/ganchrow session is expired",
+    };
+  }
+  if (input.httpStatus === 401) {
+    return { status: "session_expired", error: "HTTP 401 — session expired" };
+  }
+  if (input.httpStatus === 403) {
+    if ((input.cfMitigated ?? "").trim() !== "") {
+      return {
+        status: "challenge",
+        error: `Cloudflare challenge (cf-mitigated: ${input.cfMitigated})`,
+      };
+    }
+    if (/not permitted|forbidden|not authorized/i.test(input.body)) {
+      return {
+        status: "not_permitted",
+        error: "HTTP 403 — the account lacks this report permission",
+      };
+    }
+    return { status: "forbidden", error: "HTTP 403 — access denied" };
+  }
+  if (input.httpStatus === 429) {
+    return { status: "throttled", error: "HTTP 429 — rate limited" };
+  }
+  if (input.httpStatus >= 500) {
+    return {
+      status: "server_error",
+      error: `HTTP ${input.httpStatus} from Manager Tools`,
+    };
+  }
+  if (input.httpStatus < 200 || input.httpStatus >= 300) {
+    return {
+      status: "forbidden",
+      error: `unexpected HTTP ${input.httpStatus}`,
+    };
+  }
+  // The reports endpoint returns a valid JSON array with `content-type: text/html`, so parse
+  // first and only fall back to the login-HTML diagnosis when the body is not JSON.
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input.body);
+  } catch {
+    if (
+      !input.contentType.toLowerCase().includes("json") ||
+      input.body.trimStart().startsWith("<")
+    ) {
+      return {
+        status: "session_expired",
+        error: `HTTP 200 with a non-JSON body (${input.contentType || "no content-type"}) — login HTML`,
+      };
+    }
+    return { status: "invalid_json", error: "HTTP 200 with invalid JSON" };
+  }
+  if (typeof parsed === "object" && parsed !== null && "e" in parsed) {
+    const code = (parsed as Record<string, unknown>)["e"];
+    const detail = (parsed as Record<string, unknown>)["d"];
+    const message =
+      typeof detail === "string"
+        ? detail
+        : `API error envelope e=${String(code)}`;
+    if (/not permitted|not authorized|forbidden/i.test(message)) {
+      return { status: "not_permitted", error: message };
+    }
+    if (String(code) === "1" || String(code) === "401") {
+      return { status: "session_expired", error: message };
+    }
+    return { status: "shape_error", error: message };
+  }
+  if (input.kind === "live-data") {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !("sports" in parsed) ||
+      !("leagues" in parsed)
+    ) {
+      return {
+        status: "shape_error",
+        error: "catalog JSON lacks sports/leagues maps",
+      };
+    }
+    return { status: "ok", error: null };
+  }
+  if (!Array.isArray(parsed)) {
+    return {
+      status: "shape_error",
+      error: "report response is not a JSON array",
+    };
+  }
+  return { status: "ok", error: null };
+}
+
+function countFor(kind: GsliveManagerEndpointKind, parsed: unknown): number {
+  if (Array.isArray(parsed)) return parsed.length;
+  if (typeof parsed === "object" && parsed !== null) {
+    return Object.keys(parsed).length;
+  }
+  return 0;
+}
+
+/** Fetch one endpoint and return its structured status; never throws on HTTP failure. */
+export async function probeManagerEndpoint(
+  kind: GsliveManagerEndpointKind,
+  options: GsliveManagerProbeOptions,
+): Promise<GsliveManagerProbe> {
+  const now = options.now ?? Date.now;
+  const checkedAt = new Date(now()).toISOString();
+  const window = options.window ?? defaultManagerWindow(now());
+  const url =
+    kind === "live-data"
+      ? GSLIVE_LIVE_DATA_URL
+      : managerReportUrl(kind, window, options.partnerId ?? 118);
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    referer: "https://plive.sportswidgets.pro/manager-tools/",
+    "user-agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  };
+  if (options.cookieHeader.trim() !== "") headers.cookie = options.cookieHeader;
+  if ((options.xGsSession ?? "").trim() !== "") {
+    headers["x-gs-session"] = options.xGsSession as string;
+  }
+  const started = now();
+  try {
+    const response = await (options.fetchImpl ?? fetch)(url, {
+      headers,
+      redirect: "manual",
+      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
+    });
+    const latencyMs = Math.max(0, now() - started);
+    const body = await response.text().catch(() => "");
+    const classified = classifyManagerEndpointResponse({
+      httpStatus: response.status,
+      contentType: response.headers.get("content-type") ?? "",
+      cfMitigated: response.headers.get("cf-mitigated"),
+      body,
+      kind,
+    });
+    let count: number | null = null;
+    if (classified.status === "ok") {
+      try {
+        count = countFor(kind, JSON.parse(body));
+      } catch {
+        count = 0;
+      }
+    }
+    return {
+      kind,
+      status: classified.status,
+      httpStatus: response.status,
+      latencyMs,
+      checkedAt,
+      count,
+      error: classified.error,
+    };
+  } catch (error) {
+    return {
+      kind,
+      status: "unreachable",
+      httpStatus: null,
+      latencyMs: Math.max(0, now() - started),
+      checkedAt,
+      count: null,
+      error:
+        error instanceof Error && error.name === "TimeoutError"
+          ? "timed out"
+          : "no response (network/DNS/TLS)",
+    };
+  }
+}
+
+/** Probe every endpoint the desk uses; order is stable for display/tests. */
+export async function probeManagerEndpoints(
+  options: GsliveManagerProbeOptions,
+): Promise<readonly GsliveManagerProbe[]> {
+  const kinds: readonly GsliveManagerEndpointKind[] = [
+    "live-data",
+    "users-report",
+    "events-report",
+    "summary-report",
+    "bettor-report",
+  ];
+  const out: GsliveManagerProbe[] = [];
+  for (const kind of kinds) {
+    out.push(await probeManagerEndpoint(kind, options));
+  }
+  return out;
+}
+
+export interface GsliveLiveDataSummary {
+  readonly sports: number;
+  readonly leagues: number;
+  readonly countries: number;
+}
+
+/** Parse the public `live/data` catalog once at the boundary; null when the shape is wrong. */
+export function parseLiveDataCatalog(
+  raw: unknown,
+): GsliveLiveDataSummary | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const record = raw as Record<string, unknown>;
+  const sports = record["sports"];
+  const leagues = record["leagues"];
+  const countries = record["countries"];
+  if (
+    typeof sports !== "object" ||
+    sports === null ||
+    typeof leagues !== "object" ||
+    leagues === null ||
+    typeof countries !== "object" ||
+    countries === null
+  ) {
+    return null;
+  }
+  return {
+    sports: Object.keys(sports).length,
+    leagues: Object.keys(leagues).length,
+    countries: Object.keys(countries).length,
+  };
+}
+
+/** True when an endpoint failed for an infrastructure/auth reason rather than a permission gap. */
+export function isBlockingManagerStatus(
+  status: GsliveManagerEndpointStatus,
+): boolean {
+  return (
+    status === "session_expired" ||
+    status === "challenge" ||
+    status === "unreachable" ||
+    status === "throttled" ||
+    status === "server_error" ||
+    status === "invalid_json" ||
+    status === "shape_error"
+  );
+}

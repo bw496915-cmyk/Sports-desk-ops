@@ -127,3 +127,24 @@ The three library suites cover audit appends/rollups/backfill idempotency, the p
 outcomes export (latest-per-ticket, MISSING db). The filtered CLI tests cover `alert-log` reads,
 activity merge and `--performance` against an outcomes file. An operator can also re-run step 2
 with a nonexistent `--db` and confirm it prints `db_missing` instead of writing an empty file.
+
+## Live endpoint status
+
+The read-only Manager Tools wire now has a first-class status probe, so an expired cookie,
+a permission gap, and a transport failure are no longer the same error:
+
+```sh
+./bin/dx fetch-live-data                 # public sports/leagues/countries catalog → live-data.json
+./bin/dx fetch-report-status             # status matrix for live-data + report kinds
+./bin/dx fetch-report-status --from 1793509200 --to 1794203999 --json --out report-status.json
+```
+
+Status classes: `ok`, `not_permitted`, `session_expired`, `challenge`, `forbidden`, `throttled`,
+`server_error`, `unreachable`, `invalid_json`, `shape_error`. The probe mints the per-run
+`x-gs-session` from the GSID cookie; it never prints either value (only cookie names and the
+`sessionGate` state). A permission gap (`bettor-report` → `403 Not permitted`) is reported but
+does not make the command exit non-zero; session/transport/shape failures do.
+
+Measured 2026-11-08: `live-data`, `users-report`, `events-report`, `summary-report` → `200 ok`;
+`bettor-report` → `403 not_permitted`. The reports endpoint answers with a JSON body under
+`content-type: text/html`, so the classifier parses the body before treating HTML as a login trap.
