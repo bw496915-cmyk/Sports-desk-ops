@@ -181,7 +181,11 @@ function createLockFile(
   payload: string,
   pid: number,
 ): boolean {
-  const tmpPath = `${lockPath}.${pid}.${randomUUID()}.tmp`;
+  const nonce =
+    typeof Bun !== "undefined" && typeof Bun.randomUUIDv7 === "function"
+      ? Bun.randomUUIDv7()
+      : randomUUID();
+  const tmpPath = `${lockPath}.${pid}.${nonce}.tmp`;
   try {
     writeFileSync(tmpPath, payload, {
       encoding: "utf8",
