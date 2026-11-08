@@ -176,6 +176,9 @@ describe("manager endpoint probes", () => {
         if (url.includes("/periods/index.php")) {
           return Response.json(["Game", "Half"]);
         }
+        if (url.includes("kind=open-bet-report")) {
+          return Response.json([{ eventId: "1" }, { eventId: "2" }]);
+        }
         if (url.includes("kind=bettor-report")) {
           return new Response(
             '{"e":1,"r":[],"d":"Not permitted to access this report"}',
@@ -191,6 +194,7 @@ describe("manager endpoint probes", () => {
       "users-report",
       "events-report",
       "summary-report",
+      "open-bet-report",
       "bettor-report",
     ]);
     expect(results[0]?.status).toBe("ok");
@@ -198,7 +202,8 @@ describe("manager endpoint probes", () => {
     expect(results[1]?.status).toBe("ok");
     expect(results[1]?.count).toBe(2);
     expect(results[2]?.count).toBe(2);
-    expect(results[5]?.status).toBe("not_permitted");
+    expect(results[4]?.count).toBe(2);
+    expect(results[6]?.status).toBe("not_permitted");
     expect(JSON.stringify(results)).not.toContain("live-secret");
   });
 

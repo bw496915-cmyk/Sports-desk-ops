@@ -23,6 +23,7 @@ export type GsliveManagerEndpointKind =
   | "users-report"
   | "events-report"
   | "summary-report"
+  | "open-bet-report"
   | "bettor-report";
 
 export type GsliveManagerEndpointStatus =
@@ -291,13 +292,12 @@ export async function probeManagerEndpoints(
     "users-report",
     "events-report",
     "summary-report",
+    "open-bet-report",
     "bettor-report",
   ];
-  const out: GsliveManagerProbe[] = [];
-  for (const kind of kinds) {
-    out.push(await probeManagerEndpoint(kind, options));
-  }
-  return out;
+  return await Promise.all(
+    kinds.map((kind) => probeManagerEndpoint(kind, options)),
+  );
 }
 
 /** Parse the periods vocabulary; null when it is not an array of strings. */

@@ -145,9 +145,16 @@ Status classes: `ok`, `not_permitted`, `session_expired`, `challenge`, `forbidde
 `sessionGate` state). A permission gap (`bettor-report` → `403 Not permitted`) is reported but
 does not make the command exit non-zero; session/transport/shape failures do.
 
-Measured 2026-11-08: `live-data`, `users-report`, `events-report`, `summary-report` → `200 ok`;
-`bettor-report` → `403 not_permitted`. The reports endpoint answers with a JSON body under
-`content-type: text/html`, so the classifier parses the body before treating HTML as a login trap.
+Measured 2026-11-08: `live-data`, `periods`, `users-report`, `events-report`, `summary-report` →
+`200 ok`; `bettor-report` → `403 not_permitted`. The reports endpoint answers with a JSON body
+under `content-type: text/html`, so the classifier parses the body before treating HTML as a login
+trap.
+
+`open-bet-report` is wired too, but a wide window (8 days) currently returns **504 Gateway Timeout**
+from Manager Tools; the probe reports it as a blocking `server_error`/timeout. Use a narrow window
+or retry after the gateway recovers. A missing `x-gs-session` handshake makes the report probes
+time out rather than return the login HTML; the matrix shows `x-gs-session unavailable` when that
+happens.
 
 `periods` and `fetch-report-periods`:
 
