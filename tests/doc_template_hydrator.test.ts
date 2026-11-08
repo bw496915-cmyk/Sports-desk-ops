@@ -104,10 +104,14 @@ Fallback Login: NONE
 
   it("detects extended sensitive pattern set by default (R2/M1)", () => {
     // AWS Key (assembled dynamically to avoid push-protection false positives)
-    expect(checkUnresolvedSentinels(["AKIA", "IOSFODNN7EXAMPLE"].join("")).valid).toBe(false);
+    expect(
+      checkUnresolvedSentinels(["AKIA", "IOSFODNN7EXAMPLE"].join("")).valid,
+    ).toBe(false);
     // Google API Key (39 chars total: AIza + 35 chars)
     expect(
-      checkUnresolvedSentinels(["AIza", "SyD1234567890abcdefghijklmnopqrstuv"].join("")).valid,
+      checkUnresolvedSentinels(
+        ["AIza", "SyD1234567890abcdefghijklmnopqrstuv"].join(""),
+      ).valid,
     ).toBe(false);
     // GitHub fine-grained PAT
     expect(
@@ -117,15 +121,21 @@ Fallback Login: NONE
     ).toBe(false);
     // Slack token
     expect(
-      checkUnresolvedSentinels(["xoxb-", "123456789012-", "abcdefghijklm"].join("")).valid,
+      checkUnresolvedSentinels(
+        ["xoxb-", "123456789012-", "abcdefghijklm"].join(""),
+      ).valid,
     ).toBe(false);
     // Stripe live key
     expect(
-      checkUnresolvedSentinels(["sk_", "live_", "1234567890abcdefghijklmn"].join("")).valid,
+      checkUnresolvedSentinels(
+        ["sk_", "live_", "1234567890abcdefghijklmn"].join(""),
+      ).valid,
     ).toBe(false);
     // PEM Private Key
     expect(
-      checkUnresolvedSentinels(["-----BEGIN ", "RSA ", "PRIVATE KEY-----"].join("")).valid,
+      checkUnresolvedSentinels(
+        ["-----BEGIN ", "RSA ", "PRIVATE KEY-----"].join(""),
+      ).valid,
     ).toBe(false);
   });
 
