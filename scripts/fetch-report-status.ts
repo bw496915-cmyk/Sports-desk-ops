@@ -11,6 +11,7 @@
  */
 
 import {
+  DEFAULT_MANAGER_PARTNER_ID,
   defaultManagerWindow,
   isBlockingManagerStatus,
   probeManagerEndpoints,
@@ -35,7 +36,7 @@ Probe the read-only Manager Tools endpoints and print a status matrix.
 Options:
   --from <epoch-seconds>   window start (default: now - 7d)
   --to <epoch-seconds>     window end (default: now)
-  --partner <id>           partner id (default 118)
+  --partner <id>           partner id (default ${DEFAULT_MANAGER_PARTNER_ID})
   --json                   machine-readable document
   --out <path>             write the JSON document to a file
   -h, --help
@@ -58,7 +59,7 @@ export function parseStatusArgs(
   let to = defaults.toEpochSec;
   let json = false;
   let outPath: string | null = null;
-  let partnerId = 118;
+  let partnerId = DEFAULT_MANAGER_PARTNER_ID;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "-h" || arg === "--help") return null;

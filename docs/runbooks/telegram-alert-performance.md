@@ -159,9 +159,9 @@ happens.
 `periods` and `fetch-report-periods`:
 
 ```sh
-./bin/dx fetch-report-periods            # 20 period labels → report-periods.json
+./bin/dx fetch-report-periods            # period labels → report-periods.json
 ```
 
-Measured 2026-11-08: the periods endpoint returns `200` and 20 string labels; the status matrix
-reports `periods ok count=20`. The labels are display vocabulary (Game, Half, Period, Extra Time,
-1st 3 Innings, Match Play …), not a code→label map for the corpus period codes.
+The endpoint returns a JSON array of label strings; `fetch-report-status` prints the label count it
+actually measured. The labels are display vocabulary (Game, Half, Period, Extra Time, 1st 3
+Innings, Match Play …), not a code→label map for the corpus period codes.

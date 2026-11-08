@@ -14,6 +14,21 @@ export const GSLIVE_LIVE_DATA_URL =
 export const GSLIVE_REPORTS_BASE =
   "https://plive.sportswidgets.pro/manager-tools/reports/";
 
+import { GSLIVE_PARTNER_ID } from "./gslive_manager_watchlist.ts";
+
+/** Single ordered endpoint list; probes and tests derive from this, not a copied literal. */
+export const MANAGER_ENDPOINT_KINDS = [
+  "live-data",
+  "periods",
+  "users-report",
+  "events-report",
+  "summary-report",
+  "open-bet-report",
+  "bettor-report",
+] as const satisfies readonly GsliveManagerEndpointKind[];
+
+export const DEFAULT_MANAGER_PARTNER_ID = Number(GSLIVE_PARTNER_ID);
+
 export const GSLIVE_REPORT_PERIODS_URL =
   "https://plive.sportswidgets.pro/manager-tools/reports/periods/index.php";
 
@@ -75,9 +90,9 @@ export function defaultManagerWindow(
 }
 
 export function managerReportUrl(
-  kind: Exclude<GsliveManagerEndpointKind, "live-data">,
+  kind: Exclude<GsliveManagerEndpointKind, "live-data" | "periods">,
   window: GsliveManagerWindow,
-  partnerId = 118,
+  partnerId = DEFAULT_MANAGER_PARTNER_ID,
 ): string {
   const url = new URL(GSLIVE_REPORTS_BASE);
   url.searchParams.set("from", String(window.fromEpochSec));
@@ -222,7 +237,11 @@ export async function probeManagerEndpoint(
       ? GSLIVE_LIVE_DATA_URL
       : kind === "periods"
         ? GSLIVE_REPORT_PERIODS_URL
-        : managerReportUrl(kind, window, options.partnerId ?? 118);
+        : managerReportUrl(
+            kind,
+            window,
+            options.partnerId ?? DEFAULT_MANAGER_PARTNER_ID,
+          );
   const headers: Record<string, string> = {
     accept: "application/json",
     referer: "https://plive.sportswidgets.pro/manager-tools/",
@@ -286,17 +305,8 @@ export async function probeManagerEndpoint(
 export async function probeManagerEndpoints(
   options: GsliveManagerProbeOptions,
 ): Promise<readonly GsliveManagerProbe[]> {
-  const kinds: readonly GsliveManagerEndpointKind[] = [
-    "live-data",
-    "periods",
-    "users-report",
-    "events-report",
-    "summary-report",
-    "open-bet-report",
-    "bettor-report",
-  ];
   return await Promise.all(
-    kinds.map((kind) => probeManagerEndpoint(kind, options)),
+    MANAGER_ENDPOINT_KINDS.map((kind) => probeManagerEndpoint(kind, options)),
   );
 }
 

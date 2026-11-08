@@ -7,6 +7,7 @@ import {
   classifyManagerEndpointResponse,
   defaultManagerWindow,
   managerReportUrl,
+  MANAGER_ENDPOINT_KINDS,
   parseLiveDataCatalog,
   parsePeriodVocabulary,
   probeManagerEndpoint,
@@ -17,6 +18,8 @@ import { fetchLiveData } from "../fetch-live-data.ts";
 import { parseStatusArgs } from "../scripts/fetch-report-status.ts";
 
 const checkedAt = Date.parse("2026-11-08T20:00:00.000Z");
+const PERIODS = ["Game", "Half"];
+const REPORT_ROWS = [{ id: 1 }, { id: 2 }];
 const CATALOG = {
   sports: { "1": { n: "Baseball" }, "2": { n: "Basketball" } },
   leagues: { "2": { n: "NBA Props", s: 24 }, "4": { n: "NFL", s: 3 } },
@@ -174,10 +177,10 @@ describe("manager endpoint probes", () => {
           return Response.json(CATALOG);
         }
         if (url.includes("/periods/index.php")) {
-          return Response.json(["Game", "Half"]);
+          return Response.json(PERIODS);
         }
         if (url.includes("kind=open-bet-report")) {
-          return Response.json([{ eventId: "1" }, { eventId: "2" }]);
+          return Response.json(REPORT_ROWS);
         }
         if (url.includes("kind=bettor-report")) {
           return new Response(
@@ -185,25 +188,20 @@ describe("manager endpoint probes", () => {
             { status: 403, headers: { "content-type": "text/html" } },
           );
         }
-        return Response.json([{ id: 1 }, { id: 2 }]);
+        return Response.json(REPORT_ROWS);
       }),
     });
     expect(results.map((result) => result.kind)).toEqual([
-      "live-data",
-      "periods",
-      "users-report",
-      "events-report",
-      "summary-report",
-      "open-bet-report",
-      "bettor-report",
+      ...MANAGER_ENDPOINT_KINDS,
     ]);
-    expect(results[0]?.status).toBe("ok");
-    expect(results[0]?.count).toBe(3);
-    expect(results[1]?.status).toBe("ok");
-    expect(results[1]?.count).toBe(2);
-    expect(results[2]?.count).toBe(2);
-    expect(results[4]?.count).toBe(2);
-    expect(results[6]?.status).toBe("not_permitted");
+    const byKind = new Map(results.map((result) => [result.kind, result]));
+    expect(byKind.get("live-data")?.status).toBe("ok");
+    expect(byKind.get("live-data")?.count).toBe(Object.keys(CATALOG).length);
+    expect(byKind.get("periods")?.status).toBe("ok");
+    expect(byKind.get("periods")?.count).toBe(PERIODS.length);
+    expect(byKind.get("users-report")?.count).toBe(REPORT_ROWS.length);
+    expect(byKind.get("open-bet-report")?.count).toBe(REPORT_ROWS.length);
+    expect(byKind.get("bettor-report")?.status).toBe("not_permitted");
     expect(JSON.stringify(results)).not.toContain("live-secret");
   });
 
@@ -249,10 +247,10 @@ describe("fetch-live-data and status args", () => {
     const result = await fetchAndWriteReportPeriods({
       outPath,
       cookieHeader: "",
-      fetchImpl: fakeFetch(() => Response.json(["Game", "Half"])),
+      fetchImpl: fakeFetch(() => Response.json(PERIODS)),
     });
-    expect(result.periods).toEqual(["Game", "Half"]);
-    expect(JSON.parse(readFileSync(outPath, "utf8"))).toEqual(["Game", "Half"]);
+    expect(result.periods).toEqual(PERIODS);
+    expect(JSON.parse(readFileSync(outPath, "utf8"))).toEqual(PERIODS);
   });
 
   test("status args default to a 7-day window and parse overrides", () => {
