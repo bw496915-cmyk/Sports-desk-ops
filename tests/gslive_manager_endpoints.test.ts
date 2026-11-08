@@ -8,9 +8,11 @@ import {
   defaultManagerWindow,
   managerReportUrl,
   parseLiveDataCatalog,
+  parsePeriodVocabulary,
   probeManagerEndpoint,
   probeManagerEndpoints,
 } from "../lib/gslive_manager_endpoints.ts";
+import { fetchAndWriteReportPeriods } from "../fetch-report-periods.ts";
 import { fetchLiveData } from "../fetch-live-data.ts";
 import { parseStatusArgs } from "../scripts/fetch-report-status.ts";
 
@@ -29,7 +31,7 @@ function fakeFetch(
 }
 
 describe("manager endpoint classification", () => {
-  test("reports are ok only for JSON arrays; catalogs need sports/leagues", () => {
+  test("reports are ok only for JSON arrays; catalogs need sports/leagues; periods need strings", () => {
     expect(
       classifyManagerEndpointResponse({
         httpStatus: 200,
@@ -60,6 +62,22 @@ describe("manager endpoint classification", () => {
         contentType: "application/json",
         body: '{"rows":[]}',
         kind: "users-report",
+      }).status,
+    ).toBe("shape_error");
+    expect(
+      classifyManagerEndpointResponse({
+        httpStatus: 200,
+        contentType: "text/html",
+        body: '["Game","Half"]',
+        kind: "periods",
+      }).status,
+    ).toBe("ok");
+    expect(
+      classifyManagerEndpointResponse({
+        httpStatus: 200,
+        contentType: "text/html",
+        body: '["Game",1]',
+        kind: "periods",
       }).status,
     ).toBe("shape_error");
   });
@@ -140,6 +158,8 @@ describe("manager endpoint classification", () => {
       countries: 1,
     });
     expect(parseLiveDataCatalog({ sports: {} })).toBeNull();
+    expect(parsePeriodVocabulary(["Game", "Half"])).toEqual(["Game", "Half"]);
+    expect(parsePeriodVocabulary(["Game", 1])).toBeNull();
   });
 });
 
@@ -153,6 +173,9 @@ describe("manager endpoint probes", () => {
         if (url.includes("/live/data")) {
           return Response.json(CATALOG);
         }
+        if (url.includes("/periods/index.php")) {
+          return Response.json(["Game", "Half"]);
+        }
         if (url.includes("kind=bettor-report")) {
           return new Response(
             '{"e":1,"r":[],"d":"Not permitted to access this report"}',
@@ -164,6 +187,7 @@ describe("manager endpoint probes", () => {
     });
     expect(results.map((result) => result.kind)).toEqual([
       "live-data",
+      "periods",
       "users-report",
       "events-report",
       "summary-report",
@@ -171,8 +195,10 @@ describe("manager endpoint probes", () => {
     ]);
     expect(results[0]?.status).toBe("ok");
     expect(results[0]?.count).toBe(3);
+    expect(results[1]?.status).toBe("ok");
     expect(results[1]?.count).toBe(2);
-    expect(results[4]?.status).toBe("not_permitted");
+    expect(results[2]?.count).toBe(2);
+    expect(results[5]?.status).toBe("not_permitted");
     expect(JSON.stringify(results)).not.toContain("live-secret");
   });
 
@@ -209,6 +235,19 @@ describe("fetch-live-data and status args", () => {
     });
     expect(result.summary).toEqual({ sports: 2, leagues: 2, countries: 1 });
     expect(JSON.parse(readFileSync(outPath, "utf8"))).toEqual(CATALOG);
+  });
+
+  test("writes the report period vocabulary", async () => {
+    const root = mkdtempSync(join(tmpdir(), "report-periods-"));
+    roots.push(root);
+    const outPath = join(root, "report-periods.json");
+    const result = await fetchAndWriteReportPeriods({
+      outPath,
+      cookieHeader: "",
+      fetchImpl: fakeFetch(() => Response.json(["Game", "Half"])),
+    });
+    expect(result.periods).toEqual(["Game", "Half"]);
+    expect(JSON.parse(readFileSync(outPath, "utf8"))).toEqual(["Game", "Half"]);
   });
 
   test("status args default to a 7-day window and parse overrides", () => {

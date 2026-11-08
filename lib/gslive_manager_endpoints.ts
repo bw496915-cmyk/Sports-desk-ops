@@ -14,8 +14,12 @@ export const GSLIVE_LIVE_DATA_URL =
 export const GSLIVE_REPORTS_BASE =
   "https://plive.sportswidgets.pro/manager-tools/reports/";
 
+export const GSLIVE_REPORT_PERIODS_URL =
+  "https://plive.sportswidgets.pro/manager-tools/reports/periods/index.php";
+
 export type GsliveManagerEndpointKind =
   | "live-data"
+  | "periods"
   | "users-report"
   | "events-report"
   | "summary-report"
@@ -161,6 +165,18 @@ export function classifyManagerEndpointResponse(input: {
     }
     return { status: "shape_error", error: message };
   }
+  if (input.kind === "periods") {
+    if (
+      !Array.isArray(parsed) ||
+      parsed.some((value) => typeof value !== "string")
+    ) {
+      return {
+        status: "shape_error",
+        error: "periods response is not an array of strings",
+      };
+    }
+    return { status: "ok", error: null };
+  }
   if (input.kind === "live-data") {
     if (
       typeof parsed !== "object" ||
@@ -203,7 +219,9 @@ export async function probeManagerEndpoint(
   const url =
     kind === "live-data"
       ? GSLIVE_LIVE_DATA_URL
-      : managerReportUrl(kind, window, options.partnerId ?? 118);
+      : kind === "periods"
+        ? GSLIVE_REPORT_PERIODS_URL
+        : managerReportUrl(kind, window, options.partnerId ?? 118);
   const headers: Record<string, string> = {
     accept: "application/json",
     referer: "https://plive.sportswidgets.pro/manager-tools/",
@@ -269,6 +287,7 @@ export async function probeManagerEndpoints(
 ): Promise<readonly GsliveManagerProbe[]> {
   const kinds: readonly GsliveManagerEndpointKind[] = [
     "live-data",
+    "periods",
     "users-report",
     "events-report",
     "summary-report",
@@ -279,6 +298,47 @@ export async function probeManagerEndpoints(
     out.push(await probeManagerEndpoint(kind, options));
   }
   return out;
+}
+
+/** Parse the periods vocabulary; null when it is not an array of strings. */
+export function parsePeriodVocabulary(raw: unknown): readonly string[] | null {
+  if (!Array.isArray(raw)) return null;
+  if (raw.some((value) => typeof value !== "string")) return null;
+  return raw as readonly string[];
+}
+
+/** Fetch the report period vocabulary (cookie + optional x-gs-session). */
+export async function fetchReportPeriods(options: {
+  readonly cookieHeader: string;
+  readonly xGsSession?: string;
+  readonly fetchImpl?: typeof fetch;
+  readonly timeoutMs?: number;
+}): Promise<readonly string[] | null> {
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    referer: "https://plive.sportswidgets.pro/manager-tools/",
+    "user-agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  };
+  if (options.cookieHeader.trim() !== "") headers.cookie = options.cookieHeader;
+  if ((options.xGsSession ?? "").trim() !== "") {
+    headers["x-gs-session"] = options.xGsSession as string;
+  }
+  const response = await (options.fetchImpl ?? fetch)(
+    GSLIVE_REPORT_PERIODS_URL,
+    {
+      headers,
+      redirect: "manual",
+      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
+    },
+  );
+  if (!response.ok) return null;
+  const body = await response.text();
+  try {
+    return parsePeriodVocabulary(JSON.parse(body));
+  } catch {
+    return null;
+  }
 }
 
 export interface GsliveLiveDataSummary {

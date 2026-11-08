@@ -148,3 +148,13 @@ does not make the command exit non-zero; session/transport/shape failures do.
 Measured 2026-11-08: `live-data`, `users-report`, `events-report`, `summary-report` → `200 ok`;
 `bettor-report` → `403 not_permitted`. The reports endpoint answers with a JSON body under
 `content-type: text/html`, so the classifier parses the body before treating HTML as a login trap.
+
+`periods` and `fetch-report-periods`:
+
+```sh
+./bin/dx fetch-report-periods            # 20 period labels → report-periods.json
+```
+
+Measured 2026-11-08: the periods endpoint returns `200` and 20 string labels; the status matrix
+reports `periods ok count=20`. The labels are display vocabulary (Game, Half, Period, Extra Time,
+1st 3 Innings, Match Play …), not a code→label map for the corpus period codes.
