@@ -6,8 +6,6 @@
  */
 
 import { parseArgs } from "node:util";
-import { readFileSync, existsSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import {
   checkUnresolvedSentinels,
   DEFAULT_SENSITIVE_PATTERNS,
@@ -59,7 +57,7 @@ async function main() {
   if (target === "-") {
     content = await Bun.stdin.text();
   } else if (values["doc-id"]) {
-    const agyAccount = process.env.AGY_ACCOUNT;
+    const agyAccount = Bun.env.AGY_ACCOUNT;
     if (!agyAccount) {
       console.error(
         "[check-doc-sentinels] Error: AGY_ACCOUNT environment variable is required to read Google Docs via CLI.",
@@ -68,35 +66,34 @@ async function main() {
     }
 
     console.log(`[check-doc-sentinels] Reading Google Doc ${target}...`);
-    const proc = spawnSync(
-      "gdocs",
-      ["readonly", "read", target, "--comments=false"],
+    const proc = Bun.spawnSync(
+      ["gdocs", "readonly", "read", target, "--comments=false"],
       {
-        encoding: "utf-8",
         env: {
-          PATH: process.env.PATH || "",
-          HOME: process.env.HOME || "",
+          PATH: Bun.env.PATH || "",
+          HOME: Bun.env.HOME || "",
           AGY_ACCOUNT: agyAccount,
         },
       },
     );
-    if (proc.status !== 0) {
+    if (proc.exitCode !== 0) {
       console.error(
         "[check-doc-sentinels] Failed to read doc via gdocs directly:",
-        proc.stderr || proc.stdout,
+        proc.stderr?.toString() || proc.stdout?.toString(),
       );
       console.log(
         "[TIP] In Antigravity, use pipeline: gdocs readonly read <docID> | bun scripts/check_doc_sentinels.ts -",
       );
       process.exit(1);
     }
-    content = String(proc.stdout);
+    content = proc.stdout ? proc.stdout.toString() : "";
   } else {
-    if (!existsSync(target)) {
+    const file = Bun.file(target);
+    if (!(await file.exists())) {
       console.error(`[check-doc-sentinels] File not found: ${target}`);
       process.exit(1);
     }
-    content = readFileSync(target, { encoding: "utf-8" });
+    content = await file.text();
   }
 
   if (values["template-mode"]) {

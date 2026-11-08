@@ -5,34 +5,38 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { spawnSync } from "node:child_process";
-import {
-  writeFileSync,
-  unlinkSync,
-  mkdirSync,
-  chmodSync,
-  rmSync,
-  readdirSync,
-  readFileSync,
-} from "node:fs";
+import { unlinkSync, mkdirSync, chmodSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+function runCli(
+  args: string[],
+  opts: {
+    env?: Record<string, string | undefined>;
+    stdin?: string | Buffer;
+  } = {},
+) {
+  const proc = Bun.spawnSync(
+    ["bun", "scripts/gdocs_template_instantiate.ts", ...args],
+    {
+      env: (opts.env || Bun.env) as Record<string, string>,
+      stdin: opts.stdin ? Buffer.from(opts.stdin) : undefined,
+    },
+  );
+  return {
+    status: proc.exitCode,
+    stdout: proc.stdout ? proc.stdout.toString() : "",
+    stderr: proc.stderr ? proc.stderr.toString() : "",
+  };
+}
+
 describe("gdocs_template_instantiate CLI", () => {
   it("fails with friendly error message when removed --title option is supplied", () => {
-    const proc = spawnSync(
-      "bun",
-      [
-        "scripts/gdocs_template_instantiate.ts",
-        "--template-id",
-        "fake-template-id",
-        "--title",
-        "My Leaky Title",
-      ],
+    const proc = runCli(
+      ["--template-id", "fake-template-id", "--title", "My Leaky Title"],
       {
-        encoding: "utf-8",
         env: {
-          ...process.env,
+          ...Bun.env,
           AGY_ACCOUNT: "test@example.com",
         },
       },
@@ -46,21 +50,12 @@ describe("gdocs_template_instantiate CLI", () => {
   });
 
   it("fails with exit code 1 when --title-file is omitted (C2/R1)", () => {
-    const proc = spawnSync(
-      "bun",
-      [
-        "scripts/gdocs_template_instantiate.ts",
-        "--template-id",
-        "fake-template-id",
-      ],
-      {
-        encoding: "utf-8",
-        env: {
-          ...process.env,
-          AGY_ACCOUNT: "test@example.com",
-        },
+    const proc = runCli(["--template-id", "fake-template-id"], {
+      env: {
+        ...Bun.env,
+        AGY_ACCOUNT: "test@example.com",
       },
-    );
+    });
 
     expect(proc.status).toBe(1);
     expect(proc.stderr).toContain(
@@ -69,25 +64,17 @@ describe("gdocs_template_instantiate CLI", () => {
     expect(proc.stdout).not.toContain("Document ready");
   });
 
-  it("fails with exit code 1 when AGY_ACCOUNT is missing (C6)", () => {
+  it("fails with exit code 1 when AGY_ACCOUNT is missing (C6)", async () => {
     const tmpTitle = join(tmpdir(), `title-${Date.now()}.txt`);
-    writeFileSync(tmpTitle, "My Safe Title", { mode: 0o600 });
+    await Bun.write(tmpTitle, "My Safe Title");
 
     try {
-      const proc = spawnSync(
-        "bun",
-        [
-          "scripts/gdocs_template_instantiate.ts",
-          "--template-id",
-          "fake-template-id",
-          "--title-file",
-          tmpTitle,
-        ],
+      const proc = runCli(
+        ["--template-id", "fake-template-id", "--title-file", tmpTitle],
         {
-          encoding: "utf-8",
           env: {
-            PATH: process.env.PATH || "",
-            HOME: process.env.HOME || "",
+            PATH: Bun.env.PATH || "",
+            HOME: Bun.env.HOME || "",
             // AGY_ACCOUNT omitted intentionally
           },
         },
@@ -102,20 +89,16 @@ describe("gdocs_template_instantiate CLI", () => {
     }
   });
 
-  it("masks values by default in --dry-run and rejects --show-values in non-TTY without force (C5/N2)", () => {
+  it("masks values by default in --dry-run and rejects --show-values in non-TTY without force (C5/N2)", async () => {
     const tmpTitle = join(tmpdir(), `title-${Date.now()}.txt`);
     const tmpVars = join(tmpdir(), `vars-${Date.now()}.txt`);
-    writeFileSync(tmpTitle, "My Safe Title", { mode: 0o600 });
-    writeFileSync(tmpVars, "SECRET_ACCOUNT=KP406\nSECRET_SPLIT=50/50", {
-      mode: 0o600,
-    });
+    await Bun.write(tmpTitle, "My Safe Title");
+    await Bun.write(tmpVars, "SECRET_ACCOUNT=KP406\nSECRET_SPLIT=50/50");
 
     try {
       // 1. Default dry-run masks values
-      const procMasked = spawnSync(
-        "bun",
+      const procMasked = runCli(
         [
-          "scripts/gdocs_template_instantiate.ts",
           "--template-id",
           "fake-template-id",
           "--title-file",
@@ -125,9 +108,8 @@ describe("gdocs_template_instantiate CLI", () => {
           "--dry-run",
         ],
         {
-          encoding: "utf-8",
           env: {
-            ...process.env,
+            ...Bun.env,
             AGY_ACCOUNT: "test@example.com",
           },
         },
@@ -139,10 +121,8 @@ describe("gdocs_template_instantiate CLI", () => {
       expect(procMasked.stdout).not.toContain("KP406");
 
       // 2. Non-TTY without --force-unmasked must fail
-      const procNonTty = spawnSync(
-        "bun",
+      const procNonTty = runCli(
         [
-          "scripts/gdocs_template_instantiate.ts",
           "--template-id",
           "fake-template-id",
           "--title-file",
@@ -153,9 +133,8 @@ describe("gdocs_template_instantiate CLI", () => {
           "--show-values",
         ],
         {
-          encoding: "utf-8",
           env: {
-            ...process.env,
+            ...Bun.env,
             AGY_ACCOUNT: "test@example.com",
           },
         },
@@ -171,7 +150,7 @@ describe("gdocs_template_instantiate CLI", () => {
     }
   });
 
-  it("fails closed and auto-trashes doc on post-hydration sentinel failure (P3/C1/P4)", () => {
+  it("fails closed and auto-trashes doc on post-hydration sentinel failure (P3/C1/P4)", async () => {
     const mockBinDir = join(tmpdir(), `mock-bin-${Date.now()}`);
     mkdirSync(mockBinDir, { recursive: true });
 
@@ -209,29 +188,26 @@ exit 0
 
     const gdriveBin = join(mockBinDir, "gdrive");
     const gdocsBin = join(mockBinDir, "gdocs");
-    writeFileSync(gdriveBin, mockGdriveScript);
-    writeFileSync(gdocsBin, mockGdocsScript);
+    await Bun.write(gdriveBin, mockGdriveScript);
+    await Bun.write(gdocsBin, mockGdocsScript);
     chmodSync(gdriveBin, 0o755);
     chmodSync(gdocsBin, 0o755);
 
     const tmpTitle = join(tmpdir(), `title-${Date.now()}.txt`);
-    writeFileSync(tmpTitle, "Mock Partner Document", { mode: 0o600 });
+    await Bun.write(tmpTitle, "Mock Partner Document");
 
     try {
-      const proc = spawnSync(
-        "bun",
+      const proc = runCli(
         [
-          "scripts/gdocs_template_instantiate.ts",
           "--template-id",
           "mock-template-id-1234567890",
           "--title-file",
           tmpTitle,
         ],
         {
-          encoding: "utf-8",
           env: {
-            ...process.env,
-            PATH: `${mockBinDir}:${process.env.PATH}`,
+            ...Bun.env,
+            PATH: `${mockBinDir}:${Bun.env.PATH}`,
             AGY_ACCOUNT: "test@example.com",
           },
         },
@@ -252,7 +228,7 @@ exit 0
   });
 
   // Test A: Temp cleanup on child failure (H6/H7/R3)
-  it("cleans up temporary directory and files when child sed fails (Test A)", () => {
+  it("cleans up temporary directory and files when child sed fails (Test A)", async () => {
     const mockBinDir = join(tmpdir(), `mock-fail-bin-${Date.now()}`);
     mkdirSync(mockBinDir, { recursive: true });
 
@@ -284,21 +260,19 @@ fi
 exit 0
 `;
 
-    writeFileSync(join(mockBinDir, "gdrive"), mockGdriveScript);
-    writeFileSync(join(mockBinDir, "gdocs"), mockGdocsScript);
+    await Bun.write(join(mockBinDir, "gdrive"), mockGdriveScript);
+    await Bun.write(join(mockBinDir, "gdocs"), mockGdocsScript);
     chmodSync(join(mockBinDir, "gdrive"), 0o755);
     chmodSync(join(mockBinDir, "gdocs"), 0o755);
 
     const tmpTitle = join(tmpdir(), `title-${Date.now()}.txt`);
     const tmpVars = join(tmpdir(), `vars-${Date.now()}.txt`);
-    writeFileSync(tmpTitle, "Mock Fail Title", { mode: 0o600 });
-    writeFileSync(tmpVars, "KEY=VAL", { mode: 0o600 });
+    await Bun.write(tmpTitle, "Mock Fail Title");
+    await Bun.write(tmpVars, "KEY=VAL");
 
     try {
-      const proc = spawnSync(
-        "bun",
+      const proc = runCli(
         [
-          "scripts/gdocs_template_instantiate.ts",
           "--template-id",
           "mock-template-id",
           "--title-file",
@@ -307,10 +281,9 @@ exit 0
           tmpVars,
         ],
         {
-          encoding: "utf-8",
           env: {
-            ...process.env,
-            PATH: `${mockBinDir}:${process.env.PATH}`,
+            ...Bun.env,
+            PATH: `${mockBinDir}:${Bun.env.PATH}`,
             AGY_ACCOUNT: "test@example.com",
           },
         },
@@ -333,7 +306,7 @@ exit 0
   });
 
   // Test B: Title absence from argv (C2/R1)
-  it("never passes sensitive title on child argv; verifies generic clone title (Test B)", () => {
+  it("never passes sensitive title on child argv; verifies generic clone title (Test B)", async () => {
     const mockBinDir = join(tmpdir(), `mock-argv-bin-${Date.now()}`);
     mkdirSync(mockBinDir, { recursive: true });
 
@@ -360,20 +333,18 @@ echo "$@" >> "${argvLogFile}"
 exit 0
 `;
 
-    writeFileSync(join(mockBinDir, "gdrive"), mockGdriveScript);
-    writeFileSync(join(mockBinDir, "gdocs"), mockGdocsScript);
+    await Bun.write(join(mockBinDir, "gdrive"), mockGdriveScript);
+    await Bun.write(join(mockBinDir, "gdocs"), mockGdocsScript);
     chmodSync(join(mockBinDir, "gdrive"), 0o755);
     chmodSync(join(mockBinDir, "gdocs"), 0o755);
 
     const sensitiveTitle = "CONFIDENTIAL_CANARY_PLAYER_BB55103_SETTLEMENT";
     const tmpTitle = join(tmpdir(), `title-${Date.now()}.txt`);
-    writeFileSync(tmpTitle, sensitiveTitle, { mode: 0o600 });
+    await Bun.write(tmpTitle, sensitiveTitle);
 
     try {
-      const proc = spawnSync(
-        "bun",
+      const proc = runCli(
         [
-          "scripts/gdocs_template_instantiate.ts",
           "--template-id",
           "mock-template-id",
           "--title-file",
@@ -381,10 +352,9 @@ exit 0
           "--skip-sentinel-check",
         ],
         {
-          encoding: "utf-8",
           env: {
-            ...process.env,
-            PATH: `${mockBinDir}:${process.env.PATH}`,
+            ...Bun.env,
+            PATH: `${mockBinDir}:${Bun.env.PATH}`,
             AGY_ACCOUNT: "test@example.com",
           },
         },
@@ -393,7 +363,7 @@ exit 0
       expect(proc.status).toBe(0);
 
       // Read all recorded command lines from argv log
-      const argvLogs = readFileSync(argvLogFile, "utf-8");
+      const argvLogs = await Bun.file(argvLogFile).text();
 
       // 1. Sensitive title must NEVER appear in child argv
       expect(argvLogs).not.toContain(sensitiveTitle);
@@ -408,7 +378,7 @@ exit 0
   });
 
   // Test C: Child subprocess environment decoy test (P2/P8)
-  it("strips decoy secrets from subprocess environment (Test C)", () => {
+  it("strips decoy secrets from subprocess environment (Test C)", async () => {
     const mockBinDir = join(tmpdir(), `mock-env-bin-${Date.now()}`);
     mkdirSync(mockBinDir, { recursive: true });
 
@@ -420,17 +390,15 @@ echo '{"id":"mock-env-doc"}'
 exit 0
 `;
 
-    writeFileSync(join(mockBinDir, "gdrive"), mockGdriveScript);
+    await Bun.write(join(mockBinDir, "gdrive"), mockGdriveScript);
     chmodSync(join(mockBinDir, "gdrive"), 0o755);
 
     const tmpTitle = join(tmpdir(), `title-${Date.now()}.txt`);
-    writeFileSync(tmpTitle, "Mock Env Doc", { mode: 0o600 });
+    await Bun.write(tmpTitle, "Mock Env Doc");
 
     try {
-      spawnSync(
-        "bun",
+      runCli(
         [
-          "scripts/gdocs_template_instantiate.ts",
           "--template-id",
           "mock-template-id",
           "--title-file",
@@ -438,10 +406,9 @@ exit 0
           "--skip-sentinel-check",
         ],
         {
-          encoding: "utf-8",
           env: {
-            ...process.env,
-            PATH: `${mockBinDir}:${process.env.PATH}`,
+            ...Bun.env,
+            PATH: `${mockBinDir}:${Bun.env.PATH}`,
             AGY_ACCOUNT: "operator@example.com",
             AWS_SECRET_ACCESS_KEY: "DECOY_LEAKED_AWS_KEY_CANARY",
             GITHUB_TOKEN: "DECOY_LEAKED_GH_TOKEN_CANARY",
@@ -450,7 +417,7 @@ exit 0
         },
       );
 
-      const capturedEnv = readFileSync(envDumpFile, "utf-8");
+      const capturedEnv = await Bun.file(envDumpFile).text();
 
       // Assert whitelisted vars are present
       expect(capturedEnv).toContain("AGY_ACCOUNT=operator@example.com");
@@ -469,7 +436,7 @@ exit 0
   });
 
   // Test D (R-C): Fail closed on post-hydration read failure
-  it("fails closed and auto-trashes doc when readonly read fails (R-C)", () => {
+  it("fails closed and auto-trashes doc when readonly read fails (R-C)", async () => {
     const mockBinDir = join(tmpdir(), `mock-readfail-bin-${Date.now()}`);
     mkdirSync(mockBinDir, { recursive: true });
 
@@ -504,29 +471,21 @@ fi
 exit 0
 `;
 
-    writeFileSync(join(mockBinDir, "gdrive"), mockGdriveScript);
-    writeFileSync(join(mockBinDir, "gdocs"), mockGdocsScript);
+    await Bun.write(join(mockBinDir, "gdrive"), mockGdriveScript);
+    await Bun.write(join(mockBinDir, "gdocs"), mockGdocsScript);
     chmodSync(join(mockBinDir, "gdrive"), 0o755);
     chmodSync(join(mockBinDir, "gdocs"), 0o755);
 
     const tmpTitle = join(tmpdir(), `title-${Date.now()}.txt`);
-    writeFileSync(tmpTitle, "Mock ReadFail Title", { mode: 0o600 });
+    await Bun.write(tmpTitle, "Mock ReadFail Title");
 
     try {
-      const proc = spawnSync(
-        "bun",
-        [
-          "scripts/gdocs_template_instantiate.ts",
-          "--template-id",
-          "mock-template-id",
-          "--title-file",
-          tmpTitle,
-        ],
+      const proc = runCli(
+        ["--template-id", "mock-template-id", "--title-file", tmpTitle],
         {
-          encoding: "utf-8",
           env: {
-            ...process.env,
-            PATH: `${mockBinDir}:${process.env.PATH}`,
+            ...Bun.env,
+            PATH: `${mockBinDir}:${Bun.env.PATH}`,
             AGY_ACCOUNT: "test@example.com",
           },
         },
@@ -546,13 +505,7 @@ exit 0
   });
 
   it("lists registered template kinds and exits 0 when --list-kinds is passed", () => {
-    const proc = spawnSync(
-      "bun",
-      ["scripts/gdocs_template_instantiate.ts", "--list-kinds"],
-      {
-        encoding: "utf-8",
-      },
-    );
+    const proc = runCli(["--list-kinds"]);
 
     expect(proc.status).toBe(0);
     expect(proc.stdout).toContain("Registered Document Template Kinds:");
@@ -561,19 +514,17 @@ exit 0
     expect(proc.stdout).toContain("risk-audit");
   });
 
-  it("validates required variables upfront when --kind is used", () => {
+  it("validates required variables upfront when --kind is used", async () => {
     const tmpTitle = join(tmpdir(), `title-kind-${Date.now()}.txt`);
-    writeFileSync(tmpTitle, "Partner Review Title", { mode: 0o600 });
+    await Bun.write(tmpTitle, "Partner Review Title");
 
     const tmpVars = join(tmpdir(), `vars-kind-${Date.now()}.env`);
     // Only supply PLAYER_HANDLE, missing AGENT_ID and REVIEW_PERIOD
-    writeFileSync(tmpVars, "PLAYER_HANDLE=KP406\n", { mode: 0o600 });
+    await Bun.write(tmpVars, "PLAYER_HANDLE=KP406\n");
 
     try {
-      const proc = spawnSync(
-        "bun",
+      const proc = runCli(
         [
-          "scripts/gdocs_template_instantiate.ts",
           "--kind",
           "partner-review",
           "--title-file",
@@ -583,9 +534,8 @@ exit 0
           "--dry-run",
         ],
         {
-          encoding: "utf-8",
           env: {
-            ...process.env,
+            ...Bun.env,
             AGY_ACCOUNT: "test@example.com",
           },
         },

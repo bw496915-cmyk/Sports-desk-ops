@@ -21,17 +21,9 @@
  */
 
 import { parseArgs } from "node:util";
-import {
-  mkdtempSync,
-  writeFileSync,
-  rmSync,
-  readFileSync,
-  statSync,
-} from "node:fs";
+import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import {
   buildSedScript,
   parseSubstitutionInput,
@@ -119,6 +111,7 @@ async function main() {
         kind: { type: "string" },
         "list-kinds": { type: "boolean", default: false },
         "template-id": { type: "string" },
+        title: { type: "string" },
         "title-file": { type: "string" },
         "title-stdin": { type: "boolean", default: false },
         "var-file": { type: "string" },
@@ -136,26 +129,24 @@ async function main() {
       allowPositionals: false,
     });
   } catch (err: unknown) {
-    if (
-      err instanceof Error &&
-      (err.message.includes("title") || err.message.includes("unknown option"))
-    ) {
-      if (process.argv.includes("--title")) {
-        console.error(
-          "\n❌ [ERROR] Option '--title' was removed to prevent process-table argument leaks.",
-        );
-        console.error(
-          "           Please pass your title via '--title-file <path>' (mode 0600) or '--title-stdin'.\n",
-        );
-      } else {
-        console.error(`\n❌ [ERROR] ${err.message}\n`);
-      }
+    if (err instanceof Error) {
+      console.error(`\n❌ [ERROR] ${err.message}\n`);
       process.exit(1);
     }
     throw err;
   }
 
   const { values } = parsedArgs;
+
+  if (values.title) {
+    console.error(
+      "\n❌ [ERROR] Option '--title' was removed to prevent process-table argument leaks.",
+    );
+    console.error(
+      "           Please pass your title via '--title-file <path>' (mode 0600) or '--title-stdin'.\n",
+    );
+    process.exit(1);
+  }
 
   if (values.help) {
     printUsageAndExit(0);
@@ -190,7 +181,7 @@ async function main() {
   }
 
   // C6: Require AGY_ACCOUNT explicitly, never fall back to hardcoded personal identity
-  const agyAccount = process.env.AGY_ACCOUNT;
+  const agyAccount = Bun.env.AGY_ACCOUNT;
   if (!agyAccount) {
     console.error(
       "[gdocs] Error: AGY_ACCOUNT environment variable is required (e.g. AGY_ACCOUNT=user@example.com).",
@@ -207,7 +198,7 @@ async function main() {
         `[WARNING] Title file ${values["title-file"]} has loose permissions (${(titleStat.mode & 0o777).toString(8)}). Mode 0600 recommended.`,
       );
     }
-    title = readFileSync(values["title-file"], "utf-8").trim();
+    title = (await Bun.file(values["title-file"]).text()).trim();
   } else if (values["title-stdin"]) {
     if (values.stdin) {
       console.error(
@@ -245,7 +236,7 @@ async function main() {
         `Variable file exceeds 1 MiB limit (${varStat.size} bytes).`,
       );
     }
-    rawVarsContent = readFileSync(values["var-file"], "utf-8");
+    rawVarsContent = await Bun.file(values["var-file"]).text();
   } else if (values.stdin) {
     rawVarsContent = await Bun.stdin.text();
     if (rawVarsContent.length > MAX_INPUT_SIZE_BYTES) {
@@ -310,11 +301,7 @@ async function main() {
   const minimalSubprocessEnv = buildSubprocessEnv(agyAccount);
 
   // 2. Clone template using generic non-sensitive title (C2 / R1)
-  // Use time-ordered Bun.randomUUIDv7() when available, fallback to crypto.randomUUID()
-  const tempUuid =
-    typeof Bun !== "undefined" && typeof Bun.randomUUIDv7 === "function"
-      ? Bun.randomUUIDv7()
-      : randomUUID();
+  const tempUuid = Bun.randomUUIDv7();
   const genericCloneTitle = `[Pending Hydration: DOC-TEMP-${tempUuid}]`;
   const cpArgs = ["mutate", "cp", templateId, genericCloneTitle, "--json"];
   if (values.parent) {
@@ -324,43 +311,45 @@ async function main() {
   console.log(
     `[gdocs] Cloning template ${templateId} with secure generic placeholder...`,
   );
-  let cpProc = spawnSync("gdrive", cpArgs, {
-    encoding: "utf-8",
+  let cpProc = Bun.spawnSync(["gdrive", ...cpArgs], {
     env: minimalSubprocessEnv,
   });
 
   // R4: Fallback if --json is unrecognized by older gdrive build
-  if (cpProc.status !== 0 && cpProc.stderr?.includes("unknown flag")) {
+  if (
+    cpProc.exitCode !== 0 &&
+    cpProc.stderr?.toString().includes("unknown flag")
+  ) {
     console.warn(
       "[gdocs] Older gdrive CLI detected (no --json); retrying with standard output...",
     );
     const fallbackCpArgs = ["mutate", "cp", templateId, genericCloneTitle];
     if (values.parent) fallbackCpArgs.push("--parent", values.parent);
-    cpProc = spawnSync("gdrive", fallbackCpArgs, {
-      encoding: "utf-8",
+    cpProc = Bun.spawnSync(["gdrive", ...fallbackCpArgs], {
       env: minimalSubprocessEnv,
     });
   }
 
-  if (cpProc.status !== 0) {
+  if (cpProc.exitCode !== 0) {
     console.error(
       "[gdocs] Error copying template via gdrive cp:",
-      cpProc.stderr || cpProc.stdout,
+      cpProc.stderr?.toString() || cpProc.stdout?.toString(),
     );
     process.exit(1);
   }
 
   // Parse new file ID from gdrive JSON or anchored fallback
   let newDocId: string | null = null;
+  const cpStdout = cpProc.stdout ? cpProc.stdout.toString() : "";
   try {
-    const parsed = JSON.parse(cpProc.stdout);
+    const parsed = JSON.parse(cpStdout);
     if (parsed && typeof parsed.id === "string") {
       newDocId = parsed.id;
     } else if (parsed && typeof parsed.ID === "string") {
       newDocId = parsed.ID;
     }
   } catch {
-    const idMatch = cpProc.stdout.match(/([a-zA-Z0-9_-]{25,})/);
+    const idMatch = cpStdout.match(/([a-zA-Z0-9_-]{25,})/);
     if (idMatch && idMatch[1]) {
       newDocId = idMatch[1];
     }
@@ -369,7 +358,7 @@ async function main() {
   if (!newDocId) {
     console.error(
       "[gdocs] Could not parse new document ID from gdrive output:\n",
-      cpProc.stdout,
+      cpStdout,
     );
     process.exit(1);
   }
@@ -382,41 +371,39 @@ async function main() {
   // 3. R5/P5: Reset ACL Permissions to owner-only before writing any substitutions (FAIL-CLOSED)
   if (!values["skip-acl-reset"]) {
     console.log(`[gdocs] Resetting document ACL permissions to owner-only...`);
-    const permProc = spawnSync(
-      "gdrive",
-      ["readonly", "permissions", newDocId, "--json"],
+    const permProc = Bun.spawnSync(
+      ["gdrive", "readonly", "permissions", newDocId, "--json"],
       {
-        encoding: "utf-8",
         env: minimalSubprocessEnv,
       },
     );
 
-    if (permProc.status !== 0) {
+    if (permProc.exitCode !== 0) {
       console.error(
         "[gdocs] Error querying permissions for ACL reset:",
-        permProc.stderr || permProc.stdout,
+        permProc.stderr?.toString() || permProc.stdout?.toString(),
       );
       hydrationFailed = true;
     } else {
       try {
-        const perms = JSON.parse(permProc.stdout);
+        const perms = JSON.parse(
+          permProc.stdout ? permProc.stdout.toString() : "[]",
+        );
         if (Array.isArray(perms)) {
           for (const perm of perms) {
             if (perm && perm.role !== "owner" && perm.id) {
               console.log(
                 `[gdocs] Removing inherited non-owner permission: ${perm.id} (${perm.role})`,
               );
-              const rmPermProc = spawnSync(
-                "gdrive",
-                ["mutate", "remove-permission", newDocId, perm.id],
+              const rmPermProc = Bun.spawnSync(
+                ["gdrive", "mutate", "remove-permission", newDocId, perm.id],
                 {
-                  encoding: "utf-8",
                   env: minimalSubprocessEnv,
                 },
               );
-              if (rmPermProc.status !== 0) {
+              if (rmPermProc.exitCode !== 0) {
                 console.error(
-                  `[ERROR] Failed to remove permission ${perm.id}: ${rmPermProc.stderr}. Aborting for confidentiality.`,
+                  `[ERROR] Failed to remove permission ${perm.id}: ${rmPermProc.stderr?.toString()}. Aborting for confidentiality.`,
                 );
                 hydrationFailed = true;
                 break; // Stop immediately
@@ -441,25 +428,21 @@ async function main() {
     try {
       const renameBatchPath = join(tmpDir, "rename.json");
       const renameOps = [{ op: "rename", id: newDocId, name: title }];
-      writeFileSync(renameBatchPath, JSON.stringify(renameOps), {
-        mode: 0o600,
-      });
+      await Bun.write(renameBatchPath, JSON.stringify(renameOps));
 
       console.log(
         `[gdocs] Applying final document title securely via batch operation...`,
       );
-      const renameProc = spawnSync(
-        "gdrive",
-        ["mutate", "batch", "-f", renameBatchPath],
+      const renameProc = Bun.spawnSync(
+        ["gdrive", "mutate", "batch", "-f", renameBatchPath],
         {
-          encoding: "utf-8",
           env: minimalSubprocessEnv,
         },
       );
-      if (renameProc.status !== 0) {
+      if (renameProc.exitCode !== 0) {
         console.error(
           "[gdocs] Error renaming document via gdrive batch:",
-          renameProc.stderr || renameProc.stdout,
+          renameProc.stderr?.toString() || renameProc.stdout?.toString(),
         );
         hydrationFailed = true;
       }
@@ -467,23 +450,21 @@ async function main() {
       // 5. Apply substitutions via gdocs mutate sed -f (mode 0600)
       if (Object.keys(substitutions).length > 0 && !hydrationFailed) {
         const tmpSedPath = join(tmpDir, "hydrate.sed");
-        writeFileSync(tmpSedPath, sedContent, { mode: 0o600 });
+        await Bun.write(tmpSedPath, sedContent);
         console.log(
           `[gdocs] Applying ${Object.keys(substitutions).length} substitutions securely via sed...`,
         );
         // Do NOT pass --regex; find and replacement must be literal strings (V1)
-        const sedProc = spawnSync(
-          "gdocs",
-          ["mutate", "sed", newDocId, "-f", tmpSedPath],
+        const sedProc = Bun.spawnSync(
+          ["gdocs", "mutate", "sed", newDocId, "-f", tmpSedPath],
           {
-            encoding: "utf-8",
             env: minimalSubprocessEnv,
           },
         );
-        if (sedProc.status !== 0) {
+        if (sedProc.exitCode !== 0) {
           console.error(
             "[gdocs] Error executing gdocs mutate sed:",
-            sedProc.stderr || sedProc.stdout,
+            sedProc.stderr?.toString() || sedProc.stdout?.toString(),
           );
           hydrationFailed = true;
         } else {
@@ -502,25 +483,26 @@ async function main() {
     console.log(
       `[gdocs] Verifying hydrated document for unreplaced sentinels and secrets...`,
     );
-    const readProc = spawnSync(
-      "gdocs",
-      ["readonly", "read", newDocId, "--comments=false"],
+    const readProc = Bun.spawnSync(
+      ["gdocs", "readonly", "read", newDocId, "--comments=false"],
       {
-        encoding: "utf-8",
         env: minimalSubprocessEnv,
       },
     );
 
-    if (readProc.status !== 0) {
+    if (readProc.exitCode !== 0) {
       console.error(
         "[gdocs] Error reading back document for sentinel verification:",
-        readProc.stderr || readProc.stdout,
+        readProc.stderr?.toString() || readProc.stdout?.toString(),
       );
       hydrationFailed = true;
     } else {
-      const check = checkUnresolvedSentinels(readProc.stdout, {
-        sensitivePatterns: DEFAULT_SENSITIVE_PATTERNS,
-      });
+      const check = checkUnresolvedSentinels(
+        readProc.stdout ? readProc.stdout.toString() : "",
+        {
+          sensitivePatterns: DEFAULT_SENSITIVE_PATTERNS,
+        },
+      );
 
       if (!check.valid) {
         console.error(
@@ -546,11 +528,10 @@ async function main() {
 
     if (!values["keep-on-failure"]) {
       console.log(`[gdocs] Auto-trashing incomplete document ${newDocId}...`);
-      const trashProc = spawnSync("gdrive", ["mutate", "trash", newDocId], {
-        encoding: "utf-8",
+      const trashProc = Bun.spawnSync(["gdrive", "mutate", "trash", newDocId], {
         env: minimalSubprocessEnv,
       });
-      if (trashProc.status === 0) {
+      if (trashProc.exitCode === 0) {
         console.error(
           `[gdocs] Incomplete document moved to Drive trash (recoverable via 'gdrive mutate untrash ${newDocId}').`,
         );

@@ -91,7 +91,7 @@ export function redactSecretMatch(match: string): string {
  */
 export function buildSubprocessEnv(
   agyAccount: string,
-  sourceEnv: NodeJS.ProcessEnv = process.env,
+  sourceEnv: NodeJS.ProcessEnv = Bun.env,
 ): Record<string, string> {
   const result: Record<string, string> = {
     AGY_ACCOUNT: agyAccount,
