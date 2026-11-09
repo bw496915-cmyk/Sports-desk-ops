@@ -45,12 +45,14 @@ describe("Unified Bun Agent Diagnostics Layer", () => {
   });
 
   test("redactStackTrace sanitizes JWTs, Bearer tokens, and sensitive query params", () => {
+    const publicSampleJwt =
+      "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U";
     const rawTrace = `
 Error: Request failed: 401 Unauthorized
     at async fetchWithAuth (https://api.fantasy402.com/v1/data?token=super_secret_998877&auth=secret123)
     at async runPipeline (app.ts:42:15)
 Headers:
-    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+    Authorization: Bearer ${publicSampleJwt}
     Cookie: session_id=sess_abcdef123456; other=public
 `;
 

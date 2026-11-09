@@ -13,6 +13,7 @@ import { describe, expect, test } from "bun:test";
 const SOURCES = [
   "lib/gslive_tally_rollup.ts",
   "lib/f402_bet_ticker_delta.ts",
+  "lib/f402_pending_rollup.ts",
 ] as const;
 const BASELINE_COLLECTION_ALLOCATIONS = 0;
 
