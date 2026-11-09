@@ -1769,7 +1769,7 @@ export async function fetchWagersByStateLive(
   const fromEpochSec = supplied?.from ?? opts.fromEpochSec;
   const toEpochSec = supplied?.to ?? opts.toEpochSec;
   const dateFilterBy =
-    supplied?.dateFilterBy ?? opts.dateFilterBy ?? "calcTime";
+    supplied?.dateFilterBy ?? opts.dateFilterBy ?? "betTime";
   const rows =
     supplied === null
       ? await fetchBetReportRows({
@@ -2909,7 +2909,7 @@ async function main(args: readonly string[]): Promise<void> {
       from: { type: "string" },
       to: { type: "string" },
       payload: { type: "string" },
-      "date-filter-by": { type: "string", default: "calcTime" },
+      "date-filter-by": { type: "string", default: "betTime" },
       timeout: { type: "string", default: "15000" },
       out: { type: "string" },
       json: { type: "string" },

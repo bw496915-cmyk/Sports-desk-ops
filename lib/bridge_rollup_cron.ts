@@ -54,7 +54,12 @@ import {
   bridgeWeblogCorpusPresent,
   resolveBridgeWeblogCorpusFrom,
 } from "./f402_weblog_bridge_inputs.ts";
-import { ensureF402Session, readF402Session } from "./f402_session.ts";
+import {
+  ensureF402Session,
+  readF402Session,
+  type F402Session,
+} from "./f402_session.ts";
+import { resolveF402BearerForCredentialProbe } from "./f402_pending_fetch.ts";
 import {
   F402_KEYCHAIN_NAMES,
   GSID_KEYCHAIN_NAME,
@@ -612,8 +617,12 @@ export interface KeychainCredentialProbeOptions {
   readonly readSecret?: (name: string) => Promise<string | null>;
   /** Default: `readF402Session() !== null`. */
   readonly sessionPresent?: () => boolean;
+  /** Default: `readF402Session`. Used for bridge3b bearer-from-session. */
+  readonly readSession?: () => F402Session | null;
   /** Default: the token file exists and is non-empty. */
   readonly tokenFilePresent?: (path: string) => boolean;
+  /** Default: `readFileSync`. Used for bridge3b bearer-from-file in tests. */
+  readonly readFile?: (path: string) => string;
   /** Keychain names, passed in so lib/ does not import scripts/. */
   readonly gsidName?: string;
   readonly agentIdName?: string;
@@ -633,8 +642,8 @@ function defaultTokenFilePath(
 /**
  * Keychain-aware gate for the cron daemon. It matches where each CLI actually reads from:
  * - 3c: `resolveManagerSession()` is keychain-first, so a stored GSID satisfies it with no env.
- * - 3b: the CLI sends `Authorization: Bearer`, so only a bearer source (env or token file) counts;
- *   the stored agent id/password are deliberately NOT accepted here (the bearer mint is held).
+ * - 3b: the CLI sends `Authorization: Bearer`, so only a bearer source (env, token file, or
+ *   `session:login` authorizationHeader) counts; agent id/password alone do not satisfy 3b.
  * - 3a: needs an agent id plus a readable session file; the agent id is injected into the child
  *   env, never the password.
  */
@@ -699,19 +708,22 @@ export function keychainCredentialProbe(
         };
       }
       if (job.id === "bridge3b") {
-        const envName = (
-          ["F402_BEARER_TOKEN", "F402_TOKEN_FILE"] as const
-        ).find((name) => nonEmpty(envValue(env, name)));
-        if (envName !== undefined)
-          return { ok: true, source: `env:${envName}` };
-        if (tokenFilePresent(defaultTokenFilePath(env))) {
-          return { ok: true, source: "token-file" };
+        try {
+          const resolved = resolveF402BearerForCredentialProbe({
+            environment: env,
+            readSession: options.readSession ?? (() => readF402Session()),
+            ...(options.readFile === undefined
+              ? {}
+              : { readFile: options.readFile }),
+          });
+          return { ok: true, source: resolved.probeSource };
+        } catch {
+          return {
+            ok: false,
+            error:
+              "missing credentials: bearer token (F402_BEARER_TOKEN, F402_TOKEN_FILE, or session:login authorizationHeader)",
+          };
         }
-        return {
-          ok: false,
-          error:
-            "missing credentials: bearer token (F402_BEARER_TOKEN or F402_TOKEN_FILE); the cookie session is not accepted by the 3b fetch",
-        };
       }
       // bridge3a
       const envAgent = (envValue(env, "F402_AGENT_ID") ?? "").trim();
