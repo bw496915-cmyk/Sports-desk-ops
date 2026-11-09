@@ -2,6 +2,17 @@
 
 Upstream contract: one **HTTPS URL** → one `index.json` → Discover lists bundles; **install** still uses Plugins → Installed / `plugin_manager`.
 
+**Harness references (read before inventing fields):**
+
+| Doc | Purpose |
+|---|---|
+| [User guide: Plugin indexes](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/plugin-market.md) | Turn on Discover, HTTPS URL rules, trust model |
+| [Agent Note: index format](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md) | Required fields, `author`, declared `category`, git `source`, `engines.dsh` + `includePrerelease` |
+| [Agent Note: Discover](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md) | Reader service, UI, install path |
+| [`@deepseek-ai/dsh-plugin-market`](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/boot/plugin-market) | `cacheTtlMs` default 10m, `refresh: true`, fetch limits |
+
+Machine layout: **`dsh-ops/notes/SPORTSDESK-MARKET.md`** (profiles, experimental bundle, validation).
+
 ## Copy style (Discover metadata)
 
 **Title** — Title Case, 2–4 words. Acronyms uppercase (`UI`, `API`, `F402`); product fragments like `GSLive` as published. No trailing period.
@@ -59,45 +70,86 @@ What `-0` changes (always with `includePrerelease: true`):
 
 In ad-hoc scripts, still pass **`includePrerelease: true`** when comparing prerelease runtimes; without it, `semver.satisfies` can return false even when the range would match.
 
-## Publish before pasting Index sources
+## Which URL Discover should use (catalog vs lockfile)
 
-Repo **`bw496915-cmyk/Sports-desk-ops` is public**, but raw `market/index.json` must exist **on the ref in the URL**. Until `market/` is **committed and pushed**, every raw URL returns **404** (same symptom as a private repo).
+| Artifact | Role | Immutability |
+|---|---|---|
+| `market/index.json` | **Catalog** — browse metadata in Discover | Moving target is fine; operators want “what’s available now” |
+| `versions[].source.commit` | **Lockfile** — exact install payload | Must stay pinned; CI checks `git cat-file` |
 
-**Sequence:** `git add market/ && git commit` on your branch → push → verify **branch** URL → merge to `main` (or keep a commit-pinned URL).
-
-Unauthenticated check on the branch **before** merge (example):
-
-```sh
-curl -sI "https://raw.githubusercontent.com/bw496915-cmyk/Sports-desk-ops/fix/p0-status-correctness-and-monitoring/market/index.json" | head -1
-```
-
-After merge to `main`:
-
-```sh
-curl -sI "https://raw.githubusercontent.com/bw496915-cmyk/Sports-desk-ops/main/market/index.json" | head -1
-```
-
-**Index sources** (branch-tracking):
+**Recommended (Option A):** set Discover **once** to `main`, gate merges with `bun run test:market-index`, cut `market-index-N` tags only for **audit** (“what was live at time T”), not as the live URL.
 
 ```text
 https://raw.githubusercontent.com/bw496915-cmyk/Sports-desk-ops/main/market/index.json
 ```
 
-**Commit-pinned index** — use a **git tag** on the index commit so squash-merge does not GC the object (branch-only SHAs 404 eventually):
+Until `market/` is merged to `main`, that URL returns **404** — use a tag or branch URL pre-merge, then switch Discover to `main` after merge.
 
-Cut a **new** tag on every index bump (`market-index-2`, `market-index-3`, …). **Never move a published index tag** — immutability is the point; moving a tag can leave raw.githubusercontent serving a stale body briefly. Point **Discover** at the latest tag URL, not a branch-only SHA (squash-merge can GC those objects). Raw SHA URLs are fine for **pre-merge** curl checks only.
-
-Current Discover URL:
+**Tag-pinned URL (Option C)** — no manual updates only if the catalog rarely changes; every metadata bump needs a new tag **and** a Discover URL edit. Use when you deliberately want the catalog URL itself frozen (not required for install safety — `source.commit` already is).
 
 ```text
 https://raw.githubusercontent.com/bw496915-cmyk/Sports-desk-ops/market-index-3/market/index.json
 ```
+
+Never **move** a published `market-index-N` tag; cut `market-index-(N+1)` instead.
+
+### Branch protection (Option A)
+
+After CI exposes **Validate market index** on `main`, require it on merges:
+
+```sh
+gh api repos/bw496915-cmyk/Sports-desk-ops/branches/main/protection \
+  --method PUT \
+  -f required_status_checks[strict]=true \
+  -f required_status_checks[checks][][context]='verify' \
+  -F enforce_admins=false \
+  -F required_pull_request_reviews[required_approving_review_count]=0 \
+  -F restrictions=null
+```
+
+Adjust `context` to match the job name GitHub reports (repo → Actions → a green `main` run → check name). `sportsdesk-ops-ci` / job `verify` is the workflow to watch.
+
+### Discover cache check (three layers)
+
+| Layer | TTL / behavior | What operators do |
+|---|---|---|
+| **raw.githubusercontent** | `cache-control: max-age=300` (~5 min) | `curl` after push may lag |
+| **Harness `pluginMarket`** | Default **`cacheTtlMs: 600000` (10 min)** per index URL in memory; concurrent reads share one fetch | Discover toolbar **Refresh** passes `refresh: true` and bypasses cache |
+| **Profile settings** | Index **URL list** persisted (`settings.update` on profile entry); not the JSON body | Change URL only when switching sources |
+
+Upstream: `@deepseek-ai/dsh-plugin-market` `search(url, { refresh: true })` refetches; failed reads keep the last good listing until Retry. `plugin-market/changed` (e.g. index URL list edit) invalidates removed sources. Detail/README reads use the same TTL unless the entry page Retry sets `refresh`.
+
+**Option A still works:** moving `main` does not require a new Discover URL — after CDN + up to 10 min (or **Refresh**), cards show the new metadata. Install specs still come from the row's `source.commit`, unchanged until you bump the index pin.
+
+### Install path (why catalog immutability is optional)
+
+Discover **Install** calls `marketInstallTarget(name, version)` → for git:
+
+`git+https://github.com/.../Sports-desk-ops.git#<40-hex-commit>&path:/dsh-plugin-ui`
+
+Harness **`plugin_manager`** clones that **commit**, not the index URL. Compatibility uses `engines.dsh` vs runtime with `includePrerelease: true` (`evaluatePluginCompatibility`). The index is only how operators **find** the pin; changing catalog text does not change installed bytes.
+
+## Publish checklist
+
+1. Branch → `bun run test:market-index` green.
+2. Merge to `main` (with protection when enabled).
+3. `curl -sI …/main/market/index.json` → **200**.
+4. Discover: **`main` URL** (one-time), or tag URL until step 2 is done.
+5. Optional audit: `git tag market-index-N <merge-commit> && git push origin market-index-N` (do not retag old `market-index-*`).
 
 GitHub raw may cache for a few minutes after push. Body is usually served as `text/plain`; Discover parses JSON from the body.
 
 ## Squash-merge and plugin `source.commit` pins
 
 Each row pins bundle source to a git commit (today `4f847435…`). If that commit exists **only** on a feature branch and the PR is **squash-merged**, the original commits can become unreachable and `git fetch <sha>` for installs breaks — even though `raw.githubusercontent.com/<sha>/…` may still work briefly.
+
+**Never squash-merge a PR that introduces or moves `source.commit` pins unless one of these is already true:**
+
+1. Every pinned SHA is an **ancestor of `origin/main`** (`git merge-base --is-ancestor <sha> origin/main`), or  
+2. You pushed a **`market-pin-N` tag** on each pin SHA **before** merge (`git tag market-pin-N <sha> && git push origin market-pin-N`), or  
+3. You re-pin every row to the **post-merge `main` commit** (and bump `version` / `publishTimestamp`) in the same PR.
+
+Do **not** delete published `market-pin-*` tags. Git installs use `git+<url>#<commit>`; tags are the lifeboat when squash-merge drops branch commits.
 
 Before merge:
 
@@ -106,9 +158,9 @@ git merge-base --is-ancestor 4f84743536a4de78a8ff81e09e00a8228ae09be6 origin/mai
 ```
 
 - **safe** — pin is already on `main`; any merge strategy is fine.
-- **orphan-risk** — use a real merge commit, **or** tag the pin (`git tag market-pin-1 4f84743536a4de78a8ff81e09e00a8228ae09be6 && git push origin market-pin-1`), **or** re-pin `source.commit` to the post-merge `main` SHA and bump `publishTimestamp`.
+- **orphan-risk** — tag the pin (**`market-pin-1`** today), merge, or re-pin to squash commit on `main`.
 
-Tagging is cheap insurance for SHA-pinned Discover URLs and for DSH git installs.
+`market-index-N` tags protect the **catalog JSON** for audit; `market-pin-N` tags protect **installable bundle source** SHAs.
 
 ## Bump procedure
 
