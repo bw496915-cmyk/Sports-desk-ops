@@ -28,9 +28,30 @@ const INVARIANT_FILES = [
 ] as const;
 
 const isCI = Boolean(Bun.env.CI);
+const ENRICHED_FIXTURE = join(
+  ROOT,
+  "tests/fixtures/backtest/enriched_customers_full.json",
+);
+const DOWNLINE_FIXTURE = join(
+  ROOT,
+  "tests/fixtures/backtest/sportsdesk_downline_data.json",
+);
 const hasEnrichedCustomers = existsSync(
   join(ROOT, "enriched_customers_full.json"),
 );
+
+/** Gitignored operator artifacts; CI stages tracked backtest fixtures before verify-load. */
+async function ensureCiBacktestFixtures(): Promise<void> {
+  if (!isCI) return;
+  for (const [name, source] of [
+    ["enriched_customers_full.json", ENRICHED_FIXTURE],
+    ["sportsdesk_downline_data.json", DOWNLINE_FIXTURE],
+  ] as const) {
+    const target = join(ROOT, name);
+    if (existsSync(target)) continue;
+    await Bun.write(target, Bun.file(source));
+  }
+}
 
 describe("DSH plugin bundles", () => {
   test("discovers at least one dsh-plugin* bundle at repository root", () => {
@@ -54,22 +75,13 @@ describe("DSH plugin bundles", () => {
       }
     });
 
-    // By design, dsh-plugin/verify-load.mjs reads operator-only customer PII
-    // (enriched_customers_full.json, gitignored per AGENTS.md:34-39). In CI (or
-    // when that local fixture is absent), all 5 bundles run the structural
-    // manifest check above, while verify-load runs for the 4 fixture-free
-    // bundles and skips dsh-plugin ("5 discovered, 4 verified in CI").
-    const shouldSkip =
-      bundle === "dsh-plugin" && (isCI || !hasEnrichedCustomers);
-    const verifyLabel =
-      bundle === "dsh-plugin"
-        ? `${bundle} verify-load passes (requires local enriched_customers_full.json; skipped in CI)`
-        : `${bundle} verify-load passes`;
+    // dsh-plugin/verify-load.mjs reads gitignored backtest JSON. CI copies tracked fixtures first.
+    const shouldSkip = bundle === "dsh-plugin" && !isCI && !hasEnrichedCustomers;
+    const verifyLabel = `${bundle} verify-load passes`;
 
-    test.skipIf(shouldSkip)(
-      verifyLabel,
-      async () => {
-        const bundleDir = join(ROOT, bundle);
+    test.skipIf(shouldSkip)(verifyLabel, async () => {
+      await ensureCiBacktestFixtures();
+      const bundleDir = join(ROOT, bundle);
         const harness = join(bundleDir, "verify-load.mjs");
         expect(existsSync(harness), `${bundle} has no verify-load.mjs`).toBe(
           true,
