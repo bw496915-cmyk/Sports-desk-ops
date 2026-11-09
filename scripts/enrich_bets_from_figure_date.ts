@@ -211,6 +211,11 @@ export async function runEnrichment(options: CliOptions): Promise<{
     throw new Error(`Ticker file not found: ${options.tickerPath}`);
   }
 
+  const startNs =
+    typeof Bun !== "undefined" && typeof Bun.nanoseconds === "function"
+      ? Bun.nanoseconds()
+      : 0;
+
   const figureIndex = await loadFigureIndex(options.figurePath);
   let totalTickerRows = 0;
   let matchedRows = 0;
@@ -341,6 +346,15 @@ export async function runEnrichment(options: CliOptions): Promise<{
 
   if (outWriter) await outWriter.end();
 
+  const durationMs =
+    typeof Bun !== "undefined" && typeof Bun.nanoseconds === "function"
+      ? Number(Bun.nanoseconds() - startNs) / 1_000_000
+      : 0;
+  const throughputRowsPerSec =
+    durationMs > 0
+      ? Math.round((totalTickerRows / durationMs) * 1000)
+      : undefined;
+
   const inspection = new FigureDateEnrichmentInspection(
     {
       figureRecordsIndexed: figureIndex.size,
@@ -351,6 +365,8 @@ export async function runEnrichment(options: CliOptions): Promise<{
         totalTickerRows > 0 ? (matchedRows / totalTickerRows) * 100 : 0,
       totalRiskCents: parseAsCents(totalRiskCents, true),
       totalNetPnlCents: parseAsCents(totalNetPnlCents, true),
+      durationMs,
+      throughputRowsPerSec,
     },
     samples,
   );

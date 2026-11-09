@@ -12,9 +12,11 @@ import {
   onTestFinished,
   spyOn,
 } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { Database } from "bun:sqlite";
+import { mkdirSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { parseCliArgs, runNormalizer } from "../scripts/normalize.ts";
+import { registerPortalPeriodSqliteFunctions } from "../lib/portal_period_taxonomy.ts";
 
 const TEST_TMP_DIR = join(import.meta.dir, "../scratch/test_normalize_tmp");
 
@@ -256,5 +258,49 @@ describe("runNormalizer execution", () => {
     expect(records[0]!.wagerNumber).toBe(10002);
     expect(records[0]!.portalPeriod).toBe(1);
     expect(provenance.stats.totalProcessed).toBe(4);
+  });
+
+  it("parses --sqlite CLI option and bulk ingests into SQLite database", async () => {
+    const sqlitePath = join(TEST_TMP_DIR, "test_norm_wagers.sqlite");
+    const parsed = parseCliArgs([
+      "--mode",
+      "CPV",
+      "--period",
+      "1",
+      "--engine",
+      "native",
+      "--sqlite",
+      sqlitePath,
+      "--input",
+      FIXTURE_PATH,
+    ]);
+
+    expect(parsed.sqlitePath).toBe(sqlitePath);
+
+    const { records } = await runNormalizer(parsed);
+    expect(records.length).toBe(1);
+
+    const db = new Database(sqlitePath);
+    registerPortalPeriodSqliteFunctions(db);
+    const row = db
+      .query(
+        "SELECT wager_number, portal_period_label(portal_period) as period_label, sum_risk_cents(risk) as cents FROM normalized_wagers",
+      )
+      .get() as {
+      wager_number: string;
+      period_label: string;
+      cents: number;
+    } | null;
+
+    expect(row?.wager_number).toBe("10002");
+    expect(row?.period_label).toBe("1st Half");
+    expect(row?.cents).toBe(5000);
+
+    db.close();
+    try {
+      unlinkSync(sqlitePath);
+    } catch {
+      // ignore
+    }
   });
 });

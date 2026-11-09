@@ -13,6 +13,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import * as readline from "node:readline";
 import { Readable } from "node:stream";
+import { Database } from "bun:sqlite";
 import {
   DATE_FAMILIES,
   PORTAL_PERIOD_LABELS,
@@ -21,6 +22,8 @@ import {
   isDerivativePointsLineWager,
   normalizeWager,
   PeriodTaxonomyInspection,
+  registerPortalPeriodSqliteFunctions,
+  insertNormalizedWagers,
   type NormalizedWagerRecord,
   type PortalPeriodCode,
   type ProvenanceSidecar,
@@ -58,6 +61,7 @@ Options:
   --range start=...,end=...   Optional date window (maps to mode's date family)
   --input <path>              Path to JSONL wagers file
   --output <path>             Path to save normalized JSON output (also writes <output>_meta.json)
+  --sqlite <path>             Ingest normalized records directly into SQLite database using atomic transaction
   --format <fmt>              Output presentation format: inspect | table | json | summary (default: table)
   --inspect                   Format output using Bun.inspect inspection view (shortcut for --format=inspect)
   --help                      Show this help message
@@ -77,6 +81,7 @@ export interface CliOptions {
   endDate: string | null;
   inputPath: InputFileSource;
   outputPath: string | null;
+  sqlitePath?: string | null;
   format: "json" | "table" | "inspect" | "summary";
   inspect?: boolean;
 }
@@ -92,6 +97,7 @@ export function parseCliArgs(args: string[]): CliOptions {
   let endDate: string | null = null;
   let inputPath = "";
   let outputPath: string | null = null;
+  let sqlitePath: string | null = null;
   let format: "json" | "table" | "inspect" | "summary" = "table";
   let inspect = false;
 
@@ -154,6 +160,8 @@ export function parseCliArgs(args: string[]): CliOptions {
       inputPath = args[++i] ?? "";
     } else if (arg === "--output" && i + 1 < args.length) {
       outputPath = args[++i] ?? null;
+    } else if (arg === "--sqlite" && i + 1 < args.length) {
+      sqlitePath = args[++i] ?? null;
     } else if (arg === "--format" && i + 1 < args.length) {
       const nextArg = args[++i];
       const val = nextArg ? nextArg.toLowerCase() : "";
@@ -198,6 +206,7 @@ export function parseCliArgs(args: string[]): CliOptions {
     endDate,
     inputPath,
     outputPath,
+    sqlitePath,
     format,
     inspect,
   };
@@ -250,6 +259,10 @@ export async function runNormalizer(options: CliOptions): Promise<{
 
   let totalProcessed = 0;
   let totalRisk = 0;
+  const startNs =
+    typeof Bun !== "undefined" && typeof Bun.nanoseconds === "function"
+      ? Bun.nanoseconds()
+      : 0;
 
   const rl = readline.createInterface({
     input: Readable.fromWeb(
@@ -372,6 +385,22 @@ export async function runNormalizer(options: CliOptions): Promise<{
     rl.close();
   }
 
+  const durationMs =
+    typeof Bun !== "undefined" && typeof Bun.nanoseconds === "function"
+      ? Number(Bun.nanoseconds() - startNs) / 1_000_000
+      : 0;
+  const throughputRowsPerSec =
+    durationMs > 0
+      ? Math.round((totalProcessed / durationMs) * 1000)
+      : undefined;
+
+  if (options.sqlitePath) {
+    const db = new Database(options.sqlitePath);
+    registerPortalPeriodSqliteFunctions(db);
+    insertNormalizedWagers(db, records);
+    db.close();
+  }
+
   const provenance: ProvenanceSidecar = {
     capturedAt: new Date().toISOString(),
     reportMode: options.mode,
@@ -392,6 +421,8 @@ export async function runNormalizer(options: CliOptions): Promise<{
         records.length > 0
           ? Math.round((totalRisk / records.length) * 100) / 100
           : 0,
+      durationMs,
+      throughputRowsPerSec,
       periodBreakdown,
       detailedBreakdown,
     },
@@ -501,7 +532,13 @@ async function main(): Promise<void> {
       `\n[Normalizer] Wrote ${records.length} records to: ${outPath}`,
     );
     console.log(`[Normalizer] Wrote provenance metadata to:   ${metaPath}`);
-  } else if (options.format === "json") {
+  }
+
+  if (options.sqlitePath) {
+    console.log(
+      `\n[Normalizer] Ingested ${records.length} records into SQLite: ${resolve(options.sqlitePath)}`,
+    );
+  } else if (!options.outputPath && options.format === "json") {
     console.log(
       JSON.stringify({ provenance, sample: records.slice(0, 5) }, null, 2),
     );

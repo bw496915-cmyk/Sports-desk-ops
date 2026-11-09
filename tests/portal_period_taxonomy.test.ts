@@ -23,6 +23,7 @@ import {
   PeriodTaxonomyInspection,
   createNormalizedWagersDirectStream,
   registerPortalPeriodSqliteFunctions,
+  insertNormalizedWagers,
 } from "../lib/portal_period_taxonomy.ts";
 
 describe("Portal Period Taxonomy Enum", () => {
@@ -416,5 +417,126 @@ describe("Engine Detection & Risk Dollars", () => {
     expect(row?.is_dt).toBe(1);
     expect(row?.not_dt).toBe(0);
     db.close();
+  });
+
+  it("registers and executes aggregate SQLite user-defined functions (sum_risk_cents, count_derivative_points)", () => {
+    const db = new Database(":memory:");
+    registerPortalPeriodSqliteFunctions(db);
+
+    db.run("CREATE TABLE bets (risk REAL, desc TEXT)");
+    db.run(
+      "INSERT INTO bets VALUES (50.25, 'Team A derivative points Over 20')",
+    );
+    db.run(
+      "INSERT INTO bets VALUES (100.50, 'Team B derivative points Over 21')",
+    );
+    db.run("INSERT INTO bets VALUES (25.00, 'Team C -3 -110')");
+
+    const row = db
+      .query(
+        "SELECT sum_risk_cents(risk) as total_cents, count_derivative_points(desc) as dt_count FROM bets",
+      )
+      .get() as { total_cents: number; dt_count: number } | null;
+
+    expect(row?.total_cents).toBe(17575); // 5025 + 10050 + 2500 = 17575 cents
+    expect(row?.dt_count).toBe(2);
+    db.close();
+  });
+
+  it("ingests normalized wager records into SQLite via atomic transaction (insertNormalizedWagers)", () => {
+    const db = new Database(":memory:");
+    registerPortalPeriodSqliteFunctions(db);
+
+    const norm1 = normalizeWager({
+      WagerNumber: "W1001",
+      WagerType: "E",
+      Period: "1H",
+      ShortDesc: "Celtics derivative points Over 55.5 -110",
+      Risk: 75.5,
+      CustomerID: "VIP99",
+      AgentID: "BOSS",
+      Sport: "Basketball",
+      TicketWriter: "Internet",
+      InsertDateTime: "2026-11-02 19:00:00",
+    });
+
+    const norm2 = normalizeWager({
+      WagerNumber: "W1002",
+      WagerType: "E",
+      Period: "2H",
+      ShortDesc: "Warriors derivative points Under 52 -115",
+      Risk: 125.0,
+      CustomerID: "VIP99",
+      AgentID: "BOSS",
+      Sport: "Basketball",
+      TicketWriter: "Internet",
+      InsertDateTime: "2026-11-02 20:00:00",
+    });
+
+    const result = insertNormalizedWagers(db, [norm1, norm2]);
+    expect(result.insertedCount).toBe(2);
+
+    const query = db
+      .query(
+        "SELECT wager_number, portal_period_label(portal_period) as period_label, sum_risk_cents(risk) as cents FROM normalized_wagers GROUP BY portal_period ORDER BY portal_period ASC",
+      )
+      .all() as Array<{
+      wager_number: string;
+      period_label: string;
+      cents: number;
+    }>;
+
+    expect(query.length).toBe(2);
+    expect(query[0]!.period_label).toBe("1st Half");
+    expect(query[0]!.cents).toBe(7550);
+    expect(query[1]!.period_label).toBe("2nd Half");
+    expect(query[1]!.cents).toBe(12500);
+
+    db.close();
+  });
+
+  it("formats throughput rows per second in PeriodTaxonomyInspection when present", () => {
+    const norm = normalizeWager({
+      WagerNumber: "W1",
+      WagerType: "E",
+      Period: "1H",
+      ShortDesc: "Bills derivative points Over 14.5",
+      AmountWagered: "100.00",
+    });
+
+    const provenance = {
+      capturedAt: "2026-11-09T08:00:00.000Z",
+      reportMode: "CPV" as const,
+      wagerType: "E (native) / M,P (Gansrow TT)",
+      filtersExpanded: true,
+      period: "1",
+      portalPeriod: 1 as const,
+      portalPeriodLabel: "1st Half",
+      engineFilter: "native" as const,
+      dateFamily: "Customer Volume" as const,
+      dateFields: {
+        start: null,
+        end: null,
+        startG: null,
+        endG: null,
+        startReportVolumen: "2026-11-01",
+        endReportVolumen: "2026-11-09",
+      },
+      stats: {
+        totalProcessed: 1000,
+        matchedRows: 1,
+        totalRisk: 100,
+        avgRisk: 100,
+        durationMs: 2.5,
+        throughputRowsPerSec: 400000,
+        periodBreakdown: {},
+      },
+    };
+
+    const inspection = new PeriodTaxonomyInspection(provenance, [norm]);
+    const report = Bun.inspect(inspection, { colors: false });
+    expect(report).toContain(
+      "Throughput        : 400,000 wagers/sec (2.5ms total)",
+    );
   });
 });

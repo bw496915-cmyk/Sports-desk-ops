@@ -7,6 +7,7 @@ import { describe, expect, it } from "bun:test";
 import {
   buildCanonicalEventId,
   buildCompositeMatchKey,
+  hashCompositeMatchKey,
   canonicalTeamToken,
   computeExecutionLatency,
   enrichWagerRecord,
@@ -686,5 +687,40 @@ describe("Figure Date Enrichment Engine", () => {
     Bun.inspect(inspection, { colors: true });
     Bun.inspect(inspection, { colors: false });
     expect(JSON.stringify(inspection)).toBe(before);
+  });
+
+  it("hashCompositeMatchKey computes 64-bit wyhash bigint fingerprints deterministically", () => {
+    const key = "DAN245|2026-11-06 20:09|2300|2000|546";
+    const h1 = hashCompositeMatchKey(key);
+    const h2 = hashCompositeMatchKey(key);
+    expect(typeof h1).toBe("bigint");
+    expect(h1).toBe(h2);
+
+    const diffKey = "DAN245|2026-11-06 20:09|2300|2000|547";
+    const hDiff = hashCompositeMatchKey(diffKey);
+    expect(h1).not.toBe(hDiff);
+  });
+
+  it("formats throughput and duration in FigureDateEnrichmentInspection when present", () => {
+    const enriched = enrichWagerRecord(sampleTicker, sampleFigure);
+    const inspection = new FigureDateEnrichmentInspection(
+      {
+        figureRecordsIndexed: 100,
+        tickerRowsStreamed: 1000,
+        exactMatchedRows: 950,
+        unmatchedRows: 50,
+        matchRatePct: 95.0,
+        totalRiskCents: enriched.settlement.amountWageredCents,
+        totalNetPnlCents: enriched.settlement.netPnlCents,
+        durationMs: 4.2,
+        throughputRowsPerSec: 238095,
+      },
+      [enriched],
+    );
+
+    const report = Bun.inspect(inspection, { colors: false });
+    expect(report).toContain(
+      "Throughput             : 238,095 rows/sec (4.2ms total)",
+    );
   });
 });

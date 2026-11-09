@@ -185,6 +185,8 @@ export interface ProvenanceSidecar {
     readonly totalRisk: number;
     readonly avgRisk: number;
     readonly periodBreakdown: Record<string, { count: number; risk: number }>;
+    readonly durationMs?: number | undefined;
+    readonly throughputRowsPerSec?: number | undefined;
     readonly detailedBreakdown?: Record<
       string,
       {
@@ -587,6 +589,11 @@ export class PeriodTaxonomyInspection {
       `Matched Rows      : ${cyan(p.stats.matchedRows.toLocaleString())} wagers`,
       `Total Risk Volume : $${bold(totalRiskStr)}`,
       `Average Risk      : $${avgRiskStr}`,
+      ...(p.stats.throughputRowsPerSec !== undefined
+        ? [
+            `Throughput        : ${cyan(p.stats.throughputRowsPerSec.toLocaleString())} wagers/sec (${p.stats.durationMs?.toFixed(1) ?? "0"}ms total)`,
+          ]
+        : []),
     ].join("\n");
 
     const breakdownEntries = Object.entries(p.stats.detailedBreakdown ?? {});
@@ -662,9 +669,13 @@ export function createNormalizedWagersDirectStream(
  * Registers canonical portal period taxonomy and market classifiers as user-defined
  * functions in a `bun:sqlite` Database instance.
  *
- * Exposes:
+ * Scalar UDFs:
  * - `portal_period_label(code)`: Translates canonical period code (-1..6) to portal label.
  * - `is_derivative_points_line(shortDesc)`: Returns 1 if description matches derivative points flow, else 0.
+ *
+ * Aggregate UDFs:
+ * - `sum_risk_cents(dollars)`: Accumulates risk dollars into strict integer Cents (Math.round(val * 100)).
+ * - `count_derivative_points(shortDesc)`: Counts wagers matching derivative points flow across rows.
  */
 export function registerPortalPeriodSqliteFunctions(db: Database): void {
   if (!db || typeof db.function !== "function") return;
@@ -682,4 +693,90 @@ export function registerPortalPeriodSqliteFunctions(db: Database): void {
       ? 1
       : 0;
   });
+
+  if (typeof db.aggregate === "function") {
+    db.aggregate("sum_risk_cents", {
+      start: 0,
+      step: (totalCents: number, dollars: unknown) => {
+        const d = typeof dollars === "number" ? dollars : Number(dollars || 0);
+        return totalCents + Math.round(d * 100);
+      },
+    });
+
+    db.aggregate("count_derivative_points", {
+      start: 0,
+      step: (count: number, shortDesc: unknown) => {
+        return (
+          count +
+          (isDerivativePointsLineWager({ ShortDesc: String(shortDesc || "") })
+            ? 1
+            : 0)
+        );
+      },
+    });
+  }
+}
+
+/**
+ * Ingests a collection or stream of normalized wager records into a SQLite database
+ * within a single atomic transaction.
+ *
+ * Utilizes `db.transaction()` to compile the prepared transaction loop in native C++,
+ * achieving high-throughput batch ingestion without SQL re-parsing overhead.
+ */
+export function insertNormalizedWagers(
+  db: Database,
+  records: Iterable<NormalizedWagerRecord>,
+): { insertedCount: number } {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS normalized_wagers (
+      wager_number TEXT PRIMARY KEY,
+      engine TEXT NOT NULL,
+      portal_period INTEGER NOT NULL,
+      half TEXT NOT NULL,
+      market TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      agent_id TEXT NOT NULL,
+      sport TEXT NOT NULL,
+      sub_sport TEXT NOT NULL,
+      risk REAL NOT NULL,
+      risk_cents INTEGER NOT NULL,
+      ticket_writer TEXT NOT NULL,
+      inserted_at TEXT NOT NULL
+    )
+  `);
+
+  const insertStmt = db.prepare(`
+    INSERT OR REPLACE INTO normalized_wagers (
+      wager_number, engine, portal_period, half, market,
+      customer_id, agent_id, sport, sub_sport, risk, risk_cents,
+      ticket_writer, inserted_at
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+  `);
+
+  const runBatch = db.transaction((recs: Iterable<NormalizedWagerRecord>) => {
+    let count = 0;
+    for (const r of recs) {
+      insertStmt.run(
+        String(r.wagerNumber),
+        r.engine,
+        r.portalPeriod,
+        r.half,
+        r.market,
+        String(r.customerId),
+        String(r.agentId),
+        r.sport,
+        r.subSport,
+        r.risk,
+        Number(r.riskCents),
+        r.ticketWriter,
+        r.insertedAt,
+      );
+      count++;
+    }
+    return count;
+  });
+
+  const insertedCount = runBatch(records);
+  return { insertedCount };
 }

@@ -209,6 +209,27 @@ export function buildCompositeMatchKey(
 }
 
 /**
+ * Computes a high-performance 64-bit wyhash fingerprint of a composite match key.
+ * Enables O(1) integer map lookups, BigUint64Array indexing, and zero-string-allocation
+ * join tables across large (>900k rows) socket streams.
+ */
+export function hashCompositeMatchKey(key: string): bigint {
+  if (
+    typeof Bun !== "undefined" &&
+    Bun.hash &&
+    typeof Bun.hash.wyhash === "function"
+  ) {
+    return Bun.hash.wyhash(key);
+  }
+  // Deterministic fallback
+  let hash = 0n;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31n + BigInt(key.charCodeAt(i))) & 0xffffffffffffffffn;
+  }
+  return hash;
+}
+
+/**
  * Canonicalizes team strings for event identification:
  * 1. Normalizes "Saint " to "St."
  * 2. Normalizes "St " (without period) to "St."
@@ -546,6 +567,8 @@ export interface FigureDateEnrichmentStats {
   readonly matchRatePct: number;
   readonly totalRiskCents: Cents;
   readonly totalNetPnlCents: Cents;
+  readonly durationMs?: number | undefined;
+  readonly throughputRowsPerSec?: number | undefined;
   readonly sportBreakdown?: Record<string, { count: number; riskCents: Cents }>;
 }
 
@@ -631,6 +654,11 @@ export class FigureDateEnrichmentInspection {
       `Unmatched Rows         : ${yellow(this.stats.unmatchedRows.toLocaleString())}`,
       `Total Risk Monitored   : ${bold(totalRiskDol)}`,
       `Net Settlement PnL     : ${bold(netPnlDol)}`,
+      ...(this.stats.throughputRowsPerSec !== undefined
+        ? [
+            `Throughput             : ${cyan(this.stats.throughputRowsPerSec.toLocaleString())} rows/sec (${this.stats.durationMs?.toFixed(1) ?? "0"}ms total)`,
+          ]
+        : []),
     ].join("\n");
 
     const sampleLines =

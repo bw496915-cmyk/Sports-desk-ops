@@ -325,7 +325,7 @@ Usage: ./bin/dx <command> [args...]
     ./bin/dx blob-formdata <file>   Parse a blob as FormData and print JSON (or '-' for stdin)
     ./bin/dx enrich --figure=<path> [--ticker=<path>] [--output=<path>] [--format=inspect|jsonl|summary] [--inspect]
                                     Stream and join live ticker wagers with settled getWagersByFigureDate
-    ./bin/dx taxonomy [--mode=CP|CPS|CPV|G] [--period=-1..6] [--engine=native|full] [--format=inspect|table|json] [--inspect]
+    ./bin/dx taxonomy [--mode=CP|CPS|CPV|G] [--period=-1..6] [--engine=native|full] [--sqlite=<path>] [--format=inspect|table|json] [--inspect]
                                     Normalize wagers to canonical 0-6 portal period enum with multi-family dates
 
   Deploy
