@@ -77,6 +77,10 @@ with `bun run audit:tool-calls`.
   (under `scripts/`) so a live refresh does not rewrite the committed 4-week backtest artifact.
 - **Deploy credentials** come from `./cloudflare.env` or `$XDG_CONFIG_HOME/cloudflare/pages.env`;
   never source `.env` (1Password FIFO plus R2/F402 secrets that shadow the Pages token).
+- **`bun:bundle` AST constraint:** `feature()` from `"bun:bundle"` can only appear directly
+  inside an `if` condition or ternary (`feature("FLAG") ? true : false`). Passing it directly to
+  functions (like `expect()` or `expectTypeOf()`) fails at parse time. Testing `--feature=FLAG`
+  requires subprocess spawning (`Bun.spawnSync`), as flags cannot be toggled mid-process.
 
 ## DSH Discover (plugin market index)
 
@@ -152,8 +156,13 @@ Revoke any token that was exposed. Live manager API calls must use **`createF402
   wired by `code-project sync-environments --apply` (2026-11-02: it carries an environment id and
   `.env` is a 1Password-mounted pipe on the operator machine). Do not hand-write secrets into the
   repo.
-- `~/platform` is an external policy checkout (pinned SHA in `.github/workflows/ci.yml`); without
-  it `policy`-based scripts fail. Say so instead of disabling them.
+- **Bun-native policy ratchet removed 2026-11-09 (operator decision).** `bun run policy:check`,
+  the `~/platform` checkout it required, the pinned `PLATFORM_SHA` and the `PLATFORM_DEPLOY_KEY`
+  CI secret are gone. The rules it enforced (`zod-not-guard-calls`, `bun-env`, `node-fs-read-write-file`
+  and the rest) are now a review convention, **not a gate**: nothing fails when they are violated.
+  When the ratchet was removed it was reporting 239 matches over the frozen baseline across 91
+  files (137 of them `zod-not-guard-calls`). Reintroducing it means restoring the copy, the
+  baseline and a decision about that debt — not just re-adding a step.
 
 ### Data-handling budgets
 

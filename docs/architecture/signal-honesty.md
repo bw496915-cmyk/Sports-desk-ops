@@ -69,25 +69,25 @@ External fetch CLIs may honor operator verbose flags (for example `F402_FETCH_VE
 
 ## Cron `requiredEnv` audit (2026-11-09)
 
-| Job       | `requiredEnv` | Notes |
-| --------- | ------------- | ----- |
-| `bridge3a` | `F402_AGENT_ID` | + keychain probe for bearer |
-| `bridge3b` | F402 credential env set | pending bets rollup |
-| `bridge3c` | `GSLIVE_SESSION_ID`, `GSID`, … | manager session |
-| `weblog`   | `[]` | Corpus via `resolveBridgeWeblogCorpusFrom` + `bridgeWeblogCorpusPresent`; not “needs nothing” |
+| Job        | `requiredEnv`                  | Notes                                                                                         |
+| ---------- | ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `bridge3a` | `F402_AGENT_ID`                | + keychain probe for bearer                                                                   |
+| `bridge3b` | F402 credential env set        | pending bets rollup                                                                           |
+| `bridge3c` | `GSLIVE_SESSION_ID`, `GSID`, … | manager session                                                                               |
+| `weblog`   | `[]`                           | Corpus via `resolveBridgeWeblogCorpusFrom` + `bridgeWeblogCorpusPresent`; not “needs nothing” |
 
 Only **weblog** uses an empty `requiredEnv` array; credentials are **corpus presence**, not GSID.
 
 ## Operator triage matrix
 
-| If you see this… | It usually means… | Do this… |
-| ---------------- | ----------------- | -------- |
-| `[not live]` on dashboard | Fixture or scratch capture, not live ajax | Check `source` / tooltip; verify cron and auth if live expected |
-| `bridge3c` exit 1 | Read stderr: `HTTP 401` vs `ECONNRESET` / timeout | 401 → refresh GSID (`secrets:gslive set` / `login`); timeout/big payload → narrow `--open-from`/`--open-to`, raise `--timeout` |
-| `pipeline.r2` sink `stale` | Local artifact may exist but R2 pointer not updated | Run publish step (`wagers:publish-snapshot`, bridge rollup with R2); check R2 credentials |
-| `getBetReport returned HTTP 401` | GSID expired or wrong keychain name | `bun run secrets:gslive status`; store under `GSLIVE_SESSION_ID` |
-| `bearer source=session` | No env bearer; using session file | OK for dev; set keychain/env bearer for cron |
-| Weblog cron “fresh” KPI, old desk window | Republish of stale corpus | Tail cron for `weblog: published rollup for data window … (Nd old)` |
+| If you see this…                         | It usually means…                                   | Do this…                                                                                                                       |
+| ---------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `[not live]` on dashboard                | Fixture or scratch capture, not live ajax           | Check `source` / tooltip; verify cron and auth if live expected                                                                |
+| `bridge3c` exit 1                        | Read stderr: `HTTP 401` vs `ECONNRESET` / timeout   | 401 → refresh GSID (`secrets:gslive set` / `login`); timeout/big payload → narrow `--open-from`/`--open-to`, raise `--timeout` |
+| `pipeline.r2` sink `stale`               | Local artifact may exist but R2 pointer not updated | Run publish step (`wagers:publish-snapshot`, bridge rollup with R2); check R2 credentials                                      |
+| `getBetReport returned HTTP 401`         | GSID expired or wrong keychain name                 | `bun run secrets:gslive status`; store under `GSLIVE_SESSION_ID`                                                               |
+| `bearer source=session`                  | No env bearer; using session file                   | OK for dev; set keychain/env bearer for cron                                                                                   |
+| Weblog cron “fresh” KPI, old desk window | Republish of stale corpus                           | Tail cron for `weblog: published rollup for data window … (Nd old)`                                                            |
 
 ## References
 
@@ -96,5 +96,5 @@ Only **weblog** uses an empty `requiredEnv` array; credentials are **corpus pres
 - Wagers two-step publish: `docs/runbooks/wagers_live_capture_runbook.md`
 - Recovery arc: GitHub #84 (multi-sink R2 stale; closed when sinks honest)
 - Open gaps this ADR governs (not closed by the ADR PR): #91 (weblog producer), #93 (wagers cron), #94 (bridge3c `--timeout`), #78 (KPI data-age vs publish-age)
-- Enforcement: platform policy rule `signal-honesty-generic-throw` (generic `throw new Error("failed"|"error"|…)` banned)
+- Enforcement (review convention since 2026-11-09): the `signal-honesty-generic-throw` rule still bans a generic `throw new Error("failed"|"error"|…)`, but the platform ratchet that used to fail the build on it was removed with `policy:check`, so nothing automated catches a regression
 - Weblog producer (#91): `weblog:sentinel` OS cron reminds at 08:00 when today's JSONL is missing (manual export; no Mode A fetch)
