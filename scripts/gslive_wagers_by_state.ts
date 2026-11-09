@@ -1768,8 +1768,7 @@ export async function fetchWagersByStateLive(
     opts.payload === undefined ? null : parseBetReportRequest(opts.payload);
   const fromEpochSec = supplied?.from ?? opts.fromEpochSec;
   const toEpochSec = supplied?.to ?? opts.toEpochSec;
-  const dateFilterBy =
-    supplied?.dateFilterBy ?? opts.dateFilterBy ?? "betTime";
+  const dateFilterBy = supplied?.dateFilterBy ?? opts.dateFilterBy ?? "betTime";
   const rows =
     supplied === null
       ? await fetchBetReportRows({

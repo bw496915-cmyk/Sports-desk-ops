@@ -41,7 +41,6 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
@@ -625,17 +624,6 @@ export interface KeychainCredentialProbeOptions {
   readonly agentIdName?: string;
 }
 
-function defaultTokenFilePath(
-  env: Readonly<Record<string, string | undefined>>,
-): string {
-  const explicit = (envValue(env, "F402_TOKEN_FILE") ?? "").trim();
-  if (explicit !== "") return explicit;
-  const configHome =
-    (envValue(env, "XDG_CONFIG_HOME") ?? "").trim() ||
-    `${(envValue(env, "HOME") ?? "").trim()}/.config`;
-  return `${configHome}/sportsdesk/f402-token`;
-}
-
 /**
  * Keychain-aware gate for the cron daemon. It matches where each CLI actually reads from:
  * - 3c: `resolveManagerSession()` is keychain-first, so a stored GSID satisfies it with no env.
@@ -651,15 +639,7 @@ export function keychainCredentialProbe(
   const readSecret = options.readSecret ?? readSecretCanonicalThenLegacy;
   const sessionPresent =
     options.sessionPresent ?? (() => readF402Session() !== null);
-  const tokenFilePresent =
-    options.tokenFilePresent ??
-    ((path: string) => {
-      try {
-        return statSync(path).size > 0;
-      } catch {
-        return false;
-      }
-    });
+  void options.tokenFilePresent;
   const gsidName = options.gsidName ?? GSID_KEYCHAIN_NAME;
   const agentIdName = options.agentIdName ?? F402_KEYCHAIN_NAMES.agentId;
   const probeRoot = options.root ?? defaultRoot();
