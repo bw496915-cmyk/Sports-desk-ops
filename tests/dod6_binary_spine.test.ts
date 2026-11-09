@@ -782,8 +782,8 @@ describe("real spine (88 MB)", () => {
   test("cross-foots settledStakedCents vs lifetimeStakedCents and bet count identities from spine header and columns", () => {
     const totals = summarizeDod6V54SpineTotals(DODBIN);
     expect(totals).not.toBeNull();
-    expect(totals!.meta.customerCount).toBe( meta!.customerCount );
-    expect(totals!.meta.rowCapacity).toBe( meta!.rowCapacity );
+    expect(totals!.meta.customerCount).toBe(meta!.customerCount);
+    expect(totals!.meta.rowCapacity).toBe(meta!.rowCapacity);
     expect(totals!.betsIdentityHolds).toBe(true);
     expect(totals!.outcomesIdentityHolds).toBe(true);
     expect(totals!.settledBetsCount + totals!.openBetsCount).toBe(

@@ -760,17 +760,21 @@ export function startServer(options?: ServerOptions) {
   const scheduler = new ReportingSchedulerService(telegramService);
   const wagerListDir = options?.wagerListDir ?? resolve(repoRoot, "data");
   const wagerLists = wagerListSources(wagerListDir);
-  const resolvedLiveBetsPath = resolve(
-    options?.liveBetsPath ?? LIVE_BETS_PATH,
-  );
+  const resolvedLiveBetsPath = resolve(options?.liveBetsPath ?? LIVE_BETS_PATH);
   const liveBetsArtifact = liveBetsArtifactFor(resolvedLiveBetsPath);
   const deskLive = createDeskLiveReads({
     repoRoot,
     liveBetsPath: resolvedLiveBetsPath,
     wagerListDir,
-    ...(options?.liveTicker === undefined ? {} : { liveTicker: options.liveTicker }),
-    ...(options?.livePending === undefined ? {} : { livePending: options.livePending }),
-    ...(options?.liveRefresh === undefined ? {} : { liveRefresh: options.liveRefresh }),
+    ...(options?.liveTicker === undefined
+      ? {}
+      : { liveTicker: options.liveTicker }),
+    ...(options?.livePending === undefined
+      ? {}
+      : { livePending: options.livePending }),
+    ...(options?.liveRefresh === undefined
+      ? {}
+      : { liveRefresh: options.liveRefresh }),
     daemonEntry: options?.daemonEntry === true,
     readLiveBetsArtifact: async () =>
       (await liveBetsArtifact.read())?.value ?? null,
@@ -1324,9 +1328,7 @@ export function startServer(options?: ServerOptions) {
           );
         }
 
-        const sourceMode = parseLiveSourceMode(
-          url.searchParams.get("source"),
-        );
+        const sourceMode = parseLiveSourceMode(url.searchParams.get("source"));
         if (sourceMode === "invalid") {
           return Response.json(
             { success: false, error: "source must be auto, live or file" },
@@ -1367,7 +1369,9 @@ export function startServer(options?: ServerOptions) {
 
         const games = (served.body.games as LiveBetGame[]) ?? [];
         const agents = served.body.agents as AgentScope;
-        const summary = served.body.summary as ReturnType<typeof summarizeGames>;
+        const summary = served.body.summary as ReturnType<
+          typeof summarizeGames
+        >;
 
         const scoreboard = await loadScoreboard();
         const withScores = games.map((game) => ({
@@ -2565,9 +2569,7 @@ export function startServer(options?: ServerOptions) {
           );
         }
 
-        const sourceMode = parseLiveSourceMode(
-          url.searchParams.get("source"),
-        );
+        const sourceMode = parseLiveSourceMode(url.searchParams.get("source"));
         if (sourceMode === "invalid") {
           return Response.json(
             { success: false, error: "source must be auto, live or file" },
@@ -2588,9 +2590,9 @@ export function startServer(options?: ServerOptions) {
         }
 
         const artifact = {
-          wagers:
-            (resolved.body.wagers as WagerListArtifact["wagers"]) ?? [],
-          provenance: resolved.body.provenance as WagerListArtifact["provenance"],
+          wagers: (resolved.body.wagers as WagerListArtifact["wagers"]) ?? [],
+          provenance: resolved.body
+            .provenance as WagerListArtifact["provenance"],
         };
         const wagers = artifact.wagers;
         const skipped =
@@ -2599,15 +2601,14 @@ export function startServer(options?: ServerOptions) {
         // No `ageSeconds`: it advances every second, and in the version it would turn each poll
         // into a new entry in the shared 48-body cache, which clears whole when full. The page
         // computes the age from `asOf`; `stale` flips once, so it can be part of the version.
-        const fresh =
-          (resolved.body.freshness as Omit<
-            ReturnType<typeof freshness>,
-            "ageSeconds"
-          > & { stale: boolean }) ?? {
-            stale: false,
-            asOf: artifact.provenance.observedAt ?? new Date().toISOString(),
-            asOfFrom: "artifact" as const,
-          };
+        const fresh = (resolved.body.freshness as Omit<
+          ReturnType<typeof freshness>,
+          "ageSeconds"
+        > & { stale: boolean }) ?? {
+          stale: false,
+          asOf: artifact.provenance.observedAt ?? new Date().toISOString(),
+          asOfFrom: "artifact" as const,
+        };
         const liveStatus = resolved.body.live;
 
         const writer = (url.searchParams.get("writer") ?? "")

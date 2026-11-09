@@ -51,7 +51,9 @@ const MODE_ENDPOINT_PLANS_TABLE: ReadonlyMap<
   for (let m = 1; m <= 10; m++) {
     const modeNum = m as DiagnosticModeNumber;
     const all = MODE_ENDPOINTS_TABLE.get(modeNum) ?? [];
-    const sourceEndpoints = Object.freeze(all.filter((e) => e.role === "source"));
+    const sourceEndpoints = Object.freeze(
+      all.filter((e) => e.role === "source"),
+    );
     const sinkEndpoints = Object.freeze(all.filter((e) => e.role === "sink"));
     const httpsSourceEndpoints = Object.freeze(
       sourceEndpoints.filter((e) => e.connectTransport === "https"),
@@ -112,7 +114,9 @@ export function getEndpointsForDomainMask(
 /**
  * Returns the pre-partitioned ModeEndpointPlan for a mode.
  */
-export function getModeEndpointPlan(mode: DiagnosticModeNumber): ModeEndpointPlan {
+export function getModeEndpointPlan(
+  mode: DiagnosticModeNumber,
+): ModeEndpointPlan {
   const plan = MODE_ENDPOINT_PLANS_TABLE.get(mode);
   if (!plan) {
     throw new Error(`Unrecognized diagnostic mode: ${mode}`);

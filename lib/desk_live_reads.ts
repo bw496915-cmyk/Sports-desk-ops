@@ -16,7 +16,10 @@ import {
   REPORT_PENDING_OPERATION,
   type LivePendingDiagnostic,
 } from "./f402_live_pending.ts";
-import { fetchLiveBetTicker, type LiveTickerDiagnostic } from "./f402_live_ticker.ts";
+import {
+  fetchLiveBetTicker,
+  type LiveTickerDiagnostic,
+} from "./f402_live_ticker.ts";
 import type { F402Session } from "./f402_session.ts";
 import {
   LIVE_PENDING_DEFAULT_TTL_MS,
@@ -258,8 +261,7 @@ function toDiagnostic(
     ...("hint" in diagnostic && typeof diagnostic.hint === "string"
       ? { hint: diagnostic.hint }
       : {}),
-    ...("httpStatus" in diagnostic &&
-    typeof diagnostic.httpStatus === "number"
+    ...("httpStatus" in diagnostic && typeof diagnostic.httpStatus === "number"
       ? { httpStatus: diagnostic.httpStatus }
       : {}),
   };
@@ -367,7 +369,8 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
   const persistGateOn =
     persistExplicit === true ||
     (persistExplicit !== false &&
-      (envFlag(pendingEnv, LIVE_PERSIST_GATE) ?? pendingEnv.NODE_ENV !== "test"));
+      (envFlag(pendingEnv, LIVE_PERSIST_GATE) ??
+        pendingEnv.NODE_ENV !== "test"));
 
   const persistThrottleMs = clampMs(
     pendingOpt.persistence?.throttleMs === undefined
@@ -423,17 +426,12 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
     if (raw === undefined || raw.trim() === "") return null;
     const parsed = Number(raw);
     if (!Number.isFinite(parsed)) return null;
-    return Math.min(
-      LIVE_REFRESH_MAX_MS,
-      Math.max(0, Math.trunc(parsed)),
-    );
+    return Math.min(LIVE_REFRESH_MAX_MS, Math.max(0, Math.trunc(parsed)));
   }
 
   const envRefreshMs = readRefreshEnvMs(refreshEnv);
   const statusRefreshIntervalMs =
-    options.liveRefresh?.intervalMs ??
-    envRefreshMs ??
-    LIVE_REFRESH_DEFAULT_MS;
+    options.liveRefresh?.intervalMs ?? envRefreshMs ?? LIVE_REFRESH_DEFAULT_MS;
 
   function refreshEnabled(): boolean {
     if (options.liveRefresh?.enabled === false) return false;
@@ -596,8 +594,12 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
 
     const result = await fetchLiveBetTicker({
       ...(tickerOpt.fetch === undefined ? {} : { fetchImpl: tickerOpt.fetch }),
-      ...(tickerOpt.session === undefined ? {} : { session: tickerOpt.session }),
-      ...(tickerOpt.agentId === undefined ? {} : { agentId: tickerOpt.agentId }),
+      ...(tickerOpt.session === undefined
+        ? {}
+        : { session: tickerOpt.session }),
+      ...(tickerOpt.agentId === undefined
+        ? {}
+        : { agentId: tickerOpt.agentId }),
       timeoutMs: tickerTimeoutMs,
       now: tickerNow(),
       env: tickerEnv,
@@ -673,8 +675,12 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
     const customers = await resolvePendingCustomers();
     const result = await fetchLivePending({
       customers,
-      ...(pendingOpt.fetch === undefined ? {} : { fetchImpl: pendingOpt.fetch }),
-      ...(pendingOpt.session === undefined ? {} : { session: pendingOpt.session }),
+      ...(pendingOpt.fetch === undefined
+        ? {}
+        : { fetchImpl: pendingOpt.fetch }),
+      ...(pendingOpt.session === undefined
+        ? {}
+        : { session: pendingOpt.session }),
       maxCustomers: pendingMaxCustomers,
       timeoutMs: pendingTimeoutMs,
       now: pendingNow(),
@@ -772,8 +778,7 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
       }
     } catch (error) {
       refreshLastOk = false;
-      refreshLastError =
-        error instanceof Error ? error.message : String(error);
+      refreshLastError = error instanceof Error ? error.message : String(error);
     }
   }
 
@@ -799,13 +804,12 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
     return stop;
   }
 
-  function     statusBlock(options?: { exposeReads?: boolean }): LiveStatusBlock {
-      const expose =
-        options?.exposeReads === true ||
-        (refreshEnabled() && refreshTicks > 0);
-      return {
-        ticker: expose ? statusTicker : null,
-        pending: expose ? statusPending : null,
+  function statusBlock(options?: { exposeReads?: boolean }): LiveStatusBlock {
+    const expose =
+      options?.exposeReads === true || (refreshEnabled() && refreshTicks > 0);
+    return {
+      ticker: expose ? statusTicker : null,
+      pending: expose ? statusPending : null,
       refresh: {
         enabled: refreshEnabled(),
         intervalMs: statusRefreshIntervalMs,

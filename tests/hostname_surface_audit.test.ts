@@ -31,7 +31,8 @@ describe("P0 — 1: UNIX Hostname Identity & WHATWG vs Legacy Parity", () => {
     expect(fileRow?.isWhatwgAndLegacyHostnameIdentical).toBe(false);
 
     const remainingRows = AUDITED_ENDPOINTS_CACHE.filter(
-      (ep) => ep.endpointId !== "LOCAL-UNIX-03" && ep.endpointId !== "LOCAL-FILE-03",
+      (ep) =>
+        ep.endpointId !== "LOCAL-UNIX-03" && ep.endpointId !== "LOCAL-FILE-03",
     );
     expect(remainingRows.length).toBe(23);
     for (const ep of remainingRows) {
@@ -81,7 +82,9 @@ describe("P0 — 2: Transport Disambiguation (socketTransport & connectTransport
 
 describe("P1 — 3: Endpoint Role Classification (source / sink / doc)", () => {
   test("partitions 25 endpoints into 19 sources, 3 sinks, and 3 docs", () => {
-    const sources = AUDITED_ENDPOINTS_CACHE.filter((ep) => ep.role === "source");
+    const sources = AUDITED_ENDPOINTS_CACHE.filter(
+      (ep) => ep.role === "source",
+    );
     const sinks = AUDITED_ENDPOINTS_CACHE.filter((ep) => ep.role === "sink");
     const docs = AUDITED_ENDPOINTS_CACHE.filter((ep) => ep.role === "doc");
 
@@ -105,7 +108,9 @@ describe("P1 — 3: Endpoint Role Classification (source / sink / doc)", () => {
 
 describe("P1 — 4: SPA Hash Query Preservation & Effective Route", () => {
   test("preserves query in effectiveRoute while stripping spaHashRoute", () => {
-    const ui01 = AUDITED_ENDPOINTS_CACHE.find((ep) => ep.endpointId === "GSLIVE-UI-01");
+    const ui01 = AUDITED_ENDPOINTS_CACHE.find(
+      (ep) => ep.endpointId === "GSLIVE-UI-01",
+    );
     expect(ui01).toBeDefined();
     expect(ui01?.spaHashQuery).toBe("?partnerId=118");
     expect(ui01?.spaHashRoute).toBe("#/reports/users");
@@ -113,7 +118,9 @@ describe("P1 — 4: SPA Hash Query Preservation & Effective Route", () => {
       "/manager-tools/#/reports/users?partnerId=118",
     );
 
-    const ui02 = AUDITED_ENDPOINTS_CACHE.find((ep) => ep.endpointId === "GSLIVE-UI-02");
+    const ui02 = AUDITED_ENDPOINTS_CACHE.find(
+      (ep) => ep.endpointId === "GSLIVE-UI-02",
+    );
     expect(ui02).toBeDefined();
     expect(ui02?.spaHashQuery).toBe("?partnerId=118");
     expect(ui02?.spaHashRoute).toBe("#/events/bet-history");
@@ -122,7 +129,8 @@ describe("P1 — 4: SPA Hash Query Preservation & Effective Route", () => {
     );
 
     const otherRows = AUDITED_ENDPOINTS_CACHE.filter(
-      (ep) => ep.endpointId !== "GSLIVE-UI-01" && ep.endpointId !== "GSLIVE-UI-02",
+      (ep) =>
+        ep.endpointId !== "GSLIVE-UI-01" && ep.endpointId !== "GSLIVE-UI-02",
     );
     for (const ep of otherRows) {
       expect(ep.spaHashQuery).toBeNull();
@@ -178,7 +186,10 @@ describe("Bridge Module: Pre-Filtered Mode & Domain Queries", () => {
     );
     expect(crossMarketSources.length).toBe(7);
 
-    const allModeSinks = getEndpointsForDomainMask(DomainMask.ALL_MODES, "sink");
+    const allModeSinks = getEndpointsForDomainMask(
+      DomainMask.ALL_MODES,
+      "sink",
+    );
     expect(allModeSinks.length).toBe(3);
   });
 });
