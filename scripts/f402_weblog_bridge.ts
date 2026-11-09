@@ -3,6 +3,7 @@
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
+import { resolveF402BetsJsonlPath } from "../lib/f402_bets_corpus_path.ts";
 import { R2S3Client, resolveSecretBackedEnv } from "../lib/r2_s3_client.ts";
 import {
   buildWeblogRollup,
@@ -40,8 +41,15 @@ const from = (
   .split(",")
   .map((p) => p.trim())
   .filter(Boolean);
-const betsPath =
-  values.bets ?? Bun.env.F402_BETS_JSONL ?? "out13/f402-bets.jsonl";
+let betsPath: string;
+try {
+  betsPath = resolveF402BetsJsonlPath(
+    values.bets !== undefined ? { cliValue: values.bets } : {},
+  );
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
 const web = await readWeblogRows(from);
 const fromMs = Math.min(...web.rows.map((r) => r.accessMs));
 const toMs = Math.max(...web.rows.map((r) => r.accessMs)) + 1;
