@@ -9,10 +9,10 @@
  *   bun run scripts/normalize.ts --help
  */
 
-import { createReadStream, existsSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import * as readline from "node:readline";
+import { Readable } from "node:stream";
 import {
   DATE_FAMILIES,
   PORTAL_PERIOD_LABELS,
@@ -206,7 +206,8 @@ export async function runNormalizer(options: CliOptions): Promise<{
   provenance: ProvenanceSidecar;
   inspection: PeriodTaxonomyInspection;
 }> {
-  if (!options.inputPath || !existsSync(options.inputPath)) {
+  const inputFile = Bun.file(options.inputPath);
+  if (!options.inputPath || !(await inputFile.exists())) {
     throw new Error(`Input file not found: ${options.inputPath}`);
   }
 
@@ -243,7 +244,7 @@ export async function runNormalizer(options: CliOptions): Promise<{
   let totalRisk = 0;
 
   const rl = readline.createInterface({
-    input: createReadStream(options.inputPath),
+    input: Readable.fromWeb(inputFile.stream()),
     crlfDelay: Infinity,
   });
 
@@ -400,8 +401,8 @@ async function main(): Promise<void> {
       const outPath = resolve(options.outputPath);
       const metaPath = outPath.replace(/(\.json)?$/i, "_meta.json");
 
-      await writeFile(outPath, JSON.stringify(records, null, 2), "utf8");
-      await writeFile(metaPath, JSON.stringify(provenance, null, 2), "utf8");
+      await Bun.write(outPath, JSON.stringify(records, null, 2));
+      await Bun.write(metaPath, JSON.stringify(provenance, null, 2));
 
       console.log(
         `\n[Normalizer] Wrote ${records.length} records to: ${outPath}`,
@@ -478,8 +479,8 @@ async function main(): Promise<void> {
     const outPath = resolve(options.outputPath);
     const metaPath = outPath.replace(/(\.json)?$/i, "_meta.json");
 
-    await writeFile(outPath, JSON.stringify(records, null, 2), "utf8");
-    await writeFile(metaPath, JSON.stringify(provenance, null, 2), "utf8");
+    await Bun.write(outPath, JSON.stringify(records, null, 2));
+    await Bun.write(metaPath, JSON.stringify(provenance, null, 2));
 
     console.log(
       `\n[Normalizer] Wrote ${records.length} records to: ${outPath}`,

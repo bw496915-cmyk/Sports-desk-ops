@@ -11,10 +11,9 @@
  *   bun run scripts/enrich_bets_from_figure_date.ts --figure scratch/figure_date.json --ticker probes/out13/f402-bets.jsonl --output scratch/f402-bets-enriched.jsonl
  */
 
-import { createReadStream, createWriteStream, existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import * as readline from "node:readline";
+import { Readable } from "node:stream";
 import {
   buildCompositeMatchKey,
   enrichWagerRecord,
@@ -127,11 +126,11 @@ async function loadFigureIndex(
   filePath: string,
 ): Promise<Map<string, FigureDateWager>> {
   const index = new Map<string, FigureDateWager>();
-  const content = await readFile(filePath, "utf-8");
+  const file = Bun.file(filePath);
 
   let records: FigureDateWager[] = [];
   try {
-    const parsed = JSON.parse(content);
+    const parsed: any = await file.json();
     if (Array.isArray(parsed)) {
       records = parsed;
     } else if (parsed?.LIST?.INFO && Array.isArray(parsed.LIST.INFO)) {
@@ -140,7 +139,8 @@ async function loadFigureIndex(
       records = parsed.rows;
     }
   } catch {
-    // If not single JSON, parse line-by-line JSONL
+    // If not single JSON, parse line-by-line JSONL from file text
+    const content = await file.text();
     const lines = content.split("\n");
     for (const line of lines) {
       const trimmed = line.trim();
@@ -174,10 +174,12 @@ export async function runEnrichment(options: CliOptions): Promise<{
   enrichedOutPath: string;
   inspection: FigureDateEnrichmentInspection;
 }> {
-  if (!existsSync(options.figurePath)) {
+  const figureFile = Bun.file(options.figurePath);
+  if (!(await figureFile.exists())) {
     throw new Error(`Figure file not found: ${options.figurePath}`);
   }
-  if (!existsSync(options.tickerPath)) {
+  const tickerFile = Bun.file(options.tickerPath);
+  if (!(await tickerFile.exists())) {
     throw new Error(`Ticker file not found: ${options.tickerPath}`);
   }
 
@@ -190,16 +192,12 @@ export async function runEnrichment(options: CliOptions): Promise<{
   const samples: EnrichedWager[] = [];
   const maxSamples = options.sampleCount ?? 5;
 
-  const inStream = createReadStream(options.tickerPath, { encoding: "utf-8" });
   const rl = readline.createInterface({
-    input: inStream,
+    input: Readable.fromWeb(tickerFile.stream()),
     crlfDelay: Infinity,
   });
 
-  const outStream = createWriteStream(options.outputPath, {
-    flags: "w",
-    encoding: "utf-8",
-  });
+  const outWriter = Bun.file(options.outputPath).writer();
 
   for await (const line of rl) {
     const trimmed = line.trim();
@@ -235,7 +233,7 @@ export async function runEnrichment(options: CliOptions): Promise<{
       if (samples.length < maxSamples) {
         samples.push(enriched);
       }
-      outStream.write(JSON.stringify(enriched) + "\n");
+      outWriter.write(JSON.stringify(enriched) + "\n");
     } else {
       unmatchedRows++;
       const periodClassification = classifyPortalPeriod({
@@ -243,7 +241,7 @@ export async function runEnrichment(options: CliOptions): Promise<{
         WagerType: tickerRow.WagerType,
       });
       // Output pending un-enriched row with consistent schema flag
-      outStream.write(
+      outWriter.write(
         JSON.stringify({
           ticketNumber: String(tickerRow.WagerNumber),
           liveWagerNumber: tickerRow.WagerNumber,
@@ -300,12 +298,7 @@ export async function runEnrichment(options: CliOptions): Promise<{
     }
   }
 
-  await new Promise<void>((resolve, reject) => {
-    outStream.end((err?: Error | null) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
+  await outWriter.end();
 
   const inspection = new FigureDateEnrichmentInspection(
     {
