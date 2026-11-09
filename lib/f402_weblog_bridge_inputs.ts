@@ -9,6 +9,7 @@ import {
   type WebLogRequest,
 } from "./f402_weblog_fetch.ts";
 import type { ResolveF402BearerOptions } from "./f402_pending_fetch.ts";
+import { readF402Session } from "./f402_session.ts";
 
 export const WEBLOG_BRIDGE_USAGE_HINT = [
   "weblog: --from required (or --fetch-mode to capture first)",
@@ -116,8 +117,18 @@ export async function resolveWeblogCorpusPaths(
       ...(values.ip !== undefined ? { ip: values.ip } : {}),
     };
 
+    const session = readF402Session();
+    const cookieHeader = session?.cookieHeader?.trim();
+
     try {
-      await fetchAndPersist({ token, request, capturePath });
+      await fetchAndPersist({
+        token,
+        request,
+        capturePath,
+        ...(cookieHeader !== undefined && cookieHeader !== ""
+          ? { cookieHeader }
+          : {}),
+      });
     } catch (error) {
       return {
         ok: false,
