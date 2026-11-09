@@ -3,7 +3,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { createRequire } from "node:module";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
@@ -12,10 +12,10 @@ const INDEX_URL =
   "https://raw.githubusercontent.com/bw496915-cmyk/Sports-desk-ops/main/market/index.json";
 
 const HARNESS_ROOT =
-  process.env.MARKET_INDEX_HARNESS ??
-  process.env.DSH_HARNESS_ROOT ??
-  process.env.DSH_HARNESS_WEB_ROOT ??
-  join(process.env.HOME ?? "", "code/deepseek-harness-web");
+  Bun.env.MARKET_INDEX_HARNESS ??
+  Bun.env.DSH_HARNESS_ROOT ??
+  Bun.env.DSH_HARNESS_WEB_ROOT ??
+  join(Bun.env.HOME ?? "", "code/deepseek-harness-web");
 
 const PUBLISHED_PARSER_PKG = join(
   ROOT,
@@ -40,6 +40,8 @@ const EXPECTED_PATHS: Record<string, string> = {
 type RawIndex = {
   plugins: Array<{
     name: string;
+    author?: string;
+    description?: { en?: string };
     "dist-tags"?: { latest?: string };
     versions: Array<{
       version: string;
@@ -48,8 +50,8 @@ type RawIndex = {
   }>;
 };
 
-function loadRawIndex(): RawIndex {
-  return JSON.parse(readFileSync(INDEX_PATH, "utf8")) as RawIndex;
+async function loadRawIndex(): Promise<RawIndex> {
+  return (await Bun.file(INDEX_PATH).json()) as RawIndex;
 }
 
 /** Canonical range = first row; every plugin version must match (not per-plugin ranges). */
@@ -78,8 +80,8 @@ type SemverLike = {
   ) => boolean;
 };
 
-function harnessCheckoutValid(): boolean {
-  if (!process.env.MARKET_INDEX_HARNESS) return true;
+async function harnessCheckoutValid(): Promise<boolean> {
+  if (!Bun.env.MARKET_INDEX_HARNESS) return true;
 
   const rootPkgPath = join(HARNESS_ROOT, "package.json");
   const marketPkgPath = join(
@@ -88,10 +90,10 @@ function harnessCheckoutValid(): boolean {
   );
   if (!existsSync(rootPkgPath) || !existsSync(marketPkgPath)) return false;
 
-  const rootPkg = JSON.parse(readFileSync(rootPkgPath, "utf8")) as {
+  const rootPkg = (await Bun.file(rootPkgPath).json()) as {
     version?: string;
   };
-  const marketPkg = JSON.parse(readFileSync(marketPkgPath, "utf8")) as {
+  const marketPkg = (await Bun.file(marketPkgPath).json()) as {
     version?: string;
   };
   // Root version is authoritative; internal package version may diverge in future harness releases.
@@ -102,7 +104,7 @@ function harnessCheckoutValid(): boolean {
     return false;
   }
 
-  const expectedHead = process.env.HARNESS_VALIDATOR_SHA;
+  const expectedHead = Bun.env.HARNESS_VALIDATOR_SHA;
   if (!expectedHead) return true;
 
   const head = Bun.spawnSync(["git", "-C", HARNESS_ROOT, "rev-parse", "HEAD"], {
@@ -113,21 +115,33 @@ function harnessCheckoutValid(): boolean {
   return head.stdout.toString().trim() === expectedHead;
 }
 
-function publishedValidatorReady(): boolean {
+async function publishedValidatorReady(): Promise<boolean> {
   if (
     !existsSync(PUBLISHED_PARSER_ENTRY) ||
     !existsSync(PUBLISHED_PARSER_PKG)
   ) {
     return false;
   }
-  const pkg = JSON.parse(readFileSync(PUBLISHED_PARSER_PKG, "utf8")) as {
+  const pkg = (await Bun.file(PUBLISHED_PARSER_PKG).json()) as {
     version?: string;
   };
   return pkg.version === HARNESS_RUNTIME;
 }
 
 function marketIndexTestsReady(): boolean {
-  return publishedValidatorReady() && harnessCheckoutValid();
+  if (
+    !existsSync(PUBLISHED_PARSER_ENTRY) ||
+    !existsSync(PUBLISHED_PARSER_PKG)
+  ) {
+    return false;
+  }
+  if (!Bun.env.MARKET_INDEX_HARNESS) return true;
+  const rootPkgPath = join(HARNESS_ROOT, "package.json");
+  const marketPkgPath = join(
+    HARNESS_ROOT,
+    "packages/util/plugin-market-index/package.json",
+  );
+  return existsSync(rootPkgPath) && existsSync(marketPkgPath);
 }
 
 async function loadParser() {
@@ -147,36 +161,30 @@ function loadSemver(): SemverLike {
   return req("semver") as SemverLike;
 }
 
-const REQUIRE_MARKET_INDEX = process.env.REQUIRE_MARKET_INDEX === "1";
+const REQUIRE_MARKET_INDEX = Bun.env.REQUIRE_MARKET_INDEX === "1";
 
-test("published validator installed (REQUIRE_MARKET_INDEX)", () => {
+test("published validator installed (REQUIRE_MARKET_INDEX)", async () => {
   if (!REQUIRE_MARKET_INDEX) return;
-  expect(publishedValidatorReady()).toBe(true);
+  expect(await publishedValidatorReady()).toBe(true);
 });
 
 describe.skipIf(!marketIndexTestsReady() && !REQUIRE_MARKET_INDEX)(
   "market/index.json",
   () => {
-    test("harness validator checkout matches pin when MARKET_INDEX_HARNESS is set", () => {
-      if (!process.env.MARKET_INDEX_HARNESS) return;
-      expect(harnessCheckoutValid()).toBe(true);
+    test("harness validator checkout matches pin when MARKET_INDEX_HARNESS is set", async () => {
+      if (!Bun.env.MARKET_INDEX_HARNESS) return;
+      expect(await harnessCheckoutValid()).toBe(true);
     });
 
     test("parseMarketIndex accepts the document", async () => {
       const { parseMarketIndex } = await loadParser();
-      const raw = loadRawIndex();
+      const raw = await loadRawIndex();
       const doc = parseMarketIndex(raw, INDEX_URL);
       expect(doc.plugins).toHaveLength(Object.keys(EXPECTED_PATHS).length);
     });
 
     test("every plugin has author and localized description for Discover", async () => {
-      const raw = JSON.parse(readFileSync(INDEX_PATH, "utf8")) as {
-        plugins: Array<{
-          name: string;
-          author?: string;
-          description?: { en?: string };
-        }>;
-      };
+      const raw = await loadRawIndex();
       for (const plugin of raw.plugins) {
         expect(plugin.author, `${plugin.name}: author`).toBe("Sportsdesk Ops");
         const desc = plugin.description?.en;
@@ -192,7 +200,7 @@ describe.skipIf(!marketIndexTestsReady() && !REQUIRE_MARKET_INDEX)(
     });
 
     test("dist-tags.latest matches a versions[] row per plugin", async () => {
-      const raw = loadRawIndex();
+      const raw = await loadRawIndex();
       for (const plugin of raw.plugins) {
         const latest = plugin["dist-tags"]?.latest;
         expect(latest, `${plugin.name}: dist-tags.latest`).toBeDefined();
@@ -205,7 +213,7 @@ describe.skipIf(!marketIndexTestsReady() && !REQUIRE_MARKET_INDEX)(
 
     test("every indexed bundle matches name, path, and commit in git", async () => {
       const { parseMarketIndex } = await loadParser();
-      const raw = loadRawIndex();
+      const raw = await loadRawIndex();
       const doc = parseMarketIndex(raw, INDEX_URL);
 
       for (const plugin of doc.plugins) {
@@ -259,7 +267,7 @@ describe.skipIf(!marketIndexTestsReady() && !REQUIRE_MARKET_INDEX)(
     test("engines.dsh satisfies harness install check (includePrerelease)", async () => {
       const semver = loadSemver();
       const { parseMarketIndex } = await loadParser();
-      const raw = loadRawIndex();
+      const raw = await loadRawIndex();
       const doc = parseMarketIndex(raw, INDEX_URL);
       const canonicalRange = enginesRangeFromIndex(raw);
 
