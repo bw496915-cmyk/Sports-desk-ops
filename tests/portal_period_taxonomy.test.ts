@@ -6,6 +6,12 @@
 
 import { describe, expect, it } from "bun:test";
 import { Database } from "bun:sqlite";
+import type {
+  Cents,
+  CustomerIdentifier,
+  AgentIdentifier,
+  Dollars,
+} from "../design/domain-branded-types.ts";
 import {
   DATE_FAMILIES,
   PORTAL_PERIOD_LABELS,
@@ -228,14 +234,14 @@ describe("Engine Detection & Risk Dollars", () => {
       half: "1H",
       market: "Native Desk Derivative Points Line (1st Half)",
       customer: "VIP101",
-      customerId: "VIP101" as any,
+      customerId: "VIP101" as unknown as CustomerIdentifier,
       agent: "BOSS1",
-      agentId: "BOSS1" as any,
+      agentId: "BOSS1" as unknown as AgentIdentifier,
       sport: "Football",
       subSport: "CFB",
       risk: 50.0,
-      riskDollars: 50.0 as any,
-      riskCents: 5000 as any,
+      riskDollars: 50.0 as unknown as Dollars,
+      riskCents: 5000 as unknown as Cents,
       ticketWriter: "Internet",
       insertedAt: "2026-11-01 12:00:00.000",
     });
@@ -398,12 +404,17 @@ describe("Engine Detection & Risk Dollars", () => {
       .query(
         "SELECT portal_period_label(1) as h1, portal_period_label(0) as game, is_derivative_points_line('Patriots derivative points Over 24.5') as is_dt, is_derivative_points_line('Patriots -3 -110') as not_dt",
       )
-      .get() as any;
+      .get() as {
+      h1: string;
+      game: string;
+      is_dt: number;
+      not_dt: number;
+    } | null;
 
-    expect(row.h1).toBe("1st Half");
-    expect(row.game).toBe("Game");
-    expect(row.is_dt).toBe(1);
-    expect(row.not_dt).toBe(0);
+    expect(row?.h1).toBe("1st Half");
+    expect(row?.game).toBe("Game");
+    expect(row?.is_dt).toBe(1);
+    expect(row?.not_dt).toBe(0);
     db.close();
   });
 });

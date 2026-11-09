@@ -214,7 +214,7 @@ export async function runNormalizer(options: CliOptions): Promise<{
       : options.inputPath;
   if (
     typeof options.inputPath === "string" &&
-    (!options.inputPath || !(await (inputFile as any).exists()))
+    (!options.inputPath || !(await Bun.file(options.inputPath).exists()))
   ) {
     throw new Error(`Input file not found: ${options.inputPath}`);
   }
@@ -252,7 +252,9 @@ export async function runNormalizer(options: CliOptions): Promise<{
   let totalRisk = 0;
 
   const rl = readline.createInterface({
-    input: Readable.fromWeb(inputFile.stream() as any),
+    input: Readable.fromWeb(
+      inputFile.stream() as unknown as Parameters<typeof Readable.fromWeb>[0],
+    ),
     crlfDelay: Infinity,
   });
 

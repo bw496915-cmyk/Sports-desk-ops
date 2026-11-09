@@ -212,7 +212,11 @@ describe("runNormalizer execution", () => {
     expect(parsed.inspect).toBe(true);
     expect(parsed.format).toBe("inspect");
 
-    const { records, provenance, inspection } = await runNormalizer(parsed);
+    const {
+      records,
+      provenance: _provenance,
+      inspection,
+    } = await runNormalizer(parsed);
     expect(records.length).toBe(1);
     expect(inspection).toBeDefined();
 

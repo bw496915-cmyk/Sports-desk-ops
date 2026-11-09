@@ -27,6 +27,7 @@
  * - Grading (G): `startG` / `endG` (user-driven, enabled)
  */
 
+import type { Database } from "bun:sqlite";
 import type {
   Cents,
   CustomerIdentifier,
@@ -591,7 +592,7 @@ export class PeriodTaxonomyInspection {
     const breakdownEntries = Object.entries(p.stats.detailedBreakdown ?? {});
     let breakdownBlock = "";
     if (breakdownEntries.length > 0) {
-      const rows = breakdownEntries.map(([_, v]) => ({
+      const rows = breakdownEntries.map(([, v]) => ({
         engine: v.engine,
         code: v.code,
         label: v.label,
@@ -599,11 +600,13 @@ export class PeriodTaxonomyInspection {
         count: v.count,
         risk: `$${v.risk.toFixed(2)}`,
       }));
-      if (
-        typeof Bun !== "undefined" &&
-        typeof (Bun.inspect as any).table === "function"
-      ) {
-        breakdownBlock = `\n${bold("Taxonomy Breakdown:")}\n${(Bun.inspect as any).table(rows, { colors })}`;
+      const inspectTable = (
+        Bun.inspect as unknown as {
+          table?: (data: unknown, opts?: unknown) => string;
+        }
+      ).table;
+      if (typeof Bun !== "undefined" && typeof inspectTable === "function") {
+        breakdownBlock = `\n${bold("Taxonomy Breakdown:")}\n${inspectTable(rows, { colors })}`;
       }
     }
 
@@ -650,7 +653,9 @@ export function createNormalizedWagersDirectStream(
       controller.close();
     },
   };
-  return new ReadableStream(source as any);
+  return new ReadableStream(
+    source as unknown as ConstructorParameters<typeof ReadableStream>[0],
+  );
 }
 
 /**
@@ -661,19 +666,18 @@ export function createNormalizedWagersDirectStream(
  * - `portal_period_label(code)`: Translates canonical period code (-1..6) to portal label.
  * - `is_derivative_points_line(shortDesc)`: Returns 1 if description matches derivative points flow, else 0.
  */
-export function registerPortalPeriodSqliteFunctions(db: {
-  function: (name: string, fn: (...args: any[]) => any) => void;
-}): void {
+export function registerPortalPeriodSqliteFunctions(db: Database): void {
   if (!db || typeof db.function !== "function") return;
 
-  db.function("portal_period_label", (code: number) => {
+  db.function("portal_period_label", (code: unknown) => {
+    const num = typeof code === "number" ? code : Number(code);
     return (
-      PORTAL_PERIOD_LABELS[code as keyof typeof PORTAL_PERIOD_LABELS] ??
+      PORTAL_PERIOD_LABELS[num as keyof typeof PORTAL_PERIOD_LABELS] ??
       "Unknown"
     );
   });
 
-  db.function("is_derivative_points_line", (shortDesc: string) => {
+  db.function("is_derivative_points_line", (shortDesc: unknown) => {
     return isDerivativePointsLineWager({ ShortDesc: String(shortDesc || "") })
       ? 1
       : 0;

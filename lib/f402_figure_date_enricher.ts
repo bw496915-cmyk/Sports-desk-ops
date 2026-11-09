@@ -675,5 +675,7 @@ export function createEnrichedWagersDirectStream(
       controller.close();
     },
   };
-  return new ReadableStream(source as any);
+  return new ReadableStream(
+    source as unknown as ConstructorParameters<typeof ReadableStream>[0],
+  );
 }

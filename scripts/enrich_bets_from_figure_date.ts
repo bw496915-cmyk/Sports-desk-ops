@@ -20,7 +20,6 @@ import {
   inferTotalPicks,
   parseBuyPointsFromDesc,
   FigureDateEnrichmentInspection,
-  formatEnrichedWagerInspect,
   type FigureDateWager,
   type LiveTickerWager,
   type EnrichedWager,
@@ -132,17 +131,31 @@ async function loadFigureIndex(
 
   let records: FigureDateWager[] = [];
   try {
-    const parsed: any =
-      "json" in file && typeof (file as any).json === "function"
-        ? await (file as any).json()
+    const fileWithJson = file as Blob & { json?: () => Promise<unknown> };
+    const parsed: unknown =
+      typeof fileWithJson.json === "function"
+        ? await fileWithJson.json()
         : JSON.parse(await file.text());
 
     if (Array.isArray(parsed)) {
-      records = parsed;
-    } else if (parsed?.LIST?.INFO && Array.isArray(parsed.LIST.INFO)) {
-      records = parsed.LIST.INFO;
-    } else if (parsed?.rows && Array.isArray(parsed.rows)) {
-      records = parsed.rows;
+      records = parsed as FigureDateWager[];
+    } else if (
+      parsed &&
+      typeof parsed === "object" &&
+      "LIST" in parsed &&
+      parsed.LIST &&
+      typeof parsed.LIST === "object" &&
+      "INFO" in parsed.LIST &&
+      Array.isArray((parsed.LIST as Record<string, unknown>).INFO)
+    ) {
+      records = (parsed.LIST as { INFO: FigureDateWager[] }).INFO;
+    } else if (
+      parsed &&
+      typeof parsed === "object" &&
+      "rows" in parsed &&
+      Array.isArray((parsed as Record<string, unknown>).rows)
+    ) {
+      records = (parsed as { rows: FigureDateWager[] }).rows;
     }
   } catch {
     // If not single JSON, parse line-by-line JSONL from file text
@@ -180,13 +193,9 @@ export async function runEnrichment(options: CliOptions): Promise<{
   enrichedOutPath: string;
   inspection: FigureDateEnrichmentInspection;
 }> {
-  const figureFile: Blob =
-    typeof options.figurePath === "string"
-      ? Bun.file(options.figurePath)
-      : options.figurePath;
   if (
     typeof options.figurePath === "string" &&
-    !(await (figureFile as any).exists())
+    !(await Bun.file(options.figurePath).exists())
   ) {
     throw new Error(`Figure file not found: ${options.figurePath}`);
   }
@@ -197,7 +206,7 @@ export async function runEnrichment(options: CliOptions): Promise<{
       : options.tickerPath;
   if (
     typeof options.tickerPath === "string" &&
-    !(await (tickerFile as any).exists())
+    !(await Bun.file(options.tickerPath).exists())
   ) {
     throw new Error(`Ticker file not found: ${options.tickerPath}`);
   }
@@ -212,7 +221,9 @@ export async function runEnrichment(options: CliOptions): Promise<{
   const maxSamples = options.sampleCount ?? 5;
 
   const rl = readline.createInterface({
-    input: Readable.fromWeb(tickerFile.stream() as any),
+    input: Readable.fromWeb(
+      tickerFile.stream() as unknown as Parameters<typeof Readable.fromWeb>[0],
+    ),
     crlfDelay: Infinity,
   });
 
