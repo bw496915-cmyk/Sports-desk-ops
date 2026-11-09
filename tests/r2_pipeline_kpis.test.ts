@@ -5,7 +5,10 @@ describe("probeR2PipelineKpis", () => {
   test("maps HEAD Last-Modified into ageSeconds and stale", async () => {
     const now = new Date("2026-11-09T04:00:00.000Z");
     const last = new Date("2026-11-04T04:37:28.000Z");
-    const fetchImpl: typeof fetch = async (input, init) => {
+    const fetchImpl = async (
+      input: string | Request | URL,
+      init?: RequestInit,
+    ) => {
       const url = String(input);
       if (init?.method !== "HEAD") throw new Error("expected HEAD");
       const key = url.split("/").slice(-2).join("/");
@@ -23,7 +26,7 @@ describe("probeR2PipelineKpis", () => {
       }
       return new Response(null, { status: 404 });
     };
-    const kpis = await probeR2PipelineKpis(now, fetchImpl);
+    const kpis = await probeR2PipelineKpis(now, fetchImpl as typeof fetch);
     expect(kpis["f402-bet-ticker"]?.stale).toBe(false);
     expect(kpis["gslive-tally"]?.stale).toBe(true);
     expect(kpis["gslive-tally"]?.ageSeconds).toBeGreaterThan(400_000);
