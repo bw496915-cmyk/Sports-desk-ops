@@ -16,7 +16,6 @@ import {
   formatManagerProbeTable,
   isBlockingManagerStatus,
   probeManagerEndpoints,
-  type GsliveManagerEndpointStatus,
   type GsliveManagerWindow,
 } from "../lib/gslive_manager_endpoints.ts";
 import { gsliveCookieNames } from "../lib/gslive_session_health.ts";

@@ -1716,9 +1716,10 @@ async function cmdAlertLog(
     activityRows: number;
   } | null = null;
   if (backfill) {
-    backfillResult = await backfillAlertAuditFromActivity(context.root, {
-      ...(since === undefined ? {} : { since }),
-    });
+    backfillResult = await backfillAlertAuditFromActivity(
+      context.root,
+      since === undefined ? {} : { since },
+    );
   }
   // Read the whole (filtered) ledger for summaries/filters; the display limit applies after.
   const structuredAll = await readAlertAudit(context.root, {

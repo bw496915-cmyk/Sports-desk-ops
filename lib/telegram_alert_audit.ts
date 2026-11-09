@@ -332,9 +332,11 @@ export async function backfillAlertAuditFromActivity(
     existingKeys.add(key);
     rows.push(row);
   }
-  await appendAlertAuditRows(root, rows, {
-    ...(options.maxBytes === undefined ? {} : { maxBytes: options.maxBytes }),
-  });
+  await appendAlertAuditRows(
+    root,
+    rows,
+    options.maxBytes === undefined ? {} : { maxBytes: options.maxBytes },
+  );
   return { imported: rows.length, skipped, activityRows: activity.length };
 }
 
