@@ -113,6 +113,11 @@ jobs:
         run: bash scripts/ci/test-changed-plugins.sh
 
   verify:
+    # Full ratchet on main (and unattended cadence), not on pull requests — PRs use verify-changed.
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     continue-on-error: true
