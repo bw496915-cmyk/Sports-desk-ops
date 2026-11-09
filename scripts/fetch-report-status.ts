@@ -13,6 +13,7 @@
 import {
   DEFAULT_MANAGER_PARTNER_ID,
   defaultManagerWindow,
+  formatManagerProbeTable,
   isBlockingManagerStatus,
   probeManagerEndpoints,
   type GsliveManagerEndpointStatus,
@@ -104,12 +105,6 @@ function cookieHeader(): string {
   return gsid === "" ? "" : `GSID=${gsid}`;
 }
 
-function statusClass(status: GsliveManagerEndpointStatus): string {
-  if (status === "ok") return "ok";
-  if (status === "not_permitted" || status === "forbidden") return "permission";
-  return "blocking";
-}
-
 export async function main(
   argv: readonly string[] = process.argv.slice(2),
 ): Promise<number> {
@@ -169,14 +164,7 @@ export async function main(
     console.log(
       `Manager endpoint status · window ${parsed.window.fromEpochSec}–${parsed.window.toEpochSec} · cookie ${cookie === "" ? "missing" : `present (${gsliveCookieNames(cookie).join(",")})`} · x-gs-session ${gateState}`,
     );
-    console.log(
-      "kind              status            http  latency  count  class      detail",
-    );
-    for (const endpoint of endpoints) {
-      console.log(
-        `${endpoint.kind.padEnd(17)} ${endpoint.status.padEnd(17)} ${String(endpoint.httpStatus ?? "—").padStart(4)} ${String(endpoint.latencyMs ?? "—").padStart(7)}ms ${String(endpoint.count ?? "—").padStart(5)}  ${statusClass(endpoint.status).padEnd(10)} ${endpoint.error ?? ""}`,
-      );
-    }
+    console.log(formatManagerProbeTable(endpoints));
     console.log(
       `blocking=${blocking.length} permissionGaps=${permission.length}${permission.length > 0 ? ` (${permission.map((endpoint) => endpoint.kind).join(", ")})` : ""}`,
     );

@@ -224,6 +224,59 @@ function countFor(kind: GsliveManagerEndpointKind, parsed: unknown): number {
   return 0;
 }
 
+const INSPECT_CUSTOM = (Bun.inspect as unknown as { custom: symbol }).custom;
+const INSPECT_TABLE = (
+  Bun.inspect as unknown as {
+    table: (
+      data: readonly Record<string, unknown>[],
+      properties: readonly string[],
+      options: { colors?: boolean },
+    ) => string;
+  }
+).table;
+
+/**
+ * Attach a single-line custom inspector so `Bun.inspect(probe)` is readable while
+ * `JSON.stringify(probe)` stays the exact wire shape (the symbol is non-enumerable).
+ */
+function withCustomInspect(probe: GsliveManagerProbe): GsliveManagerProbe {
+  Object.defineProperty(probe, INSPECT_CUSTOM, {
+    enumerable: false,
+    value: () => {
+      const http = probe.httpStatus === null ? "—" : String(probe.httpStatus);
+      const count = probe.count === null ? "" : ` count=${probe.count}`;
+      const error = probe.error === null ? "" : ` — ${probe.error}`;
+      return `${probe.kind}: ${probe.status} (HTTP ${http})${count}${error}`;
+    },
+  });
+  return probe;
+}
+
+/** Bun.inspect.table rendering of a probe list; callers own the surrounding prose. */
+export function formatManagerProbeTable(
+  probes: readonly GsliveManagerProbe[],
+  colors = Bun.enableANSIColors,
+): string {
+  const rows = probes.map((probe) => ({
+    kind: probe.kind,
+    status: probe.status,
+    http: probe.httpStatus,
+    latencyMs: probe.latencyMs,
+    count: probe.count,
+    class: isBlockingManagerStatus(probe.status)
+      ? "blocking"
+      : probe.status === "ok"
+        ? "ok"
+        : "permission",
+    detail: probe.error,
+  }));
+  return INSPECT_TABLE(
+    rows,
+    ["kind", "status", "http", "latencyMs", "count", "class", "detail"],
+    { colors },
+  );
+}
+
 /** Fetch one endpoint and return its structured status; never throws on HTTP failure. */
 export async function probeManagerEndpoint(
   kind: GsliveManagerEndpointKind,
@@ -276,7 +329,7 @@ export async function probeManagerEndpoint(
         count = 0;
       }
     }
-    return {
+    return withCustomInspect({
       kind,
       status: classified.status,
       httpStatus: response.status,
@@ -284,9 +337,9 @@ export async function probeManagerEndpoint(
       checkedAt,
       count,
       error: classified.error,
-    };
+    });
   } catch (error) {
-    return {
+    return withCustomInspect({
       kind,
       status: "unreachable",
       httpStatus: null,
@@ -297,7 +350,7 @@ export async function probeManagerEndpoint(
         error instanceof Error && error.name === "TimeoutError"
           ? "timed out"
           : "no response (network/DNS/TLS)",
-    };
+    });
   }
 }
 
