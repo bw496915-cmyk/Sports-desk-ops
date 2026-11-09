@@ -168,4 +168,35 @@ describe("runNormalizer execution", () => {
       provenance.stats.periodBreakdown["∅ Out-of-Portal (Set)"]?.count,
     ).toBe(1);
   });
+
+  it("produces a valid PeriodTaxonomyInspection honoring Bun.inspect custom format", async () => {
+    const parsed = parseCliArgs([
+      "--mode",
+      "CPV",
+      "--period",
+      "1",
+      "--engine",
+      "native",
+      "--inspect",
+      "--input",
+      FIXTURE_PATH,
+    ]);
+
+    expect(parsed.inspect).toBe(true);
+    expect(parsed.format).toBe("inspect");
+
+    const { records, provenance, inspection } = await runNormalizer(parsed);
+    expect(records.length).toBe(1);
+    expect(inspection).toBeDefined();
+
+    const inspectStr = Bun.inspect(inspection, { colors: false });
+    expect(inspectStr).toContain(
+      "=== Portal Period Taxonomy Inspection Report ===",
+    );
+    expect(inspectStr).toContain(
+      "Report Mode       : CPV (Customer Volume Family)",
+    );
+    expect(inspectStr).toContain("Period Filter     : [1] 1st Half");
+    expect(inspectStr).toContain("Sample Normalized Records (1):");
+  });
 });

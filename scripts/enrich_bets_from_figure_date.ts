@@ -20,9 +20,14 @@ import {
   enrichWagerRecord,
   inferTotalPicks,
   parseBuyPointsFromDesc,
+  FigureDateEnrichmentInspection,
+  formatEnrichedWagerInspect,
   type FigureDateWager,
   type LiveTickerWager,
+  type EnrichedWager,
 } from "../lib/f402_figure_date_enricher.ts";
+import { parseAsCents } from "../design/domain-branded-types.ts";
+import { cliInspectOptions, inspectReport } from "../lib/cli_inspect.ts";
 import { classifyPortalPeriod } from "../lib/portal_period_taxonomy.ts";
 
 function printUsage(): void {
@@ -35,23 +40,32 @@ Options:
   --figure <path>    Path to getWagersByFigureDate JSON payload or JSONL
   --ticker <path>    Path to raw f402-bets.jsonl stream
   --output <path>    Path to emit enriched JSONL wagers
-  --stats            Output match rate and summary statistics
+  --format <fmt>     Output presentation format: inspect | jsonl | summary | table (default: summary)
+  --inspect          Format output using Bun.inspect inspection view (shortcut for --format=inspect)
+  --sample <N>       Number of sample enriched wagers to inspect (default: 5)
+  --stats            Output match rate and summary statistics (default: true)
   --help             Show this help message
 `);
 }
 
-interface CliOptions {
+export interface CliOptions {
   figurePath: string;
   tickerPath: string;
   outputPath: string;
   stats: boolean;
+  format: "jsonl" | "inspect" | "summary" | "table";
+  inspect: boolean;
+  sampleCount: number;
 }
 
-function parseCliArgs(args: string[]): CliOptions {
+export function parseCliArgs(args: string[]): CliOptions {
   let figurePath = "";
   let tickerPath = resolve(process.cwd(), "probes/out13/f402-bets.jsonl");
   let outputPath = resolve(process.cwd(), "scratch/f402-bets-enriched.jsonl");
   let stats = true;
+  let format: "jsonl" | "inspect" | "summary" | "table" = "summary";
+  let inspect = false;
+  let sampleCount = 5;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -70,6 +84,25 @@ function parseCliArgs(args: string[]): CliOptions {
       if (val) outputPath = resolve(process.cwd(), val);
     } else if (arg === "--no-stats") {
       stats = false;
+    } else if (arg === "--format" && i + 1 < args.length) {
+      const nextArg = args[++i];
+      const val = nextArg ? nextArg.toLowerCase() : "";
+      if (
+        val === "inspect" ||
+        val === "jsonl" ||
+        val === "summary" ||
+        val === "table"
+      ) {
+        format = val;
+      }
+    } else if (arg === "--inspect") {
+      inspect = true;
+      format = "inspect";
+    } else if (arg === "--sample" && i + 1 < args.length) {
+      const parsed = parseInt(args[++i] ?? "5", 10);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        sampleCount = parsed;
+      }
     }
   }
 
@@ -79,7 +112,15 @@ function parseCliArgs(args: string[]): CliOptions {
     process.exit(1);
   }
 
-  return { figurePath, tickerPath, outputPath, stats };
+  return {
+    figurePath,
+    tickerPath,
+    outputPath,
+    stats,
+    format,
+    inspect,
+    sampleCount,
+  };
 }
 
 async function loadFigureIndex(
@@ -131,6 +172,7 @@ export async function runEnrichment(options: CliOptions): Promise<{
   matchedRows: number;
   unmatchedRows: number;
   enrichedOutPath: string;
+  inspection: FigureDateEnrichmentInspection;
 }> {
   if (!existsSync(options.figurePath)) {
     throw new Error(`Figure file not found: ${options.figurePath}`);
@@ -143,6 +185,10 @@ export async function runEnrichment(options: CliOptions): Promise<{
   let totalTickerRows = 0;
   let matchedRows = 0;
   let unmatchedRows = 0;
+  let totalRiskCents = 0;
+  let totalNetPnlCents = 0;
+  const samples: EnrichedWager[] = [];
+  const maxSamples = options.sampleCount ?? 5;
 
   const inStream = createReadStream(options.tickerPath, { encoding: "utf-8" });
   const rl = readline.createInterface({
@@ -184,6 +230,11 @@ export async function runEnrichment(options: CliOptions): Promise<{
     if (figureRow) {
       matchedRows++;
       const enriched = enrichWagerRecord(tickerRow, figureRow);
+      totalRiskCents += enriched.settlement.amountWageredCents;
+      totalNetPnlCents += enriched.settlement.netPnlCents;
+      if (samples.length < maxSamples) {
+        samples.push(enriched);
+      }
       outStream.write(JSON.stringify(enriched) + "\n");
     } else {
       unmatchedRows++;
@@ -256,7 +307,23 @@ export async function runEnrichment(options: CliOptions): Promise<{
     });
   });
 
-  if (options.stats) {
+  const inspection = new FigureDateEnrichmentInspection(
+    {
+      figureRecordsIndexed: figureIndex.size,
+      tickerRowsStreamed: totalTickerRows,
+      exactMatchedRows: matchedRows,
+      unmatchedRows,
+      matchRatePct:
+        totalTickerRows > 0 ? (matchedRows / totalTickerRows) * 100 : 0,
+      totalRiskCents: parseAsCents(totalRiskCents, true),
+      totalNetPnlCents: parseAsCents(totalNetPnlCents, true),
+    },
+    samples,
+  );
+
+  if (options.inspect || options.format === "inspect") {
+    console.log(inspectReport(inspection, cliInspectOptions()));
+  } else if (options.stats && options.format === "summary") {
     console.log("Enrichment Run Summary:");
     console.log(`- Settled Figure Records Indexed: ${figureIndex.size}`);
     console.log(`- Ticker Rows Streamed:           ${totalTickerRows}`);
@@ -270,6 +337,7 @@ export async function runEnrichment(options: CliOptions): Promise<{
     matchedRows,
     unmatchedRows,
     enrichedOutPath: options.outputPath,
+    inspection,
   };
 }
 

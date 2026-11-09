@@ -7,6 +7,13 @@
  * deterministic SubSports, native line values, and execution-latency metrics.
  */
 
+import type {
+  AmericanOdds,
+  Cents,
+  CustomerIdentifier,
+  AgentIdentifier,
+} from "../design/domain-branded-types.ts";
+import { parseAsCents } from "../design/domain-branded-types.ts";
 import {
   classifyPortalPeriod,
   type PortalPeriodCode,
@@ -76,11 +83,59 @@ export interface LiveTickerWager {
   [key: string]: unknown;
 }
 
+// ============================================================================
+// Canonical Domain Brand & Entity Aliases
+// ============================================================================
+
+export type SettledFigureDateWager = FigureDateWager;
+export type LiveIntakeTickerWager = LiveTickerWager;
+export type EnrichedWagerRecord = EnrichedWager;
+export type CanonicalEventId = string;
+export type CompositeMatchKey = string;
+
+/**
+ * Safely normalizes string into a CustomerIdentifier brand without throwing on raw feeds.
+ */
+export function safeCustomerIdentifier(value: unknown): CustomerIdentifier {
+  const str = String(value ?? "")
+    .trim()
+    .toUpperCase();
+  return (str.length >= 2 ? str : "UNKNOWN") as CustomerIdentifier;
+}
+
+/**
+ * Safely normalizes string into an AgentIdentifier brand without throwing on raw feeds.
+ */
+export function safeAgentIdentifier(value: unknown): AgentIdentifier {
+  const str = String(value ?? "")
+    .trim()
+    .toUpperCase();
+  return (str.length >= 2 ? str : "DIRECT") as AgentIdentifier;
+}
+
+/**
+ * Safely parses odds into AmericanOdds brand (outside [-99..+99] deadband) or returns null.
+ */
+export function safeAmericanOdds(raw: unknown): AmericanOdds | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const rounded = Math.round(raw);
+    if (rounded <= -100 || rounded >= 100) {
+      return rounded as AmericanOdds;
+    }
+  } else if (typeof raw === "string") {
+    const parsed = parseInt(raw.trim(), 10);
+    if (!Number.isNaN(parsed) && (parsed <= -100 || parsed >= 100)) {
+      return parsed as AmericanOdds;
+    }
+  }
+  return null;
+}
+
 export interface EnrichedWager {
   readonly ticketNumber: string;
   readonly liveWagerNumber: number;
-  readonly customerId: string;
-  readonly agentLogin: string;
+  readonly customerId: CustomerIdentifier;
+  readonly agentLogin: AgentIdentifier;
   readonly ticketWriter: string;
   readonly volumeAmount: number;
   readonly totalPicks: number;
@@ -112,18 +167,18 @@ export interface EnrichedWager {
     readonly line: number | null;
     readonly origLine: number | null;
     readonly buyPoints: number;
-    readonly price: number | null;
+    readonly price: AmericanOdds | null;
     readonly overUnder?: "O" | "U" | null;
   };
   readonly settlement: {
     readonly isSettled: boolean;
     readonly status: string;
     readonly outcome: string;
-    readonly amountWageredCents: number;
-    readonly toWinCents: number;
-    readonly amountWonCents: number;
-    readonly amountLostCents: number;
-    readonly netPnlCents: number;
+    readonly amountWageredCents: Cents;
+    readonly toWinCents: Cents;
+    readonly amountWonCents: Cents;
+    readonly amountLostCents: Cents;
+    readonly netPnlCents: Cents;
     readonly awayScore: number | null;
     readonly homeScore: number | null;
   };
@@ -376,11 +431,32 @@ export function enrichWagerRecord(
           ticker.ShortDesc || figure.Description,
         );
 
+  const customerId = safeCustomerIdentifier(
+    ticker.CustomerID || figure.CustomerID || ticker.Login,
+  );
+  const agentLogin = safeAgentIdentifier(
+    ticker.AgentLogin || ticker.AgentID || "",
+  );
+  const rawOdds = figure.FinalMoney ?? figure.GradeMoney;
+  const price = safeAmericanOdds(rawOdds);
+
+  const amountWageredCents = parseAsCents(
+    Number(figure.AmountWagered || ticker.AmountWagered || 0),
+    true,
+  );
+  const toWinCents = parseAsCents(
+    Number(figure.ToWinAmount || ticker.ToWinAmount || 0),
+    true,
+  );
+  const amountWonCents = parseAsCents(amountWon, true);
+  const amountLostCents = parseAsCents(amountLost, true);
+  const netPnlCents = parseAsCents(netPnl, true);
+
   return {
     ticketNumber: String(figure.TicketNumber || ticker.WagerNumber),
     liveWagerNumber: ticker.WagerNumber,
-    customerId: ticker.CustomerID.trim(),
-    agentLogin: (ticker.AgentLogin || ticker.AgentID || "").trim(),
+    customerId,
+    agentLogin,
     ticketWriter: (figure.TicketWriter || ticker.TicketWriter).trim(),
     volumeAmount: Number(ticker.VolumeAmount ?? ticker.AmountWagered ?? 0),
     totalPicks,
@@ -431,7 +507,7 @@ export function enrichWagerRecord(
             : (figure.AdjTotalPoints ?? figure.AdjSpread ?? null),
       origLine,
       buyPoints,
-      price: figure.FinalMoney ?? figure.GradeMoney ?? null,
+      price,
       overUnder:
         figure.TotalPointsOU?.trim() === "O" ||
         figure.TotalPointsOU?.trim() === "U"
@@ -442,15 +518,139 @@ export function enrichWagerRecord(
       isSettled: figure.WagerStatus !== "P" && figure.WagerStatus !== "O",
       status: figure.WagerStatus || "P",
       outcome: figure.Outcome || figure.WagerStatus || "PENDING",
-      amountWageredCents: Number(
-        figure.AmountWagered || ticker.AmountWagered || 0,
-      ),
-      toWinCents: Number(figure.ToWinAmount || ticker.ToWinAmount || 0),
-      amountWonCents: amountWon,
-      amountLostCents: amountLost,
-      netPnlCents: netPnl,
+      amountWageredCents,
+      toWinCents,
+      amountWonCents,
+      amountLostCents,
+      netPnlCents,
       awayScore: figure.Team1FinalScore ?? null,
       homeScore: figure.Team2FinalScore ?? null,
     },
   };
+}
+
+// ============================================================================
+// Canonical Function Aliases & Bun.inspect Inspection Tooling
+// ============================================================================
+
+export const compositeMatchKey = buildCompositeMatchKey;
+export const canonicalEventId = buildCanonicalEventId;
+export const teamToken = canonicalTeamToken;
+export const enrichWager = enrichWagerRecord;
+
+export interface FigureDateEnrichmentStats {
+  readonly figureRecordsIndexed: number;
+  readonly tickerRowsStreamed: number;
+  readonly exactMatchedRows: number;
+  readonly unmatchedRows: number;
+  readonly matchRatePct: number;
+  readonly totalRiskCents: Cents;
+  readonly totalNetPnlCents: Cents;
+  readonly sportBreakdown?: Record<string, { count: number; riskCents: Cents }>;
+}
+
+function formatCentsToCurrency(cents: number): string {
+  const dol = cents / 100;
+  if (dol < 0) {
+    return `-$${Math.abs(dol).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+  return `$${dol.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export function formatEnrichedWagerInspect(
+  w: EnrichedWager,
+  options: { colors?: boolean } = {},
+): string {
+  const colors = options.colors === true;
+  const bold = (s: string) => (colors ? `\u001b[1m${s}\u001b[22m` : s);
+  const green = (s: string) => (colors ? `\u001b[32m${s}\u001b[39m` : s);
+  const red = (s: string) => (colors ? `\u001b[31m${s}\u001b[39m` : s);
+  const yellow = (s: string) => (colors ? `\u001b[33m${s}\u001b[39m` : s);
+  const cyan = (s: string) => (colors ? `\u001b[36m${s}\u001b[39m` : s);
+
+  const statusColor =
+    w.settlement.outcome === "W"
+      ? green
+      : w.settlement.outcome === "L"
+        ? red
+        : yellow;
+
+  const riskStr = formatCentsToCurrency(w.settlement.amountWageredCents);
+  const pnlStr = formatCentsToCurrency(w.settlement.netPnlCents);
+
+  const steamTag = w.isLateSteam ? red(" [LATE STEAM]") : "";
+  const liveTag = w.isLive ? yellow(" [LIVE]") : "";
+
+  return [
+    `#${bold(String(w.ticketNumber))}`,
+    `[${cyan(w.customerId)}]`,
+    `${bold(w.sport)}/${w.subSport}`,
+    `Period:${w.periodDescription || w.portalPeriod || "0"}`,
+    `Risk:${bold(riskStr)}`,
+    `Outcome:${statusColor(w.settlement.outcome)} (${statusColor(pnlStr)})`,
+    `Latency:${w.latencySeconds}s${steamTag}${liveTag}`,
+  ].join(" ");
+}
+
+export class FigureDateEnrichmentInspection {
+  readonly stats: FigureDateEnrichmentStats;
+  readonly samples: readonly EnrichedWager[];
+
+  constructor(
+    stats: FigureDateEnrichmentStats,
+    samples: readonly EnrichedWager[] = [],
+  ) {
+    this.stats = stats;
+    this.samples = samples;
+  }
+
+  [Bun.inspect.custom](
+    _depth: number,
+    options: Parameters<typeof Bun.inspect>[1] = {},
+  ): string {
+    const colors = options?.colors === true;
+    const bold = (s: string) => (colors ? `\u001b[1m${s}\u001b[22m` : s);
+    const cyan = (s: string) => (colors ? `\u001b[36m${s}\u001b[39m` : s);
+    const green = (s: string) => (colors ? `\u001b[32m${s}\u001b[39m` : s);
+    const yellow = (s: string) => (colors ? `\u001b[33m${s}\u001b[39m` : s);
+
+    const totalRiskDol = formatCentsToCurrency(this.stats.totalRiskCents);
+    const netPnlDol = formatCentsToCurrency(this.stats.totalNetPnlCents);
+
+    const header = [
+      bold("=== Fantasy402 Figure Date Enrichment Inspection ==="),
+      `Figure Records Indexed : ${bold(this.stats.figureRecordsIndexed.toLocaleString())}`,
+      `Ticker Rows Streamed  : ${bold(this.stats.tickerRowsStreamed.toLocaleString())}`,
+      `Exact Matched Rows     : ${green(this.stats.exactMatchedRows.toLocaleString())} (${cyan(`${this.stats.matchRatePct.toFixed(2)}%`)})`,
+      `Unmatched Rows         : ${yellow(this.stats.unmatchedRows.toLocaleString())}`,
+      `Total Risk Monitored   : ${bold(totalRiskDol)}`,
+      `Net Settlement PnL     : ${bold(netPnlDol)}`,
+    ].join("\n");
+
+    const sampleLines =
+      this.samples.length > 0
+        ? [
+            `\n${bold(`Sample Enriched Wagers (${this.samples.length}):`)}`,
+            ...this.samples.map(
+              (w, idx) =>
+                `  ${idx + 1}. ${formatEnrichedWagerInspect(w, options)}`,
+            ),
+          ].join("\n")
+        : "";
+
+    return `${header}${sampleLines}`;
+  }
+
+  toJSON() {
+    return {
+      stats: this.stats,
+      samples: this.samples,
+    };
+  }
 }

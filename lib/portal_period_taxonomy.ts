@@ -27,6 +27,12 @@
  * - Grading (G): `startG` / `endG` (user-driven, enabled)
  */
 
+import type {
+  Cents,
+  CustomerIdentifier,
+  AgentIdentifier,
+  Dollars,
+} from "../design/domain-branded-types.ts";
 import { parseBetMarket } from "./bet_market_parse.ts";
 
 export type PortalPeriodCode = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -127,6 +133,13 @@ export interface ClassifiedPeriod {
   readonly isOrphanOutOfPortal: boolean;
 }
 
+// ============================================================================
+// Canonical Taxonomy Domain Aliases & Type Specifications
+// ============================================================================
+
+export type NormalizedWager = NormalizedWagerRecord;
+export type PortalPeriodClassifier = typeof classifyPortalPeriod;
+
 export interface NormalizedWagerRecord {
   readonly wagerNumber: number | string;
   readonly engine: NormalizedEngine;
@@ -135,10 +148,14 @@ export interface NormalizedWagerRecord {
   readonly half: NormalizedHalf;
   readonly market: string;
   readonly customer: string;
+  readonly customerId: CustomerIdentifier;
   readonly agent: string;
+  readonly agentId: AgentIdentifier;
   readonly sport: string;
   readonly subSport: string;
   readonly risk: number;
+  readonly riskDollars: Dollars;
+  readonly riskCents: Cents;
   readonly ticketWriter: string;
   readonly insertedAt: string;
 }
@@ -201,7 +218,7 @@ export function detectEngine(w: RawWagerInput): NormalizedEngine {
     wagerType === "M" ||
     wagerType === "P" ||
     /^[MP][.:]/i.test(desc) ||
-    /derivative|team\s*total/i.test(desc)
+    /derivative|individual\s*points|team[_\s]*total/i.test(desc)
   ) {
     return "gansrow";
   }
@@ -218,7 +235,7 @@ export function isDerivativePointsLineWager(w: RawWagerInput): boolean {
   );
   return (
     wagerType === "E" ||
-    /derivative|individual\s*points|team\s*total/i.test(desc)
+    /derivative|individual\s*points|team[_\s]*total/i.test(desc)
   );
 }
 
@@ -451,13 +468,23 @@ export function normalizeWager(w: RawWagerInput): NormalizedWagerRecord {
   const wagerNumber = w.WagerNumber ?? w.wagerNumber ?? "";
   const wagerType = String(w.WagerType ?? w.wagerType ?? "").trim();
   const market = extractMarketDescriptor(w);
-  const customer = String(w.Login ?? w.CustomerID ?? w.customer ?? "").trim();
-  const agent = String(w.AgentLogin ?? w.AgentID ?? w.agent ?? "")
+  const custStr = String(w.Login ?? w.CustomerID ?? w.customer ?? "")
     .trim()
-    .replace(/\.$/, "");
+    .toUpperCase();
+  const customerId = (
+    custStr.length >= 2 ? custStr : "UNKNOWN"
+  ) as CustomerIdentifier;
+  const agtStr = String(w.AgentLogin ?? w.AgentID ?? w.agent ?? "")
+    .trim()
+    .replace(/\.$/, "")
+    .toUpperCase();
+  const agentId = (agtStr.length >= 2 ? agtStr : "DIRECT") as AgentIdentifier;
   const sport = extractSport(w);
   const subSport = extractSubSport(w);
-  const risk = extractRiskDollars(w);
+  const rawRisk = extractRiskDollars(w);
+  const roundedRisk = Math.round(rawRisk * 100) / 100;
+  const riskDollars = roundedRisk as Dollars;
+  const riskCents = Math.round(roundedRisk * 100) as Cents;
   const ticketWriter = String(w.TicketWriter ?? w.ticketWriter ?? "").trim();
   const insertedAt = String(
     w.InsertDateTime ?? w.PlacedDate ?? w.GradedDate ?? "",
@@ -470,12 +497,134 @@ export function normalizeWager(w: RawWagerInput): NormalizedWagerRecord {
     portalPeriod: periodInfo.portalPeriod,
     half: periodInfo.half,
     market,
-    customer,
-    agent,
+    customer: custStr,
+    customerId,
+    agent: agtStr,
+    agentId,
     sport,
     subSport,
-    risk: Math.round(risk * 100) / 100,
+    risk: roundedRisk,
+    riskDollars,
+    riskCents,
     ticketWriter,
     insertedAt,
   };
+}
+
+// ============================================================================
+// Canonical Function Aliases & Bun.inspect Inspection Tooling
+// ============================================================================
+
+export const normalizeWagerRecord = normalizeWager;
+
+export function formatNormalizedWagerInspect(
+  w: NormalizedWagerRecord,
+  options: { colors?: boolean } = {},
+): string {
+  const colors = options.colors === true;
+  const bold = (s: string) => (colors ? `\u001b[1m${s}\u001b[22m` : s);
+  const cyan = (s: string) => (colors ? `\u001b[36m${s}\u001b[39m` : s);
+  const yellow = (s: string) => (colors ? `\u001b[33m${s}\u001b[39m` : s);
+
+  const riskStr = `$${(w.riskCents / 100).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+  const periodTag =
+    w.portalPeriod !== null
+      ? `Period:${w.portalPeriod} (${PORTAL_PERIOD_LABELS[w.portalPeriod]})`
+      : yellow("Period:∅ (Out-of-Portal)");
+
+  return [
+    `#${bold(String(w.wagerNumber))}`,
+    `[${cyan(w.customerId)}]`,
+    `Engine:${w.engine}`,
+    periodTag,
+    `${bold(w.sport)}/${w.subSport}`,
+    `Risk:${bold(riskStr)}`,
+    `Writer:${w.ticketWriter || "N/A"}`,
+  ].join(" ");
+}
+
+export class PeriodTaxonomyInspection {
+  readonly provenance: ProvenanceSidecar;
+  readonly sample: readonly NormalizedWagerRecord[];
+
+  constructor(
+    provenance: ProvenanceSidecar,
+    sample: readonly NormalizedWagerRecord[] = [],
+  ) {
+    this.provenance = provenance;
+    this.sample = sample;
+  }
+
+  [Bun.inspect.custom](
+    _depth: number,
+    options: Parameters<typeof Bun.inspect>[1] = {},
+  ): string {
+    const colors = options?.colors === true;
+    const bold = (s: string) => (colors ? `\u001b[1m${s}\u001b[22m` : s);
+    const cyan = (s: string) => (colors ? `\u001b[36m${s}\u001b[39m` : s);
+
+    const p = this.provenance;
+    const totalRiskStr = p.stats.totalRisk.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const avgRiskStr = p.stats.avgRisk.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+    const header = [
+      bold("=== Portal Period Taxonomy Inspection Report ==="),
+      `Report Mode       : ${bold(p.reportMode)} (${p.dateFamily} Family)`,
+      `Period Filter     : [${p.period}] ${bold(p.portalPeriodLabel)}`,
+      `Engine Scope      : ${p.engineFilter}`,
+      `Total Processed   : ${bold(p.stats.totalProcessed.toLocaleString())} wagers`,
+      `Matched Rows      : ${cyan(p.stats.matchedRows.toLocaleString())} wagers`,
+      `Total Risk Volume : $${bold(totalRiskStr)}`,
+      `Average Risk      : $${avgRiskStr}`,
+    ].join("\n");
+
+    const breakdownEntries = Object.entries(p.stats.detailedBreakdown ?? {});
+    let breakdownBlock = "";
+    if (breakdownEntries.length > 0) {
+      const rows = breakdownEntries.map(([_, v]) => ({
+        engine: v.engine,
+        code: v.code,
+        label: v.label,
+        market: v.market,
+        count: v.count,
+        risk: `$${v.risk.toFixed(2)}`,
+      }));
+      if (
+        typeof Bun !== "undefined" &&
+        typeof (Bun.inspect as any).table === "function"
+      ) {
+        breakdownBlock = `\n${bold("Taxonomy Breakdown:")}\n${(Bun.inspect as any).table(rows, { colors })}`;
+      }
+    }
+
+    const sampleBlock =
+      this.sample.length > 0
+        ? [
+            `\n${bold(`Sample Normalized Records (${this.sample.length}):`)}`,
+            ...this.sample.map(
+              (w, idx) =>
+                `  ${idx + 1}. ${formatNormalizedWagerInspect(w, options)}`,
+            ),
+          ].join("\n")
+        : "";
+
+    return `${header}${breakdownBlock}${sampleBlock}`;
+  }
+
+  toJSON() {
+    return {
+      provenance: this.provenance,
+      sample: this.sample,
+    };
+  }
 }

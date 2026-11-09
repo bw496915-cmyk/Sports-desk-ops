@@ -94,12 +94,19 @@ describe("Streaming Enrichment CLI Pipeline", () => {
       tickerPath,
       outputPath: outPath,
       stats: false,
+      format: "summary",
+      inspect: false,
+      sampleCount: 5,
     });
 
     expect(result.totalTickerRows).toBe(3);
     // ALERT row was skipped from output, 1 matched, 1 unmatched
     expect(result.matchedRows).toBe(1);
     expect(result.unmatchedRows).toBe(1);
+    expect(result.inspection).toBeDefined();
+    expect(result.inspection.stats.exactMatchedRows).toBe(1);
+    expect(Number(result.inspection.stats.totalRiskCents)).toBe(230000);
+    expect(result.inspection.samples.length).toBe(1);
 
     const outLines = readFileSync(outPath, "utf-8")
       .trim()

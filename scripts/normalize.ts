@@ -20,12 +20,14 @@ import {
   detectEngine,
   isDerivativePointsLineWager,
   normalizeWager,
+  PeriodTaxonomyInspection,
   type NormalizedWagerRecord,
   type PortalPeriodCode,
   type ProvenanceSidecar,
   type RawWagerInput,
   type ReportMode,
 } from "../lib/portal_period_taxonomy.ts";
+import { cliInspectOptions, inspectReport } from "../lib/cli_inspect.ts";
 
 function printUsage(): void {
   console.log(`
@@ -56,12 +58,13 @@ Options:
   --range start=...,end=...   Optional date window (maps to mode's date family)
   --input <path>              Path to JSONL wagers file
   --output <path>             Path to save normalized JSON output (also writes <output>_meta.json)
-  --format <json|table>       Output presentation format (default: table)
+  --format <fmt>              Output presentation format: inspect | table | json | summary (default: table)
+  --inspect                   Format output using Bun.inspect inspection view (shortcut for --format=inspect)
   --help                      Show this help message
 `);
 }
 
-interface CliOptions {
+export interface CliOptions {
   mode: ReportMode;
   period: PortalPeriodCode;
   engine: "native" | "full";
@@ -72,7 +75,8 @@ interface CliOptions {
   endDate: string | null;
   inputPath: string;
   outputPath: string | null;
-  format: "json" | "table";
+  format: "json" | "table" | "inspect" | "summary";
+  inspect?: boolean;
 }
 
 export function parseCliArgs(args: string[]): CliOptions {
@@ -86,7 +90,8 @@ export function parseCliArgs(args: string[]): CliOptions {
   let endDate: string | null = null;
   let inputPath = "";
   let outputPath: string | null = null;
-  let format: "json" | "table" = "table";
+  let format: "json" | "table" | "inspect" | "summary" = "table";
+  let inspect = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -150,9 +155,17 @@ export function parseCliArgs(args: string[]): CliOptions {
     } else if (arg === "--format" && i + 1 < args.length) {
       const nextArg = args[++i];
       const val = nextArg ? nextArg.toLowerCase() : "";
-      if (val === "json" || val === "table") {
+      if (
+        val === "json" ||
+        val === "table" ||
+        val === "inspect" ||
+        val === "summary"
+      ) {
         format = val;
       }
+    } else if (arg === "--inspect") {
+      inspect = true;
+      format = "inspect";
     }
   }
 
@@ -184,12 +197,14 @@ export function parseCliArgs(args: string[]): CliOptions {
     inputPath,
     outputPath,
     format,
+    inspect,
   };
 }
 
 export async function runNormalizer(options: CliOptions): Promise<{
   records: NormalizedWagerRecord[];
   provenance: ProvenanceSidecar;
+  inspection: PeriodTaxonomyInspection;
 }> {
   if (!options.inputPath || !existsSync(options.inputPath)) {
     throw new Error(`Input file not found: ${options.inputPath}`);
@@ -366,18 +381,40 @@ export async function runNormalizer(options: CliOptions): Promise<{
     },
   };
 
-  return { records, provenance };
+  const inspection = new PeriodTaxonomyInspection(
+    provenance,
+    records.slice(0, 10),
+  );
+
+  return { records, provenance, inspection };
 }
 
 async function main(): Promise<void> {
   const options = parseCliArgs(process.argv.slice(2));
 
+  const { records, provenance, inspection } = await runNormalizer(options);
+
+  if (options.inspect || options.format === "inspect") {
+    console.log(inspectReport(inspection, cliInspectOptions()));
+    if (options.outputPath) {
+      const outPath = resolve(options.outputPath);
+      const metaPath = outPath.replace(/(\.json)?$/i, "_meta.json");
+
+      await writeFile(outPath, JSON.stringify(records, null, 2), "utf8");
+      await writeFile(metaPath, JSON.stringify(provenance, null, 2), "utf8");
+
+      console.log(
+        `\n[Normalizer] Wrote ${records.length} records to: ${outPath}`,
+      );
+      console.log(`[Normalizer] Wrote provenance metadata to:   ${metaPath}`);
+    }
+    return;
+  }
+
   console.log(`[Normalizer] Processing: ${options.inputPath}`);
   console.log(
     `[Normalizer] Mode: ${options.mode} (${DATE_FAMILIES[options.mode].family}) | Period: ${options.period} (${PORTAL_PERIOD_LABELS[options.period]}) | Engine: ${options.engine}`,
   );
-
-  const { records, provenance } = await runNormalizer(options);
 
   console.log(`\n=== Provenance & Date Window Metadata ===`);
   console.log(`Mode:            ${provenance.reportMode}`);

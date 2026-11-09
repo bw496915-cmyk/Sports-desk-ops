@@ -14,6 +14,8 @@ import {
   inferTotalPicks,
   isLiveSubSport,
   parseBuyPointsFromDesc,
+  FigureDateEnrichmentInspection,
+  formatEnrichedWagerInspect,
   type FigureDateWager,
   type LiveTickerWager,
 } from "../lib/f402_figure_date_enricher.ts";
@@ -116,7 +118,7 @@ describe("Figure Date Enrichment Engine", () => {
 
     expect(enriched.ticketNumber).toBe("1075710577");
     expect(enriched.liveWagerNumber).toBe(767671201);
-    expect(enriched.customerId).toBe("DAN245");
+    expect<string>(enriched.customerId).toBe("DAN245");
     expect(enriched.totalPicks).toBe(1);
     expect(enriched.eventId).toBe(
       "NBA-20261106-OklahomaCityThunder@MemphisGrizzlies",
@@ -134,11 +136,11 @@ describe("Figure Date Enrichment Engine", () => {
     expect(enriched.marketType).toBe("spread");
     expect(enriched.selection.chosenTeam).toBe("Memphis Grizzlies");
     expect(enriched.selection.line).toBe(1);
-    expect(enriched.selection.price).toBe(-115);
+    expect<number | null>(enriched.selection.price).toBe(-115);
     expect(enriched.settlement.isSettled).toBe(true);
     expect(enriched.settlement.outcome).toBe("L");
-    expect(enriched.settlement.amountLostCents).toBe(230000);
-    expect(enriched.settlement.netPnlCents).toBe(-230000);
+    expect<number>(enriched.settlement.amountLostCents).toBe(230000);
+    expect<number>(enriched.settlement.netPnlCents).toBe(-230000);
     expect(enriched.settlement.awayScore).toBe(35);
     expect(enriched.settlement.homeScore).toBe(28);
   });
@@ -197,7 +199,7 @@ describe("Figure Date Enrichment Engine", () => {
     expect(enriched.periodDescription).toBe("Game");
     expect(enriched.selection.overUnder).toBe("O");
     expect(enriched.selection.line).toBe(220.5);
-    expect(enriched.settlement.netPnlCents).toBe(200000);
+    expect<number>(enriched.settlement.netPnlCents).toBe(200000);
     expect(enriched.buyPoints).toBe(0);
     expect(enriched.selection.buyPoints).toBe(0);
   });
@@ -371,7 +373,7 @@ describe("Figure Date Enrichment Engine", () => {
     const enriched = enrichWagerRecord(ticker, figure);
     expect(enriched.ticketNumber).toBe("1075808451");
     expect(enriched.liveWagerNumber).toBe(767691433);
-    expect(enriched.customerId).toBe("DAN245");
+    expect<string>(enriched.customerId).toBe("DAN245");
     expect(enriched.sport).toBe("Basketball");
     expect(enriched.subSport).toBe("NBA Live");
     expect(enriched.dailyFigureDate).toBe("2026-11-06");
@@ -381,7 +383,7 @@ describe("Figure Date Enrichment Engine", () => {
     expect(enriched.portalPeriod).toBe(0);
     expect(enriched.selection.chosenTeam).toBe("Lakers (Live)");
     expect(enriched.selection.line).toBe(3.5);
-    expect(enriched.selection.price).toBe(-110);
+    expect<number | null>(enriched.selection.price).toBe(-110);
     expect(enriched.buyPoints).toBe(0);
   });
 
@@ -435,7 +437,7 @@ describe("Figure Date Enrichment Engine", () => {
     expect(enriched.portalPeriod).toBe(2);
     expect(enriched.selection.chosenTeam).toBe("Dallas Cowboys");
     expect(enriched.selection.line).toBe(-4);
-    expect(enriched.selection.price).toBe(-112);
+    expect<number | null>(enriched.selection.price).toBe(-112);
     expect(enriched.buyPoints).toBe(0);
   });
 
@@ -486,7 +488,7 @@ describe("Figure Date Enrichment Engine", () => {
     expect(octEnriched.opponents.home).toBe("Dallas Stars");
     expect(octEnriched.selection.chosenTeam).toBe("Dallas Stars");
     expect(octEnriched.selection.line).toBe(-1.5);
-    expect(octEnriched.selection.price).toBe(145);
+    expect<number | null>(octEnriched.selection.price).toBe(145);
 
     // Ticket 1074473813 placed on 2026-11-03: Stars are Away (#9, odd)
     const novTicker: LiveTickerWager = {
@@ -532,7 +534,7 @@ describe("Figure Date Enrichment Engine", () => {
     expect(novEnriched.opponents.away).toBe("Dallas Stars");
     expect(novEnriched.opponents.home).toBe("Washington Capitals");
     expect(novEnriched.selection.chosenTeam).toBe("Dallas Stars");
-    expect(novEnriched.selection.price).toBe(-107);
+    expect<number | null>(novEnriched.selection.price).toBe(-107);
 
     // Verify canonical event ID differentiation by DailyFigureDate and Home/Away venue
     expect(octEnriched.eventId).toBe("NHL-20261002-St.LouisBlues@DallasStars");
@@ -590,5 +592,46 @@ describe("Figure Date Enrichment Engine", () => {
     expect(isLiveSubSport("Basketball", "NBA", "Lakers")).toBe(false);
     expect(isLiveSubSport("Hockey", "NHL", "Dallas Stars")).toBe(false);
     expect(isLiveSubSport(undefined, undefined, undefined)).toBe(false);
+  });
+
+  it("formats enriched wagers and honors Bun.inspect.custom on FigureDateEnrichmentInspection", () => {
+    const enriched = enrichWagerRecord(sampleTicker, sampleFigure);
+    const line = formatEnrichedWagerInspect(enriched, { colors: false });
+
+    expect(line).toContain("#1075710577");
+    expect(line).toContain("[DAN245]");
+    expect(line).toContain("Basketball/NBA");
+    expect(line).toContain("Risk:$2,300.00");
+    expect(line).toContain("Outcome:L (-$2,300.00)");
+    expect(line).toContain("Latency:25s [LATE STEAM]");
+
+    const inspection = new FigureDateEnrichmentInspection(
+      {
+        figureRecordsIndexed: 1,
+        tickerRowsStreamed: 1,
+        exactMatchedRows: 1,
+        unmatchedRows: 0,
+        matchRatePct: 100.0,
+        totalRiskCents: enriched.settlement.amountWageredCents,
+        totalNetPnlCents: enriched.settlement.netPnlCents,
+      },
+      [enriched],
+    );
+
+    const rendered = Bun.inspect(inspection, { colors: false });
+    expect(rendered).toContain(
+      "=== Fantasy402 Figure Date Enrichment Inspection ===",
+    );
+    expect(rendered).toContain("Figure Records Indexed : 1");
+    expect(rendered).toContain("Ticker Rows Streamed  : 1");
+    expect(rendered).toContain("Exact Matched Rows     : 1 (100.00%)");
+    expect(rendered).toContain("Total Risk Monitored   : $2,300.00");
+    expect(rendered).toContain("Net Settlement PnL     : -$2,300.00");
+    expect(rendered).toContain("Sample Enriched Wagers (1):");
+    expect(rendered).toContain("#1075710577");
+
+    const json = inspection.toJSON();
+    expect(json.stats.figureRecordsIndexed).toBe(1);
+    expect(json.samples.length).toBe(1);
   });
 });

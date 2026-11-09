@@ -13,6 +13,7 @@ import {
   extractRiskDollars,
   isDerivativePointsLineWager,
   normalizeWager,
+  PeriodTaxonomyInspection,
 } from "../lib/portal_period_taxonomy.ts";
 
 describe("Portal Period Taxonomy Enum", () => {
@@ -224,12 +225,90 @@ describe("Engine Detection & Risk Dollars", () => {
       half: "1H",
       market: "Native Desk Derivative Points Line (1st Half)",
       customer: "VIP101",
+      customerId: "VIP101" as any,
       agent: "BOSS1",
+      agentId: "BOSS1" as any,
       sport: "Football",
       subSport: "CFB",
       risk: 50.0,
+      riskDollars: 50.0 as any,
+      riskCents: 5000 as any,
       ticketWriter: "Internet",
       insertedAt: "2026-11-01 12:00:00.000",
     });
+  });
+
+  it("formats normalized wagers and honors Bun.inspect.custom on PeriodTaxonomyInspection", () => {
+    const norm = normalizeWager({
+      WagerNumber: 991001,
+      WagerType: "E",
+      ShortDesc: "E.Football #101 Patriots O 24½ -110 - For 1st Half",
+      AmountWagered: 5000,
+      Login: "VIP101",
+      AgentLogin: "BOSS1",
+      InsertDateTime: "2026-11-01 12:00:00.000",
+      TicketWriter: "Internet",
+    });
+
+    const singleInspect = norm;
+    expect(String(singleInspect.customerId)).toBe("VIP101");
+    expect(Number(singleInspect.riskCents)).toBe(5000);
+    expect(Number(singleInspect.riskDollars)).toBe(50.0);
+
+    const inspection = new PeriodTaxonomyInspection(
+      {
+        capturedAt: "2026-11-09T00:00:00.000Z",
+        reportMode: "CPV",
+        wagerType: "E",
+        filtersExpanded: true,
+        period: "1",
+        portalPeriod: 1,
+        portalPeriodLabel: "1st Half",
+        engineFilter: "native",
+        dateFamily: "Customer Volume",
+        dateFields: {
+          start: null,
+          end: null,
+          startG: null,
+          endG: null,
+          startReportVolumen: "2026-10-01",
+          endReportVolumen: "2026-10-31",
+        },
+        stats: {
+          totalProcessed: 1,
+          matchedRows: 1,
+          totalRisk: 50.0,
+          avgRisk: 50.0,
+          periodBreakdown: { "1st Half": { count: 1, risk: 50.0 } },
+          detailedBreakdown: {
+            "native:1:Derivative": {
+              engine: "native",
+              code: "1",
+              label: "1st Half",
+              market: "Derivative Points Line",
+              count: 1,
+              risk: 50.0,
+            },
+          },
+        },
+      },
+      [norm],
+    );
+
+    const rendered = Bun.inspect(inspection, { colors: false });
+    expect(rendered).toContain(
+      "=== Portal Period Taxonomy Inspection Report ===",
+    );
+    expect(rendered).toContain(
+      "Report Mode       : CPV (Customer Volume Family)",
+    );
+    expect(rendered).toContain("Period Filter     : [1] 1st Half");
+    expect(rendered).toContain("Sample Normalized Records (1):");
+    expect(rendered).toContain("#991001");
+    expect(rendered).toContain("[VIP101]");
+
+    const json = inspection.toJSON();
+    expect(json.provenance.reportMode).toBe("CPV");
+    expect(json.sample.length).toBe(1);
   });
 });
