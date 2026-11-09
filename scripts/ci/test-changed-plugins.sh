@@ -15,8 +15,18 @@ else
   exit 0
 fi
 
+CHANGED=$(git diff --name-only "$RANGE" 2>/dev/null || true)
+
+# Root manifest, lockfile, or workspace packages can break every plugin bundle.
+if echo "$CHANGED" | grep -qE '^(package\.json|bun\.lock|packages/)'; then
+  echo "test-changed-plugins: shared dependency paths changed; running full plugin bundle suite"
+  export CI=true
+  bun test tests/plugin_bundles.test.ts
+  exit 0
+fi
+
 mapfile -t BUNDLES < <(
-  git diff --name-only "$RANGE" 2>/dev/null \
+  echo "$CHANGED" \
     | awk -F/ '/^dsh-plugin(-|$)/ {print $1}' \
     | sort -u
 )
