@@ -666,4 +666,25 @@ describe("Figure Date Enrichment Engine", () => {
     expect(text).toContain("1075710577");
     expect(text).toContain("DAN245");
   });
+
+  it("guarantees FigureDateEnrichmentInspection is strictly pure and mutation-free during Bun.inspect", () => {
+    const enriched = enrichWagerRecord(sampleTicker, sampleFigure);
+    const inspection = new FigureDateEnrichmentInspection(
+      {
+        figureRecordsIndexed: 1,
+        tickerRowsStreamed: 1,
+        exactMatchedRows: 1,
+        unmatchedRows: 0,
+        matchRatePct: 100.0,
+        totalRiskCents: enriched.settlement.amountWageredCents,
+        totalNetPnlCents: enriched.settlement.netPnlCents,
+      },
+      [enriched],
+    );
+
+    const before = JSON.stringify(inspection);
+    Bun.inspect(inspection, { colors: true });
+    Bun.inspect(inspection, { colors: false });
+    expect(JSON.stringify(inspection)).toBe(before);
+  });
 });

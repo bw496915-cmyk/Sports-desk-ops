@@ -338,4 +338,53 @@ describe("Engine Detection & Risk Dollars", () => {
     expect(parsed.portalPeriod).toBe(1);
     expect(parsed.risk).toBe(50.0);
   });
+
+  it("guarantees PeriodTaxonomyInspection is strictly pure and mutation-free during Bun.inspect", () => {
+    const raw = {
+      WagerNumber: 991001,
+      WagerType: "E",
+      ShortDesc: "E.Football #101 Patriots - For 1st Half",
+      AmountWagered: 5000,
+      Login: "VIP101",
+      AgentLogin: "AG7",
+      InsertDateTime: "2026-10-20 14:00:00.000",
+      TicketWriter: "Internet",
+    };
+    const norm = normalizeWager(raw);
+    const inspection = new PeriodTaxonomyInspection(
+      {
+        capturedAt: "2026-10-20T14:00:00.000Z",
+        reportMode: "CPV",
+        wagerType: "E",
+        filtersExpanded: true,
+        period: "1",
+        portalPeriod: 1,
+        portalPeriodLabel: "1st Half",
+        engineFilter: "native",
+        dateFamily: "Customer Volume",
+        dateFields: {
+          start: null,
+          end: null,
+          startG: null,
+          endG: null,
+          startReportVolumen: null,
+          endReportVolumen: null,
+        },
+        stats: {
+          totalProcessed: 1,
+          matchedRows: 1,
+          totalRisk: 50.0,
+          avgRisk: 50.0,
+          periodBreakdown: { "1st Half": { count: 1, risk: 50.0 } },
+          detailedBreakdown: {},
+        },
+      },
+      [norm],
+    );
+
+    const before = JSON.stringify(inspection);
+    Bun.inspect(inspection, { colors: true });
+    Bun.inspect(inspection, { colors: false });
+    expect(JSON.stringify(inspection)).toBe(before);
+  });
 });

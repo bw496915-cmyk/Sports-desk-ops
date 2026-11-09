@@ -220,108 +220,112 @@ export async function runEnrichment(options: CliOptions): Promise<{
     ? Bun.file(options.outputPath).writer()
     : null;
 
-  for await (const line of rl) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    totalTickerRows++;
+  try {
+    for await (const line of rl) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      totalTickerRows++;
 
-    let tickerRow: LiveTickerWager;
-    try {
-      tickerRow = JSON.parse(trimmed);
-    } catch {
-      continue;
-    }
-
-    // Skip ALERT mirrors if VolumeAmount === 0 to avoid double counting
-    if (tickerRow.TicketWriter === "ALERT" && tickerRow.VolumeAmount === 0) {
-      continue;
-    }
-
-    const matchKey = buildCompositeMatchKey(
-      String(tickerRow.CustomerID || ""),
-      String(tickerRow.InsertDateTime || ""),
-      Number(tickerRow.AmountWagered || 0),
-      Number(tickerRow.ToWinAmount || 0),
-      String(tickerRow.ShortDesc || ""),
-    );
-
-    const figureRow = figureIndex.get(matchKey);
-    if (figureRow) {
-      matchedRows++;
-      const enriched = enrichWagerRecord(tickerRow, figureRow);
-      totalRiskCents += enriched.settlement.amountWageredCents;
-      totalNetPnlCents += enriched.settlement.netPnlCents;
-      if (samples.length < maxSamples) {
-        samples.push(enriched);
+      let tickerRow: LiveTickerWager;
+      try {
+        tickerRow = JSON.parse(trimmed);
+      } catch {
+        continue;
       }
-      if (outWriter) outWriter.write(JSON.stringify(enriched) + "\n");
-    } else {
-      unmatchedRows++;
-      const periodClassification = classifyPortalPeriod({
-        ShortDesc: tickerRow.ShortDesc,
-        WagerType: tickerRow.WagerType,
-      });
-      // Output pending un-enriched row with consistent schema flag
-      if (outWriter) {
-        outWriter.write(
-          JSON.stringify({
-            ticketNumber: String(tickerRow.WagerNumber),
-            liveWagerNumber: tickerRow.WagerNumber,
-            customerId: String(tickerRow.CustomerID || "").trim(),
-            agentLogin: String(
-              tickerRow.AgentLogin || tickerRow.AgentID || "",
-            ).trim(),
-            ticketWriter: String(tickerRow.TicketWriter || "").trim(),
-            volumeAmount: Number(
-              tickerRow.VolumeAmount ?? tickerRow.AmountWagered ?? 0,
-            ),
-            totalPicks: inferTotalPicks(
-              tickerRow.WagerType,
-              tickerRow.ShortDesc,
-            ),
-            eventId: "UNSETTLED",
-            sport: "Unknown",
-            subSport: "Unknown",
-            opponents: { away: "", home: "" },
-            gameDateTime: tickerRow.InsertDateTime,
-            acceptedDateTime: tickerRow.InsertDateTime,
-            dailyFigureDate: tickerRow.InsertDateTime.slice(0, 10),
-            latencySeconds: 0,
-            isLateSteam: false,
-            isLive: /LIVE/i.test(tickerRow.ShortDesc || ""),
-            portalPeriod: periodClassification.portalPeriod,
-            periodNumber: periodClassification.portalPeriod ?? 0,
-            periodDescription: periodClassification.portalLabel,
-            marketType: "other",
-            buyPoints: parseBuyPointsFromDesc(tickerRow.ShortDesc || ""),
-            origSpread: null,
-            adjSpread: null,
-            origTotalPoints: null,
-            adjTotalPoints: null,
-            selection: {
-              chosenTeam: "",
-              line: null,
-              origLine: null,
+
+      // Skip ALERT mirrors if VolumeAmount === 0 to avoid double counting
+      if (tickerRow.TicketWriter === "ALERT" && tickerRow.VolumeAmount === 0) {
+        continue;
+      }
+
+      const matchKey = buildCompositeMatchKey(
+        String(tickerRow.CustomerID || ""),
+        String(tickerRow.InsertDateTime || ""),
+        Number(tickerRow.AmountWagered || 0),
+        Number(tickerRow.ToWinAmount || 0),
+        String(tickerRow.ShortDesc || ""),
+      );
+
+      const figureRow = figureIndex.get(matchKey);
+      if (figureRow) {
+        matchedRows++;
+        const enriched = enrichWagerRecord(tickerRow, figureRow);
+        totalRiskCents += enriched.settlement.amountWageredCents;
+        totalNetPnlCents += enriched.settlement.netPnlCents;
+        if (samples.length < maxSamples) {
+          samples.push(enriched);
+        }
+        if (outWriter) outWriter.write(JSON.stringify(enriched) + "\n");
+      } else {
+        unmatchedRows++;
+        const periodClassification = classifyPortalPeriod({
+          ShortDesc: tickerRow.ShortDesc,
+          WagerType: tickerRow.WagerType,
+        });
+        // Output pending un-enriched row with consistent schema flag
+        if (outWriter) {
+          outWriter.write(
+            JSON.stringify({
+              ticketNumber: String(tickerRow.WagerNumber),
+              liveWagerNumber: tickerRow.WagerNumber,
+              customerId: String(tickerRow.CustomerID || "").trim(),
+              agentLogin: String(
+                tickerRow.AgentLogin || tickerRow.AgentID || "",
+              ).trim(),
+              ticketWriter: String(tickerRow.TicketWriter || "").trim(),
+              volumeAmount: Number(
+                tickerRow.VolumeAmount ?? tickerRow.AmountWagered ?? 0,
+              ),
+              totalPicks: inferTotalPicks(
+                tickerRow.WagerType,
+                tickerRow.ShortDesc,
+              ),
+              eventId: "UNSETTLED",
+              sport: "Unknown",
+              subSport: "Unknown",
+              opponents: { away: "", home: "" },
+              gameDateTime: tickerRow.InsertDateTime,
+              acceptedDateTime: tickerRow.InsertDateTime,
+              dailyFigureDate: tickerRow.InsertDateTime.slice(0, 10),
+              latencySeconds: 0,
+              isLateSteam: false,
+              isLive: /LIVE/i.test(tickerRow.ShortDesc || ""),
+              portalPeriod: periodClassification.portalPeriod,
+              periodNumber: periodClassification.portalPeriod ?? 0,
+              periodDescription: periodClassification.portalLabel,
+              marketType: "other",
               buyPoints: parseBuyPointsFromDesc(tickerRow.ShortDesc || ""),
-              price: null,
-              overUnder: null,
-            },
-            settlement: {
-              isSettled: false,
-              status: "P",
-              outcome: "PENDING",
-              amountWageredCents: Number(tickerRow.AmountWagered || 0),
-              toWinCents: Number(tickerRow.ToWinAmount || 0),
-              amountWonCents: 0,
-              amountLostCents: 0,
-              netPnlCents: 0,
-              awayScore: null,
-              homeScore: null,
-            },
-          }) + "\n",
-        );
+              origSpread: null,
+              adjSpread: null,
+              origTotalPoints: null,
+              adjTotalPoints: null,
+              selection: {
+                chosenTeam: "",
+                line: null,
+                origLine: null,
+                buyPoints: parseBuyPointsFromDesc(tickerRow.ShortDesc || ""),
+                price: null,
+                overUnder: null,
+              },
+              settlement: {
+                isSettled: false,
+                status: "P",
+                outcome: "PENDING",
+                amountWageredCents: Number(tickerRow.AmountWagered || 0),
+                toWinCents: Number(tickerRow.ToWinAmount || 0),
+                amountWonCents: 0,
+                amountLostCents: 0,
+                netPnlCents: 0,
+                awayScore: null,
+                homeScore: null,
+              },
+            }) + "\n",
+          );
+        }
       }
     }
+  } finally {
+    rl.close();
   }
 
   if (outWriter) await outWriter.end();

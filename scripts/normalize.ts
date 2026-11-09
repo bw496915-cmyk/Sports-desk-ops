@@ -261,108 +261,113 @@ export async function runNormalizer(options: CliOptions): Promise<{
     : null;
   const endBound = options.endDate ? new Date(options.endDate).getTime() : null;
 
-  for await (const line of rl) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
+  try {
+    for await (const line of rl) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
 
-    let raw: RawWagerInput;
-    try {
-      raw = JSON.parse(trimmed);
-    } catch {
-      continue;
-    }
+      let raw: RawWagerInput;
+      try {
+        raw = JSON.parse(trimmed);
+      } catch {
+        continue;
+      }
 
-    const wagerNum = raw.WagerNumber ?? raw.wagerNumber;
-    if (wagerNum !== undefined) {
-      if (seenWagerNumbers.has(wagerNum)) continue;
-      seenWagerNumbers.add(wagerNum);
-    }
+      const wagerNum = raw.WagerNumber ?? raw.wagerNumber;
+      if (wagerNum !== undefined) {
+        if (seenWagerNumbers.has(wagerNum)) continue;
+        seenWagerNumbers.add(wagerNum);
+      }
 
-    // Market scope filter
-    if (options.market === "tt" && !isDerivativePointsLineWager(raw)) {
-      continue;
-    }
+      // Market scope filter
+      if (options.market === "tt" && !isDerivativePointsLineWager(raw)) {
+        continue;
+      }
 
-    // Engine scope filter
-    const eng = detectEngine(raw);
-    if (options.engine === "native" && eng !== "native") {
-      continue;
-    }
+      // Engine scope filter
+      const eng = detectEngine(raw);
+      if (options.engine === "native" && eng !== "native") {
+        continue;
+      }
 
-    totalProcessed++;
+      totalProcessed++;
 
-    // Date range filter
-    if (startBound !== null || endBound !== null) {
-      const dateStr = raw.InsertDateTime ?? raw.PlacedDate ?? raw.GradedDate;
-      if (dateStr) {
-        const time = new Date(dateStr).getTime();
-        if (!Number.isNaN(time)) {
-          if (startBound !== null && time < startBound) continue;
-          if (endBound !== null && time > endBound) continue;
+      // Date range filter
+      if (startBound !== null || endBound !== null) {
+        const dateStr = raw.InsertDateTime ?? raw.PlacedDate ?? raw.GradedDate;
+        if (dateStr) {
+          const time = new Date(dateStr).getTime();
+          if (!Number.isNaN(time)) {
+            if (startBound !== null && time < startBound) continue;
+            if (endBound !== null && time > endBound) continue;
+          }
         }
       }
-    }
 
-    // Portal Period classification
-    const pInfo = classifyPortalPeriod(raw);
-    const code = pInfo.portalPeriod === null ? "∅" : String(pInfo.portalPeriod);
-    const label = pInfo.portalLabel;
-    const normalized = normalizeWager(raw);
+      // Portal Period classification
+      const pInfo = classifyPortalPeriod(raw);
+      const code =
+        pInfo.portalPeriod === null ? "∅" : String(pInfo.portalPeriod);
+      const label = pInfo.portalLabel;
+      const normalized = normalizeWager(raw);
 
-    // Sport / Sub-sport filter
-    if (
-      options.sport &&
-      normalized.sport.toLowerCase() !== options.sport.toLowerCase()
-    ) {
-      continue;
-    }
-    if (
-      options.subSport &&
-      normalized.subSport.toLowerCase() !== options.subSport.toLowerCase()
-    ) {
-      continue;
-    }
+      // Sport / Sub-sport filter
+      if (
+        options.sport &&
+        normalized.sport.toLowerCase() !== options.sport.toLowerCase()
+      ) {
+        continue;
+      }
+      if (
+        options.subSport &&
+        normalized.subSport.toLowerCase() !== options.subSport.toLowerCase()
+      ) {
+        continue;
+      }
 
-    if (!periodBreakdown[label]) {
-      periodBreakdown[label] = { count: 0, risk: 0 };
-    }
-    periodBreakdown[label].count++;
-    periodBreakdown[label].risk += normalized.risk;
+      if (!periodBreakdown[label]) {
+        periodBreakdown[label] = { count: 0, risk: 0 };
+      }
+      periodBreakdown[label].count++;
+      periodBreakdown[label].risk += normalized.risk;
 
-    const wt = String(raw.WagerType ?? raw.wagerType ?? "").trim();
-    let marketName = "Derivative Points Line";
-    if (eng === "native") {
-      marketName = "Native Desk Derivative Points Line";
-    } else if (wt === "M") {
-      marketName = "Gansrow In-Play Single";
-    } else if (wt === "P") {
-      marketName = "Gansrow Builder Parlay";
-    }
+      const wt = String(raw.WagerType ?? raw.wagerType ?? "").trim();
+      let marketName = "Derivative Points Line";
+      if (eng === "native") {
+        marketName = "Native Desk Derivative Points Line";
+      } else if (wt === "M") {
+        marketName = "Gansrow In-Play Single";
+      } else if (wt === "P") {
+        marketName = "Gansrow Builder Parlay";
+      }
 
-    const dKey = `${eng}|${code}|${label}|${marketName}`;
-    if (!detailedBreakdown[dKey]) {
-      detailedBreakdown[dKey] = {
-        engine: eng,
-        code,
-        label,
-        market: marketName,
-        count: 0,
-        risk: 0,
-      };
-    }
-    detailedBreakdown[dKey].count++;
-    detailedBreakdown[dKey].risk += normalized.risk;
+      const dKey = `${eng}|${code}|${label}|${marketName}`;
+      if (!detailedBreakdown[dKey]) {
+        detailedBreakdown[dKey] = {
+          engine: eng,
+          code,
+          label,
+          market: marketName,
+          count: 0,
+          risk: 0,
+        };
+      }
+      detailedBreakdown[dKey].count++;
+      detailedBreakdown[dKey].risk += normalized.risk;
 
-    // Period filter matching
-    if (options.period === -1) {
-      // All Periods: portal exposes all 0..6
-      records.push(normalized);
-      totalRisk += normalized.risk;
-    } else if (pInfo.portalPeriod === options.period) {
-      // Exact portal period match
-      records.push(normalized);
-      totalRisk += normalized.risk;
+      // Period filter matching
+      if (options.period === -1) {
+        // All Periods: portal exposes all 0..6
+        records.push(normalized);
+        totalRisk += normalized.risk;
+      } else if (pInfo.portalPeriod === options.period) {
+        // Exact portal period match
+        records.push(normalized);
+        totalRisk += normalized.risk;
+      }
     }
+  } finally {
+    rl.close();
   }
 
   const provenance: ProvenanceSidecar = {
