@@ -4,12 +4,12 @@ Upstream contract: one **HTTPS URL** → one `index.json` → Discover lists bun
 
 **Harness references (read before inventing fields):**
 
-| Doc | Purpose |
-|---|---|
-| [User guide: Plugin indexes](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/plugin-market.md) | Turn on Discover, HTTPS URL rules, trust model |
+| Doc                                                                                                                                                                | Purpose                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| [User guide: Plugin indexes](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/plugin-market.md)                                         | Turn on Discover, HTTPS URL rules, trust model                                                    |
 | [Agent Note: index format](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md) | Required fields, `author`, declared `category`, git `source`, `engines.dsh` + `includePrerelease` |
-| [Agent Note: Discover](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md) | Reader service, UI, install path |
-| [`@deepseek-ai/dsh-plugin-market`](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/boot/plugin-market) | `cacheTtlMs` default 10m, `refresh: true`, fetch limits |
+| [Agent Note: Discover](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/notes/implemented/feature/2026-10-02-plugin-market-discover.md)         | Reader service, UI, install path                                                                  |
+| [`@deepseek-ai/dsh-plugin-market`](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/boot/plugin-market)                                        | `cacheTtlMs` default 10m, `refresh: true`, fetch limits                                           |
 
 Machine layout: **`dsh-ops/notes/SPORTSDESK-MARKET.md`** (profiles, experimental bundle, validation).
 
@@ -40,13 +40,13 @@ dsh-harness plugin --profile desktop add "${CODE_ROOT}/sportsdesk-ops/dsh-plugin
 
 ## Indexed bundles (five)
 
-| `name` (npm) | `source.path` |
-|---|---|
-| `dsh-plugin-sportsdesk-ops` | `dsh-plugin` |
-| `dsh-plugin-sportsdesk-security` | `dsh-plugin-security` |
-| `dsh-plugin-sportsdesk-desk-status` | `dsh-plugin-ui` |
-| `dsh-plugin-sportsdesk-desk-panel` | `dsh-plugin-sidebar` |
-| `dsh-plugin-watchlist-autobet` | `dsh-plugin-watchlist-autobet` |
+| `name` (npm)                        | `source.path`                  |
+| ----------------------------------- | ------------------------------ |
+| `dsh-plugin-sportsdesk-ops`         | `dsh-plugin`                   |
+| `dsh-plugin-sportsdesk-security`    | `dsh-plugin-security`          |
+| `dsh-plugin-sportsdesk-desk-status` | `dsh-plugin-ui`                |
+| `dsh-plugin-sportsdesk-desk-panel`  | `dsh-plugin-sidebar`           |
+| `dsh-plugin-watchlist-autobet`      | `dsh-plugin-watchlist-autobet` |
 
 Four rows use the `dsh-plugin-sportsdesk-*` prefix; watchlist keeps its historical npm name (`dsh-plugin-watchlist-autobet`) — intentional, not a path typo.
 
@@ -60,11 +60,11 @@ The `-0` on each bound means “include prereleases of that bound’s lineage.�
 
 What `-0` changes (always with `includePrerelease: true`):
 
-| Version | `>=0.2.0 <0.3.0` | `>=0.2.0-0 <0.3.0-0` |
-|---|---|---|
-| `0.2.0-rc.1` | false | **true** (admits prereleases of the lower bound) |
-| `0.2.2-rc.1` | true | true |
-| `0.3.0-rc.1` | **true** | **false** (rejects next-minor prereleases) |
+| Version      | `>=0.2.0 <0.3.0` | `>=0.2.0-0 <0.3.0-0`                             |
+| ------------ | ---------------- | ------------------------------------------------ |
+| `0.2.0-rc.1` | false            | **true** (admits prereleases of the lower bound) |
+| `0.2.2-rc.1` | true             | true                                             |
+| `0.3.0-rc.1` | **true**         | **false** (rejects next-minor prereleases)       |
 
 `-0` is the semver idiom for “the whole **0.2.x** lineage including prereleases, and nothing from **0.3.x**.” The **upper** bound is the important guard: it stops a future **`0.3.0-rc.1`** harness from installing these bundles.
 
@@ -72,10 +72,10 @@ In ad-hoc scripts, still pass **`includePrerelease: true`** when comparing prere
 
 ## Which URL Discover should use (catalog vs lockfile)
 
-| Artifact | Role | Immutability |
-|---|---|---|
-| `market/index.json` | **Catalog** — browse metadata in Discover | Moving target is fine; operators want “what’s available now” |
-| `versions[].source.commit` | **Lockfile** — exact install payload | Must stay pinned; CI checks `git cat-file` |
+| Artifact                   | Role                                      | Immutability                                                 |
+| -------------------------- | ----------------------------------------- | ------------------------------------------------------------ |
+| `market/index.json`        | **Catalog** — browse metadata in Discover | Moving target is fine; operators want “what’s available now” |
+| `versions[].source.commit` | **Lockfile** — exact install payload      | Must stay pinned; CI checks `git cat-file`                   |
 
 **Recommended (Option A):** set Discover **once** to `main`, gate merges with `bun run test:market-index`, cut `market-index-N` tags only for **audit** (“what was live at time T”), not as the live URL.
 
@@ -111,11 +111,11 @@ Adjust `context` to match the job name GitHub reports (repo → Actions → a gr
 
 ### Discover cache check (three layers)
 
-| Layer | TTL / behavior | What operators do |
-|---|---|---|
-| **raw.githubusercontent** | `cache-control: max-age=300` (~5 min) | `curl` after push may lag |
+| Layer                      | TTL / behavior                                                                                      | What operators do                                                      |
+| -------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **raw.githubusercontent**  | `cache-control: max-age=300` (~5 min)                                                               | `curl` after push may lag                                              |
 | **Harness `pluginMarket`** | Default **`cacheTtlMs: 600000` (10 min)** per index URL in memory; concurrent reads share one fetch | Discover toolbar **Refresh** passes `refresh: true` and bypasses cache |
-| **Profile settings** | Index **URL list** persisted (`settings.update` on profile entry); not the JSON body | Change URL only when switching sources |
+| **Profile settings**       | Index **URL list** persisted (`settings.update` on profile entry); not the JSON body                | Change URL only when switching sources                                 |
 
 Upstream: `@deepseek-ai/dsh-plugin-market` `search(url, { refresh: true })` refetches; failed reads keep the last good listing until Retry. `plugin-market/changed` (e.g. index URL list edit) invalidates removed sources. Detail/README reads use the same TTL unless the entry page Retry sets `refresh`.
 
@@ -145,8 +145,8 @@ Each row pins bundle source to a git commit (today `4f847435…`). If that commi
 
 **Never squash-merge a PR that introduces or moves `source.commit` pins unless one of these is already true:**
 
-1. Every pinned SHA is an **ancestor of `origin/main`** (`git merge-base --is-ancestor <sha> origin/main`), or  
-2. You pushed a **`market-pin-N` tag** on each pin SHA **before** merge (`git tag market-pin-N <sha> && git push origin market-pin-N`), or  
+1. Every pinned SHA is an **ancestor of `origin/main`** (`git merge-base --is-ancestor <sha> origin/main`), or
+2. You pushed a **`market-pin-N` tag** on each pin SHA **before** merge (`git tag market-pin-N <sha> && git push origin market-pin-N`), or
 3. You re-pin every row to the **post-merge `main` commit** (and bump `version` / `publishTimestamp`) in the same PR.
 
 Do **not** delete published `market-pin-*` tags. Git installs use `git+<url>#<commit>`; tags are the lifeboat when squash-merge drops branch commits.
@@ -172,10 +172,10 @@ git merge-base --is-ancestor 4f84743536a4de78a8ff81e09e00a8228ae09be6 origin/mai
 
 Validation runs the **exact published validator that install uses** — same package (`@deepseek-ai/dsh-plugin-market-index`), same version (`0.2.2-rc.1` exact in `package.json` devDependencies, no caret), same `includePrerelease: true` semver path as harness install checks. Do not “simplify” this back to a harness source clone without reinstalling the monorepo.
 
-| Step | What | Guarantees | Failure means |
-|---|---|---|---|
-| **Validate market index** | `bun install` → `bun test tests/market_index.test.ts` using npm `@deepseek-ai/dsh-plugin-market-index@0.2.2-rc.1` | `index.json` is valid for the harness you ship | Index format, pins, or `engines.dsh` wrong |
-| **Audit validator pin** (CI only) | Shallow clone `deepseek-harness` at `HARNESS_VALIDATOR_SHA`, set `MARKET_INDEX_HARNESS` | The pinned SHA is real and matches the shipped release (root `package.json` version; internal `plugin-market-index` version may diverge in future harness releases) | Pin drifted or SHA unreachable |
+| Step                              | What                                                                                                              | Guarantees                                                                                                                                                          | Failure means                              |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **Validate market index**         | `bun install` → `bun test tests/market_index.test.ts` using npm `@deepseek-ai/dsh-plugin-market-index@0.2.2-rc.1` | `index.json` is valid for the harness you ship                                                                                                                      | Index format, pins, or `engines.dsh` wrong |
+| **Audit validator pin** (CI only) | Shallow clone `deepseek-harness` at `HARNESS_VALIDATOR_SHA`, set `MARKET_INDEX_HARNESS`                           | The pinned SHA is real and matches the shipped release (root `package.json` version; internal `plugin-market-index` version may diverge in future harness releases) | Pin drifted or SHA unreachable             |
 
 GitHub Actions uses **`fetch-depth: 0`** on this repo so `git cat-file -e <pin>^{commit}` still works after `main` advances past older index pins.
 
