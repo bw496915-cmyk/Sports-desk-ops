@@ -112,6 +112,7 @@ Do not delete these contracts as redundant without reading the ADR:
 10. **#93** — Wire wagers capture + `publish-snapshot` into cron (open).
 11. **#94** — `bridge3c` `--timeout` for large `getBetReport` (open).
 12. **#78** — KPI data-age vs R2 `Last-Modified` (open).
+13. **Desk Host `apiPort`** — Cordis `config.apiPort` wired in `dsh-plugin-sidebar/index.js` (`resolveDeskOrigin`); default 4020.
 
 ## Layout
 

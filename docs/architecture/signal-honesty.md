@@ -35,6 +35,7 @@ results, and resolvers must name **cause**, **source**, and **absence** explicit
 - If a CLI flag exists (`--fetch-mode`, `--timeout`, `--from`), it must affect behavior or reject with a named error.
 - If a cron job is scheduled, its argv and credential probe must match what the child script requires (`requiredEnv`, corpus present, keychain probe).
 - Empty `requiredEnv: []` is allowed only when a **dedicated** probe documents the real prerequisites (for example weblog corpus resolution).
+- Cordis / patch **config** keys must be read by the Host or Client that documents them (for example `apiPort` on `dsh-plugin-sportsdesk-desk-panel` → `resolveDeskOrigin()`).
 
 ### 4. Unknowns require explicit provenance
 
