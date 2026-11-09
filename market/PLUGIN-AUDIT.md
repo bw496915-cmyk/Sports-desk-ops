@@ -1,4 +1,8 @@
-# Plugin audit — pin `4f847435` (`market-pin-1`)
+# Plugin audit — install pin `b435fc1` (`market-pin-3`)
+
+Historical: `market-pin-1` / `4f847435` (pre–`repoPath` fix). Catalog `source.commit` may
+trail `main`; git installs use the commit named in `market/index.json` (squash-safe when that
+commit is tagged).
 
 Catalog metadata is gated by CI job **`market-index`**. This doc tracks **bundle contents** at the index git pin: manifest parity, shipped surface, and open install/usability gaps.
 
