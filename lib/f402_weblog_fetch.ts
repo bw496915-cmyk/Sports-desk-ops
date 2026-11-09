@@ -184,4 +184,9 @@ export async function fetchAndPersistWebLog(options: {
   return result;
 }
 
-export { resolveF402BearerToken };
+export {
+  resolveF402BearerToken,
+  resolveF402BearerTokenDetailed,
+  type F402BearerSource,
+  type ResolvedF402Bearer,
+} from "./f402_pending_fetch.ts";

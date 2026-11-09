@@ -876,8 +876,9 @@ Do not pre-migrate before `bun --help` lists `lint`; the docs have been ahead of
 | I    | `type:"I"`, `customerID:"0"`, `ip:<ip>`         | as supplied  |
 
 All carry `operation:"getWebLog"`, `RRO:1`, `agentID`, `agentOwner`. Token resolution is read-only
-(`--bearer-token` → `F402_BEARER_TOKEN` → `F402_TOKEN_FILE`, else
-`$XDG_CONFIG_HOME/sportsdesk/f402-token`), rejecting empty/`"0"`/`<24`-char tokens before I/O.
+(`--bearer-token` → `F402_BEARER_TOKEN` → `F402_TOKEN_FILE` →
+`session:login` `authorizationHeader` in `f402-session.json`), rejecting empty/`"0"`/`<24`-char
+tokens before I/O.
 Responses pass a Class A guard (200, JSON, not HTML) and are atomically persisted 0600 as JSONL.
 
 CLI (`scripts/f402_weblog_bridge.ts`):

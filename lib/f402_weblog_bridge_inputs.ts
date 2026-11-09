@@ -4,10 +4,11 @@
 
 import {
   fetchAndPersistWebLog,
-  resolveF402BearerToken,
+  resolveF402BearerTokenDetailed,
   type WebLogMode,
   type WebLogRequest,
 } from "./f402_weblog_fetch.ts";
+import type { ResolveF402BearerOptions } from "./f402_pending_fetch.ts";
 
 export const WEBLOG_BRIDGE_USAGE_HINT = [
   "weblog: --from required (or --fetch-mode to capture first)",
@@ -55,7 +56,9 @@ export type WeblogCorpusResolution =
   | { readonly ok: false; readonly exitCode: 1 | 2; readonly message: string };
 
 export interface WeblogCorpusResolverDeps {
-  readonly resolveToken?: typeof resolveF402BearerToken;
+  readonly resolveToken?: (
+    options: ResolveF402BearerOptions,
+  ) => ReturnType<typeof resolveF402BearerTokenDetailed>;
   readonly fetchAndPersist?: typeof fetchAndPersistWebLog;
   readonly now?: () => Date;
   readonly log?: (line: string) => void;
@@ -65,7 +68,7 @@ export async function resolveWeblogCorpusPaths(
   values: WeblogBridgeCliValues,
   deps: WeblogCorpusResolverDeps = {},
 ): Promise<WeblogCorpusResolution> {
-  const resolveToken = deps.resolveToken ?? resolveF402BearerToken;
+  const resolveToken = deps.resolveToken ?? resolveF402BearerTokenDetailed;
   const fetchAndPersist = deps.fetchAndPersist ?? fetchAndPersistWebLog;
   const now = deps.now ?? (() => new Date());
   const log = deps.log ?? (() => {});
@@ -86,15 +89,17 @@ export async function resolveWeblogCorpusPaths(
     const deskDate = (values.date ?? "").trim() || defaultDeskDateYmd(now());
     let token: string;
     try {
-      token = resolveToken({
+      const resolved = resolveToken({
         cliToken: values["bearer-token"],
       });
+      token = resolved.token;
+      log(`weblog: bearer source=${resolved.source}`);
     } catch {
       return {
         ok: false,
         exitCode: 1,
         message:
-          "weblog: --fetch-mode needs F402_BEARER_TOKEN, F402_TOKEN_FILE, or --bearer-token",
+          "weblog: --fetch-mode needs F402_BEARER_TOKEN, F402_TOKEN_FILE, --bearer-token, or session:login",
       };
     }
 

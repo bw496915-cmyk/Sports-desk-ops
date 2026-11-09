@@ -44,7 +44,7 @@ describe("f402_weblog_bridge inputs", () => {
         "bearer-token": TOKEN,
       },
       {
-        resolveToken: () => TOKEN,
+        resolveToken: () => ({ token: TOKEN, source: "cli" as const }),
         fetchAndPersist: async (opts) => {
           captured.push({
             capturePath: opts.capturePath,

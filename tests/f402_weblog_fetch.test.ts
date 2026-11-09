@@ -102,7 +102,11 @@ describe("f402 weblog fetch", () => {
   test("rejects short/zero tokens", () => {
     for (const token of ["", "0", "short"]) {
       expect(() =>
-        resolveF402BearerToken({ cliToken: token, environment: {} }),
+        resolveF402BearerToken({
+          cliToken: token,
+          environment: {},
+          readSession: () => null,
+        }),
       ).toThrow();
     }
   });
