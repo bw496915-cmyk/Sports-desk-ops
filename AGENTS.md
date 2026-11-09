@@ -108,7 +108,7 @@ Do not delete these contracts as redundant without reading the ADR:
 6. **#89** — Reject weblog Mode B/I (shared-IP ≠ activity stream).
 7. **#90 / #92** — Weblog cron `--from` + three-tier corpus; publish data-window log line.
 8. **#84 / GSID** — Multi-sink R2 recovery; canonical `GSLIVE_SESSION_ID`; wagers two-step (`--live` + `wagers:publish-snapshot`).
-9. **#91** — Off-repo weblog JSONL producer (open).
+9. **#91** — Weblog corpus: manual portal export + `weblog:sentinel` (08:00 Telegram if today's JSONL missing); not headless Mode A fetch.
 10. **#93** — Wire wagers capture + `publish-snapshot` into cron (open).
 11. **#94** — `bridge3c` `--timeout` for large `getBetReport` (open).
 12. **#78** — KPI data-age vs R2 `Last-Modified` (open).

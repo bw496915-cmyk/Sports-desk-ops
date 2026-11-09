@@ -96,4 +96,5 @@ Only **weblog** uses an empty `requiredEnv` array; credentials are **corpus pres
 - Wagers two-step publish: `docs/runbooks/wagers_live_capture_runbook.md`
 - Recovery arc: GitHub #84 (multi-sink R2 stale; closed when sinks honest)
 - Open gaps this ADR governs (not closed by the ADR PR): #91 (weblog producer), #93 (wagers cron), #94 (bridge3c `--timeout`), #78 (KPI data-age vs publish-age)
-- Enforcement tracking: ast-grep / lint ban on generic throws (see repo issues)
+- Enforcement: platform policy rule `signal-honesty-generic-throw` (generic `throw new Error("failed"|"error"|…)` banned)
+- Weblog producer (#91): `weblog:sentinel` OS cron reminds at 08:00 when today's JSONL is missing (manual export; no Mode A fetch)
