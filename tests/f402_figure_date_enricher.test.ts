@@ -649,4 +649,21 @@ describe("Figure Date Enrichment Engine", () => {
     expect(parsed.ticketNumber).toBe("1075710577");
     expect(parsed.settlement.amountWageredCents).toBe(230000);
   });
+
+  it("pipes direct stream through CompressionStream with automatic backpressure", async () => {
+    const enriched = enrichWagerRecord(sampleTicker, sampleFigure);
+    const directStream = createEnrichedWagersDirectStream([enriched]);
+
+    // Pipe through standard Web TransformStream with native backpressure
+    const gzipCompressed = directStream.pipeThrough(
+      new CompressionStream("gzip"),
+    );
+    const gzipDecompressed = gzipCompressed.pipeThrough(
+      new DecompressionStream("gzip"),
+    );
+
+    const text = await new Response(gzipDecompressed).text();
+    expect(text).toContain("1075710577");
+    expect(text).toContain("DAN245");
+  });
 });

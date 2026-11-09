@@ -659,15 +659,18 @@ export class FigureDateEnrichmentInspection {
  * Creates a high-throughput direct ReadableStream emitting enriched wagers as JSONL.
  * Utilizes Bun's native `type: "direct"` DirectController to bypass JavaScript
  * stream queues and stream UTF-8 lines directly to native consumer sinks.
+ *
+ * Implements native backpressure: `await controller.write()` pauses execution
+ * when the downstream consumer / socket buffer fills up.
  */
 export function createEnrichedWagersDirectStream(
-  wagers: Iterable<EnrichedWager>,
+  wagers: Iterable<EnrichedWager> | AsyncIterable<EnrichedWager>,
 ): ReadableStream {
   const source: Bun.DirectUnderlyingSource = {
     type: "direct",
-    pull(controller) {
-      for (const wager of wagers) {
-        controller.write(JSON.stringify(wager) + "\n");
+    async pull(controller) {
+      for await (const wager of wagers) {
+        await controller.write(JSON.stringify(wager) + "\n");
       }
       controller.close();
     },

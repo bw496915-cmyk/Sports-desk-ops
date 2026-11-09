@@ -633,15 +633,19 @@ export class PeriodTaxonomyInspection {
  * Creates a high-throughput direct ReadableStream emitting normalized wager records as JSONL.
  * Utilizes Bun's native `type: "direct"` DirectController to bypass JavaScript
  * stream queues and stream UTF-8 lines directly to native consumer sinks.
+ *
+ * Implements native backpressure: `await controller.write()` pauses execution
+ * when the downstream consumer / socket buffer fills up.
  */
 export function createNormalizedWagersDirectStream(
-  records: Iterable<NormalizedWagerRecord>,
+  records:
+    Iterable<NormalizedWagerRecord> | AsyncIterable<NormalizedWagerRecord>,
 ): ReadableStream {
   const source: Bun.DirectUnderlyingSource = {
     type: "direct",
-    pull(controller) {
-      for (const record of records) {
-        controller.write(JSON.stringify(record) + "\n");
+    async pull(controller) {
+      for await (const record of records) {
+        await controller.write(JSON.stringify(record) + "\n");
       }
       controller.close();
     },
