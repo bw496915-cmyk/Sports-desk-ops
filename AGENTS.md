@@ -29,6 +29,7 @@ bun run tasks:render --no-color --columns 0 >/dev/null && bun run docs:render
 bun run gen:tokens:gate
 bun bin/check-fetch-init.ts --verbose
 bun bin/check-innerhtml.ts --verbose
+bun bin/check-signal-honesty.ts --verbose
 CI=true bun run schema:gate
 bun run test:market-index                       # CI: Validate market index (REQUIRE_MARKET_INDEX=1)
 bun test tests/ --path-ignore-patterns='**/market_index.test.ts'
