@@ -78,6 +78,13 @@ export const MODULE_SINK_ANCHORS: Readonly<Record<string, readonly string[]>> =
     "https://www.fantasy402.com/app/manager/module/pending-thin.js": [
       "bet-desc",
       "gameReport",
+      "getResultTicketPending",
+      "getResultTicketMobileDetails",
+    ],
+    "https://www.fantasy402.com/app/manager/module/agent-management-thin.js": [
+      '[data-action="setPassword"]',
+      '[data-action="setName"]',
+      'data-col="password"',
     ],
   } as const;
 

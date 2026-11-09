@@ -599,9 +599,27 @@ describe("security seam preload: module allowlist", () => {
     expect(
       missingModuleSinkAnchors(
         "https://www.fantasy402.com/app/manager/module/pending-thin.js",
-        "gameReport but no modal field",
+        "gameReport getResultTicketPending getResultTicketMobileDetails but no modal field",
       ),
     ).toEqual(["bet-desc"]);
+    expect(
+      missingModuleSinkAnchors(
+        "https://www.fantasy402.com/app/manager/module/pending-thin.js",
+        "x bet-desc y gameReport z getResultTicketPending w getResultTicketMobileDetails v",
+      ),
+    ).toEqual([]);
+    expect(
+      missingModuleSinkAnchors(
+        "https://www.fantasy402.com/app/manager/module/agent-management-thin.js",
+        'x [data-action="setPassword"] y [data-action="setName"] z data-col="password" w',
+      ),
+    ).toEqual([]);
+    expect(
+      missingModuleSinkAnchors(
+        "https://www.fantasy402.com/app/manager/module/agent-management-thin.js",
+        'only [data-action="setPassword"] present',
+      ),
+    ).toEqual(['[data-action="setName"]', 'data-col="password"']);
     expect(
       missingModuleSinkAnchors("https://example.test/other.js", ""),
     ).toEqual([]);
@@ -722,6 +740,391 @@ describe("security seam preload: module allowlist", () => {
     expect(jq.fn.html).toBe(baseHtml);
     jq.fn.html.call(passwordTarget, "second");
     expect(htmlCalls[1]).toBe("second");
+  });
+
+  test("agent-management-thin setPassword and setName escape markup while leaving other .html calls raw", async () => {
+    const source = await preloadSource();
+    const context = runPreload(source, "https://x/");
+    const defined = withRegistry(context);
+    class Security {
+      logOut(): void {}
+    }
+    defined["system/security"] = Security;
+    decorateNamed(
+      context,
+      "system/security",
+      Security as unknown as Record<string, unknown>,
+    );
+    let captured: Record<string, unknown> | null = null;
+    const htmlCalls: string[] = [];
+    const passwordTarget = {
+      is: (sel: string) => sel === '[data-action="setPassword"]',
+    };
+    const nameTarget = {
+      is: (sel: string) => sel === '[data-action="setName"]',
+    };
+    const otherTarget = { is: () => false };
+    context.window["jQuery"] = {
+      ajax(options: Record<string, unknown>): void {
+        captured = options;
+      },
+      fn: {
+        html(this: unknown, value: string): void {
+          htmlCalls.push(value);
+        },
+      },
+    };
+    class AgentManagementThin {
+      setPassword(a: { agentID: string; value: string }): void {
+        const jq = context.window["jQuery"] as {
+          ajax: (o: unknown) => void;
+          fn: { html: (this: unknown, v: string) => void };
+        };
+        jq.ajax({
+          data: {
+            operation: "updateCustomerField",
+            field: "Password",
+            value: a.value,
+          },
+          success: () => {
+            jq.fn.html.call(passwordTarget, a.value);
+            jq.fn.html.call(otherTarget, "<b>raw</b>");
+          },
+        });
+      }
+      setName(a: { agentID: string; value: string }): void {
+        const jq = context.window["jQuery"] as {
+          ajax: (o: unknown) => void;
+          fn: { html: (this: unknown, v: string) => void };
+        };
+        jq.ajax({
+          data: {
+            operation: "updateCustomerField",
+            field: "NameFirst",
+            value: a.value,
+          },
+          success: () => {
+            jq.fn.html.call(nameTarget, a.value);
+            jq.fn.html.call(otherTarget, "<i>raw</i>");
+          },
+        });
+      }
+    }
+    defined["manager/module/agent-management-thin"] = AgentManagementThin;
+    decorateNamed(
+      context,
+      "manager/module/agent-management-thin",
+      AgentManagementThin as unknown as Record<string, unknown>,
+    );
+
+    const instance = new AgentManagementThin();
+    instance.setPassword({ agentID: "AG1", value: 'pass"<script>' });
+    expect(captured).not.toBeNull();
+    (captured as unknown as { success: () => void }).success();
+    expect(htmlCalls[0]).toBe("pass&quot;&lt;script&gt;");
+    expect(htmlCalls[1]).toBe("<b>raw</b>");
+
+    captured = null;
+    instance.setName({ agentID: "AG1", value: "name'<tag>" });
+    expect(captured).not.toBeNull();
+    (captured as unknown as { success: () => void }).success();
+    expect(htmlCalls[2]).toBe("name&#39;&lt;tag&gt;");
+    expect(htmlCalls[3]).toBe("<i>raw</i>");
+  });
+
+  test("agent-management-thin setColsAgentManagement escapes password column while balance stays raw", async () => {
+    const source = await preloadSource();
+    const context = runPreload(source, "https://x/");
+    const defined = withRegistry(context);
+    class Security {
+      logOut(): void {}
+    }
+    defined["system/security"] = Security;
+    decorateNamed(
+      context,
+      "system/security",
+      Security as unknown as Record<string, unknown>,
+    );
+    const htmlCalls: string[] = [];
+    const passwordLi = {
+      is: (sel: string) => sel === '[data-col="password"] li',
+      closest: (sel: string) => (sel === '[data-col="password"]' ? [1] : []),
+    };
+    const balanceLi = {
+      is: (sel: string) => sel === '[data-col="balance"] li',
+      closest: () => [],
+    };
+    context.window["jQuery"] = {
+      fn: {
+        html(this: unknown, value: string): void {
+          htmlCalls.push(value);
+        },
+      },
+    };
+    class AgentManagementThin {
+      setColsAgentManagement(): void {
+        const jq = context.window["jQuery"] as {
+          fn: { html: (this: unknown, v: string) => void };
+        };
+        jq.fn.html.call(passwordLi, 'server"pass<word>');
+        jq.fn.html.call(balanceLi, '<span class="green">$500.00</span>');
+      }
+    }
+    defined["manager/module/agent-management-thin"] = AgentManagementThin;
+    decorateNamed(
+      context,
+      "manager/module/agent-management-thin",
+      AgentManagementThin as unknown as Record<string, unknown>,
+    );
+
+    new AgentManagementThin().setColsAgentManagement();
+    expect(htmlCalls[0]).toBe("server&quot;pass&lt;word&gt;");
+    expect(htmlCalls[1]).toBe('<span class="green">$500.00</span>');
+  });
+
+  test("agent-management-thin restores html hook when success handler or setCols throws", async () => {
+    const source = await preloadSource();
+    const context = runPreload(source, "https://x/");
+    const defined = withRegistry(context);
+    class Security {
+      logOut(): void {}
+    }
+    defined["system/security"] = Security;
+    decorateNamed(
+      context,
+      "system/security",
+      Security as unknown as Record<string, unknown>,
+    );
+    let captured: Record<string, unknown> | null = null;
+    context.window["jQuery"] = {
+      ajax(options: Record<string, unknown>): void {
+        captured = options;
+      },
+      fn: {
+        html(): void {},
+      },
+    };
+    const jq = context.window["jQuery"] as {
+      fn: { html: (this: unknown, v: string) => void };
+    };
+    const baseHtml = jq.fn.html;
+    class AgentManagementThin {
+      setPassword(): void {
+        (context.window["jQuery"] as { ajax: (o: unknown) => void }).ajax({
+          data: { operation: "updateCustomerField", field: "Password" },
+          success: () => {
+            throw new Error("ajax render failed");
+          },
+        });
+      }
+      setColsAgentManagement(): void {
+        throw new Error("setCols failed");
+      }
+    }
+    defined["manager/module/agent-management-thin"] = AgentManagementThin;
+    decorateNamed(
+      context,
+      "manager/module/agent-management-thin",
+      AgentManagementThin as unknown as Record<string, unknown>,
+    );
+
+    const instance = new AgentManagementThin();
+    instance.setPassword();
+    expect(() =>
+      (captured as unknown as { success: () => void }).success(),
+    ).toThrow("ajax render failed");
+    expect(jq.fn.html).toBe(baseHtml);
+
+    expect(() => instance.setColsAgentManagement()).toThrow("setCols failed");
+    expect(jq.fn.html).toBe(baseHtml);
+  });
+
+  test("pending-thin getResultTicketPending escapes Description, ChosenTeamID, and teams while preserving template HTML", async () => {
+    const source = await preloadSource();
+    const context = runPreload(source, "https://x/");
+    const defined = withRegistry(context);
+    class Security {
+      logOut(): void {}
+    }
+    defined["system/security"] = Security;
+    decorateNamed(
+      context,
+      "system/security",
+      Security as unknown as Record<string, unknown>,
+    );
+
+    class PendingThin {
+      getResultTicketPending(data: Array<Record<string, unknown>>): string {
+        const item = data[0]!;
+        return `<div class='col-md-12 col-sm-12 col-xs-12 gameReport'><label class='normalDescription'>${item.Description}</label> - <label>${item.ChosenTeamID}</label><label class='line'>${item.PeriodDescription}</label></div>`;
+      }
+    }
+    defined["manager/module/pending-thin"] = PendingThin;
+    decorateNamed(
+      context,
+      "manager/module/pending-thin",
+      PendingThin as unknown as Record<string, unknown>,
+    );
+
+    const instance = new PendingThin();
+    const rawLegs = [
+      {
+        WagerType: "C",
+        Description: 'Contest" <script>alert("desc")</script>',
+        ChosenTeamID: "LAL <img src=x onerror=alert(1)>",
+        PeriodDescription: "1H <b>Test</b>",
+        Comments: "Dangerous Note <svg/onload=alert(2)>",
+      },
+    ];
+
+    const rendered = instance.getResultTicketPending(rawLegs);
+    expect(rendered).toContain(
+      "Contest&quot; &lt;script&gt;alert(&quot;desc&quot;)&lt;/script&gt;",
+    );
+    expect(rendered).toContain("LAL &lt;img src=x onerror=alert(1)&gt;");
+    expect(rendered).toContain("1H &lt;b&gt;Test&lt;/b&gt;");
+    expect(rendered).toContain(
+      "<div class='col-md-12 col-sm-12 col-xs-12 gameReport'>",
+    );
+    // Raw inputs must remain unmodified (immutability check)
+    expect(rawLegs[0]!.Description).toBe(
+      'Contest" <script>alert("desc")</script>',
+    );
+    expect(rawLegs[0]!.ChosenTeamID).toBe("LAL <img src=x onerror=alert(1)>");
+  });
+
+  test("pending-thin getResultTicketMobileDetails escapes Comments, Description, and team fields while preserving template HTML", async () => {
+    const source = await preloadSource();
+    const context = runPreload(source, "https://x/");
+    const defined = withRegistry(context);
+    class Security {
+      logOut(): void {}
+    }
+    defined["system/security"] = Security;
+    decorateNamed(
+      context,
+      "system/security",
+      Security as unknown as Record<string, unknown>,
+    );
+
+    class PendingThin {
+      getResultTicketMobileDetails(
+        data: Array<Record<string, unknown>>,
+        _account: unknown,
+        _param: unknown,
+      ): string {
+        const g = data[0]!;
+        let k = `<div class='col-md-12 col-sm-12 col-xs-12 wagerPendingMobile ESPONJA-C'><label class='normalDescription'>${g.Description}</label></div>`;
+        if (g.Comments) {
+          k += `<div class='col-md-12 col-sm-12 col-xs-12 wagerPendingMobile ESPONJA-D'><label class=normalDescription>Game Note :</label><label class=normalDescription>${g.Comments}</label></div>`;
+        }
+        return k;
+      }
+    }
+    defined["manager/module/pending-thin"] = PendingThin;
+    decorateNamed(
+      context,
+      "manager/module/pending-thin",
+      PendingThin as unknown as Record<string, unknown>,
+    );
+
+    const instance = new PendingThin();
+    const rawLegs = [
+      {
+        Description: 'Spread <script>alert("mobile-desc")</script>',
+        Comments: 'Player Note <iframe src="evil.test"></iframe>',
+      },
+    ];
+
+    const rendered = instance.getResultTicketMobileDetails(rawLegs, {}, {});
+    expect(rendered).toContain(
+      "Spread &lt;script&gt;alert(&quot;mobile-desc&quot;)&lt;/script&gt;",
+    );
+    expect(rendered).toContain(
+      "Player Note &lt;iframe src=&quot;evil.test&quot;&gt;&lt;/iframe&gt;",
+    );
+    expect(rendered).toContain("ESPONJA-C");
+    expect(rendered).toContain("ESPONJA-D");
+    expect(rawLegs[0]!.Comments).toBe(
+      'Player Note <iframe src="evil.test"></iframe>',
+    );
+  });
+
+  test("pending-thin getResultTicketMobile escapes chosen team and short names", async () => {
+    const source = await preloadSource();
+    const context = runPreload(source, "https://x/");
+    const defined = withRegistry(context);
+    class Security {
+      logOut(): void {}
+    }
+    defined["system/security"] = Security;
+    decorateNamed(
+      context,
+      "system/security",
+      Security as unknown as Record<string, unknown>,
+    );
+
+    class PendingThin {
+      getResultTicketMobile(
+        data: Array<Record<string, unknown>>,
+        _format: unknown,
+      ): string {
+        const item = data[0]!;
+        return `<div class='wagerPendingMobile'><label>${item.ShortName1}</label><label>${item.ChosenTeamID}</label></div>`;
+      }
+    }
+    defined["manager/module/pending-thin"] = PendingThin;
+    decorateNamed(
+      context,
+      "manager/module/pending-thin",
+      PendingThin as unknown as Record<string, unknown>,
+    );
+
+    const instance = new PendingThin();
+    const rendered = instance.getResultTicketMobile(
+      [
+        {
+          ShortName1: "BOS <script>alert('team')</script>",
+          ChosenTeamID: "BOS <script>",
+        },
+      ],
+      {},
+    );
+    expect(rendered).toContain(
+      "BOS &lt;script&gt;alert(&#39;team&#39;)&lt;/script&gt;",
+    );
+    expect(rendered).toContain("BOS &lt;script&gt;");
+  });
+
+  test("pending-thin records failure in status when class or prototype is invalid", async () => {
+    const source = await preloadSource();
+    const context = runPreload(source, "https://x/");
+    const defined = withRegistry(context);
+    class Security {
+      logOut(): void {}
+    }
+    defined["system/security"] = Security;
+    decorateNamed(
+      context,
+      "system/security",
+      Security as unknown as Record<string, unknown>,
+    );
+
+    defined["manager/module/pending-thin"] =
+      "not-a-class" as unknown as typeof Security;
+    decorateNamed(
+      context,
+      "manager/module/pending-thin",
+      "not-a-class" as unknown as Record<string, unknown>,
+    );
+
+    const diag = (
+      context.window["__F402_SEAMS__"] as {
+        diag: () => Record<string, unknown>;
+      }
+    ).diag();
+    expect(diag.pendingThinEscaperInstalled).toBe(false);
+    expect(diag.pendingThinEscaperFailure).toBe("pending-thin-invalid");
   });
 
   test("a manager class without searchComponent installs loudly, not silently", async () => {

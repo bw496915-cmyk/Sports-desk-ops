@@ -47,9 +47,11 @@ they were unpinned. Fixed by adding `DYNAMIC_APP_MODULES` to the coverage list; 
 
 - `player-info.js` `password-h` — confirmed `.html(n.Password)` sink; **fixed** in the overlay
   (`7c8b6ad`), restore-on-throw test added, module anchor present.
-- `pending-thin.js` `bet-desc` — copy of `.gameReport`; **anchor-protected but not closed**. Source
-  render `getResultTicketPending`/`getResultTicketMobileDetails` is the fix; tracked as its own
-  ticket.
+- `agent-management-thin.js` `u.Password`, `setPassword`, `setName` — confirmed `.html()` sinks
+  rendering server-supplied passwords and operator inputs; **fixed** in the overlay via
+  `applyAgentManagementThinEscaper` (`MODULE_SINK_WRAPPERS["manager/module/agent-management-thin"]`),
+  restore-on-throw tests added, module sink anchors registered in `lib/f402_client_seams.ts`.
+- `pending-thin.js` `bet-desc` and source render (`getResultTicketPending`, `getResultTicketMobileDetails`, `getResultTicketMobile`) — confirmed player-adjacent note (`Comments`) and game description/team fields; **fixed** in the overlay via `applyPendingThinEscaper` (`MODULE_SINK_WRAPPERS["manager/module/pending-thin"]`), escaping leg data fields before template interpolation into `.gameReport` / `.wagerPendingMobile`, making the row render and downstream `bet-desc` `.html()` copy safe; module anchors registered in `lib/f402_client_seams.ts`.
 - `delete-wager.js` `data-ticket` — string-concatenated table; no `Note`/`Comments` field in the
   module; classified system/game data pending a server-schema check.
 - Select2 demo (`escapeMarkup` identity, `http://api.github.com`) — cached `transaction-history-main`
@@ -80,11 +82,10 @@ coverage proof.
 
 ## Next audit order
 
-1. `game-admin.js` and `agent-management-thin.js` — most candidate calls, `Login`/`Password`/
-   `Description` nearby.
+1. `game-admin.js` — candidate calls with `ChosenTeamID`/`Description` nearby (`agent-management-thin.js`
+   and `pending-thin.js` credential/note sinks now wrapped and anchor-protected).
 2. `player-info.js` beyond `password-h`, `customer-admin.js`, `message.js`.
-3. `pending-thin.js` source render (tracked).
-4. Re-run this census after each module wrapper lands; a count reduction is not the success metric —
+3. Re-run this census after each module wrapper lands; a count reduction is not the success metric —
    the success metric is each candidate classified as escaped / system-only / copy.
 
 ## Re-run
