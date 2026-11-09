@@ -1,8 +1,5 @@
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { BUILD_FEATURES } from "../types/features.ts";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * SportsDesk Target Bundler
@@ -37,7 +34,7 @@ export async function buildTarget(config: TargetBuildConfig) {
 if (import.meta.main) {
   const target = (process.argv[2] as "prod" | "dev" | "test") || "prod";
   const defaultEntry = path.join(
-    __dirname,
+    import.meta.dir,
     "../examples/feature_flags/risk_engine.ts",
   );
   const entrypoint = process.argv[3] || defaultEntry;
