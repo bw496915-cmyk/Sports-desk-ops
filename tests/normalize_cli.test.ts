@@ -3,7 +3,15 @@
  * @description Tests for scripts/normalize.ts CLI arguments, execution, and provenance sidecar output.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  spyOn,
+} from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseCliArgs, runNormalizer } from "../scripts/normalize.ts";
@@ -102,6 +110,25 @@ describe("normalize CLI parseCliArgs", () => {
     expect(opts.startDate).toBe("2026-10-01");
     expect(opts.endDate).toBe("2026-10-31");
     expect(opts.outputPath).toBe("scratch/test.json");
+  });
+
+  it("uses using spyOn (Symbol.dispose) and onTestFinished for scoped cleanup", () => {
+    const captured: string[] = [];
+    {
+      using spy = spyOn(console, "log").mockImplementation((...args) => {
+        captured.push(args.join(" "));
+      });
+      console.log("Parsing test CLI arguments");
+      expect(spy).toHaveBeenCalledTimes(1);
+    }
+    expect(captured[0]).toBe("Parsing test CLI arguments");
+
+    // onTestFinished hook registers per-test cleanup
+    let finishedClean = false;
+    onTestFinished(() => {
+      finishedClean = true;
+    });
+    expect(finishedClean).toBe(false);
   });
 });
 

@@ -3,7 +3,7 @@
  * @description Invariant tests for the streaming enrichment CLI.
  */
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, onTestFinished } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runEnrichment } from "../scripts/enrich_bets_from_figure_date.ts";
@@ -13,6 +13,9 @@ const TMP_DIR = join(process.cwd(), "scratch/test_enrich_tmp");
 describe("Streaming Enrichment CLI Pipeline", () => {
   it("streams and joins ticker rows against figure date report", async () => {
     mkdirSync(TMP_DIR, { recursive: true });
+    onTestFinished(() => {
+      rmSync(TMP_DIR, { recursive: true, force: true });
+    });
 
     const figurePath = join(TMP_DIR, "figure.json");
     const tickerPath = join(TMP_DIR, "ticker.jsonl");
@@ -127,8 +130,6 @@ describe("Streaming Enrichment CLI Pipeline", () => {
     const unmatched = outLines[1];
     expect(unmatched.ticketNumber).toBe("767671999");
     expect(unmatched.settlement.isSettled).toBe(false);
-
-    rmSync(TMP_DIR, { recursive: true, force: true });
   });
 
   it("streams and enriches records directly from in-memory web File instances", async () => {
