@@ -64,6 +64,8 @@ Options:
 `);
 }
 
+export type InputFileSource = string | File | Blob;
+
 export interface CliOptions {
   mode: ReportMode;
   period: PortalPeriodCode;
@@ -73,7 +75,7 @@ export interface CliOptions {
   subSport?: string | null;
   startDate: string | null;
   endDate: string | null;
-  inputPath: string;
+  inputPath: InputFileSource;
   outputPath: string | null;
   format: "json" | "table" | "inspect" | "summary";
   inspect?: boolean;
@@ -206,8 +208,14 @@ export async function runNormalizer(options: CliOptions): Promise<{
   provenance: ProvenanceSidecar;
   inspection: PeriodTaxonomyInspection;
 }> {
-  const inputFile = Bun.file(options.inputPath);
-  if (!options.inputPath || !(await inputFile.exists())) {
+  const inputFile: Blob =
+    typeof options.inputPath === "string"
+      ? Bun.file(options.inputPath)
+      : options.inputPath;
+  if (
+    typeof options.inputPath === "string" &&
+    (!options.inputPath || !(await (inputFile as any).exists()))
+  ) {
     throw new Error(`Input file not found: ${options.inputPath}`);
   }
 
@@ -244,7 +252,7 @@ export async function runNormalizer(options: CliOptions): Promise<{
   let totalRisk = 0;
 
   const rl = readline.createInterface({
-    input: Readable.fromWeb(inputFile.stream()),
+    input: Readable.fromWeb(inputFile.stream() as any),
     crlfDelay: Infinity,
   });
 

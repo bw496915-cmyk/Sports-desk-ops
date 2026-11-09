@@ -47,14 +47,16 @@ Options:
 `);
 }
 
+export type InputFileSource = string | File | Blob;
+
 export interface CliOptions {
-  figurePath: string;
-  tickerPath: string;
-  outputPath: string;
-  stats: boolean;
-  format: "jsonl" | "inspect" | "summary" | "table";
-  inspect: boolean;
-  sampleCount: number;
+  figurePath: InputFileSource;
+  tickerPath: InputFileSource;
+  outputPath?: string | null;
+  stats?: boolean;
+  format?: "jsonl" | "inspect" | "summary" | "table";
+  inspect?: boolean;
+  sampleCount?: number;
 }
 
 export function parseCliArgs(args: string[]): CliOptions {
@@ -123,14 +125,18 @@ export function parseCliArgs(args: string[]): CliOptions {
 }
 
 async function loadFigureIndex(
-  filePath: string,
+  source: InputFileSource,
 ): Promise<Map<string, FigureDateWager>> {
   const index = new Map<string, FigureDateWager>();
-  const file = Bun.file(filePath);
+  const file: Blob = typeof source === "string" ? Bun.file(source) : source;
 
   let records: FigureDateWager[] = [];
   try {
-    const parsed: any = await file.json();
+    const parsed: any =
+      "json" in file && typeof (file as any).json === "function"
+        ? await (file as any).json()
+        : JSON.parse(await file.text());
+
     if (Array.isArray(parsed)) {
       records = parsed;
     } else if (parsed?.LIST?.INFO && Array.isArray(parsed.LIST.INFO)) {
@@ -174,12 +180,25 @@ export async function runEnrichment(options: CliOptions): Promise<{
   enrichedOutPath: string;
   inspection: FigureDateEnrichmentInspection;
 }> {
-  const figureFile = Bun.file(options.figurePath);
-  if (!(await figureFile.exists())) {
+  const figureFile: Blob =
+    typeof options.figurePath === "string"
+      ? Bun.file(options.figurePath)
+      : options.figurePath;
+  if (
+    typeof options.figurePath === "string" &&
+    !(await (figureFile as any).exists())
+  ) {
     throw new Error(`Figure file not found: ${options.figurePath}`);
   }
-  const tickerFile = Bun.file(options.tickerPath);
-  if (!(await tickerFile.exists())) {
+
+  const tickerFile: Blob =
+    typeof options.tickerPath === "string"
+      ? Bun.file(options.tickerPath)
+      : options.tickerPath;
+  if (
+    typeof options.tickerPath === "string" &&
+    !(await (tickerFile as any).exists())
+  ) {
     throw new Error(`Ticker file not found: ${options.tickerPath}`);
   }
 
@@ -193,11 +212,13 @@ export async function runEnrichment(options: CliOptions): Promise<{
   const maxSamples = options.sampleCount ?? 5;
 
   const rl = readline.createInterface({
-    input: Readable.fromWeb(tickerFile.stream()),
+    input: Readable.fromWeb(tickerFile.stream() as any),
     crlfDelay: Infinity,
   });
 
-  const outWriter = Bun.file(options.outputPath).writer();
+  const outWriter = options.outputPath
+    ? Bun.file(options.outputPath).writer()
+    : null;
 
   for await (const line of rl) {
     const trimmed = line.trim();
@@ -233,7 +254,7 @@ export async function runEnrichment(options: CliOptions): Promise<{
       if (samples.length < maxSamples) {
         samples.push(enriched);
       }
-      outWriter.write(JSON.stringify(enriched) + "\n");
+      if (outWriter) outWriter.write(JSON.stringify(enriched) + "\n");
     } else {
       unmatchedRows++;
       const periodClassification = classifyPortalPeriod({
@@ -241,64 +262,69 @@ export async function runEnrichment(options: CliOptions): Promise<{
         WagerType: tickerRow.WagerType,
       });
       // Output pending un-enriched row with consistent schema flag
-      outWriter.write(
-        JSON.stringify({
-          ticketNumber: String(tickerRow.WagerNumber),
-          liveWagerNumber: tickerRow.WagerNumber,
-          customerId: String(tickerRow.CustomerID || "").trim(),
-          agentLogin: String(
-            tickerRow.AgentLogin || tickerRow.AgentID || "",
-          ).trim(),
-          ticketWriter: String(tickerRow.TicketWriter || "").trim(),
-          volumeAmount: Number(
-            tickerRow.VolumeAmount ?? tickerRow.AmountWagered ?? 0,
-          ),
-          totalPicks: inferTotalPicks(tickerRow.WagerType, tickerRow.ShortDesc),
-          eventId: "UNSETTLED",
-          sport: "Unknown",
-          subSport: "Unknown",
-          opponents: { away: "", home: "" },
-          gameDateTime: tickerRow.InsertDateTime,
-          acceptedDateTime: tickerRow.InsertDateTime,
-          dailyFigureDate: tickerRow.InsertDateTime.slice(0, 10),
-          latencySeconds: 0,
-          isLateSteam: false,
-          isLive: /LIVE/i.test(tickerRow.ShortDesc || ""),
-          portalPeriod: periodClassification.portalPeriod,
-          periodNumber: periodClassification.portalPeriod ?? 0,
-          periodDescription: periodClassification.portalLabel,
-          marketType: "other",
-          buyPoints: parseBuyPointsFromDesc(tickerRow.ShortDesc || ""),
-          origSpread: null,
-          adjSpread: null,
-          origTotalPoints: null,
-          adjTotalPoints: null,
-          selection: {
-            chosenTeam: "",
-            line: null,
-            origLine: null,
+      if (outWriter) {
+        outWriter.write(
+          JSON.stringify({
+            ticketNumber: String(tickerRow.WagerNumber),
+            liveWagerNumber: tickerRow.WagerNumber,
+            customerId: String(tickerRow.CustomerID || "").trim(),
+            agentLogin: String(
+              tickerRow.AgentLogin || tickerRow.AgentID || "",
+            ).trim(),
+            ticketWriter: String(tickerRow.TicketWriter || "").trim(),
+            volumeAmount: Number(
+              tickerRow.VolumeAmount ?? tickerRow.AmountWagered ?? 0,
+            ),
+            totalPicks: inferTotalPicks(
+              tickerRow.WagerType,
+              tickerRow.ShortDesc,
+            ),
+            eventId: "UNSETTLED",
+            sport: "Unknown",
+            subSport: "Unknown",
+            opponents: { away: "", home: "" },
+            gameDateTime: tickerRow.InsertDateTime,
+            acceptedDateTime: tickerRow.InsertDateTime,
+            dailyFigureDate: tickerRow.InsertDateTime.slice(0, 10),
+            latencySeconds: 0,
+            isLateSteam: false,
+            isLive: /LIVE/i.test(tickerRow.ShortDesc || ""),
+            portalPeriod: periodClassification.portalPeriod,
+            periodNumber: periodClassification.portalPeriod ?? 0,
+            periodDescription: periodClassification.portalLabel,
+            marketType: "other",
             buyPoints: parseBuyPointsFromDesc(tickerRow.ShortDesc || ""),
-            price: null,
-            overUnder: null,
-          },
-          settlement: {
-            isSettled: false,
-            status: "P",
-            outcome: "PENDING",
-            amountWageredCents: Number(tickerRow.AmountWagered || 0),
-            toWinCents: Number(tickerRow.ToWinAmount || 0),
-            amountWonCents: 0,
-            amountLostCents: 0,
-            netPnlCents: 0,
-            awayScore: null,
-            homeScore: null,
-          },
-        }) + "\n",
-      );
+            origSpread: null,
+            adjSpread: null,
+            origTotalPoints: null,
+            adjTotalPoints: null,
+            selection: {
+              chosenTeam: "",
+              line: null,
+              origLine: null,
+              buyPoints: parseBuyPointsFromDesc(tickerRow.ShortDesc || ""),
+              price: null,
+              overUnder: null,
+            },
+            settlement: {
+              isSettled: false,
+              status: "P",
+              outcome: "PENDING",
+              amountWageredCents: Number(tickerRow.AmountWagered || 0),
+              toWinCents: Number(tickerRow.ToWinAmount || 0),
+              amountWonCents: 0,
+              amountLostCents: 0,
+              netPnlCents: 0,
+              awayScore: null,
+              homeScore: null,
+            },
+          }) + "\n",
+        );
+      }
     }
   }
 
-  await outWriter.end();
+  if (outWriter) await outWriter.end();
 
   const inspection = new FigureDateEnrichmentInspection(
     {
@@ -329,7 +355,7 @@ export async function runEnrichment(options: CliOptions): Promise<{
     totalTickerRows,
     matchedRows,
     unmatchedRows,
-    enrichedOutPath: options.outputPath,
+    enrichedOutPath: options.outputPath ?? ":memory:",
     inspection,
   };
 }

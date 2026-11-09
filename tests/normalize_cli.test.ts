@@ -199,4 +199,31 @@ describe("runNormalizer execution", () => {
     expect(inspectStr).toContain("Period Filter     : [1] 1st Half");
     expect(inspectStr).toContain("Sample Normalized Records (1):");
   });
+
+  it("normalizes records directly from an in-memory web File instance", async () => {
+    const memFile = new File([FIXTURE_DATA], "sample_wagers.jsonl", {
+      type: "application/x-ndjson",
+    });
+    expect(memFile.name).toBe("sample_wagers.jsonl");
+    expect(memFile.type).toBe("application/x-ndjson");
+    expect(memFile.size).toBeGreaterThan(0);
+    expect(await memFile.text()).toContain("CUST1");
+
+    const { records, provenance } = await runNormalizer({
+      mode: "CPV",
+      period: 1,
+      engine: "native",
+      market: "tt",
+      startDate: null,
+      endDate: null,
+      inputPath: memFile,
+      outputPath: null,
+      format: "table",
+    });
+
+    expect(records.length).toBe(1);
+    expect(records[0]!.wagerNumber).toBe(10002);
+    expect(records[0]!.portalPeriod).toBe(1);
+    expect(provenance.stats.totalProcessed).toBe(4);
+  });
 });

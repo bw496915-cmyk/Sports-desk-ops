@@ -130,4 +130,99 @@ describe("Streaming Enrichment CLI Pipeline", () => {
 
     rmSync(TMP_DIR, { recursive: true, force: true });
   });
+
+  it("streams and enriches records directly from in-memory web File instances", async () => {
+    const figureData = {
+      LIST: {
+        INFO: [
+          {
+            TicketNumber: 1075710577,
+            WagerNumber: 1,
+            PlayNumber: 1,
+            AmountWagered: 230000,
+            ToWinAmount: 200000,
+            WagerType: "S",
+            AmountWon: 0,
+            AmountLost: 230000,
+            WagerStatus: "L",
+            Description: "Basketball #546 Grizzlies +1 -115 - For 1st Quarter",
+            AcceptedDateTime: "2026-11-06 20:09:35.077",
+            CustomerID: "DAN245    ",
+            TicketWriter: "Internet",
+            GameDateTime: "2026-11-06 20:10:00.000",
+            SportType: "Basketball          ",
+            SportSubType: "NBA                 ",
+            AdjSpread: 1,
+            AdjTotalPoints: 0,
+            FinalMoney: -115,
+            ChosenTeamID: "Memphis Grizzlies",
+            Outcome: "L",
+            PeriodDescription: "1st Quarter         ",
+            Team1ID: "Oklahoma City Thunder",
+            Team1FinalScore: 35,
+            Team2ID: "Memphis Grizzlies",
+            Team2FinalScore: 28,
+          },
+        ],
+      },
+    };
+
+    const tickerData = [
+      JSON.stringify({
+        WagerNumber: 767671190,
+        CustomerID: "DAN245    ",
+        AmountWagered: 230000,
+        ToWinAmount: 200000,
+        VolumeAmount: 0,
+        InsertDateTime: "2026-11-06 20:09:29.680",
+        TicketWriter: "ALERT",
+        ShortDesc: "S:Basketball #546 Grizzlies +1 -115 - For 1st Quarter ",
+      }),
+      JSON.stringify({
+        WagerNumber: 767671201,
+        CustomerID: "DAN245    ",
+        AmountWagered: 230000,
+        ToWinAmount: 200000,
+        VolumeAmount: 200000,
+        InsertDateTime: "2026-11-06 20:09:35.080",
+        TicketWriter: "Internet",
+        ShortDesc: "S.Basketball #546 Grizzlies +1 -115 - For 1st Quarter",
+      }),
+    ].join("\n");
+
+    const figureFile = new File([JSON.stringify(figureData)], "figure.json", {
+      type: "application/json",
+    });
+    const tickerFile = new File([tickerData], "ticker.jsonl", {
+      type: "application/x-ndjson",
+    });
+
+    expect(figureFile.name).toBe("figure.json");
+    expect(figureFile.type).toContain("application/json");
+    expect(figureFile.size).toBeGreaterThan(0);
+    expect(await figureFile.text()).toContain("DAN245");
+
+    expect(tickerFile.name).toBe("ticker.jsonl");
+    expect(tickerFile.type).toContain("application/x-ndjson");
+    expect(tickerFile.size).toBeGreaterThan(0);
+    expect(await tickerFile.text()).toContain("767671201");
+
+    const result = await runEnrichment({
+      figurePath: figureFile,
+      tickerPath: tickerFile,
+      outputPath: null,
+      stats: false,
+      format: "summary",
+      inspect: false,
+      sampleCount: 5,
+    });
+
+    expect(result.totalTickerRows).toBe(2);
+    expect(result.matchedRows).toBe(1);
+    expect(result.unmatchedRows).toBe(0);
+    expect(result.inspection.stats.exactMatchedRows).toBe(1);
+    expect(Number(result.inspection.stats.totalRiskCents)).toBe(230000);
+    expect(result.inspection.samples.length).toBe(1);
+    expect(result.inspection.samples[0]!.ticketNumber).toBe("1075710577");
+  });
 });
