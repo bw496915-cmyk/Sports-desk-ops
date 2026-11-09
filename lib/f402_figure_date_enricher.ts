@@ -194,6 +194,21 @@ export function buildCanonicalEventId(
 }
 
 /**
+ * Detects whether a wager belongs to an in-play (LIVE) market based on
+ * SportType, SportSubType, or team name markers.
+ */
+export function isLiveSubSport(
+  sportType?: string,
+  sportSubType?: string,
+  teamId?: string,
+): boolean {
+  if (sportType?.trim() === "LIVE") return true;
+  if (sportSubType?.includes("Live")) return true;
+  if (teamId && /\(Live\)/i.test(teamId)) return true;
+  return false;
+}
+
+/**
  * Categorizes market type without ever using the forbidden phrase.
  */
 export function inferMarketType(
@@ -385,8 +400,7 @@ export function enrichWagerRecord(
     latencySeconds,
     isLateSteam,
     isLive:
-      sport.toUpperCase() === "LIVE" ||
-      subSport.toUpperCase().includes("LIVE") ||
+      isLiveSubSport(sport, subSport, figure.ChosenTeamID) ||
       /LIVE/i.test(ticker.ShortDesc ?? ""),
     portalPeriod:
       figure.PeriodNumber !== undefined &&

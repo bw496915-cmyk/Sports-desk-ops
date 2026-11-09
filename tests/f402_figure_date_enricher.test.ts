@@ -12,6 +12,7 @@ import {
   enrichWagerRecord,
   inferMarketType,
   inferTotalPicks,
+  isLiveSubSport,
   parseBuyPointsFromDesc,
   type FigureDateWager,
   type LiveTickerWager,
@@ -579,5 +580,15 @@ describe("Figure Date Enrichment Engine", () => {
     expect(event1).toBe("NHL-20261002-St.LouisBlues@DallasStars");
     expect(event2).toBe("NHL-20261002-St.LouisBlues@DallasStars");
     expect(event3).toBe("NHL-20261002-St.LouisBlues@DallasStars");
+  });
+
+  it("identifies in-play live sub-sports across SportType, SportSubType, and team name markers", () => {
+    expect(isLiveSubSport("LIVE", undefined, undefined)).toBe(true);
+    expect(isLiveSubSport("Basketball", "NBA Live", undefined)).toBe(true);
+    expect(isLiveSubSport("Football", "NFL Live", undefined)).toBe(true);
+    expect(isLiveSubSport("Basketball", "NBA", "Lakers (Live)")).toBe(true);
+    expect(isLiveSubSport("Basketball", "NBA", "Lakers")).toBe(false);
+    expect(isLiveSubSport("Hockey", "NHL", "Dallas Stars")).toBe(false);
+    expect(isLiveSubSport(undefined, undefined, undefined)).toBe(false);
   });
 });

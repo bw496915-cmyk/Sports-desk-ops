@@ -98,28 +98,32 @@ Across the **930,791 live tickets** in `probes/out13/f402-bets.jsonl`:
 - **Standard Puck Line (`NHL`)**: Fixed spread at `-1.5` (favorite) / `+1.5` (underdog). Overtime is included, but sudden-death OT rules dictate that a game ending tied in regulation can only finish with a 1-goal margin. Thus, `-1.5` must win in regulation, while `+1.5` automatically cashes if tied at 60:00.
 - **Underdog Side, -1.5 Alt Line (`Hockey Alter`)**:
   > **Underdog side, -1.5 alt line = bet the underdog to win by 2+ goals. Fair price ≈ +350 to +400 for a 20–22% probability. Observed book prices range +245 to +375.**
-- **Desk Hold Across Observed Book Prices**:
-  - If fair probability = 20% (Fair: `+400`):
-    - Maple Leafs Alt (`+260`, 27.78%): **+7.78% edge**
-    - Blue Jackets Alt (`+270`, 27.03%): **+7.03% edge**
-    - Oilers Alt (`+315`, 24.10%): **+4.10% edge**
-    - Ducks Alt (`+375`, 21.05%): **+1.05% edge**
-  - If fair probability = 22% (Fair: `+355`):
-    - Maple Leafs Alt: **+5.78% edge**
-    - Blue Jackets Alt: **+5.03% edge**
-    - Oilers Alt: **+2.10% edge**
-    - Ducks Alt: **-0.95% edge** (desk is slightly under fair on this unbet longshot)
-  - Full range across all 4 observed prices is **+1.05% to +7.78%** (fair=20%) or **-0.95% to +5.78%** (fair=22%). The 3 tickets actually fired by `GX195` carry a **+2.10% to +7.78%** desk edge.
+- **Implied Probability Gap (pp) vs. Unhedged Single-Bet Expected Hold (%)**:
+  The trading desk measures both the raw probability gap ($p_{\text{posted}} - p_{\text{fair}}$) and the mathematical bookmaker hold ($H = 1 - p_{\text{fair}} \times (1 + \text{odds}_{\text{decimal}})$):
+
+  | Selection / Price                    | Posted Implied | Fair = 20% ($d_{\text{fair}}=5.0$) Prob Gap | Fair = 20% Expected Hold | Fair = 22% ($d_{\text{fair}}=4.55$) Prob Gap | Fair = 22% Expected Hold |
+  | ------------------------------------ | :------------: | :-----------------------------------------: | :----------------------: | :------------------------------------------: | :----------------------: |
+  | **Leafs Alt +260** ($d=3.60$)        |     27.78%     |                **+7.78 pp**                 |        **+28.0%**        |                 **+5.78 pp**                 |        **+20.8%**        |
+  | **Blue Jackets Alt +270** ($d=3.70$) |     27.03%     |                **+7.03 pp**                 |        **+26.0%**        |                 **+5.03 pp**                 |        **+18.6%**        |
+  | **Oilers Alt +315** ($d=4.15$)       |     24.10%     |                **+4.10 pp**                 |        **+17.0%**        |                 **+2.10 pp**                 |        **+8.7%**         |
+  | **Ducks Alt +375** ($d=4.75$)        |     21.05%     |                **+1.05 pp**                 |        **+5.0%**         |                 **−0.95 pp**                 |        **−4.5%**         |
+
+  Across the 3 tickets actually fired by `GX195` (Leafs, CBJ, Oilers), the unhedged single-bet expected hold retained by the desk was **+17.0% to +28.0%** (at $p=20\%$) or **+8.7% to +20.8%** (at $p=22\%$).
+
 - **Empty-Net Mechanics & Empirical Margin Evidence**:
-  - **Unconditional League Rate**: Across historical full-season NHL data, **~42% to 45% of all games finish with a 1-goal margin**.
-  - **Conditional In-Play Mechanics (Vollman et al.)**: Quantitative modeling (_Hockey Abstract_, 6,500+ games) describes the conditional state (_trailing by 1 with goalie pulled and < 2:00 remaining_):
-    - Empty-Net Goal (leading team extends to 2+ goals): **29.4%**
-    - Equalizer (trailing team forces OT): **12.1%**
-    - No change (1-goal final): **58.5%**
-    - Note: This 58.5% rate is strictly conditional on the late-game state, not the unconditional 1-goal rate across all games.
+  - **Unconditional League Rate**: Across historical full-season NHL regular-season data, **~42% to 45% of all games finish with a 1-goal margin**.
+  - **Conditional In-Play Mechanics (Vollman et al.)**:
+    - _Bibliographic Note_: Approximate reference, subject to physical copy verification (Rob Vollman, _Stat Shot_, ECW Press, 2018, Goalie-Pull Dynamics dataset).
+    - Describes the strictly conditional state (_trailing by 1 with goalie pulled and < 2:00 remaining_):
+      - Empty-Net Goal (leading team extends to 2+ goals): **29.4%**
+      - Equalizer (trailing team forces OT): **12.1%**
+      - No change (1-goal final): **58.5%**
+    - _Critical distinction_: This 58.5% rate is strictly conditional on the late-game goalie-pull state, not the unconditional 1-goal rate across all games.
   - **Sample Illustrative Data (2026-11-03 GX195 Portfolio Slate)**:
-    - In this 7-game slate (selected by bettor `GX195`, introducing potential selection bias toward perceived close/competitive matchups), **4 of 7 games (57.1%)** ended with a 1-goal margin (Mammoth 3–2, Devils 4–3, Ducks 5–4, Stars 6–5).
-    - With $n=7$, the 95% confidence interval is roughly **25% to 86%**; these observations **illustrate** and are consistent with the historical ~42–45% rate, but larger-sample validation across all graded tickets remains the empirical contract.
+    - On this date, there were **11 scheduled NHL games league-wide**. Customer `GX195` placed 8 wagers across **7 of the 11 games (63.6% slate coverage, leaving 4 games unbet)**.
+    - These 8 wagers represent **0.286%** of the 2,794 deduplicated hockey puck line wagers in the intake corpus (or 0.203% of the 3,932 raw intake sightings).
+    - In this 7-game slate, **4 of 7 games (57.1%)** ended with a 1-goal margin (Mammoth 3–2, Devils 4–3, Ducks 5–4, Stars 6–5).
+    - With $n=7$, the 95% confidence interval is roughly **25% to 86%**; these observations **illustrate** and are consistent with the historical ~42–45% rate, but do not replace larger-sample validation across all graded tickets.
     - 2-goal margin: **1 of 7 (14.3%)** (Wild 4–2); $\ge$3-goal margin: **2 of 7 (28.6%)** (Predators 4–1, Blue Jackets 7–2).
     - Underdog 2+ goal wins in the sample: **1 of 7 (14.3%)** (Blue Jackets 7–2).
 
