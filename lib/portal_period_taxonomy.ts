@@ -652,3 +652,30 @@ export function createNormalizedWagersDirectStream(
   };
   return new ReadableStream(source as any);
 }
+
+/**
+ * Registers canonical portal period taxonomy and market classifiers as user-defined
+ * functions in a `bun:sqlite` Database instance.
+ *
+ * Exposes:
+ * - `portal_period_label(code)`: Translates canonical period code (-1..6) to portal label.
+ * - `is_derivative_points_line(shortDesc)`: Returns 1 if description matches derivative points flow, else 0.
+ */
+export function registerPortalPeriodSqliteFunctions(db: {
+  function: (name: string, fn: (...args: any[]) => any) => void;
+}): void {
+  if (!db || typeof db.function !== "function") return;
+
+  db.function("portal_period_label", (code: number) => {
+    return (
+      PORTAL_PERIOD_LABELS[code as keyof typeof PORTAL_PERIOD_LABELS] ??
+      "Unknown"
+    );
+  });
+
+  db.function("is_derivative_points_line", (shortDesc: string) => {
+    return isDerivativePointsLineWager({ ShortDesc: String(shortDesc || "") })
+      ? 1
+      : 0;
+  });
+}

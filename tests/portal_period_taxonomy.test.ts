@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
+import { Database } from "bun:sqlite";
 import {
   DATE_FAMILIES,
   PORTAL_PERIOD_LABELS,
@@ -15,6 +16,7 @@ import {
   normalizeWager,
   PeriodTaxonomyInspection,
   createNormalizedWagersDirectStream,
+  registerPortalPeriodSqliteFunctions,
 } from "../lib/portal_period_taxonomy.ts";
 
 describe("Portal Period Taxonomy Enum", () => {
@@ -386,5 +388,22 @@ describe("Engine Detection & Risk Dollars", () => {
     Bun.inspect(inspection, { colors: true });
     Bun.inspect(inspection, { colors: false });
     expect(JSON.stringify(inspection)).toBe(before);
+  });
+
+  it("registers and executes portal period taxonomy SQLite user-defined functions", () => {
+    const db = new Database(":memory:");
+    registerPortalPeriodSqliteFunctions(db);
+
+    const row = db
+      .query(
+        "SELECT portal_period_label(1) as h1, portal_period_label(0) as game, is_derivative_points_line('Patriots derivative points Over 24.5') as is_dt, is_derivative_points_line('Patriots -3 -110') as not_dt",
+      )
+      .get() as any;
+
+    expect(row.h1).toBe("1st Half");
+    expect(row.game).toBe("Game");
+    expect(row.is_dt).toBe(1);
+    expect(row.not_dt).toBe(0);
+    db.close();
   });
 });
