@@ -41,7 +41,7 @@ describe("weblog_sentinel", () => {
   test("dry-run alerts once per desk date", async () => {
     const root = mkdtempSync(join(tmpdir(), "weblog-sentinel-"));
     const statePath = join(root, "state.json");
-    let saved: string | null = null;
+    let savedDeskDate: string | undefined;
 
     const first = await runWeblogSentinelTick({
       root,
@@ -55,12 +55,12 @@ describe("weblog_sentinel", () => {
         updatedAt: "",
       }),
       saveState: async (s) => {
-        saved = JSON.stringify(s);
+        savedDeskDate = s.lastMissingAlertDeskDate ?? undefined;
       },
     });
     expect(first.corpusPresent).toBe(false);
     expect(first.skippedReason).toBe("dry-run");
-    expect(saved).toContain("2026-11-09");
+    expect(savedDeskDate).toBe("2026-11-09");
 
     const second = await runWeblogSentinelTick({
       root,

@@ -238,11 +238,14 @@ export async function runWeblogSentinelTick(
     updatedAt: now().toISOString(),
   });
 
-  return {
+  const result: WeblogSentinelTickResult = {
     deskDateYmd,
     corpusPresent: false,
     checkedPaths: probe.paths,
     alerted: sent.ok === true,
-    skippedReason: sent.ok ? undefined : sent.description ?? "send-failed",
   };
+  if (sent.ok !== true) {
+    return { ...result, skippedReason: "send-failed" };
+  }
+  return result;
 }
