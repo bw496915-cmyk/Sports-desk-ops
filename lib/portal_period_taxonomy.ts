@@ -651,9 +651,9 @@ export function createNormalizedWagersDirectStream(
   records:
     Iterable<NormalizedWagerRecord> | AsyncIterable<NormalizedWagerRecord>,
 ): ReadableStream {
-  const source: Bun.DirectUnderlyingSource = {
-    type: "direct",
-    async pull(controller) {
+  const source = {
+    type: "direct" as const,
+    async pull(controller: ReadableStreamDirectController) {
       for await (const record of records) {
         await controller.write(JSON.stringify(record) + "\n");
       }

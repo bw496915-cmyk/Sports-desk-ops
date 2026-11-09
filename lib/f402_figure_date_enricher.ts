@@ -694,9 +694,9 @@ export class FigureDateEnrichmentInspection {
 export function createEnrichedWagersDirectStream(
   wagers: Iterable<EnrichedWager> | AsyncIterable<EnrichedWager>,
 ): ReadableStream {
-  const source: Bun.DirectUnderlyingSource = {
-    type: "direct",
-    async pull(controller) {
+  const source = {
+    type: "direct" as const,
+    async pull(controller: ReadableStreamDirectController) {
       for await (const wager of wagers) {
         await controller.write(JSON.stringify(wager) + "\n");
       }
