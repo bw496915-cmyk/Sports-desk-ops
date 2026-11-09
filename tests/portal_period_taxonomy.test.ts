@@ -14,6 +14,7 @@ import {
   isDerivativePointsLineWager,
   normalizeWager,
   PeriodTaxonomyInspection,
+  createNormalizedWagersDirectStream,
 } from "../lib/portal_period_taxonomy.ts";
 
 describe("Portal Period Taxonomy Enum", () => {
@@ -310,5 +311,31 @@ describe("Engine Detection & Risk Dollars", () => {
     const json = inspection.toJSON();
     expect(json.provenance.reportMode).toBe("CPV");
     expect(json.sample.length).toBe(1);
+  });
+
+  it("streams normalized records via Bun native direct ReadableStream (type: direct)", async () => {
+    const raw = {
+      WagerNumber: 991001,
+      WagerType: "E",
+      ShortDesc: "E.Football #101 Patriots - For 1st Half",
+      AmountWagered: 5000,
+      Login: "VIP101",
+      AgentLogin: "AG7",
+      InsertDateTime: "2026-10-20 14:00:00.000",
+      TicketWriter: "Internet",
+    };
+    const norm = normalizeWager(raw);
+    const stream = createNormalizedWagersDirectStream([norm]);
+    expect(stream).toBeInstanceOf(ReadableStream);
+
+    const text = await new Response(stream).text();
+    expect(text).toContain("VIP101");
+    expect(text).toContain("991001");
+    expect(text.endsWith("\n")).toBe(true);
+
+    const parsed = JSON.parse(text.trim());
+    expect(parsed.wagerNumber).toBe(991001);
+    expect(parsed.portalPeriod).toBe(1);
+    expect(parsed.risk).toBe(50.0);
   });
 });

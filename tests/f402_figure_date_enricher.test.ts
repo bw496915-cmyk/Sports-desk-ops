@@ -16,6 +16,7 @@ import {
   parseBuyPointsFromDesc,
   FigureDateEnrichmentInspection,
   formatEnrichedWagerInspect,
+  createEnrichedWagersDirectStream,
   type FigureDateWager,
   type LiveTickerWager,
 } from "../lib/f402_figure_date_enricher.ts";
@@ -633,5 +634,19 @@ describe("Figure Date Enrichment Engine", () => {
     const json = inspection.toJSON();
     expect(json.stats.figureRecordsIndexed).toBe(1);
     expect(json.samples.length).toBe(1);
+  });
+
+  it("streams enriched wagers via Bun native direct ReadableStream (type: direct)", async () => {
+    const enriched = enrichWagerRecord(sampleTicker, sampleFigure);
+    const stream = createEnrichedWagersDirectStream([enriched]);
+    expect(stream).toBeInstanceOf(ReadableStream);
+
+    const text = await new Response(stream).text();
+    expect(text).toContain("DAN245");
+    expect(text.endsWith("\n")).toBe(true);
+
+    const parsed = JSON.parse(text.trim());
+    expect(parsed.ticketNumber).toBe("1075710577");
+    expect(parsed.settlement.amountWageredCents).toBe(230000);
   });
 });
