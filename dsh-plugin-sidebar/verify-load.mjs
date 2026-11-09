@@ -237,6 +237,9 @@ check("every file the bundle ships exists", () => {
  */
 const FIXTURE_HEALTH = {
   status: "healthy",
+  operationalStatus: "ok",
+  dataStatus: "ok",
+  httpStatus: 200,
   port: 4020,
   hostname: "localhost",
   url: "http://localhost:4020/",
@@ -245,6 +248,37 @@ const FIXTURE_HEALTH = {
   runtime: "Bun v1.4.4 (arm64-darwin)",
   ingress: { proxied: false, trustProxy: false },
   nodeEnv: "development",
+  version: {
+    gitSha: "fixture",
+    buildTime: "2026-11-04T18:13:39.531Z",
+    nodeEnv: "development",
+  },
+  checks: {
+    daemon: "ok",
+    auth: {
+      f402: { status: "ok", source: "session-file", expiresInSeconds: 3600 },
+      gslive: { status: "ok", source: "keychain", probeStatus: 200 },
+    },
+    pipelines: {
+      r2Fresh: 4,
+      r2Total: 4,
+      r2StaleKeys: [],
+      dataStaleKeys: [],
+      checks: {
+        ticker: "ok",
+        gslive: "ok",
+        weblog: "ok",
+        wagers: "ok",
+      },
+    },
+  },
+  sources: {
+    auth: {
+      f402: { status: "ok", source: "session-file", expiresInSeconds: 3600 },
+      gslive: { status: "ok", source: "keychain", probeStatus: 200 },
+    },
+  },
+  degradedReasons: [],
 };
 
 const FIXTURE_STATUS = {
@@ -388,6 +422,36 @@ const FIXTURE_KPIS = {
       tickets: 1_100,
       customerNetCents: -118_120_894,
       provenance: { ageSeconds: 136_162, stale: false },
+    },
+  },
+  pipeline: {
+    r2: {
+      "f402-bet-ticker": {
+        stale: false,
+        state: "fresh",
+        ageSeconds: 120,
+        reason: "2m old",
+      },
+      "gslive-tally": {
+        stale: false,
+        state: "fresh",
+        ageSeconds: 300,
+        reason: "5m old",
+      },
+      "wagers-by-state": {
+        stale: true,
+        state: "stale",
+        ageSeconds: 200_000,
+        reason: "48h SLA",
+      },
+      "f402-weblog": {
+        stale: false,
+        state: "fresh",
+        ageSeconds: 100,
+        reason: "2m old",
+        dataAgeSeconds: 3_600,
+        dataStale: false,
+      },
     },
   },
 };
@@ -1004,17 +1068,25 @@ await checkAsync(
       "441 citations",
       "2,640 tests",
       "Last measured",
+      "R2 pipelines",
+      "Ticker (F402 · 3a)",
+      "GSLive tally (3c)",
+      "Wagers aggregate",
     ]) {
       assert(text.includes(expected), `overview page is missing ${expected}`);
     }
     // The feed's own age row is measured in hours, not invented.
     assert(!text.includes("undefined"), "page rendered an undefined value");
-    // One attention item: the captured feed is stale and WSS is not ingested.
     const attention = findOne(tree, "spsd-attention");
-    assert(attention !== undefined, "no attention banner for the stale feed");
+    assert(attention !== undefined, "no attention banner for stale signals");
+    const attentionCount = Number(attention.props["data-count"]);
     assert(
-      attention.props["data-count"] === "1",
-      `attention count ${attention.props["data-count"]}`,
+      attentionCount >= 2,
+      `attention count ${attention.props["data-count"]} (feed + R2 sink)`,
+    );
+    assert(
+      text.includes("R2 sink"),
+      "stale R2 pipeline sink is not called out in attention",
     );
     harness.dispose();
   },
@@ -1063,7 +1135,10 @@ await checkAsync(
       flat.includes("provenance") && flat.includes("17m ago"),
       "Agents row should read provenance · 17m ago",
     );
-    assert(flat.includes("not live"), "Agents row is missing the not-live chip");
+    assert(
+      flat.includes("not live"),
+      "Agents row is missing the not-live chip",
+    );
     harness.dispose();
   },
 );
@@ -1282,8 +1357,8 @@ await checkAsync(
     const attention = findOne(tree, "spsd-attention");
     assert(attention !== undefined, "no attention banner");
     assert(
-      attention.props["data-count"] === "4",
-      `attention count ${attention.props["data-count"]} (feed + kill + mode + live)`,
+      attention.props["data-count"] === "5",
+      `attention count ${attention.props["data-count"]} (feed + kill + mode + live + stale R2)`,
     );
     for (const expected of [
       "Market feed:",
@@ -1316,11 +1391,36 @@ await checkAsync("attention is quiet for a fully healthy desk", async () => {
     policy: { liveEnabled: false, maxOpenIntents: 25 },
     provenance: { stale: false },
   };
+  const healthyKpis = {
+    ...FIXTURE_KPIS,
+    kpis: {
+      ...FIXTURE_KPIS.kpis,
+      pending: {
+        ...FIXTURE_KPIS.kpis.pending,
+        provenance: { ageSeconds: 1, stale: false },
+      },
+      ticker: {
+        ...FIXTURE_KPIS.kpis.ticker,
+        provenance: { ageSeconds: 1, stale: false, partial: false },
+      },
+    },
+    pipeline: {
+      r2: Object.fromEntries(
+        Object.entries(FIXTURE_KPIS.pipeline.r2).map(([key, value]) => [
+          key,
+          { ...value, stale: false, state: "fresh" },
+        ]),
+      ),
+    },
+  };
   const harness = bootClient(async (url) => {
     const text = String(url);
     if (text.endsWith("/graph")) return proxiedResponse(url, fresh);
     if (text.endsWith("/execution")) {
       return proxiedResponse(url, healthyExecution);
+    }
+    if (text.endsWith("/kpis") || text.endsWith("/api/kpis")) {
+      return proxiedResponse(url, healthyKpis);
     }
     return proxiedResponse(url, fixtureFor(url));
   });
@@ -1799,7 +1899,11 @@ await checkAsync(
       `absent stream rendered as ${card.props["data-live-state"]}`,
     );
     const cardText = JSON.stringify(card);
-    for (const expected of ["polling fallback", "Last poll", "15 s graph probe"]) {
+    for (const expected of [
+      "polling fallback",
+      "Last poll",
+      "15 s graph probe",
+    ]) {
       assert(
         cardText.includes(expected),
         `polling fallback is missing ${expected}`,
@@ -2154,19 +2258,23 @@ function streamResponse(
 async function bootHost({
   origin = "https://dsh.example",
   deferInjection = false,
+  config,
 } = {}) {
   const module = await import("./index.js");
   const webServer = fakeWebServer(origin);
   let pending = null;
-  const dispose = module.apply({
-    inject(_deps, callback) {
-      if (deferInjection) {
-        pending = callback;
-        return;
-      }
-      webServer.instantiate(callback);
+  const dispose = module.apply(
+    {
+      inject(_deps, callback) {
+        if (deferInjection) {
+          pending = callback;
+          return;
+        }
+        webServer.instantiate(callback);
+      },
     },
-  });
+    config,
+  );
   return {
     routes: webServer.routes,
     disposals: webServer.disposals,
@@ -2198,6 +2306,45 @@ async function withFetchStub(fetchImpl, body) {
     globalThis.fetch = original;
   }
 }
+
+await checkAsync("host resolveDeskOrigin honors config.apiPort", async () => {
+  const module = await import("./index.js");
+  assert(
+    module.resolveDeskOrigin(undefined) === "http://127.0.0.1:4020",
+    "default port",
+  );
+  assert(
+    module.resolveDeskOrigin({ apiPort: 3000 }) === "http://127.0.0.1:3000",
+    "numeric apiPort",
+  );
+  assert(
+    module.resolveDeskOrigin({ apiPort: "3000" }) === "http://127.0.0.1:3000",
+    "string apiPort",
+  );
+});
+
+await checkAsync(
+  "host proxy uses config.apiPort for upstream fetch",
+  async () => {
+    const host = await bootHost({ config: { apiPort: 3000 } });
+    const health = host.routes.find(
+      (candidate) => candidate.path === "/api/sportsdesk-desk/health",
+    ).handler;
+    let seenUrl = "";
+    await withFetchStub(
+      async (url) => {
+        seenUrl = String(url);
+        return upstreamBody('{"status":"healthy"}', 200);
+      },
+      () => health({ method: "GET", headers: {} }, fakeRes()),
+    );
+    assert(
+      seenUrl === "http://127.0.0.1:3000/health",
+      `upstream was ${seenUrl}`,
+    );
+    host.dispose();
+  },
+);
 
 await checkAsync(
   "host registers the allowlisted GET proxy routes",

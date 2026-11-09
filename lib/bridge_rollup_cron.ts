@@ -24,9 +24,11 @@
  * The first cycle only establishes the baseline. Ids are stable, so a consumer can dedupe a
  * replayed digest.
  *
- * The file is pure orchestration: it never touches the network, spawns only through
- * `options.spawnJob`, reads only through `options.readArtifact`, and writes only `statePath` and
- * `historyPath` (atomic temp+rename for state, one JSON line per cycle for history).
+ * The file is mostly pure orchestration: it may call {@link ensureF402Session} once per cycle before
+ * F402 jobs (bridge3a/bridge3b) and {@link ensureGsid} before GSLive
+ * jobs; otherwise it spawns only through `options.spawnJob`, reads only through
+ * `options.readArtifact`, and writes only `statePath` and `historyPath` (atomic temp+rename for
+ * state, one JSON line per cycle for history).
  *
  * @see scripts/f402_bet_ticker_bridge3a.ts
  * @see scripts/f402_pending_bridge3b.ts
@@ -44,10 +46,15 @@ import {
 } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import {
+  ensureGsid,
+  GSLIVE_MANUAL_DUAL_AUTH_ACTION,
+  isGsliveCloudflareBlockedError,
+} from "./gslive_auto_session.ts";
+import {
   bridgeWeblogCorpusPresent,
   resolveBridgeWeblogCorpusFrom,
 } from "./f402_weblog_bridge_inputs.ts";
-import { readF402Session } from "./f402_session.ts";
+import { ensureF402Session, readF402Session } from "./f402_session.ts";
 import {
   F402_KEYCHAIN_NAMES,
   GSID_KEYCHAIN_NAME,
@@ -55,7 +62,13 @@ import {
   readSecretCanonicalThenLegacy,
 } from "./secrets.ts";
 
-export type BridgeRollupJobId = "bridge3a" | "bridge3b" | "bridge3c" | "weblog";
+export type BridgeRollupJobId =
+  | "bridge3a"
+  | "bridge3b"
+  | "bridge3c"
+  | "weblog"
+  | "wagers-by-state"
+  | "wagers-publish";
 
 export interface BridgeRollupJobResult {
   readonly id: BridgeRollupJobId;
@@ -169,6 +182,10 @@ export const BRIDGE_ROLLUP_JOBS: readonly BridgeRollupJobSpec[] = [
       "run",
       "scripts/gslive_tally_bridge3c.ts",
       "--fetch-open",
+      "--open-from",
+      "{openFromEpoch}",
+      "--open-to",
+      "{openToEpoch}",
       "--save-capture",
       "{root}/scratch/bridge-rollup/open-bets.json",
       "--out",
@@ -200,6 +217,38 @@ export const BRIDGE_ROLLUP_JOBS: readonly BridgeRollupJobSpec[] = [
     timeoutMs: 180_000,
     requiredEnv: [],
   },
+  {
+    id: "wagers-by-state",
+    label: "Wagers by State Publish",
+    args: [
+      "bun",
+      "--no-orphans",
+      "--no-env-file",
+      "run",
+      "scripts/gslive_wagers_by_state.ts",
+      "--live",
+    ],
+    timeoutMs: 120_000,
+    requiredEnv: [
+      "GSLIVE_SESSION_ID",
+      "GSID",
+      "GSID_COOKIE",
+      "GSLIVE_SESSION_FILE",
+    ],
+  },
+  {
+    id: "wagers-publish",
+    label: "Wagers R2 Snapshot Publish",
+    args: [
+      "bun",
+      "--no-orphans",
+      "--no-env-file",
+      "run",
+      "scripts/publish_wagers_snapshot.ts",
+    ],
+    timeoutMs: 60_000,
+    requiredEnv: [],
+  },
 ];
 
 /** Alert-key segment per job; weblog keeps the key from the documented alert-id example. */
@@ -208,6 +257,8 @@ const BRIDGE_ALERT_KEYS: Readonly<Record<BridgeRollupJobId, string>> = {
   bridge3b: "bridge3b",
   bridge3c: "bridge3c",
   weblog: "f402-weblog",
+  "wagers-by-state": "wagers-by-state",
+  "wagers-publish": "wagers-publish",
 };
 
 const JOB_IDS: readonly BridgeRollupJobId[] = [
@@ -215,6 +266,8 @@ const JOB_IDS: readonly BridgeRollupJobId[] = [
   "bridge3b",
   "bridge3c",
   "weblog",
+  "wagers-by-state",
+  "wagers-publish",
 ];
 
 const FLAG_NAMES = [
@@ -255,6 +308,11 @@ const BRIDGE_ARTIFACTS: Readonly<
   bridge3b: { kind: "stdout" },
   bridge3c: { kind: "file", path: "scratch/bridge-rollup/bridge3c.json" },
   weblog: { kind: "file", path: "scratch/bridge-rollup/weblog.json" },
+  "wagers-by-state": {
+    kind: "file",
+    path: "scratch/gslive-wagers-by-state.summary.json",
+  },
+  "wagers-publish": { kind: "stdout" },
 };
 
 export interface BridgeRollupJobContext extends BridgeRollupJobSpec {
@@ -305,6 +363,41 @@ export interface BridgeRollupCycleOptions {
     argv: readonly string[],
   ) => Promise<BridgeSpawnResult>;
   readonly readArtifact?: (job: BridgeRollupJobRun) => Promise<unknown | null>;
+  /**
+   * Once per cycle, before the first GSLive CLI (`bridge3c`, `wagers-by-state`).
+   * Default: {@link ensureGsid} (keychain username/password → verified GSID).
+   */
+  readonly ensureGsliveSession?: () => Promise<void>;
+  /**
+   * Once per cycle, before the first F402 CLI (`bridge3a`, `bridge3b`).
+   * Default: {@link ensureF402Session} with `allowLiveLogin: true`.
+   */
+  readonly ensureF402Session?: () => Promise<void>;
+}
+
+const F402_SESSION_JOB_IDS: ReadonlySet<BridgeRollupJobId> = new Set([
+  "bridge3a",
+  "bridge3b",
+]);
+
+const GSLIVE_SESSION_JOB_IDS: ReadonlySet<BridgeRollupJobId> = new Set([
+  "bridge3c",
+  "wagers-by-state",
+]);
+
+async function defaultEnsureF402Session(): Promise<void> {
+  await ensureF402Session({ allowLiveLogin: true });
+}
+
+async function defaultEnsureGsliveSession(): Promise<void> {
+  await ensureGsid();
+}
+
+function gsliveSessionFailureMessage(error: unknown): string {
+  if (isGsliveCloudflareBlockedError(error)) {
+    return `GSLive expired. Manual dual-auth required. ${GSLIVE_MANUAL_DUAL_AUTH_ACTION}`;
+  }
+  return `GSLive auth failed: ${describeError(error)}`;
 }
 
 interface BridgeGateSnapshot {
@@ -347,7 +440,9 @@ function isJobId(value: unknown): value is BridgeRollupJobId {
     value === "bridge3a" ||
     value === "bridge3b" ||
     value === "bridge3c" ||
-    value === "weblog"
+    value === "weblog" ||
+    value === "wagers-by-state" ||
+    value === "wagers-publish"
   );
 }
 
@@ -399,10 +494,7 @@ export function lastBridgeJobFailureHint(
   stderr: string,
   stdout: string,
 ): string | null {
-  const lines = [
-    ...meaningfulLogLines(stderr),
-    ...meaningfulLogLines(stdout),
-  ];
+  const lines = [...meaningfulLogLines(stderr), ...meaningfulLogLines(stdout)];
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i]!;
     if (FAILURE_LINE.test(line)) return clip(line);
@@ -437,10 +529,14 @@ function resolvePlaceholders(
   value: string,
   root: string,
   weblogFrom: string,
+  openFromEpoch: string,
+  openToEpoch: string,
 ): string {
   return value
     .replaceAll("{root}", root)
-    .replaceAll("{weblogFrom}", weblogFrom);
+    .replaceAll("{weblogFrom}", weblogFrom)
+    .replaceAll("{openFromEpoch}", openFromEpoch)
+    .replaceAll("{openToEpoch}", openToEpoch);
 }
 
 function resolveArgv(
@@ -455,7 +551,12 @@ function resolveArgv(
     env: ctx.env,
     now: () => new Date(ctx.now()),
   });
-  return job.args.map((arg) => resolvePlaceholders(arg, root, weblogFrom));
+  const nowSec = Math.floor(ctx.now() / 1000);
+  const openToEpoch = String(nowSec);
+  const openFromEpoch = String(nowSec - 86_400);
+  return job.args.map((arg) =>
+    resolvePlaceholders(arg, root, weblogFrom, openFromEpoch, openToEpoch),
+  );
 }
 
 function jobContext(
@@ -573,7 +674,7 @@ export function keychainCredentialProbe(
           ? { ok: true, source: "corpus" }
           : { ok: false, error: present.message };
       }
-      if (job.id === "bridge3c") {
+      if (job.id === "bridge3c" || job.id === "wagers-by-state") {
         const envNames = [
           "GSLIVE_SESSION_ID",
           "GSID",
@@ -1106,6 +1207,10 @@ export async function runBridgeRollupCycle(
   const spawnJob = options.spawnJob ?? defaultSpawnJob(root);
   const readArtifact = options.readArtifact ?? defaultReadArtifact();
   const credentials = options.credentials ?? envCredentialProbe(env);
+  const ensureF402SessionFn =
+    options.ensureF402Session ?? defaultEnsureF402Session;
+  const ensureGsliveSession =
+    options.ensureGsliveSession ?? defaultEnsureGsliveSession;
   const selected = selectJobs(options.jobs);
   const previous = readState(statePath);
 
@@ -1116,7 +1221,76 @@ export async function runBridgeRollupCycle(
     Record<BridgeRollupJobId, BridgeArtifactStatus>
   > = {};
 
+  let f402SessionReady: boolean | null = null;
+  let f402SessionError: string | null = null;
+  let gsliveSessionReady: boolean | null = null;
+  let gsliveSessionError: string | null = null;
+
   for (const job of selected) {
+    if (F402_SESSION_JOB_IDS.has(job.id)) {
+      if (f402SessionReady === false) {
+        jobs.push({
+          id: job.id,
+          label: job.label,
+          ok: false,
+          durationMs: 0,
+          error: f402SessionError ?? "F402 auth failed",
+        });
+        artifactStatus[job.id] = "missing";
+        continue;
+      }
+      if (f402SessionReady === null) {
+        try {
+          await ensureF402SessionFn();
+          f402SessionReady = true;
+        } catch (error) {
+          f402SessionReady = false;
+          f402SessionError = `F402 auth failed: ${describeError(error)}`;
+          jobs.push({
+            id: job.id,
+            label: job.label,
+            ok: false,
+            durationMs: 0,
+            error: f402SessionError,
+          });
+          artifactStatus[job.id] = "missing";
+          continue;
+        }
+      }
+    }
+
+    if (GSLIVE_SESSION_JOB_IDS.has(job.id)) {
+      if (gsliveSessionReady === false) {
+        jobs.push({
+          id: job.id,
+          label: job.label,
+          ok: false,
+          durationMs: 0,
+          error: gsliveSessionError ?? "GSLive auth failed",
+        });
+        artifactStatus[job.id] = "missing";
+        continue;
+      }
+      if (gsliveSessionReady === null) {
+        try {
+          await ensureGsliveSession();
+          gsliveSessionReady = true;
+        } catch (error) {
+          gsliveSessionReady = false;
+          gsliveSessionError = gsliveSessionFailureMessage(error);
+          jobs.push({
+            id: job.id,
+            label: job.label,
+            ok: false,
+            durationMs: 0,
+            error: gsliveSessionError,
+          });
+          artifactStatus[job.id] = "missing";
+          continue;
+        }
+      }
+    }
+
     const decision = await credentials.check(job);
     if (!decision.ok) {
       jobs.push({

@@ -172,7 +172,7 @@ export const SECRET_MANIFEST: readonly SecretDefinition[] = [
   },
   {
     envName: "GS_SESSION",
-    keychainName: null,
+    keychainName: "GSLIVE_GANCHROW_SESSION",
     groups: ["gslive"],
     inject: false,
     description:
@@ -222,6 +222,8 @@ export function manifestNames(): ReadonlySet<string> {
  * safe to print. "Hard" suffixes (`_TOKEN`, `_SECRET`, ...) can never be allowlisted: register them.
  */
 export const NON_SECRET_ALLOWLIST: Readonly<Record<string, string>> = {
+  ANTIGRAVITY_CONVERSATION_ID:
+    "agent session conversation identifier for brain artifact sync",
   F402_CUSTOMER_ID: "customer identifier sent in request URLs, not a login",
   F402_GRAPH_ROOT_AGENT_ID: "root node id of the agent tree, a query parameter",
   F402_MASTER_ID:

@@ -77,6 +77,10 @@ with `bun run audit:tool-calls`.
   (under `scripts/`) so a live refresh does not rewrite the committed 4-week backtest artifact.
 - **Deploy credentials** come from `./cloudflare.env` or `$XDG_CONFIG_HOME/cloudflare/pages.env`;
   never source `.env` (1Password FIFO plus R2/F402 secrets that shadow the Pages token).
+- **`bun:bundle` AST constraint:** `feature()` from `"bun:bundle"` can only appear directly
+  inside an `if` condition or ternary (`feature("FLAG") ? true : false`). Passing it directly to
+  functions (like `expect()` or `expectTypeOf()`) fails at parse time. Testing `--feature=FLAG`
+  requires subprocess spawning (`Bun.spawnSync`), as flags cannot be toggled mid-process.
 
 ## DSH Discover (plugin market index)
 
@@ -89,6 +93,30 @@ Five Cordis bundles under `dsh-plugin*` are listed in **`market/index.json`** fo
   tags when pins are branch-only until merged to `main`.
 - Operator URL policy and cache behavior: **`market/README.md`** · cross-host notes:
   **`$CODE_ROOT/dsh-ops/notes/SPORTSDESK-MARKET.md`**.
+
+## Signal honesty
+
+Architecture and review standard: [docs/architecture/signal-honesty.md](docs/architecture/signal-honesty.md).
+PRs should complete the **Signal Honesty Checklist** in
+[`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md).
+
+### Nov 2026 — nine “lies by omission” fixes (institutional memory)
+
+Do not delete these contracts as redundant without reading the ADR:
+
+1. **#69 / #85** — Fixture isolation; `jobFailure()` must not swallow child stdout.
+2. **#73 / #74** — KPI provenance: pending vs fixture vs live.
+3. **#75** — Replay transport 401 retry.
+4. **#87** — `--fetch-mode` wired; session/bearer fallback for getWebLog.
+5. **#88** — `resolveF402BetsJsonlPath` (env → operator default).
+6. **#89** — Reject weblog Mode B/I (shared-IP ≠ activity stream).
+7. **#90 / #92** — Weblog cron `--from` + three-tier corpus; publish data-window log line.
+8. **#84 / GSID** — Multi-sink R2 recovery; canonical `GSLIVE_SESSION_ID`; wagers two-step (`--live` + `wagers:publish-snapshot`).
+9. **#91** — Weblog corpus: manual portal export + `weblog:sentinel` (08:00 Telegram if today's JSONL missing); not headless Mode A fetch.
+10. **#93** — Wire wagers capture + `publish-snapshot` into cron (open).
+11. **#94** — `bridge3c` `--timeout` for large `getBetReport` (open).
+12. **#78** — KPI data-age vs R2 `Last-Modified` (open).
+13. **Desk Host `apiPort`** — Cordis `config.apiPort` wired in `dsh-plugin-sidebar/index.js` (`resolveDeskOrigin`); default 4020.
 
 ## Layout
 
@@ -128,8 +156,13 @@ Revoke any token that was exposed. Live manager API calls must use **`createF402
   wired by `code-project sync-environments --apply` (2026-11-02: it carries an environment id and
   `.env` is a 1Password-mounted pipe on the operator machine). Do not hand-write secrets into the
   repo.
-- `~/platform` is an external policy checkout (pinned SHA in `.github/workflows/ci.yml`); without
-  it `policy`-based scripts fail. Say so instead of disabling them.
+- **Bun-native policy ratchet removed 2026-11-09 (operator decision).** `bun run policy:check`,
+  the `~/platform` checkout it required, the pinned `PLATFORM_SHA` and the `PLATFORM_DEPLOY_KEY`
+  CI secret are gone. The rules it enforced (`zod-not-guard-calls`, `bun-env`, `node-fs-read-write-file`
+  and the rest) are now a review convention, **not a gate**: nothing fails when they are violated.
+  When the ratchet was removed it was reporting 239 matches over the frozen baseline across 91
+  files (137 of them `zod-not-guard-calls`). Reintroducing it means restoring the copy, the
+  baseline and a decision about that debt — not just re-adding a step.
 
 ### Data-handling budgets
 
