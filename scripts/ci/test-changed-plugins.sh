@@ -17,8 +17,18 @@ fi
 
 CHANGED=$(git diff --name-only "$RANGE" 2>/dev/null || true)
 
-# Root manifest, lockfile, or workspace packages can break every plugin bundle.
-if echo "$CHANGED" | grep -qE '^(package\.json|bun\.lock|packages/)'; then
+# Lockfile or workspace packages can break every plugin bundle; root package.json only when deps change.
+shared_full_suite=false
+if echo "$CHANGED" | grep -qE '^(bun\.lock|packages/)'; then
+  shared_full_suite=true
+elif echo "$CHANGED" | grep -qx 'package.json'; then
+  if git diff "$RANGE" -- package.json 2>/dev/null \
+    | grep -qE '^[+-].*"(dependencies|devDependencies|workspaces|catalog|trustedDependencies|overrides)"'; then
+    shared_full_suite=true
+  fi
+fi
+
+if [[ "$shared_full_suite" == true ]]; then
   echo "test-changed-plugins: shared dependency paths changed; running full plugin bundle suite"
   export CI=true
   bun test tests/plugin_bundles.test.ts
