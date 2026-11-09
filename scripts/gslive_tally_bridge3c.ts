@@ -84,14 +84,6 @@ async function fetchOpenCapture(path: string): Promise<void> {
     session.sessionGate !== ""
       ? session.sessionGate
       : sessionGateFromEnv(Bun.env);
-  const timeoutVal =
-    values.timeout !== undefined ? Number(values.timeout) : undefined;
-  const timeoutMs =
-    timeoutVal !== undefined && Number.isFinite(timeoutVal)
-      ? timeoutVal < 1000
-        ? timeoutVal * 1000
-        : timeoutVal
-      : undefined;
   const rows = await fetchBetReportRows({
     fromEpochSec: from,
     toEpochSec: to,
