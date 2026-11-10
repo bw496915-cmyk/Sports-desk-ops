@@ -10,12 +10,20 @@
 
 import type { CSSProperties } from "react";
 
-export type WagerTier = "CRITICAL" | "STEAM" | "LATENCY" | "RECREATIONAL";
+export type WagerTier =
+  | "ORIGINATOR_HIGH_RISK"
+  | "STEAM_MOVE"
+  | "LATENCY_ARB"
+  | "BASELINE"
+  | "CRITICAL"
+  | "STEAM"
+  | "LATENCY"
+  | "RECREATIONAL";
 
 export const SURFACE = {
   panel: "#0d1527",
   border: "#1e293b",
-  text: "#f8fafc",
+  text: "#f1f5f9", // canonical; fixed drift from #f8fafc
   muted: "#94a3b8",
   accent: "#38bdf8",
 } as const;
@@ -61,24 +69,45 @@ export const composite = (fg: string, a: number, bg: string): string => {
  * Written as literal hex constants for zero runtime CPU overhead and 100% browser bundle safety.
  */
 export const TIER = {
-  CRITICAL: {
+  ORIGINATOR_HIGH_RISK: {
     fg: "#f87171",
     bg: "#302332", // composite("#f87171", 0.15, SURFACE.panel)
     border: "#ef4444",
   },
-  STEAM: {
-    fg: "#fb923c",
-    bg: "#31282a", // composite("#fb923c", 0.15, SURFACE.panel)
-    border: "#fb923c",
+  STEAM_MOVE: {
+    fg: "#f59e0b", // canonical; fixed drift from #fb923c
+    bg: "#31282a", // composite("#f59e0b", 0.15, SURFACE.panel)
+    border: "#f59e0b",
   },
-  LATENCY: {
+  LATENCY_ARB: {
     fg: "#c084fc",
     bg: "#282647", // composite("#c084fc", 0.15, SURFACE.panel)
     border: "#c084fc",
   },
-  RECREATIONAL: {
+  BASELINE: {
     fg: "#4ade80",
     bg: "#163334", // composite("#4ade80", 0.15, SURFACE.panel)
+    border: "#22c55e",
+  },
+  // Backward-compatibility aliases for v2 tier keys
+  CRITICAL: {
+    fg: "#f87171",
+    bg: "#302332",
+    border: "#ef4444",
+  },
+  STEAM: {
+    fg: "#f59e0b",
+    bg: "#31282a",
+    border: "#f59e0b",
+  },
+  LATENCY: {
+    fg: "#c084fc",
+    bg: "#282647",
+    border: "#c084fc",
+  },
+  RECREATIONAL: {
+    fg: "#4ade80",
+    bg: "#163334",
     border: "#22c55e",
   },
 } as const satisfies Record<
@@ -103,6 +132,31 @@ export const BADGE_BASE: CSSProperties = {
 
 /** Precomputed once — safe to reuse across every row and live re-render without GC churn */
 export const WAGER_BADGE: Record<WagerTier, CSSProperties> = {
+  ORIGINATOR_HIGH_RISK: {
+    ...BADGE_BASE,
+    color: TIER.ORIGINATOR_HIGH_RISK.fg,
+    backgroundColor: TIER.ORIGINATOR_HIGH_RISK.bg,
+    border: `1px solid ${TIER.ORIGINATOR_HIGH_RISK.border}`,
+  },
+  STEAM_MOVE: {
+    ...BADGE_BASE,
+    color: TIER.STEAM_MOVE.fg,
+    backgroundColor: TIER.STEAM_MOVE.bg,
+    border: `1px solid ${TIER.STEAM_MOVE.border}`,
+  },
+  LATENCY_ARB: {
+    ...BADGE_BASE,
+    color: TIER.LATENCY_ARB.fg,
+    backgroundColor: TIER.LATENCY_ARB.bg,
+    border: `1px solid ${TIER.LATENCY_ARB.border}`,
+  },
+  BASELINE: {
+    ...BADGE_BASE,
+    color: TIER.BASELINE.fg,
+    backgroundColor: TIER.BASELINE.bg,
+    border: `1px solid ${TIER.BASELINE.border}`,
+  },
+  // Backward compatibility
   CRITICAL: {
     ...BADGE_BASE,
     color: TIER.CRITICAL.fg,

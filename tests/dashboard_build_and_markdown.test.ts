@@ -41,7 +41,7 @@ describe("Dashboard Build and Markdown Pipeline", () => {
     it("precomputes CSSProperties badges with zero runtime allocation overhead", () => {
       expect(WAGER_BADGE.CRITICAL.color).toBe("#f87171");
       expect(WAGER_BADGE.CRITICAL.backgroundColor).toBe("#302332");
-      expect(WAGER_BADGE.STEAM.color).toBe("#fb923c");
+      expect(WAGER_BADGE.STEAM.color).toBe("#f59e0b");
       expect(WAGER_BADGE.LATENCY.color).toBe("#c084fc");
       expect(WAGER_BADGE.RECREATIONAL.color).toBe("#4ade80");
 
@@ -57,7 +57,7 @@ describe("Dashboard Build and Markdown Pipeline", () => {
 
       expect(ansi).toContain("\x1b[38;2;248;113;113m"); // Critical fg
       expect(ansi).toContain("\x1b[48;2;48;35;50m"); // Critical bg
-      expect(ansi).toContain("\x1b[38;2;251;146;60m"); // Steam fg
+      expect(ansi).toContain("\x1b[38;2;245;158;11m"); // Steam fg (#f59e0b)
       expect(ansi).toContain("\x1b[38;2;74;222;128m"); // Recreational fg
       expect(ansi).toContain("# Wager Alert");
     });
@@ -88,6 +88,36 @@ describe("Dashboard Build and Markdown Pipeline", () => {
       expect(stripped).toContain("next line");
       // SGR bytes must not inflate visible column width
       expect(Bun.stringWidth(out)).toBe(Bun.stringWidth(stripped));
+    });
+
+    it("preserves visual column alignment across multi-byte and emoji codepoints using padDisplay", async () => {
+      const { padDisplay } = await import("../lib/cli_inspect.ts");
+      const emojiHeader = "📊 SHARPNESS RADAR";
+      const paddedLeft = padDisplay(emojiHeader, 25);
+      expect(Bun.stringWidth(paddedLeft)).toBe(25);
+
+      const paddedRight = padDisplay("⚡ STEAM", 15, "right");
+      expect(Bun.stringWidth(paddedRight)).toBe(15);
+      expect(paddedRight.endsWith("⚡ STEAM")).toBe(true);
+
+      const ansiColored = "\x1b[32m+14.2¢\x1b[0m";
+      const paddedAnsi = padDisplay(ansiColored, 12, "right");
+      expect(Bun.stringWidth(paddedAnsi)).toBe(12);
+
+      // ZWJ grapheme cluster sequences
+      const zwjFamily = "👨‍👩‍👧‍👦";
+      const paddedZwj = padDisplay(zwjFamily, 10);
+      expect(Bun.stringWidth(paddedZwj)).toBe(10);
+
+      // Modifier / skin tone sequences
+      const skinTone = "👍🏽";
+      const paddedSkin = padDisplay(skinTone, 8, "right");
+      expect(Bun.stringWidth(paddedSkin)).toBe(8);
+
+      // Combining marks
+      const combining = "e\u0301";
+      const paddedCombining = padDisplay(combining, 6);
+      expect(Bun.stringWidth(paddedCombining)).toBe(6);
     });
 
     it("resets colors cleanly on multi-param SGR 39;49, 1;39, and bare \\x1b[m", () => {

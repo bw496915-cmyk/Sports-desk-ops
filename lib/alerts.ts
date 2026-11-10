@@ -952,10 +952,11 @@ export async function processWagerSurveillance(
     (wager.clvCents >= 10 ? 9.0 : wager.clvCents >= 7 ? 7.5 : 3.0);
 
   let tier: AlertTier = "RECREATIONAL";
-  if (
-    score >= cfg.tiers.CRITICAL.minScore ||
-    wager.riskUsd >= cfg.surveillance.highRiskThresholdUsd
-  ) {
+  const isHighRiskStake =
+    wager.riskUsd >= cfg.surveillance.highRiskThresholdUsd &&
+    (wager.clvCents > 0 || score >= 7.0);
+
+  if (score >= cfg.tiers.CRITICAL.minScore || isHighRiskStake) {
     tier = "CRITICAL";
   } else if (
     score >= cfg.tiers.STEAM.minScore ||
@@ -966,7 +967,7 @@ export async function processWagerSurveillance(
     tier = "LATENCY";
   }
 
-  const tierConfig = cfg.tiers[tier];
+  const tierConfig = cfg.tiers[tier] ?? cfg.tiers.BASELINE;
   let enqueued = false;
   let deliveryId: string | undefined = undefined;
   let deduplicated = false;

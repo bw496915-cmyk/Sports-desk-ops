@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
+import "./desk.css";
 import { renderAnsiReact } from "./ansi.tsx";
 import { type WagerTier, wagerBadge } from "../../lib/wager_tokens.ts";
 
@@ -9,6 +10,7 @@ export interface DashboardData {
 }
 
 export interface DnsData {
+  readonly success?: boolean;
   readonly telemetry: {
     readonly size: number;
     readonly hitRatePercent: number;
@@ -17,9 +19,14 @@ export interface DnsData {
     readonly cacheMisses: number;
     readonly defaultTtlSeconds: number;
   };
-  readonly hosts: readonly {
+  readonly hosts?: readonly {
     readonly hostname: string;
-    readonly serviceName: string;
+    readonly serviceName?: string;
+  }[];
+  readonly coreHosts?: readonly {
+    readonly hostname: string;
+    readonly port?: number;
+    readonly serviceName?: string;
   }[];
 }
 
@@ -1324,6 +1331,20 @@ export function App(): React.ReactElement {
       });
   }, []);
 
+  // UI enhancement states: banner dismissal & collapsible KPI cards
+  const [bannerDismissed, setBannerDismissed] = useState(
+    () =>
+      typeof sessionStorage !== "undefined" &&
+      sessionStorage.getItem("portalBannerDismissed") === "1",
+  );
+  const [kpisCollapsed, setKpisCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("kpisCollapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+
   // Alerts, DLQ, and Operator Shift state
   const [alertRecords, setAlertRecords] = useState<DashboardAlertRecord[]>([]);
   const [alertFilter, setAlertFilter] = useState<
@@ -1475,10 +1496,9 @@ export function App(): React.ReactElement {
 
   // Auto-dismiss toast after 4s
   useEffect(() => {
-    if (alertToast) {
-      const t = setTimeout(() => setAlertToast(null), 4000);
-      return () => clearTimeout(t);
-    }
+    if (!alertToast) return;
+    const t = setTimeout(() => setAlertToast(null), 4000);
+    return () => clearTimeout(t);
   }, [alertToast]);
 
   // Terminal Emulator state
@@ -1797,7 +1817,10 @@ export function App(): React.ReactElement {
     try {
       const [dashRes, dnsRes] = await Promise.all([
         fetch("/api/dashboard"),
-        fetch("/api/dns"),
+        fetch("/api/dns/telemetry").then(async (res) => {
+          if (!res.ok) return fetch("/api/dns");
+          return res;
+        }),
       ]);
       if (dashRes.ok) {
         const json = (await dashRes.json()) as DashboardData;
@@ -1815,19 +1838,40 @@ export function App(): React.ReactElement {
   useEffect(() => {
     fetchDashboard();
 
-    // Hot-reload WebSocket connection
+    // Hot-reload WebSocket connection with React StrictMode-safe lifecycle
+    let isMounted = true;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
+    ws.onopen = () => {
+      if (isMounted) {
+        setConnected(true);
+      } else {
+        ws.close();
+      }
+    };
+    ws.onclose = () => {
+      if (isMounted) setConnected(false);
+    };
     ws.onmessage = (event) => {
-      if (event.data === "reload" || event.data === "dashboard-updated") {
+      if (
+        isMounted &&
+        (event.data === "reload" || event.data === "dashboard-updated")
+      ) {
         fetchDashboard();
       }
     };
 
-    return () => ws.close();
+    return () => {
+      isMounted = false;
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      } else if (ws.readyState === WebSocket.CONNECTING) {
+        // Wait for handshake to finish before closing to avoid browser
+        // "WebSocket is closed before the connection is established" warning in React StrictMode
+        ws.onopen = () => ws.close();
+      }
+    };
   }, []);
 
   const filteredCustomers = SAMPLE_PROFILE_DATA.filter((cust) => {
@@ -1850,6 +1894,27 @@ export function App(): React.ReactElement {
       return cust.tier === "TIER_5_RECREATIONAL";
     return true;
   });
+
+  type CustomerSortKey = "id" | "score" | "gini" | "var95Usd" | "holdPct";
+  const [customerSort, setCustomerSort] = useState<{
+    key: CustomerSortKey;
+    dir: 1 | -1;
+  }>({ key: "score", dir: -1 });
+
+  const onCustomerSort = (key: CustomerSortKey) =>
+    setCustomerSort((s) =>
+      s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: -1 },
+    );
+
+  const sortedCustomers = useMemo(() => {
+    return [...filteredCustomers].sort((a, b) => {
+      const v =
+        customerSort.key === "id"
+          ? a.id.localeCompare(b.id)
+          : (a[customerSort.key] as number) - (b[customerSort.key] as number);
+      return v * customerSort.dir;
+    });
+  }, [filteredCustomers, customerSort]);
 
   return (
     <div style={styles.container}>
@@ -2011,6 +2076,7 @@ export function App(): React.ReactElement {
           >
             ⚡ Live Wagers ({SAMPLE_LIVE_WAGERS.length})
             <span
+              className="live-alert-pulse"
               style={{
                 fontSize: "10px",
                 padding: "1px 5px",
@@ -2066,69 +2132,148 @@ export function App(): React.ReactElement {
       <main style={styles.main}>
         {activeTab === "customers" ? (
           <div>
-            {/* Session Notice Banner */}
+            {/* Session Notice Banner (Dismissible) */}
+            {!bannerDismissed && (
+              <div
+                style={{
+                  marginBottom: "16px",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  background: "rgba(245, 158, 11, 0.1)",
+                  border: "1px solid rgba(245, 158, 11, 0.2)",
+                  fontSize: "12px",
+                  color: "#fbbf24",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "10px",
+                  }}
+                >
+                  <span style={{ fontSize: "16px", lineHeight: "1" }}>⚠️</span>
+                  <div>
+                    <b>Fantasy402 Portal Session Notice:</b> Direct portal links
+                    require an active, authenticated manager session in your
+                    browser. If you encounter <i>"Your session has expired"</i>,
+                    log into fantasy402.com first. For instant local telemetry,
+                    all accounts are profiled below; click any row/ID to inspect
+                    or use <b>📋 Copy CLI</b>.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#fbbf24",
+                    fontSize: "16px",
+                    cursor: "pointer",
+                    padding: "0 4px",
+                    lineHeight: "1",
+                  }}
+                  onClick={() => {
+                    setBannerDismissed(true);
+                    try {
+                      sessionStorage.setItem("portalBannerDismissed", "1");
+                    } catch {}
+                  }}
+                  title="Dismiss notice"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Collapsible KPI Strip Header */}
             <div
               style={{
-                marginBottom: "16px",
-                padding: "10px 14px",
-                borderRadius: "8px",
-                background: "rgba(245, 158, 11, 0.1)",
-                border: "1px solid rgba(245, 158, 11, 0.2)",
-                fontSize: "12px",
-                color: "#fbbf24",
                 display: "flex",
-                alignItems: "flex-start",
-                gap: "10px",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "8px",
               }}
             >
-              <span style={{ fontSize: "16px", lineHeight: "1" }}>⚠️</span>
-              <div>
-                <b>Fantasy402 Portal Session Notice:</b> Direct portal links
-                require an active, authenticated manager session in your
-                browser. If you encounter <i>"Your session has expired"</i>, log
-                into fantasy402.com first. For instant local telemetry, all
-                accounts are profiled below; click any row/ID to inspect or use{" "}
-                <b>📋 Copy CLI</b>.
-              </div>
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: "#64748b",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  fontWeight: 600,
+                }}
+              >
+                Corpora & Surveillance Cohorts
+              </span>
+              <button
+                type="button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#38bdf8",
+                  fontSize: "11px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  padding: "2px 6px",
+                }}
+                onClick={() => {
+                  const next = !kpisCollapsed;
+                  setKpisCollapsed(next);
+                  try {
+                    localStorage.setItem("kpisCollapsed", next ? "1" : "0");
+                  } catch {}
+                }}
+              >
+                {kpisCollapsed ? "Show Corpora ▼" : "Hide Corpora ▲"}
+              </button>
             </div>
 
-            {/* KPI Summary Cards */}
-            <div style={styles.kpiGrid}>
-              <div style={styles.kpiCard}>
-                <div style={styles.kpiLabel}>Backtest Cohort</div>
-                <div style={styles.kpiVal}>49 Accounts</div>
-                <div style={styles.kpiSub}>4-Wk CFB/NBA Backtest (docs/)</div>
-              </div>
-              <div style={styles.kpiCard}>
-                <div style={styles.kpiLabel}>Key Number Sharps</div>
-                <div style={styles.kpiVal}>5 Elite Accounts</div>
-                <div style={styles.kpiSub}>
-                  Football 3, 7, 10, 14, 21 Watchlist
+            {/* KPI Summary Cards (Collapsible) */}
+            {!kpisCollapsed && (
+              <div className="kpi-strip" style={styles.kpiGrid}>
+                <div style={styles.kpiCard}>
+                  <div style={styles.kpiLabel}>Backtest Cohort</div>
+                  <div style={styles.kpiVal}>49 Accounts</div>
+                  <div style={styles.kpiSub}>4-Wk CFB/NBA Backtest (docs/)</div>
+                </div>
+                <div style={styles.kpiCard}>
+                  <div style={styles.kpiLabel}>Key Number Sharps</div>
+                  <div style={styles.kpiVal}>5 Elite Accounts</div>
+                  <div style={styles.kpiSub}>
+                    Football 3, 7, 10, 14, 21 Watchlist
+                  </div>
+                </div>
+                <div style={styles.kpiCard}>
+                  <div style={styles.kpiLabel}>Hook Syndicates</div>
+                  <div style={styles.kpiVal}>5 Downlines</div>
+                  <div style={styles.kpiSub}>Half-Point Syndicate Clusters</div>
+                </div>
+                <div style={styles.kpiCard}>
+                  <div style={styles.kpiLabel}>CI Synthetic Fixtures</div>
+                  <div style={styles.kpiVal}>6 Accounts</div>
+                  <div style={styles.kpiSub}>Regression Testing Fixtures</div>
+                </div>
+                <div style={styles.kpiCard}>
+                  <div style={styles.kpiLabel}>Local Customer Book</div>
+                  <div style={styles.kpiVal}>220 Accounts</div>
+                  <div style={styles.kpiSub}>
+                    1,100 Sampled Tickets (29 Agents)
+                  </div>
+                </div>
+                <div style={styles.kpiCard}>
+                  <div style={styles.kpiLabel}>Broad Surveillance</div>
+                  <div style={styles.kpiVal}>4,914 IDs</div>
+                  <div style={styles.kpiSub}>Captures & Weblog Streams</div>
                 </div>
               </div>
-              <div style={styles.kpiCard}>
-                <div style={styles.kpiLabel}>Hook Syndicates</div>
-                <div style={styles.kpiVal}>5 Downlines</div>
-                <div style={styles.kpiSub}>Half-Point Syndicate Clusters</div>
-              </div>
-              <div style={styles.kpiCard}>
-                <div style={styles.kpiLabel}>CI Synthetic Fixtures</div>
-                <div style={styles.kpiVal}>6 Accounts</div>
-                <div style={styles.kpiSub}>Regression Testing Fixtures</div>
-              </div>
-              <div style={styles.kpiCard}>
-                <div style={styles.kpiLabel}>Local Customer Book</div>
-                <div style={styles.kpiVal}>220 Accounts</div>
-                <div style={styles.kpiSub}>
-                  1,100 Sampled Tickets (29 Agents)
-                </div>
-              </div>
-              <div style={styles.kpiCard}>
-                <div style={styles.kpiLabel}>Broad Surveillance</div>
-                <div style={styles.kpiVal}>4,914 IDs</div>
-                <div style={styles.kpiSub}>Captures & Weblog Streams</div>
-              </div>
-            </div>
+            )}
 
             {/* Filter and Search Bar */}
             <div style={styles.filterBar}>
@@ -2176,25 +2321,119 @@ export function App(): React.ReactElement {
             <div style={styles.showcaseGrid}>
               {/* Left Column: Customers Table */}
               <div style={styles.tablePanel}>
-                <h3 style={styles.panelTitle}>
-                  Profiled Bettors ({filteredCustomers.length})
-                </h3>
-                <div style={styles.tableContainer}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <h3 style={{ margin: 0, fontSize: "16px", color: "#f8fafc" }}>
+                    Profiled Bettors ({sortedCustomers.length})
+                  </h3>
+                  <span style={{ fontSize: "11px", color: "#64748b" }}>
+                    Click header to sort · Pinned Directive
+                  </span>
+                </div>
+                <div className="profiles-wrap">
                   <table style={styles.table}>
                     <thead>
                       <tr style={styles.thRow}>
-                        <th style={styles.th}>Customer</th>
-                        <th style={styles.th}>Unified Sharpness</th>
-                        <th style={styles.th}>Sizing Strategy</th>
+                        <th
+                          className="sortable"
+                          style={styles.th}
+                          onClick={() => onCustomerSort("id")}
+                        >
+                          Customer
+                          <span className="sort-arrow">
+                            {customerSort.key === "id"
+                              ? customerSort.dir === 1
+                                ? "▲"
+                                : "▼"
+                              : ""}
+                          </span>
+                        </th>
+                        <th
+                          className="sortable"
+                          style={styles.th}
+                          onClick={() => onCustomerSort("score")}
+                        >
+                          Unified Sharpness
+                          <span className="sort-arrow">
+                            {customerSort.key === "score"
+                              ? customerSort.dir === 1
+                                ? "▲"
+                                : "▼"
+                              : ""}
+                          </span>
+                        </th>
+                        <th
+                          className="sortable"
+                          style={styles.th}
+                          onClick={() => onCustomerSort("gini")}
+                        >
+                          Sizing Strategy
+                          <span className="sort-arrow">
+                            {customerSort.key === "gini"
+                              ? customerSort.dir === 1
+                                ? "▲"
+                                : "▼"
+                              : ""}
+                          </span>
+                        </th>
                         <th style={styles.th}>Specialization</th>
                         <th style={styles.th}>Correlated Par</th>
-                        <th style={styles.th}>7d VaR (95%)</th>
-                        <th style={styles.th}>Desk Directive</th>
+                        <th
+                          className="sortable"
+                          style={styles.th}
+                          onClick={() => onCustomerSort("var95Usd")}
+                        >
+                          7d VaR (95%)
+                          <span className="sort-arrow">
+                            {customerSort.key === "var95Usd"
+                              ? customerSort.dir === 1
+                                ? "▲"
+                                : "▼"
+                              : ""}
+                          </span>
+                        </th>
+                        <th
+                          className="sortable directive"
+                          style={styles.th}
+                          onClick={() => onCustomerSort("holdPct")}
+                        >
+                          Desk Directive
+                          <span className="sort-arrow">
+                            {customerSort.key === "holdPct"
+                              ? customerSort.dir === 1
+                                ? "▲"
+                                : "▼"
+                              : ""}
+                          </span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredCustomers.map((cust) => {
+                      {sortedCustomers.map((cust) => {
                         const isSelected = selectedCustomer?.id === cust.id;
+                        const tierClass = cust.tier.includes("TIER_1")
+                          ? "tier-1"
+                          : cust.tier.includes("TIER_2")
+                            ? "tier-2"
+                            : cust.tier.includes("TIER_3")
+                              ? "tier-3"
+                              : cust.tier.includes("TIER_4")
+                                ? "tier-4"
+                                : "tier-5";
+
+                        const actionClass = cust.action.includes("ALERT")
+                          ? "action-alert"
+                          : cust.action.includes("MONITOR") ||
+                              cust.action.includes("THROTTLE")
+                            ? "action-monitor"
+                            : "action-accept";
+
                         return (
                           <tr
                             key={cust.id}
@@ -2257,8 +2496,15 @@ export function App(): React.ReactElement {
                               </div>
                             </td>
                             <td style={styles.td}>
-                              <span style={styles.tierBadge(cust.tier)}>
-                                {cust.score.toFixed(1)}/10 ·{" "}
+                              <span className={`chip ${tierClass}`}>
+                                {cust.score >= 9.0
+                                  ? "🚨 "
+                                  : cust.score >= 8.0
+                                    ? "⚡ "
+                                    : cust.score >= 7.0
+                                      ? "⚠️ "
+                                      : "✅ "}
+                                {cust.score.toFixed(1)} ·{" "}
                                 {cust.tier.replace("TIER_", "T")}
                               </span>
                             </td>
@@ -2284,17 +2530,16 @@ export function App(): React.ReactElement {
                             <td style={styles.td}>
                               <div>${cust.var95Usd.toLocaleString()}</div>
                               <div
-                                style={{
-                                  ...styles.custSub,
-                                  color:
-                                    cust.holdPct < 0 ? "#f87171" : "#4ade80",
-                                }}
+                                className={
+                                  cust.holdPct < 0 ? "hold-neg" : "hold-pos"
+                                }
+                                style={{ fontSize: "11px" }}
                               >
                                 Hold: {cust.holdPct}%
                               </div>
                             </td>
-                            <td style={styles.td}>
-                              <span style={styles.actionBadge(cust.action)}>
+                            <td className="directive" style={styles.td}>
+                              <span className={`chip ${actionClass}`}>
                                 {cust.action}
                               </span>
                               <div style={styles.custSub}>
@@ -2311,7 +2556,7 @@ export function App(): React.ReactElement {
               </div>
 
               {/* Right Column: Deep-Dive Inspector */}
-              <div style={styles.inspectorPanel}>
+              <div className="detail-panel" style={styles.inspectorPanel}>
                 {selectedCustomer ? (
                   <div>
                     <div style={styles.inspectorHeader}>
@@ -2328,8 +2573,10 @@ export function App(): React.ReactElement {
                       <div
                         style={{
                           display: "flex",
+                          flexWrap: "wrap",
+                          justifyContent: "flex-end",
                           alignItems: "center",
-                          gap: "8px",
+                          gap: "6px",
                         }}
                       >
                         <button
@@ -2379,7 +2626,7 @@ export function App(): React.ReactElement {
                             padding: "4px 8px",
                             fontSize: "11px",
                             textDecoration: "none",
-                            color: "#38bdf8",
+                            color: "#0f172a",
                           }}
                           title="Requires active Fantasy402 manager session in your browser"
                         >
@@ -3775,7 +4022,7 @@ export function App(): React.ReactElement {
                             <td style={styles.td}>
                               <span
                                 style={{
-                                  ...wagerBadge(alert.tier, tiersConfig),
+                                  ...styles.wagerBadge(alert.tier, tiersConfig),
                                   display: "inline-block",
                                   padding: "2px 6px",
                                   borderRadius: "4px",
@@ -5122,23 +5369,26 @@ const styles = {
     flexDirection: "column" as const,
   },
   header: {
-    padding: "16px 24px",
+    padding: "14px 24px",
     backgroundColor: "#0d1527",
     borderBottom: "1px solid #1e293b",
     display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "12px",
     justifyContent: "space-between",
     alignItems: "center",
   },
   headerLeft: {
     display: "flex",
+    flexWrap: "wrap" as const,
     alignItems: "center",
-    gap: "16px",
+    gap: "10px",
   },
   title: {
     margin: 0,
     fontSize: "20px",
     fontWeight: 700,
-    color: "#f8fafc",
+    color: "#f1f5f9",
   },
   badge: (active: boolean) => ({
     padding: "4px 10px",
@@ -5153,19 +5403,35 @@ const styles = {
   }),
   tabNav: {
     display: "flex",
-    gap: "8px",
+    flexWrap: "wrap" as const,
+    gap: "6px",
   },
   tabBtn: (active: boolean) => ({
-    padding: "8px 16px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "7px 12px",
     borderRadius: "6px",
-    fontSize: "13px",
+    fontSize: "12px",
     fontWeight: 600,
+    whiteSpace: "nowrap" as const,
     cursor: "pointer",
     backgroundColor: active ? "#38bdf8" : "#1e293b",
     color: active ? "#0f172a" : "#94a3b8",
     border: "none",
     transition: "all 0.15s ease",
   }),
+  keyShortcutBadge: {
+    marginLeft: "2px",
+    padding: "1px 5px",
+    borderRadius: "4px",
+    fontSize: "10px",
+    fontFamily:
+      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+    fontWeight: 600,
+    backgroundColor: "rgba(15, 23, 42, 0.22)",
+    opacity: 0.85,
+  },
   main: {
     flex: 1,
     padding: "24px",
@@ -5310,8 +5576,8 @@ const styles = {
       color = "#f87171";
       bg = "rgba(239, 68, 68, 0.2)";
     } else if (tier.includes("TIER_2") || tier.includes("STEAM")) {
-      color = "#fb923c";
-      bg = "rgba(251, 146, 60, 0.2)";
+      color = "#f59e0b";
+      bg = "rgba(245, 158, 11, 0.2)";
     } else if (tier.includes("TIER_3") || tier.includes("DISCIPLINED")) {
       color = "#fbbf24";
       bg = "rgba(251, 191, 36, 0.2)";

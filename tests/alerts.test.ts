@@ -429,6 +429,20 @@ describe("Surveillance Alert Queue & DLQ Substrate (lib/alerts.ts)", () => {
     expect(recRes.tier).toBe("RECREATIONAL");
     expect(recRes.enqueued).toBe(false);
     expect(recRes.deliveryId).toBeUndefined();
+
+    // 3. High-stake recreational whale wager (e.g. RF2003 with $25k stake, -4.2¢ CLV)
+    // Must NOT be falsely escalated to CRITICAL originator alert
+    const whaleRes = await processWagerSurveillance({
+      ticketId: "W-PROD-03",
+      customerId: "RF2003",
+      riskUsd: 25000,
+      clvCents: -4.2,
+      sharpScore: 3.0,
+    });
+
+    expect(whaleRes.tier).toBe("RECREATIONAL");
+    expect(whaleRes.enqueued).toBe(false);
+    expect(whaleRes.deliveryId).toBeUndefined();
   });
 
   it("sendTelegramAlert posts HTML card to Bot API and parses 200/429 responses", async () => {

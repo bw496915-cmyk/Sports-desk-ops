@@ -31,6 +31,8 @@ if (!result.success) {
 
 const jsArtifact = result.outputs.find((o) => o.path.endsWith(".js"));
 const jsFileName = jsArtifact ? jsArtifact.path.split("/").pop() : "index.js";
+const cssArtifact = result.outputs.find((o) => o.path.endsWith(".css"));
+const cssFileName = cssArtifact ? cssArtifact.path.split("/").pop() : null;
 
 const htmlContent = `<!doctype html>
 <html lang="en">
@@ -38,6 +40,7 @@ const htmlContent = `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SportsDesk &amp; Fantasy402 Dashboard (Production)</title>
+    ${cssFileName ? `<link rel="stylesheet" href="./${cssFileName}" />` : ""}
     <style>
       :root {
         color-scheme: dark;

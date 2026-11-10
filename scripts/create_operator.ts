@@ -124,7 +124,7 @@ const readLineTTY = async (prompt: string, masked = false): Promise<string> => {
         if (code === 0x03) return done(() => reject(new Error("aborted")));
         if (code === 0x7f || code === 0x08) {
           if (buf.length > 0) {
-            buf = buf.slice(0, -1);
+            buf = Array.from(buf).slice(0, -1).join("");
             if (masked) process.stdout.write("\b \b");
           }
           continue;
