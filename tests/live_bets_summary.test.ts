@@ -1,6 +1,17 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { REPORT_PENDING_OPERATION } from "../lib/f402_live_pending.ts";
 import { WAGER_TYPE_LABELS } from "../lib/game_admin.ts";
+import {
+  buildArtifact,
+  hierarchyIndexFromAgentIndex,
+  readPendingRows,
+} from "../lib/live_bets.ts";
 import { startServer } from "../services/sportsdesk_webview_server.ts";
+
+const REPO_ROOT = resolve(import.meta.dir, "..");
 
 interface Bucket {
   games: number;
@@ -20,17 +31,37 @@ interface Summary {
 
 describe("GET /api/live-bets/summary?source=auto", () => {
   let server: ReturnType<typeof startServer>;
+  let fixtureDir: string;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), "live-bets-summary-"));
+    const liveBetsPath = join(fixtureDir, "live-bets.json");
+    const samplePayload: unknown = await Bun.file(
+      join(REPO_ROOT, "tests/f402-pending-wager-sample.json"),
+    ).json();
+    const agentIndexPayload: unknown = await Bun.file(
+      join(REPO_ROOT, "data/agent-index.json"),
+    ).json();
+    const artifact = buildArtifact(readPendingRows(samplePayload), {
+      operation: REPORT_PENDING_OPERATION,
+      capturedAt: "2026-11-01T15:32:15.533Z",
+      hierarchyIndex: hierarchyIndexFromAgentIndex(agentIndexPayload),
+    });
+    await Bun.write(liveBetsPath, JSON.stringify(artifact));
+
     server = startServer({
       port: 0,
       hostname: "127.0.0.1",
       development: false,
+      liveBetsPath,
+      livePending: { enabled: false },
+      liveTicker: { enabled: false },
     });
   });
 
   afterAll(() => {
     server.stop(true);
+    rmSync(fixtureDir, { recursive: true, force: true });
   });
 
   const getSummary = async (): Promise<Summary> => {
