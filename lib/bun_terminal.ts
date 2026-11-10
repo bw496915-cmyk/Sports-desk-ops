@@ -5,6 +5,11 @@
  * @see {@link BUN_TERMINAL_V14_BLOG_CAPABILITIES_URL} (write · resize · colored output · #25415 #29522)
  * @see {@link BUN_TERMINAL_DOCS}
  * @see tests/cli_terminal_automation.test.ts
+ *
+ * Security Audit (2026-11-09):
+ * TerminalSession spaws subprocesses exclusively via array-form `Bun.spawn([...cmd], { terminal })`
+ * calling direct execve syscalls. No shell wrappers (`sh -c` / `bash -c`) are invoked, rendering
+ * shell metacharacter injections inert (regression guard: `tests/pty_injection.test.ts`).
  */
 
 import { bunUrl, textFragment } from "./bun_urls.ts";

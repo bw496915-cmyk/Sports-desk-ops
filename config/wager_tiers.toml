@@ -1,0 +1,52 @@
+# config/wager_tiers.toml
+# Declarative Wager Tiers and Surveillance Alert Configuration (Bun.TOML)
+# Precedence: CLI flags > this file > built-in token defaults.
+
+[surface]
+panel = "#0d1527"
+border = "#1e293b"
+text = "#f8fafc"
+muted = "#94a3b8"
+accent = "#38bdf8"
+
+[tiers.CRITICAL]
+fg = "#f87171"
+bg = "#302332"
+border = "#ef4444"
+badge = "🚨 CRITICAL (T1 Originator)"
+minScore = 9.0
+action = "ALERT_OPERATOR"
+alertTelegram = true
+
+[tiers.STEAM]
+fg = "#fb923c"
+bg = "#31282a"
+border = "#fb923c"
+badge = "⚡ STEAM (T2 Syndicate)"
+minScore = 8.0
+action = "MONITOR_FLOW"
+alertTelegram = true
+
+[tiers.LATENCY]
+fg = "#c084fc"
+bg = "#282647"
+border = "#c084fc"
+badge = "⚠️ LATENCY (Arb / Off-Market)"
+minScore = 7.0
+action = "THROTTLE_INPLAY"
+alertTelegram = false
+
+[tiers.RECREATIONAL]
+fg = "#4ade80"
+bg = "#163334"
+border = "#22c55e"
+badge = "✅ RECREATIONAL (Square / Retail)"
+minScore = 0.0
+action = "STANDARD_ROUTING"
+alertTelegram = false
+
+[surveillance]
+clvAlertThresholdCents = 10.0
+steamTimeWindowSeconds = 120
+highRiskThresholdUsd = 5000
+inplayDelaySeconds = 3

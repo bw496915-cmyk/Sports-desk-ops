@@ -12,10 +12,14 @@
  *  6. Tokenized ANSI parser (`parseAnsiSegments`) and safe HTML generator (`ansiToHtml`).
  *  7. Keybindings reference specification and autocomplete registry.
  *  8. Invariant: autoExecute: false across all directives and outputs.
+ *  9. Security Audit (2026-11-09): All subprocess execution uses array-form Bun.spawn
+ *     execve arguments without intermediate shell (no sh -c / bash -c). Injection via
+ *     semicolons, pipes, backticks, or subshells is impossible (covered by tests/pty_injection.test.ts).
  */
 
 import { resolve } from "node:path";
 import { TerminalSession, type SpawnInPtyOptions } from "./bun_terminal.ts";
+import { auditPty } from "./audit_log.ts";
 import { benchmarkResolverLatency, classifyIpAddress } from "./bun_dns.ts";
 import {
   KEY_NUMBER_BUYER_PROFILES,
@@ -32,6 +36,70 @@ import {
 } from "./canonical_osc8_links.ts";
 import { formatHalfPointLine } from "../design/domain-branded-types.ts";
 import { padDisplay } from "./cli_inspect.ts";
+import { TIER, SURFACE, composite, type WagerTier } from "./wager_tokens.ts";
+
+const FG = (c: string) =>
+  typeof Bun !== "undefined" && Bun.color
+    ? (Bun.color(c, "ansi-16m") ?? "")
+    : "";
+const BG = (c: string) => FG(c).replace("\x1b[38;", "\x1b[48;");
+
+/** Gate every escape through Bun.enableANSIColors — mirrors AnsiTheme.colors */
+const S = (sgr: string) =>
+  typeof Bun !== "undefined" && Bun.enableANSIColors !== false ? sgr : "";
+const R = "\x1b[0m";
+
+export const renderWagerBadgeTerminal = (t: WagerTier, s: string): string =>
+  `${S(FG(TIER[t].fg) + BG(TIER[t].bg) + "\x1b[1m")} ${s} ${S(R)}`;
+
+/**
+ * Anchored regex for detecting wager tier keywords in markdown **bold** spans.
+ * Rejects non-tier text and names like STEAM100 while allowing optional alert prefixes and parentheticals.
+ */
+export const TIER_KEYWORD_RE =
+  /^(?:#\s*|(?:🚨|⚡|⚠️|✅)\s*)?(CRITICAL|STEAM|LATENCY|RECREATIONAL)(?:\s*\([^)]+\))?$/u;
+
+/**
+ * Custom Bun.markdown.render callback map that translates Markdown AST elements
+ * directly into ANSI SGR sequences using the exact TrueColor hex tokens from wagerBadge().
+ */
+export function renderWagerMarkdownTerminal(markdown: string): string {
+  // trusted-markdown: terminal emulator interactive markdown-to-ANSI custom renderer
+  return Bun.markdown.render(markdown, {
+    heading: (children, meta) =>
+      `${S(FG(SURFACE.text) + "\x1b[1m")}${"#".repeat(meta.level)} ${children}${S(R)}\n\n`,
+    paragraph: (children) => `${children}\n\n`,
+    strong: (children) => {
+      const text = String(children).trim();
+      // Whole-span case-sensitive tier match (with optional # or alert emoji prefix, or parens)
+      const tierMatch = TIER_KEYWORD_RE.exec(text);
+      if (tierMatch) {
+        const tier = tierMatch[1] as WagerTier;
+        return renderWagerBadgeTerminal(tier, text);
+      }
+      return `${S(FG(SURFACE.text) + "\x1b[1m")}${children}${S("\x1b[22m")}`;
+    },
+    emphasis: (children) => `${S("\x1b[4m")}${children}${S("\x1b[24m")}`,
+    codespan: (children) =>
+      `${S(FG(SURFACE.muted) + BG(composite(SURFACE.muted, 0.1, SURFACE.panel)))} ${children} ${S(R)}`,
+    code: (children) => `${S(FG(SURFACE.muted))}${children}${S(R)}\n`,
+    blockquote: (children) => `${S(FG(SURFACE.muted))}│ ${children}${S(R)}\n`,
+    link: (children, meta) => {
+      const { href } = meta;
+      if (href.startsWith("http://") || href.startsWith("https://")) {
+        return formatOsc8Hyperlink(href, String(children));
+      }
+      return `${S(FG(SURFACE.accent) + "\x1b[4m")}${children}${S("\x1b[24m")} (${href})`;
+    },
+    list: (children) => `${children}\n`,
+    listItem: (children) => `  • ${children}`,
+    tr: (children) => `${children}\n`,
+    th: (children) =>
+      `${S(FG(SURFACE.accent) + "\x1b[1m")}${children}${S(R)} | `,
+    td: (children) => `${children} | `,
+    hr: () => `${S(FG(SURFACE.border))}${"─".repeat(50)}${S(R)}\n\n`,
+  });
+}
 
 let _cachedRanking: Promise<BatchedRankingResult> | null = null;
 function getCachedRanking(): Promise<BatchedRankingResult> {
@@ -842,16 +910,26 @@ export function parseAnsiSegments(raw: string): AnsiSegment[] {
       });
       currentLink = undefined;
     } else if (match[2] !== undefined) {
-      const codes = match[2]
-        .split(";")
-        .map((c) => (c === "" ? 0 : Number.parseInt(c, 10)));
-      for (const code of codes) {
+      const paramStr = match[2];
+      const codes =
+        paramStr === ""
+          ? [0]
+          : paramStr
+              .split(";")
+              .filter((c, idx, arr) => !(idx === arr.length - 1 && c === ""))
+              .map((c) => (c === "" ? 0 : Number.parseInt(c, 10)));
+      for (let i = 0; i < codes.length; i++) {
+        const code = codes[i]!;
         if (code === 0) {
           currentColor = undefined;
           currentBg = undefined;
           currentBold = false;
           currentDim = false;
           currentUnderline = false;
+        } else if (code === 39) {
+          currentColor = undefined;
+        } else if (code === 49) {
+          currentBg = undefined;
         } else if (code === 1) {
           currentBold = true;
         } else if (code === 2) {
@@ -863,14 +941,32 @@ export function parseAnsiSegments(raw: string): AnsiSegment[] {
           currentDim = false;
         } else if (code === 24) {
           currentUnderline = false;
+        } else if (
+          code === 38 &&
+          codes[i + 1] === 2 &&
+          codes[i + 4] !== undefined
+        ) {
+          // ANSI 24-bit TrueColor foreground: 38;2;r;g;b
+          const r = codes[i + 2]!;
+          const g = codes[i + 3]!;
+          const b = codes[i + 4]!;
+          currentColor = `rgb(${r}, ${g}, ${b})`;
+          i += 4;
+        } else if (
+          code === 48 &&
+          codes[i + 1] === 2 &&
+          codes[i + 4] !== undefined
+        ) {
+          // ANSI 24-bit TrueColor background: 48;2;r;g;b
+          const r = codes[i + 2]!;
+          const g = codes[i + 3]!;
+          const b = codes[i + 4]!;
+          currentBg = `rgb(${r}, ${g}, ${b})`;
+          i += 4;
         } else if (code >= 30 && code <= 37) {
           currentColor = ANSI_COLOR_MAP[code];
-        } else if (code === 39) {
-          currentColor = undefined;
         } else if (code >= 40 && code <= 47) {
           currentBg = ANSI_BG_MAP[code];
-        } else if (code === 49) {
-          currentBg = undefined;
         } else if (code >= 90 && code <= 97) {
           currentColor = ANSI_COLOR_MAP[code];
         } else if (code >= 100 && code <= 107) {
@@ -1286,7 +1382,7 @@ function renderKeybindingsCheatSheet(): string {
  * Uses Bun.Terminal PTY with Bun.spawn for authentic command execution,
  * with fast in-memory fallbacks for instant searches.
  */
-export async function executeTerminalQuery(
+async function executeTerminalQueryInner(
   rawInput: string,
   options: TerminalQueryOptions = {},
 ): Promise<TerminalQueryResult> {
@@ -1838,7 +1934,7 @@ export async function executeTerminalQuery(
           mdText = await f.text();
         }
       }
-      const rendered = Bun.markdown.ansi(mdText);
+      const rendered = renderWagerMarkdownTerminal(mdText);
       return {
         command: trimmed,
         stdout: rendered,
@@ -2201,4 +2297,23 @@ export async function executeTerminalQuery(
       timestamp: startedAt,
     };
   }
+}
+
+/**
+ * High-Level Terminal Query Dispatcher with append-only operational audit logging.
+ */
+export async function executeTerminalQuery(
+  rawInput: string,
+  options: TerminalQueryOptions = {},
+): Promise<TerminalQueryResult> {
+  const result = await executeTerminalQueryInner(rawInput, options);
+  if (result.command) {
+    auditPty({
+      command: result.command,
+      exitCode: result.exitCode,
+      durationMs: result.durationMs,
+      cwd: options.cwd,
+    });
+  }
+  return result;
 }
