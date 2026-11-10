@@ -1,8 +1,9 @@
 # config/wager_tiers.toml
 # =============================================================================
-# Wager Tier & Surveillance Alert Configuration
+# Wager Tier, Surveillance Alert & Slice Hold-Floor Policy (SSOT)
 # Format:      TOML 1.0 — Bun-native import: `import cfg from "...toml"`
 # Schema:      wager-tiers/v3   (was v2 — tier keys renamed, see [meta.deprecatedKeys])
+# Consumed by: src/config/wagerTiers.ts, lib/wager_config.ts, and src/risk/hold_floor_config.ts
 # Precedence:  CLI flags > runtime overrides > ENV > this file > built-in defaults
 # Owner:       risk-ops
 # =============================================================================
@@ -17,6 +18,7 @@ timezone = "UTC"
 # Metadata about this file (does not affect runtime behaviour)
 # ---------------------------------------------------------------------------
 [meta]
+schema_version = 1
 name = "Wager Tier & Surveillance Matrix"
 owner = "risk-ops@example.com" # canonical team alias; mirrors CODEOWNERS
 channel = "#risk-ops"
@@ -267,3 +269,33 @@ sink = "stdout+file"
 filePath = "./var/audit/wager-tiers.log"
 sampleRate = 1.0
 redactPII = true
+
+# ---------------------------------------------------------------------------
+# Slice Hold-Floor Policy & Blended Hold SLO (src/risk/hold_floor_config.ts)
+# Constraint: Do NOT lower hold_floors to hide negative floor deltas; gates flag asymmetry instead.
+# ---------------------------------------------------------------------------
+[slo]
+blended_hold_floor_pct = 3.50
+exclude_blocked = true
+exclude_directional = true
+
+[hold_floors]
+default_pct = 3.50
+
+[hold_floors.by_slice]
+
+[hold_floors.by_sport]
+Football = 3.50
+Basketball = 3.50
+Hockey = 3.00
+Baseball = 3.00
+Soccer = 3.50
+LIVE = 4.00
+Other = 3.00
+
+[hold_floors.by_market]
+Moneyline = 3.25
+Spread = 3.50
+Total = 3.50
+"Team Total" = 3.75
+"All Markets" = 3.50

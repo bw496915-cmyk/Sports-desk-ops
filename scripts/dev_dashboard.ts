@@ -1,18 +1,22 @@
 /**
  * @file scripts/dev_dashboard.ts
- * @description Native Bun-Powered Development Server for SportsDesk Dashboard.
+ * @description Native Bun-Powered Enhanced Dashboard & Surveillance Server.
  *
  * Implements:
- *  - Native React 18 bundling on the fly via Bun.build
- *  - Fast zero-copy file serving via Bun.file
- *  - Hot-reloading over native WebSockets for both React components and dashboard.md
- *  - Live Markdown-to-HTML rendering via Bun.markdown.html
+ *  - Declarative `Bun.serve({ routes })` routing with native HTML bundle import (`src/dashboard/index.html`)
+ *  - Operator authentication, session cookies, and CSRF validation (`/api/auth/*`)
+ *  - Throttled O(1) `/health` probe, surveillance alert DLQ (`ack`, `retry`, `sweep`), and `/api/shift/summary`
+ *  - Declarative `config/wager_tiers.toml` v3 API (`/api/config/tiers`) + hot reload over WebSockets
+ *  - Compile-time `bun:bundle` dead-code elimination matrix inspection (`/api/build-matrix`)
+ *  - Sub-2ms TypedArray arena counterfactual shadow-pricing & elasticity API (`/api/shadow-pricing`)
+ *  - Hot-reloading over native WebSockets for React components, `dashboard.md`, and `wager_tiers.toml`
  */
 
-import { watch } from "node:fs";
+import { watch, type FSWatcher } from "node:fs";
 import { resolve } from "node:path";
-import type { ServerWebSocket } from "bun";
-import { runBunBuild } from "./build.ts";
+import type { Server, ServerWebSocket } from "bun";
+import indexHtml from "../src/dashboard/index.html";
+import { AlertDispatcher } from "../lib/alerts.ts";
 import {
   benchmarkResolverLatency,
   classifyIpAddress,
@@ -20,7 +24,7 @@ import {
   prefetchSportsDeskEndpoints,
   SPORTSDESK_CORE_HOSTS,
 } from "../lib/bun_dns.ts";
-import { executeTerminalQuery } from "../lib/terminal_emulator.ts";
+import type { CustomerRow, TicketRow } from "../lib/customer_profile.ts";
 import {
   handleLogin,
   handleLogout,
@@ -28,99 +32,69 @@ import {
   requireCsrf,
   requireSession,
 } from "../lib/http_auth.ts";
-import { AlertDispatcher } from "../lib/alerts.ts";
-import type { CustomerRow, TicketRow } from "../lib/customer_profile.ts";
+import { SUBSPORT_TAXONOMY_CATALOG } from "../lib/market_taxonomy_catalog.ts";
+import {
+  type MarketFilter,
+  type PeriodFilter,
+  type RouterAuditMode,
+  runShadowPricingDashboard,
+  type ShadowRepriceMode,
+  type SportFilter,
+  type SubSportFilter,
+} from "../lib/shadow_pricing_engine.ts";
+import { executeTerminalQuery } from "../lib/terminal_emulator.ts";
+import { runBunBuild } from "./build.ts";
+import { computeDashboardDceMatrix } from "./build_dashboard.ts";
 
-const PORT = Number(process.env.PORT) || 4022;
-const DASHBOARD_MD_PATH = resolve(process.cwd(), "dashboard.md");
-const DASHBOARD_ENTRY_PATH = resolve(process.cwd(), "src/dashboard/index.tsx");
-const WAGER_TIERS_TOML_PATH = resolve(process.cwd(), "config/wager_tiers.toml");
-
-const clients = new Set<ServerWebSocket<unknown>>();
-
-// Initialize and start background surveillance alert dispatcher (5-second drain sweep)
-const alertDispatcher = new AlertDispatcher({
-  sweepIntervalMs: 5000,
-});
-alertDispatcher.start();
-
-// Native memory pressure handler (Bun 1.4)
-if (typeof process !== "undefined" && typeof process.on === "function") {
-  try {
-    process.on("memoryPressure", (level: string) => {
-      console.warn(
-        `[SportsDesk Dev Server] Host memory pressure: ${level}. Reclaiming build cache.`,
-      );
-    });
-  } catch {
-    // Unsupported environment fallback
-  }
+export interface DashboardServerOptions {
+  readonly port?: number | undefined;
+  readonly hostname?: string | undefined;
+  readonly watchFiles?: boolean | undefined;
+  readonly shadowDbPath?: string | undefined;
+  readonly forceShadowFixture?: boolean | undefined;
 }
 
-// Watch dashboard.md, src/dashboard, and config/wager_tiers.toml for live reloading
-try {
-  watch(DASHBOARD_MD_PATH, () => {
-    // Publish to "dashboard" topic natively, plus legacy clients
-    server.publish("dashboard", "dashboard-updated");
-    for (const ws of clients) {
-      if (
-        !ws.subscriptions ||
-        ws.subscriptions.length === 0 ||
-        ws.subscriptions.includes("dashboard")
-      ) {
-        ws.send("dashboard-updated");
-      }
-    }
-  });
-
-  watch(resolve(process.cwd(), "src/dashboard"), { recursive: true }, () => {
-    server.publish("dashboard", "reload");
-    for (const ws of clients) {
-      if (
-        !ws.subscriptions ||
-        ws.subscriptions.length === 0 ||
-        ws.subscriptions.includes("dashboard")
-      ) {
-        ws.send("reload");
-      }
-    }
-  });
-
-  watch(WAGER_TIERS_TOML_PATH, async () => {
-    try {
-      const { reloadTomlConfigIfChanged } =
-        await import("../lib/wager_config.ts");
-      const { changed, config } = await reloadTomlConfigIfChanged();
-      if (changed) {
-        server.publish("tiers-updated", JSON.stringify(config));
-        for (const ws of clients) {
-          if (
-            !ws.subscriptions ||
-            ws.subscriptions.length === 0 ||
-            ws.subscriptions.includes("tiers-updated") ||
-            ws.subscriptions.includes("dashboard")
-          ) {
-            ws.send("tiers-updated");
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("File watch reload failed for wager_tiers.toml:", err);
-    }
-  });
-} catch (err) {
-  console.warn("File watch initialized with fallback:", err);
+export interface DashboardServerHandle {
+  readonly server: Server<undefined>;
+  readonly url: URL;
+  readonly port: number;
+  stop: (closeActiveConnections?: boolean) => void;
 }
 
-// Module-scope health check throttle state
-let lastDbProbe = 0;
-let lastSweep = 0;
-let lastAlertProbe = 0;
-const DB_PROBE_MS = 5_000;
-const SWEEP_MS = 5 * 60_000;
-const ALERT_PROBE_MS = 15_000;
-let cachedDbStatus = "unconfigured";
-let cachedAlertMetrics = alertDispatcher.getHealthMetrics();
+function parseFiniteNumber(raw: string | null | undefined): number | undefined {
+  if (raw === null || raw === undefined || raw.trim() === "") return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseRepriceMode(
+  raw: string | null | undefined,
+): ShadowRepriceMode | undefined {
+  if (raw === "floor" || raw === "exact") return raw;
+  return undefined;
+}
+
+function parseRouterAuditMode(
+  raw: string | null | undefined,
+): RouterAuditMode | undefined {
+  if (raw === "observed_ledger" || raw === "enforced_lockout") return raw;
+  return undefined;
+}
+
+function isAuthRequired(): boolean {
+  return process.env.NODE_ENV === "production"
+    ? process.env.SPORTSDESK_AUTH_DISABLED !== "1"
+    : process.env.SPORTSDESK_AUTH_REQUIRED === "1";
+}
+
+async function enforceOptionalAuth(req: Request): Promise<Response | null> {
+  if (!isAuthRequired()) return null;
+  const authRes = await requireSession(req, async () => new Response("OK"));
+  if (authRes.status !== 200) return authRes;
+  const csrfRes = await requireCsrf(req, async () => new Response("OK"));
+  if (csrfRes.status !== 200) return csrfRes;
+  return null;
+}
 
 async function findCustomerRow(id: string): Promise<CustomerRow | null> {
   const normId = id.trim().toUpperCase();
@@ -149,7 +123,7 @@ async function findCustomerRow(id: string): Promise<CustomerRow | null> {
           if (found) return found;
         }
       } catch {
-        // ignore read/parse failure
+        // signal-honesty: intentional-fallback-invalid-json-candidate
       }
     }
   }
@@ -173,7 +147,7 @@ async function findCustomerRow(id: string): Promise<CustomerRow | null> {
         if (found) return found;
       }
     } catch {
-      // ignore
+      // signal-honesty: intentional-fallback-invalid-profiles-json
     }
   }
   return null;
@@ -314,986 +288,1079 @@ async function loadDevLiveWagers(): Promise<Array<Record<string, unknown>>> {
           });
         }
       } catch {
-        // fall through to fallback
+        // signal-honesty: intentional-fallback-next-wagers-fixture
       }
     }
   }
   return [];
 }
 
-const server = Bun.serve({
-  port: PORT,
-  async fetch(req, server) {
-    const url = new URL(req.url);
+const FALLBACK_DEV_WAGERS: Array<Record<string, unknown>> = [
+  {
+    ticketId: "W-109281",
+    timestamp: "14:32:01 ET",
+    customerId: "GP301",
+    agentId: "AG99",
+    masterAgent: "MASTER_VEND",
+    sport: "NFL",
+    betType: "Total",
+    event: "Kansas City Chiefs @ Buffalo Bills",
+    selection: "Under",
+    lineDisplay: "47½",
+    oddsAmerican: "-110",
+    riskUsd: 5500,
+    toWinUsd: 5000,
+    clvCents: 14.2,
+    alertTier: "CRITICAL",
+    alertBadge: "🚨 CRITICAL (T1 Originator)",
+    operatorDirective: "Clamp Max $250 (autoExecute: false)",
+    maxRecommendedStake: 250,
+    autoExecute: false,
+  },
+  {
+    ticketId: "W-109282",
+    timestamp: "14:32:15 ET",
+    customerId: "CCC88412",
+    agentId: "FATSNOBOT",
+    masterAgent: "NOLAWOLF",
+    sport: "CFB",
+    betType: "Spread",
+    event: "Georgia @ Texas",
+    selection: "Texas",
+    lineDisplay: "+3½",
+    oddsAmerican: "-105",
+    riskUsd: 5250,
+    toWinUsd: 5000,
+    clvCents: 11.5,
+    alertTier: "STEAM",
+    alertBadge: "🚨 STEAM (Key Number 3)",
+    operatorDirective: "Clamp Max $250 (autoExecute: false)",
+    maxRecommendedStake: 250,
+    autoExecute: false,
+  },
+  {
+    ticketId: "W-109288",
+    timestamp: "14:34:25 ET",
+    customerId: "RF2003",
+    agentId: "FAKEMONEY",
+    masterAgent: "NOLAWOLF",
+    sport: "SOCCER",
+    betType: "Total",
+    event: "Real Madrid vs Barcelona",
+    selection: "Over",
+    lineDisplay: "3½ Goals",
+    oddsAmerican: "+130",
+    riskUsd: 25000,
+    toWinUsd: 32500,
+    clvCents: -4.2,
+    alertTier: "RECREATIONAL",
+    alertBadge: "✅ RECREATIONAL (Whale)",
+    operatorDirective: "Accept Normal ($25k) (autoExecute: false)",
+    maxRecommendedStake: 25000,
+    autoExecute: false,
+  },
+];
 
-    // WebSocket upgrade for hot reload
-    if (url.pathname === "/ws") {
-      const upgraded = server.upgrade(req);
-      if (upgraded) return undefined;
-      return new Response("WebSocket upgrade failed", { status: 400 });
+export function startDashboardServer(
+  options: DashboardServerOptions = {},
+): DashboardServerHandle {
+  const port =
+    options.port !== undefined ? options.port : Number(Bun.env.PORT) || 4022;
+  const hostname = options.hostname ?? "127.0.0.1";
+  const dashboardMdPath = resolve(process.cwd(), "dashboard.md");
+  const dashboardEntryPath = resolve(process.cwd(), "src/dashboard/index.tsx");
+  const wagerTiersTomlPath = resolve(process.cwd(), "config/wager_tiers.toml");
+
+  const clients = new Set<ServerWebSocket<unknown>>();
+  const watchers: FSWatcher[] = [];
+
+  const alertDispatcher = new AlertDispatcher({
+    sweepIntervalMs: 5000,
+  });
+  if (options.watchFiles !== false) {
+    alertDispatcher.start();
+  }
+
+  let lastDbProbe = 0;
+  let lastSweep = 0;
+  let lastAlertProbe = 0;
+  const DB_PROBE_MS = 5_000;
+  const SWEEP_MS = 5 * 60_000;
+  const ALERT_PROBE_MS = 15_000;
+  let cachedDbStatus = "unconfigured";
+  let cachedAlertMetrics = alertDispatcher.getHealthMetrics();
+
+  let cachedDceMatrix: Awaited<
+    ReturnType<typeof computeDashboardDceMatrix>
+  > | null = null;
+
+  const buildDnsPayload = () => {
+    const telemetry = getDnsTelemetry();
+    const nowIso = new Date().toISOString();
+    return {
+      success: true,
+      telemetry,
+      hosts: SPORTSDESK_CORE_HOSTS,
+      coreHosts: SPORTSDESK_CORE_HOSTS.map((h) => ({
+        hostname: h.hostname,
+        port: h.port,
+        serviceName: h.serviceName,
+      })),
+      updatedAt: nowIso,
+      generatedAt: nowIso,
+    };
+  };
+
+  const buildLiveWagersPayload = async () => {
+    let wagers = await loadDevLiveWagers();
+    if (wagers.length === 0) {
+      wagers = FALLBACK_DEV_WAGERS;
     }
+    return {
+      wagers,
+      totalRiskUsd: wagers.reduce(
+        (sum, w: Record<string, unknown>) => sum + (Number(w.riskUsd) || 0),
+        0,
+      ),
+      totalToWinUsd: wagers.reduce(
+        (sum, w: Record<string, unknown>) => sum + (Number(w.toWinUsd) || 0),
+        0,
+      ),
+      criticalSteamCount: wagers.filter(
+        (w: Record<string, unknown>) =>
+          w.alertTier === "CRITICAL" || w.alertTier === "STEAM",
+      ).length,
+      autoExecute: false,
+      timestamp: new Date().toISOString(),
+    };
+  };
 
-    // Health check endpoint for operator & agent diagnostics (throttled to avoid DB/Disk DoS)
-    if (url.pathname === "/health") {
-      const now = Date.now();
-      let purgedSessions = 0;
+  const server: Server<undefined> = Bun.serve({
+    port,
+    hostname,
+    routes: {
+      "/": indexHtml,
+      "/dashboard": indexHtml,
 
-      if (process.env.PGUSER && process.env.PGPASSWORD) {
-        if (now - lastDbProbe > DB_PROBE_MS) {
-          lastDbProbe = now;
+      // Health check endpoint for operator & agent diagnostics (throttled to avoid DB/Disk DoS)
+      "/health": {
+        GET: async (): Promise<Response> => {
+          const now = Date.now();
+          let purgedSessions = 0;
+
+          if (process.env.PGUSER && process.env.PGPASSWORD) {
+            if (now - lastDbProbe > DB_PROBE_MS) {
+              lastDbProbe = now;
+              try {
+                const { sql } = await import("../lib/db.ts");
+                await sql`SELECT 1`;
+                cachedDbStatus = "connected";
+              } catch (err) {
+                cachedDbStatus = `error: ${err instanceof Error ? err.message : String(err)}`;
+              }
+            }
+
+            if (now - lastSweep > SWEEP_MS) {
+              lastSweep = now;
+              try {
+                const { sessionCleanup } = await import("../lib/session.ts");
+                purgedSessions = await sessionCleanup();
+              } catch {
+                // signal-honesty: intentional-fire-and-forget-session-cleanup
+              }
+            }
+          }
+
+          if (now - lastAlertProbe > ALERT_PROBE_MS) {
+            lastAlertProbe = now;
+            cachedAlertMetrics = alertDispatcher.getHealthMetrics();
+          }
+
+          const overallStatus =
+            cachedAlertMetrics.status === "degraded"
+              ? "degraded"
+              : cachedAlertMetrics.status === "warning"
+                ? "warning"
+                : "ok";
+
+          return Response.json({
+            status: overallStatus,
+            service: "sportsdesk-dev-dashboard",
+            port: server.port ?? port,
+            bunVersion: Bun.version,
+            uptimeSeconds: Math.floor(process.uptime()),
+            db: cachedDbStatus,
+            purgedSessions,
+            alerts: cachedAlertMetrics,
+            timestamp: new Date().toISOString(),
+          });
+        },
+      },
+
+      // Operator Auth Endpoints
+      "/api/auth/login": {
+        POST: (req) => handleLogin(req, server),
+      },
+      "/api/auth/logout": {
+        POST: (req) => handleLogout(req),
+      },
+      "/api/auth/me": {
+        GET: (req) => handleSessionMe(req),
+      },
+
+      // API: Real-time dashboard.md parsed via Bun.markdown.html
+      "/api/dashboard": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+
+          const file = Bun.file(dashboardMdPath);
+          if (!(await file.exists())) {
+            return Response.json(
+              { error: "dashboard.md not found" },
+              { status: 404 },
+            );
+          }
+
+          const markdown = await file.text();
+          // trusted-markdown: local repo-owned dashboard.md rendered for operator dev server
+          const html = Bun.markdown.html(markdown);
+          return Response.json({
+            markdown,
+            html,
+            updatedAt: new Date().toISOString(),
+          });
+        },
+      },
+
+      // API: Real-time DNS Cache Telemetry (canonical + alias)
+      "/api/dns": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          return Response.json(buildDnsPayload());
+        },
+      },
+      "/api/dns/telemetry": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          return Response.json(buildDnsPayload());
+        },
+      },
+
+      // API: DNS Resolver Latency Benchmark
+      "/api/dns/benchmark": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          const url = new URL(req.url);
+          const host = url.searchParams.get("host") || "fantasy402.com";
+          const result = await benchmarkResolverLatency(
+            host,
+            ["c-ares", "system"],
+            3,
+          );
+          return Response.json(result);
+        },
+      },
+
+      // API: Reverse DNS & Forensics IP Classification
+      "/api/dns/reverse": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          const url = new URL(req.url);
+          const ip = url.searchParams.get("ip") || "1.1.1.1";
+          const result = await classifyIpAddress(ip);
+          return Response.json(result);
+        },
+      },
+
+      // API: Customer Profiling & Behavioral Sharp Showcase (dynamic counts, zero hardcoding)
+      "/api/customers": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+
+          const backtestFile = Bun.file("docs/backtest-4wk-cfb-nba.json");
+          const backtestJson = (await backtestFile.exists())
+            ? ((await backtestFile.json()) as {
+                customerLeaderboard?: Array<Record<string, unknown>>;
+              })
+            : { customerLeaderboard: [] };
+
+          const fixtureFile = Bun.file(
+            "tests/fixtures/backtest/enriched_customers_full.json",
+          );
+          const fixtureJson = (await fixtureFile.exists())
+            ? ((await fixtureFile.json()) as Array<Record<string, unknown>>)
+            : [];
+
+          const {
+            KEY_NUMBER_BUYER_PROFILES,
+            HALF_POINT_HOOK_SYNDICATE_PROFILES,
+          } = await import("../lib/customer_profile.ts");
+
+          const uniqueSurveillanceIds = new Set<string>();
+          for (const row of backtestJson.customerLeaderboard ?? []) {
+            const id =
+              (row as Record<string, unknown>).customer ??
+              (row as Record<string, unknown>).customerId ??
+              (row as Record<string, unknown>).customer_id;
+            if (id) uniqueSurveillanceIds.add(String(id).trim().toUpperCase());
+          }
+          for (const row of fixtureJson) {
+            const id =
+              (row as Record<string, unknown>).customer_id ??
+              (row as Record<string, unknown>).customerId;
+            if (id) uniqueSurveillanceIds.add(String(id).trim().toUpperCase());
+          }
+          for (const key of KEY_NUMBER_BUYER_PROFILES.keys()) {
+            uniqueSurveillanceIds.add(key.trim().toUpperCase());
+          }
+          for (const key of HALF_POINT_HOOK_SYNDICATE_PROFILES.keys()) {
+            uniqueSurveillanceIds.add(key.trim().toUpperCase());
+          }
+
+          return Response.json({
+            cohorts: {
+              backtestCount: backtestJson.customerLeaderboard?.length ?? 0,
+              keyNumberSharpsCount: KEY_NUMBER_BUYER_PROFILES.size,
+              hookSyndicateCount: HALF_POINT_HOOK_SYNDICATE_PROFILES.size,
+              fixtureCount: fixtureJson.length,
+              fullBookSpecCount: fixtureJson.length,
+              uniqueSurveillanceCount: uniqueSurveillanceIds.size,
+            },
+            backtestTop: (backtestJson.customerLeaderboard ?? []).slice(0, 20),
+            fixtures: fixtureJson,
+          });
+        },
+      },
+
+      // API: Customer profiling: unified behavioral forensics & composite sharpness
+      "/api/customer/profile": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+
+          const url = new URL(req.url);
+          const id = (url.searchParams.get("id") ?? "").trim();
+          if (!id) {
+            return Response.json(
+              { success: false, error: "Missing required parameter 'id'" },
+              { status: 400 },
+            );
+          }
+          const row = await findCustomerRow(id);
+          if (!row) {
+            return Response.json(
+              { success: false, error: `Customer '${id}' not found` },
+              { status: 404 },
+            );
+          }
+          const { buildComprehensiveCustomerProfile } =
+            await import("../lib/customer_profiling_enhanced.ts");
+          const profile = buildComprehensiveCustomerProfile(row);
+          return Response.json(
+            {
+              success: true,
+              profile,
+              generatedAt: new Date().toISOString(),
+            },
+            { headers: { "Cache-Control": "no-store" } },
+          );
+        },
+      },
+
+      // API: Customer rating: Bayesian skill profile, Kelly sizing & statistical CLV
+      "/api/customer/rating": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+
+          const url = new URL(req.url);
+          const id = (url.searchParams.get("id") ?? "").trim();
+          if (!id) {
+            return Response.json(
+              { success: false, error: "Missing required parameter 'id'" },
+              { status: 400 },
+            );
+          }
+          const row = await findCustomerRow(id);
+          if (!row) {
+            return Response.json(
+              { success: false, error: `Customer '${id}' not found` },
+              { status: 404 },
+            );
+          }
+          const [
+            { CustomerObservations },
+            {
+              rateCustomerFromObservations,
+              computeBayesianSkillProfile,
+              computeKellyMetrics,
+            },
+            { buildPortfolioRiskForensics },
+          ] = await Promise.all([
+            import("../lib/customer_profile.ts"),
+            import("../lib/customer_rating.ts"),
+            import("../lib/customer_profiling_enhanced.ts"),
+          ]);
+          const tickets = Array.isArray(row.recent_tickets)
+            ? (row.recent_tickets as unknown as readonly TicketRow[])
+            : [];
+          const riskForensics = buildPortfolioRiskForensics(row, tickets);
+          const obs = new CustomerObservations(
+            String(row.customer_id ?? id),
+            tickets.length,
+            riskForensics.lifetimeVolumeUsd,
+            riskForensics.lifetimeNetUsd,
+            [],
+            "2026-10-01",
+            "2026-11-09",
+          );
+          const baseRating = rateCustomerFromObservations(obs);
+          const bayesianSkill = computeBayesianSkillProfile([]);
+          const kellyMetrics = computeKellyMetrics(
+            -110,
+            bayesianSkill.posteriorMeanWinRate,
+            obs.nTickets > 0 ? obs.totalRiskUsd / obs.nTickets : 100,
+          );
+          return Response.json(
+            {
+              success: true,
+              rating: {
+                ...baseRating,
+                bayesianSkill,
+                kellyMetrics,
+              },
+              generatedAt: new Date().toISOString(),
+            },
+            { headers: { "Cache-Control": "no-store" } },
+          );
+        },
+      },
+
+      // API: PTY Terminal Emulator Execution powered by Bun.Terminal & Bun.spawn
+      "/api/terminal/exec": {
+        POST: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
           try {
-            const { sql } = await import("../lib/db.ts");
-            await sql`SELECT 1`;
-            cachedDbStatus = "connected";
+            const body = (await req.json()) as {
+              command?: string;
+              cols?: number;
+              rows?: number;
+            };
+            const command = body.command?.trim() ?? "help";
+            const result = await executeTerminalQuery(command, {
+              cols: body.cols ?? 100,
+              rows: body.rows ?? 30,
+            });
+            return Response.json(result);
           } catch (err) {
-            cachedDbStatus = `error: ${err instanceof Error ? err.message : String(err)}`;
+            return Response.json(
+              { error: err instanceof Error ? err.message : String(err) },
+              { status: 500 },
+            );
           }
-        }
+        },
+      },
 
-        if (now - lastSweep > SWEEP_MS) {
-          lastSweep = now;
+      // API: 30-Day Batched Player Rankings
+      "/api/rankings/all": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
           try {
-            const { sessionCleanup } = await import("../lib/session.ts");
-            purgedSessions = await sessionCleanup();
-          } catch {
-            // fire-and-forget, don't fail probe
+            const url = new URL(req.url);
+            const { runBatchedRanking } =
+              await import("../lib/customer_rankings.ts");
+            const limit = Number(url.searchParams.get("limit")) || 100;
+            const data = await runBatchedRanking({ limitPlayers: limit });
+            return Response.json(data);
+          } catch (err) {
+            return Response.json(
+              { error: err instanceof Error ? err.message : String(err) },
+              { status: 500 },
+            );
           }
+        },
+      },
+
+      // API: Proxy Conduits
+      "/api/agency/conduits": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          try {
+            const { runBatchedRanking } =
+              await import("../lib/customer_rankings.ts");
+            const data = await runBatchedRanking({ limitPlayers: 50 });
+            const conduits = data.topSubAgents.filter((s) => s.isProxyConduit);
+            return Response.json({ conduits });
+          } catch (err) {
+            return Response.json(
+              { error: err instanceof Error ? err.message : String(err) },
+              { status: 500 },
+            );
+          }
+        },
+      },
+
+      // API: Live Incoming Wager Feed & Surveillance Alerts (canonical + alias)
+      "/api/wagers": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          return Response.json(await buildLiveWagersPayload());
+        },
+      },
+      "/api/live-wagers": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          return Response.json(await buildLiveWagersPayload());
+        },
+      },
+
+      // API: Wager Tiers and Surveillance TOML Configuration (Bun.TOML v3)
+      "/api/config/tiers": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          try {
+            const { loadTomlConfig } = await import("../lib/wager_config.ts");
+            const config = await loadTomlConfig();
+            return Response.json(config);
+          } catch (err) {
+            return Response.json(
+              { error: err instanceof Error ? err.message : String(err) },
+              { status: 500 },
+            );
+          }
+        },
+      },
+
+      // API: Surveillance Alert Queue Drain Sweep Trigger
+      "/api/alerts/sweep": {
+        POST: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          const sweep = await alertDispatcher.sweepOnce();
+          return Response.json({ ok: true, sweep });
+        },
+      },
+
+      // API: Surveillance Alerts Query (DLQ, queued, delivered, acknowledged, all)
+      "/api/alerts": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          const url = new URL(req.url);
+          const statusParam = (
+            url.searchParams.get("status") ?? "all"
+          ).toLowerCase();
+          const { listAlerts } = await import("../lib/alerts.ts");
+          const alerts = listAlerts(statusParam);
+          return Response.json({
+            alerts,
+            total: alerts.length,
+            status: statusParam,
+            timestamp: new Date().toISOString(),
+          });
+        },
+      },
+
+      // API: Acknowledge Alert
+      "/api/alerts/:id/ack": {
+        POST: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          const deliveryId = req.params.id;
+          let body: { operatorId?: string; notes?: string } = {};
+          try {
+            body = (await req.json()) as {
+              operatorId?: string;
+              notes?: string;
+            };
+          } catch {
+            // signal-honesty: intentional-empty-json-body-allowed
+          }
+          const { acknowledgeAlert } = await import("../lib/alerts.ts");
+          const ok = await acknowledgeAlert({
+            deliveryId,
+            operatorId: body.operatorId ?? "operator",
+            notes: body.notes,
+          });
+          return Response.json({ ok, deliveryId });
+        },
+      },
+
+      // API: Replay from DLQ
+      "/api/alerts/:id/retry": {
+        POST: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          const deliveryId = req.params.id;
+          let body: { operatorId?: string } = {};
+          try {
+            body = (await req.json()) as { operatorId?: string };
+          } catch {
+            // signal-honesty: intentional-empty-json-body-allowed
+          }
+          const { retryAlert } = await import("../lib/alerts.ts");
+          const newDeliveryId = await retryAlert({
+            deliveryId,
+            operatorId: body.operatorId ?? "operator",
+          });
+          if (!newDeliveryId) {
+            return Response.json(
+              { error: "Alert not found in dead-letter state" },
+              { status: 404 },
+            );
+          }
+          return Response.json({
+            ok: true,
+            originalDeliveryId: deliveryId,
+            newDeliveryId,
+          });
+        },
+      },
+
+      // API: Shift Summary (Shift handoff aggregation of alerts, queries, and auth)
+      "/api/shift/summary": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          const url = new URL(req.url);
+          const operatorId = url.searchParams.get("operatorId") ?? "operator";
+          const { getShiftSummary } = await import("../lib/alerts.ts");
+          const summary = getShiftSummary(operatorId);
+          return Response.json(summary);
+        },
+      },
+
+      // API: Canonical 4-Level Market Taxonomy Catalog (Sport -> SubSport -> Period per SubSport -> Market)
+      "/api/taxonomy-catalog": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          return Response.json({
+            schemaVersion: 1,
+            catalog: SUBSPORT_TAXONOMY_CATALOG,
+          });
+        },
+      },
+
+      // API: Counterfactual Shadow-Pricing & Hierarchical Taxonomy Cube (#135)
+      "/api/shadow-pricing": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          try {
+            const url = new URL(req.url);
+            const forceFixture =
+              options.forceShadowFixture === true ||
+              url.searchParams.get("source") === "fixture";
+            const sportParam = url.searchParams.get("sport");
+            const subSportParam = url.searchParams.get("subSport");
+            const periodParam = url.searchParams.get("period");
+            const marketParam = url.searchParams.get("market");
+            const payload = await runShadowPricingDashboard({
+              dbPath: options.shadowDbPath,
+              forceFixture,
+              ladderKey3: parseFiniteNumber(url.searchParams.get("ladder3")),
+              ladderKey7: parseFiniteNumber(url.searchParams.get("ladder7")),
+              ladderKey14_21: parseFiniteNumber(
+                url.searchParams.get("ladderOther"),
+              ),
+              minVolume: parseFiniteNumber(url.searchParams.get("minVolume")),
+              retailElasticity: parseFiniteNumber(
+                url.searchParams.get("elasticity"),
+              ),
+              repriceMode: parseRepriceMode(url.searchParams.get("mode")),
+              sport: (sportParam ?? undefined) as SportFilter | undefined,
+              subSport: (subSportParam ?? undefined) as
+                SubSportFilter | undefined,
+              period: (periodParam ?? undefined) as PeriodFilter | undefined,
+              market: (marketParam ?? undefined) as MarketFilter | undefined,
+              routerAuditMode: parseRouterAuditMode(
+                url.searchParams.get("routerAudit"),
+              ),
+            });
+            return Response.json(payload);
+          } catch (err) {
+            return Response.json(
+              { error: err instanceof Error ? err.message : String(err) },
+              { status: 500 },
+            );
+          }
+        },
+        POST: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          try {
+            const body = (await req.json()) as {
+              ladderKey3?: number;
+              ladderKey7?: number;
+              ladderKey14_21?: number;
+              minVolume?: number;
+              retailElasticity?: number;
+              repriceMode?: ShadowRepriceMode;
+              sport?: SportFilter;
+              subSport?: SubSportFilter;
+              period?: PeriodFilter;
+              market?: MarketFilter;
+              routerAuditMode?: RouterAuditMode;
+              source?: string;
+            };
+            const forceFixture =
+              options.forceShadowFixture === true || body.source === "fixture";
+            const payload = await runShadowPricingDashboard({
+              dbPath: options.shadowDbPath,
+              forceFixture,
+              ladderKey3: body.ladderKey3,
+              ladderKey7: body.ladderKey7,
+              ladderKey14_21: body.ladderKey14_21,
+              minVolume: body.minVolume,
+              retailElasticity: body.retailElasticity,
+              repriceMode: parseRepriceMode(body.repriceMode),
+              sport: body.sport,
+              subSport: body.subSport,
+              period: body.period,
+              market: body.market,
+              routerAuditMode: parseRouterAuditMode(body.routerAuditMode),
+            });
+            return Response.json(payload);
+          } catch (err) {
+            return Response.json(
+              { error: err instanceof Error ? err.message : String(err) },
+              { status: 400 },
+            );
+          }
+        },
+      },
+
+      // API: Compile-Time bun:bundle DCE Target Matrix
+      "/api/build-matrix": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          try {
+            if (!cachedDceMatrix) {
+              cachedDceMatrix = await computeDashboardDceMatrix();
+            }
+            return Response.json({
+              schemaVersion: 1,
+              targets: cachedDceMatrix,
+              generatedAt: new Date().toISOString(),
+            });
+          } catch (err) {
+            return Response.json(
+              { error: err instanceof Error ? err.message : String(err) },
+              { status: 500 },
+            );
+          }
+        },
+      },
+
+      // API: WebSocket Status & Topic Subscriptions Telemetry
+      "/api/ws/status": {
+        GET: async (req) => {
+          const denied = await enforceOptionalAuth(req);
+          if (denied) return denied;
+          const topicCounts: Record<string, number> = {};
+          const clientSummaries: Array<{ id: number; topics: string[] }> = [];
+          let clientId = 1;
+
+          for (const ws of clients) {
+            const subs = ws.subscriptions ?? [];
+            clientSummaries.push({ id: clientId++, topics: subs });
+            for (const topic of subs) {
+              topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+            }
+          }
+
+          return Response.json({
+            totalConnectedClients: clients.size,
+            topicDistribution: topicCounts,
+            clients: clientSummaries,
+            serverTopics: [
+              "dashboard",
+              "live-bets",
+              "syndicate-alerts",
+              "tiers-updated",
+              "proxy-conduits",
+              "terminal-logs",
+            ],
+            timestamp: new Date().toISOString(),
+          });
+        },
+      },
+
+      // Legacy on-demand JS/CSS bundle endpoints for compatibility
+      "/index.js": {
+        GET: async () => {
+          const build = await runBunBuild({
+            entrypoints: [dashboardEntryPath],
+            target: "browser",
+            sourcemap: "inline",
+          });
+
+          if (!build.success || build.outputs.length === 0) {
+            console.error("Build failed:", build.logs);
+            return new Response("console.error('Bundle compilation failed');", {
+              status: 500,
+              headers: { "Content-Type": "application/javascript" },
+            });
+          }
+
+          const jsOutput =
+            build.outputs.find(
+              (o) => o.kind === "entry-point" || o.path.endsWith(".js"),
+            ) ?? build.outputs[0];
+          if (!jsOutput) {
+            return new Response("Missing output", { status: 500 });
+          }
+          return new Response(await jsOutput.text(), {
+            headers: {
+              "Content-Type": "application/javascript",
+              "Cache-Control": "no-cache",
+            },
+          });
+        },
+      },
+
+      "/index.css": {
+        GET: async () => {
+          const build = await runBunBuild({
+            entrypoints: [dashboardEntryPath],
+            target: "browser",
+            sourcemap: "inline",
+          });
+          const cssOutput = build.outputs.find(
+            (o) => o.kind === "asset" && o.path.endsWith(".css"),
+          );
+          if (!cssOutput) {
+            return new Response("/* No CSS emitted */", {
+              headers: { "Content-Type": "text/css" },
+            });
+          }
+          return new Response(await cssOutput.text(), {
+            headers: {
+              "Content-Type": "text/css",
+              "Cache-Control": "no-cache",
+            },
+          });
+        },
+      },
+
+      // Wildcard 404 for unknown API routes
+      "/api/*": Response.json(
+        { error: "Dashboard API route not found" },
+        { status: 404 },
+      ),
+    },
+
+    fetch(req, srv) {
+      const url = new URL(req.url);
+
+      // WebSocket upgrade for hot reload & topic pub/sub
+      if (url.pathname === "/ws") {
+        const upgraded = srv.upgrade(req);
+        if (upgraded) return undefined;
+        return new Response("WebSocket upgrade failed", { status: 400 });
+      }
+
+      return new Response("Not Found", { status: 404 });
+    },
+
+    websocket: {
+      open(ws) {
+        ws.subscribe("dashboard");
+        ws.subscribe("live-bets");
+        ws.subscribe("syndicate-alerts");
+        ws.subscribe("tiers-updated");
+        clients.add(ws);
+      },
+      message(ws, message) {
+        try {
+          const str =
+            typeof message === "string"
+              ? message
+              : new TextDecoder().decode(message);
+          if (str.startsWith("{")) {
+            const parsed = JSON.parse(str) as {
+              action?: "subscribe" | "unsubscribe";
+              type?: string;
+              topic?: string;
+              topics?: string[];
+            };
+            const kind = parsed.type ?? parsed.action;
+            if (kind === "subscribe" && parsed.topic) {
+              ws.subscribe(parsed.topic);
+              ws.send(
+                JSON.stringify({
+                  type: "subscribed",
+                  topic: parsed.topic,
+                  activeTopics: ws.subscriptions,
+                }),
+              );
+            } else if (
+              kind === "subscribe-all" ||
+              (kind === "subscribe" && parsed.topics)
+            ) {
+              const list = parsed.topics ?? [
+                "dashboard",
+                "live-bets",
+                "syndicate-alerts",
+                "tiers-updated",
+                "proxy-conduits",
+                "terminal-logs",
+              ];
+              for (const t of list) ws.subscribe(t);
+              ws.send(
+                JSON.stringify({
+                  type: "subscribed-many",
+                  topics: list,
+                  activeTopics: ws.subscriptions,
+                }),
+              );
+            } else if (kind === "unsubscribe" && parsed.topic) {
+              ws.unsubscribe(parsed.topic);
+              ws.send(
+                JSON.stringify({
+                  type: "unsubscribed",
+                  topic: parsed.topic,
+                  activeTopics: ws.subscriptions,
+                }),
+              );
+            } else if (kind === "query-subscriptions") {
+              ws.send(
+                JSON.stringify({
+                  type: "subscriptions",
+                  activeTopics: ws.subscriptions,
+                }),
+              );
+            }
+          }
+        } catch {
+          // signal-honesty: intentional-ignore-nonjson-ws-ping
         }
-      }
+      },
+      close(ws) {
+        clients.delete(ws);
+      },
+    },
+  });
 
-      if (now - lastAlertProbe > ALERT_PROBE_MS) {
-        lastAlertProbe = now;
-        cachedAlertMetrics = alertDispatcher.getHealthMetrics();
-      }
-
-      const overallStatus =
-        cachedAlertMetrics.status === "degraded"
-          ? "degraded"
-          : cachedAlertMetrics.status === "warning"
-            ? "warning"
-            : "ok";
-
-      return Response.json({
-        status: overallStatus,
-        service: "sportsdesk-dev-dashboard",
-        port: PORT,
-        bunVersion: Bun.version,
-        uptimeSeconds: Math.floor(process.uptime()),
-        db: cachedDbStatus,
-        purgedSessions,
-        alerts: cachedAlertMetrics,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // ── Auth Endpoints ──────────────────────────────────────────────────────────
-    if (url.pathname === "/api/auth/login" && req.method === "POST") {
-      return handleLogin(req, server);
-    }
-    if (url.pathname === "/api/auth/logout" && req.method === "POST") {
-      return handleLogout(req);
-    }
-    if (url.pathname === "/api/auth/me" && req.method === "GET") {
-      return handleSessionMe(req);
-    }
-
-    // Fail-closed in production; opt-in in development
-    const authRequired =
-      process.env.NODE_ENV === "production"
-        ? process.env.SPORTSDESK_AUTH_DISABLED !== "1"
-        : process.env.SPORTSDESK_AUTH_REQUIRED === "1";
-
-    if (
-      authRequired &&
-      url.pathname.startsWith("/api/") &&
-      !url.pathname.startsWith("/api/auth/")
-    ) {
-      const authRes = await requireSession(req, async () => new Response("OK"));
-      if (authRes.status !== 200) {
-        return authRes;
-      }
-      const csrfRes = await requireCsrf(req, async () => new Response("OK"));
-      if (csrfRes.status !== 200) {
-        return csrfRes;
-      }
-    }
-
-    // API: Real-time dashboard data parsed via Bun.markdown.html
-    if (url.pathname === "/api/dashboard") {
-      const file = Bun.file(DASHBOARD_MD_PATH);
-      if (!(await file.exists())) {
-        return Response.json(
-          { error: "dashboard.md not found" },
-          { status: 404 },
-        );
-      }
-
-      const markdown = await file.text();
-      // trusted-markdown: local repo-owned dashboard.md rendered for operator dev server
-      const html = Bun.markdown.html(markdown);
-      return Response.json({
-        markdown,
-        html,
-        updatedAt: new Date().toISOString(),
-      });
-    }
-
-    // API: Real-time DNS Cache Telemetry
-    if (url.pathname === "/api/dns" || url.pathname === "/api/dns/telemetry") {
-      const telemetry = getDnsTelemetry();
-      return Response.json({
-        success: true,
-        telemetry,
-        hosts: SPORTSDESK_CORE_HOSTS,
-        coreHosts: SPORTSDESK_CORE_HOSTS.map((h) => ({
-          hostname: h.hostname,
-          port: h.port,
-          serviceName: h.serviceName,
-        })),
-        updatedAt: new Date().toISOString(),
-        generatedAt: new Date().toISOString(),
-      });
-    }
-
-    // API: DNS Resolver Latency Benchmark
-    if (url.pathname === "/api/dns/benchmark") {
-      const host = url.searchParams.get("host") || "fantasy402.com";
-      const result = await benchmarkResolverLatency(
-        host,
-        ["c-ares", "system"],
-        3,
+  if (options.watchFiles !== false) {
+    try {
+      watchers.push(
+        watch(dashboardMdPath, () => {
+          server.publish("dashboard", "dashboard-updated");
+          for (const ws of clients) {
+            if (
+              !ws.subscriptions ||
+              ws.subscriptions.length === 0 ||
+              ws.subscriptions.includes("dashboard")
+            ) {
+              ws.send("dashboard-updated");
+            }
+          }
+        }),
       );
-      return Response.json(result);
-    }
 
-    // API: Reverse DNS & Forensics IP Classification
-    if (url.pathname === "/api/dns/reverse") {
-      const ip = url.searchParams.get("ip") || "1.1.1.1";
-      const result = await classifyIpAddress(ip);
-      return Response.json(result);
-    }
-
-    // API: Customer Profiling & Behavioral Sharp Showcase
-    if (url.pathname === "/api/customers") {
-      const backtestFile = Bun.file("docs/backtest-4wk-cfb-nba.json");
-      const backtestJson = (await backtestFile.exists())
-        ? ((await backtestFile.json()) as {
-            customerLeaderboard?: Array<Record<string, unknown>>;
-          })
-        : { customerLeaderboard: [] };
-
-      const fixtureFile = Bun.file(
-        "tests/fixtures/backtest/enriched_customers_full.json",
-      );
-      const fixtureJson = (await fixtureFile.exists())
-        ? ((await fixtureFile.json()) as Array<Record<string, unknown>>)
-        : [];
-
-      const { KEY_NUMBER_BUYER_PROFILES, HALF_POINT_HOOK_SYNDICATE_PROFILES } =
-        await import("../lib/customer_profile.ts");
-
-      const uniqueSurveillanceIds = new Set<string>();
-      for (const row of backtestJson.customerLeaderboard ?? []) {
-        const id =
-          (row as Record<string, unknown>).customer ??
-          (row as Record<string, unknown>).customerId ??
-          (row as Record<string, unknown>).customer_id;
-        if (id) uniqueSurveillanceIds.add(String(id).trim().toUpperCase());
-      }
-      for (const row of fixtureJson) {
-        const id =
-          (row as Record<string, unknown>).customer_id ??
-          (row as Record<string, unknown>).customerId;
-        if (id) uniqueSurveillanceIds.add(String(id).trim().toUpperCase());
-      }
-      for (const key of KEY_NUMBER_BUYER_PROFILES.keys()) {
-        uniqueSurveillanceIds.add(key.trim().toUpperCase());
-      }
-      for (const key of HALF_POINT_HOOK_SYNDICATE_PROFILES.keys()) {
-        uniqueSurveillanceIds.add(key.trim().toUpperCase());
-      }
-
-      return Response.json({
-        cohorts: {
-          backtestCount: backtestJson.customerLeaderboard?.length ?? 0,
-          keyNumberSharpsCount: KEY_NUMBER_BUYER_PROFILES.size,
-          hookSyndicateCount: HALF_POINT_HOOK_SYNDICATE_PROFILES.size,
-          fixtureCount: fixtureJson.length,
-          fullBookSpecCount: fixtureJson.length,
-          uniqueSurveillanceCount: uniqueSurveillanceIds.size,
-        },
-        backtestTop: (backtestJson.customerLeaderboard ?? []).slice(0, 20),
-        fixtures: fixtureJson,
-      });
-    }
-
-    // API: Customer profiling: unified behavioral forensics & composite sharpness
-    if (url.pathname === "/api/customer/profile" && req.method === "GET") {
-      const id = (url.searchParams.get("id") ?? "").trim();
-      if (!id) {
-        return Response.json(
-          { success: false, error: "Missing required parameter 'id'" },
-          { status: 400 },
-        );
-      }
-      const row = await findCustomerRow(id);
-      if (!row) {
-        return Response.json(
-          { success: false, error: `Customer '${id}' not found` },
-          { status: 404 },
-        );
-      }
-      const { buildComprehensiveCustomerProfile } =
-        await import("../lib/customer_profiling_enhanced.ts");
-      const profile = buildComprehensiveCustomerProfile(row);
-      return Response.json(
-        {
-          success: true,
-          profile,
-          generatedAt: new Date().toISOString(),
-        },
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    }
-
-    // API: Customer rating: Bayesian skill profile, Kelly sizing & statistical CLV
-    if (url.pathname === "/api/customer/rating" && req.method === "GET") {
-      const id = (url.searchParams.get("id") ?? "").trim();
-      if (!id) {
-        return Response.json(
-          { success: false, error: "Missing required parameter 'id'" },
-          { status: 400 },
-        );
-      }
-      const row = await findCustomerRow(id);
-      if (!row) {
-        return Response.json(
-          { success: false, error: `Customer '${id}' not found` },
-          { status: 404 },
-        );
-      }
-      const [
-        { CustomerObservations },
-        {
-          rateCustomerFromObservations,
-          computeBayesianSkillProfile,
-          computeKellyMetrics,
-        },
-        { buildPortfolioRiskForensics },
-      ] = await Promise.all([
-        import("../lib/customer_profile.ts"),
-        import("../lib/customer_rating.ts"),
-        import("../lib/customer_profiling_enhanced.ts"),
-      ]);
-      const tickets = Array.isArray(row.recent_tickets)
-        ? (row.recent_tickets as unknown as readonly TicketRow[])
-        : [];
-      const riskForensics = buildPortfolioRiskForensics(row, tickets);
-      const obs = new CustomerObservations(
-        String(row.customer_id ?? id),
-        tickets.length,
-        riskForensics.lifetimeVolumeUsd,
-        riskForensics.lifetimeNetUsd,
-        [],
-        "2026-10-01",
-        "2026-11-09",
-      );
-      const baseRating = rateCustomerFromObservations(obs);
-      const bayesianSkill = computeBayesianSkillProfile([]);
-      const kellyMetrics = computeKellyMetrics(
-        -110,
-        bayesianSkill.posteriorMeanWinRate,
-        obs.nTickets > 0 ? obs.totalRiskUsd / obs.nTickets : 100,
-      );
-      const rating = {
-        ...baseRating,
-        bayesianSkill,
-        kellyMetrics,
-      };
-      return Response.json(
-        {
-          success: true,
-          rating,
-          generatedAt: new Date().toISOString(),
-        },
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    }
-
-    // API: PTY Terminal Emulator Execution powered by Bun.Terminal & Bun.spawn
-    if (url.pathname === "/api/terminal/exec" && req.method === "POST") {
-      try {
-        const body = (await req.json()) as {
-          command?: string;
-          cols?: number;
-          rows?: number;
-        };
-        const command = body.command?.trim() ?? "help";
-        const result = await executeTerminalQuery(command, {
-          cols: body.cols ?? 100,
-          rows: body.rows ?? 30,
-        });
-        return Response.json(result);
-      } catch (err) {
-        return Response.json(
-          { error: err instanceof Error ? err.message : String(err) },
-          { status: 500 },
-        );
-      }
-    }
-
-    // API: 30-Day Batched Player Rankings
-    if (url.pathname === "/api/rankings/all") {
-      try {
-        const { runBatchedRanking } =
-          await import("../lib/customer_rankings.ts");
-        const limit = Number(url.searchParams.get("limit")) || 100;
-        const data = await runBatchedRanking({ limitPlayers: limit });
-        return Response.json(data);
-      } catch (err) {
-        return Response.json(
-          { error: err instanceof Error ? err.message : String(err) },
-          { status: 500 },
-        );
-      }
-    }
-
-    // API: Proxy Conduits
-    if (url.pathname === "/api/agency/conduits") {
-      try {
-        const { runBatchedRanking } =
-          await import("../lib/customer_rankings.ts");
-        const data = await runBatchedRanking({ limitPlayers: 50 });
-        const conduits = data.topSubAgents.filter((s) => s.isProxyConduit);
-        return Response.json({ conduits });
-      } catch (err) {
-        return Response.json(
-          { error: err instanceof Error ? err.message : String(err) },
-          { status: 500 },
-        );
-      }
-    }
-
-    // API: Live Incoming Wager Feed & Surveillance Alerts
-    if (url.pathname === "/api/wagers" || url.pathname === "/api/live-wagers") {
-      let wagers = await loadDevLiveWagers();
-      if (wagers.length === 0) {
-        wagers = [
-          {
-            ticketId: "W-109281",
-            timestamp: "14:32:01 ET",
-            customerId: "GP301",
-            agentId: "AG99",
-            masterAgent: "MASTER_VEND",
-            sport: "NFL",
-            betType: "Total",
-            event: "Kansas City Chiefs @ Buffalo Bills",
-            selection: "Under",
-            lineDisplay: "47½",
-            oddsAmerican: "-110",
-            riskUsd: 5500,
-            toWinUsd: 5000,
-            clvCents: 14.2,
-            alertTier: "CRITICAL",
-            alertBadge: "🚨 CRITICAL (T1 Originator)",
-            operatorDirective: "Clamp Max $250 (autoExecute: false)",
-            maxRecommendedStake: 250,
-            autoExecute: false,
+      watchers.push(
+        watch(
+          resolve(process.cwd(), "src/dashboard"),
+          { recursive: true },
+          () => {
+            cachedDceMatrix = null;
+            server.publish("dashboard", "reload");
+            for (const ws of clients) {
+              if (
+                !ws.subscriptions ||
+                ws.subscriptions.length === 0 ||
+                ws.subscriptions.includes("dashboard")
+              ) {
+                ws.send("reload");
+              }
+            }
           },
-          {
-            ticketId: "W-109282",
-            timestamp: "14:32:15 ET",
-            customerId: "CCC88412",
-            agentId: "FATSNOBOT",
-            masterAgent: "NOLAWOLF",
-            sport: "CFB",
-            betType: "Spread",
-            event: "Georgia @ Texas",
-            selection: "Texas",
-            lineDisplay: "+3½",
-            oddsAmerican: "-105",
-            riskUsd: 5250,
-            toWinUsd: 5000,
-            clvCents: 11.5,
-            alertTier: "STEAM",
-            alertBadge: "🚨 STEAM (Key Number 3)",
-            operatorDirective: "Clamp Max $250 (autoExecute: false)",
-            maxRecommendedStake: 250,
-            autoExecute: false,
-          },
-          {
-            ticketId: "W-109283",
-            timestamp: "14:32:44 ET",
-            customerId: "BRT5235",
-            agentId: "AG_SHARP",
-            masterAgent: "MASTER_SYNDICATE",
-            sport: "CFB",
-            betType: "Spread",
-            event: "Duke @ North Carolina",
-            selection: "North Carolina",
-            lineDisplay: "+7½",
-            oddsAmerican: "-110",
-            riskUsd: 3300,
-            toWinUsd: 3000,
-            clvCents: 9.8,
-            alertTier: "STEAM",
-            alertBadge: "🚨 STEAM (Hook Syndicate)",
-            operatorDirective: "Clamp Max $250 (autoExecute: false)",
-            maxRecommendedStake: 250,
-            autoExecute: false,
-          },
-          {
-            ticketId: "W-109284",
-            timestamp: "14:33:02 ET",
-            customerId: "MJ107",
-            agentId: "MJ2026",
-            masterAgent: "NOLAWOLF",
-            sport: "CFB",
-            betType: "Spread",
-            event: "Ohio State @ Penn State",
-            selection: "Ohio State",
-            lineDisplay: "-3½",
-            oddsAmerican: "-115",
-            riskUsd: 4600,
-            toWinUsd: 4000,
-            clvCents: 8.4,
-            alertTier: "STEAM",
-            alertBadge: "⚡ STEAM (Line Mover)",
-            operatorDirective: "Clamp Max $250 (autoExecute: false)",
-            maxRecommendedStake: 250,
-            autoExecute: false,
-          },
-          {
-            ticketId: "W-109285",
-            timestamp: "14:33:28 ET",
-            customerId: "BGD101",
-            agentId: "BIGDAD",
-            masterAgent: "BIGDAD",
-            sport: "NFL",
-            betType: "Spread",
-            event: "Baltimore Ravens @ Pittsburgh Steelers",
-            selection: "Pittsburgh",
-            lineDisplay: "+3½",
-            oddsAmerican: "-110",
-            riskUsd: 2200,
-            toWinUsd: 2000,
-            clvCents: 7.9,
-            alertTier: "STEAM",
-            alertBadge: "⚡ STEAM (Key Number 3)",
-            operatorDirective: "Clamp Max $500 (autoExecute: false)",
-            maxRecommendedStake: 500,
-            autoExecute: false,
-          },
-          {
-            ticketId: "W-109286",
-            timestamp: "14:33:51 ET",
-            customerId: "BAR301",
-            agentId: "BAR01",
-            masterAgent: "MASTER_SYNDICATE",
-            sport: "NFL",
-            betType: "Spread",
-            event: "Detroit Lions @ Green Bay Packers",
-            selection: "Detroit",
-            lineDisplay: "-6½",
-            oddsAmerican: "-110",
-            riskUsd: 3300,
-            toWinUsd: 3000,
-            clvCents: 7.1,
-            alertTier: "STEAM",
-            alertBadge: "⚡ STEAM (Early Opener)",
-            operatorDirective: "Clamp Max $500 (autoExecute: false)",
-            maxRecommendedStake: 500,
-            autoExecute: false,
-          },
-          {
-            ticketId: "W-109287",
-            timestamp: "14:34:10 ET",
-            customerId: "KENT99",
-            agentId: "KENT02",
-            masterAgent: "MASTER_B",
-            sport: "NBA",
-            betType: "Total",
-            event: "Boston Celtics @ Miami Heat",
-            selection: "Miami Heat 2H",
-            lineDisplay: "+4½",
-            oddsAmerican: "-110",
-            riskUsd: 2200,
-            toWinUsd: 2000,
-            clvCents: 6.8,
-            alertTier: "LATENCY",
-            alertBadge: "⚠️ LATENCY (Halftime)",
-            operatorDirective: "Delay 3s + Cap $500 (autoExecute: false)",
-            maxRecommendedStake: 500,
-            autoExecute: false,
-          },
-          {
-            ticketId: "W-109288",
-            timestamp: "14:34:25 ET",
-            customerId: "RF2003",
-            agentId: "FAKEMONEY",
-            masterAgent: "NOLAWOLF",
-            sport: "SOCCER",
-            betType: "Total",
-            event: "Real Madrid vs Barcelona",
-            selection: "Over",
-            lineDisplay: "3½ Goals",
-            oddsAmerican: "+130",
-            riskUsd: 25000,
-            toWinUsd: 32500,
-            clvCents: -4.2,
-            alertTier: "RECREATIONAL",
-            alertBadge: "✅ RECREATIONAL (Whale)",
-            operatorDirective: "Accept Normal ($25k) (autoExecute: false)",
-            maxRecommendedStake: 25000,
-            autoExecute: false,
-          },
-          {
-            ticketId: "W-109289",
-            timestamp: "14:34:42 ET",
-            customerId: "LIVE99",
-            agentId: "AG44",
-            masterAgent: "MASTER_B",
-            sport: "NBA",
-            betType: "Moneyline",
-            event: "Denver Nuggets @ LA Lakers",
-            selection: "Lakers In-Play",
-            lineDisplay: "ML",
-            oddsAmerican: "+165",
-            riskUsd: 1500,
-            toWinUsd: 2475,
-            clvCents: 5.4,
-            alertTier: "LATENCY",
-            alertBadge: "⚠️ LATENCY (In-Play)",
-            operatorDirective: "Delay 3s + Cap $1,000 (autoExecute: false)",
-            maxRecommendedStake: 1000,
-            autoExecute: false,
-          },
-          {
-            ticketId: "W-109290",
-            timestamp: "14:35:05 ET",
-            customerId: "SQUARE1",
-            agentId: "AG05",
-            masterAgent: "MASTER_RETAIL",
-            sport: "CFB",
-            betType: "Parlay",
-            event: "4-Leg CFB Parlay",
-            selection: "MIA -7 / TEX -3 / OSU -3 / ORE -14",
-            lineDisplay: "4-Leg",
-            oddsAmerican: "+1100",
-            riskUsd: 1000,
-            toWinUsd: 11000,
-            clvCents: -12.5,
-            alertTier: "RECREATIONAL",
-            alertBadge: "✅ RECREATIONAL (Square Parlay)",
-            operatorDirective: "Accept Normal ($25k) (autoExecute: false)",
-            maxRecommendedStake: 25000,
-            autoExecute: false,
-          },
-          {
-            ticketId: "W-109291",
-            timestamp: "14:35:30 ET",
-            customerId: "BRT5229",
-            agentId: "AG_SHARP",
-            masterAgent: "MASTER_SYNDICATE",
-            sport: "NFL",
-            betType: "Spread",
-            event: "Philadelphia Eagles @ Dallas Cowboys",
-            selection: "Philadelphia",
-            lineDisplay: "-3½",
-            oddsAmerican: "-110",
-            riskUsd: 5000,
-            toWinUsd: 4545,
-            clvCents: 12.1,
-            alertTier: "CRITICAL",
-            alertBadge: "🚨 CRITICAL (Steam Root)",
-            operatorDirective: "Clamp Max $250 (autoExecute: false)",
-            maxRecommendedStake: 250,
-            autoExecute: false,
-          },
-          {
-            ticketId: "W-109292",
-            timestamp: "14:35:55 ET",
-            customerId: "BK119",
-            agentId: "AG81",
-            masterAgent: "MASTER_C",
-            sport: "CFB",
-            betType: "Total",
-            event: "Michigan @ Michigan State",
-            selection: "2H Under",
-            lineDisplay: "21½",
-            oddsAmerican: "-105",
-            riskUsd: 800,
-            toWinUsd: 762,
-            clvCents: 3.2,
-            alertTier: "STEAM",
-            alertBadge: "⚡ SEMI-SHARP (2H Total)",
-            operatorDirective: "Cap Max $2,500 (autoExecute: false)",
-            maxRecommendedStake: 2500,
-            autoExecute: false,
-          },
-        ];
-      }
-
-      return Response.json({
-        wagers,
-        totalRiskUsd: wagers.reduce(
-          (sum, w: Record<string, unknown>) => sum + (Number(w.riskUsd) || 0),
-          0,
         ),
-        totalToWinUsd: wagers.reduce(
-          (sum, w: Record<string, unknown>) => sum + (Number(w.toWinUsd) || 0),
-          0,
-        ),
-        criticalSteamCount: wagers.filter(
-          (w: Record<string, unknown>) =>
-            w.alertTier === "CRITICAL" || w.alertTier === "STEAM",
-        ).length,
-        autoExecute: false,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // API: Wager Tiers and Surveillance TOML Configuration (Bun.TOML)
-    if (url.pathname === "/api/config/tiers") {
-      try {
-        const { loadTomlConfig } = await import("../lib/wager_config.ts");
-        const config = await loadTomlConfig();
-        return Response.json(config);
-      } catch (err) {
-        return Response.json(
-          { error: err instanceof Error ? err.message : String(err) },
-          { status: 500 },
-        );
-      }
-    }
-
-    // API: Surveillance Alert Queue Drain Sweep Trigger
-    if (url.pathname === "/api/alerts/sweep" && req.method === "POST") {
-      const sweep = await alertDispatcher.sweepOnce();
-      return Response.json({ ok: true, sweep });
-    }
-
-    // API: Surveillance Alerts Query (DLQ, queued, delivered, acknowledged, all)
-    if (url.pathname === "/api/alerts" && req.method === "GET") {
-      const statusParam = (
-        url.searchParams.get("status") ?? "all"
-      ).toLowerCase();
-      const { listAlerts } = await import("../lib/alerts.ts");
-      const alerts = listAlerts(statusParam);
-      return Response.json({
-        alerts,
-        total: alerts.length,
-        status: statusParam,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // API: Acknowledge Alert (Operator action to clear dead alert or active alert)
-    const ackMatch = url.pathname.match(/^\/api\/alerts\/([^/]+)\/ack$/);
-    if (ackMatch && req.method === "POST") {
-      const deliveryId = ackMatch[1]!;
-      let body: { operatorId?: string; notes?: string } = {};
-      try {
-        body = (await req.json()) as { operatorId?: string; notes?: string };
-      } catch {
-        // empty body is acceptable
-      }
-      const { acknowledgeAlert } = await import("../lib/alerts.ts");
-      const ok = await acknowledgeAlert({
-        deliveryId,
-        operatorId: body.operatorId ?? "operator",
-        notes: body.notes,
-      });
-      return Response.json({ ok, deliveryId });
-    }
-
-    // API: Replay from DLQ (Operator action to retry dead-lettered alert)
-    const retryMatch = url.pathname.match(/^\/api\/alerts\/([^/]+)\/retry$/);
-    if (retryMatch && req.method === "POST") {
-      const deliveryId = retryMatch[1]!;
-      let body: { operatorId?: string } = {};
-      try {
-        body = (await req.json()) as { operatorId?: string };
-      } catch {
-        // empty body is acceptable
-      }
-      const { retryAlert } = await import("../lib/alerts.ts");
-      const newDeliveryId = await retryAlert({
-        deliveryId,
-        operatorId: body.operatorId ?? "operator",
-      });
-      if (!newDeliveryId) {
-        return Response.json(
-          { error: "Alert not found in dead-letter state" },
-          { status: 404 },
-        );
-      }
-      return Response.json({
-        ok: true,
-        originalDeliveryId: deliveryId,
-        newDeliveryId,
-      });
-    }
-
-    // API: Shift Summary (Shift handoff aggregation of alerts, queries, and auth)
-    if (url.pathname === "/api/shift/summary" && req.method === "GET") {
-      const operatorId = url.searchParams.get("operatorId") ?? "operator";
-      const { getShiftSummary } = await import("../lib/alerts.ts");
-      const summary = getShiftSummary(operatorId);
-      return Response.json(summary);
-    }
-
-    // API: WebSocket Status & Topic Subscriptions Telemetry (ServerWebSocket.subscriptions)
-    if (url.pathname === "/api/ws/status") {
-      const topicCounts: Record<string, number> = {};
-      const clientSummaries: Array<{ id: number; topics: string[] }> = [];
-      let clientId = 1;
-
-      for (const ws of clients) {
-        const subs = ws.subscriptions ?? [];
-        clientSummaries.push({ id: clientId++, topics: subs });
-        for (const topic of subs) {
-          topicCounts[topic] = (topicCounts[topic] || 0) + 1;
-        }
-      }
-
-      return Response.json({
-        totalConnectedClients: clients.size,
-        topicDistribution: topicCounts,
-        clients: clientSummaries,
-        serverTopics: [
-          "dashboard",
-          "live-bets",
-          "syndicate-alerts",
-          "tiers-updated",
-          "proxy-conduits",
-          "terminal-logs",
-        ],
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Dynamic React bundle compiled on the fly via Bun.build
-    if (url.pathname === "/index.js") {
-      const build = await runBunBuild({
-        entrypoints: [DASHBOARD_ENTRY_PATH],
-        target: "browser",
-        sourcemap: "inline",
-      });
-
-      if (!build.success || build.outputs.length === 0) {
-        console.error("Build failed:", build.logs);
-        return new Response("console.error('Bundle compilation failed');", {
-          status: 500,
-          headers: { "Content-Type": "application/javascript" },
-        });
-      }
-
-      const jsOutput =
-        build.outputs.find(
-          (o) => o.kind === "entry-point" || o.path.endsWith(".js"),
-        ) ?? build.outputs[0];
-      if (!jsOutput) {
-        return new Response("Missing output", { status: 500 });
-      }
-      return new Response(await jsOutput.text(), {
-        headers: {
-          "Content-Type": "application/javascript",
-          "Cache-Control": "no-cache",
-        },
-      });
-    }
-
-    // Dynamic CSS bundle compiled on the fly via Bun.build
-    if (url.pathname === "/index.css") {
-      const build = await runBunBuild({
-        entrypoints: [DASHBOARD_ENTRY_PATH],
-        target: "browser",
-        sourcemap: "inline",
-      });
-
-      const cssOutput = build.outputs.find(
-        (o) => o.kind === "asset" && o.path.endsWith(".css"),
       );
-      if (!cssOutput) {
-        return new Response("/* No CSS emitted */", {
-          headers: { "Content-Type": "text/css" },
-        });
-      }
-      return new Response(await cssOutput.text(), {
-        headers: {
-          "Content-Type": "text/css",
-          "Cache-Control": "no-cache",
-        },
-      });
+
+      watchers.push(
+        watch(wagerTiersTomlPath, async () => {
+          try {
+            const { reloadTomlConfigIfChanged } =
+              await import("../lib/wager_config.ts");
+            const { changed, config } = await reloadTomlConfigIfChanged();
+            if (changed) {
+              server.publish("tiers-updated", JSON.stringify(config));
+              for (const ws of clients) {
+                if (
+                  !ws.subscriptions ||
+                  ws.subscriptions.length === 0 ||
+                  ws.subscriptions.includes("tiers-updated") ||
+                  ws.subscriptions.includes("dashboard")
+                ) {
+                  ws.send("tiers-updated");
+                }
+              }
+            }
+          } catch (err) {
+            console.warn("File watch reload failed for wager_tiers.toml:", err);
+          }
+        }),
+      );
+    } catch (err) {
+      console.warn("File watch initialized with fallback:", err);
     }
+  }
 
-    // Root SPA Shell
-    if (url.pathname === "/" || !url.pathname.includes(".")) {
-      const htmlShell = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SportsDesk &amp; Fantasy402 Real-Time Dashboard</title>
-    <link rel="stylesheet" href="/index.css" />
-    <style>
-      :root {
-        color-scheme: dark;
-        --bg: #070b14;
-        --card: #0d1527;
-        --border: #1e293b;
-        --text: #f1f5f9;
-        --muted: #94a3b8;
-        --accent: #38bdf8;
+  return {
+    server,
+    url: server.url,
+    port: server.port ?? port,
+    stop(closeActiveConnections = true) {
+      alertDispatcher.stop();
+      for (const w of watchers) {
+        w.close();
       }
-      body {
-        margin: 0;
-        background-color: var(--bg);
-        color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 16px 0;
-        font-size: 14px;
-      }
-      th, td {
-        padding: 10px 14px;
-        border: 1px solid var(--border);
-        text-align: left;
-      }
-      th {
-        background-color: var(--card);
-        color: var(--muted);
-        text-transform: uppercase;
-        font-size: 12px;
-      }
-      tr:nth-child(even) td {
-        background-color: rgba(30, 41, 59, 0.4);
-      }
-      code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        color: #f59e0b;
-        background: rgba(30, 41, 59, 0.6);
-        padding: 2px 6px;
-        border-radius: 4px;
-      }
-      a {
-        color: var(--accent);
-        text-decoration: none;
-      }
-      a:hover {
-        text-decoration: underline;
-      }
-      blockquote {
-        margin: 12px 0;
-        padding: 8px 16px;
-        border-left: 4px solid var(--accent);
-        background: rgba(13, 21, 39, 0.7);
-        color: var(--muted);
-      }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/index.js"></script>
-  </body>
-</html>`;
-      return new Response(htmlShell, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+      server.stop(closeActiveConnections);
+    },
+  };
+}
+
+if (import.meta.main) {
+  if (typeof process !== "undefined" && typeof process.on === "function") {
+    try {
+      process.on("memoryPressure", (level: string) => {
+        console.warn(
+          `[SportsDesk Dev Server] Host memory pressure: ${level}. Reclaiming build cache.`,
+        );
       });
+    } catch {
+      // signal-honesty: intentional-unsupported-memory-pressure-event
     }
+  }
 
-    return new Response("Not Found", { status: 404 });
-  },
-  websocket: {
-    open(ws) {
-      clients.add(ws);
-      // Automatically subscribe to base dashboard broadcast channel
-      ws.subscribe("dashboard");
-    },
-    close(ws) {
-      clients.delete(ws);
-    },
-    message(ws, message) {
-      try {
-        const text =
-          typeof message === "string"
-            ? message
-            : new TextDecoder().decode(message);
-        const data = JSON.parse(text) as {
-          type?: string;
-          topic?: string;
-          topics?: string[];
-        };
+  prefetchSportsDeskEndpoints();
+  const handle = startDashboardServer({ watchFiles: true });
 
-        if (data.type === "subscribe" && data.topic) {
-          ws.subscribe(data.topic);
-          ws.send(
-            JSON.stringify({
-              type: "subscribed",
-              topic: data.topic,
-              activeTopics: ws.subscriptions,
-            }),
-          );
-        } else if (
-          data.type === "subscribe-all" ||
-          (data.type === "subscribe" && data.topics)
-        ) {
-          const list = data.topics ?? [
-            "dashboard",
-            "live-bets",
-            "syndicate-alerts",
-            "tiers-updated",
-            "proxy-conduits",
-            "terminal-logs",
-          ];
-          for (const t of list) ws.subscribe(t);
-          ws.send(
-            JSON.stringify({
-              type: "subscribed-many",
-              topics: list,
-              activeTopics: ws.subscriptions,
-            }),
-          );
-        } else if (data.type === "unsubscribe" && data.topic) {
-          ws.unsubscribe(data.topic);
-          ws.send(
-            JSON.stringify({
-              type: "unsubscribed",
-              topic: data.topic,
-              activeTopics: ws.subscriptions,
-            }),
-          );
-        } else if (data.type === "query-subscriptions") {
-          ws.send(
-            JSON.stringify({
-              type: "subscriptions",
-              activeTopics: ws.subscriptions,
-            }),
-          );
-        }
-      } catch {
-        // Plain string or ping/pong fallback
-      }
-    },
-  },
-});
-
-// Pre-warm DNS cache for all sportsdesk service endpoints
-const warmedHosts = prefetchSportsDeskEndpoints();
-
-console.log(
-  `\n🚀 SportsDesk Dashboard Dev Server listening at http://localhost:${server.port}`,
-);
-console.log(
-  `🌐 Pre-warmed DNS cache for ${warmedHosts} core endpoints via Bun.dns.prefetch()`,
-);
-console.log(
-  `🔔 In-flight surveillance alert dispatcher active (5s background sweep)`,
-);
-console.log(
-  `⚡ Hot-reloading active on React components (src/dashboard/) and dashboard.md\n`,
-);
+  console.log(`\n⚡ SportsDesk Enhanced Dashboard Server running!`);
+  console.log(`   ➜ Local URL:    ${handle.url.href}`);
+  console.log(`   ➜ Health Probe: ${handle.url.href}health`);
+  console.log(`   ➜ Markdown API: ${handle.url.href}api/dashboard`);
+  console.log(`   ➜ Shadow API:   ${handle.url.href}api/shadow-pricing`);
+  console.log(`   ➜ Tiers Config: ${handle.url.href}api/config/tiers`);
+  console.log(`   ➜ DCE Matrix:   ${handle.url.href}api/build-matrix`);
+  console.log(`   ➜ DNS Cache:    ${handle.url.href}api/dns`);
+  console.log(
+    `   ➜ WebSocket:    ws://${handle.url.host}/ws (Topics: dashboard, live-bets, syndicate-alerts, tiers-updated)\n`,
+  );
+}

@@ -144,6 +144,7 @@ export const wagerTiersConfigSchema = z.object({
   timezone: z.string().optional(),
   meta: z
     .object({
+      schema_version: z.number().int().optional(),
       name: z.string().optional(),
       owner: z.string().optional(),
       channel: z.string().optional(),

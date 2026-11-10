@@ -45,6 +45,7 @@ export type WagerTiersMap = Record<string, Tier> & {
 };
 
 export interface MetaConfig {
+  schema_version?: number;
   name: string;
   owner: string;
   channel: string;

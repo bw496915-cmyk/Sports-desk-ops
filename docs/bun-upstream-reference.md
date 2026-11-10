@@ -1154,6 +1154,14 @@ Bun v1.4 natively runs multiple `package.json` scripts concurrently with Foreman
 | **Orphan Prevention**  | [#29930](https://github.com/oven-sh/bun/pull/29930)                                                      | `--no-orphans` (`[run] noOrphans = true`)                                | Enforced on all long-lived workers and watch scripts (`wagers:watch`, `positions:cron`, `supervisor.ts`); exits when parent dies and SIGKILLs descendants.           |
 | **Env File Isolation** | [#24767](https://github.com/oven-sh/bun/pull/24767)                                                      | `--no-env-file` (`env = false` in `bunfig.toml`)                         | Enforced on cron jobs to prevent accidental loading of local 1Password `.env` pipes; secrets are injected via `Bun.secrets` or explicit supervisor env.              |
 
+### Connected `bun run --help` Surface (`lib/bun_cli_flags.ts` & `scripts/dx_run_control.ts`)
+
+Rather than duplicating upstream CLI documentation by hand, `readBunRunCliSurface()` in [`lib/bun_cli_flags.ts`](../lib/bun_cli_flags.ts) spawns `bun run --help` against the active binary (`process.execPath`), parses every flag/alias/description row dynamically, classifies each flag into `control`, `monitor`, `workspace`, `environment`, `network`, or `transpiler`, and connects that live surface directly into `./bin/dx --help` and `bun run cli --help`:
+
+- **Help introspection**: `./bin/dx --help` and `bun run cli --help` append the curated control/monitoring footer; `./bin/dx help --bun` (and `bun run cli --bun-help`) render the full categorized `bun run --help` catalog with `--category=<kind>`, `--filter=<substring>`, and `--raw` passthrough.
+- **Validated runtime forwarding (`./bin/dx run` & `DX_BUN_FLAGS`)**: [`scripts/dx_run_control.ts`](../scripts/dx_run_control.ts) validates every forwarded Bun flag against `surface.flags` (suggesting nearest flag names on typos), injects containment defaults (`--no-orphans`, `--unhandled-rejections=strict`, `--title=dx:<target>`), maps operator presets (`--profile-cpu`, `--profile-heap`, `--isolated-env`, `--low-mem`, `--watch-safe`, `--debug`, `--timeout-ms`), and blocks execution whenever `BUN_CONFIG_VERBOSE_FETCH` is enabled alongside any populated credential from [`lib/secret_manifest.ts`](../lib/secret_manifest.ts).
+- **Live telemetry (`./bin/dx monitor` & `./bin/dx live-bets`)**: `./bin/dx monitor` joins `ps` Bun process telemetry (`--no-orphans` and `--title` visibility), `:4020` `/health` + `/api/v2/live-bets` probes (honoring `--offline` and `DX_STATUS_OFFLINE=1`), and `scratch/profiles/` hotspot extraction/pruning; `./bin/dx live-bets` exposes direct CLI control and watch polling over the explicit `/api/v2/live-bets` `source`/`fallback` contract.
+
 ### macOS kqueue Event Loop Bug & Event Filter Semantics
 
 #### Root Cause Analysis: Signed Filter Enums vs Bitwise Masks
@@ -1197,3 +1205,11 @@ Kernel filters are defined as signed negative integer constants (ordinals), **no
 2. **Process and Socket Supervision under kqueue:**
    - In `bunfig.toml`, `noOrphans = true` registers `EVFILT_PROC` with `NOTE_EXIT` to guarantee that spawned child processes (including headless browser workers) terminate when parent daemons exit.
    - Long-lived daemons (`:4020` webview server, websocket streams, and `positions:cron`) on macOS rely on Bun versions containing this fix to avoid socket spin loops during idle write readiness.
+
+## `bun fmt`: CI gates vs. `pre-commit` (`--staged`)
+
+Bun 1.4.4 ships `bun fmt --staged`, `bun fmt --changed`, and `bun fmt --check` (exit `0` clean, `1` needs formatting, `2` syntax/tool error). In `sportsdesk-ops`, formatting is enforced at two layers and **intentionally not wired to a `pre-commit` hook**:
+
+- **PR gate (`.github/workflows/ci.yml` `verify-changed`):** runs `bun fmt --check --changed="origin/${GITHUB_BASE_REF}"`, distinguishing exit `1` (unformatted files) from exit `2` (tool/syntax failure).
+- **Mainline backstop (`.github/workflows/ci.yml` `verify` & `bun run format:check`):** runs full-repo `bun fmt --check` across all tracked files not excluded by `.gitignore` or `bunfig.toml [fmt].ignorePatterns`.
+- **Why `bun fmt --staged` is not wired to `pre-commit`:** `.git/hooks/` is untracked unless the repo adopts a `core.hooksPath` / hook-runner policy, reformatting partially staged files rewrites the working tree relative to staged hunks, and the existing `pre-push` gate plus PR `verify-changed` already catch drift without per-commit friction.

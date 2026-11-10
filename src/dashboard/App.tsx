@@ -1,6 +1,11 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import "./desk.css";
 import { renderAnsiReact } from "./ansi.tsx";
+import { ShadowPricingPanel } from "./ShadowPricingPanel.tsx";
+import {
+  debugDashboardTrace,
+  getDashboardRuntimeFlags,
+} from "./runtime_flags.ts";
 import { type WagerTier, wagerBadge } from "../../lib/wager_tokens.ts";
 
 export interface DashboardData {
@@ -1255,10 +1260,54 @@ function apiPostHeaders(): HeadersInit {
   return headers;
 }
 
+interface BuildMatrixRow {
+  readonly target: string;
+  readonly features: readonly string[];
+  readonly totalJsBytes: number;
+  readonly totalCssBytes: number;
+  readonly hasDebugSentinel: boolean;
+  readonly hasExperimentalSentinel: boolean;
+  readonly hasProdSentinel: boolean;
+}
+
+type DashboardTabId =
+  | "surveillance"
+  | "customers"
+  | "terminal"
+  | "rankings"
+  | "wagers"
+  | "alerts"
+  | "shadow";
+
+function resolveInitialTab(): DashboardTabId {
+  if (typeof window === "undefined") return "customers";
+  const raw = new URLSearchParams(window.location.search).get("tab");
+  if (
+    raw === "shadow" ||
+    raw === "surveillance" ||
+    raw === "customers" ||
+    raw === "terminal" ||
+    raw === "rankings" ||
+    raw === "wagers" ||
+    raw === "alerts"
+  ) {
+    return raw;
+  }
+  return "customers";
+}
+
 export function App(): React.ReactElement {
-  const [activeTab, setActiveTab] = useState<
-    "surveillance" | "customers" | "terminal" | "rankings" | "wagers" | "alerts"
-  >("customers");
+  const runtimeFlags = getDashboardRuntimeFlags();
+  const [activeTab, setActiveTab] = useState<DashboardTabId>(resolveInitialTab);
+  const [showBuildMatrix, setShowBuildMatrix] = useState<boolean>(() =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("matrix") === "1"
+      : false,
+  );
+  const [buildMatrixRows, setBuildMatrixRows] = useState<
+    readonly BuildMatrixRow[] | null
+  >(null);
+  const [buildMatrixLoading, setBuildMatrixLoading] = useState<boolean>(false);
   const [rankingsFilter, setRankingsFilter] = useState<
     "ALL" | "CONDUITS" | "TIER3" | "WHALES"
   >("ALL");
@@ -1597,6 +1646,9 @@ export function App(): React.ReactElement {
       } else if (e.ctrlKey && e.key === "6") {
         e.preventDefault();
         setActiveTab("alerts");
+      } else if (e.ctrlKey && e.key === "7") {
+        e.preventDefault();
+        setActiveTab("shadow");
       }
     };
     window.addEventListener("keydown", handleGlobalKeyDown);
@@ -2032,6 +2084,43 @@ export function App(): React.ReactElement {
           >
             📋 Shift Handoff
           </button>
+          <button
+            type="button"
+            className="sd-pill sd-mono"
+            style={{ cursor: "pointer" }}
+            onClick={() => {
+              const next = !showBuildMatrix;
+              setShowBuildMatrix(next);
+              if (next && !buildMatrixRows && !buildMatrixLoading) {
+                setBuildMatrixLoading(true);
+                fetch("/api/build-matrix")
+                  .then((r) =>
+                    r.ok
+                      ? (r.json() as Promise<{
+                          targets?: readonly BuildMatrixRow[];
+                        }>)
+                      : null,
+                  )
+                  .then((json) => {
+                    if (json?.targets) {
+                      debugDashboardTrace("loaded DCE build matrix", json);
+                      setBuildMatrixRows(json.targets);
+                    }
+                  })
+                  .catch((err) => {
+                    console.warn("Build matrix probe unavailable:", err);
+                  })
+                  .finally(() => setBuildMatrixLoading(false));
+              }
+            }}
+            title="Inspect compile-time bun:bundle dead-code elimination & tokens.toml CSS Houdini registry"
+          >
+            🧬 Target: {runtimeFlags.target.toUpperCase()} (
+            {runtimeFlags.enabledFeatures.length > 0
+              ? runtimeFlags.enabledFeatures.join("+")
+              : "HMR"}
+            )
+          </button>
         </div>
         <div style={styles.tabNav}>
           <button
@@ -2041,6 +2130,14 @@ export function App(): React.ReactElement {
           >
             👥 Profiles ({SAMPLE_PROFILE_DATA.length})
             <span style={styles.keyShortcutBadge}>Ctrl+1</span>
+          </button>
+          <button
+            style={styles.tabBtn(activeTab === "shadow")}
+            onClick={() => setActiveTab("shadow")}
+            title="Counterfactual Shadow Pricing & Slice Hold-Floor Cube (Ctrl+7)"
+          >
+            ⚖️ Shadow Pricing (#135)
+            <span style={styles.keyShortcutBadge}>Ctrl+7</span>
           </button>
           <button
             style={styles.tabBtn(activeTab === "surveillance")}
@@ -2127,6 +2224,124 @@ export function App(): React.ReactElement {
           </button>
         </div>
       </header>
+
+      {showBuildMatrix ? (
+        <section
+          style={{
+            padding: "14px 24px",
+            backgroundColor: "var(--sd-surface-cli, #0a1020)",
+            borderBottom: "1px solid var(--sd-surface-border, #1e293b)",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "1600px",
+              margin: "0 auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "8px",
+              }}
+            >
+              <strong style={{ fontSize: "13px" }}>
+                🧬 Compile-Time <code>bun:bundle</code> DCE Matrix &amp;{" "}
+                <code>design/tokens.toml</code> Houdini Palette
+              </strong>
+              <span
+                className="sd-mono"
+                style={{
+                  fontSize: "11px",
+                  color: "var(--sd-text-muted, #94a3b8)",
+                }}
+              >
+                Active Bundle Sentinel: {runtimeFlags.dceMarker}
+              </span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {[
+                ["--sd-surface-bg", "Obsidian"],
+                ["--sd-surface-card", "Card"],
+                ["--sd-tier-alert", "Alert L21"],
+                ["--sd-tier-steam", "Steam L22"],
+                ["--sd-tier-whale", "Whale L23"],
+                ["--sd-tier-rec-bias", "Rec L24"],
+                ["--sd-theme-emerald", "Gateway L20"],
+                ["--sd-route-sharp", "Sharp R02"],
+                ["--sd-route-devig", "Devig R04"],
+                ["--sd-route-manager", "Manager R03"],
+              ].map(([token, label]) => (
+                <span key={token} className="sd-pill sd-mono">
+                  <span
+                    className="sd-token-swatch"
+                    style={{ backgroundColor: `var(${token})` }}
+                  />
+                  {label}: {token}
+                </span>
+              ))}
+            </div>
+            {buildMatrixLoading ? (
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "var(--sd-text-muted, #94a3b8)",
+                }}
+              >
+                Compiling live <code>prod</code> / <code>dev</code> /{" "}
+                <code>test</code> bundles via <code>Bun.build</code>…
+              </div>
+            ) : buildMatrixRows ? (
+              <table style={{ margin: 0 }}>
+                <thead>
+                  <tr>
+                    <th>Target</th>
+                    <th>Enabled bun:bundle Flags</th>
+                    <th>JS Bundle</th>
+                    <th>CSS Tokens + Chrome</th>
+                    <th>PROD Branch</th>
+                    <th>DEBUG Branch</th>
+                    <th>EXPERIMENTAL Branch</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {buildMatrixRows.map((r) => (
+                    <tr key={r.target}>
+                      <td className="sd-mono">
+                        <strong>{r.target}</strong>
+                      </td>
+                      <td className="sd-mono">{r.features.join(", ")}</td>
+                      <td className="sd-mono">
+                        {(r.totalJsBytes / 1024).toFixed(1)} KB
+                      </td>
+                      <td className="sd-mono">
+                        {(r.totalCssBytes / 1024).toFixed(1)} KB
+                      </td>
+                      <td className="sd-mono">
+                        {r.hasProdSentinel ? "✅ Kept" : "✂️ Pruned (DCE)"}
+                      </td>
+                      <td className="sd-mono">
+                        {r.hasDebugSentinel ? "✅ Kept" : "✂️ Pruned (DCE)"}
+                      </td>
+                      <td className="sd-mono">
+                        {r.hasExperimentalSentinel
+                          ? "✅ Kept"
+                          : "✂️ Pruned (DCE)"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {/* Main View Area */}
       <main style={styles.main}>
@@ -4208,6 +4423,23 @@ export function App(): React.ReactElement {
               </div>
             </div>
           </div>
+        ) : activeTab === "shadow" ? (
+          <ShadowPricingPanel
+            onInspectAccount={(accountId) => {
+              const found = SAMPLE_PROFILE_DATA.find(
+                (c) => c.id.toUpperCase() === accountId.toUpperCase(),
+              );
+              if (found) {
+                setSelectedCustomer(found);
+              }
+              setSearchQuery(accountId);
+              setActiveTab("customers");
+            }}
+            onRunPtyCommand={(cmd) => {
+              setActiveTab("terminal");
+              void runTerminalCommand(cmd);
+            }}
+          />
         ) : (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "20px" }}
@@ -4941,8 +5173,9 @@ export function App(): React.ReactElement {
       <footer style={styles.footer}>
         <span>Updated: {data?.updatedAt ?? "—"}</span>
         <span>
-          Native Bun.serve + Bun.markdown + Bun.build (Zero Webpack / Vite) ·
-          autoExecute: false invariant active
+          Native Bun HTML Bundler + Bun.serve Routes + bun:bundle (
+          {runtimeFlags.target}) + tokens.toml v1.1.0 · autoExecute: false
+          invariant active
         </span>
       </footer>
 
