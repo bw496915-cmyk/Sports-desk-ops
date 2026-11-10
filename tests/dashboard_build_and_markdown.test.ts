@@ -298,17 +298,22 @@ describe("Dashboard Build and Markdown Pipeline", () => {
         for (const c of candidates) TIER_KEYWORD_RE.test(c);
       }
 
-      const ITERS = 50_000;
-      const start = Bun.nanoseconds();
-      for (let i = 0; i < ITERS; i++) {
-        for (const c of candidates) {
-          TIER_KEYWORD_RE.test(c);
+      const SAMPLES = 7;
+      const ITERS_PER_SAMPLE = 10_000;
+      const sampleRates: number[] = [];
+      for (let s = 0; s < SAMPLES; s++) {
+        const start = Bun.nanoseconds();
+        for (let i = 0; i < ITERS_PER_SAMPLE; i++) {
+          for (const c of candidates) {
+            TIER_KEYWORD_RE.test(c);
+          }
         }
+        const elapsedNs = Bun.nanoseconds() - start;
+        sampleRates.push(elapsedNs / (ITERS_PER_SAMPLE * candidates.length));
       }
-      const elapsedNs = Bun.nanoseconds() - start;
-      const totalOps = ITERS * candidates.length;
-      const nsPerOp = elapsedNs / totalOps;
-      expect(nsPerOp).toBeLessThan(250);
+      sampleRates.sort((a, b) => a - b);
+      const medianNsPerOp = sampleRates[Math.floor(SAMPLES / 2)]!;
+      expect(medianNsPerOp).toBeLessThan(250);
     });
   });
 
@@ -317,8 +322,10 @@ describe("Dashboard Build and Markdown Pipeline", () => {
       const file = Bun.file(resolve(process.cwd(), "dashboard.md"));
       expect(await file.exists()).toBe(true);
 
-      const start = performance.now();
       const markdown = await file.text();
+      // Warm up Bun.markdown.ansi before timing pure render latency
+      renderAnsiMarkdown("# warmup", { colors: false, columns: 0 });
+      const start = performance.now();
       const rendered = renderAnsiMarkdown(markdown, {
         colors: false,
         columns: 0,

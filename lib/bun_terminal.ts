@@ -350,6 +350,8 @@ export class TerminalSession implements AsyncDisposable {
   private readonly _auditEvents: TerminalAuditEvent[] = [];
   private _timeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly _listeners: Array<(chunk: string) => void> = [];
+  private _ptyClosedPromise: Promise<void> | null = null;
+  private _resolvePtyClosed: (() => void) | null = null;
 
   constructor(private readonly _options: TerminalSessionOptions = {}) {}
 
@@ -404,6 +406,9 @@ export class TerminalSession implements AsyncDisposable {
 
     this._cmd = [...cmd];
     this._startedAt = Date.now();
+    this._ptyClosedPromise = new Promise<void>((resolve) => {
+      this._resolvePtyClosed = resolve;
+    });
 
     const term = new Bun.Terminal({
       cols: this._options.cols ?? 80,
@@ -418,6 +423,7 @@ export class TerminalSession implements AsyncDisposable {
       },
       exit: (_terminal, ptyCode, signal) => {
         this._ptyExitCode = ptyCode;
+        this._resolvePtyClosed?.();
         this._options.onPtyClose?.(ptyCode, signal);
         this._emitAudit({
           type: "pty_close",
@@ -522,8 +528,22 @@ export class TerminalSession implements AsyncDisposable {
       throw new Error("TerminalSession has not been started");
     }
     const effectiveTimeout = timeoutMs ?? this._options.timeoutMs;
+    const drainPty = async (): Promise<void> => {
+      if (!this._ptyClosedPromise) return;
+      await Promise.race([
+        this._ptyClosedPromise,
+        new Promise<void>((resolve) => setTimeout(resolve, 25)),
+      ]);
+      const final = this._decoder.decode();
+      if (final) {
+        this._raw += final;
+      }
+    };
+
     if (!effectiveTimeout || effectiveTimeout <= 0) {
-      return await this._proc.exited;
+      const code = await this._proc.exited;
+      await drainPty();
+      return code;
     }
 
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -539,7 +559,9 @@ export class TerminalSession implements AsyncDisposable {
     });
 
     try {
-      return await Promise.race([this._proc.exited, timeoutPromise]);
+      const code = await Promise.race([this._proc.exited, timeoutPromise]);
+      await drainPty();
+      return code;
     } finally {
       if (timer) clearTimeout(timer);
     }
