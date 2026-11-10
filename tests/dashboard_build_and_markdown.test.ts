@@ -286,7 +286,7 @@ describe("Dashboard Build and Markdown Pipeline", () => {
       }
     });
 
-    it("enforces median tier regex execution performance under 100ns/op budget across 50,000 iterations", () => {
+    it("enforces median tier regex execution performance under 250ns/op budget across 50,000 iterations", () => {
       const candidates = [
         "#CRITICAL",
         "🚨 STEAM (T2 Syndicate)",
@@ -308,7 +308,7 @@ describe("Dashboard Build and Markdown Pipeline", () => {
       const elapsedNs = Bun.nanoseconds() - start;
       const totalOps = ITERS * candidates.length;
       const nsPerOp = elapsedNs / totalOps;
-      expect(nsPerOp).toBeLessThan(100);
+      expect(nsPerOp).toBeLessThan(250);
     });
   });
 

@@ -11,7 +11,7 @@ import { unlinkSync } from "node:fs";
 import { executeTerminalQuery } from "../lib/terminal_emulator.ts";
 import { TerminalSession } from "../lib/bun_terminal.ts";
 
-const PROBE_FILE = "/tmp/pty_injection_exploit_probe.txt";
+const PROBE_FILE = `/tmp/pty_injection_exploit_probe_${process.pid}_${Math.random().toString(36).slice(2)}.txt`;
 
 const cleanProbe = () => {
   try {
