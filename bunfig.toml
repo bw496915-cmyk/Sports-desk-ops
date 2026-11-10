@@ -105,7 +105,6 @@ pathIgnorePatterns = [
   "Scratch/**",
   "verification/**",
   "tests/fixtures/**",
-  "tests/market_index.test.ts",
 ]
 
 # Dual coverage reporting: preserves console text table while producing lcov.info for CI
