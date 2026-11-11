@@ -11,7 +11,7 @@
  * Opt-in: loading a program costs ~1s, which is too slow for the default path.
  */
 
-import * as ts from "typescript-compiler-legacy";
+import * as ts from "typescript";
 import path from "node:path";
 
 export interface NamespaceGap {
