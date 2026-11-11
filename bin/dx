@@ -14,7 +14,17 @@
 # ==============================================================================
 set -eo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+dx_resolve_script_dir() {
+  local src="$1" dir
+  while [[ -L "$src" ]]; do
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  cd -P "$(dirname "$src")" && pwd
+}
+
+REPO_ROOT="$(cd -P "$(dx_resolve_script_dir "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Host home: inside the sandbox $HOME is <host home>/.gemini/users/<id>; elsewhere it is $HOME.
 HOST_HOME="${HOME%%/.gemini/users/*}"
@@ -181,7 +191,7 @@ done
 
 # Every command `dx` dispatches itself. Keep in step with the case below (`dx_commands_check`
 # in tests/dx_cli.test.ts fails when they drift) and with `help`.
-DX_COMMANDS="help status setup scripts run monitor live-bets iptracker modes gslive docs api-docs api stale profile combo bridge crossdomain shot session screenshot image-meta bun deps blob-formdata fetch-config fetch-i18n fetch-common fetch-live-data fetch-report-status fetch-report-periods wagers-by-state wagers-by-state-live ticket flags queue backtest poll watch pipeline stage deploy ship exec enrich taxonomy edge shadow-price nsh worktrees"
+DX_COMMANDS="help status setup scripts run monitor live-bets iptracker modes gslive docs api-docs api stale profile combo bridge crossdomain shot session screenshot image-meta assets bun deps blob-formdata fetch-config fetch-i18n fetch-common fetch-live-data fetch-report-status fetch-report-periods wagers-by-state wagers-by-state-live ticket flags queue backtest poll watch pipeline stage deploy ship exec enrich taxonomy edge shadow-price nsh worktrees"
 
 # dx_bun_run <script_or_file> [args...]: fast `bun run` when DX_BUN_FLAGS is unset; otherwise
 # delegates through `dx_run_control.ts` so every flag in DX_BUN_FLAGS is validated against live
@@ -348,6 +358,8 @@ Usage: ./bin/dx <command> [args...]
     ./bin/dx shot <url>             Bun.WebView screenshot → scratch/shots/ (--f402-login, --profile <dir>)
     ./bin/dx session [status|login] Portal session file the replay transport reads (status is read-only)
     ./bin/dx image-meta <file>      Print image metadata via Bun.Image (or '-' for stdin)
+    ./bin/dx assets [--write] [--json|--yaml]
+                                    Audit & optimize repo image assets with Bun.file().image() & WebP siblings
     ./bin/dx blob-formdata <file>   Parse a blob as FormData and print JSON (or '-' for stdin)
     ./bin/dx enrich --figure=<path> [--ticker=<path>] [--output=<path>] [--format=inspect|jsonl|summary] [--inspect]
                                     Stream and join live ticker wagers with settled getWagersByFigureDate
@@ -391,7 +403,7 @@ EOF
       if [[ "${DX_STATUS_OFFLINE:-}" == "1" ]]; then
         printf '%s\n' "not probed (DX_STATUS_OFFLINE=1)" >"$dx_probe_dir/wrangler"
       else
-        (cd "$REPO_ROOT" && ./wrangler --version 2>/dev/null | head -n 1 || true) >"$dx_probe_dir/wrangler"
+        (cd "$REPO_ROOT" && "$REPO_ROOT/bin/wrangler" --version 2>/dev/null | grep -m1 -v '^[[:space:]]*$' || true) >"$dx_probe_dir/wrangler"
       fi
     ) &
     (
@@ -551,6 +563,10 @@ EOF
     cd "$REPO_ROOT"
     exec bun bin/image-meta.ts "$@"
     ;;
+  assets)
+    cd "$REPO_ROOT"
+    exec bun run scripts/optimize_assets.ts "$@"
+    ;;
   bun)
     cd "$REPO_ROOT"
     exec bun bin/bun_surface.ts "$@"
@@ -601,7 +617,7 @@ VERSION_HELP
     ;;
   fetch-config)
     cd "$REPO_ROOT"
-    dx_bun_run fetch-config.ts "$@"
+    dx_bun_run scripts/fetch-config.ts "$@"
     ;;
   fetch-i18n)
     cd "$REPO_ROOT"
@@ -613,7 +629,7 @@ VERSION_HELP
     ;;
   fetch-live-data)
     cd "$REPO_ROOT"
-    dx_bun_run fetch-live-data.ts "$@"
+    dx_bun_run scripts/fetch-live-data.ts "$@"
     ;;
   fetch-report-status)
     cd "$REPO_ROOT"
@@ -621,7 +637,7 @@ VERSION_HELP
     ;;
   fetch-report-periods)
     cd "$REPO_ROOT"
-    dx_bun_run fetch-report-periods.ts "$@"
+    dx_bun_run scripts/fetch-report-periods.ts "$@"
     ;;
   wagers-by-state)
     cd "$REPO_ROOT"
@@ -702,12 +718,12 @@ VERSION_HELP
           continue
         fi
         echo "  ↑ $bucket/$key"
-        ./wrangler r2 object put "$bucket/$key" --file="$file" --content-type="$type" --remote || exit 1
+        "$REPO_ROOT/bin/wrangler" r2 object put "$bucket/$key" --file="$file" --content-type="$type" --remote || exit 1
       done < <(bun -e 'const m=JSON.parse(await Bun.file(process.argv[1]).text()); for (const f of m.files) console.log([f.key,f.file,f.type].join("\t"));' "$manifest")
       rm -f "$manifest"
     fi
     if [[ -n "${CLOUDFLARE_API_TOKEN:-}" ]]; then
-      ./wrangler pages deploy dist --project-name=fantasy402-docs --branch=main "$@"
+      "$REPO_ROOT/bin/wrangler" pages deploy dist --project-name=fantasy402-docs --branch=main "$@"
     else
       echo "⚠️  Cloudflare Pages deploy SKIPPED: CLOUDFLARE_API_TOKEN is unset (R2 upload above is done)." >&2
       echo "    Put a Pages-scoped CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID in ./cloudflare.env or" >&2
