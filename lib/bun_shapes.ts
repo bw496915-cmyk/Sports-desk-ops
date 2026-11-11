@@ -13,7 +13,7 @@
  * it the real repository. Adding a `Bun.*` call without an entry here fails that test.
  */
 
-import * as ts from "typescript";
+import * as ts from "typescript-compiler-legacy";
 import { listSourceFiles } from "./source_files.ts";
 
 /** The exact upstream artifacts this table is written against. */

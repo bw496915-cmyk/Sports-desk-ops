@@ -9,7 +9,15 @@ declare module "*.html" {
   export default bundle;
 }
 
-declare module "*.css" {
-  const href: string;
-  export default href;
+/** Side-effect and default URL imports — use `declare module "*.module.css"` for CSS modules. */
+declare module "*.css" {}
+
+declare module "*.module.css" {
+  const classes: { readonly [key: string]: string };
+  export = classes;
+}
+
+declare module "*.svg" {
+  const path: `${string}.svg`;
+  export default path;
 }
