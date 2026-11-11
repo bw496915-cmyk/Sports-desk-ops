@@ -8,22 +8,25 @@
 
 import {
   agentIdentifier,
+  customerIdentifier,
   isAgentIdentifier,
+  isCustomerIdentifier,
   isIsoDateTimeUtc,
   isoDateTimeUtc,
   parseAsCents,
   sha256HexFromDigest,
   type AgentIdentifier,
   type Cents,
+  type CustomerIdentifier,
   type IsoDateTimeUtc,
   type Sha256Hex,
 } from "../../design/domain-branded-types.ts";
 import type { WagerTypeLabel } from "../../lib/game_admin.ts";
 import type {
   AgentScope,
-  TicketKey,
   LiveBetGame,
   LiveBetsSummary,
+  TicketKey,
 } from "../../lib/live_bets.ts";
 import type { summarizeScoreboard, WagerScore } from "../../lib/scoreboard.ts";
 import type {
@@ -139,6 +142,7 @@ export interface ValidatedLiveBetGameExposure {
   readonly wageredCents: Cents;
   readonly toWinCents: Cents;
   readonly picks: number;
+  readonly customerId: CustomerIdentifier | null;
   readonly agentId: AgentIdentifier | null;
 }
 
@@ -194,16 +198,21 @@ export function parseLiveBetsProvenance(
 }
 
 /**
- * Projects a `LiveBetsV2Game` into unit-explicit `Cents` and `AgentIdentifier`
- * domain primitives for internal risk and exposure consumers.
+ * Projects a `LiveBetsV2Game` into unit-explicit `Cents`, `CustomerIdentifier`,
+ * and `AgentIdentifier` domain primitives for internal risk and exposure consumers.
  */
 export function toValidatedLiveBetGameExposure(
   game: LiveBetsV2Game,
 ): ValidatedLiveBetGameExposure {
-  const rawAgent = game.agent?.id ?? game.agent?.key ?? null;
+  const rawAgent = game.agent?.id || game.agent?.key || null;
   const agentId =
     rawAgent !== null && isAgentIdentifier(rawAgent)
       ? agentIdentifier(rawAgent)
+      : null;
+  const rawCustomer = String(game.customerID ?? "").trim();
+  const customerId =
+    rawCustomer !== "" && isCustomerIdentifier(rawCustomer)
+      ? customerIdentifier(rawCustomer)
       : null;
   return {
     ticketKey: game.ticketKey,
@@ -212,6 +221,7 @@ export function toValidatedLiveBetGameExposure(
     wageredCents: parseAsCents(game.wagered, true),
     toWinCents: parseAsCents(game.toWin, true),
     picks: game.picks,
+    customerId,
     agentId,
   };
 }

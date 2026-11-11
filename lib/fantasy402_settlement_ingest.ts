@@ -541,7 +541,8 @@ export class WagerSettlementStore {
   insertObservation(row: SettlementInsert): void {
     const { observation } = row;
     const ssot = buildWagerSettlementSsotInsert(row);
-    // Legacy composite column; `outcome` and `lifecycle` axes are authoritative.
+    // Legacy composite column kept for older readers/indexes; the two axes are
+    // authoritative. Read `outcome` / `lifecycle` from here on.
     const legacyStatus = ssot.wager_status;
     this.db
       .query(
