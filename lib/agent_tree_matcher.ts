@@ -3,10 +3,10 @@
  *
  * Provides project-wide declarative query matching, structural invariant assertions,
  * and subtree filtering over the agent hierarchy tree using native Bun primitives
- * (`Bun.deepMatch`, `Bun.deepEquals`).
+ * (`Bun.deepEquals`).
  */
 
-import { deepMatch, deepEquals } from "bun";
+import { deepEquals } from "bun";
 import type { AgentKey } from "./live_bets.ts";
 import {
   type AgentNode,
@@ -25,7 +25,7 @@ export interface AgentNodePattern {
 }
 
 export interface AgentTreeMatchQuery {
-  /** Match specific node properties via Bun.deepMatch */
+  /** Match specific node properties */
   readonly pattern?: AgentNodePattern | undefined;
   /** Filter to nodes residing within a specific subtree root */
   readonly underRoot?: AgentKey | undefined;
@@ -58,13 +58,25 @@ export interface AgentTreeEnsureResult {
 }
 
 /**
- * Checks whether an AgentNode satisfies a pattern using Bun.deepMatch.
+ * Checks whether an AgentNode satisfies a pattern.
  */
 export function matchAgentNode(
   node: AgentNode,
   pattern: AgentNodePattern,
 ): boolean {
-  return deepMatch(pattern, node);
+  if (pattern.level !== undefined && node.level !== pattern.level) {
+    return false;
+  }
+  if (pattern.agentType !== undefined && node.agentType !== pattern.agentType) {
+    return false;
+  }
+  if (pattern.parent !== undefined && node.parent !== pattern.parent) {
+    return false;
+  }
+  if (pattern.ambiguous !== undefined && node.ambiguous !== pattern.ambiguous) {
+    return false;
+  }
+  return true;
 }
 
 /**
