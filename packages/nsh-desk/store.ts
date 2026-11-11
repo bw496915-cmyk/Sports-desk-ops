@@ -1,12 +1,22 @@
 import process from "process";
-import { batch, cleanup, Clipboard, computed, signal, Storage } from "nsh";
+import {
+  batch,
+  cleanup,
+  Clipboard,
+  computed,
+  setColorScheme,
+  signal,
+  Storage,
+} from "nsh";
 import {
   buildDiagnosticsSnapshotJson,
   buildExposurePlotData,
   buildScoreboardRows,
   buildSignalArenaIndex,
+  DESK_APPEARANCE_STORAGE_KEY,
   DESK_PREFS_STORAGE_KEY,
   extractApiFailureCause,
+  parseAppearanceChoice,
   parseKalshiPayload,
   parseKpisPayload,
   parseLiveBetsSummaryPayload,
@@ -15,6 +25,7 @@ import {
   resolveDeskOrigin,
   serializeWorkspacePrefs,
   sortSignalArenaIndex,
+  type DeskAppearance,
   type DeskLeagueFilter,
   type EndpointSnapshot,
   type ParsedKalshiPayload,
@@ -44,7 +55,7 @@ export function defaultWorkspaceLayout(): DockAreaLayout {
         { type: "tabs", panels: ["signals", "scoreboard"] },
         { type: "tabs", panels: ["exposure"] },
       ],
-      sizes: [null, 352],
+      sizes: [null, 356],
     },
     left: { layout: { type: "tabs", panels: ["kpis"] }, size: 296 },
     bottom: { layout: { type: "tabs", panels: ["diagnostics"] }, size: 214 },
@@ -200,10 +211,13 @@ export function createDeskStore() {
   const layout = signal<DockAreaLayout>(defaultWorkspaceLayout());
   const locked = signal(false);
   const dockOpen = signal({ left: true, bottom: true });
+  const appearance = signal<DeskAppearance>("system");
   const uiKitOpen = signal(false);
+  const commandOpen = signal(false);
   const copiedDiagnosticsBytes = signal<number | null>(null);
 
   let userMutatedPrefs = false;
+  let userMutatedAppearance = false;
 
   const persistPrefs = () => {
     userMutatedPrefs = true;
@@ -215,6 +229,15 @@ export function createDeskStore() {
       dockOpen: dockOpen(),
     });
     void Storage.setItem(DESK_PREFS_STORAGE_KEY, payload).catch(() => {
+      // Non-fatal if host Storage quota or capability is unavailable.
+    });
+  };
+
+  const applyAppearance = (next: DeskAppearance) => {
+    userMutatedAppearance = true;
+    appearance.set(next);
+    setColorScheme(next);
+    void Storage.setItem(DESK_APPEARANCE_STORAGE_KEY, next).catch(() => {
       // Non-fatal if host Storage quota or capability is unavailable.
     });
   };
@@ -232,6 +255,17 @@ export function createDeskStore() {
     })
     .catch(() => {
       // Keep defaults when Storage is unavailable.
+    });
+
+  void Storage.getItem(DESK_APPEARANCE_STORAGE_KEY)
+    .then((raw) => {
+      if (userMutatedAppearance || raw === null) return;
+      const hydrated = parseAppearanceChoice(raw);
+      appearance.set(hydrated);
+      setColorScheme(hydrated);
+    })
+    .catch(() => {
+      // Keep system appearance when Storage is unavailable.
     });
 
   const refreshAll = async () => {
@@ -301,6 +335,19 @@ export function createDeskStore() {
     return firstIdx !== undefined ? (arena.items[firstIdx] ?? null) : null;
   });
 
+  const selectedDisplayRow = computed<number | null>(() => {
+    const active = selectedSignal();
+    if (!active) return null;
+    const idxData = signalArenaIndex();
+    const origIdx = idxData.indexById.get(active.id);
+    if (origIdx === undefined) return null;
+    const order = signalArena().order;
+    for (let pos = 0; pos < order.length; pos++) {
+      if (order[pos] === origIdx) return pos;
+    }
+    return null;
+  });
+
   const plotPoints = computed(() => {
     const snap = kalshiSnap();
     return snap.status === "ready"
@@ -366,6 +413,7 @@ export function createDeskStore() {
     signalSort: () => signalSort(),
     signalArena,
     selectedSignal,
+    selectedDisplayRow,
     plotPoints,
     activePlotPoint,
     leagueFilter: () => leagueFilter(),
@@ -375,10 +423,13 @@ export function createDeskStore() {
     layout: () => layout(),
     locked: () => locked(),
     dockOpen: () => dockOpen(),
+    appearance: () => appearance(),
     uiKitOpen: () => uiKitOpen(),
+    commandOpen: () => commandOpen(),
     copiedDiagnosticsBytes: () => copiedDiagnosticsBytes(),
     refreshAll,
     copyDiagnosticsToClipboard,
+    setAppearance: applyAppearance,
     setAutoPoll: (next: boolean) => {
       autoPoll.set(next);
       persistPrefs();
@@ -388,6 +439,9 @@ export function createDeskStore() {
       persistPrefs();
     },
     setSignalSort: (next: DataTableSort | null) => signalSort.set(next),
+    selectSignalById: (signalId: string) => {
+      selectedSignalId.set(signalId);
+    },
     selectSignalByDisplayRow: (displayRow: number) => {
       const arena = signalArena();
       const origIdx = arena.order[displayRow];
@@ -422,6 +476,7 @@ export function createDeskStore() {
       persistPrefs();
     },
     setUiKitOpen: (next: boolean) => uiKitOpen.set(next),
+    setCommandOpen: (next: boolean) => commandOpen.set(next),
   };
 }
 

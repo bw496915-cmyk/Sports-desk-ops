@@ -7,7 +7,7 @@
  *   1. Scoped `bun fmt` on changed files (~30ms; `--check` for read-only)
  *   2. Parallel `Promise.all` execution of:
  *      - `bun check --no-script -p tsconfig.json` + `src/dashboard/tsconfig.json` (.ts + .tsx)
- *      - `oxlint --deny-warnings` scoped to changed JS/TS/TSX files (`--deep` adds `--type-aware`)
+ *      - `bun lint --no-script --deny-warnings` scoped to changed JS/TS/TSX files (`--deep` adds `--type-aware`)
  *      - Path-triggered gates ONLY when relevant directories changed
  *      - Targeted tests: `bun test --parallel --changed` (or head shard `--shard=1/8` + explicit
  *        changed/matched `*.test.ts` when root configs changed or inside a sandboxed worktree).
@@ -17,10 +17,11 @@
  *   bun run verify:fast lib/foo.ts           # verify specific file(s) + matching tests
  *   bun run verify:fast --check              # read-only format check
  *   bun run verify:fast --shard              # force head shard (1/8)
- *   bun run verify:fast --deep               # include type-aware oxlint pass
+ *   bun run verify:fast --deep               # include type-aware `bun lint` pass
  */
 
 import { existsSync, lstatSync, statSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
 
@@ -248,20 +249,34 @@ if (
   }
 }
 
-function resolveOxlintCmd(): string[] | null {
-  const localBin = path.join(ROOT, "node_modules", ".bin", "oxlint");
-  if (
-    existsSync(localBin) ||
-    Bun.which("oxlint", { PATH: Bun.env.PATH ?? "" }) !== null
-  ) {
-    // Use `bun --bun run oxlint` so Bun injects its `node` PATH shim for both
-    // the oxlint wrapper (`#!/usr/bin/env node`) and any child `tsgolint` process.
-    return [process.execPath, "--bun", "run", "oxlint"];
+function hasNativeBunLint(bin: string): boolean {
+  try {
+    const res = Bun.spawnSync([bin, "--help"], {
+      cwd: ROOT,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (res.exitCode !== 0) return false;
+    return /\blint\b/.test(new TextDecoder().decode(res.stdout));
+  } catch {
+    return false;
+  }
+}
+
+function resolveBunLintCmd(): string[] | null {
+  const candidates = [
+    process.execPath,
+    path.join(os.homedir(), ".bun", "bin", "bun"),
+  ];
+  for (const bin of candidates) {
+    if (existsSync(bin) && hasNativeBunLint(bin)) {
+      return [bin, "lint", "--no-script"];
+    }
   }
   return null;
 }
 
-const oxlintCmd = resolveOxlintCmd();
+const bunLintCmd = resolveBunLintCmd();
 
 // Phase 2: Parallel typecheck + UI typecheck + scoped lint + targeted tests
 const tasks: Promise<TaskResult>[] = [
@@ -276,23 +291,21 @@ const tasks: Promise<TaskResult>[] = [
   runTask("ensure:tsconfig", ["bun", "run", "scripts/ensure_deep_tsconfig.ts"]),
 ];
 
-if (lintTargets.length > 0 && oxlintCmd !== null) {
+if (lintTargets.length > 0 && bunLintCmd !== null) {
   tasks.push(
-    runTask(`oxlint (${lintTargets.length})`, [
-      ...oxlintCmd,
+    runTask(`lint (${lintTargets.length})`, [
+      ...bunLintCmd,
       "--deny-warnings",
       ...lintTargets,
     ]),
   );
 }
 
-if (values.deep && oxlintCmd !== null) {
+if (values.deep && bunLintCmd !== null) {
   tasks.push(
-    runTask("oxlint:type-aware", [
-      ...oxlintCmd,
+    runTask("lint:type-aware", [
+      ...bunLintCmd,
       "--type-aware",
-      "-c",
-      ".oxlintrc.type-aware.json",
       "--deny-warnings",
     ]),
   );

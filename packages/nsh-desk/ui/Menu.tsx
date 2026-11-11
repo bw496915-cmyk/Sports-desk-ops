@@ -1,5 +1,6 @@
 import { keymap, platform, Text, View, type JSX } from "nsh";
 import { Button, Menu, MenuItem, MenuSeparator } from "nsh/base";
+import { DeskIcon } from "./Icon";
 import {
   FOCUS_RING_CLASS,
   MOTION,
@@ -43,7 +44,7 @@ export function DeskMenu(props: DeskMenuProps): JSX.Element {
           <Text class="text-xs font-medium text-card-foreground group-aria-expanded:font-semibold">
             {props.label}
           </Text>
-          <Text class="text-xs text-muted-foreground">▾</Text>
+          <DeskIcon name="chevron-down" size={12} tone="muted-foreground" />
         </Button>
       }
     >
@@ -56,6 +57,7 @@ export interface DeskMenuItemProps {
   label: string;
   shortcut?: string;
   checked?: boolean;
+  radio?: boolean;
   disabled?: boolean;
   destructive?: boolean;
   testID?: string;
@@ -78,15 +80,12 @@ export function DeskMenuItem(props: DeskMenuItemProps): JSX.Element {
   return (
     <MenuItem
       testID={props.testID}
+      role={props.radio ? "menuitemradio" : undefined}
       checked={checkState()}
       disabled={props.disabled}
       onSelect={props.onSelect}
-      indicatorClass="w-4 items-center justify-center"
-      indicator={
-        <Text class="text-xs font-semibold text-foreground">
-          {props.checked ? "✓" : ""}
-        </Text>
-      }
+      indicatorClass="w-4 items-center justify-center opacity-0 checked:opacity-100"
+      indicator={<DeskIcon name="check" size={12} tone="popover-foreground" />}
       class={`group ${ITEM_HEIGHT_CLASS} flex-row items-center justify-between gap-4 rounded-(--radius-sm) px-2.5 transition-colors duration-100 hover:bg-accent active:bg-accent motion-reduce:transition-none ${FOCUS_RING_CLASS} disabled:opacity-45`}
     >
       <View class="flex-1 flex-row items-center justify-between gap-4">

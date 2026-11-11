@@ -311,25 +311,24 @@ Two consequences for code here:
 
 ## Bun Shell (`Bun.$`) — measured 2026-11-04
 
-`Bun.$` is a lazy template tag: a command starts no process until the promise is awaited or an
+[`Bun.$`](https://bun.com/reference/globals/bun/$) (`packages/bun-types/shell.d.ts`) is a lazy template tag: a command starts no process until the promise is awaited or an
 output method is called. Measured: a command's marker file was absent before the first `await`
 and present after it.
 
 - **Awaited → `ShellOutput`**, with **synchronous** `text(encoding?)`, `json()`, `bytes()`,
-  `arrayBuffer()` and `blob()`.
+  `arrayBuffer()` and `blob()` (`shell.d.ts` declares `class ShellOutput` in `namespace $`, though at runtime on `1.4.4` `Bun.$.ShellPromise` and `Bun.$.ShellError` are constructors while `Bun.$.ShellOutput` is `undefined`).
 - **Un-awaited → `ShellPromise`**, with the same names returning promises plus `.lines()` (an
   async iterable), `.quiet()`, `.nothrow()`, `.throws(bool)`, `.cwd(str)` and `.env(obj)`.
   Iterating the promise itself throws (`iterable should have an iterator symbol`); iterate
-  `.lines()`. bun-types 1.4.4 declares `text()` on the promise but **not** `bytes()`; await the
-  output first (or cast) when reading bytes.
-- **Bytes over text, lines over split.** Use `.bytes()` for byte-level work and `.lines()` for
+  `.lines()`. `bun-types@1.4.4` (`shell.d.ts`) declares `text()` on `ShellPromise` but **not** `bytes()` (though `ShellPromise.prototype.bytes` exists at runtime), and conversely declares `get stdin(): WritableStream` on `ShellPromise` even though `sp.stdin` is `undefined` at runtime on `1.4.4` (`Object.getOwnPropertyDescriptor(Bun.$.ShellPromise.prototype, "stdin") === undefined`). Pass standard input via `< ${Buffer | Uint8Array | Blob | Response | ReadableStream}` redirection or `Bun.spawn(cmd, { stdin })`.
+- **Bytes over text, lines over split.** Use `.bytes()` on the awaited `ShellOutput` for byte-level work and `.lines()` for
   line scanning. `printf 'one\ntwo\nthree\n'` through `.lines()` yields
   `["one", "two", "three", ""]` — the trailing newline is a final empty line.
 - **Output methods quietly capture.** A bare `await` of the tag echoes the process stdout
   (measured: `BARE-ECHO` appeared before the next `console.log`); call `.quiet()` when that is
   unwanted. Calling an output method already implies quiet.
-- **Failures still yield bytes.** `ShellError` carries `exitCode`, `stdout` and `stderr` as
-  `Buffer`s; the stderr bytes are available even though the promise rejected.
+- **Failures still yield bytes.** `Bun.$.ShellError` (`instanceof Bun.$.ShellError`, extending `ShellOutput`) carries `exitCode`, `stdout` and `stderr` as
+  `Buffer`s plus `.text()` / `.bytes()`; the stderr bytes are available even though the promise rejected.
 - **Do not copy the `T[P<P>]` generic signatures** from the reference page; they are malformed.
 
 **Where it may be used:** tooling only (`scripts/`, `bin/`), and every command must capture its
@@ -347,35 +346,18 @@ enforces that split and the capture rule.
 - Walkthroughs: [bun.com/guides](https://bun.com/guides)
 - PM topics that match this repo: [install](https://bun.com/docs/pm/cli/install), [add](https://bun.com/docs/pm/cli/add), [remove](https://bun.com/docs/pm/cli/remove), [workspaces](https://bun.com/docs/pm/workspaces), [lifecycle](https://bun.com/docs/pm/lifecycle), [lockfile](https://bun.com/docs/pm/lockfile), [isolated installs](https://bun.com/docs/pm/isolated-installs), [patch](https://bun.com/docs/pm/cli/patch)
 
-**Ahead of the release — the `/docs/lint` linter.** [bun.com/docs/lint](https://bun.com/docs/lint)
-documents a built-in `bun lint` (rules in `bunfig.toml [lint]`, `--type-aware` backed by
-`bun check`, `--no-script`, `--doctor`). Measured 2026-11-04 on this machine: the latest GitHub
-release is **v1.4.4**, whose tag `bun-v1.4.4` is commit `38afee6c84…` — exactly the installed
-binary's revision (`1.4.4+38afee6c8`) — and the v1.4.4 blog post announces `bun fmt`, not a
-linter (`bun lint` appears zero times there; the only "lint" is `lint-staged` in the `bun fmt
---staged` section). The command is absent from the binary: `bun --help` lists `fmt` but no `lint`,
-and `bun lint` (with or without `--no-script`) in a directory with no `lint` script fails with
-`Script not found "lint"`. In this repo the `package.json` `lint` script shadows the name, so
-`bun lint --type-aware` executes `oxlint --fix --type-aware` — a mutating oxlint run, not the
-documented linter. Until a release ships the command, `bun run lint:check` (oxlint 1.90.0 plus
-`.oxlintrc.type-aware.json`) remains the gate; after an upgrade, run `bun lint --doctor` to see
-which oxlint/ESLint rules run natively, then decide whether the shadowing script becomes
-`bun lint --fix` (inside that script `bun lint` is the linter, per the docs) or `--no-script`.
+**Built-in `/docs/lint` adoption (`bunfig.toml [lint]`).** [bun.com/docs/lint](https://bun.com/docs/lint)
+documents built-in `bun lint` (rules in `bunfig.toml [lint]`, `--type-aware` backed by
+`bun check`, `--no-script`, `--deny-warnings`, `--fix`). Because `package.json` defines `"lint"`,
+bare `bun lint` executes `scripts.lint` unless `--no-script` is passed; this repo therefore sets:
 
-**Type-aware parity, measured on oxlint 1.90.0 (2026-11-04).** oxlint implements the same 61
-type-aware rules the docs describe (the docs' `@typescript-eslint/*` names map to `typescript/*`),
-but with two operational differences the docs' builtin would remove:
-
-- Type-aware runs require the pinned native package `oxlint-tsgolint@7.0.2005` (declared in
-  `package.json`; platform binaries ship as optional deps). Outside a project that installs it,
-  `oxlint --type-aware` fails with `Failed to find tsgolint executable` — so the gate is not
-  self-contained the way a builtin would be.
-- oxlint's `--type-check` reports TypeScript diagnostics: on this checkout it reproduced exactly
-  the three `tsc` errors in `lib/bridge_and_channel_router.ts` (TS2412 + 2×TS2379) in 1.6 s over
-  925 files. `bun run typecheck` (tsc) is faster (~0.2 s) and remains the type-error SSOT; adding
-  `--type-check` to lint would only duplicate it. `--tsconfig` with a narrower `include` did not
-  change those type-check diagnostics, confirming the docs' caveat: next to an oxlint config it
-  sets import resolution, not the tsconfig used to type-check each file.
+- `"lint": "bun lint --no-script --fix"` for safe autofixes.
+- `"lint:check": "bun lint --no-script --deny-warnings && bun lint --no-script --type-aware --deny-warnings"`
+  for read-only AST + type-aware gating against `bunfig.toml [lint]`, with zero standalone linter
+  packages in `devDependencies`.
+- `bun run typecheck` (`bun check --no-script -p tsconfig.json` + `src/dashboard/tsconfig.json`,
+  documented in [`typecheck-desk.md`](./typecheck-desk.md)) remains the dedicated type-error SSOT,
+  keeping fast project-sliced `bun check` separate from `bun lint --type-aware`.
 
 **Ahead of the release — `import.meta.glob` and the `bun test` env view.** The
 [`ImportMeta` reference](https://bun.com/reference/globals/bun/ImportMeta) documents
@@ -682,7 +664,7 @@ Contracts exercised against Bun 1.4.4 (`.bun-version`), the version the CI `setu
 | Strict `Bun.TOML` (#32953)                           | Quoted strings and safe integers only; no unquoted values or missing newlines.                                                                                                                                                                                                                                                                                                                                            | `Bun.TOML.parse` accepts `bunfig.toml` (`fmt`, `run`) and `config/wagers-capture.toml` (`capture`, `paths`, `alerts`, `publish`, `session`).                                                    |
 | `Bun.YAML` is YAML 1.2 (#25537)                      | `yes/no/on/off` are strings; workflow `on:` remains the string key `"on"` (correct for GitHub Actions).                                                                                                                                                                                                                                                                                                                   | `Bun.YAML.parse("a: yes\nb: no\nc: on\nd: off")` → all strings; `dsh-plugin/cordis.patch.yml` parses as a 1-element array. `scripts/ci_local.ts` reads only `jobs[*].steps[*].run`, never `on`. |
 | `res.writeHeader()` removed (#31991)                 | No use of the removed Node API.                                                                                                                                                                                                                                                                                                                                                                                           | `grep -rn "writeHeader("` → no matches.                                                                                                                                                         |
-| Bun-as-node skips `.env` (#36610)                    | Only `bun --bun` scripts are `lint` / `lint:check` (oxlint), which do not read `.env`. No `bunx` or node-shebang invocation paths.                                                                                                                                                                                                                                                                                        | `package.json` scripts; regular `bun run` scripts keep `.env` loading.                                                                                                                          |
+| Bun-as-node skips `.env` (#36610)                    | No `package.json` scripts rely on `bun --bun`, `bunx`, or node-shebang wrappers (`lint`, `fmt`, and `check` run natively through Bun).                                                                                                                                                                                                                                                                                    | `package.json` scripts; regular `bun run` scripts keep `.env` loading.                                                                                                                          |
 | `server.publish()` vs `ws.publish()` (#32889)        | `services/blob_and_live_bets_server.ts` broadcasts with `server.publish()` only (`ws.publish()` excludes the sender) and answers `{channel, published, delivered, subscribers}` where `subscribers = server.subscriberCount(channel)`: `-1` → HTTP 503 `backpressure`, `0` → HTTP 202 `delivered: false`, `>0` → HTTP 200 `delivered: true`.                                                                              | POST `/api/v1/live-bets` handler; `publish reports server.subscriberCount` and `publish with no subscriber` tests.                                                                              |
 
 ## v1.4.0 long-tail runtime primitives
@@ -698,7 +680,7 @@ Pinned/used by this repo (Bun 1.4.4):
 | Same-origin guarded WebSocket upgrade (`Server.upgrade` in `fetch`)                                                              | `services/sportsdesk_webview_server.ts` upgrades the **already-registered** guarded route `/api/live-bets` when `upgrade: websocket`, so `DAEMON_ROUTES`, the OpenAPI fragment and the ledger's route counts are unchanged and a remote peer without the admin token is refused by the route's own `piiRejection` (the token is moved from the `bearer-` subprotocol into a synthetic `authorization` header). The hub speaks the gateway's `SUBSCRIBE`/`SUBSCRIBED` protocol from `ws.subscriptions` and a lazily started relay mints a server-side ticket with `BLOB_API_TOKEN`, subscribes the five topics and republishes each frame by `kind`. No token is ever put in a URL. Deployment note: a reverse proxy must forward the `Upgrade` header on this path, and behind a proxy that is not declared with `SPORTSDESK_TRUST_PROXY=1` the dashboard's token must equal `SPORTSDESK_ADMIN_TOKEN`, because the route guard then checks it.                                                                                                                                                                                                                                                                                                 | `tests/webview_bridge_ws.test.ts` (handshake pieces, guard reuse against a non-loopback peer, and a real stub-gateway → hub → browser relay).                                                                                                                |
 | `Bun.serve` `development: { hmr: false }`                                                                                        | The daemon serves an API plus hand-written pages, so no module graph calls `import.meta.hot.accept()`. Dev mode keeps Bun's error pages but disables the HMR reload channel, which would otherwise warn that every update invalidated the page.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `tests/server_port.test.ts` starts the daemon with the object form and asserts `/health`.                                                                                                                                                                    |
 | `Bun.cron` in-process bridge schedules                                                                                           | `services/reporting_scheduler_service.ts` owns the bridge rollups; the **webview daemon** starts them (`startBridgeSchedules()`) on the desk clock, `{ tz: "America/Chicago" }`: `*/15` runs `bridge3a --once` (skipped unless `F402_AGENT_ID` is set), `bridge3b` (needs an F402 token) and `bridge3c --fetch-open` (needs `GSID`); minute 7 of every hour runs the WebLog rollup (its `--from` default is the CWD-relative `out/f402/weblog/<date>.jsonl` corpus). The Telegram bot daemon starts the other schedules with `BRIDGE_SCHEDULE_IDS` excluded, so running both processes cannot publish or page twice. `startInProcessCron` skips overlapping ticks; a job whose credentials are missing is recorded as failed WITHOUT spawning, so cron cannot hammer a CLI that would exit 2. The first tick only records the baseline; alerts fire on a gate/flag/job-status CHANGE, so an unchanged 15-minute run sends nothing — suppression is keyed on new alerts, meaning a standing failure that already paged stays off Telegram until it changes again (it remains visible on the dashboard Review Queue), and a manual `Dispatch digest` always sends that last recorded state instead of spawning the CLIs inside the HTTP request. | `tests/reporting_scheduler_bridge.test.ts` drives the scheduler with an injected cycle runner and a fake Telegram client (no CLI spawn, no message sent); `tests/bridge_rollup_cron.test.ts` covers the diff/state layer and pins each CLI's verified flags. |
-| `Bun.markdown.html()` / `render()` are sinks, not sanitizers                                                                     | The native renderer passes raw HTML and attributes through, so `bin/check-innerhtml.ts` now fails any `Bun.markdown.html(...)`/`Bun.markdown.render(...)` call without a `// trusted-markdown: <reason>` annotation (same line or line above), while text that merely names the API is not treated as a call. The five call sites in `lib/docs_render_cache.ts`, `lib/manager_boot_runbook_render.ts`, `scripts/render_tasks.ts` and `services/sportsdesk_ingestion_replay.ts` render repo-owned markdown and are annotated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `tests/check_innerhtml_meta.test.ts` (unannotated call fails; same-line and preceding-line annotations pass; help text does not false-positive).                                                                                                             |
+| `Bun.markdown.html()` / `render()` are sinks, not sanitizers                                                                     | The native renderer passes raw HTML and attributes through, so `scripts/gates/check-innerhtml.ts` now fails any `Bun.markdown.html(...)`/`Bun.markdown.render(...)` call without a `// trusted-markdown: <reason>` annotation (same line or line above), while text that merely names the API is not treated as a call. The five call sites in `lib/docs_render_cache.ts`, `lib/manager_boot_runbook_render.ts`, `scripts/render_tasks.ts` and `services/sportsdesk_ingestion_replay.ts` render repo-owned markdown and are annotated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `tests/check_innerhtml_meta.test.ts` (unannotated call fails; same-line and preceding-line annotations pass; help text does not false-positive).                                                                                                             |
 | `process.on("memoryPressure")` (#32594)                                                                                          | Same server prunes expired `pendingTickets` on `"warning"`, clears them on `"critical"`, and removes the listener from `close()`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `--no-orphans` / `--no-env-file` (#29930, #24767)                                                                                | `services/supervisor.ts` spawns children with `--no-orphans`; `--no-env-file` is added when `SUPERVISOR_NO_ENV_FILE=1` or `noEnvFile: true`, so an unmounted `.env` FIFO cannot block startup when secrets come from `Bun.secrets`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `Bun.S3Client` `contentDisposition`/`contentEncoding`/`slice().stream()` (#25363, #25999)                                        | Not yet used; `lib/gslive_tally_sink.ts`/R2 readers remain Range-capable through `R2S3Client`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -782,11 +764,11 @@ If you migrate one of the six holdouts above, remove its row from this table in 
 
 ## `Bun.$` — available, but argv-only for credentials (2026-11-04 audit)
 
-[`Bun.$`](https://bun.com/reference/globals/bun#bun.$) is the shell-tag that runs a command
+[`Bun.$`](https://bun.com/reference/globals/bun/$) is the shell-tag that runs a command
 through a parser, with a fluent `.env()` / `.cwd()` / `.nothrow()` / `.text()` API plus pure
 helpers `Bun.$.escape(str)` (shell-safe quote) and `Bun.$.braces(pattern)` (bash-brace
 expansion). It is pinned in `bin/bun_surface.ts` and covered by
-`tests/bun_capabilities.test.ts` ("Bun.$ exposes the shell-tag…").
+`tests/bun_shell_contract.test.ts` and `tests/bun_capabilities.test.ts` ("Bun.$ exposes the shell-tag…").
 
 **The repo-wide rule is argv-only for anything that touches a credential.** This codifies what
 [`lib/f402_credentials_policy.ts`](../lib/f402_credentials_policy.ts) says in prose:
@@ -834,7 +816,7 @@ The docs warn, verbatim:
 > recently in memory.
 
 This invariant — "every byte the consumer may read is written first" — is not something
-`bun check` or `oxlint` can enforce. Every call site needs a per-site argument.
+`bun check` or `bun lint` can enforce. Every call site needs a per-site argument.
 
 **Where this repo uses it (pinned 2026-11-04):**
 
@@ -866,43 +848,22 @@ This invariant — "every byte the consumer may read is written first" — is no
 Before adding a third call site, open `tests/bun_capabilities.test.ts` ("Bun.allocUnsafe returns
 a Uint8Array of the requested length (unzeroed)") and add the new file:line to the table above.
 
-## Future: `bun lint --type-check` unification (2026-11-04 audit)
+## Native `bun lint`, `bun fmt`, and `bun check` flag discipline
 
-Bun ships `bun check` (type errors) and `bun fmt` as built-ins on 1.4.4; **`bun lint` is not in
-1.4.4** (`bun --help` does not list it; `cd /tmp/empty && bun lint` returns `error: Script not
-found "lint"`). The [`/docs/lint`](https://bun.com/docs/lint) page describes a future feature
-whose relevant surface for this repo is:
+All linting, formatting, and typechecking in `sportsdesk-ops` use native Bun subcommands with
+explicit flags configured in `bunfig.toml` and [`typecheck-desk.md`](./typecheck-desk.md):
 
-- `bun lint --type-aware --type-check` — reports type errors too, the way `bun check` does, in a
-  single pass that also runs the type-aware lint rules.
-- `bun lint --tsconfig <path>` — pins one `tsconfig.json` for the whole run, bypassing per-file
-  auto-discovery. A `tsconfig.json` without `"include"` triggers a `warn: Loaded N files in Ts to
-lint foo.ts` warning because it covers every file below it.
+| Surface    | Command & Flags                                                                                              | Config SSOT                                                         |
+| :--------- | :----------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------ |
+| **Lint**   | `bun lint --no-script --fix` (`lint`) · `bun lint --no-script [--type-aware] --deny-warnings` (`lint:check`) | `bunfig.toml` `[lint]`, `[lint.categories]`, `[lint.rules]`         |
+| **Format** | `bun fmt` (`format`) · `bun fmt --check` (`format:check`) · `bun fmt --check --changed=...` (PR CI)          | `bunfig.toml` `[fmt]` (`printWidth = 80`)                           |
+| **Check**  | `bun check --no-script -p tsconfig.json` + `-p src/dashboard/tsconfig.json` (`typecheck`) · `--aot`          | `tsconfig.json`, `src/dashboard/tsconfig.json`, `bun_check_desk.ts` |
 
-**What the repo already looks like, measured 2026-11-04:**
-
-| Audit                                   | This repo                                                                                                                                     | Future `bun lint` implication                                                                                                                      |
-| :-------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Root `tsconfig.json` has `"include"`?   | `"include": ["**/*.ts"]`                                                                                                                      | Won't trigger the "no `include`" warning.                                                                                                          |
-| Monorepo with multiple `tsconfig.json`? | No — one root tsconfig, plus `Scratch/security/tsconfig.scoped.json` (scratch area, ignored by `.oxlintrc.type-aware.json` `ignorePatterns`). | Per-file tsconfig discovery is unambiguous; no `--tsconfig` flag needed.                                                                           |
-| Current lint pass shape                 | `lint:check` runs oxlint twice: regular + `--type-aware -c .oxlintrc.type-aware.json`.                                                        | Could collapse to one `bun lint --type-check --type-aware -c .oxlintrc.type-aware.json` call.                                                      |
-| Current typecheck pass shape            | `typecheck` runs `bun check --no-script -p tsconfig.json` after `ensure:deep-tsconfig`.                                                       | The `bun check` invocation could merge into the single `bun lint --type-check` pass, cutting one full-repo type-check cycle out of the gate chain. |
-
-**When Bun ships `bun lint`, the migration shape is:**
-
-1. Confirm the Bun version in `AGENTS.md` ships `bun lint` built-in (not just the docs page);
-   `bun --help | grep -w lint` must list it.
-2. Rename the `package.json` `"lint"` script to `"oxlint"` (or similar) to clear the shadow —
-   see `/docs/lint`: _"If `package.json` has a `lint` script, `bun lint` runs that script."_
-3. Collapse `lint:check` + `typecheck` into one call:
-   `bun lint --type-check --type-aware -c .oxlintrc.type-aware.json --no-script`
-4. Keep `ensure:deep-tsconfig` — it's a strict-flags gate on the single tsconfig, orthogonal
-   to whichever linter reads it.
-5. Measure: time the before/after, and verify the oxlint `-f github` CI annotation path
-   ([PR #50](https://github.com/bw496915-cmyk/Sports-desk-ops/pull/50)) still works
-   (`bun lint -f github` is documented).
-
-Do not pre-migrate before `bun --help` lists `lint`; the docs have been ahead of the binary.
+- Always pass `--no-script` when invoking `bun lint` or `bun check` inside scripts so a matching
+  `package.json` script key (`"lint"`) never shadows or recurses into the built-in subcommand.
+- Keep `ensure:deep-tsconfig` ahead of `bun check --no-script -p tsconfig.json`, and keep
+  `packages/nsh-desk/**` in `bunfig.toml` `[lint].ignorePatterns` because its `.nsh/tsconfig.json`
+  is generated locally by `nsh`.
 
 ## v1.4.0 feed/transport primitives in use
 

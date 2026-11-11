@@ -1,7 +1,7 @@
 import { reduceMotion, Scroll, Text, View, type JSX } from "nsh";
 import { Dialog } from "nsh/base";
 import { DeskButton } from "./Button";
-import { SCRIM_BACKDROP_CLASS } from "./tokens";
+import { DESK_SCROLLBAR_THEME, SCRIM_BACKDROP_CLASS } from "./tokens";
 
 export interface DeskDialogProps {
   open: boolean;
@@ -43,7 +43,7 @@ export function DeskDialog(props: DeskDialogProps): JSX.Element {
           onPress={() => props.onOpenChange(false)}
         />
       </View>
-      <Scroll class="min-h-0 flex-1">
+      <Scroll class="min-h-0 flex-1" scrollbar={DESK_SCROLLBAR_THEME}>
         <View class="gap-4 p-4">{props.children}</View>
       </Scroll>
     </Dialog>

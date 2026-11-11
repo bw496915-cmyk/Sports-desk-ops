@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { wagerStatusLabel } from "../cli/enums.ts";
+import { wagerStatusLabel } from "../lib/ticket_capture/enums.ts";
 
 describe("wager status labels", () => {
   test("maps W/L/X and defaults to Pending", () => {

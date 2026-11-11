@@ -1,6 +1,7 @@
 import { platform, Text, type JSX } from "nsh";
 import { Switch } from "nsh/base";
 import { FOCUS_RING_CLASS } from "./tokens";
+import { renderOptionalTooltip } from "./Tooltip";
 
 const TOUCH_TARGET_CLASS = platform.desktop ? "h-7" : "min-h-11";
 
@@ -21,7 +22,7 @@ export function DeskSwitch(props: DeskSwitchProps): JSX.Element {
       checked={props.checked}
       disabled={props.disabled}
       accessibilityLabel={props.accessibilityLabel ?? props.label}
-      tooltip={props.tooltip}
+      tooltip={renderOptionalTooltip(props.tooltip)}
       hitSlop={6}
       onChange={({ checked }) => props.onChange(checked)}
       class={`group ${TOUCH_TARGET_CLASS} flex-row items-center gap-2 rounded-(--radius) px-2 hover:bg-accent/60 active:bg-accent ${FOCUS_RING_CLASS} disabled:opacity-45`}

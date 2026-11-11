@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -7,7 +8,9 @@ import {
   fetchVerifiedBlob,
   ingestF402ReportBlob,
   inspectBlobSource,
+  isBunFile,
   parseF402ListEnvelope,
+  streamVerifiedBlobToFile,
   toBlob,
   writeVerifiedBlob,
 } from "../lib/blob_ingest.ts";
@@ -54,7 +57,59 @@ describe("Blob unification & ingestion pipeline (lib/blob_ingest.ts)", () => {
     expect(fromResponse.mimeType).toContain("application/json");
   });
 
-  test("writeVerifiedBlob writes via Bun.write and verifies Bun.file(dest).size === blob.size", async () => {
+  test("toBlob re-tags untyped BunFile via zero-copy slice and writeVerifiedBlob / streamVerifiedBlobToFile enforce regular-file stat", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "blob-ingest-stream-"));
+    try {
+      const rawPath = join(dir, "rawbin");
+      await writeFile(rawPath, "zero-copy-payload");
+      const untypedFile = Bun.file(rawPath);
+      expect(isBunFile(untypedFile)).toBe(true);
+      const retagged = await toBlob(untypedFile, "application/x-sportsdesk");
+      expect(retagged.type).toBe("application/x-sportsdesk");
+      expect(await retagged.text()).toBe("zero-copy-payload");
+
+      const streamedDest = join(dir, "streamed", "out.json");
+      const payload = JSON.stringify({ streamed: true, count: 42 });
+      const expected = await inspectBlobSource(payload, "application/json");
+      const streamed = await streamVerifiedBlobToFile(
+        streamedDest,
+        new Blob([payload], { type: "application/json" }),
+      );
+      expect(streamed.writtenBytes).toBe(expected.size);
+      expect(streamed.sha256).toBe(expected.sha256);
+      expect((await Bun.file(streamedDest).stat()).size).toBe(expected.size);
+
+      const cappedDest = join(dir, "capped.bin");
+      await expect(
+        streamVerifiedBlobToFile(cappedDest, new Blob(["0123456789"]), {
+          maxBytes: 4,
+        }),
+      ).rejects.toThrow(/exceeded maxBytes/);
+      expect(await Bun.file(cappedDest).exists()).toBe(false);
+
+      const targetPath = join(dir, "target.txt");
+      const linkPath = join(dir, "symlink.txt");
+      await writeFile(targetPath, "keep");
+      await symlink(targetPath, linkPath);
+      await expect(writeVerifiedBlob(linkPath, "overwrite")).rejects.toThrow(
+        /non-regular or symlink/,
+      );
+      await expect(
+        streamVerifiedBlobToFile(linkPath, new Blob(["overwrite"])),
+      ).rejects.toThrow(/non-regular or symlink/);
+
+      const fifoPath = join(dir, "pipe.fifo");
+      if (spawnSync("mkfifo", [fifoPath]).status === 0) {
+        await expect(writeVerifiedBlob(fifoPath, "fifo")).rejects.toThrow(
+          /non-regular or symlink/,
+        );
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("writeVerifiedBlob writes via Bun.write and verifies Bun.file(dest).stat().size === blob.size", async () => {
     const dir = await mkdtemp(join(tmpdir(), "blob-ingest-write-"));
     try {
       const dest = join(dir, "nested", "sample.json");

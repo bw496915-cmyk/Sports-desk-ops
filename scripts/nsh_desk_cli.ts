@@ -1110,8 +1110,9 @@ function printWrapperHelp(): void {
   console.log(`nsh-desk CLI — Sportsdesk Native Shell operator & CI wrapper
 
 Usage:
-  bun run scripts/nsh_desk_cli.ts <command> [flags...]
-  ./bin/dx nsh <command> [flags...]
+  bunx nsh-desk <command> [flags...]
+  bun run nsh:<doctor|verify|artifacts|check|build|test|run> [flags...]
+  dx nsh <command> [flags...]
 
 Wrapper commands (Bun-native diagnostics & verification):
   doctor [--json|--yaml]               Inspect nsh binary, semver, nsh.json mode/caps, skills YAML & origin

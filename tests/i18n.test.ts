@@ -21,7 +21,7 @@ import {
   t,
   tryLoadUiTable,
   type UiTable,
-} from "../cli/i18n.ts";
+} from "../lib/ticket_capture/i18n.ts";
 
 describe("t() fallback chain", () => {
   const table: UiTable = {

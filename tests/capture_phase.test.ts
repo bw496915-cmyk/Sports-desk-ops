@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { detectPhase, externalDeps, inspectPace } from "../cli/info.ts";
+import {
+  detectPhase,
+  externalDeps,
+  inspectPace,
+} from "../lib/ticket_capture/info.ts";
 
 describe("capture phase", () => {
   test("login-form page classified as pre-auth", () => {

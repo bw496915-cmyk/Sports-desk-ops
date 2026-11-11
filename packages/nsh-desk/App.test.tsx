@@ -92,6 +92,39 @@ const STUB_KALSHI = {
         },
       ],
     },
+    {
+      id: "NFL-NE_MIA-spread-2.5",
+      league: "NFL",
+      marketKind: "spread",
+      teams: ["NE", "MIA"],
+      sideTeam: "MIA",
+      line: -2.5,
+      overUnder: null,
+      distinctAccounts: 3,
+      riskUsd: 63000,
+      fairProb: 0.541,
+      confidence: 78,
+      provenance: {
+        dataMode: "PARTIAL",
+        ageSeconds: 517600,
+        stale: true,
+        fixture: true,
+        sources: ["docs/graph-live-feed.json"],
+      },
+      kalshi: {
+        edgeBps: 510,
+        verdict: "actionable",
+        reason: "sharp consensus",
+      },
+      accounts: [
+        {
+          login: "VIP88",
+          agentId: "AG100",
+          archetype: "Sharp Syndicate",
+          riskUsd: 42000,
+        },
+      ],
+    },
   ],
 };
 
@@ -141,7 +174,7 @@ function defaultStubNetwork(onKpiCall?: () => void) {
   };
 }
 
-test("renders workspace, provenance badges, 503 diagnostic honesty, and keyboard refresh", async () => {
+test("renders workspace, ranked exposure plot, provenance badges, 503 diagnostic honesty, and keyboard refresh", async () => {
   let kpiCalls = 0;
   const app = await open("./App.tsx", {
     platform: "macos",
@@ -162,7 +195,10 @@ test("renders workspace, provenance badges, 503 diagnostic honesty, and keyboard
   expect(texts).toContain(
     "/api/live-bets/summary HTTP 503 [unauthorized]: live Report/Pending unavailable — Report/Pending returned 401",
   );
-  expect(texts).toContain("MJ102 (MJ2026)");
+  // Highest-risk signal ($63.0K NFL NE@MIA) is selected first and ranked #1 in Exposure Plot
+  expect(texts).toContain("VIP88 (AG100)");
+  expect(texts).toContain("RANK #1");
+  expect(texts).toContain("Exposure $63.0K");
 
   await app.press("Refresh");
   await app.waitUntil(() => kpiCalls >= 2);
@@ -207,7 +243,7 @@ test("surfaces explicit unavailable cause instead of zero when signals endpoint 
   );
 });
 
-test("switches semantic tokens across light and dark appearances and opens/dismisses UI kit via keyboard", async () => {
+test("syncs appearance across Command palette, Workspace menu, UI kit, and Storage", async () => {
   const app = await open("./App.tsx", {
     platform: "macos",
     width: 1280,
@@ -223,10 +259,34 @@ test("switches semantic tokens across light and dark appearances and opens/dismi
   expect(lightTitleStyle.color.toLowerCase()).toBe("#0f172aff");
   expect(lightTitleStyle.fontSize).toBeGreaterThanOrEqual(12);
 
-  await app.setColorScheme("dark");
+  // Open Command palette via mod+k, filter to Dark appearance, and execute
+  await app.keyboard.press("mod+k");
+  await app.waitFor("text:Sportsdesk Desk command palette");
+  await app.type(
+    "label:Search workspace commands and signals",
+    "Appearance: Dark",
+  );
+  await app.press("text:Appearance: Dark");
+  await app.waitFor("text:Sportsdesk Desk command palette", { state: "gone" });
+
+  await app.waitUntil(
+    () => app.storage()["ops.sportsdesk.desk.appearance.v1"] === "dark",
+  );
   const darkTitleStyle = app.spanStyle("text:Sportsdesk Desk");
   expect(darkTitleStyle.color.toLowerCase()).toBe("#f1f5f9ff");
 
+  // Use Command palette to jump to the #2 NBA BOS_LAL signal
+  await app.keyboard.press("mod+k");
+  await app.waitFor("text:Sportsdesk Desk command palette");
+  await app.type("label:Search workspace commands and signals", "LAL@BOS");
+  await app.press(
+    "text:NBA · LAL@BOS · 1q_total (over 55.5) ($27.7K · actionable)",
+  );
+  await app.waitUntil(() =>
+    app.texts().some((t) => t.includes("MJ102 (MJ2026)")),
+  );
+
+  // Verify UI kit reflects synced appearance and closes cleanly on Escape
   await app.keyboard.press("mod+u");
   await app.waitFor("text:Sportsdesk UI kit");
   expect(app.texts().join("\n")).toContain("Buttons — variants & states");
@@ -245,9 +305,10 @@ test("adapts cleanly to compact mobile viewport with drawer/sheet docks", async 
   });
 
   await app.waitUntil(() =>
-    app.texts().some((t) => t.includes("NBA-BOS_LAL-1q_total-55.5-over")),
+    app.texts().some((t) => t.includes("NFL-NE_MIA-spread-2.5")),
   );
   expect(app.shows("Refresh")).toBe(true);
+  expect(app.shows("id:open-command-palette")).toBe(true);
   expect(app.shows("id:workspace-menu")).toBe(true);
 });
 
@@ -265,11 +326,15 @@ test("hydrates Storage preferences, persists lock mutations, and copies diagnost
         locked: false,
         dockOpen: { left: true, bottom: true },
       }),
+      "ops.sportsdesk.desk.appearance.v1": "dark",
     },
     network: defaultStubNetwork(),
   });
 
   await app.waitUntil(() => app.texts().some((t) => t.includes("2,276 nodes")));
+  expect(app.spanStyle("text:Sportsdesk Desk").color.toLowerCase()).toBe(
+    "#f1f5f9ff",
+  );
 
   await app.keyboard.press("mod+shift+l");
   await app.waitUntil(() => {

@@ -661,6 +661,8 @@ export function buildSignalArenaView(
 
 export interface ExposurePlotPoint {
   readonly index: number;
+  readonly signalId: string;
+  readonly axisLabel: string;
   readonly shortLabel: string;
   readonly fullLabel: string;
   readonly league: string;
@@ -670,18 +672,41 @@ export interface ExposurePlotPoint {
   readonly provenanceText: string;
 }
 
+/**
+ * Ranks Kalshi signals by `riskUsd` descending (preserving original index order
+ * on ties) and builds top-N exposure bars with concise, unique x-axis labels so
+ * highest-exposure positions are never dropped and bars never repeat identical
+ * league-only labels across the axis.
+ */
 export function buildExposurePlotData(
   items: readonly KalshiSignalItem[],
   limit = 12,
 ): ExposurePlotPoint[] {
-  const count = Math.min(items.length, limit);
+  const total = items.length;
+  const count = Math.min(total, Math.max(0, limit));
+  if (count === 0) return [];
+
+  const order = new Uint32Array(total);
+  for (let i = 0; i < total; i++) {
+    order[i] = i;
+  }
+  order.sort((a, b) => {
+    const diff = items[b]!.riskUsd - items[a]!.riskUsd;
+    return diff !== 0 ? diff : a - b;
+  });
+
   // eslint-disable-next-line unicorn/no-new-array -- dense preallocation filled by index
   const points: ExposurePlotPoint[] = new Array(count);
   for (let i = 0; i < count; i++) {
-    const s = items[i]!;
+    const s = items[order[i]!]!;
     const shortId = s.id.replace(/^[A-Z]+-/, "").slice(0, 14);
+    const matchupHead = (s.marketLabel.split(" · ")[0] ?? shortId)
+      .replaceAll("_", "@")
+      .slice(0, 9);
     points[i] = {
       index: i,
+      signalId: s.id,
+      axisLabel: `#${i + 1} ${matchupHead}`,
       shortLabel: shortId,
       fullLabel: `${s.league} · ${s.marketLabel}`,
       league: s.league,
@@ -718,6 +743,7 @@ export function buildScoreboardRows(
 }
 
 export type DeskLeagueFilter = "ALL" | "NFL" | "NBA" | "NHL" | "NCAA";
+export type DeskAppearance = "system" | "light" | "dark";
 
 const VALID_LEAGUE_FILTERS: ReadonlySet<string> = new Set([
   "ALL",
@@ -727,8 +753,18 @@ const VALID_LEAGUE_FILTERS: ReadonlySet<string> = new Set([
   "NCAA",
 ]);
 
-/** Key used with NSH `Storage` (`nsh.json` `"id": "ops.sportsdesk.desk"`). */
+/** Keys used with NSH `Storage` (`nsh.json` `"id": "ops.sportsdesk.desk"`). */
 export const DESK_PREFS_STORAGE_KEY = "ops.sportsdesk.desk.prefs.v1";
+export const DESK_APPEARANCE_STORAGE_KEY = "ops.sportsdesk.desk.appearance.v1";
+
+export function parseAppearanceChoice(
+  raw: string | null | undefined,
+): DeskAppearance {
+  if (raw === "light" || raw === "dark" || raw === "system") {
+    return raw;
+  }
+  return "system";
+}
 
 export interface DeskWorkspacePrefs {
   readonly schemaVersion: 1;

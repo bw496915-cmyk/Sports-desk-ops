@@ -1,4 +1,4 @@
-# Bun shape contracts — the 86 shapes this repository calls
+# Bun shape contracts — the 88 shapes this repository calls
 
 The single source of truth is layered, and nothing here restates upstream text: **declarations** come from `bun-types@1.4.4` (the surface the reference site renders), **behaviour** from probes against the local `Bun 1.4.4` binary (`tests/bun_baseline.json`), **property attributes** from the pinned Bun commit `38afee6c84`. When they disagree: declarations win on names and signatures, the Bun source wins on attributes, and the measured binary wins on behaviour.
 
@@ -20,6 +20,20 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - `Bun.spawnSync(["echo","ok"])` returns `stdout` + `exitCode`; `Bun.gc(false)` returns a value that is `undefined` — `proc.spawn`.
 - `Bun.which` honours a `PATH` override; `Bun.resolveSync` resolves against a directory; `Bun.fileURLToPath("file:///tmp/x.ts")` → `/tmp/x.ts`; `Bun.openInEditor` is a 1-arity function — `proc.paths`.
 - `Bun.Terminal` is a constructor; `Bun.FileSink` has no runtime value — `proc.terminal`.
+
+#### Bun.BunFile (type)
+
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/BunFile)
+- **Shape:** type-only: declared, no runtime value
+- **Here:** `lib/artifact_cache.ts`, `lib/blob_ingest.ts`
+- **Evidence:** `surface:file`, `test:tests/blob_ingest.test.ts`
+
+#### Bun.FileBlob (type)
+
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/FileBlob)
+- **Shape:** type-only: declared, no runtime value
+- **Here:** `lib/blob_ingest.ts`
+- **Evidence:** `surface:file`, `test:tests/blob_ingest.test.ts`
 
 #### Bun.FileSink (type)
 
@@ -44,11 +58,11 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.$
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/$)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Members (9):** `Shell`, `ShellError`, `ShellPromise`, `braces`, `cwd`, `env`, `escape`, `nothrow`, `throws`
-- **Here:** `dsh-plugin/verify-load.mjs`, `bin/bun_surface.ts`
-- **Evidence:** `test:tests/bun_shapes_coverage.test.ts`
+- **Here:** `bin/bun_surface.ts`, `scripts/compute_dump_lag.ts`
+- **Evidence:** `surface:$`, `surface:$.escape`, `surface:$.braces`, `probe:proc.shell`, `test:tests/bun_shell_contract.test.ts`, `test:tests/bun_capabilities.test.ts`
 
 #### Bun.file
 
@@ -138,7 +152,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/stdout)
 - **Shape:** value: `object` · writable true · enumerable true
-- **Here:** `cli/sportsdesk_replay_cli.ts`, `scripts/capture/f402_hierarchy_probe.ts`
+- **Here:** `scripts/capture/f402_hierarchy_probe.ts`
 - **Evidence:** `probe:proc.stdio`
 
 #### Bun.which
@@ -157,7 +171,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.isStandaloneExecutable
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/isStandaloneExecutable)
 - **Shape:** value: `boolean` · writable false · enumerable true
 - **Here:** `bin/bun_surface.ts`, `scripts/wagers_by_state_capture.ts`
 - **Evidence:** `surface:isStandaloneExecutable`
@@ -221,7 +235,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.sliceAnsi
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/sliceAnsi)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `bin/bun_surface.ts`
 - **Evidence:** `surface:sliceAnsi`
@@ -365,7 +379,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.s3
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/s3)
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (9):** `delete`, `exists`, `file`, `list`, `presign`, `size`, `stat`, `unlink`, `write`
 - **Here:** `bin/bun_surface.ts`
@@ -373,9 +387,9 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.S3File (type)
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/S3File)
 - **Shape:** type-only: declared, no runtime value
-- **Here:** `lib/r2_s3_client.ts`, `types/bun-api.d.ts`
+- **Here:** `lib/r2_s3_client.ts`
 - **Evidence:** `test:tests/bun_s3client_contract.test.ts`
 
 #### Bun.S3FilePresignOptions (type)
@@ -401,16 +415,16 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.S3Options (type)
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/S3Options)
 - **Shape:** type-only: declared, no runtime value
-- **Here:** `lib/r2_s3_client.ts`, `types/bun-api.d.ts`
+- **Here:** `lib/r2_s3_client.ts`
 - **Evidence:** `test:tests/bun_s3client_contract.test.ts`
 
 #### Bun.S3Stats (type)
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/S3Stats)
 - **Shape:** type-only: declared, no runtime value
-- **Here:** `lib/r2_s3_client.ts`, `types/bun-api.d.ts`
+- **Here:** `lib/r2_s3_client.ts`
 - **Evidence:** `test:tests/bun_s3client_contract.test.ts`
 
 #### Bun.SQL
@@ -452,7 +466,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.CSRF
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/CSRF)
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (2):** `generate`, `verify`
 - **Here:** `bin/bun_surface.ts`, `lib/csrf.ts`
@@ -482,14 +496,14 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.readableStreamToArrayBuffer
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/readableStreamToArrayBuffer)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `bin/bun_surface.ts`, `bin/image-meta.ts`
 - **Evidence:** `surface:readableStreamToArrayBuffer`, `test:tests/jsonl_stream_replay.test.ts`
 
 #### Bun.allocUnsafe
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/allocUnsafe)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `bin/bun_surface.ts`, `lib/f402_bet_ticker_jsonl.ts`
 - **Evidence:** `surface:allocUnsafe`, `test:tests/bun_capabilities.test.ts`
@@ -697,5 +711,5 @@ Non-test production imports from `bun:sqlite`, `bun:jsc`, and `bun:bundle` are i
 - **`bun:bundle` → `feature`** (bundler macro) — here: `src/dashboard/runtime_flags.ts` · evidence: `test:tests/wager_tiers_toml.test.ts`
 - **`bun:jsc` → `estimateShallowMemoryUsageOf`** (runtime export) — here: `bin/bun_surface.ts`, `lib/f402_hierarchy_memory.ts` · evidence: `surface:bun:jsc.estimateShallowMemoryUsageOf`
 - **`bun:jsc` → `heapStats`** (runtime export) — here: `bin/bun_surface.ts`, `scripts/bench_bridge3a_workload.ts` · evidence: `surface:bun:jsc.heapStats`
-- **`bun:sqlite` → `Database`** (runtime export) — here: `bin/bun_surface.ts`, `cli/review.ts` · evidence: `surface:bun:sqlite.Database`
+- **`bun:sqlite` → `Database`** (runtime export) — here: `bin/bun_surface.ts`, `lib/candidate_match_evaluation.ts` · evidence: `surface:bun:sqlite.Database`
 - **`bun:sqlite` → `constants`** (runtime export) — here: `bin/bun_surface.ts`, `lib/sportsdesk_sqlite.ts` · evidence: `surface:bun:sqlite.constants`

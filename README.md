@@ -100,22 +100,23 @@ bun run reports -- --format table
 bun run sim
 ```
 
-Repository lint uses exact-pinned Oxlint through Bun; stable Bun 1.4.4 does not
-enable native `bun lint`. Run `bun run lint:check` for a read-only gate that
-fails on warnings or errors, or `bun run lint` to apply safe fixes. CI runs lint
-alongside token regeneration, the fetch/innerHTML gates, and the full tests.
+Repository lint runs through native `bun lint` configured in `bunfig.toml` (`[lint]`,
+`[lint.categories]`, and `[lint.rules]`). Run `bun run lint:check` (`bun lint --no-script
+--deny-warnings && bun lint --no-script --type-aware --deny-warnings`) for a read-only gate
+that fails on warnings or errors, or `bun run lint` (`bun lint --no-script --fix`) to apply
+safe autofixes. CI runs lint alongside token regeneration, the fetch/innerHTML gates, and the
+full tests.
 
-Run `bun run format` to format the repository or `bun run format:check` for a
-read-only check. `bunfig.toml` preserves the existing 80-column, two-space,
-double-quote style with semicolons. Run `bun run typecheck` for Bun's native
-strict, no-emit checker; `tsconfig.json` makes the previous inferred compiler
-defaults explicit and includes the repository's source, tests, and declarations.
-CI runs formatting and type checking before lint. Bun remains pinned to 1.4.4
-in CI and declared in `package.json` (`packageManager` and `engines`), with
-matching `@types/bun`; no Prettier or oxfmt package is required. These manifest
-fields document the required version; CI explicitly selects it. The canonical
-local checkout on this machine is `~/code/sportsdesk-ops`; the dotfiles symlink
-is only a convenience pointer.
+Run `bun run format` (`bun fmt`) to format the repository or `bun run format:check`
+(`bun fmt --check`, plus `--changed` on PR diffs) for a read-only check. `bunfig.toml`
+preserves the existing 80-column, two-space, double-quote style with semicolons. Run
+`bun run typecheck` (`bun check --no-script -p tsconfig.json` and
+`bun check --no-script -p src/dashboard/tsconfig.json`, plus `bun run typecheck:projects` and
+`bun run typecheck:aot` per [docs/typecheck-desk.md](docs/typecheck-desk.md)) for Bun's native
+strict, no-emit checker. CI runs formatting and type checking before lint; no external linter
+or formatter package is required. Bun remains pinned to 1.4.4 in `package.json`
+(`packageManager` and `engines`), with matching `@types/bun`. The canonical local checkout on
+this machine is `~/code/sportsdesk-ops`; the dotfiles symlink is only a convenience pointer.
 
 ## Pinned Bun compatibility tests
 

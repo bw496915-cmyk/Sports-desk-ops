@@ -14,11 +14,11 @@
 import { isAbsolute, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-const HELP = `sql-query — read-only unified SQL inspector (Bun.SQL / Bun.sql)
+const HELP = `dx sql — read-only unified SQL inspector (Bun.SQL / Bun.sql)
 
 Usage:
-  bun x sql-query [--url <url|sqlite-path>] "<SELECT ...>" [--limit <n>] [--json | --yaml]
-  bun x sql-query [--url <url|sqlite-path>] --tables [--json | --yaml]
+  bunx dx sql [--url <url|sqlite-path>] "<SELECT ...>" [--limit <n>] [--json | --yaml]
+  bunx dx sql [--url <url|sqlite-path>] --tables [--json | --yaml]
 
 Targets:
   --url <target>   sqlite://<path>, :memory:, ./path/to/file.sqlite, or postgres://...

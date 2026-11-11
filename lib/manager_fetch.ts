@@ -8,7 +8,6 @@
  * zod parsing once at the boundary in the caller, and atomic `Bun.write`.
  */
 
-import type { BunRequestInit, BunResponse } from "../types/bun-api";
 import type { RetryPolicy } from "../types/wagers";
 
 export const MANAGER_USER_AGENT =
@@ -49,7 +48,7 @@ export function requireGsid(
  * expired GSID (302 to /login, or 200 with an HTML login page) never
  * reaches `JSON.parse` as "Unexpected token '<'".
  */
-export function assertJsonResponse(response: BunResponse, tool: string): void {
+export function assertJsonResponse(response: Response, tool: string): void {
   if (response.status === 302) {
     throw new Error(
       `${tool}: redirected to ${response.headers.get("location") ?? "(unknown)"} — GSID likely expired`,
@@ -70,8 +69,8 @@ export function assertJsonResponse(response: BunResponse, tool: string): void {
 export async function fetchManagerJson(
   url: string,
   cookie: string,
-  init?: BunRequestInit,
-): Promise<BunResponse> {
+  init?: BunFetchRequestInit,
+): Promise<Response> {
   return await fetch(url, {
     ...init,
     headers: {
@@ -90,8 +89,8 @@ export async function postManagerJson(
   url: string,
   cookie: string,
   body: unknown,
-  init?: BunRequestInit,
-): Promise<BunResponse> {
+  init?: BunFetchRequestInit,
+): Promise<Response> {
   return await fetch(url, {
     ...init,
     method: "POST",
@@ -163,12 +162,12 @@ function retriable(status: number): boolean {
  * immediately — retrying those would only burn the session.
  */
 export async function fetchWithRetry(
-  doFetch: () => Promise<BunResponse>,
+  doFetch: () => Promise<Response>,
   tool: string,
   retry: RetryPolicy = DEFAULT_RETRY,
-): Promise<BunResponse> {
+): Promise<Response> {
   const attempts = Math.max(1, Math.floor(retry.attempts));
-  let last: BunResponse | null = null;
+  let last: Response | null = null;
   for (let i = 0; i < attempts; i++) {
     const res = await doFetch();
     if (!retriable(res.status)) {

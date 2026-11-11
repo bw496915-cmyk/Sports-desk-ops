@@ -191,7 +191,7 @@ done
 
 # Every command `dx` dispatches itself. Keep in step with the case below (`dx_commands_check`
 # in tests/dx_cli.test.ts fails when they drift) and with `help`.
-DX_COMMANDS="help status setup scripts run monitor live-bets iptracker modes gslive docs api-docs api stale profile combo bridge crossdomain shot session screenshot image-meta assets bun provenance deps blob-formdata xml-parse sql fetch-config fetch-i18n fetch-common fetch-live-data fetch-report-status fetch-report-periods wagers-by-state wagers-by-state-live ticket flags bet-flags layoff-risk queue backtest poll watch pipeline stage deploy ship exec enrich taxonomy edge shadow-price nsh worktrees"
+DX_COMMANDS="help status setup scripts run monitor live-bets iptracker modes gslive docs api-docs api stale profile combo bridge crossdomain shot session screenshot image-meta assets bun bun-surface provenance desk-provenance deps blob-formdata xml-parse sql sql-query fetch-config fetch-i18n fetch-common fetch-live-data fetch-report-status fetch-report-periods wagers-by-state wagers-by-state-live ticket flags bet-flags layoff-risk queue backtest poll watch pipeline stage deploy ship exec enrich taxonomy edge shadow-price nsh worktrees"
 
 # dx_bun_run <script_or_file> [args...]: fast `bun run` when DX_BUN_FLAGS is unset; otherwise
 # delegates through `dx_run_control.ts` so every flag in DX_BUN_FLAGS is validated against live
@@ -572,11 +572,11 @@ EOF
     cd "$REPO_ROOT"
     exec bun run scripts/optimize_assets.ts "$@"
     ;;
-  bun)
+  bun|bun-surface)
     cd "$REPO_ROOT"
     exec bun bin/bun_surface.ts "$@"
     ;;
-  provenance)
+  provenance|desk-provenance)
     cd "$REPO_ROOT"
     exec bun bin/desk-provenance.ts "$@"
     ;;
@@ -628,7 +628,7 @@ VERSION_HELP
     cd "$REPO_ROOT"
     exec bun bin/xml-parse.ts "$@"
     ;;
-  sql)
+  sql|sql-query)
     cd "$REPO_ROOT"
     exec bun bin/sql-query.ts "$@"
     ;;

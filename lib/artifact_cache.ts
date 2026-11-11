@@ -7,9 +7,14 @@
  * file's mtime and size: a rewrite invalidates the cache immediately, with no TTL to guess and no
  * window where a stale artifact is served.
  *
- * A missing file is not cached — it is the "not captured yet" state, and creating the file must be
- * visible on the next request.
+ * Every read is gated by `lstat(path)` + `Bun.file(path).stat()` so symlinks, directories, sockets,
+ * device nodes, and FIFOs (where `Bun.file(fifo).exists()` returns `true` and blocks on read) fail
+ * closed as `null`. A missing file is not cached — creating the file is visible on the next request.
  */
+
+import type { BunFile } from "bun";
+import type { Stats } from "node:fs";
+import { lstat } from "node:fs/promises";
 
 export interface ArtifactVersion<T> {
   /** `mtimeMs:size`, the cache key; also the body-cache version for lib/http_compression. */
@@ -17,17 +22,45 @@ export interface ArtifactVersion<T> {
   readonly value: T;
 }
 
+export interface RegularFileEntry {
+  readonly file: BunFile;
+  readonly stat: Stats;
+  readonly version: string;
+}
+
 const parsed = new Map<string, ArtifactVersion<unknown>>();
 const bytes = new Map<string, ArtifactVersion<Uint8Array<ArrayBuffer>>>();
 /** Must exceed the daemon's artifact count, or every full-cache insert clears the rest. */
 const MAX_CACHED_FILES = 16;
 
-async function versionOf(path: string): Promise<string | null> {
-  const stat = await Bun.file(path)
-    .stat()
-    .catch(() => null);
-  if (stat === null) return null;
-  return `${stat.mtimeMs}:${stat.size}`;
+/**
+ * Verifies `path` is a non-symlink regular file (`!linkStat.isSymbolicLink() && fileStat.isFile()`)
+ * with matching `(dev, ino)` across `lstat` and `BunFile.stat()`.
+ */
+export async function statRegularFile(
+  path: string,
+): Promise<RegularFileEntry | null> {
+  const file = Bun.file(path);
+  const [linkStat, fileStat] = await Promise.all([
+    lstat(path).catch(() => null),
+    file.stat().catch(() => null),
+  ]);
+  if (
+    linkStat === null ||
+    fileStat === null ||
+    linkStat.isSymbolicLink() ||
+    !linkStat.isFile() ||
+    !fileStat.isFile() ||
+    linkStat.ino !== fileStat.ino ||
+    linkStat.dev !== fileStat.dev
+  ) {
+    return null;
+  }
+  return {
+    file,
+    stat: fileStat,
+    version: `${fileStat.mtimeMs}:${fileStat.size}`,
+  };
 }
 
 function remember<T>(
@@ -54,34 +87,39 @@ export function cachedJsonFile<T>(
 ): { read(): Promise<ArtifactVersion<T> | null> } {
   return {
     async read(): Promise<ArtifactVersion<T> | null> {
-      const version = await versionOf(path);
-      if (version === null) {
+      const entry = await statRegularFile(path);
+      if (entry === null) {
         parsed.delete(path);
         return null;
       }
       const hit = parsed.get(path);
-      if (hit !== undefined && hit.version === version) {
+      if (hit !== undefined && hit.version === entry.version) {
         return hit as ArtifactVersion<T>;
       }
-      const value = parse(await Bun.file(path).json());
-      return remember(parsed, path, version, value);
+      const value = parse(await entry.file.json());
+      return remember(parsed, path, entry.version, value);
     },
   };
 }
 
-/** Raw bytes of a file plus their version, or `null` when it is absent. */
+/** Raw bytes of a regular non-symlink file plus their version, or `null` when absent/irregular. */
 export async function readFileBytes(
   path: string,
 ): Promise<ArtifactVersion<Uint8Array<ArrayBuffer>> | null> {
-  const version = await versionOf(path);
-  if (version === null) {
+  const entry = await statRegularFile(path);
+  if (entry === null) {
     bytes.delete(path);
     return null;
   }
   const hit = bytes.get(path);
-  if (hit !== undefined && hit.version === version) return hit;
-  const value = new Uint8Array<ArrayBuffer>(await Bun.file(path).arrayBuffer());
-  return remember(bytes, path, version, value);
+  if (hit !== undefined && hit.version === entry.version) return hit;
+  const buf = await entry.file.arrayBuffer();
+  if (buf.byteLength !== entry.stat.size) {
+    bytes.delete(path);
+    return null;
+  }
+  const value = new Uint8Array<ArrayBuffer>(buf);
+  return remember(bytes, path, entry.version, value);
 }
 
 /** Drop every cached artifact; tests use it to prove invalidation is real. */

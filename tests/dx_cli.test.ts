@@ -211,7 +211,15 @@ describe("dx command dispatch", () => {
   });
 
   test("help documents every primary command (aliases excluded)", async () => {
-    const aliases = new Set(["api-docs", "api", "crossdomain", "screenshot"]);
+    const aliases = new Set([
+      "api-docs",
+      "api",
+      "crossdomain",
+      "screenshot",
+      "bun-surface",
+      "desk-provenance",
+      "sql-query",
+    ]);
     const source = await Bun.file(DX).text();
     const declared =
       /^DX_COMMANDS="([^"]+)"/m.exec(source)?.[1]?.split(/\s+/) ?? [];

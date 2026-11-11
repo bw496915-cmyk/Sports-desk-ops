@@ -99,21 +99,21 @@ Also avoid duplicating scoped registries in bunfig; Bun reads **`~/.npmrc`** for
 | **Explicit array**                           | **Only** listed names; default list ignored                                                                                                    |
 | **`[]` (this repo)**                         | **No** dependency lifecycle scripts, including none from the default list                                                                      |
 
-Root `package.json` `{pre|post}install` / `{pre|post}prepare` still run on install unless `--ignore-scripts`. This repo pins `trustedDependencies` to `[]` and mirrors it in `bun.lock` so lockfile-only drift is visible. **Oxlint** ships platform `@oxlint/binding-*` optional packages as prebuilt tarballs (lockfile lists `os` / `cpu` / `libc`); there are no `patchedDependencies` / `overrides` on the root manifest today.
+Root `package.json` `{pre|post}install` / `{pre|post}prepare` still run on install unless `--ignore-scripts`. This repo pins `trustedDependencies` to `[]` and mirrors it in `bun.lock` so lockfile-only drift is visible. **TypeScript 7** (`typescript@7.0.2`) ships platform `@typescript/typescript-*` optional packages as prebuilt tarballs (lockfile lists `os` / `cpu`); there are no `patchedDependencies` / `overrides` on the root manifest today.
 
 ### `bun.lock` shape here
 
 Measured on the committed lock (Bun 1.4.4 text format):
 
-| Field                      | Value / meaning                                                                                                    |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `lockfileVersion`          | `2` ([lockfile](https://bun.com/docs/pm/lockfile))                                                                 |
-| `configVersion`            | `1` → isolated linker default for workspaces                                                                       |
-| `workspaces[""]`           | Root `sportsdesk-ops` holds **all** npm dependencies                                                               |
-| `workspaces["packages/…"]` | Workspace **name** + **version** only (no nested deps yet)                                                         |
-| Root workspace version     | **Not** stored under `workspaces[""]` (Bun omits it); doctor compares versions only for `packages/*`               |
-| `packages`                 | Resolved graph including optional platform packages (e.g. oxlint bindings) skipped at install time on other OS/CPU |
-| `trustedDependencies`      | `[]`, must stay aligned with `package.json`                                                                        |
+| Field                      | Value / meaning                                                                                                               |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `lockfileVersion`          | `2` ([lockfile](https://bun.com/docs/pm/lockfile))                                                                            |
+| `configVersion`            | `1` → isolated linker default for workspaces                                                                                  |
+| `workspaces[""]`           | Root `sportsdesk-ops` holds **all** npm dependencies                                                                          |
+| `workspaces["packages/…"]` | Workspace **name** + **version** only (no nested deps yet)                                                                    |
+| Root workspace version     | **Not** stored under `workspaces[""]` (Bun omits it); doctor compares versions only for `packages/*`                          |
+| `packages`                 | Resolved graph including optional platform packages (e.g. `@typescript/typescript-*`) skipped at install time on other OS/CPU |
+| `trustedDependencies`      | `[]`, must stay aligned with `package.json`                                                                                   |
 
 Policy tests recompute expected workspace keys from globbed `package.json` files and compare to the lock (`lockWorkspaceNames`, `lockWorkspaceVersions`, `patchState` in `lib/pm_policy.ts`) — stricter than `bun install --frozen-lockfile` alone.
 
@@ -232,8 +232,8 @@ bun test tests/bun_config_policy.test.ts
 **B. Add or bump a root dependency** (from repo root; graph lives on the root workspace)
 
 ```sh
-bun-deps add -d oxlint@1.90.0          # example: exact pin matches house style
-# or: bun-deps update oxlint
+bun-deps add -d semver@7.8.6           # example: exact pin matches house style
+# or: bun-deps update semver
 bun run pm:doctor --only lock
 bun test tests/bun_config_policy.test.ts
 git add package.json bun.lock
@@ -314,7 +314,7 @@ Root manifest: `"workspaces": ["packages/*"]`. Packages under `packages/` curren
 
 ### Root manifest pinning
 
-Root `dependencies` / `devDependencies` use **exact** versions (no `^` on pinned packages in `package.json`; the lock holds the same pins). CI installs on **linux x64**; `bun.lock` still lists every `@oxlint/binding-*` optional platform package so the lock stays cross-platform ([install → platform-specific](https://bun.com/docs/pm/cli/install#platform-specific-dependencies)). Prod license audit: regenerate gitignored `licenses.json` with `bun pm licenses --prod --json` (see `.gitignore`).
+Root `dependencies` / `devDependencies` use **exact** versions (no `^` on pinned packages in `package.json`; the lock holds the same pins). CI installs on **linux x64**; `bun.lock` still lists every `@typescript/typescript-*` optional platform package so the lock stays cross-platform ([install → platform-specific](https://bun.com/docs/pm/cli/install#platform-specific-dependencies)). Prod license audit: regenerate gitignored `licenses.json` with `bun pm licenses --prod --json` (see `.gitignore`).
 
 ### Scoped registry (`@tennis-hq`)
 
@@ -459,7 +459,7 @@ node_modules/
 
 `pm:doctor` **`installed tree`** checks for `node_modules/.bun`. **`bun pm cache rm`** wipes cache **and** `links/` — every project using `globalStore` needs reinstall ([global cache](https://bun.com/docs/pm/global-cache)).
 
-**Oxlint on this repo:** devDependency `oxlint` pulls one native `@oxlint/binding-*` matching the host OS/CPU/libc; other bindings stay in `bun.lock` but are not installed ([optionalDependencies](https://bun.com/docs/pm/cli/install#platform-specific-dependencies)). macOS dev and Linux CI both validate the same lockfile.
+**Platform-specific binaries on this repo:** devDependency `typescript` (`7.0.2`) pulls one native `@typescript/typescript-*` package matching the host OS/CPU; other platform entries stay in `bun.lock` ([optionalDependencies](https://bun.com/docs/pm/cli/install#platform-specific-dependencies)) so macOS dev and Linux CI both validate the same lockfile.
 
 ## Hand-editing manifests
 

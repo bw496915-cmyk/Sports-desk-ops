@@ -5,7 +5,7 @@ import path from "node:path";
 
 /**
  * Gate Integrity Meta-Test for no-unsafe-innerhtml
- * Verifies that bin/check-innerhtml.ts accurately detects:
+ * Verifies that scripts/gates/check-innerhtml.ts accurately detects:
  * 1. Simple dynamic variable assignment (must fail, exit 1)
  * 2. Template literal with interpolation (must fail, exit 1)
  * 3. String concatenation (must fail, exit 1)
@@ -25,7 +25,7 @@ describe("check-innerhtml 5-case meta-test suite", () => {
       const proc = Bun.spawnSync(
         [
           process.execPath,
-          path.join(import.meta.dir, "../bin/check-innerhtml.ts"),
+          path.join(import.meta.dir, "../scripts/gates/check-innerhtml.ts"),
           root,
         ],
         {
@@ -113,7 +113,7 @@ describe("check-innerhtml Bun.markdown sink coverage", () => {
       const proc = Bun.spawnSync(
         [
           process.execPath,
-          path.join(import.meta.dir, "../bin/check-innerhtml.ts"),
+          path.join(import.meta.dir, "../scripts/gates/check-innerhtml.ts"),
           root,
         ],
         { env: { PATH: Bun.env.PATH ?? "", HOME: Bun.env.HOME ?? "" } },

@@ -1,7 +1,13 @@
 import { Scroll, Text, View, type JSX } from "nsh";
 import { formatProvenanceCompact } from "../desk_model";
 import type { DeskStore } from "../store";
-import { Badge, createPanelReadyMotion, StateNotice, Surface } from "../ui";
+import {
+  Badge,
+  createPanelReadyMotion,
+  DESK_SCROLLBAR_THEME,
+  StateNotice,
+  Surface,
+} from "../ui";
 import { provenanceTone } from "./provenance";
 
 export function KpisPanel(props: { store: DeskStore }): JSX.Element {
@@ -20,7 +26,7 @@ export function KpisPanel(props: { store: DeskStore }): JSX.Element {
           <If
             when={snap().status === "unavailable"}
             else={
-              <Scroll class="min-h-0 flex-1">
+              <Scroll class="min-h-0 flex-1" scrollbar={DESK_SCROLLBAR_THEME}>
                 <View style={readyMotion.style} class="gap-2.5 p-3">
                   <Each of={cards()} key={(card) => card.id}>
                     {(card) => (

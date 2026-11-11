@@ -6,7 +6,7 @@
  * manifest, and snapshots spine repository HEAD SHAs, branch names, and optional DSH worktrees.
  *
  * Usage:
- *   bun x desk-provenance [--table] [--json] [--yaml] [--worktrees] [--check] [--strict-exec] [--no-oracle] [--out=<path>]
+ *   bunx dx provenance [--table] [--json] [--yaml] [--worktrees] [--check] [--strict-exec] [--no-oracle] [--out=<path>]
  *   bun run desk:provenance
  *   ./bin/dx provenance
  */
@@ -18,7 +18,7 @@ import { deskProvenanceSnapshot } from "../lib/bun_runtime.ts";
 const HELP = `desk-provenance — Bun runtime oracle pin + spine repo & worktree SHA provenance
 
 Usage:
-  bun x desk-provenance [options]
+  bunx dx provenance [options]
   bun run desk:provenance
   ./bin/dx provenance [options]
 

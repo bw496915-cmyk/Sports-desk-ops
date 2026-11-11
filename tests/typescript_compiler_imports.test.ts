@@ -5,7 +5,11 @@ import { join } from "node:path";
 const root = join(import.meta.dir, "..");
 
 describe("typescript compiler API imports", () => {
-  for (const rel of ["lib/bun_shapes.ts", "bin/bun_types.ts"]) {
+  for (const rel of [
+    "lib/bun_shapes.ts",
+    "bin/bun_types.ts",
+    "scripts/gates/check-slice-bitsets.ts",
+  ]) {
     test(rel, () => {
       const src = readFileSync(join(root, rel), "utf8");
       expect(src).toContain("typescript-compiler-legacy");

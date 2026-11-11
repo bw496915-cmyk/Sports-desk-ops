@@ -43,5 +43,5 @@ bun run pin:cdn:update --vendor-version <version>  # human action; see docs/runb
 bun run sri:apply --in <html> [--out <html>]       # rewrite a document from the manifest
 ```
 
-`bin/check-innerhtml.ts` enforces the manifest offline for tracked HTML; the live check runs in CI on
+`scripts/gates/check-innerhtml.ts` enforces the manifest offline for tracked HTML; the live check runs in CI on
 the daily schedule and through `portal:drift:cron`.

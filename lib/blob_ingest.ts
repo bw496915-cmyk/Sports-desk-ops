@@ -4,7 +4,7 @@
  *
  * Unifies the five binary/text surfaces across sportsdesk-ops around web-standard `Blob`:
  * 1. `fetch()` -> `await res.blob()` (with decompression-aware `content-length` verification)
- * 2. `Bun.file(path)` -> `BunFile` (which is a lazy `Blob` subclass)
+ * 2. `Bun.file(path)` -> `BunFile` / `FileBlob` (lazy `Blob` subclasses from `"bun"`)
  * 3. `Bun.WebView.screenshot({ encoding: "blob" })` & `new Bun.Image(blob).blob()`
  * 4. `scripts/capture/recorder.ts` (`RecordResponseInput` & `CaptureRecord` from `Blob`/`Response`)
  * 5. `lib/combo_identity.ts` & `lib/fantasy402_settlement_ingest.ts` (F402 `Pending` / `getGrading` /
@@ -12,7 +12,8 @@
  *    explicit polymorphic `LIST: ""` empty-envelope handling).
  */
 
-import { mkdir } from "node:fs/promises";
+import type { BunFile, FileBlob } from "bun";
+import { lstat, mkdir, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { Sha256Hex } from "../design/domain-branded-types.ts";
 import { auditRunId, type AuditRunId } from "./audit_run_id.ts";
@@ -51,17 +52,29 @@ export interface VerifiedWriteResult extends InspectedBlob {
   readonly writtenBytes: number;
 }
 
-export interface FetchVerifiedBlobOptions extends RequestInit {
-  /** Optional local destination path; when set, writes via `Bun.write` and verifies disk size. */
+export interface StreamVerifiedBlobOptions {
+  readonly fallbackMimeType?: string;
+  readonly highWaterMark?: number;
+  readonly maxBytes?: number;
+}
+
+export interface StreamVerifiedWriteResult {
+  readonly path: string;
+  readonly size: number;
+  readonly writtenBytes: number;
+  readonly mimeType: string;
+  readonly sha256: Sha256Hex;
+}
+
+export interface FetchVerifiedBlobOptions extends BunFetchRequestInit {
+  /** Optional local destination path; when set, writes via `Bun.write` and verifies disk stat. */
   readonly writeTo?: string;
-  /** Optional Bun HTTP protocol selector ("http1.1" | "http2" | "http3"). */
-  readonly protocol?: "http1.1" | "http2" | "http3";
   /** If true (default), throws on non-2xx HTTP status codes. */
   readonly requireOk?: boolean;
   /** Optional custom fetch implementation for deterministic unit testing. */
   readonly fetcher?: (
     input: string | URL | Request,
-    init?: RequestInit,
+    init?: BunFetchRequestInit,
   ) => Promise<Response>;
 }
 
@@ -73,6 +86,62 @@ export interface FetchVerifiedBlobResult extends InspectedBlob {
   readonly wireContentLength: number | null;
   readonly wireCompressed: boolean;
   readonly writtenPath: string | null;
+}
+
+/**
+ * Runtime guard narrowing a web `Blob` to a canonical `BunFile` / `FileBlob` handle (`Bun.file(...)`).
+ */
+export function isBunFile(value: Blob): value is BunFile | FileBlob {
+  return (
+    typeof (value as Partial<BunFile>).stat === "function" &&
+    typeof (value as Partial<BunFile>).writer === "function"
+  );
+}
+
+async function assertSafeWriteDestination(destPath: string): Promise<void> {
+  const existing = await lstat(destPath).catch(() => null);
+  if (existing === null) return;
+  if (existing.isSymbolicLink() || !existing.isFile()) {
+    throw new Error(
+      `refusing to write to non-regular or symlink destination: ${destPath}`,
+    );
+  }
+}
+
+async function verifyWrittenRegularFile(
+  destPath: string,
+  expectedBytes: number,
+  reportedWrittenBytes?: number,
+): Promise<number> {
+  const [linkStat, diskStat] = await Promise.all([
+    lstat(destPath),
+    Bun.file(destPath).stat(),
+  ]);
+  if (
+    linkStat.isSymbolicLink() ||
+    !linkStat.isFile() ||
+    !diskStat.isFile() ||
+    linkStat.ino !== diskStat.ino ||
+    linkStat.dev !== diskStat.dev
+  ) {
+    throw new Error(
+      `post-write verification failed for ${destPath}: destination is not a stable regular file`,
+    );
+  }
+  if (
+    reportedWrittenBytes !== undefined &&
+    reportedWrittenBytes !== expectedBytes
+  ) {
+    throw new Error(
+      `partial write to ${destPath}: Bun.write reported ${reportedWrittenBytes} B, expected ${expectedBytes} B`,
+    );
+  }
+  if (diskStat.size !== expectedBytes) {
+    throw new Error(
+      `partial write to ${destPath}: stat reported ${diskStat.size} B, expected ${expectedBytes} B`,
+    );
+  }
+  return diskStat.size;
 }
 
 /**
@@ -110,6 +179,8 @@ export function parseF402ListEnvelope(
 
 /**
  * Normalizes any `BlobSource` into a `Blob` with an explicit MIME type.
+ * Uses zero-copy `Blob.prototype.slice` / `BunFile.slice` when re-tagging MIME types so lazy
+ * `BunFile` handles are not eagerly materialized into heap `Uint8Array` buffers.
  */
 export async function toBlob(
   source: BlobSource,
@@ -117,15 +188,28 @@ export async function toBlob(
 ): Promise<Blob> {
   if (source instanceof Response) {
     const headerType = source.headers.get("content-type")?.trim();
+    const targetType = headerType || fallbackMimeType;
     const rawBlob = await source.blob();
-    if (rawBlob.type) return rawBlob;
-    return new Blob([await rawBlob.bytes()], {
-      type: headerType || fallbackMimeType,
-    });
+    if (
+      rawBlob.type !== "" &&
+      (rawBlob.type !== "application/octet-stream" ||
+        targetType === "application/octet-stream")
+    ) {
+      return rawBlob;
+    }
+    return rawBlob.slice(0, undefined, targetType);
   }
   if (source instanceof Blob) {
-    if (source.type) return source;
-    return new Blob([await source.bytes()], { type: fallbackMimeType });
+    if (
+      source.type !== "" &&
+      (source.type !== "application/octet-stream" ||
+        fallbackMimeType === "application/octet-stream")
+    ) {
+      return source;
+    }
+    return isBunFile(source)
+      ? source.slice(0, fallbackMimeType)
+      : source.slice(0, undefined, fallbackMimeType);
   }
   if (typeof source === "string") {
     return new Blob([source], {
@@ -143,7 +227,7 @@ export async function toBlob(
 
 /**
  * Materializes a `BlobSource` once into `{ blob, bytes, size, mimeType, sha256 }`.
- * Uses `await blob.bytes()` in Bun 1.4.4+ for zero-copy/single-pass byte extraction.
+ * Uses `await blob.bytes()` in Bun 1.4.4+ for single-pass byte extraction.
  */
 export async function inspectBlobSource(
   source: BlobSource,
@@ -163,8 +247,9 @@ export async function inspectBlobSource(
 }
 
 /**
- * Writes a `BlobSource` to disk via `Bun.write(dest, blob)` and verifies
- * `Bun.file(dest).size === blob.size` so partial writes fail closed.
+ * Writes a `BlobSource` to disk via `Bun.write(dest, blob)` and verifies post-write
+ * `lstat(dest)` + `await Bun.file(dest).stat()` against `inspected.size` (never synchronous
+ * `Bun.file(dest).size`, which is unpopulated before a read/stat).
  */
 export async function writeVerifiedBlob(
   destPath: string,
@@ -173,18 +258,94 @@ export async function writeVerifiedBlob(
 ): Promise<VerifiedWriteResult> {
   const inspected = await inspectBlobSource(source, fallbackMimeType);
   await mkdir(dirname(destPath), { recursive: true });
-  await Bun.write(destPath, inspected.blob);
-  const diskFile = Bun.file(destPath);
-  const writtenBytes = diskFile.size;
-  if (writtenBytes !== inspected.size) {
-    throw new Error(
-      `partial write to ${destPath}: wrote ${writtenBytes} B, expected ${inspected.size} B`,
-    );
-  }
+  await assertSafeWriteDestination(destPath);
+  const reportedWritten = await Bun.write(destPath, inspected.blob);
+  const writtenBytes = await verifyWrittenRegularFile(
+    destPath,
+    inspected.size,
+    reportedWritten,
+  );
   return {
     ...inspected,
     path: destPath,
     writtenBytes,
+  };
+}
+
+/**
+ * Streams a `Blob`, `Response`, or `ReadableStream<Uint8Array>` to disk via `Blob.prototype.stream()`
+ * + `Bun.CryptoHasher("sha256")` + `Bun.file(dest).writer()` (`Bun.FileSink`) without buffering the
+ * full payload in heap memory, then verifies `lstat(dest)` + `Bun.file(dest).stat()`.
+ */
+export async function streamVerifiedBlobToFile(
+  destPath: string,
+  source: Blob | Response | ReadableStream<Uint8Array>,
+  options: StreamVerifiedBlobOptions = {},
+): Promise<StreamVerifiedWriteResult> {
+  const fallbackMimeType =
+    options.fallbackMimeType ?? "application/octet-stream";
+  let mimeType = fallbackMimeType;
+  let stream: ReadableStream<Uint8Array> | null;
+
+  if (source instanceof Response) {
+    mimeType = source.headers.get("content-type")?.trim() || fallbackMimeType;
+    stream = source.body;
+  } else if (source instanceof Blob) {
+    mimeType = source.type || fallbackMimeType;
+    stream = source.stream();
+  } else {
+    stream = source;
+  }
+
+  await mkdir(dirname(destPath), { recursive: true });
+  await assertSafeWriteDestination(destPath);
+
+  const hasher = new Bun.CryptoHasher("sha256");
+  const destFile = Bun.file(destPath);
+  const sink =
+    options.highWaterMark !== undefined
+      ? destFile.writer({ highWaterMark: options.highWaterMark })
+      : destFile.writer();
+
+  let totalBytes = 0;
+  try {
+    if (stream !== null) {
+      const reader = stream.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value.byteLength === 0) continue;
+          totalBytes += value.byteLength;
+          if (options.maxBytes !== undefined && totalBytes > options.maxBytes) {
+            await reader.cancel("maxBytes exceeded");
+            throw new Error(
+              `stream to ${destPath} exceeded maxBytes (${totalBytes} B > ${options.maxBytes} B)`,
+            );
+          }
+          hasher.update(value);
+          const flushed = sink.write(value);
+          if (flushed instanceof Promise) await flushed;
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
+    const ended = sink.end();
+    if (ended instanceof Promise) await ended;
+  } catch (err) {
+    await Promise.resolve(sink.end()).catch(() => undefined);
+    await rm(destPath, { force: true }).catch(() => undefined);
+    throw err;
+  }
+
+  const writtenBytes = await verifyWrittenRegularFile(destPath, totalBytes);
+  return {
+    path: destPath,
+    size: totalBytes,
+    writtenBytes,
+    mimeType,
+    sha256: hasher.digest("hex") as Sha256Hex,
   };
 }
 
@@ -194,7 +355,7 @@ export async function writeVerifiedBlob(
  * - Enforces `Number(contentLength) === blob.size` when `content-encoding` is absent or `"identity"`.
  * - Records `wireCompressed: true` and `wireContentLength` when `gzip` / `br` / `zstd` / `deflate`
  *   transparently expanded the body in `fetch()`.
- * - Optionally persists and size-verifies the `Blob` on disk when `writeTo` is provided.
+ * - Optionally persists and stat-verifies the `Blob` on disk when `writeTo` is provided.
  */
 export async function fetchVerifiedBlob(
   url: string,
@@ -202,15 +363,12 @@ export async function fetchVerifiedBlob(
 ): Promise<FetchVerifiedBlobResult> {
   const {
     writeTo,
-    protocol,
     requireOk = true,
     fetcher = fetch,
     ...requestInit
   } = options;
-  const init: RequestInit & { protocol?: string } = { ...requestInit };
-  if (protocol) init.protocol = protocol;
 
-  const response = await fetcher(url, init);
+  const response = await fetcher(url, requestInit);
   if (requireOk && !response.ok) {
     const preview = (await response.text().catch(() => "")).slice(0, 200);
     throw new Error(`HTTP ${response.status} from ${url}: ${preview}`);
@@ -374,10 +532,13 @@ export interface F402ReportBlobIngestResult {
   readonly settlementIngestedCount: number;
 }
 
+const UTF8_FATAL_DECODER = new TextDecoder("utf-8", { fatal: true });
+
 /**
  * Ingests an F402 Report/Manager response from any `BlobSource` (`Bun.file(".../Pending.json")`,
  * `await res.blob()`, or a `webview-probe` JSON wrapper):
- * 1. Computes `payloadSha256` over the exact `Blob` bytes.
+ * 1. Computes `payloadSha256` over the exact `Blob` bytes and decodes UTF-8 from `inspected.bytes`
+ *    in a single read (avoiding a second disk/stream read via `inspected.blob.text()`).
  * 2. Unwraps either raw F402 envelopes (`{"Pending":[...]}`, `{"LIST":[...]}`, `{"LIST":""}`) or
  *    `f402_probe.ts` probe files (`{ operation, result: { status, bytes, preview } }` or
  *    `{ operation, response: { status, bytes, bodyPreview } }`), repairing truncated preview slices
@@ -397,7 +558,7 @@ export async function ingestF402ReportBlob(
   } = {},
 ): Promise<F402ReportBlobIngestResult> {
   const inspected = await inspectBlobSource(source, "application/json");
-  const text = await inspected.blob.text();
+  const text = UTF8_FATAL_DECODER.decode(inspected.bytes);
   const parsed = JSON.parse(text) as unknown;
 
   let envelopeKind: F402BlobEnvelopeKind = "empty-list";

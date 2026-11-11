@@ -1,7 +1,7 @@
 import { Scroll, Text, View, type JSX } from "nsh";
 import { formatAgeShort, formatUsd } from "../desk_model";
 import type { DeskStore } from "../store";
-import { SectionHeader, Surface } from "../ui";
+import { DESK_SCROLLBAR_THEME, SectionHeader, Surface } from "../ui";
 
 export function DiagnosticsPanel(props: { store: DeskStore }): JSX.Element {
   const formatEndpointReady = (
@@ -26,7 +26,10 @@ export function DiagnosticsPanel(props: { store: DeskStore }): JSX.Element {
   };
 
   return (
-    <Scroll class="min-h-0 flex-1 bg-background">
+    <Scroll
+      class="min-h-0 flex-1 bg-background"
+      scrollbar={DESK_SCROLLBAR_THEME}
+    >
       <View class="flex-row flex-wrap gap-3 p-3">
         <View class="min-w-72 flex-1 gap-2">
           <SectionHeader

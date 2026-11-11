@@ -1,4 +1,4 @@
-import { Text, View, type JSX } from "nsh";
+import { platform, Text, View, type JSX } from "nsh";
 import { formatProvenanceCompact, formatUsd } from "../desk_model";
 import type { DeskStore } from "../store";
 import {
@@ -13,17 +13,25 @@ import {
 import { provenanceTone } from "./provenance";
 
 export const SIGNAL_COLUMNS: DataTableColumn[] = [
-  { key: "league", title: "Lg", width: 58, fixed: true, sortable: true },
   {
-    key: "market",
-    title: "Market signal",
-    width: 196,
+    key: "league",
+    title: "Lg",
+    width: 68,
+    minWidth: 60,
     fixed: true,
     sortable: true,
   },
-  { key: "risk", title: "Risk", width: 84, align: "end", sortable: true },
-  { key: "accounts", title: "Accts", width: 72, align: "end", sortable: true },
-  { key: "fairProb", title: "Fair%", width: 78, align: "end", sortable: true },
+  {
+    key: "market",
+    title: "Market signal",
+    width: platform.desktop ? 204 : 172,
+    minWidth: 140,
+    fixed: platform.desktop,
+    sortable: true,
+  },
+  { key: "risk", title: "Risk", width: 88, align: "end", sortable: true },
+  { key: "accounts", title: "Accts", width: 74, align: "end", sortable: true },
+  { key: "fairProb", title: "Fair%", width: 80, align: "end", sortable: true },
   {
     key: "edge",
     title: "Edge",
@@ -32,9 +40,9 @@ export const SIGNAL_COLUMNS: DataTableColumn[] = [
     sortable: true,
     ...SEMANTIC_DELTA_CLASSES,
   },
-  { key: "confidence", title: "Conf", width: 76, align: "end", sortable: true },
+  { key: "confidence", title: "Conf", width: 78, align: "end", sortable: true },
   { key: "verdict", title: "Verdict", width: 120 },
-  { key: "provenance", title: "Provenance", width: 170 },
+  { key: "provenance", title: "Provenance", width: 172 },
 ];
 
 export function SignalsPanel(props: { store: DeskStore }): JSX.Element {
@@ -119,6 +127,7 @@ export function SignalsPanel(props: { store: DeskStore }): JSX.Element {
                     columns={SIGNAL_COLUMNS}
                     data={props.store.signalArena().rows}
                     sort={props.store.signalSort()}
+                    selectedRow={props.store.selectedDisplayRow()}
                     onSortChange={(next) => props.store.setSignalSort(next)}
                     onRowSelect={(row) =>
                       props.store.selectSignalByDisplayRow(row)

@@ -10,9 +10,11 @@ import {
   buildScoreboardRows,
   buildSignalArenaIndex,
   buildSignalArenaView,
+  DESK_APPEARANCE_STORAGE_KEY,
   DESK_PREFS_STORAGE_KEY,
   defaultWorkspacePrefs,
   extractApiFailureCause,
+  parseAppearanceChoice,
   parseKalshiPayload,
   parseKpisPayload,
   parseScoreboardPayload,
@@ -158,7 +160,13 @@ describe("packages/nsh-desk model and capability contracts", () => {
     expect(flipA.rows[1]).toBe(flipB.rows[0]);
 
     const plot = buildExposurePlotData(kalshi.signals);
-    expect(plot.map((p) => p.riskUsd)).toEqual([12000, 48000]);
+    expect(plot.map((p) => p.riskUsd)).toEqual([48000, 12000]);
+    expect(plot.map((p) => p.axisLabel)).toEqual(["#1 LAL@BOS", "#2 KC@BUF"]);
+    expect(DESK_APPEARANCE_STORAGE_KEY).toBe(
+      "ops.sportsdesk.desk.appearance.v1",
+    );
+    expect(parseAppearanceChoice("dark")).toBe("dark");
+    expect(parseAppearanceChoice("invalid")).toBe("system");
   });
 
   test("buildScoreboardRows filters by league", () => {
@@ -198,6 +206,7 @@ describe("packages/nsh-desk model and capability contracts", () => {
     );
     const manifest = (await Bun.file(nshJsonPath).json()) as {
       id: string;
+      minRuntime?: string;
       capabilities: {
         network: {
           hosts?: string[];
@@ -212,6 +221,7 @@ describe("packages/nsh-desk model and capability contracts", () => {
     };
 
     expect(manifest.id).toBe("ops.sportsdesk.desk");
+    expect(manifest.minRuntime).toBe("0.4.0");
     expect(manifest.capabilities.network.hosts).toBeUndefined();
     expect(manifest.capabilities.network.http).toEqual([
       { host: "127.0.0.1", methods: ["GET"], schemes: ["http"] },

@@ -1,6 +1,5 @@
+import type { S3Client, S3File, S3Options, S3Stats } from "bun";
 import { describe, expect, test } from "bun:test";
-
-import type { BunS3Client } from "../types/bun-api.ts";
 
 const METHODS = [
   "delete",
@@ -30,7 +29,7 @@ describe("Bun.S3Client contract", () => {
   });
 
   test("lazy S3File exposes the pinned members and a NaN size", () => {
-    const file = Bun.s3.file("missing.txt");
+    const file: S3File = Bun.s3.file("missing.txt");
     for (const name of [
       "slice",
       "stat",
@@ -47,8 +46,17 @@ describe("Bun.S3Client contract", () => {
     expect(Number.isNaN(file.size)).toBe(true);
   });
 
-  test("Bun.s3 is an S3Client value and matches the type alias", () => {
-    const s3: BunS3Client = Bun.s3;
+  test("Bun.s3 satisfies canonical S3Client and S3 companion types from module 'bun'", () => {
+    const s3: S3Client = Bun.s3;
+    const opts: S3Options = { region: "auto" };
+    const checkCompanionTypes = (
+      stats: S3Stats,
+    ): [number, string, string | undefined] => [
+      stats.size,
+      stats.etag,
+      opts.region,
+    ];
+    expect(typeof checkCompanionTypes).toBe("function");
     // Cross-realm instanceof checks fail under worker isolation on Linux CI.
     // Validate prototype constructor name and method contract across all environments.
     expect(Object.getPrototypeOf(s3).constructor.name).toBe("S3Client");

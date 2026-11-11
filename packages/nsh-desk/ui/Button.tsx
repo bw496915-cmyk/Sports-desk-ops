@@ -1,6 +1,8 @@
 import { platform, Text, type JSX } from "nsh";
 import { Button } from "nsh/base";
+import { DeskIcon, type IconName, type IconTone } from "./Icon";
 import { FOCUS_RING_CLASS, MOTION, type ControlSize } from "./tokens";
+import { renderOptionalTooltip } from "./Tooltip";
 
 export type ButtonVariant =
   "default" | "primary" | "outline" | "ghost" | "danger";
@@ -18,6 +20,12 @@ const ICON_SIZE_CLASSES: Record<ControlSize, string> = {
   xs: `size-6 rounded-(--radius-sm) ${TOUCH_ICON_CLASS}`,
   sm: `size-7 rounded-(--radius) ${TOUCH_ICON_CLASS}`,
   md: `size-8 rounded-(--radius) ${TOUCH_ICON_CLASS}`,
+};
+
+const ICON_PX: Record<ControlSize, number> = {
+  xs: 12,
+  sm: 13,
+  md: 14,
 };
 
 const TEXT_SIZE_CLASSES: Record<ControlSize, string> = {
@@ -48,8 +56,27 @@ const VARIANT_TEXT_CLASSES: Record<ButtonVariant, string> = {
   danger: "text-destructive-foreground",
 };
 
+function resolveVariantIconTone(
+  variant: ButtonVariant,
+  selected?: boolean,
+): IconTone {
+  switch (variant) {
+    case "primary":
+      return "primary-foreground";
+    case "default":
+      return "secondary-foreground";
+    case "outline":
+      return "card-foreground";
+    case "danger":
+      return "destructive-foreground";
+    case "ghost":
+      return selected ? "foreground" : "muted-foreground";
+  }
+}
+
 export interface DeskButtonProps {
   label: string;
+  icon?: IconName;
   variant?: ButtonVariant;
   size?: ControlSize;
   selected?: boolean;
@@ -57,6 +84,7 @@ export interface DeskButtonProps {
   loading?: boolean;
   accessibilityLabel?: string;
   tooltip?: string;
+  shortcutHint?: string;
   testID?: string;
   class?: string;
   onPress?: () => void;
@@ -73,11 +101,20 @@ export function DeskButton(props: DeskButtonProps): JSX.Element {
       selected={props.selected}
       disabled={isDisabled()}
       accessibilityLabel={props.accessibilityLabel ?? props.label}
-      tooltip={props.tooltip}
+      tooltip={renderOptionalTooltip(props.tooltip, props.shortcutHint)}
       hitSlop={4}
       onPress={props.onPress}
       class={`group flex-row items-center justify-center ${SIZE_CLASSES[size()]} ${VARIANT_CLASSES[variant()]} ${MOTION.buttonTransitionClass} ${FOCUS_RING_CLASS} disabled:opacity-45 ${props.class ?? ""}`}
     >
+      <If when={props.icon}>
+        {(ic) => (
+          <DeskIcon
+            name={ic()}
+            size={ICON_PX[size()]}
+            tone={resolveVariantIconTone(variant(), props.selected)}
+          />
+        )}
+      </If>
       <Text
         class={`${TEXT_SIZE_CLASSES[size()]} ${VARIANT_TEXT_CLASSES[variant()]}`}
       >
@@ -88,9 +125,11 @@ export function DeskButton(props: DeskButtonProps): JSX.Element {
 }
 
 export interface DeskIconButtonProps {
-  symbol: string;
+  icon?: IconName;
+  symbol?: string;
   accessibilityLabel: string;
   tooltip?: string;
+  shortcutHint?: string;
   variant?: ButtonVariant;
   size?: ControlSize;
   selected?: boolean;
@@ -109,16 +148,32 @@ export function DeskIconButton(props: DeskIconButtonProps): JSX.Element {
       selected={props.selected}
       disabled={props.disabled}
       accessibilityLabel={props.accessibilityLabel}
-      tooltip={props.tooltip ?? props.accessibilityLabel}
+      tooltip={renderOptionalTooltip(
+        props.tooltip ?? props.accessibilityLabel,
+        props.shortcutHint,
+      )}
       hitSlop={6}
       onPress={props.onPress}
       class={`group items-center justify-center ${ICON_SIZE_CLASSES[size()]} ${VARIANT_CLASSES[variant()]} ${MOTION.iconButtonTransitionClass} ${FOCUS_RING_CLASS} disabled:opacity-45`}
     >
-      <Text
-        class={`${TEXT_SIZE_CLASSES[size()]} ${VARIANT_TEXT_CLASSES[variant()]}`}
+      <If
+        when={props.icon}
+        else={
+          <Text
+            class={`${TEXT_SIZE_CLASSES[size()]} ${VARIANT_TEXT_CLASSES[variant()]}`}
+          >
+            {props.symbol ?? ""}
+          </Text>
+        }
       >
-        {props.symbol}
-      </Text>
+        {(ic) => (
+          <DeskIcon
+            name={ic()}
+            size={ICON_PX[size()]}
+            tone={resolveVariantIconTone(variant(), props.selected)}
+          />
+        )}
+      </If>
     </Button>
   );
 }

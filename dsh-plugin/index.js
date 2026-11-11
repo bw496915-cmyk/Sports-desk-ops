@@ -242,7 +242,7 @@ const DEV_CHECKS = Object.assign(Object.create(null), {
   lint: {
     kind: "gate",
     argv: ["run", "lint:check"],
-    description: "oxlint with no autofix.",
+    description: "bun lint (--no-script --deny-warnings) with no autofix.",
   },
   unit: {
     kind: "gate",

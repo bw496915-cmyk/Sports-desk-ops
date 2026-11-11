@@ -1,4 +1,4 @@
-import { effect, Text, View, type JSX } from "nsh";
+import { effect, Text, token, View, type JSX } from "nsh";
 import {
   DataTable,
   DockArea,
@@ -16,7 +16,7 @@ import {
   Menu as DesktopMenu,
   Window as DesktopWindow,
 } from "nsh/desktop";
-import type { ExposurePlotPoint } from "../desk_model";
+import type { DeskAppearance, ExposurePlotPoint } from "../desk_model";
 import { FOCUS_RING_CLASS, SCRIM_BACKDROP_CLASS } from "./tokens";
 
 export type { DataTableColumn, DataTableSort, DockAreaLayout, DockAreaRef };
@@ -31,6 +31,7 @@ const DESK_TABLE_CLASSES = {
   header: "border-b border-border bg-muted/60 text-muted-foreground",
   headerCell: "ps-2.5 pe-1.5",
   headerContent: "gap-1",
+  headerCellSorted: "bg-accent/55 text-foreground",
   headerCellSelected: "bg-accent/70",
   sortIndicator:
     "rounded-(--radius-sm) text-muted-foreground hover:bg-accent active:bg-accent",
@@ -51,6 +52,7 @@ export interface DeskDataTableProps<T = Record<string, unknown>> {
   columns: DataTableColumn[];
   data: T[];
   sort?: DataTableSort | null;
+  selectedRow?: number | null;
   accessibilityLabel?: string;
   onSortChange?: (next: DataTableSort | null) => void;
   onRowSelect?: (rowIndex: number) => void;
@@ -69,6 +71,14 @@ export function DeskDataTable<T = Record<string, unknown>>(
       fontSize={12}
       stripe={true}
       rowHeader={false}
+      columnSelectable={false}
+      selection={
+        props.selectedRow !== undefined
+          ? props.selectedRow === null
+            ? null
+            : { row: props.selectedRow }
+          : undefined
+      }
       accessibilityLabel={props.accessibilityLabel}
       sort={props.sort ?? undefined}
       onSortChange={
@@ -91,23 +101,54 @@ export function DeskDataTable<T = Record<string, unknown>>(
 
 export interface DeskExposurePlotProps {
   points: ExposurePlotPoint[];
+  activePoint?: ExposurePlotPoint | null;
   formatUsd: (usd: number) => string;
   onHoverIndexChange: (index: number | null) => void;
 }
 
 export function DeskExposurePlot(props: DeskExposurePlotProps): JSX.Element {
+  const chartColors = () => [
+    token("chart-1"),
+    token("chart-2"),
+    token("chart-3"),
+    token("chart-4"),
+    token("chart-5"),
+  ];
+
+  const a11yValue = () => {
+    const pt = props.activePoint;
+    if (!pt) return undefined;
+    return {
+      now: pt.riskUsd,
+      text: `${pt.fullLabel}, ${props.formatUsd(pt.riskUsd)}, confidence ${pt.confidence}%`,
+    };
+  };
+
   return (
     <View class="min-h-0 flex-1 ps-12 pe-2 pb-6 pt-2">
       <Plot
-        class="flex-1 text-chart-1"
+        class={`flex-1 rounded-(--radius-sm) text-chart-1 ${FOCUS_RING_CLASS}`}
         data={props.points}
-        xScale={{ type: "band", paddingInner: 0.28, paddingOuter: 0.15 }}
+        xScale={{
+          type: "band",
+          paddingInner: 0.26,
+          paddingOuter: 0.14,
+          maxBandWidth: 56,
+        }}
         y="riskUsd"
-        accessibilityLabel="Risk exposure in USD by Kalshi signal"
+        colorScale={{
+          type: "ordinal",
+          domain: ["NFL", "NBA", "NHL", "CFB", "NCAA"],
+          range: chartColors(),
+          unknown: token("chart-1"),
+        }}
+        crossLineClass="w-full rounded-(--radius-sm) bg-accent/25"
+        accessibilityLabel="Top Kalshi signal exposure in USD"
+        accessibilityValue={a11yValue()}
         onHoverChange={({ index }) => props.onHoverIndexChange(index ?? null)}
       >
         <Grid class="stroke-border" />
-        <Bar cornerRadii={4} class="fill-chart-1/85" />
+        <Bar cornerRadii={4} color="league" inactiveOpacity={0.45} />
         <PlotAxis
           placement="left"
           ticks={5}
@@ -116,7 +157,8 @@ export function DeskExposurePlot(props: DeskExposurePlotProps): JSX.Element {
         />
         <PlotAxis
           placement="bottom"
-          format={(v) => props.points[Math.round(v)]?.league ?? ""}
+          ticks={Math.min(props.points.length, 6)}
+          format={(v) => props.points[Math.round(v)]?.axisLabel ?? ""}
           labelClass="font-mono text-xs text-muted-foreground"
         />
       </Plot>
@@ -212,12 +254,15 @@ export interface DesktopShellMenuOptions {
   locked: () => boolean;
   leftOpen: () => boolean;
   bottomOpen: () => boolean;
+  appearance: () => DeskAppearance;
   onRefresh: () => void;
   onToggleAutoPoll: () => void;
   onToggleLeftDock: () => void;
   onToggleBottomDock: () => void;
   onToggleLocked: () => void;
   onResetLayout: () => void;
+  onSetAppearance: (next: DeskAppearance) => void;
+  onOpenCommandPalette: () => void;
   onCopyDiagnostics?: () => void;
   onOpenUiKit: () => void;
 }
@@ -238,6 +283,7 @@ export function bindDesktopShellMenu(opts: DesktopShellMenuOptions): void {
     const isLocked = opts.locked();
     const isLeftOpen = opts.leftOpen();
     const isBottomOpen = opts.bottomOpen();
+    const currentAppearance = opts.appearance();
 
     DesktopMenu.setApplicationMenu([
       {
@@ -245,6 +291,11 @@ export function bindDesktopShellMenu(opts: DesktopShellMenuOptions): void {
         submenu: [
           { role: "about" },
           { type: "separator" },
+          {
+            label: "Command palette…",
+            shortcut: "mod+k",
+            onSelect: opts.onOpenCommandPalette,
+          },
           {
             label: "UI kit…",
             shortcut: "mod+u",
@@ -265,6 +316,12 @@ export function bindDesktopShellMenu(opts: DesktopShellMenuOptions): void {
       {
         label: "Workspace",
         submenu: [
+          {
+            label: "Command palette…",
+            shortcut: "mod+k",
+            onSelect: opts.onOpenCommandPalette,
+          },
+          { type: "separator" },
           {
             label: "Refresh endpoints",
             shortcut: "mod+r",
@@ -298,6 +355,27 @@ export function bindDesktopShellMenu(opts: DesktopShellMenuOptions): void {
           {
             label: "Reset layout",
             onSelect: opts.onResetLayout,
+          },
+          { type: "separator" },
+          {
+            label: "Appearance",
+            submenu: [
+              {
+                label: "System",
+                checked: currentAppearance === "system",
+                onSelect: () => opts.onSetAppearance("system"),
+              },
+              {
+                label: "Light",
+                checked: currentAppearance === "light",
+                onSelect: () => opts.onSetAppearance("light"),
+              },
+              {
+                label: "Dark",
+                checked: currentAppearance === "dark",
+                onSelect: () => opts.onSetAppearance("dark"),
+              },
+            ],
           },
           ...(opts.onCopyDiagnostics
             ? [

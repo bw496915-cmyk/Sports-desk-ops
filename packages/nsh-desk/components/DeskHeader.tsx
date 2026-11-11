@@ -1,4 +1,4 @@
-import { setColorScheme, Text, View, type JSX } from "nsh";
+import { Text, View, type JSX } from "nsh";
 import type { ResolvedDeskOrigin } from "../desk_model";
 import type { DeskStore } from "../store";
 import {
@@ -50,9 +50,11 @@ export function DeskHeader(props: DeskHeaderProps): JSX.Element {
         <DeskToolbarGroup accessibilityLabel="Polling">
           <DeskButton
             label={props.store.polling() ? "Refreshing…" : "Refresh"}
+            icon="refresh"
             variant="default"
             loading={props.store.polling()}
-            tooltip="Refresh all :4020 endpoints"
+            tooltip="Poll all :4020 endpoints"
+            shortcutHint="mod+r"
             onPress={() => {
               void props.store.refreshAll();
             }}
@@ -60,6 +62,7 @@ export function DeskHeader(props: DeskHeaderProps): JSX.Element {
           <DeskSwitch
             label="Auto 10s"
             checked={props.store.autoPoll()}
+            tooltip="Poll :4020 automatically every 10 seconds"
             onChange={(next) => props.store.setAutoPoll(next)}
           />
         </DeskToolbarGroup>
@@ -72,6 +75,8 @@ export function DeskHeader(props: DeskHeaderProps): JSX.Element {
             variant="outline"
             selected={props.store.dockOpen().left}
             accessibilityLabel="KPIs dock"
+            tooltip="Toggle KPIs & Provenance dock"
+            shortcutHint="mod+1"
             onPress={props.onToggleLeftDock}
           />
           <DeskButton
@@ -79,13 +84,33 @@ export function DeskHeader(props: DeskHeaderProps): JSX.Element {
             variant="outline"
             selected={props.store.dockOpen().bottom}
             accessibilityLabel="Pipeline dock"
+            tooltip="Toggle Pipeline & Honesty dock"
+            shortcutHint="mod+2"
             onPress={props.onToggleBottomDock}
           />
         </DeskToolbarGroup>
 
         <DeskToolbarSeparator />
 
+        <DeskButton
+          testID="open-command-palette"
+          label="Command"
+          icon="search"
+          variant="outline"
+          accessibilityLabel="Open command palette"
+          tooltip="Search commands, panels, and signals"
+          shortcutHint="mod+k"
+          onPress={() => props.store.setCommandOpen(true)}
+        />
+
         <DeskMenu label="Workspace" testID="workspace-menu">
+          <DeskMenuItem
+            testID="menu-command-palette"
+            label="Command palette…"
+            shortcut="mod+k"
+            onSelect={() => props.store.setCommandOpen(true)}
+          />
+          <DeskMenuSeparator />
           <DeskMenuItem
             label="Lock layout"
             shortcut="mod+shift+l"
@@ -101,16 +126,25 @@ export function DeskHeader(props: DeskHeaderProps): JSX.Element {
           />
           <DeskMenuSeparator />
           <DeskMenuItem
+            testID="menu-appearance-system"
             label="System appearance"
-            onSelect={() => setColorScheme("system")}
+            radio={true}
+            checked={props.store.appearance() === "system"}
+            onSelect={() => props.store.setAppearance("system")}
           />
           <DeskMenuItem
+            testID="menu-appearance-light"
             label="Light appearance"
-            onSelect={() => setColorScheme("light")}
+            radio={true}
+            checked={props.store.appearance() === "light"}
+            onSelect={() => props.store.setAppearance("light")}
           />
           <DeskMenuItem
+            testID="menu-appearance-dark"
             label="Dark appearance"
-            onSelect={() => setColorScheme("dark")}
+            radio={true}
+            checked={props.store.appearance() === "dark"}
+            onSelect={() => props.store.setAppearance("dark")}
           />
           <DeskMenuSeparator />
           <DeskMenuItem

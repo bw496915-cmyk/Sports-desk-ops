@@ -6,6 +6,11 @@ export {
   type DeskIconButtonProps,
 } from "./Button";
 export {
+  DeskCommandDialog,
+  type CommandItem,
+  type DeskCommandDialogProps,
+} from "./CommandPalette";
+export {
   bindDesktopShellMenu,
   DeskDataTable,
   DeskExposurePlot,
@@ -24,6 +29,12 @@ export {
   type DockAreaRef,
 } from "./DataView";
 export { DeskDialog, type DeskDialogProps } from "./Dialog";
+export {
+  DeskIcon,
+  type DeskIconProps,
+  type IconName,
+  type IconTone,
+} from "./Icon";
 export {
   DeskMenu,
   DeskMenuItem,
@@ -50,12 +61,19 @@ export { DeskSwitch, type DeskSwitchProps } from "./Switch";
 export {
   animateUserLayoutChange,
   createPanelReadyMotion,
+  DESK_SCROLLBAR_THEME,
   FOCUS_RING_CLASS,
   MOTION,
   POPUP_ENDING_CLASS,
   POPUP_STARTING_CLASS,
   POPUP_SURFACE_CLASS,
   SCRIM_BACKDROP_CLASS,
+  TOOLTIP_SURFACE_CLASS,
   type ControlSize,
 } from "./tokens";
+export {
+  DeskTooltip,
+  renderOptionalTooltip,
+  type DeskTooltipProps,
+} from "./Tooltip";
 export { UiKitGalleryDialog } from "./UiKitGallery";

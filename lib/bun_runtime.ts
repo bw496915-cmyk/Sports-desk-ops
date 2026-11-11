@@ -54,10 +54,19 @@ export interface BunOraclePinCheck {
   readonly mismatches: readonly string[];
 }
 
+export interface TypeScriptAlignCheck {
+  /** `process.versions.typescript` — version baked into this Bun binary. */
+  readonly bunChecker: string;
+  /** `node_modules/typescript` in the given repo, if present. */
+  readonly workspace?: string | undefined;
+  readonly aligned: boolean;
+}
+
 export interface DeskProvenanceSnapshot {
   readonly capturedAt: string;
   readonly codeRoot: string;
   readonly bun: BunRuntimeIdentity;
+  readonly typescript: TypeScriptAlignCheck;
   readonly repos: readonly RepoGitIdentity[];
   readonly worktrees?: readonly RepoGitIdentity[];
   readonly oracle?: BunOraclePinCheck;
@@ -160,6 +169,37 @@ export function bunRuntimeIdentity(): BunRuntimeIdentity {
     revisionComposite: bunRevisionComposite(),
     versionWithSha: Bun.version_with_sha,
     execPath: process.execPath,
+  };
+}
+
+/** Bun's built-in checker version (`bun -p process.versions.typescript`). */
+export function bunCheckerTypescriptVersion(): string {
+  requireBunRuntime();
+  const v = process.versions.typescript;
+  if (typeof v !== "string") {
+    throw new Error("process.versions.typescript missing");
+  }
+  return v;
+}
+
+export function workspaceTypescriptVersion(repoRoot: string): string | undefined {
+  const pkgPath = join(repoRoot, "node_modules/typescript/package.json");
+  if (!existsSync(pkgPath)) return undefined;
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { version?: string };
+    return pkg.version;
+  } catch {
+    return undefined;
+  }
+}
+
+export function typescriptAlignCheck(repoRoot = SELF_REPO_ROOT): TypeScriptAlignCheck {
+  const bunChecker = bunCheckerTypescriptVersion();
+  const workspace = workspaceTypescriptVersion(repoRoot);
+  return {
+    bunChecker,
+    workspace,
+    aligned: workspace === undefined || workspace === bunChecker,
   };
 }
 
@@ -319,10 +359,15 @@ export function deskProvenanceSnapshot(
   const codeRoot = options.codeRoot ?? resolveCodeRoot();
   const harnessPath = join(codeRoot, "deepseek-harness");
   const oraclePath = options.oracleManifestPath;
+  const selfRoot = join(codeRoot, "sportsdesk-ops");
+  const tsRoot = existsSync(join(selfRoot, "node_modules/typescript/package.json"))
+    ? selfRoot
+    : SELF_REPO_ROOT;
   return {
     capturedAt: new Date().toISOString(),
     codeRoot,
     bun: bunRuntimeIdentity(),
+    typescript: typescriptAlignCheck(tsRoot),
     repos: deskRepoIdentities(codeRoot),
     ...(options.includeWorktrees
       ? { worktrees: gitWorktreeIdentities(harnessPath, "dsh") }

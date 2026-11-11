@@ -2804,8 +2804,8 @@ export const ROLE_TRADING_WORKSTATIONS: readonly RoleTradingWorkstationSpec[] =
       ],
       preSlateCommandSequence: [
         "bun run test:market-index",
-        "bun bin/check-innerhtml.ts --verbose",
-        "bun bin/check-fetch-init.ts --verbose",
+        "bun scripts/gates/check-innerhtml.ts --verbose",
+        "bun scripts/gates/check-fetch-init.ts --verbose",
       ],
       liveSlateExecutionLoop: [
         "bun run bridge3a:poll",
@@ -3121,12 +3121,12 @@ export const DESK_WEAKEST_LINK_DIAGNOSTICS: readonly WeakestLinkDiagnosticSpec[]
       coPilotDeputyRoles: ["operator"],
       sourceModules: [
         "lib/blob_ingest.ts",
-        "bin/check-innerhtml.ts",
+        "scripts/gates/check-innerhtml.ts",
         "lib/fraud_model.ts",
       ],
       implementedEnhancement:
         "Enforced strict preflight parameter validation (--week 0, --ticket, --wager, --flag) + parseF402ListEnvelope() polymorphic LIST guard in lib/blob_ingest.ts + zero-innerHTML gate across all operator dashboards and Cordis plugins.",
-      remediationCommand: "bun bin/check-innerhtml.ts --verbose",
+      remediationCommand: "bun scripts/gates/check-innerhtml.ts --verbose",
       beforeScoreOrSla:
         "2 [unknown] 0-byte 500s · unescaped legacy search render",
       projectedAfterScoreOrSla:
@@ -3227,7 +3227,7 @@ export const GITHUB_ISSUE_AND_PR_TRIAGE_LEDGER: readonly GitHubIssueAndPrTriageE
       linkedPrsOrIssues: ["PR #119"],
       resolutionStatus: "FIXED_AND_MERGED",
       reviewAndMergeNote:
-        "Reviewed & merged in PR #119 (3c87c7d): bin/check-signal-honesty.ts + tests/check_signal_honesty_meta.test.ts enforce structured signal-honesty throws in CI.",
+        "Reviewed & merged in PR #119 (3c87c7d): scripts/gates/check-signal-honesty.ts + tests/check_signal_honesty_meta.test.ts enforce structured signal-honesty throws in CI.",
       verificationCommand: "bun test tests/check_signal_honesty_meta.test.ts",
     },
     {
@@ -3509,7 +3509,7 @@ export const GITHUB_ISSUE_AND_PR_TRIAGE_LEDGER: readonly GitHubIssueAndPrTriageE
       resolutionStatus: "FIXED_AND_MERGED",
       reviewAndMergeNote:
         "Verified all controller + MODULE_SINK_WRAPPERS active in client/overlay/security-seams.preload.js and merged in PR #129 (1f3b7af).",
-      verificationCommand: "bun bin/check-innerhtml.ts --verbose",
+      verificationCommand: "bun scripts/gates/check-innerhtml.ts --verbose",
     },
     {
       itemRef: "PR-132",
@@ -5717,7 +5717,7 @@ function escapeHtml(text: string): string {
 
 /**
  * Self-contained interactive HTML dashboard for `/governance` and CLI `--out`.
- * Uses zero external assets and zero `.innerHTML` writes so `bin/check-innerhtml.ts`
+ * Uses zero external assets and zero `.innerHTML` writes so `scripts/gates/check-innerhtml.ts`
  * and strict CSP pass without exceptions.
  */
 export function renderStandaloneGovernanceHtml(

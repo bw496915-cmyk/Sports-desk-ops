@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { detectPaceVersion, inspectPace } from "../cli/info.ts";
+import { detectPaceVersion, inspectPace } from "../lib/ticket_capture/info.ts";
 
 describe("Pace version fingerprint", () => {
   test("detects 0.4.x by style='width: X%'", () => {

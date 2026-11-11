@@ -60,7 +60,7 @@ describe("Bun.sql / Bun.SQL global surface & sql-query CLI", () => {
     ).toThrow(/read-only guard/);
   });
 
-  test("3. runReadOnlySql and `bun x --no-install sql-query` inspect a SQLite file via Bun.SQL", async () => {
+  test("3. runReadOnlySql and `bun x --no-install dx sql` inspect a SQLite file via Bun.SQL", async () => {
     const dir = mkdtempSync(join(tmpdir(), "sql-query-test-"));
     const dbPath = join(dir, "sample.sqlite");
     try {
@@ -82,7 +82,8 @@ describe("Bun.sql / Bun.SQL global surface & sql-query CLI", () => {
           process.execPath,
           "x",
           "--no-install",
-          "sql-query",
+          "dx",
+          "sql",
           "--url",
           dbPath,
           "SELECT venue, latency_ms FROM desk_metrics ORDER BY latency_ms ASC",
@@ -111,6 +112,7 @@ describe("Bun.sql / Bun.SQL global surface & sql-query CLI", () => {
           process.execPath,
           "x",
           "--no-install",
+          "dx",
           "sql-query",
           "SELECT COUNT(*) AS cnt FROM desk_metrics",
           "--json",

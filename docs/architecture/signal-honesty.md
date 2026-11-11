@@ -95,6 +95,6 @@ Only **weblog** uses an empty `requiredEnv` array; credentials are **corpus pres
 - Sources contract: `docs/Sources.txt`
 - Wagers two-step publish: `docs/runbooks/wagers_live_capture_runbook.md`
 - Recovery arc: GitHub #84 (multi-sink R2 stale; closed when sinks honest)
-- Closed gaps governed by this ADR: #93 (wagers cron wired in `reporting_scheduler_service`), #94 (bridge3c `--timeout` wired), #78 (KPI data-age vs publish-age separated in `r2_pipeline_kpis`), #96 (generic throws and silent catches banned via `bin/check-signal-honesty.ts`); #91 (weblog producer: `weblog:sentinel` OS cron)
-- Enforcement: `bin/check-signal-honesty.ts` gate (generic `throw new Error("failed"|"error"|…)` and silent catches banned)
+- Closed gaps governed by this ADR: #93 (wagers cron wired in `reporting_scheduler_service`), #94 (bridge3c `--timeout` wired), #78 (KPI data-age vs publish-age separated in `r2_pipeline_kpis`), #96 (generic throws and silent catches banned via `scripts/gates/check-signal-honesty.ts`); #91 (weblog producer: `weblog:sentinel` OS cron)
+- Enforcement: `scripts/gates/check-signal-honesty.ts` gate (generic `throw new Error("failed"|"error"|…)` and silent catches banned)
 - Weblog producer (#91): `weblog:sentinel` OS cron reminds at 08:00 when today's JSONL is missing (manual export; no Mode A fetch)

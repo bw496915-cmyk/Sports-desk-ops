@@ -21,8 +21,12 @@ import {
   type BlockedByRef,
   type ReviewPlan,
   type StoredFlagReview,
-} from "../cli/review.ts";
-import type { Anomaly, RuleName, RuleTicket } from "../cli/rules.ts";
+} from "../lib/ticket_capture/review.ts";
+import type {
+  Anomaly,
+  RuleName,
+  RuleTicket,
+} from "../lib/ticket_capture/rules.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "flags-review-"));
 afterAll(() => rmSync(ROOT, { recursive: true, force: true }));

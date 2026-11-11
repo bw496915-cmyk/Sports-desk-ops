@@ -1,46 +1,15 @@
 /**
  * @file types/bun-api.d.ts
- * @description Explicit type aliases for Bun runtime APIs used across the codebase.
+ * @description Strictly upstream-absent Bun 1.4.4+ type augmentations.
  *
- * Declares aliases for Bun globals (`Response`, `RequestInit`, `File`,
- * `ReadableStream`, `Uint8Array<ArrayBufferLike>`, etc.) so our code references
- * `BunResponse`, `BunRequestInit`, etc. explicitly instead of relying on
- * implicit global lookup via `tsconfig.json`'s `types: ["bun"]`. If Bun's
- * global type surface changes, update the aliases here in one place.
- *
- * These are type-only aliases — they erase at compile time and add no runtime
- * cost. Import with `import type { BunResponse } from "../types/bun-api.ts"`
- * (from a file in `lib/`; there is no `@/` path alias in this repo).
+ * Canonical Bun types (`BunFile`, `FileBlob`, `S3Client`, `S3File`, `S3Options`,
+ * `S3Stats`, `S3Error`, `BunFetchRequestInit`, `HTMLBundle`, etc.) are imported
+ * directly from `"bun"` or resolved from `bun-types@1.4.4` — never re-declared or
+ * hand-aliased here. Only runtime capabilities present in the Bun 1.4.4 binary that
+ * are not yet published in `bun-types@1.4.4` / `@types/node` live in this file.
  */
 
-export type BunResponse = Response;
-export type BunRequestInit = RequestInit;
-export type BunFile = File;
-export type BunReadableStream = ReadableStream<Uint8Array>;
-export type BunUint8Array = Uint8Array<ArrayBufferLike>;
-export type BunReadableStreamDefaultReader =
-  ReadableStreamDefaultReader<Uint8Array>;
-export type BunS3Client = Bun.S3Client;
-export type BunS3File = Bun.S3File;
-export type BunS3Options = Bun.S3Options;
-export type BunS3Stats = Bun.S3Stats;
-
-/** Bun's documented S3 error codes (bun.com/docs/runtime/s3#error-codes). */
-export type BunS3ErrorCode =
-  | "ERR_S3_MISSING_CREDENTIALS"
-  | "ERR_S3_INVALID_METHOD"
-  | "ERR_S3_INVALID_PATH"
-  | "ERR_S3_INVALID_ENDPOINT"
-  | "ERR_S3_INVALID_SIGNATURE"
-  | "ERR_S3_INVALID_SESSION_TOKEN";
-
-/** An S3Error from the service (name === "S3Error") or a Bun ERR_S3_* failure. */
-export interface BunS3Error extends Error {
-  readonly name: "S3Error" | string;
-  readonly code?: BunS3ErrorCode;
-}
-
-/** Windows Credential Manager persistence for Bun.secrets.set. */
+/** Windows Credential Manager persistence for Bun.secrets.set (not yet in bun-types@1.4.4). */
 export type BunSecretPersist = "local" | "enterprise";
 
 export interface BunSecretSetOptions {
@@ -51,7 +20,7 @@ export interface BunSecretSetOptions {
 }
 
 /**
- * Bun 1.4 post-quantum Web Crypto extensions (ML-KEM / ML-DSA), not yet in @types/bun.
+ * Bun 1.4 post-quantum Web Crypto extensions (ML-KEM / ML-DSA), not yet in bun-types@1.4.4.
  * Keeping these declarations here removes `as unknown as` casts at call sites.
  */
 declare global {

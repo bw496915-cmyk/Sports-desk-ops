@@ -213,7 +213,7 @@ Usage: \`bun sportsdesk_cli.ts [command|option] [parameters...]\`
 ### 9. OPERATOR SURFACES (GSLive, stale lines, screenshots):
 * **gslive** [LOGIN] [\`--date\` YYYY-MM-DD] [\`--state\` STATE] [\`--window\` 1-31] [\`--agent\` A] [\`--bet-id\` IDS] [\`--bet-group-id\` IDS] [\`--free-bet-id\` ID] [\`--kind\` KIND] [\`--group-name\` NAME] [\`--period\` P] [\`--sport\` SID] [\`--market\` IDS] [\`--json\`]: GSLive 7-param report + bet-history sidecar links
 * **profile** <0x|username> [\`--json\`]: Polymarket PnL, win rate, positions, categories, strategy
-* **combo** legs|price|wallet: CFB combo legs, product-of-legs pricing, wallet combo positions
+* **combo** legs|price|wallet|uniqueness|verify-subset|backtest|derive|ingest|lead-lag: CFB combo pricing, uniqueness & canonical SQLite venue lead-lag
 * **bridge** coverage|value|match: cross-domain join between the customer book and Polymarket wallets
 * **stale** \`-i\` FILE [\`--window-min\` N] [\`--json\`]: Stale-line / post-move bet cohort
 * **shot** <URL> [\`--out\` PATH] [\`--f402-login\`] [\`--profile\` DIR] [\`--format\` png|jpeg|webp]: Bun.WebView screenshot (default \`scratch/shots/\`)
@@ -2596,15 +2596,9 @@ export async function main(): Promise<void> {
   }
 
   if (cmd === "replay" || cmd === "ingestion-replay") {
-    const replayArgs = ["bun", "run", "cli/sportsdesk_replay_cli.ts"];
-    for (const a of rawArgs.slice(1)) replayArgs.push(a);
-    const proc = Bun.spawn(replayArgs, {
-      cwd: repoRoot,
-      stdout: "inherit",
-      stderr: "inherit",
-      stdin: "inherit",
-    });
-    process.exitCode = await proc.exited;
+    const { runIngestionReplayCli } =
+      await import("../lib/ingestion_replay_cli.ts");
+    process.exitCode = await runIngestionReplayCli(rawArgs.slice(1));
     return;
   }
 

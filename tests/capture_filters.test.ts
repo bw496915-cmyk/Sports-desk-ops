@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { checkWagerOrdering } from "../cli/analyze.ts";
-import { inspectHtmlFilters } from "../cli/html.ts";
-import { assessConfidence } from "../cli/info.ts";
+import { checkWagerOrdering } from "../lib/ticket_capture/analyze.ts";
+import { inspectHtmlFilters } from "../lib/ticket_capture/html.ts";
+import { assessConfidence } from "../lib/ticket_capture/info.ts";
 
 describe("HTML table filters", () => {
   test("detects VIP-only", () => {

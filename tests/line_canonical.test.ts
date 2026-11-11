@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { nFormatter } from "../cli/format.ts";
-import { checkDisplayLine, getLineGameFull, isDecimal } from "../cli/line.ts";
+import { nFormatter } from "../lib/ticket_capture/format.ts";
+import {
+  checkDisplayLine,
+  getLineGameFull,
+  isDecimal,
+} from "../lib/ticket_capture/line.ts";
 
 describe("canonical line formatting", () => {
   test("isDecimal renders PK and half-points", () => {

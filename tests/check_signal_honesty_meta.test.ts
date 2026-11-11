@@ -5,7 +5,7 @@ import path from "node:path";
 
 /**
  * Gate Integrity Meta-Test for check-signal-honesty
- * Verifies that bin/check-signal-honesty.ts accurately detects:
+ * Verifies that scripts/gates/check-signal-honesty.ts accurately detects:
  * 1. Generic throw new Error("failed") (must fail, exit 1)
  * 2. Generic throw new Error("error") (must fail, exit 1)
  * 3. Silent catch returning [] (must fail, exit 1)
@@ -25,7 +25,10 @@ describe("check-signal-honesty meta-test suite", () => {
       const proc = Bun.spawnSync(
         [
           process.execPath,
-          path.join(import.meta.dir, "../bin/check-signal-honesty.ts"),
+          path.join(
+            import.meta.dir,
+            "../scripts/gates/check-signal-honesty.ts",
+          ),
           root,
         ],
         {

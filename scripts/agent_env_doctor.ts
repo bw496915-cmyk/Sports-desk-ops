@@ -176,7 +176,7 @@ export async function runDoctor(root = ROOT): Promise<Check[]> {
     });
   }
 
-  const requiredBins = ["dx", "sportsdesk", "wrangler", "nsh-desk", "oxlint"];
+  const requiredBins = ["dx", "sportsdesk", "wrangler", "nsh-desk"];
   const binDir = path.join(nodeModules, ".bin");
   const missingBins = requiredBins.filter(
     (name) => !exists(path.join(binDir, name)),
@@ -191,8 +191,7 @@ export async function runDoctor(root = ROOT): Promise<Check[]> {
     ...(missingBins.length === 0
       ? {}
       : {
-          detail:
-            "bun x <cli> and oxlint gates expect packages/sportsdesk-ops linked",
+          detail: "bun x <cli> gates expect packages/sportsdesk-ops linked",
           fix: "./bin/dx exec bun-deps install   # or: bun install --frozen-lockfile",
         }),
   });

@@ -1,4 +1,12 @@
-import { ErrorBoundary, host, keymap, mount, View, type JSX } from "nsh";
+import {
+  computed,
+  ErrorBoundary,
+  host,
+  keymap,
+  mount,
+  View,
+  type JSX,
+} from "nsh";
 import {
   DeskHeader,
   DiagnosticsPanel,
@@ -8,14 +16,21 @@ import {
   ScoreboardPanel,
   SignalsPanel,
 } from "./components";
-import { createDeskStore } from "./store";
+import { formatUsd } from "./desk_model";
+import {
+  createDeskStore,
+  LEAGUE_FILTER_OPTIONS,
+  type LeagueFilter,
+} from "./store";
 import {
   animateUserLayoutChange,
   bindDesktopShellMenu,
+  DeskCommandDialog,
   DeskWorkspace,
   StateNotice,
   Surface,
   UiKitGalleryDialog,
+  type CommandItem,
   type DockAreaRef,
 } from "./ui";
 
@@ -83,7 +98,207 @@ function DeskRootBody(props: {
     void store.copyDiagnosticsToClipboard();
   };
 
+  const focusPanel = (panelId: string) => {
+    if (panelId === "kpis" && !store.dockOpen().left) {
+      animateUserLayoutChange();
+      dockRef?.setDockOpen("left", true);
+    } else if (panelId === "diagnostics" && !store.dockOpen().bottom) {
+      animateUserLayoutChange();
+      dockRef?.setDockOpen("bottom", true);
+    }
+    dockRef?.selectPanel(panelId);
+  };
+
+  const commandItems = computed<CommandItem[]>(() => {
+    const items: CommandItem[] = [
+      {
+        id: "cmd:refresh",
+        label: "Refresh all :4020 endpoints",
+        group: "Workspace",
+        shortcut: "mod+r",
+        keywords: ["poll", "reload", "fetch", "kpis", "kalshi"],
+      },
+      {
+        id: "cmd:toggle-autopoll",
+        label: "Auto refresh every 10 seconds",
+        group: "Workspace",
+        checked: store.autoPoll(),
+        keywords: ["timer", "polling", "live"],
+      },
+      {
+        id: "cmd:toggle-kpis",
+        label: "Toggle KPIs & Provenance dock",
+        group: "Workspace",
+        shortcut: "mod+1",
+        checked: store.dockOpen().left,
+        keywords: ["left", "sidebar", "agents"],
+      },
+      {
+        id: "cmd:toggle-pipeline",
+        label: "Toggle Pipeline & Honesty dock",
+        group: "Workspace",
+        shortcut: "mod+2",
+        checked: store.dockOpen().bottom,
+        keywords: ["bottom", "r2", "diagnostics", "sinks"],
+      },
+      {
+        id: "cmd:toggle-lock",
+        label: "Lock workspace layout",
+        group: "Workspace",
+        shortcut: "mod+shift+l",
+        checked: store.locked(),
+        keywords: ["freeze", "dock"],
+      },
+      {
+        id: "cmd:reset-layout",
+        label: "Reset workspace layout",
+        group: "Workspace",
+        keywords: ["default", "restore", "panes"],
+      },
+      {
+        id: "cmd:copy-diagnostics",
+        label: "Copy diagnostics JSON to clipboard",
+        group: "Workspace",
+        shortcut: "mod+shift+c",
+        keywords: ["export", "snapshot", "503"],
+      },
+      {
+        id: "cmd:open-uikit",
+        label: "Open Sportsdesk UI kit…",
+        group: "Workspace",
+        shortcut: "mod+u",
+        keywords: ["gallery", "tokens", "components"],
+      },
+      {
+        id: "panel:signals",
+        label: "Focus panel: Kalshi Signals",
+        group: "Panels",
+        keywords: ["table", "edge", "markets"],
+      },
+      {
+        id: "panel:exposure",
+        label: "Focus panel: Exposure Plot",
+        group: "Panels",
+        keywords: ["chart", "bars", "risk"],
+      },
+      {
+        id: "panel:scoreboard",
+        label: "Focus panel: Scoreboard",
+        group: "Panels",
+        keywords: ["games", "scores"],
+      },
+      {
+        id: "appearance:system",
+        label: "Appearance: System",
+        group: "Appearance",
+        checked: store.appearance() === "system",
+        keywords: ["theme", "auto"],
+      },
+      {
+        id: "appearance:light",
+        label: "Appearance: Light",
+        group: "Appearance",
+        checked: store.appearance() === "light",
+        keywords: ["theme", "day"],
+      },
+      {
+        id: "appearance:dark",
+        label: "Appearance: Dark",
+        group: "Appearance",
+        checked: store.appearance() === "dark",
+        keywords: ["theme", "night"],
+      },
+    ];
+
+    for (const opt of LEAGUE_FILTER_OPTIONS) {
+      items.push({
+        id: `league:${opt.id}`,
+        label: `Scoreboard filter: ${opt.label}`,
+        group: "Scoreboard League",
+        checked: store.leagueFilter() === opt.id,
+        keywords: ["filter", "scoreboard", opt.id.toLowerCase()],
+      });
+    }
+
+    const snap = store.kalshiSnap();
+    if (snap.status === "ready") {
+      const topSignals = store.plotPoints();
+      for (const pt of topSignals) {
+        items.push({
+          id: `signal:${pt.signalId}`,
+          label: `${pt.fullLabel} (${formatUsd(pt.riskUsd)} · ${pt.verdict})`,
+          group: "Top Kalshi Signals",
+          checked: store.selectedSignal()?.id === pt.signalId,
+          keywords: [pt.signalId, pt.league, pt.verdict],
+        });
+      }
+    }
+
+    return items;
+  });
+
+  const executeCommand = (id: string) => {
+    switch (id) {
+      case "cmd:refresh":
+        void store.refreshAll();
+        return;
+      case "cmd:toggle-autopoll":
+        store.toggleAutoPoll();
+        return;
+      case "cmd:toggle-kpis":
+        toggleLeftDock();
+        return;
+      case "cmd:toggle-pipeline":
+        toggleBottomDock();
+        return;
+      case "cmd:toggle-lock":
+        store.toggleLocked();
+        return;
+      case "cmd:reset-layout":
+        resetWorkspaceLayout();
+        return;
+      case "cmd:copy-diagnostics":
+        copyDiagnostics();
+        return;
+      case "cmd:open-uikit":
+        store.setUiKitOpen(true);
+        return;
+      case "panel:signals":
+        focusPanel("signals");
+        return;
+      case "panel:exposure":
+        focusPanel("exposure");
+        return;
+      case "panel:scoreboard":
+        focusPanel("scoreboard");
+        return;
+      case "appearance:system":
+        store.setAppearance("system");
+        return;
+      case "appearance:light":
+        store.setAppearance("light");
+        return;
+      case "appearance:dark":
+        store.setAppearance("dark");
+        return;
+    }
+
+    if (id.startsWith("league:")) {
+      const nextLeague = id.slice("league:".length) as LeagueFilter;
+      store.setLeagueFilter(nextLeague);
+      focusPanel("scoreboard");
+      return;
+    }
+
+    if (id.startsWith("signal:")) {
+      const sigId = id.slice("signal:".length);
+      store.selectSignalById(sigId);
+      focusPanel("signals");
+    }
+  };
+
   keymap.bind({
+    "mod+k": () => store.setCommandOpen(true),
     "mod+r": () => {
       void store.refreshAll();
     },
@@ -100,6 +315,7 @@ function DeskRootBody(props: {
     locked: store.locked,
     leftOpen: () => store.dockOpen().left,
     bottomOpen: () => store.dockOpen().bottom,
+    appearance: store.appearance,
     onRefresh: () => {
       void store.refreshAll();
     },
@@ -108,6 +324,8 @@ function DeskRootBody(props: {
     onToggleBottomDock: toggleBottomDock,
     onToggleLocked: () => store.toggleLocked(),
     onResetLayout: resetWorkspaceLayout,
+    onSetAppearance: (next) => store.setAppearance(next),
+    onOpenCommandPalette: () => store.setCommandOpen(true),
     onCopyDiagnostics: copyDiagnostics,
     onOpenUiKit: () => store.setUiKitOpen(true),
   });
@@ -158,8 +376,17 @@ function DeskRootBody(props: {
         }}
       />
 
+      <DeskCommandDialog
+        open={store.commandOpen()}
+        items={commandItems()}
+        onOpenChange={(open) => store.setCommandOpen(open)}
+        onSelect={executeCommand}
+      />
+
       <UiKitGalleryDialog
         open={store.uiKitOpen()}
+        appearance={store.appearance()}
+        onAppearanceChange={(next) => store.setAppearance(next)}
         onOpenChange={(open) => store.setUiKitOpen(open)}
       />
     </View>

@@ -2283,7 +2283,7 @@ await checkAsync(
         "a missing file reported an age or a stale verdict",
       );
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );
@@ -2328,7 +2328,7 @@ await checkAsync(
         "an unsupported schema returned a table (states/totals present)",
       );
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );
@@ -2435,7 +2435,7 @@ await checkAsync(
         "a clean fixture produced quality flags",
       );
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );
@@ -2527,7 +2527,7 @@ await checkAsync(
         "the message does not read as MISSING without a synthesized zero",
       );
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );
@@ -2592,7 +2592,7 @@ await checkAsync(
         "artifact freshness was not derived from the fixture mtime",
       );
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );
@@ -2632,7 +2632,7 @@ await checkAsync(
         "the report did not say attempt outcome is unmeasured",
       );
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );
@@ -2668,7 +2668,7 @@ await checkAsync(
         "an unsupported journal produced an outcome or hid the artifact",
       );
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );
@@ -2694,7 +2694,7 @@ await checkAsync(
         "a missing history reported an age or stale verdict",
       );
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );
@@ -2732,7 +2732,7 @@ await checkAsync(
         "an unsupported history returned a series",
       );
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );
@@ -2835,7 +2835,7 @@ await checkAsync(
         );
       }
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );
@@ -2971,7 +2971,7 @@ await checkAsync(
         await assertAllReports(label, paths);
       }
     } finally {
-      await Bun.$`rm -rf ${directory}`.quiet();
+      rmSync(directory, { recursive: true, force: true });
     }
   },
 );

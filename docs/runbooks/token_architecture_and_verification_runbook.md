@@ -209,15 +209,20 @@ Subprocess execution via `Bun.spawn` and Bun Shell (`$`) must adhere to strict c
   `Bun.spawn` and `$` inherit `process.env` by default. Outbound processes and git hooks must pass sanitized `env:` mappings or explicit strips to prevent leaking sensitive API tokens (`TELEGRAM_BOT_TOKEN`, `CLOUDFLARE_API_TOKEN`, `F402_PASSWORD`) to child subprocesses.
 - **Bun Shell (`$`) API Invariants:**
   - **Pipe Operators:** The pipe operator `|` belongs _inside_ the template literal string (`await $`cmd1 | cmd2`.text()`). Bun Shell's `ShellPromise` does **not** expose a `.pipe()` JavaScript method.
-  - **Input Redirection & Standard Input:** Bun Shell exposes a `get stdin(): WritableStream` property on `ShellPromise`. Piping arbitrary JavaScript strings or buffers into subprocess stdin must be performed via:
+  - **Input Redirection & Standard Input:** Although `bun-types@1.4.4` (`shell.d.ts`) declares `get stdin(): WritableStream` on `ShellPromise`, `Bun 1.4.4` (`38afee6c8`) leaves `ShellPromise.prototype.stdin === undefined` at runtime (`tests/bun_shell_contract.test.ts`). Pipe JavaScript bytes or streams into subprocess stdin via `Bun.spawn` (`stdin: Uint8Array | Blob | ReadableStream | "pipe"` with `FileSink` `proc.stdin.write(...)` / `proc.stdin.end()`) or via `Bun.$` `ShellExpression` input redirection (`< ${Buffer | Uint8Array | Blob | Response | ReadableStream}`):
     ```typescript
-    // Option A: Passing Blob/Buffer directly to Bun.spawn stdin
-    const proc = Bun.spawn(cmd, { stdin: new Blob([payloadString]) });
+    // Option A: Argv-safe Bun.spawn with direct Blob/Uint8Array stdin (preferred for daemons/lib)
+    const proc = Bun.spawn(cmd, {
+      stdin: new TextEncoder().encode(payloadString),
+    });
 
-    // Option B: Using the WritableStream getter writer
-    const writer = proc.stdin.getWriter();
-    await writer.write(new TextEncoder().encode(payloadString));
-    await writer.close();
+    // Option B: Streaming chunks via Bun.spawn({ stdin: "pipe" }) FileSink
+    const streamed = Bun.spawn(cmd, { stdin: "pipe", stdout: "pipe" });
+    streamed.stdin.write(new TextEncoder().encode(payloadString));
+    await streamed.stdin.end();
+
+    // Option C: Tooling-only Bun.$ ShellExpression redirection (never < ${untaintedPathString})
+    const out = await Bun.$`cat < ${new Blob([payloadString])}`.text();
     ```
-    Bun Shell redirection also accepts `ReadableStream`, `Blob`, and `Response` objects as expressions (`$`cat < ${blob}``). Never pass arbitrary strings as shell file paths (`< ${fileList}`).
+    Never access `shellPromise.stdin`, and never pass unvalidated strings as shell file paths (`< ${fileList}`).
   - **Exit Code Handling:** In test suites, use `.nothrow()` and assert `result.exitCode`. In operational hooks, omit `.nothrow()` (or use `.throws(true)`) to fail immediately on non-zero exits.

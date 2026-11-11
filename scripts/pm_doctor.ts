@@ -119,8 +119,10 @@ async function globalConfigChecks(): Promise<Check[]> {
   checks.push(
     check(
       "frozen lockfile",
-      install.frozenLockfile === true,
-      `frozenLockfile = ${String(install.frozenLockfile)}`,
+      install.frozenLockfile !== true,
+      install.frozenLockfile === true
+        ? "frozenLockfile = true (remove from ~/.bunfig.toml; use CI --frozen-lockfile)"
+        : `frozenLockfile = ${String(install.frozenLockfile ?? "unset")}`,
     ),
     check(
       "isolated linker",
@@ -224,6 +226,9 @@ async function projectChecks(): Promise<Check[]> {
 
 async function overrideChecks(): Promise<Check[]> {
   const command = Bun.which("bun-deps");
+  const live = globalBunfigPath(Bun.env);
+  const globalInstall = live ? ((await readInstall(live)) ?? {}) : {};
+  const globalFrozen = globalInstall.frozenLockfile === true;
   const checks = [
     check(
       "bun-deps command",
@@ -232,9 +237,19 @@ async function overrideChecks(): Promise<Check[]> {
         "not on PATH: link ~/dotfiles/shell/bin/bun-deps into ~/.local/bin",
     ),
   ];
+  if (!globalFrozen) {
+    checks.push(
+      check(
+        "deps override",
+        true,
+        "not required (global frozenLockfile off)",
+      ),
+    );
+    return checks;
+  }
   if (!existsSync(UNFROZEN)) {
     checks.push(
-      check("deps override", false, `${UNFROZEN} missing: bun-deps fails`),
+      check("deps override", false, `${UNFROZEN} missing: bun-deps needs it`),
     );
     return checks;
   }

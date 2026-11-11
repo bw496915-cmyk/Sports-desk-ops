@@ -2,6 +2,7 @@ import { Text, View, type JSX } from "nsh";
 import { formatUsd } from "../desk_model";
 import type { DeskStore } from "../store";
 import {
+  Badge,
   createPanelReadyMotion,
   DeskExposurePlot,
   StateNotice,
@@ -40,10 +41,16 @@ export function ExposurePanel(props: { store: DeskStore }): JSX.Element {
                 >
                   <If when={props.store.activePlotPoint()}>
                     {(hov) => (
-                      <Surface variant="inset" class="gap-1">
-                        <Text class="text-xs font-semibold text-foreground">
-                          {hov().fullLabel}
-                        </Text>
+                      <Surface variant="inset" class="min-w-0 gap-1">
+                        <View class="min-w-0 flex-row flex-wrap items-center justify-between gap-2">
+                          <Text class="shrink text-xs font-semibold text-foreground truncate">
+                            {hov().fullLabel}
+                          </Text>
+                          <Badge
+                            label={`RANK #${hov().index + 1}`}
+                            tone="neutral"
+                          />
+                        </View>
                         <Text class="font-mono text-xs tabular-nums text-muted-foreground">
                           {`Exposure ${formatUsd(hov().riskUsd)} · conf ${hov().confidence}% · ${hov().verdict} · [${hov().provenanceText}]`}
                         </Text>
@@ -52,6 +59,7 @@ export function ExposurePanel(props: { store: DeskStore }): JSX.Element {
                   </If>
                   <DeskExposurePlot
                     points={props.store.plotPoints()}
+                    activePoint={props.store.activePlotPoint()}
                     formatUsd={formatUsd}
                     onHoverIndexChange={(idx) =>
                       props.store.setHoveredPlotIndex(idx)

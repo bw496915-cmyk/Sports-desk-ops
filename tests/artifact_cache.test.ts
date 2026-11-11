@@ -1,11 +1,13 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   cachedJsonFile,
   readFileBytes,
   resetArtifactCache,
+  statRegularFile,
 } from "../lib/artifact_cache.ts";
 
 /**
@@ -108,5 +110,29 @@ describe("readFileBytes", () => {
 
   test("an absent file is null", async () => {
     expect(await readFileBytes(join(dir, "nope.txt"))).toBeNull();
+  });
+
+  test("rejects symlinks, directories, and FIFOs via lstat + BunFile.stat()", async () => {
+    const realPath = join(dir, "real.json");
+    const symPath = join(dir, "link.json");
+    const subDir = join(dir, "subdir");
+    writeFileSync(realPath, JSON.stringify({ secret: 1 }));
+    symlinkSync(realPath, symPath);
+    mkdirSync(subDir, { recursive: true });
+
+    expect(await statRegularFile(symPath)).toBeNull();
+    expect(await readFileBytes(symPath)).toBeNull();
+    expect(await cachedJsonFile(symPath, (x) => x).read()).toBeNull();
+
+    expect(await statRegularFile(subDir)).toBeNull();
+    expect(await readFileBytes(subDir)).toBeNull();
+
+    const fifoPath = join(dir, "named.fifo");
+    if (spawnSync("mkfifo", [fifoPath]).status === 0) {
+      // Bun.file(fifo).exists() returns true on FIFOs; statRegularFile must reject without blocking.
+      expect(await Bun.file(fifoPath).exists()).toBe(true);
+      expect(await statRegularFile(fifoPath)).toBeNull();
+      expect(await readFileBytes(fifoPath)).toBeNull();
+    }
   });
 });

@@ -21,9 +21,9 @@ import {
   inspectHtmlFilters,
   parseBetTickerHtml,
   type HtmlBetTicket,
-} from "./html.ts";
-import { checkWagerOrdering } from "./analyze.ts";
-import { wagerStatusLabel } from "./enums.ts";
+} from "../lib/ticket_capture/html.ts";
+import { checkWagerOrdering } from "../lib/ticket_capture/analyze.ts";
+import { wagerStatusLabel } from "../lib/ticket_capture/enums.ts";
 import {
   activeFilterLabels,
   assessConfidence,
@@ -35,7 +35,7 @@ import {
   parseConfidenceArg,
   type CaptureInfo,
   type Confidence,
-} from "./info.ts";
+} from "../lib/ticket_capture/info.ts";
 
 export { toSafeJson } from "../lib/live_ticket_view.ts";
 import {
@@ -50,7 +50,7 @@ import {
   t,
   type LangArg,
   type UiTable,
-} from "./i18n.ts";
+} from "../lib/ticket_capture/i18n.ts";
 
 const DEFAULT_FILE = "data/live-wagers.json";
 
@@ -409,26 +409,27 @@ function sourceLine(
   }`;
 }
 
-let values: {
-  readonly file?: string;
-  readonly json?: boolean;
-  readonly list?: boolean;
-  readonly normalized?: boolean;
-  readonly analyze?: boolean;
-  readonly lang?: string;
-  readonly langCoverage?: boolean;
-  readonly htmlHeaderMap?: boolean;
+export interface TicketCliArgs {
+  readonly file: string;
+  readonly json: boolean;
+  readonly list: boolean;
+  readonly normalized: boolean;
+  readonly analyze: boolean;
+  readonly lang: LangArg;
+  readonly langCoverage: boolean;
+  readonly htmlHeaderMap: boolean;
   readonly fromHtml?: string | undefined;
   readonly uiTable?: string | undefined;
-  readonly currencyScale?: string | undefined;
-  readonly captureInfo?: boolean;
-  readonly requireConfidence?: string | undefined;
-  readonly help?: boolean;
-};
-let positionals: string[];
-try {
+  readonly currencyScale: number;
+  readonly captureInfo: boolean;
+  readonly requireConfidence?: Confidence | undefined;
+  readonly help: boolean;
+  readonly positionals: readonly string[];
+}
+
+export function parseTicketCliArgs(argv: readonly string[]): TicketCliArgs {
   const parsed = parseArgs({
-    args: Bun.argv.slice(2),
+    args: [...argv],
     options: {
       file: { type: "string", default: DEFAULT_FILE },
       json: { type: "boolean", default: false },
@@ -448,189 +449,398 @@ try {
     allowPositionals: true,
     strict: true,
   });
-  values = {
-    file: parsed.values.file,
-    json: parsed.values.json,
-    list: parsed.values.list,
-    normalized: parsed.values.normalized,
-    analyze: parsed.values.analyze,
-    lang: parsed.values.lang,
-    langCoverage: parsed.values["lang-coverage"],
-    htmlHeaderMap: parsed.values["html-header-map"],
+
+  if (parsed.values.help === true) {
+    return {
+      file: parsed.values.file ?? DEFAULT_FILE,
+      json: parsed.values.json ?? false,
+      list: parsed.values.list ?? false,
+      normalized: parsed.values.normalized ?? false,
+      analyze: parsed.values.analyze ?? false,
+      lang: "ENGLISH",
+      langCoverage: parsed.values["lang-coverage"] ?? false,
+      htmlHeaderMap: parsed.values["html-header-map"] ?? false,
+      fromHtml: parsed.values["from-html"],
+      uiTable: parsed.values["ui-table"],
+      currencyScale: 1,
+      captureInfo: parsed.values["capture-info"] ?? false,
+      requireConfidence: undefined,
+      help: true,
+      positionals: parsed.positionals,
+    };
+  }
+
+  if (parsed.values.normalized === true && parsed.values.json !== true) {
+    throw new Error("--normalized requires --json");
+  }
+
+  const lang = parseLangArg(parsed.values.lang ?? "ENGLISH");
+  if (lang === null) {
+    throw new Error(
+      `unknown --lang ${JSON.stringify(parsed.values.lang)}; expected ${languageList()} or keys`,
+    );
+  }
+
+  const currencyScale =
+    parsed.values["currency-scale"] === undefined
+      ? 1
+      : Number(parsed.values["currency-scale"]);
+  if (!Number.isFinite(currencyScale) || currencyScale <= 0) {
+    throw new Error("--currency-scale must be a positive number");
+  }
+
+  let requireConfidence: Confidence | undefined;
+  if (parsed.values["require-confidence"] !== undefined) {
+    const conf = parseConfidenceArg(parsed.values["require-confidence"]);
+    if (conf === null) {
+      throw new Error("--require-confidence: one of none|low|medium|high");
+    }
+    requireConfidence = conf;
+  }
+
+  return {
+    file: parsed.values.file ?? DEFAULT_FILE,
+    json: parsed.values.json ?? false,
+    list: parsed.values.list ?? false,
+    normalized: parsed.values.normalized ?? false,
+    analyze: parsed.values.analyze ?? false,
+    lang,
+    langCoverage: parsed.values["lang-coverage"] ?? false,
+    htmlHeaderMap: parsed.values["html-header-map"] ?? false,
     fromHtml: parsed.values["from-html"],
     uiTable: parsed.values["ui-table"],
-    currencyScale: parsed.values["currency-scale"],
-    captureInfo: parsed.values["capture-info"],
-    requireConfidence: parsed.values["require-confidence"],
-    help: parsed.values.help,
+    currencyScale,
+    captureInfo: parsed.values["capture-info"] ?? false,
+    requireConfidence,
+    help: false,
+    positionals: parsed.positionals,
   };
-  positionals = parsed.positionals;
-} catch (error) {
-  usage(error instanceof Error ? error.message : String(error));
 }
 
-if (values.help === true) {
-  console.log(HELP);
-  process.exit(0);
-}
-if (values.normalized === true && values.json !== true) {
-  usage("--normalized requires --json");
-}
-
-/*
- * i18n wiring. The table is the same one the Manager app renders from; `--ui-table` points at
- * a newer extraction, and every label below resolves through the shared fallback chain.
- */
-const langArg: LangArg =
-  parseLangArg(values.lang ?? "ENGLISH") ??
-  usage(
-    `unknown --lang ${JSON.stringify(values.lang)}; expected ${languageList()} or keys`,
-  );
-const japaneseNotice = japaneseFallbackNotice(langArg);
-if (japaneseNotice !== null) console.error(japaneseNotice);
-let uiTable: UiTable | undefined;
-if (values.uiTable !== undefined) {
+export async function runSportsdeskTicketCli(
+  argv: readonly string[] = Bun.argv.slice(2),
+): Promise<void> {
+  let values: TicketCliArgs;
   try {
-    uiTable = loadUiTable(values.uiTable);
+    values = parseTicketCliArgs(argv);
   } catch (error) {
-    fail(
-      `cannot read --ui-table ${values.uiTable}: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    usage(error instanceof Error ? error.message : String(error));
   }
-}
-/** Localize one canonical label; the literal is preserved for ENGLISH. */
-const L = (english: string): string => label(english, langArg, uiTable);
 
-const currencyScale =
-  values.currencyScale === undefined ? 1 : Number(values.currencyScale);
-if (!Number.isFinite(currencyScale) || currencyScale <= 0) {
-  usage("--currency-scale must be a positive number");
-}
-
-let requiredConfidence: Confidence | undefined;
-if (values.requireConfidence !== undefined) {
-  const parsed = parseConfidenceArg(values.requireConfidence);
-  if (parsed === null) {
-    usage("--require-confidence: one of none|low|medium|high");
+  if (values.help === true) {
+    console.log(HELP);
+    process.exit(0);
   }
-  requiredConfidence = parsed;
-}
 
-const LANG_COVERAGE_SAMPLE = 5;
-
-if (values.langCoverage === true) {
-  let table: UiTable;
-  try {
-    table = uiTable ?? loadUiTable();
-  } catch (error) {
-    fail(
-      `cannot read the ui table: ${error instanceof Error ? error.message : String(error)}; pass --ui-table <path>`,
-    );
-  }
-  const result = coverage(table);
-  const rows = LANG_LIST.map((lang) => ({
-    Language: lang,
-    Present: result.byLang[lang].present,
-    Missing: result.byLang[lang].missing,
-    "Sample missing": result.byLang[lang].missingKeys
-      .slice(0, LANG_COVERAGE_SAMPLE)
-      .join(", "),
-  }));
-  console.log(
-    [
-      `UI language coverage · ${result.totalKeys.toLocaleString("en-US")} keys`,
-      "",
-      Bun.inspect.table(rows, { colors: false }).trimEnd(),
-      result.unknownLanguageTags.length === 0
-        ? ""
-        : `note: unknown language tag(s) present in ui.json: ${result.unknownLanguageTags.join(", ")}`,
-    ]
-      .filter((line) => line !== "")
-      .join("\n"),
-  );
-  process.exit(0);
-}
-
-if (values.htmlHeaderMap === true) {
-  let keys: readonly string[];
-  if (values.fromHtml !== undefined) {
-    let html: string;
+  const positionals = values.positionals;
+  const langArg: LangArg = values.lang;
+  const japaneseNotice = japaneseFallbackNotice(langArg);
+  if (japaneseNotice !== null) console.error(japaneseNotice);
+  let uiTable: UiTable | undefined;
+  if (values.uiTable !== undefined) {
     try {
-      html = await Bun.file(values.fromHtml).text();
+      uiTable = loadUiTable(values.uiTable);
     } catch (error) {
       fail(
-        `cannot read --from-html ${values.fromHtml}: ${error instanceof Error ? error.message : String(error)}`,
+        `cannot read --ui-table ${values.uiTable}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-    const found: string[] = [];
-    for (const match of html.matchAll(/data-language="(L-[0-9]+)"/g)) {
-      const key = match[1];
-      if (key !== undefined && !found.includes(key)) found.push(key);
-    }
-    if (found.length === 0) {
+  }
+  /** Localize one canonical label; the literal is preserved for ENGLISH. */
+  const L = (english: string): string => label(english, langArg, uiTable);
+  const currencyScale = values.currencyScale;
+  const requiredConfidence: Confidence | undefined = values.requireConfidence;
+
+  const LANG_COVERAGE_SAMPLE = 5;
+
+  if (values.langCoverage === true) {
+    let table: UiTable;
+    try {
+      table = uiTable ?? loadUiTable();
+    } catch (error) {
       fail(
-        `${values.fromHtml}: no data-language="L-..." attributes found; is this a Manager capture?`,
+        `cannot read the ui table: ${error instanceof Error ? error.message : String(error)}; pass --ui-table <path>`,
       );
     }
-    keys = found;
-  } else {
-    keys = HTML_HEADER_KEYS;
+    const result = coverage(table);
+    const rows = LANG_LIST.map((lang) => ({
+      Language: lang,
+      Present: result.byLang[lang].present,
+      Missing: result.byLang[lang].missing,
+      "Sample missing": result.byLang[lang].missingKeys
+        .slice(0, LANG_COVERAGE_SAMPLE)
+        .join(", "),
+    }));
+    console.log(
+      [
+        `UI language coverage · ${result.totalKeys.toLocaleString("en-US")} keys`,
+        "",
+        Bun.inspect.table(rows, { colors: false }).trimEnd(),
+        result.unknownLanguageTags.length === 0
+          ? ""
+          : `note: unknown language tag(s) present in ui.json: ${result.unknownLanguageTags.join(", ")}`,
+      ]
+        .filter((line) => line !== "")
+        .join("\n"),
+    );
+    process.exit(0);
   }
-  for (const key of keys) {
-    console.log(`${key}  ${labelOrKey(key, "ENGLISH", uiTable)}`);
-  }
-  process.exit(0);
-}
 
-const analyze = values.analyze === true;
-const listing = values.list === true;
-const captureInfo = values.captureInfo === true;
-if (analyze && listing) usage("--analyze and --list are mutually exclusive");
-if ((analyze || captureInfo) && positionals.length !== 0) {
-  usage(
-    captureInfo
-      ? "--capture-info takes no wager number"
-      : "--analyze takes no wager number",
-  );
-}
-
-let target: number | null = null;
-if (!analyze && !captureInfo) {
-  if (listing) {
-    if (positionals.length !== 0) usage("--list takes no wager number");
-  } else {
-    if (positionals.length !== 1) usage("expected exactly one wager number");
-    const rawWager = positionals[0]!.trim();
-    const parsed = Number(rawWager.replace(/^b/i, ""));
-    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-      usage(`invalid wager number ${JSON.stringify(rawWager)}`);
+  if (values.htmlHeaderMap === true) {
+    let keys: readonly string[];
+    if (values.fromHtml !== undefined) {
+      let html: string;
+      try {
+        html = await Bun.file(values.fromHtml).text();
+      } catch (error) {
+        fail(
+          `cannot read --from-html ${values.fromHtml}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      const found: string[] = [];
+      for (const match of html.matchAll(/data-language="(L-[0-9]+)"/g)) {
+        const key = match[1];
+        if (key !== undefined && !found.includes(key)) found.push(key);
+      }
+      if (found.length === 0) {
+        fail(
+          `${values.fromHtml}: no data-language="L-..." attributes found; is this a Manager capture?`,
+        );
+      }
+      keys = found;
+    } else {
+      keys = HTML_HEADER_KEYS;
     }
-    target = parsed;
+    for (const key of keys) {
+      console.log(`${key}  ${labelOrKey(key, "ENGLISH", uiTable)}`);
+    }
+    process.exit(0);
   }
-}
 
-const file = values.file ?? DEFAULT_FILE;
-const handle = Bun.file(file);
-if (!(await handle.exists())) {
-  fail(`${file} not found; run bun run capture:bet-ticker or pass --file`);
-}
+  const analyze = values.analyze === true;
+  const listing = values.list === true;
+  const captureInfo = values.captureInfo === true;
+  if (analyze && listing) usage("--analyze and --list are mutually exclusive");
+  if ((analyze || captureInfo) && positionals.length !== 0) {
+    usage(
+      captureInfo
+        ? "--capture-info takes no wager number"
+        : "--analyze takes no wager number",
+    );
+  }
 
-const text = await handle.text();
-if (text.trimStart().startsWith("<")) {
-  const tickets = parseBetTickerHtml(text);
-  const provenance = { source: "html-capture", observedAt: null };
+  let target: number | null = null;
+  if (!analyze && !captureInfo) {
+    if (listing) {
+      if (positionals.length !== 0) usage("--list takes no wager number");
+    } else {
+      if (positionals.length !== 1) usage("expected exactly one wager number");
+      const rawWager = positionals[0]!.trim();
+      const parsed = Number(rawWager.replace(/^b/i, ""));
+      if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+        usage(`invalid wager number ${JSON.stringify(rawWager)}`);
+      }
+      target = parsed;
+    }
+  }
+
+  const file = values.file ?? DEFAULT_FILE;
+  const handle = Bun.file(file);
+  if (!(await handle.exists())) {
+    fail(`${file} not found; run bun run capture:bet-ticker or pass --file`);
+  }
+
+  const text = await handle.text();
+  if (text.trimStart().startsWith("<")) {
+    const tickets = parseBetTickerHtml(text);
+    const provenance = { source: "html-capture", observedAt: null };
+    const info: CaptureInfo = {
+      format: "html",
+      statusOk: null,
+      hasAmounts: false,
+      pace: inspectPace(text, htmlTimeSpanMs(tickets)),
+      phase: detectPhase(text),
+      htmlSort: detectHtmlSort(text),
+      filters: inspectHtmlFilters(text),
+      hasAccountInfo: null,
+    };
+    if (values.captureInfo === true) {
+      printCaptureInfo(file, info, tickets.length);
+      process.exit(0);
+    }
+    enforceConfidence(info, requiredConfidence, file);
+
+    if (analyze) {
+      const groups = new Map<
+        string,
+        { english: string; key: string; tickets: number; legs: number }
+      >();
+      for (const ticket of tickets) {
+        const structure = htmlStructure(ticket);
+        const groupKey =
+          structure.key === "" ? structure.english : structure.key;
+        const entry = groups.get(groupKey) ?? {
+          ...structure,
+          tickets: 0,
+          legs: 0,
+        };
+        entry.tickets += 1;
+        entry.legs += ticket.legs.length;
+        groups.set(groupKey, entry);
+      }
+      const rows = [...groups.values()]
+        .sort(
+          (a, b) => b.tickets - a.tickets || a.english.localeCompare(b.english),
+        )
+        .map((entry) => ({
+          Type:
+            langArg === "keys"
+              ? entry.key === ""
+                ? entry.english
+                : `${entry.key} ${entry.english}`
+              : structureLabel(entry, langArg, uiTable),
+          Tickets: entry.tickets,
+          Legs: entry.legs,
+        }));
+      const legs = tickets.reduce((sum, ticket) => sum + ticket.legs.length, 0);
+      console.log(
+        [
+          `Ticket structures · ${tickets.length} tickets · ${legs} legs`,
+          "",
+          Bun.inspect.table(rows, { colors: false }).trimEnd(),
+          sourceLine(provenance, langArg, uiTable),
+        ].join("\n"),
+      );
+      process.exit(0);
+    }
+
+    if (listing) {
+      const legs = tickets.reduce((sum, ticket) => sum + ticket.legs.length, 0);
+      if (values.json === true) {
+        console.log(
+          JSON.stringify(
+            {
+              tickets,
+              totals: { tickets: tickets.length, legs },
+              provenance,
+            },
+            null,
+            2,
+          ),
+        );
+        process.exit(0);
+      }
+      const rows =
+        langArg === "ENGLISH" || langArg === "JAPANESE"
+          ? tickets.map((ticket) => ({
+              ticket: ticket.wagerNumber,
+              type: ticket.ticketStructure,
+              live: ticket.live,
+              legs: ticket.legs.length,
+              stake: ticket.stake,
+            }))
+          : tickets.map((ticket) => {
+              const row: Record<string, unknown> = {};
+              row[L("Ticket")] = ticket.wagerNumber;
+              row[L("Type")] = ticket.ticketStructure;
+              row[L("Live")] = ticket.live;
+              row["Legs"] = ticket.legs.length;
+              row["Stake"] = ticket.stake;
+              return row;
+            });
+      console.log(
+        [
+          Bun.inspect.table(rows, { colors: false }).trimEnd(),
+          `${tickets.length} tickets · ${legs} legs`,
+          sourceLine(provenance, langArg, uiTable),
+        ].join("\n"),
+      );
+      process.exit(0);
+    }
+
+    if (target === null) fail("internal: missing wager number");
+    const ticket = tickets.find(
+      (candidate) => candidate.wagerNumber === String(target),
+    );
+    if (ticket === undefined) {
+      fail(`wager ${target} not found in ${file}`);
+    }
+    if (values.json === true) {
+      console.log(JSON.stringify(ticket, null, 2));
+      process.exit(0);
+    }
+    const typeLabel =
+      langArg === "ENGLISH" || langArg === "JAPANESE"
+        ? ticket.ticketStructure
+        : label(ticket.ticketStructure, langArg, uiTable);
+    const lines = [
+      `${L("Ticket")} ${ticket.wagerNumber} · ${ticket.source} · ${typeLabel} · ${ticket.live ? L("Live") : "Pregame"}`,
+      `${L("Stake")} — · ${L("To Win")} —`,
+      ticket.legs.length === 0 ? "Legs: —" : "Legs:",
+      ...ticket.legs.map((leg, index) => {
+        const parts = [
+          leg.sport,
+          leg.eventName,
+          leg.period,
+          leg.market,
+          `${leg.selection}${leg.price === null ? "" : ` ${leg.price}`}`,
+        ]
+          .map((part) => part.trim())
+          .filter((part) => part !== "");
+        return `  ${index + 1}. ${parts.join(" · ")}${leg.live ? " · LIVE" : ""}`;
+      }),
+      `${L("Source")}: ${ticket.source}`,
+    ];
+    console.log(lines.join("\n"));
+    process.exit(0);
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text);
+  } catch (error) {
+    fail(
+      `${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const artifact = readWagerListArtifact(payload);
+  const meta = {
+    file,
+    source: artifact.provenance.source,
+    capturedAt: artifact.provenance.observedAt,
+  };
+
+  const rawStatus =
+    typeof payload === "object" && payload !== null && "status" in payload
+      ? (payload as { status?: unknown }).status
+      : undefined;
+  const statusOk =
+    rawStatus === undefined ? null : rawStatus === 1 || rawStatus === true;
+  const hasAmounts = artifact.wagers.some(
+    (wager) => wager.amountWagered > 0 || wager.toWinAmount > 0,
+  );
+  const accountInfo =
+    typeof payload === "object" && payload !== null
+      ? (payload as { accountInfo?: unknown }).accountInfo
+      : undefined;
+  const hasAccountInfo =
+    typeof accountInfo === "object" && accountInfo !== null;
+  const ordering = checkWagerOrdering(
+    artifact.wagers.map((wager) => ({
+      wagerNumber: String(wager.wagerNumber),
+      insertedAt: wager.insertedAt,
+    })),
+  );
   const info: CaptureInfo = {
-    format: "html",
-    statusOk: null,
-    hasAmounts: false,
-    pace: inspectPace(text, htmlTimeSpanMs(tickets)),
-    phase: detectPhase(text),
-    htmlSort: detectHtmlSort(text),
-    filters: inspectHtmlFilters(text),
-    hasAccountInfo: null,
+    format: "json",
+    statusOk,
+    hasAmounts,
+    hasAccountInfo,
+    ordering,
   };
   if (values.captureInfo === true) {
-    printCaptureInfo(file, info, tickets.length);
+    printCaptureInfo(file, info, artifact.wagers.length);
     process.exit(0);
   }
   enforceConfidence(info, requiredConfidence, file);
@@ -640,17 +850,16 @@ if (text.trimStart().startsWith("<")) {
       string,
       { english: string; key: string; tickets: number; legs: number }
     >();
-    for (const ticket of tickets) {
-      const structure = htmlStructure(ticket);
-      const groupKey = structure.key === "" ? structure.english : structure.key;
-      const entry = groups.get(groupKey) ?? {
+    for (const candidate of artifact.wagers) {
+      const structure = ticketStructure(candidate);
+      const entry = groups.get(structure.key) ?? {
         ...structure,
         tickets: 0,
         legs: 0,
       };
       entry.tickets += 1;
-      entry.legs += ticket.legs.length;
-      groups.set(groupKey, entry);
+      entry.legs += candidate.legs.length;
+      groups.set(structure.key, entry);
     }
     const rows = [...groups.values()]
       .sort(
@@ -659,328 +868,166 @@ if (text.trimStart().startsWith("<")) {
       .map((entry) => ({
         Type:
           langArg === "keys"
-            ? entry.key === ""
-              ? entry.english
-              : `${entry.key} ${entry.english}`
+            ? `${entry.key} ${entry.english}`
             : structureLabel(entry, langArg, uiTable),
         Tickets: entry.tickets,
         Legs: entry.legs,
       }));
-    const legs = tickets.reduce((sum, ticket) => sum + ticket.legs.length, 0);
+    const analyzeLegs = artifact.wagers.reduce(
+      (sum, candidate) => sum + candidate.legs.length,
+      0,
+    );
     console.log(
       [
-        `Ticket structures · ${tickets.length} tickets · ${legs} legs`,
+        `Ticket structures · ${artifact.wagers.length} tickets · ${analyzeLegs} legs`,
         "",
         Bun.inspect.table(rows, { colors: false }).trimEnd(),
-        sourceLine(provenance, langArg, uiTable),
+        sourceLine(artifact.provenance, langArg, uiTable),
       ].join("\n"),
     );
     process.exit(0);
   }
 
   if (listing) {
-    const legs = tickets.reduce((sum, ticket) => sum + ticket.legs.length, 0);
     if (values.json === true) {
-      console.log(
-        JSON.stringify(
-          {
-            tickets,
-            totals: { tickets: tickets.length, legs },
-            provenance,
-          },
-          null,
-          2,
-        ),
-      );
+      if (values.normalized === true) {
+        const tickets = artifact.wagers.map((wager) =>
+          normalizedView(wager, meta, currencyScale),
+        );
+        const legs = tickets.reduce(
+          (total, ticket) => total + ticket.legs.length,
+          0,
+        );
+        console.log(
+          JSON.stringify(
+            {
+              tickets,
+              totals: { tickets: tickets.length, legs },
+              provenance: artifact.provenance,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        const tickets = artifact.wagers.map((candidate) =>
+          safeWagerView(candidate, currencyScale),
+        );
+        const legs = tickets.reduce(
+          (total, ticket) => total + ticket.legs.length,
+          0,
+        );
+        console.log(
+          JSON.stringify(
+            {
+              tickets,
+              totals: { tickets: tickets.length, legs },
+              provenance: artifact.provenance,
+            },
+            null,
+            2,
+          ),
+        );
+      }
       process.exit(0);
     }
-    const rows =
-      langArg === "ENGLISH" || langArg === "JAPANESE"
+
+    const tickets = artifact.wagers.map((candidate) =>
+      safeWagerView(candidate, currencyScale),
+    );
+    const legs = tickets.reduce(
+      (total, ticket) => total + ticket.legs.length,
+      0,
+    );
+    const tableRows =
+      langArg === "ENGLISH"
         ? tickets.map((ticket) => ({
             ticket: ticket.wagerNumber,
-            type: ticket.ticketStructure,
+            writer: ticket.writer,
+            type: ticket.wagerType,
             live: ticket.live,
             legs: ticket.legs.length,
-            stake: ticket.stake,
+            stake: ticket.amountWagered,
+            toWin: ticket.toWinAmount,
           }))
         : tickets.map((ticket) => {
             const row: Record<string, unknown> = {};
             row[L("Ticket")] = ticket.wagerNumber;
-            row[L("Type")] = ticket.ticketStructure;
+            row["Writer"] = ticket.writer;
+            row[L("Type")] = ticket.wagerType;
             row[L("Live")] = ticket.live;
             row["Legs"] = ticket.legs.length;
-            row["Stake"] = ticket.stake;
+            row["Stake"] = ticket.amountWagered;
+            row[L("To Win")] = ticket.toWinAmount;
             return row;
           });
+    const table = Bun.inspect.table(tableRows, { colors: false });
+    const average = tickets.length === 0 ? 0 : legs / tickets.length;
     console.log(
       [
-        Bun.inspect.table(rows, { colors: false }).trimEnd(),
-        `${tickets.length} tickets · ${legs} legs`,
-        sourceLine(provenance, langArg, uiTable),
+        table.trimEnd(),
+        `${tickets.length} tickets · ${legs} legs · avg ${average.toFixed(2)} legs/ticket`,
+        sourceLine(artifact.provenance, langArg, uiTable),
       ].join("\n"),
     );
     process.exit(0);
   }
 
   if (target === null) fail("internal: missing wager number");
-  const ticket = tickets.find(
-    (candidate) => candidate.wagerNumber === String(target),
+  const wager = artifact.wagers.find(
+    (candidate) => candidate.wagerNumber === target,
   );
-  if (ticket === undefined) {
+  if (wager === undefined) {
     fail(`wager ${target} not found in ${file}`);
   }
+
+  const view = safeWagerView(wager, currencyScale);
+
   if (values.json === true) {
-    console.log(JSON.stringify(ticket, null, 2));
+    console.log(
+      JSON.stringify(
+        values.normalized === true
+          ? normalizedView(wager, meta, currencyScale)
+          : { wager: view, provenance: artifact.provenance },
+        null,
+        2,
+      ),
+    );
     process.exit(0);
   }
-  const typeLabel =
-    langArg === "ENGLISH" || langArg === "JAPANESE"
-      ? ticket.ticketStructure
-      : label(ticket.ticketStructure, langArg, uiTable);
+
+  const localized = langArg !== "ENGLISH" && langArg !== "JAPANESE";
+  const typeLabel = structureLabel(ticketStructure(wager), langArg, uiTable);
+  const liveLabel = localized
+    ? view.live
+      ? label("Live", langArg, uiTable)
+      : "Pregame"
+    : view.live
+      ? "live"
+      : "pregame";
+  const statusCode = view.wagerStatus.code;
+  const statusLine =
+    statusCode === null
+      ? []
+      : [`${L("Status")}: ${wagerStatusLabel(statusCode, langArg, uiTable)}`];
   const lines = [
-    `${L("Ticket")} ${ticket.wagerNumber} · ${ticket.source} · ${typeLabel} · ${ticket.live ? L("Live") : "Pregame"}`,
-    `${L("Stake")} — · ${L("To Win")} —`,
-    ticket.legs.length === 0 ? "Legs: —" : "Legs:",
-    ...ticket.legs.map((leg, index) => {
-      const parts = [
-        leg.sport,
-        leg.eventName,
-        leg.period,
-        leg.market,
-        `${leg.selection}${leg.price === null ? "" : ` ${leg.price}`}`,
-      ]
+    `${localized ? L("Ticket") : "Ticket"} ${wager.wagerNumber} · ${view.ticketWriter || view.writer.toUpperCase()} · ${typeLabel} (${view.wagerType}) · ${liveLabel}${view.vip ? " · VIP" : ""}`,
+    ...statusLine,
+    localized
+      ? `${L("Stake")} ${money.format(view.amountWagered)} · ${L("To Win")} ${money.format(view.toWinAmount)}${view.volumeDiffers ? ` · Volume ${money.format(view.volumeAmount)}` : ""}`
+      : `Stake ${money.format(view.amountWagered)} · To win ${money.format(view.toWinAmount)}${view.volumeDiffers ? ` · Volume ${money.format(view.volumeAmount)}` : ""}`,
+    view.legs.length === 0 ? "Legs: —" : "Legs:",
+    ...view.legs.map((leg, index) => {
+      const parts = [leg.sport, leg.game, leg.period, leg.market, leg.pick]
         .map((part) => part.trim())
         .filter((part) => part !== "");
       return `  ${index + 1}. ${parts.join(" · ")}${leg.live ? " · LIVE" : ""}`;
     }),
-    `${L("Source")}: ${ticket.source}`,
+    sourceLine(artifact.provenance, langArg, uiTable),
   ];
   console.log(lines.join("\n"));
-  process.exit(0);
 }
 
-let payload: unknown;
-try {
-  payload = JSON.parse(text);
-} catch (error) {
-  fail(
-    `${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-  );
+if (import.meta.main) {
+  await runSportsdeskTicketCli();
 }
-
-const artifact = readWagerListArtifact(payload);
-const meta = {
-  file,
-  source: artifact.provenance.source,
-  capturedAt: artifact.provenance.observedAt,
-};
-
-const rawStatus =
-  typeof payload === "object" && payload !== null && "status" in payload
-    ? (payload as { status?: unknown }).status
-    : undefined;
-const statusOk =
-  rawStatus === undefined ? null : rawStatus === 1 || rawStatus === true;
-const hasAmounts = artifact.wagers.some(
-  (wager) => wager.amountWagered > 0 || wager.toWinAmount > 0,
-);
-const accountInfo =
-  typeof payload === "object" && payload !== null
-    ? (payload as { accountInfo?: unknown }).accountInfo
-    : undefined;
-const hasAccountInfo = typeof accountInfo === "object" && accountInfo !== null;
-const ordering = checkWagerOrdering(
-  artifact.wagers.map((wager) => ({
-    wagerNumber: String(wager.wagerNumber),
-    insertedAt: wager.insertedAt,
-  })),
-);
-const info: CaptureInfo = {
-  format: "json",
-  statusOk,
-  hasAmounts,
-  hasAccountInfo,
-  ordering,
-};
-if (values.captureInfo === true) {
-  printCaptureInfo(file, info, artifact.wagers.length);
-  process.exit(0);
-}
-enforceConfidence(info, requiredConfidence, file);
-
-if (analyze) {
-  const groups = new Map<
-    string,
-    { english: string; key: string; tickets: number; legs: number }
-  >();
-  for (const candidate of artifact.wagers) {
-    const structure = ticketStructure(candidate);
-    const entry = groups.get(structure.key) ?? {
-      ...structure,
-      tickets: 0,
-      legs: 0,
-    };
-    entry.tickets += 1;
-    entry.legs += candidate.legs.length;
-    groups.set(structure.key, entry);
-  }
-  const rows = [...groups.values()]
-    .sort((a, b) => b.tickets - a.tickets || a.english.localeCompare(b.english))
-    .map((entry) => ({
-      Type:
-        langArg === "keys"
-          ? `${entry.key} ${entry.english}`
-          : structureLabel(entry, langArg, uiTable),
-      Tickets: entry.tickets,
-      Legs: entry.legs,
-    }));
-  const analyzeLegs = artifact.wagers.reduce(
-    (sum, candidate) => sum + candidate.legs.length,
-    0,
-  );
-  console.log(
-    [
-      `Ticket structures · ${artifact.wagers.length} tickets · ${analyzeLegs} legs`,
-      "",
-      Bun.inspect.table(rows, { colors: false }).trimEnd(),
-      sourceLine(artifact.provenance, langArg, uiTable),
-    ].join("\n"),
-  );
-  process.exit(0);
-}
-
-if (listing) {
-  if (values.json === true) {
-    if (values.normalized === true) {
-      const tickets = artifact.wagers.map((wager) =>
-        normalizedView(wager, meta, currencyScale),
-      );
-      const legs = tickets.reduce(
-        (total, ticket) => total + ticket.legs.length,
-        0,
-      );
-      console.log(
-        JSON.stringify(
-          {
-            tickets,
-            totals: { tickets: tickets.length, legs },
-            provenance: artifact.provenance,
-          },
-          null,
-          2,
-        ),
-      );
-    } else {
-      const tickets = artifact.wagers.map((candidate) =>
-        safeWagerView(candidate, currencyScale),
-      );
-      const legs = tickets.reduce(
-        (total, ticket) => total + ticket.legs.length,
-        0,
-      );
-      console.log(
-        JSON.stringify(
-          {
-            tickets,
-            totals: { tickets: tickets.length, legs },
-            provenance: artifact.provenance,
-          },
-          null,
-          2,
-        ),
-      );
-    }
-    process.exit(0);
-  }
-
-  const tickets = artifact.wagers.map((candidate) =>
-    safeWagerView(candidate, currencyScale),
-  );
-  const legs = tickets.reduce((total, ticket) => total + ticket.legs.length, 0);
-  const tableRows =
-    langArg === "ENGLISH"
-      ? tickets.map((ticket) => ({
-          ticket: ticket.wagerNumber,
-          writer: ticket.writer,
-          type: ticket.wagerType,
-          live: ticket.live,
-          legs: ticket.legs.length,
-          stake: ticket.amountWagered,
-          toWin: ticket.toWinAmount,
-        }))
-      : tickets.map((ticket) => {
-          const row: Record<string, unknown> = {};
-          row[L("Ticket")] = ticket.wagerNumber;
-          row["Writer"] = ticket.writer;
-          row[L("Type")] = ticket.wagerType;
-          row[L("Live")] = ticket.live;
-          row["Legs"] = ticket.legs.length;
-          row["Stake"] = ticket.amountWagered;
-          row[L("To Win")] = ticket.toWinAmount;
-          return row;
-        });
-  const table = Bun.inspect.table(tableRows, { colors: false });
-  const average = tickets.length === 0 ? 0 : legs / tickets.length;
-  console.log(
-    [
-      table.trimEnd(),
-      `${tickets.length} tickets · ${legs} legs · avg ${average.toFixed(2)} legs/ticket`,
-      sourceLine(artifact.provenance, langArg, uiTable),
-    ].join("\n"),
-  );
-  process.exit(0);
-}
-
-if (target === null) fail("internal: missing wager number");
-const wager = artifact.wagers.find(
-  (candidate) => candidate.wagerNumber === target,
-);
-if (wager === undefined) {
-  fail(`wager ${target} not found in ${file}`);
-}
-
-const view = safeWagerView(wager, currencyScale);
-
-if (values.json === true) {
-  console.log(
-    JSON.stringify(
-      values.normalized === true
-        ? normalizedView(wager, meta, currencyScale)
-        : { wager: view, provenance: artifact.provenance },
-      null,
-      2,
-    ),
-  );
-  process.exit(0);
-}
-
-const localized = langArg !== "ENGLISH" && langArg !== "JAPANESE";
-const typeLabel = structureLabel(ticketStructure(wager), langArg, uiTable);
-const liveLabel = localized
-  ? view.live
-    ? label("Live", langArg, uiTable)
-    : "Pregame"
-  : view.live
-    ? "live"
-    : "pregame";
-const statusCode = view.wagerStatus.code;
-const statusLine =
-  statusCode === null
-    ? []
-    : [`${L("Status")}: ${wagerStatusLabel(statusCode, langArg, uiTable)}`];
-const lines = [
-  `${localized ? L("Ticket") : "Ticket"} ${wager.wagerNumber} · ${view.ticketWriter || view.writer.toUpperCase()} · ${typeLabel} (${view.wagerType}) · ${liveLabel}${view.vip ? " · VIP" : ""}`,
-  ...statusLine,
-  localized
-    ? `${L("Stake")} ${money.format(view.amountWagered)} · ${L("To Win")} ${money.format(view.toWinAmount)}${view.volumeDiffers ? ` · Volume ${money.format(view.volumeAmount)}` : ""}`
-    : `Stake ${money.format(view.amountWagered)} · To win ${money.format(view.toWinAmount)}${view.volumeDiffers ? ` · Volume ${money.format(view.volumeAmount)}` : ""}`,
-  view.legs.length === 0 ? "Legs: —" : "Legs:",
-  ...view.legs.map((leg, index) => {
-    const parts = [leg.sport, leg.game, leg.period, leg.market, leg.pick]
-      .map((part) => part.trim())
-      .filter((part) => part !== "");
-    return `  ${index + 1}. ${parts.join(" · ")}${leg.live ? " · LIVE" : ""}`;
-  }),
-  sourceLine(artifact.provenance, langArg, uiTable),
-];
-console.log(lines.join("\n"));

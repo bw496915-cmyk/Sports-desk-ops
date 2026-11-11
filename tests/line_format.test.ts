@@ -5,7 +5,7 @@ import {
   formatSpread,
   formatTotal,
   formatTotalPart,
-} from "../cli/line.ts";
+} from "../lib/ticket_capture/line.ts";
 
 describe("line formatting", () => {
   test("formatSpread uses the chosen side, not the home side", () => {

@@ -1,27 +1,27 @@
 # Repository layout (root)
 
-The root holds **workspace metadata** only (`package.json`, `bun.lock`, `bunfig.toml`, `tsconfig.json`, `.npmrc`, `.oxlintrc*.json`, `dashboard.md`, and top-level docs). Executable CLIs, scripts, and SSOT live in subdirectories (`cli/`, `scripts/`, `bin/`, `packages/sportsdesk-ops/bin/`) and link into `node_modules/.bin/` for `bun x <cli>` execution.
+The root holds **workspace metadata** only (`package.json`, `bun.lock`, `bunfig.toml`, `tsconfig.json`, `.npmrc`, `dashboard.md`, and top-level docs). Executable CLIs, scripts, and SSOT live in subdirectories (`cli/`, `scripts/`, `bin/`, `packages/sportsdesk-ops/bin/`) and link into `node_modules/.bin/` for `bun x <cli>` execution.
 
-| Path            | Purpose                                                                                    |
-| --------------- | ------------------------------------------------------------------------------------------ |
-| `cli/`          | All `sportsdesk_*_cli.ts` entrypoints ([cli/README.md](cli/README.md))                     |
-| `services/`     | Daemon, bot, R2, churn engine, ingestion ([services/README.md](services/README.md))        |
-| `catalog/`      | Fantasy402 sport navigation catalog ([catalog/README.md](catalog/README.md))               |
-| `design/`       | `tokens.toml` + generated `domain-branded-types.ts` ([design/README.md](design/README.md)) |
-| `lib/`          | Shared modules; token math in `lib/validation/`                                            |
-| `schema/`       | Migrations, local manifest, schema preload ([schema/README.md](schema/README.md))          |
-| `infra/`        | Pages `_headers` for docs deploy ([infra/README.md](infra/README.md))                      |
-| `types/`        | Ambient `env.d.ts` ([types/README.md](types/README.md))                                    |
-| `scripts/`      | Generators, Manager Tools fetchers, capture, audits; `scripts/deploy/` for VPS/docs        |
-| `reports/`      | Auditable surveillance outputs, Plane 3 ingestion JSONL, and docs-review artifacts         |
-| `static/`       | Token-compiled daemon HTML dashboards                                                      |
-| `docs/`         | Evidence portal; `docs/runbooks/`; `docs/provenance/`                                      |
-| `tests/`        | Bun test suites                                                                            |
-| `client/`       | Browser-side overlay seam preload (`security-seams.preload.js`)                            |
-| `config/`       | Wagers capture configuration (`wagers.json`, `wagers-capture.toml`)                        |
-| `packages/`     | Workspace packages (`sportsdesk-ops` CLI bin package, `nsh-desk`, `ba-example`)            |
-| `verification/` | TLA+/gate verification specs (e.g. the gen-tokens zero-drift gate)                         |
-| `bin/`          | Operator wrappers (`bin/dx`, `bin/wrangler`), image/XML/blob CLIs, and CI AST gates        |
+| Path            | Purpose                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| `cli/`          | All `sportsdesk_*_cli.ts` entrypoints ([cli/README.md](cli/README.md))                                |
+| `services/`     | Daemon, bot, R2, churn engine, ingestion ([services/README.md](services/README.md))                   |
+| `catalog/`      | Fantasy402 sport navigation catalog ([catalog/README.md](catalog/README.md))                          |
+| `design/`       | `tokens.toml` + generated `domain-branded-types.ts` ([design/README.md](design/README.md))            |
+| `lib/`          | Shared modules; ticket capture/rules/review in `lib/ticket_capture/`; token math in `lib/validation/` |
+| `schema/`       | Migrations, local manifest, schema preload ([schema/README.md](schema/README.md))                     |
+| `infra/`        | Pages `_headers` for docs deploy ([infra/README.md](infra/README.md))                                 |
+| `types/`        | Ambient `env.d.ts` ([types/README.md](types/README.md))                                               |
+| `scripts/`      | Generators, Manager Tools fetchers, capture, audits; `scripts/deploy/` for VPS/docs                   |
+| `reports/`      | Auditable surveillance outputs, Plane 3 ingestion JSONL, and docs-review artifacts                    |
+| `static/`       | Token-compiled daemon HTML dashboards                                                                 |
+| `docs/`         | Evidence portal; `docs/runbooks/`; `docs/provenance/`                                                 |
+| `tests/`        | Bun test suites                                                                                       |
+| `client/`       | Browser-side overlay seam preload (`security-seams.preload.js`)                                       |
+| `config/`       | Wagers capture configuration (`wagers.json`, `wagers-capture.toml`)                                   |
+| `packages/`     | Workspace packages (`sportsdesk-ops` CLI bin package, `nsh-desk`, `ba-example`)                       |
+| `verification/` | TLA+/gate verification specs (e.g. the gen-tokens zero-drift gate)                                    |
+| `bin/`          | Operator wrappers (`bin/dx`, `bin/wrangler`), image/XML/blob CLIs, and CI AST gates                   |
 
 **Harness plugins (`dsh-plugin*`).** Removable DeepSeek Harness bundles live at the root, each its own
 package with a `cordis.patch.yml` manifest and a dependency-free `verify-load.mjs` smoke harness so it

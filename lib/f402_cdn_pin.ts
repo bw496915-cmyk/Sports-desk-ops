@@ -3,7 +3,7 @@
  *
  * Detection, not prevention: this module fetches the bytes a document names, hashes them, and
  * compares against `verification/manager-boot-oracle/pinned/cdn-manifest.json`. Prevention —
- * `integrity=` — is enforced offline by `bin/check-innerhtml.ts` against the same manifest.
+ * `integrity=` — is enforced offline by `scripts/gates/check-innerhtml.ts` against the same manifest.
  *
  * The measurement point is the origin response, not the CDN's headers: `ETag`/`Last-Modified` are
  * written by a mutable origin and a heuristically cached copy can outlive a fix, so only the bytes

@@ -10,8 +10,8 @@ import {
   planReviews,
   recordFlagReview,
   recordReviewPlan,
-} from "../cli/review.ts";
-import { customerRefOf, type Anomaly } from "../cli/rules.ts";
+} from "../lib/ticket_capture/review.ts";
+import { customerRefOf, type Anomaly } from "../lib/ticket_capture/rules.ts";
 import { loadFraudPerception } from "../lib/fraud_logs.ts";
 import type {
   FraudBetRecord,

@@ -125,7 +125,7 @@ Detection for path #3, in the existing pin pattern:
 - `lib/f402_portal_drift_signal.ts` now includes the CDN assets, so `portal:drift:cron` /
   `portal:drift:cron --run-once` alerts on them; CI runs `pin:cdn` on the daily schedule, not on
   every PR, so vendor uptime cannot red ordinary builds.
-- `bin/check-innerhtml.ts` — offline gate on tracked HTML: every external script/stylesheet must be
+- `scripts/gates/check-innerhtml.ts` — offline gate on tracked HTML: every external script/stylesheet must be
   pinned, carry the manifest's `integrity=`, and declare `crossorigin="anonymous"`; a tag whose
   origin sends no ACAO must **not** carry `integrity=`. It caught the previously unpinned Scalar
   bundle in `docs/index.html`, which is now in the manifest (its committed SRI matched the live

@@ -12,7 +12,7 @@ not the full `main`-branch ratchet. Never run the entire test suite (`bun test` 
 on iterative edits — use **`bun run verify:fast`** instead:
 
 ```sh
-bun run verify:fast          # auto-formats changed files + runs typecheck (.ts+.tsx), scoped oxlint,
+bun run verify:fast          # auto-formats changed files + runs typecheck (.ts+.tsx), scoped bun lint,
                              # path-triggered gates, and test:changed (or test:shard on root config edits) in parallel
 bun run test:changed         # parallel changed-only tests
 bun run test:shard           # parallel head shard (1/8) when root configs (package.json/tsconfig.json) are dirty
@@ -42,9 +42,9 @@ bun run audit:ops
 bun run artifacts:lock
 bun run tasks:render --no-color --columns 0 >/dev/null && bun run docs:render
 bun run gen:tokens:gate
-bun bin/check-fetch-init.ts --verbose
-bun bin/check-innerhtml.ts --verbose
-bun bin/check-signal-honesty.ts --verbose
+bun scripts/gates/check-fetch-init.ts --verbose
+bun scripts/gates/check-innerhtml.ts --verbose
+bun scripts/gates/check-signal-honesty.ts --verbose
 CI=true bun run schema:gate
 bun run test:market-index                       # CI: Validate market index (REQUIRE_MARKET_INDEX=1)
 bun test tests/ --path-ignore-patterns='**/market_index.test.ts'
@@ -101,12 +101,13 @@ with `bun run audit:tool-calls`.
   It does NOT support `{ includePrerelease: true }`. The npm `semver` package in `devDependencies`
   is strictly required for `tests/market_index.test.ts` (Discover index verification) to match
   upstream Harness install behavior. Do not replace it with `Bun.semver`.
-- **Linting engine & Bun version gate:** In Bun 1.4.4, `bun lint` is NOT a native subcommand.
-  Setting `"lint": "bun lint"` causes infinite script recursion. All linting runs through `oxlint`
-  via `.oxlintrc.json` and `.oxlintrc.type-aware.json`. When migrating to native `bun lint` in
-  future Bun versions:
-  1. Pass explicit `-c .oxlintrc.type-aware.json` for type-aware checks (it is not auto-discovered).
-  2. Retain `oxlint` in `devDependencies` for editor LSP (`oxlint --lsp`), removing only `oxlint-tsgolint`.
+- **Native `bun lint`, `bun fmt`, and `bun check` flag contract (`bunfig.toml` & `docs/typecheck-desk.md`):**
+  Because `package.json` defines `"lint"`, bare `bun lint` runs that script unless `--no-script` is
+  supplied. Always pass explicit flags:
+  1. **Lint (`bunfig.toml [lint]`):** `bun lint --no-script --fix` (`bun run lint`) for safe autofixes;
+     `bun lint --no-script --deny-warnings` plus `bun lint --no-script --type-aware --deny-warnings` (`bun run lint:check`) for read-only CI gating.
+  2. **Format (`bunfig.toml [fmt]`):** `bun fmt` (`bun run format`), `bun fmt --check` (`bun run format:check`), and `bun fmt --check --changed="origin/<base>"` on PR diffs.
+  3. **Typecheck (`docs/typecheck-desk.md`):** Never define `scripts.check`; run `bun check --no-script -p tsconfig.json` and `bun check --no-script -p src/dashboard/tsconfig.json` (`bun run typecheck`), plus `bun check --aot` (`bun run typecheck:aot`) on canary Bun.
 - **Squash-merge branch audit invariant:** In PR squash-merge workflows, commit SHAs diverge from
   `main`. Do not rely on `git cherry` or `git branch --merged` alone; cross-reference PR titles via
   `gh pr list --state all` or merge-base file diffs. Before deleting branches checked out in auxiliary

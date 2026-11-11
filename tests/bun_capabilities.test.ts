@@ -606,7 +606,7 @@ describe("Bun capabilities used by the ops tooling", () => {
   });
 
   test("Bun.$ exposes the shell-tag with escape/braces helpers and the fluent API", async () => {
-    // bun.com/reference/globals/bun#bun.$: `Bun.$` is the shell-tag used by dev scripts.
+    // https://bun.com/reference/globals/bun/$: `Bun.$` is the shell-tag used by dev scripts.
     // The repo-wide rule, codified in lib/f402_credentials_policy.ts and in
     // docs/bun-upstream-reference.md "Bun.$ — argv-only for credentials", is:
     //
@@ -614,9 +614,9 @@ describe("Bun capabilities used by the ops tooling", () => {
     //   `Bun.spawn([argv…])` with an explicit minimal env allowlist. If a dev script legitimately
     //   needs shell semantics on a user-provided string, `Bun.$.escape(value)` quotes it safely.
     //
-    // This test proves the surface the one production use (tests/subprocess_deadlock.test.ts)
-    // and any future dev script depends on: the shell-tag itself, the two pure helpers, and the
-    // fluent env/.nothrow/.text pattern that is the only form approved for non-credential work.
+    // This test proves the surface dev scripts (`scripts/compute_dump_lag.ts`) and contract tests
+    // (`tests/bun_shell_contract.test.ts`) depend on: the shell-tag itself, the two pure helpers,
+    // and the fluent env/.nothrow/.text pattern approved for non-credential tooling work.
     expect(typeof Bun.$).toBe("function");
     expect(typeof Bun.$.escape).toBe("function");
     expect(typeof Bun.$.braces).toBe("function");

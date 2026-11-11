@@ -35,16 +35,16 @@ ignorePatterns = [
 # Install keys (linker, globalStore, cache.dir, frozenLockfile, minimumReleaseAge) are owned by the
 # machine config at ~/.bunfig.toml. Setting them here would override that SSOT, so they stay out.
 
-# Native Bun lint (Bun 1.5+). Bun 1.4.4 accepts but ignores this section; the enforced
-# gate is `bun run lint:check` (oxlint 1.90 + oxlint-tsgolint). Keep this block aligned
-# with .oxlintrc.json.
+# Native Bun lint (`bun lint --no-script`). Keep `--no-script` when `package.json` defines `"lint"`
+# so `bun lint` runs the built-in linter rather than recursing into `scripts.lint`.
 #
-# `typeAware` stays off deliberately: the full type-aware pass currently reports 605
-# warnings (166 no-floating-promises), and `bun check` has 11 unrelated errors.
+# Default `bun lint --no-script` runs fast AST rules (`--fix` for safe autofixes, `--deny-warnings` in CI).
+# Pass `--type-aware` explicitly (`bun lint --no-script --type-aware --deny-warnings`) for type-aware rules.
 [lint]
 ignorePatterns = [
   "**/node_modules/**",
   "verification/manager-boot-oracle/pinned/**",
+  "packages/nsh-desk/**",
   "scratch/**",
   "Scratch/**",
   "dist/**",
@@ -58,9 +58,9 @@ correctness = "warn"
 "@typescript-eslint/no-require-imports" = "error"
 "preserve-caught-error" = "warn"
 
-# Type-aware gate: mirror .oxlintrc.type-aware.json, whose correctness category is off and
-# whose eight rules are the only type-aware errors. `bun lint --type-aware` turns on Bun's
-# recommended type-aware set, so the rules this repo has not triaged are named explicitly.
+# Type-aware gate (`bun lint --no-script --type-aware --deny-warnings`): these eight rules are
+# enforced as errors, while noisy untriaged rules from Bun's recommended type-aware set are
+# explicitly turned off below until triaged.
 "typescript/no-array-delete" = "error"
 "typescript/no-duplicate-type-constituents" = "error"
 "typescript/no-for-in-array" = "error"

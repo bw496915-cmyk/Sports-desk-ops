@@ -35,7 +35,10 @@ import {
   type DashboardSnapshot,
 } from "../lib/dashboard_markdown.ts";
 import { normalizeTicket } from "../lib/live_ticket_view.ts";
-import { DETERMINISTIC_RULES, toRuleTicket } from "../cli/rules.ts";
+import {
+  DETERMINISTIC_RULES,
+  toRuleTicket,
+} from "../lib/ticket_capture/rules.ts";
 import {
   renderDashboardAnsi,
   renderDashboardHtml,

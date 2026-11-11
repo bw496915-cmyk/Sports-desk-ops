@@ -74,7 +74,7 @@ export interface BunShape {
 
 /**
  * Shapes the binary exposes that `bun-types` does not declare. Empty today: `bun-types@1.4.4`
- * declares all 86 shapes in `BUN_SHAPES` (including `CSRF`, `isStandaloneExecutable`, and
+ * declares every shape in `BUN_SHAPES` (including `CSRF`, `isStandaloneExecutable`, and
  * `sliceAnsi`). An entry here must name the source anchor that justifies it, or
  * `analyzeBunShapes` reports `runtime-only-without-source`; once `bun-types` adds a
  * declaration, `analyzeBunShapes` reports `stale-runtime-only` so stale claims cannot linger.
@@ -193,6 +193,20 @@ export function surfaceMembers(value: unknown): string[] {
 export const BUN_SHAPES: readonly BunShape[] = [
   // process & filesystem
   {
+    name: "BunFile",
+    kind: "type",
+    subsystem: "process",
+    heading: "Bun.BunFile (type)",
+    evidence: ["surface:file", "test:tests/blob_ingest.test.ts"],
+  },
+  {
+    name: "FileBlob",
+    kind: "type",
+    subsystem: "process",
+    heading: "Bun.FileBlob (type)",
+    evidence: ["surface:file", "test:tests/blob_ingest.test.ts"],
+  },
+  {
     name: "FileSink",
     kind: "type",
     subsystem: "process",
@@ -218,7 +232,14 @@ export const BUN_SHAPES: readonly BunShape[] = [
     kind: "value",
     subsystem: "process",
     heading: "Bun.$",
-    evidence: ["test:tests/bun_shapes_coverage.test.ts"],
+    evidence: [
+      "surface:$",
+      "surface:$.escape",
+      "surface:$.braces",
+      "probe:proc.shell",
+      "test:tests/bun_shell_contract.test.ts",
+      "test:tests/bun_capabilities.test.ts",
+    ],
   },
   {
     name: "file",

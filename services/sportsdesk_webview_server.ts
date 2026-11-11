@@ -60,7 +60,10 @@ import {
   type WagerListArtifact,
 } from "../lib/live_wagers.ts";
 import { normalizeTicket } from "../lib/live_ticket_view.ts";
-import { DETERMINISTIC_RULES, toRuleTicket } from "../cli/rules.ts";
+import {
+  DETERMINISTIC_RULES,
+  toRuleTicket,
+} from "../lib/ticket_capture/rules.ts";
 import {
   BOARD_WINDOWS,
   biggestSide,
@@ -293,23 +296,23 @@ async function fileResponse(
   contentType: string,
   headers: Record<string, string>,
 ): Promise<Response> {
-  // A client that accepts no encoding gets the file streamed by Bun, which keeps byte ranges and
-  // does no work in this process. Only the compressed path needs the bytes in memory.
+  // Direct path checks lstat + file.stat() so FIFOs and symlinks return 404.
   if (negotiateEncoding(req.headers.get("accept-encoding")) === null) {
-    const file = Bun.file(path);
-    if (!(await file.exists())) {
-      return Response.json(
-        {
-          success: false,
-          error: "Not Found",
-          pathname: new URL(req.url).pathname,
-        },
-        { status: 404, headers },
-      );
-    }
-    return new Response(file, {
-      headers: { ...headers, "Content-Type": contentType },
-    });
+    const direct = await regularFileDirectResponse(
+      req,
+      path,
+      contentType,
+      headers,
+    );
+    if (direct !== null) return direct;
+    return Response.json(
+      {
+        success: false,
+        error: "Not Found",
+        pathname: new URL(req.url).pathname,
+      },
+      { status: 404, headers },
+    );
   }
 
   const bytes = await readFileBytes(path);
@@ -1739,7 +1742,7 @@ export function startServer(options?: ServerOptions) {
         const mem = process.memoryUsage();
         const cpu = process.cpuUsage();
         const checks: Record<string, "ok" | "error"> = {};
-        let telegram: unknown = null;
+        let telegram: unknown;
         try {
           telegram = {
             status: await telegramService.getStatus(),
@@ -2803,7 +2806,7 @@ export function startServer(options?: ServerOptions) {
         }> = [];
         const byRule: Record<string, number> = {};
         for (const [rule, run] of Object.entries(DETERMINISTIC_RULES)) {
-          let hits: ReturnType<typeof run> = [];
+          let hits: ReturnType<typeof run>;
           try {
             hits = run(ruleTickets);
           } catch {
@@ -4228,7 +4231,7 @@ export async function getBridgeRelayStatus(
 ): Promise<BridgeRelayStatus> {
   const { resolveBlobApiToken, resolveBlobGatewayUrl } =
     await import("../lib/blob_upload.ts");
-  let gatewayHost: string | null = null;
+  let gatewayHost: string | null;
   try {
     gatewayHost = new URL(resolveBlobGatewayUrl()).host;
   } catch {
@@ -4387,7 +4390,7 @@ async function serveContainedAsset(
 ): Promise<Response> {
   const file = Bun.file(contained);
   const stat = await file.stat().catch(() => null);
-  if (stat === null) {
+  if (stat === null || !stat.isFile()) {
     return new Response("not found", { status: 404, headers: cors });
   }
 
@@ -4404,7 +4407,7 @@ async function serveContainedAsset(
     const siblingPath = contained.replace(/\.(?:png|jpe?g)$/i, ".webp");
     const siblingFile = Bun.file(siblingPath);
     const siblingStat = await siblingFile.stat().catch(() => null);
-    if (siblingStat !== null) {
+    if (siblingStat !== null && siblingStat.isFile()) {
       const sibEtag = `"${siblingStat.mtimeMs}-${siblingStat.size}"`;
       const headers: Record<string, string> = {
         ...cors,
@@ -4549,4 +4552,29 @@ function respondLiveBetsV2(
     produce: () => new TextEncoder().encode(JSON.stringify(resolved)),
     headers,
   });
+}
+
+/**
+ * Unencoded static file helper gated by `statRegularFile` (`lstat` + `BunFile.stat()`),
+ * kept at EOF so line citations pinned in `docs/evidence/` do not shift.
+ */
+export async function regularFileDirectResponse(
+  req: Request,
+  path: string,
+  contentType: string,
+  headers: Record<string, string>,
+): Promise<Response | null> {
+  const { statRegularFile } = await import("../lib/artifact_cache.ts");
+  const entry = await statRegularFile(path);
+  if (entry === null) return null;
+  const etag = `W/"${entry.stat.size.toString(16)}-${Math.trunc(entry.stat.mtimeMs).toString(16)}"`;
+  const responseHeaders: Record<string, string> = {
+    ...headers,
+    "Content-Type": contentType,
+    ETag: etag,
+  };
+  if (req.headers.get("if-none-match") === etag) {
+    return new Response(null, { status: 304, headers: responseHeaders });
+  }
+  return new Response(entry.file, { headers: responseHeaders });
 }

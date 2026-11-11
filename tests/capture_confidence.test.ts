@@ -5,8 +5,8 @@ import {
   assessConfidence,
   confidenceReason,
   inspectPace,
-} from "../cli/info.ts";
-import { parseArgs } from "../cli/main.ts";
+} from "../lib/ticket_capture/info.ts";
+import { parseTicketCliArgs as parseArgs } from "../cli/sportsdesk_ticket_cli.ts";
 
 const HTML_FIXTURE = join(import.meta.dir, "fixtures/bet-ticker.html");
 

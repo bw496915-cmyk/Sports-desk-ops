@@ -88,9 +88,9 @@ export class ComboVenueStore {
 
   countLegRows(): number {
     const row = this.db.query(`SELECT COUNT(*) AS n FROM combo_legs`).get() as {
-      n: number;
+      n: number | bigint;
     };
-    return row.n;
+    return Number(row.n);
   }
 }
 

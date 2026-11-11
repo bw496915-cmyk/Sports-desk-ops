@@ -24,7 +24,7 @@ function writeToken(content: string): string {
 
 /**
  * Builds a JWT-shaped value at runtime. The segments are assembled so the source never carries a
- * contiguous three-segment token (bin/check-secrets.ts scans for that shape).
+ * contiguous three-segment token (scripts/gates/check-secrets.ts scans for that shape).
  */
 function jwt(
   segments: readonly string[] = ["eyJ", "a".repeat(10), "b".repeat(10)],

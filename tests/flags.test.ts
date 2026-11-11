@@ -12,7 +12,7 @@ import {
   velocityCustomer,
   velocityMarket,
   type RuleTicket,
-} from "../cli/rules.ts";
+} from "../lib/ticket_capture/rules.ts";
 import type { NormalizedTicketLeg } from "../lib/live_ticket_view.ts";
 
 function leg(

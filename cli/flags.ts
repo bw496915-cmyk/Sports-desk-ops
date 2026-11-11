@@ -10,7 +10,7 @@
 import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { loadCapture, type HtmlBetTicket } from "./html.ts";
+import { loadCapture, type HtmlBetTicket } from "../lib/ticket_capture/html.ts";
 import {
   DETERMINISTIC_RULES,
   normalizeEventName,
@@ -18,7 +18,7 @@ import {
   type Anomaly,
   type RuleName,
   type RuleTicket,
-} from "./rules.ts";
+} from "../lib/ticket_capture/rules.ts";
 import {
   normalizeTicket,
   toSafeJson,
@@ -48,7 +48,7 @@ import {
   type ReviewProgress,
   type ReviewRunSummary,
   type ReviewVerdict,
-} from "./review.ts";
+} from "../lib/ticket_capture/review.ts";
 
 const DEFAULT_FILE = "data/live-wagers.json";
 

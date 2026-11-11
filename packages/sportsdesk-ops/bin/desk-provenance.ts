@@ -1,1 +1,0 @@
-../../../bin/desk-provenance.ts

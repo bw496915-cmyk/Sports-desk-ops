@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { detectHtmlSort } from "../cli/info.ts";
+import { detectHtmlSort } from "../lib/ticket_capture/info.ts";
 
 describe("HTML table sort detection", () => {
   test("aria-sort marks client order", () => {

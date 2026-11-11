@@ -316,7 +316,7 @@ node --check dsh-plugin-watchlist-autobet/client.js
 node Scratch/watchlist-autobet/http-harness.mjs      # Lead harness (Scratch is gitignored)
 ```
 
-The Client half passes `node --check`, `bun fmt --check`, oxlint and the repo's fetch/innerHTML
+The Client half passes `node --check`, `bun fmt --check`, `bun lint` and the repo's fetch/innerHTML
 scanners, plus a fake-loader/render harness covering both slot registrations, en/zh dictionary
 agreement, the Queue/Signals/Accounts tabs, the operator-name gate (approve, signals-enqueue and
 account add/remove refuse without sending any mutation), the POST wire format (`confirm: true` +

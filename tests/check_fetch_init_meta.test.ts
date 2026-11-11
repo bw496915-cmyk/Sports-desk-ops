@@ -5,7 +5,7 @@ import path from "node:path";
 
 /**
  * Gate Integrity Meta-Test:
- * Verifies that bin/check-fetch-init.ts actually fails when violations are introduced.
+ * Verifies that scripts/gates/check-fetch-init.ts actually fails when violations are introduced.
  * Plants four deliberate violations:
  * 1. Lowercase HTTP method literal (`method: "post"`)
  * 2. BufferSource body without explicit Content-Type (`body: new Uint8Array([1, 2, 3])`)
@@ -14,7 +14,7 @@ import path from "node:path";
  */
 
 describe("check-fetch-init gate integrity meta-test", () => {
-  test("bin/check-fetch-init.ts detects all four violation classes and exits non-zero", async () => {
+  test("scripts/gates/check-fetch-init.ts detects all four violation classes and exits non-zero", async () => {
     // 1. Plant the violations in a non-test, non-doc path of a throwaway root
     const credUrl =
       "https://" + "adminUser:secretPass@" + "api.sportsdesk.internal/status";
@@ -53,7 +53,7 @@ export async function violateFetchInvariants() {
       const proc = Bun.spawn(
         [
           process.execPath,
-          path.join(import.meta.dir, "../bin/check-fetch-init.ts"),
+          path.join(import.meta.dir, "../scripts/gates/check-fetch-init.ts"),
           root,
         ],
         {
@@ -99,7 +99,7 @@ export async function violateFetchInvariants() {
       const proc = Bun.spawn(
         [
           process.execPath,
-          path.join(import.meta.dir, "../bin/check-fetch-init.ts"),
+          path.join(import.meta.dir, "../scripts/gates/check-fetch-init.ts"),
           root,
         ],
         {

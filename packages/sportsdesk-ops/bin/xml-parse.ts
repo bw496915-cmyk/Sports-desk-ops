@@ -1,1 +1,0 @@
-../../../bin/xml-parse.ts

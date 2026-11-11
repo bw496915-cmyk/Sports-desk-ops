@@ -113,8 +113,12 @@ import {
   readReviewRuns,
   type ReviewRunSummary,
   type StoredFlagReview,
-} from "./review.ts";
-import { DETERMINISTIC_RULES, customerRefOf, type RuleName } from "./rules.ts";
+} from "../lib/ticket_capture/review.ts";
+import {
+  DETERMINISTIC_RULES,
+  customerRefOf,
+  type RuleName,
+} from "../lib/ticket_capture/rules.ts";
 
 const EXIT_OK = 0;
 const EXIT_USAGE = 2;

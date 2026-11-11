@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   auditSliceBitsetFiles,
   auditSliceBitsetVirtualSource,
-} from "../bin/check-slice-bitsets.ts";
+} from "../scripts/gates/check-slice-bitsets.ts";
 import {
   evaluateHoldFloorFallbackSlo,
   getHoldFloorResolutionTelemetry,

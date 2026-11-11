@@ -32,6 +32,11 @@ import {
   type ComboEvent,
   type ComboPrice,
 } from "../lib/polymarket_combo.ts";
+import {
+  CANONICAL_COMBO_HELP_SECTION,
+  isCanonicalComboSubcommand,
+  runCanonicalComboSubcommand,
+} from "../lib/canonical_combo_cli.ts";
 
 const HELP = `Polymarket CFB combo helper
 
@@ -44,6 +49,8 @@ Usage:
   bun run scripts/polymarket_combo_cli.ts verify-subset [--all-legs-cfb] [--against <gate>] [--chain]
   bun run scripts/polymarket_combo_cli.ts verify-subset --wallet-file <path> [--strict-exit]
   bun run scripts/polymarket_combo_cli.ts backtest [--days 30] [--wallets 0x..] [--all-venues] [--json]
+
+${CANONICAL_COMBO_HELP_SECTION}
 
 Notes:
   • CFB markets come from Gamma series ${CFB_SERIES_ID}; legs are moneyline/spreads/totals.
@@ -182,6 +189,20 @@ export async function runPolymarketCombo(
   argv: readonly string[],
 ): Promise<void> {
   const args = [...argv];
+  const firstPositionalIdx = args.findIndex((arg) => !arg.startsWith("-"));
+  const firstPositional =
+    firstPositionalIdx >= 0 ? args[firstPositionalIdx] : undefined;
+  if (isCanonicalComboSubcommand(firstPositional)) {
+    const subArgs = [
+      ...args.slice(0, firstPositionalIdx),
+      ...args.slice(firstPositionalIdx + 1),
+    ];
+    process.exitCode = await runCanonicalComboSubcommand(
+      firstPositional,
+      subArgs,
+    );
+    return;
+  }
   if (args.includes("-h") || args.includes("--help") || args.length === 0) {
     console.log(HELP);
     return;

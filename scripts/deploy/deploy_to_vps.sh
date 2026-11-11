@@ -105,7 +105,7 @@ cp -f "${REPO_ROOT}/package.json" "${APP_DIR}/" 2>/dev/null || true
 cp -f "${REPO_ROOT}/bun.lock" "${REPO_ROOT}/.bun-version" "${APP_DIR}/"
 
 # Install exactly what bun.lock pins. `bun ci` is `bun install --frozen-lockfile` and fails when
-# package.json and bun.lock disagree; `--production` skips devDependencies (typescript, oxlint, ...).
+# package.json and bun.lock disagree; `--production` skips devDependencies (typescript, @types/*, ...).
 # No `|| true`: a failed install must stop the deploy, not leave a service that dies on `import "zod"`.
 # Native resolution is right here (the VPS installs for itself), so no --os/--cpu/--libc. The
 # workspace packages/ are not shipped; Bun notes the two missing ones and skips them.
