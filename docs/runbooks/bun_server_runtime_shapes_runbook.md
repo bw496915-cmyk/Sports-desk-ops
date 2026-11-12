@@ -639,7 +639,7 @@ await Bun.write("reports/audit_viewport.jpg", jpeg);
 > `TypeError` with code `ERR_INVALID_ARG_TYPE` (measured on Bun 1.4.4). Pass
 > `globalThis.console` to mirror page output to Bun's console, or a
 > `(type, ...args) => void` callback to receive each call yourself (this is what
-> `scripts/capture/webview.ts` and `scripts/audit_docs_webview_cron.ts` do).
+> `scripts/capture/webview.ts` and `scripts/audit_docs_portal.ts` do).
 
 > **WebP.** Raw `view.screenshot({ format: "webp" })` is Chrome-only — the WebKit backend
 > throws. The repo wrapper re-encodes: `scripts/capture/webview.ts`
