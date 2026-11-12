@@ -5,22 +5,25 @@
 
 export interface AlertHealthSnapshot {
   readonly status: string;
-  readonly [key: string]: unknown;
 }
 
-export interface DashboardHealthTrackerDeps {
+export interface DashboardHealthTrackerDeps<
+  TAlertMetrics extends AlertHealthSnapshot = AlertHealthSnapshot,
+> {
   readonly dbProbeMs?: number | undefined;
   readonly sweepMs?: number | undefined;
   readonly alertProbeMs?: number | undefined;
   readonly isDbConfigured: () => boolean;
   readonly probeDb: () => Promise<void>;
   readonly cleanupSessions: () => Promise<number>;
-  readonly getAlertMetrics: () => AlertHealthSnapshot;
+  readonly getAlertMetrics: () => TAlertMetrics;
   readonly getPort: () => number;
   readonly now?: (() => number) | undefined;
 }
 
-export interface DashboardHealthPayload extends Record<string, unknown> {
+export interface DashboardHealthPayload<
+  TAlertMetrics extends AlertHealthSnapshot = AlertHealthSnapshot,
+> {
   readonly status: "ok" | "warning" | "degraded";
   readonly service: "sportsdesk-dev-dashboard";
   readonly port: number;
@@ -28,25 +31,27 @@ export interface DashboardHealthPayload extends Record<string, unknown> {
   readonly uptimeSeconds: number;
   readonly db: string;
   readonly purgedSessions: number;
-  readonly alerts: AlertHealthSnapshot;
+  readonly alerts: TAlertMetrics;
   readonly timestamp: string;
 }
 
 /** Throttles DB connectivity checks, session cleanup, and alert queue metrics for `/health`. */
-export class DashboardHealthTracker {
+export class DashboardHealthTracker<
+  TAlertMetrics extends AlertHealthSnapshot = AlertHealthSnapshot,
+> {
   private readonly dbProbeMs: number;
   private readonly sweepMs: number;
   private readonly alertProbeMs: number;
-  private readonly deps: DashboardHealthTrackerDeps;
+  private readonly deps: DashboardHealthTrackerDeps<TAlertMetrics>;
   private readonly nowFn: () => number;
 
   private lastDbProbe = 0;
   private lastSweep = 0;
   private lastAlertProbe = 0;
   private cachedDbStatus = "unconfigured";
-  private cachedAlertMetrics: AlertHealthSnapshot;
+  private cachedAlertMetrics: TAlertMetrics;
 
-  constructor(deps: DashboardHealthTrackerDeps) {
+  constructor(deps: DashboardHealthTrackerDeps<TAlertMetrics>) {
     this.dbProbeMs = deps.dbProbeMs ?? 5_000;
     this.sweepMs = deps.sweepMs ?? 5 * 60_000;
     this.alertProbeMs = deps.alertProbeMs ?? 15_000;
@@ -55,7 +60,7 @@ export class DashboardHealthTracker {
     this.cachedAlertMetrics = deps.getAlertMetrics();
   }
 
-  async sample(): Promise<DashboardHealthPayload> {
+  async sample(): Promise<DashboardHealthPayload<TAlertMetrics>> {
     const now = this.nowFn();
     let purgedSessions = 0;
 

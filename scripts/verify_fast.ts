@@ -164,6 +164,16 @@ export function planTypecheckTasks(
   while (queue.length > 0) {
     const current = queue.shift()!;
     for (const dep of downstream.get(current) ?? []) {
+      // Isolated backend/api edits keep sub-100ms scoping by checking workspace
+      // boundaries without dragging root tsconfig.json into every inner-loop save;
+      // contracts/sportsdesk-ops edits still propagate into root.
+      if (
+        dep === "" &&
+        current !== "packages/contracts" &&
+        current !== "packages/sportsdesk-ops"
+      ) {
+        continue;
+      }
       if (!closure.has(dep)) {
         closure.add(dep);
         queue.push(dep);
@@ -238,12 +248,24 @@ export function inferTestsForFiles(
       candidates.push("tests/nsh_desk_contract.test.ts");
     }
 
+    if (f.startsWith("packages/backend/")) {
+      candidates.push(
+        "tests/dashboard_backend_workspace.test.ts",
+        "tests/dashboard_api_inmemory.test.ts",
+      );
+    } else if (f.startsWith("packages/api/")) {
+      candidates.push("tests/dashboard_api_inmemory.test.ts");
+    }
+
     if (
       f.startsWith("packages/ui/") ||
       f.startsWith("packages/contracts/") ||
       f.startsWith("src/dashboard/") ||
       f.startsWith("src/risk/")
     ) {
+      if (f.startsWith("packages/ui/src/")) {
+        candidates.push("tests/dashboard_ui_panels.test.tsx");
+      }
       if (stem === "ansi") {
         candidates.push("tests/dashboard_build_and_markdown.test.ts");
       } else if (stem === "wager_tokens" || stem === "runtime_flags") {

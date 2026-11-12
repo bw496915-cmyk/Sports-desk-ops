@@ -9,6 +9,8 @@ const REPO_EDGES: readonly WorkspaceEdgeRef[] = [
   { fromDir: "", toDir: "packages/sportsdesk-ops" },
   { fromDir: "", toDir: "packages/contracts" },
   { fromDir: "", toDir: "packages/ui" },
+  { fromDir: "", toDir: "packages/backend" },
+  { fromDir: "", toDir: "packages/api" },
   { fromDir: "packages/ui", toDir: "packages/contracts" },
   { fromDir: "packages/backend", toDir: "packages/contracts" },
   { fromDir: "packages/api", toDir: "packages/backend" },
@@ -107,6 +109,9 @@ describe("verify_fast workspace scoping", () => {
     ).toContain("tests/slice_metrics.test.ts");
     expect(inferTestsForFiles(["packages/ui/package.json"])).toContain(
       "tests/workspace_packs.test.ts",
+    );
+    expect(inferTestsForFiles(["packages/backend/src/wagers.ts"])).toContain(
+      "tests/dashboard_backend_workspace.test.ts",
     );
   });
 });

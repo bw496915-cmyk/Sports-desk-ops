@@ -16,7 +16,7 @@ import {
   parseRepriceMode,
   parseRouterAuditMode,
   projectLiveWagerRow,
-} from "../packages/backend/src/index.ts";
+} from "@sportsdesk-ops/backend";
 
 const SCRATCH = mkdtempSync(path.join(tmpdir(), "sd-backend-ws-"));
 
@@ -155,7 +155,10 @@ describe("@sportsdesk-ops/backend workspace services", () => {
       JSON.stringify({ profiles: [{ customerId: "RF2003", tier: "REC" }] }),
     );
 
-    const { findCustomerRow } = createCustomerRowFinder({
+    const { findCustomerRow } = createCustomerRowFinder<{
+      customer_id?: string;
+      tier?: string;
+    }>({
       enrichedPaths: [enrichedPath],
       profilesPath,
     });

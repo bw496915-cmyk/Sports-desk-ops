@@ -6,9 +6,9 @@
 import { resolve } from "node:path";
 import { BoundedStampCache, statStamp } from "./cache.ts";
 
-export type GenericCustomerRow = Record<string, unknown> & {
+export interface GenericCustomerRow {
   readonly customer_id?: string | undefined;
-};
+}
 
 export interface CustomerRowFinderOptions {
   readonly cwd?: string | undefined;
