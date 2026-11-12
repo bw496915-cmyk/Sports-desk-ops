@@ -11,7 +11,11 @@
     "./ShadowPricingPanel": "./src/ShadowPricingPanel.tsx",
     "./SliceMetricsViews": "./src/SliceMetricsViews.tsx",
     "./ansi": "./src/ansi.tsx",
+    "./panels": "./src/panels/index.tsx",
     "./runtime-flags": "./src/runtime_flags.ts",
+    "./showcase-data": "./src/showcase_data.ts",
+    "./styles": "./src/dashboard_styles.ts",
+    "./types": "./src/types.ts",
     "./desk.css": "./src/desk.css",
     "./styles/tokens.css": "./src/styles/tokens.css",
     "./styles/reset.css": "./src/styles/reset.css"
