@@ -7,3 +7,4 @@ export * from "./slice_data_table.ts";
 export * from "./slice_diff_view.ts";
 export * from "./shadow_pricing.ts";
 export * from "./features.ts";
+export * from "./dashboard_hydration.ts";

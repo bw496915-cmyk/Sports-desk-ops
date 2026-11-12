@@ -4,6 +4,10 @@
  */
 
 import { resolve } from "node:path";
+import type {
+  CustomersCohortsSummary,
+  DashboardSourceProvenance,
+} from "@sportsdesk-ops/contracts";
 import { BoundedStampCache, statStamp } from "./cache.ts";
 
 export interface GenericCustomerRow {
@@ -107,19 +111,15 @@ export interface CustomersCohortInput {
   readonly fixtures: ReadonlyArray<Record<string, unknown>>;
   readonly keyNumberBuyerIds: Iterable<string>;
   readonly hookSyndicateIds: Iterable<string>;
+  readonly localBookRows?: ReadonlyArray<Record<string, unknown>> | undefined;
+  readonly provenance?: DashboardSourceProvenance | undefined;
 }
 
 export interface CustomersCohortPayload {
-  readonly cohorts: {
-    readonly backtestCount: number;
-    readonly keyNumberSharpsCount: number;
-    readonly hookSyndicateCount: number;
-    readonly fixtureCount: number;
-    readonly fullBookSpecCount: number;
-    readonly uniqueSurveillanceCount: number;
-  };
+  readonly cohorts: CustomersCohortsSummary;
   readonly backtestTop: ReadonlyArray<Record<string, unknown>>;
   readonly fixtures: ReadonlyArray<Record<string, unknown>>;
+  readonly provenance: DashboardSourceProvenance;
 }
 
 /** Dynamically compute surveillance cohort counts with zero hardcoded numbers. */
@@ -138,6 +138,12 @@ export function computeCustomersCohortPayload(
     const id = row.customer_id ?? row.customerId;
     if (id) uniqueSurveillanceIds.add(String(id).trim().toUpperCase());
   }
+  if (input.localBookRows) {
+    for (const row of input.localBookRows) {
+      const id = row.customer_id ?? row.customerId;
+      if (id) uniqueSurveillanceIds.add(String(id).trim().toUpperCase());
+    }
+  }
   for (const key of input.keyNumberBuyerIds) {
     const norm = key.trim().toUpperCase();
     if (norm) {
@@ -153,16 +159,46 @@ export function computeCustomersCohortPayload(
     }
   }
 
+  const nowIso = new Date().toISOString();
+  const hasLocalBook = Boolean(
+    input.localBookRows && input.localBookRows.length > 0,
+  );
+  const provenance: DashboardSourceProvenance =
+    input.provenance ??
+    (hasLocalBook
+      ? {
+          kind: "capture",
+          label: "Enriched Local Book + Backtest",
+          sourcePath: "enriched_customers_full.json",
+          observedAt: nowIso,
+        }
+      : input.backtestLeaderboard.length > 0 || input.fixtures.length > 0
+        ? {
+            kind: "fixture",
+            label: "Backtest & Synthetic Fixtures",
+            sourcePath: "tests/fixtures/backtest/enriched_customers_full.json",
+            observedAt: nowIso,
+          }
+        : {
+            kind: "unavailable",
+            label: "No Customer Corpora Found",
+            sourcePath: null,
+            observedAt: nowIso,
+          });
+
   return {
     cohorts: {
       backtestCount: input.backtestLeaderboard.length,
       keyNumberSharpsCount: keyNumberSet.size,
       hookSyndicateCount: hookSyndicateSet.size,
       fixtureCount: input.fixtures.length,
-      fullBookSpecCount: input.fixtures.length,
+      fullBookSpecCount: hasLocalBook
+        ? input.localBookRows!.length
+        : input.fixtures.length,
       uniqueSurveillanceCount: uniqueSurveillanceIds.size,
     },
     backtestTop: input.backtestLeaderboard.slice(0, 20),
     fixtures: input.fixtures,
+    provenance,
   };
 }

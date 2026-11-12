@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -126,6 +126,7 @@ describe("@sportsdesk-ops/backend workspace services", () => {
       JSON.stringify({ LIST: [{ CustomerID: "GP301", AmountWagered: 1200 }] }),
     );
     const loader = createDevLiveWagersLoader({
+      cwd: SCRATCH,
       candidatePaths: [wagerFile],
       loadSharpDeps: async () => deps,
     });
@@ -133,14 +134,38 @@ describe("@sportsdesk-ops/backend workspace services", () => {
     expect(payload.autoExecute).toBe(false);
     expect(payload.wagers.length).toBe(1);
     expect(payload.criticalSteamCount).toBe(1);
+    expect(payload.provenance.kind).toBe("capture");
+    expect(payload.provenance.sourcePath).toBe("live-wagers.json");
+    expect(payload.provenance.sourcePath).not.toContain(SCRATCH);
+
+    const fixtureDir = path.join(SCRATCH, "fixtures");
+    mkdirSync(fixtureDir, { recursive: true });
+    const fixtureWagerFile = path.join(fixtureDir, "live-wagers.partial.json");
+    writeFileSync(
+      fixtureWagerFile,
+      JSON.stringify({ LIST: [{ CustomerID: "REC9", AmountWagered: 200 }] }),
+    );
+    const fixtureLoader = createDevLiveWagersLoader({
+      cwd: SCRATCH,
+      candidatePaths: [fixtureWagerFile],
+      loadSharpDeps: async () => deps,
+    });
+    const fixturePayload = await fixtureLoader.buildLiveWagersPayload();
+    expect(fixturePayload.provenance.kind).toBe("fixture");
+    expect(fixturePayload.provenance.sourcePath).toBe(
+      "fixtures/live-wagers.partial.json",
+    );
 
     const emptyLoader = createDevLiveWagersLoader({
+      cwd: SCRATCH,
       candidatePaths: [path.join(SCRATCH, "does-not-exist.json")],
       loadSharpDeps: async () => deps,
     });
     const fallback = await emptyLoader.buildLiveWagersPayload();
     expect(fallback.autoExecute).toBe(false);
     expect(fallback.wagers.length).toBe(FALLBACK_DEV_WAGERS.length);
+    expect(fallback.provenance.kind).toBe("fallback");
+    expect(fallback.provenance.sourcePath).toBeNull();
   });
 
   test("createCustomerRowFinder & computeCustomersCohortPayload aggregate dynamically", async () => {
@@ -181,6 +206,29 @@ describe("@sportsdesk-ops/backend workspace services", () => {
       fullBookSpecCount: 2,
       uniqueSurveillanceCount: 5,
     });
+    expect(cohorts.provenance.kind).toBe("fixture");
+
+    const captureCohorts = computeCustomersCohortPayload({
+      backtestLeaderboard: [{ customer: "gp301" }],
+      fixtures: [{ customer_id: "FIX_1" }],
+      localBookRows: [{ customer_id: "GP301" }, { customer_id: "BOOK_ONLY_1" }],
+      keyNumberBuyerIds: ["GP301"],
+      hookSyndicateIds: [],
+    });
+    expect(captureCohorts.cohorts.fullBookSpecCount).toBe(2);
+    expect(captureCohorts.cohorts.uniqueSurveillanceCount).toBe(3);
+    expect(captureCohorts.provenance.kind).toBe("capture");
+    expect(captureCohorts.provenance.sourcePath).toBe(
+      "enriched_customers_full.json",
+    );
+
+    const emptyCohorts = computeCustomersCohortPayload({
+      backtestLeaderboard: [],
+      fixtures: [],
+      keyNumberBuyerIds: [],
+      hookSyndicateIds: [],
+    });
+    expect(emptyCohorts.provenance.kind).toBe("unavailable");
   });
 
   test("DashboardHealthTracker throttles probes by interval", async () => {
