@@ -6,5 +6,6 @@ export * from "./dashboard_styles.ts";
 export * from "./hydration.ts";
 export * from "./panels/index.tsx";
 export * from "./runtime_flags.ts";
+export * from "./shadow_pricing/index.tsx";
 export * from "./showcase_data.ts";
 export * from "./types.ts";
