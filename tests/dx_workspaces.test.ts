@@ -30,9 +30,13 @@ describe("dx workspaces — monorepo workspace dev control", () => {
     expect(report.patterns).toEqual(["packages/*"]);
     expect(report.rows.map((r) => r.dir)).toEqual([
       ".",
+      "packages/api",
       "packages/ba-example",
+      "packages/backend",
+      "packages/contracts",
       "packages/nsh-desk",
       "packages/sportsdesk-ops",
+      "packages/ui",
     ]);
     const nshRow = report.rows.find((r) => r.dir === "packages/nsh-desk");
     expect(nshRow?.name).toBe("@sportsdesk-ops/nsh-desk");
@@ -259,7 +263,7 @@ describe("dx workspaces — monorepo workspace dev control", () => {
       count?: number;
       patterns?: string[];
     };
-    expect(parsed.count).toBe(4);
+    expect(parsed.count).toBe(8);
     expect(parsed.patterns).toEqual(["packages/*"]);
   });
 });
