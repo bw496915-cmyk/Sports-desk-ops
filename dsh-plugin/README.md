@@ -168,8 +168,17 @@ artifact's own reader, requires it to state `observedAt`, installs the normalize
 records the input's SHA-256 and mtime. A paste that does not validate is refused and the
 previous artifact is left alone. The capture report therefore lists `capturePath` and a
 `refresh` command per artifact, plus `stalePasteArtifacts` for the ones only a paste can fix.
-`sportsdesk_dev` also offers `ci-all` (`bun run ci:local --keep-going`) for a full failure
+`sportsdesk_dev` also offers `doctor` (the environment diagnostic: worktree deps, blocked
+install scripts, dangling workspace links, browser/CDP, ports, credentials) and
+`workspaces` (the monorepo gates: root privacy, globs, lock sync, `workspace:*` graph,
+self-containment), plus `ci-all` (`bun run ci:local --keep-going`) for a full failure
 inventory in one call.
+
+Both new gates fit the cheap-check tier with room to spare. Measured 2026-11-11 on this
+checkout, warm cache: `doctor` 0.07–0.13 s, `workspaces` 0.06–0.07 s, against the bundle's
+60 s `timeoutMs`. The doctor's only network probes are bounded by `AbortSignal.timeout(1200)`,
+so even a hung local service keeps the gate far inside the check tier; nothing on either path
+needs the `gateTimeoutMs` tier.
 
 It lives in the repo it operates on (unlike `dsh-plugin-fourc-odds`, its sibling in
 `~/4c-odds-intergration/dsh-plugin`), so the commands it shells and the files it
@@ -338,7 +347,28 @@ Imports the **actual module** and calls every tool against this checkout: git sp
 here is a production crash.
 
 No setup step is required: the bundle imports only `node:` builtins, so both scripts run
-from a clean checkout. The `secrets` gate they execute does spawn Bun, which is why stage 2
+from a clean checkout.
+
+The bundle does; the assertions depend on the mode stage 1 runs in. With
+`VERIFY_LOAD_FIXTURES=tests/fixtures/verify-load` — what CI sets — `BOOK_ROOT` is a materialized
+tree carrying a **tracked** `enriched_customers_full.json`, and stage 1 passes clean (13 tools).
+Without the variable, `BOOK_ROOT` is the repo root and stage 1 runs a _different, heavier_ branch
+(`derives every count from the book`). Both books are byte-identical (sha256 `c79943f4…`), so the
+split is about which assertions run, not about which data is present.
+
+Measured 2026-11-11, operator mode fails two of those heavier assertions, both expectations about
+the sample book rather than product defects: `the book no longer has a uniform sample size`
+(`ticketCounts.distinct === 1` no longer holds) and `unexpected book character
+partially-generated` (the verdict is not `generated-fixture`). They reproduce on any checkout
+because the root book equals the tracked fixture.
+
+Neither stage hardcodes the book path any more. Stage 2 resolves it from the path the tool reports
+in `source.path`, under the configured `repoPath`, so the expected rows come from what the tool
+actually read; the two `timestamps`-style assertions no longer count an absent `placed_at` as a
+timestamp (the tool skips empty values). `customer records N != source M` is a different
+assertion, in `sportsdesk_data`, and it passes.
+
+The `secrets` gate they execute does spawn Bun, which is why stage 2
 is the one that proves the runtime.
 
 ## Repo gates
@@ -378,3 +408,15 @@ Both stay shell commands where a human is in the loop.
 | `icon.svg`           | Original icon for the plugin row.                                            |
 | `verify-load.mjs`    | Stage 1: Bun load + refusal test.                                            |
 | `verify-runtime.mjs` | Stage 2: host-runtime execution test.                                        |
+
+## Release sequence
+
+One step is easy to invert: bump **before** installing. Installing at the old version puts the
+previous release in the profile, and `cordis_inspect_query` then confirms the wrong thing.
+
+1. Land the commit.
+2. Bump `version` in `package.json`.
+3. Add the real SHA to `market/index.json` `versions[]` and move `latest` off the previous pin
+   (`0.10.1 @ b435fc1d`).
+4. Install the bundle into the profile (`plugin_manager install_bundle`, absolute package path).
+5. Confirm the live rows with `cordis_inspect_query` — not `list_plugins`.
