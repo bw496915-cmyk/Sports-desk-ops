@@ -5,6 +5,7 @@ import {
   parseBunPackDryRunFiles,
   WORKSPACE_PACK_DIRS,
 } from "../scripts/check_workspace_packs.ts";
+import { buildWorkspaceRunPlan } from "../scripts/dx_workspaces.ts";
 
 const ROOT = path.resolve(import.meta.dir, "..");
 
@@ -36,6 +37,35 @@ describe("workspace pack boundaries", () => {
       expect(entry.issues).toEqual([]);
       expect(entry.packedFiles).toContain("package.json");
       expect(entry.packedFiles).toContain("src/index.ts");
+    }
+  });
+
+  test("all @sportsdesk-ops workspace packages expose typecheck, lint, test scripts and resolve topological waves", async () => {
+    for (const dir of WORKSPACE_PACK_DIRS) {
+      const manifest = (await Bun.file(
+        path.join(ROOT, dir, "package.json"),
+      ).json()) as {
+        scripts?: Record<string, string>;
+      };
+      expect(typeof manifest.scripts?.typecheck).toBe("string");
+      expect(typeof manifest.scripts?.lint).toBe("string");
+      expect(typeof manifest.scripts?.test).toBe("string");
+      if (dir === "packages/ui") {
+        expect(typeof manifest.scripts?.build).toBe("string");
+      }
+    }
+
+    for (const script of ["typecheck", "lint", "test"] as const) {
+      const plan = await buildWorkspaceRunPlan(ROOT, script, {
+        filters: ["@sportsdesk-ops/*", "!@sportsdesk-ops/nsh-desk"],
+        topological: true,
+      });
+      expect(plan.matchedWorkspaces.length).toBe(WORKSPACE_PACK_DIRS.length);
+      expect(plan.matchedWorkspaces.every((w) => w.hasScript)).toBe(true);
+      expect(plan.waves[0]).toEqual(["packages/contracts"]);
+      expect(plan.waves[1]).toContain("packages/backend");
+      expect(plan.waves[1]).toContain("packages/ui");
+      expect(plan.waves[2]).toEqual(["packages/api"]);
     }
   });
 });
