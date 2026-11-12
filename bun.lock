@@ -15,6 +15,8 @@
       },
       "devDependencies": {
         "@deepseek-ai/dsh-plugin-market-index": "0.2.2-rc.1",
+        "@sportsdesk-ops/contracts": "workspace:*",
+        "@sportsdesk-ops/ui": "workspace:*",
         "@types/bun": "1.4.4",
         "@types/react": "18.3.31",
         "@types/react-dom": "18.3.7",
