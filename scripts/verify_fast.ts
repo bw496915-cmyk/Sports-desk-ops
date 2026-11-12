@@ -279,9 +279,11 @@ export function inferTestsForFiles(
         stem === "ShadowPricingPanel" ||
         stem === "SliceMetricsViews" ||
         stem === "shadow_pricing" ||
-        stem.startsWith("slice_")
+        stem.startsWith("slice_") ||
+        f.startsWith("packages/ui/src/shadow_pricing/")
       ) {
         candidates.push(
+          "tests/dashboard_shadow_panel.test.tsx",
           "tests/slice_metrics.test.ts",
           "tests/enhanced_dashboard_builder.test.ts",
         );
