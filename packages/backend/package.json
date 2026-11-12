@@ -18,7 +18,9 @@
     "src"
   ],
   "scripts": {
-    "typecheck": "bun check --no-script -p tsconfig.json"
+    "typecheck": "bun check --no-script -p tsconfig.json",
+    "lint": "bun x --cwd ../.. oxlint -c .oxlintrc.json --deny-warnings packages/backend/src",
+    "test": "bun test --no-script --cwd ../.. tests/dashboard_backend_workspace.test.ts tests/workspace_packs.test.ts"
   },
   "dependencies": {
     "@sportsdesk-ops/contracts": "workspace:*"
