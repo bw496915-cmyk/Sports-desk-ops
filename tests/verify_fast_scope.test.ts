@@ -113,5 +113,8 @@ describe("verify_fast workspace scoping", () => {
     expect(inferTestsForFiles(["packages/backend/src/wagers.ts"])).toContain(
       "tests/dashboard_backend_workspace.test.ts",
     );
+    expect(
+      inferTestsForFiles(["packages/ui/src/panels/CustomersTabPanel.tsx"]),
+    ).toContain("tests/dashboard_ui_panels.test.tsx");
   });
 });

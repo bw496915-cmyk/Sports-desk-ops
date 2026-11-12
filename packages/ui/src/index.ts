@@ -2,4 +2,8 @@ export * from "./App.tsx";
 export * from "./ShadowPricingPanel.tsx";
 export * from "./SliceMetricsViews.tsx";
 export * from "./ansi.tsx";
+export * from "./dashboard_styles.ts";
+export * from "./panels/index.tsx";
 export * from "./runtime_flags.ts";
+export * from "./showcase_data.ts";
+export * from "./types.ts";
