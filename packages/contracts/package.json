@@ -13,7 +13,8 @@
     "./slice-data-table": "./src/slice_data_table.ts",
     "./slice-diff-view": "./src/slice_diff_view.ts",
     "./shadow-pricing": "./src/shadow_pricing.ts",
-    "./features": "./src/features.ts"
+    "./features": "./src/features.ts",
+    "./dashboard-hydration": "./src/dashboard_hydration.ts"
   },
   "files": [
     "src"

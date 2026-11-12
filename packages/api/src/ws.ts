@@ -3,14 +3,12 @@
  * @description WebSocket topic pub/sub state machine and status telemetry for the dashboard API.
  */
 
-export const DASHBOARD_WS_TOPICS = [
-  "dashboard",
-  "live-bets",
-  "syndicate-alerts",
-  "tiers-updated",
-  "proxy-conduits",
-  "terminal-logs",
-] as const;
+import {
+  DASHBOARD_WS_TOPICS,
+  type DashboardWsTopic,
+} from "@sportsdesk-ops/contracts";
+
+export { DASHBOARD_WS_TOPICS, type DashboardWsTopic };
 
 export interface WsLike {
   readonly subscriptions?: readonly string[] | undefined;
@@ -138,4 +136,21 @@ export function createDashboardWebSocketHandler<TWs extends WsLike>(
     websocket,
     buildWsStatusPayload,
   };
+}
+
+/** Broadcast a topic message once to every connected client subscribed to `topic` (or all if un-scoped). */
+export function publishDashboardTopicEvent<TWs extends WsLike>(
+  clients: Iterable<TWs>,
+  topic: DashboardWsTopic,
+  message: string,
+): number {
+  let delivered = 0;
+  for (const ws of clients) {
+    const subs = ws.subscriptions;
+    if (!subs || subs.length === 0 || subs.includes(topic)) {
+      ws.send(message);
+      delivered++;
+    }
+  }
+  return delivered;
 }

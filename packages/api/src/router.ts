@@ -8,20 +8,25 @@ import {
   parseRepriceMode,
   parseRouterAuditMode,
 } from "@sportsdesk-ops/backend";
-import type {
-  MarketFilter,
-  PeriodFilter,
-  RouterAuditMode,
-  ShadowRepriceMode,
-  SportFilter,
-  SubSportFilter,
+import {
+  type DashboardWsTopic,
+  type MarketFilter,
+  type PeriodFilter,
+  type RouterAuditMode,
+  type ShadowRepriceMode,
+  type SportFilter,
+  type SubSportFilter,
 } from "@sportsdesk-ops/contracts";
 import type {
   DashboardApiDeps,
   EncodedResponseSpec,
   RouteRequestWithParams,
 } from "./types.ts";
-import { createDashboardWebSocketHandler, type WsLike } from "./ws.ts";
+import {
+  createDashboardWebSocketHandler,
+  publishDashboardTopicEvent,
+  type WsLike,
+} from "./ws.ts";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
 
@@ -65,6 +70,19 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
   const clients = options.clients ?? new Set<TWs>();
   const { websocket, buildWsStatusPayload } =
     createDashboardWebSocketHandler(clients);
+  const publishTopic = (topic: DashboardWsTopic, message: string): number =>
+    publishDashboardTopicEvent(clients, topic, message);
+  const emitAlertsUpdated = () => {
+    publishTopic(
+      "syndicate-alerts",
+      JSON.stringify({
+        type: "topic-event",
+        topic: "syndicate-alerts",
+        event: "alerts-updated",
+        timestamp: new Date().toISOString(),
+      }),
+    );
+  };
 
   const enforceAuth = async (req: Request): Promise<Response | null> => {
     if (!deps.enforceAuth) return null;
@@ -331,6 +349,7 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
         const denied = await enforceAuth(req);
         if (denied) return denied;
         const sweep = await deps.alerts.sweepOnce();
+        emitAlertsUpdated();
         return Response.json({ ok: true, sweep });
       },
     },
@@ -513,6 +532,9 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
           operatorId: body.operatorId ?? "operator",
           notes: body.notes,
         });
+        if (ok) {
+          emitAlertsUpdated();
+        }
         return Response.json({ ok, deliveryId });
       },
     },
@@ -540,6 +562,7 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
             { status: 404 },
           );
         }
+        emitAlertsUpdated();
         return Response.json({
           ok: true,
           originalDeliveryId: deliveryId,
@@ -606,5 +629,6 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
     fetch,
     websocket,
     clients,
+    publishTopic,
   };
 }

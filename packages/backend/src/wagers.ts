@@ -3,7 +3,11 @@
  * @description Live wager normalization, risk classification, and safe fallback fixtures (`autoExecute: false`).
  */
 
-import { resolve } from "node:path";
+import { basename, relative, resolve } from "node:path";
+import type {
+  DashboardSourceProvenance,
+  WagerTier,
+} from "@sportsdesk-ops/contracts";
 import { BoundedStampCache, statStamp } from "./cache.ts";
 
 export interface ParsedShortDescLeg {
@@ -32,7 +36,7 @@ export interface ProjectedDevWagerRow {
   readonly riskUsd: number;
   readonly toWinUsd: number;
   readonly clvCents: number;
-  readonly alertTier: string;
+  readonly alertTier: WagerTier;
   readonly alertBadge: string;
   readonly operatorDirective: string;
   readonly maxRecommendedStake: number;
@@ -46,6 +50,7 @@ export interface LiveWagersPayload {
   readonly criticalSteamCount: number;
   readonly autoExecute: false;
   readonly timestamp: string;
+  readonly provenance: DashboardSourceProvenance;
 }
 
 export const FALLBACK_DEV_WAGERS: ReadonlyArray<Record<string, unknown>> = [
@@ -154,7 +159,7 @@ export function projectLiveWagerRow(
           ? 8.2
           : -2.4;
 
-  let alertTier = "RECREATIONAL";
+  let alertTier: WagerTier = "RECREATIONAL";
   let alertBadge = "✅ RECREATIONAL";
   let operatorDirective = "Accept Normal (autoExecute: false)";
   let maxRecommendedStake = 25000;
@@ -221,6 +226,45 @@ export interface DevLiveWagersLoaderOptions {
   readonly loadSharpDeps: () => Promise<ProjectLiveWagerDeps>;
 }
 
+export interface WagerSourceDescriptor {
+  readonly kind: "capture" | "fixture";
+  readonly label: string;
+  readonly sourcePath: string;
+}
+
+export interface DevLiveWagersLoadResult {
+  readonly rows: Array<Record<string, unknown>>;
+  readonly source: WagerSourceDescriptor | null;
+}
+
+/** Classify a candidate wager JSON path as `"capture"` vs `"fixture"` without leaking absolute host paths. */
+export function classifyWagerCandidateSource(
+  candidatePath: string,
+  cwd: string,
+): WagerSourceDescriptor {
+  const rel = relative(cwd, candidatePath).replace(/\\/g, "/");
+  const safePath =
+    rel && !rel.startsWith("..") && !rel.startsWith("/")
+      ? rel
+      : basename(candidatePath);
+  const normFull = candidatePath.replace(/\\/g, "/").toLowerCase();
+  if (
+    normFull.includes("/fixtures/") ||
+    basename(normFull).includes("fixture")
+  ) {
+    return {
+      kind: "fixture",
+      label: "Synthetic Fixture",
+      sourcePath: safePath,
+    };
+  }
+  return {
+    kind: "capture",
+    label: "Local Capture",
+    sourcePath: safePath,
+  };
+}
+
 /** Create a stat-cached live wagers loader + KPI aggregator for the dashboard backend. */
 export function createDevLiveWagersLoader(options: DevLiveWagersLoaderOptions) {
   const cwd = options.cwd ?? process.cwd();
@@ -230,59 +274,83 @@ export function createDevLiveWagersLoader(options: DevLiveWagersLoaderOptions) {
     resolve(cwd, "tests/fixtures/live-wagers-LIST-100.json"),
     resolve(cwd, "tests/fixtures/live-wagers-list-sample.json"),
   ];
-  const cache = new BoundedStampCache<Array<Record<string, unknown>>>(8);
+  const cache = new BoundedStampCache<DevLiveWagersLoadResult>(8);
+
+  const loadDevLiveWagersDetailed =
+    async (): Promise<DevLiveWagersLoadResult> => {
+      for (const candidatePath of candidatePaths) {
+        const stamp = await statStamp(candidatePath);
+        if (stamp === null) continue;
+
+        const hit = cache.getIfFresh(candidatePath, stamp);
+        if (hit !== undefined) return hit;
+
+        try {
+          const data = (await Bun.file(candidatePath).json()) as
+            | {
+                LIST?: Array<Record<string, unknown>>;
+                wagers?: Array<Record<string, unknown>>;
+              }
+            | Array<Record<string, unknown>>
+            | null;
+          const list = Array.isArray(
+            (data as { LIST?: Array<Record<string, unknown>> })?.LIST,
+          )
+            ? (data as { LIST: Array<Record<string, unknown>> }).LIST
+            : Array.isArray(
+                  (data as { wagers?: Array<Record<string, unknown>> })?.wagers,
+                )
+              ? (data as { wagers: Array<Record<string, unknown>> }).wagers
+              : Array.isArray(data)
+                ? (data as Array<Record<string, unknown>>)
+                : null;
+
+          if (list && list.length > 0) {
+            const sharpDeps = await options.loadSharpDeps();
+            const rows = list.map((item, idx) =>
+              projectLiveWagerRow(item, idx, sharpDeps),
+            );
+            const result: DevLiveWagersLoadResult = {
+              rows,
+              source: classifyWagerCandidateSource(candidatePath, cwd),
+            };
+            cache.set(candidatePath, stamp, result);
+            return result;
+          }
+        } catch {
+          // signal-honesty: intentional-fallback-next-wagers-fixture
+        }
+      }
+      return { rows: [], source: null };
+    };
 
   const loadDevLiveWagers = async (): Promise<
     Array<Record<string, unknown>>
   > => {
-    for (const candidatePath of candidatePaths) {
-      const stamp = await statStamp(candidatePath);
-      if (stamp === null) continue;
-
-      const hit = cache.getIfFresh(candidatePath, stamp);
-      if (hit !== undefined) return hit;
-
-      try {
-        const data = (await Bun.file(candidatePath).json()) as
-          | {
-              LIST?: Array<Record<string, unknown>>;
-              wagers?: Array<Record<string, unknown>>;
-            }
-          | Array<Record<string, unknown>>
-          | null;
-        const list = Array.isArray(
-          (data as { LIST?: Array<Record<string, unknown>> })?.LIST,
-        )
-          ? (data as { LIST: Array<Record<string, unknown>> }).LIST
-          : Array.isArray(
-                (data as { wagers?: Array<Record<string, unknown>> })?.wagers,
-              )
-            ? (data as { wagers: Array<Record<string, unknown>> }).wagers
-            : Array.isArray(data)
-              ? (data as Array<Record<string, unknown>>)
-              : null;
-
-        if (list && list.length > 0) {
-          const sharpDeps = await options.loadSharpDeps();
-          const rows = list.map((item, idx) =>
-            projectLiveWagerRow(item, idx, sharpDeps),
-          );
-          cache.set(candidatePath, stamp, rows);
-          return rows;
-        }
-      } catch {
-        // signal-honesty: intentional-fallback-next-wagers-fixture
-      }
-    }
-    return [];
+    const detailed = await loadDevLiveWagersDetailed();
+    return detailed.rows;
   };
 
   const buildLiveWagersPayload = async (): Promise<LiveWagersPayload> => {
-    let wagers: ReadonlyArray<Record<string, unknown>> =
-      await loadDevLiveWagers();
-    if (wagers.length === 0) {
-      wagers = FALLBACK_DEV_WAGERS;
-    }
+    const nowIso = new Date().toISOString();
+    const loaded = await loadDevLiveWagersDetailed();
+    const wagers: ReadonlyArray<Record<string, unknown>> =
+      loaded.rows.length > 0 ? loaded.rows : FALLBACK_DEV_WAGERS;
+    const provenance: DashboardSourceProvenance =
+      loaded.rows.length > 0 && loaded.source !== null
+        ? {
+            kind: loaded.source.kind,
+            label: loaded.source.label,
+            sourcePath: loaded.source.sourcePath,
+            observedAt: nowIso,
+          }
+        : {
+            kind: "fallback",
+            label: "In-Memory Fallback",
+            sourcePath: null,
+            observedAt: nowIso,
+          };
+
     return {
       wagers,
       totalRiskUsd: wagers.reduce(
@@ -297,12 +365,14 @@ export function createDevLiveWagersLoader(options: DevLiveWagersLoaderOptions) {
         (w) => w.alertTier === "CRITICAL" || w.alertTier === "STEAM",
       ).length,
       autoExecute: false,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso,
+      provenance,
     };
   };
 
   return {
     loadDevLiveWagers,
+    loadDevLiveWagersDetailed,
     buildLiveWagersPayload,
     clearCache: () => cache.clear(),
   };

@@ -4,6 +4,7 @@ import {
   type DashboardApiDeps,
   type WsLike,
 } from "@sportsdesk-ops/api";
+import { parseDashboardWsSignal } from "@sportsdesk-ops/contracts";
 import { startDashboardServer } from "../scripts/dev_dashboard.ts";
 
 function buildMockDeps(
@@ -266,6 +267,36 @@ describe("@sportsdesk-ops/api in-memory router (zero port bind)", () => {
     expect(subs.has("live-bets")).toBe(false);
     expect(sent.length).toBe(2);
 
+    // live-bets was unsubscribed, so publishTopic skips this client for live-bets
+    expect(api.publishTopic("live-bets", "wagers-updated")).toBe(0);
+    // syndicate-alerts is still subscribed: sweep, ack, and retry push notifications once each
+    await api.fetch(
+      new Request("http://dashboard.local/api/alerts/sweep", {
+        method: "POST",
+        headers: { Authorization: "Bearer ok" },
+      }),
+    );
+    await api.fetch(
+      new Request("http://dashboard.local/api/alerts/del-123/ack", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer ok",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ operatorId: "op1" }),
+      }),
+    );
+    await api.fetch(
+      new Request("http://dashboard.local/api/alerts/del-123/retry", {
+        method: "POST",
+        headers: { Authorization: "Bearer ok" },
+      }),
+    );
+    expect(sent.length).toBe(5);
+    expect(parseDashboardWsSignal(sent[2]!)).toEqual({
+      kind: "alerts-updated",
+    });
+
     const statusJson = (await (
       await api.fetch(
         new Request("http://dashboard.local/api/ws/status", {
@@ -277,6 +308,58 @@ describe("@sportsdesk-ops/api in-memory router (zero port bind)", () => {
 
     api.websocket.close(fakeWs);
     expect(api.clients.size).toBe(0);
+  });
+
+  test("parseDashboardWsSignal handles plain strings, structured topic events, tier configs, and malformed frames", () => {
+    expect(parseDashboardWsSignal("reload")).toEqual({ kind: "reload" });
+    expect(parseDashboardWsSignal("dashboard-updated")).toEqual({
+      kind: "dashboard-updated",
+    });
+    expect(parseDashboardWsSignal("wagers-updated")).toEqual({
+      kind: "wagers-updated",
+    });
+    expect(parseDashboardWsSignal("live-bets")).toEqual({
+      kind: "wagers-updated",
+    });
+    expect(parseDashboardWsSignal("syndicate-alerts")).toEqual({
+      kind: "alerts-updated",
+    });
+    expect(parseDashboardWsSignal("tiers-updated")).toEqual({
+      kind: "tiers-updated",
+    });
+    expect(
+      parseDashboardWsSignal(
+        JSON.stringify({
+          type: "topic-event",
+          topic: "live-bets",
+          event: "wagers-updated",
+          timestamp: "2026-11-12T00:00:00Z",
+        }),
+      ),
+    ).toEqual({ kind: "wagers-updated" });
+    expect(
+      parseDashboardWsSignal(
+        JSON.stringify({
+          type: "tiers-updated",
+          tiers: {
+            CRITICAL: { fg: "#fff", bg: "#f00", border: "#900" },
+          },
+        }),
+      ),
+    ).toEqual({
+      kind: "tiers-updated",
+      tiers: {
+        CRITICAL: { fg: "#fff", bg: "#f00", border: "#900" },
+      },
+    });
+    expect(
+      parseDashboardWsSignal(
+        JSON.stringify({ type: "subscribed-many", topics: ["dashboard"] }),
+      ),
+    ).toEqual({ kind: "ack", ackType: "subscribed-many" });
+    expect(parseDashboardWsSignal("{not-valid-json")).toEqual({
+      kind: "ignore",
+    });
   });
 
   test("startDashboardServer({ apiOnly: true }) exposes /health & /api/* without serving UI HTML", async () => {

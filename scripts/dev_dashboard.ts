@@ -115,24 +115,25 @@ export function startDashboardServer(
   const jsonReader = createCachedJsonReader(24);
   const { findCustomerRow } = createCustomerRowFinder<CustomerRow>({ cwd });
   const markdownCache = new DashboardMarkdownCache(dashboardMdPath);
-  const { buildLiveWagersPayload } = createDevLiveWagersLoader({
-    cwd,
-    loadSharpDeps: async () => {
-      const [{ parseShortDesc }, { KEY_NUMBER_BUYER_PROFILES }] =
-        await Promise.all([
-          import("../lib/live_wagers.ts"),
-          import("../lib/customer_profile.ts"),
-        ]);
-      return {
-        parseShortDesc,
-        sharpCustomerIds: new Set(
-          [...KEY_NUMBER_BUYER_PROFILES.keys()].map((k) =>
-            k.trim().toUpperCase(),
+  const { buildLiveWagersPayload, clearCache: clearWagersCache } =
+    createDevLiveWagersLoader({
+      cwd,
+      loadSharpDeps: async () => {
+        const [{ parseShortDesc }, { KEY_NUMBER_BUYER_PROFILES }] =
+          await Promise.all([
+            import("../lib/live_wagers.ts"),
+            import("../lib/customer_profile.ts"),
+          ]);
+        return {
+          parseShortDesc,
+          sharpCustomerIds: new Set(
+            [...KEY_NUMBER_BUYER_PROFILES.keys()].map((k) =>
+              k.trim().toUpperCase(),
+            ),
           ),
-        ),
-      };
-    },
-  });
+        };
+      },
+    });
 
   const healthTracker = new DashboardHealthTracker({
     isDbConfigured: () => Boolean(Bun.env.PGUSER && Bun.env.PGPASSWORD),
@@ -256,17 +257,21 @@ export function startDashboardServer(
       },
       customers: {
         getCohortReport: async () => {
-          const [backtestCached, fixtureCached] = await Promise.all([
-            jsonReader.readCachedJson<{
-              customerLeaderboard?: Array<Record<string, unknown>>;
-            }>(resolve(cwd, "docs/backtest-4wk-cfb-nba.json")),
-            jsonReader.readCachedJson<Array<Record<string, unknown>>>(
-              resolve(
-                cwd,
-                "tests/fixtures/backtest/enriched_customers_full.json",
+          const [backtestCached, fixtureCached, localBookCached] =
+            await Promise.all([
+              jsonReader.readCachedJson<{
+                customerLeaderboard?: Array<Record<string, unknown>>;
+              }>(resolve(cwd, "docs/backtest-4wk-cfb-nba.json")),
+              jsonReader.readCachedJson<Array<Record<string, unknown>>>(
+                resolve(
+                  cwd,
+                  "tests/fixtures/backtest/enriched_customers_full.json",
+                ),
               ),
-            ),
-          ]);
+              jsonReader.readCachedJson<Array<Record<string, unknown>>>(
+                resolve(cwd, "enriched_customers_full.json"),
+              ),
+            ]);
           const backtestJson = backtestCached?.value ?? {
             customerLeaderboard: [],
           };
@@ -279,11 +284,12 @@ export function startDashboardServer(
           const payload = computeCustomersCohortPayload({
             backtestLeaderboard: backtestJson.customerLeaderboard ?? [],
             fixtures: fixtureJson,
+            localBookRows: localBookCached?.value,
             keyNumberBuyerIds: KEY_NUMBER_BUYER_PROFILES.keys(),
             hookSyndicateIds: HALF_POINT_HOOK_SYNDICATE_PROFILES.keys(),
           });
           return {
-            versionStamp: `dev-customers|${backtestCached?.stamp ?? "none"}|${fixtureCached?.stamp ?? "none"}`,
+            versionStamp: `dev-customers|${backtestCached?.stamp ?? "none"}|${fixtureCached?.stamp ?? "none"}|${localBookCached?.stamp ?? "none"}`,
             payload,
           };
         },
@@ -458,26 +464,12 @@ export function startDashboardServer(
   serverRef = server;
 
   if (options.watchFiles !== false) {
-    const broadcastTopicMessage = (topic: string, msg: string) => {
-      server.publish(topic, msg);
-      for (const ws of clients) {
-        if (
-          !ws.subscriptions ||
-          ws.subscriptions.length === 0 ||
-          ws.subscriptions.includes(topic) ||
-          ws.subscriptions.includes("dashboard")
-        ) {
-          ws.send(msg);
-        }
-      }
-    };
-
     try {
       if (!apiOnly) {
         watchers.push(
           watch(dashboardMdPath, () => {
             markdownCache.invalidate();
-            broadcastTopicMessage("dashboard", "dashboard-updated");
+            api.publishTopic("dashboard", "dashboard-updated");
           }),
         );
 
@@ -492,10 +484,30 @@ export function startDashboardServer(
             watch(dir, { recursive: true }, () => {
               cachedDceMatrix = null;
               cachedLegacyBundle = null;
-              broadcastTopicMessage("dashboard", "reload");
+              api.publishTopic("dashboard", "reload");
             }),
           );
         }
+      }
+
+      const dataDir = resolve(cwd, "data");
+      if (existsSync(dataDir)) {
+        watchers.push(
+          watch(dataDir, (_eventType, filename) => {
+            if (!filename || filename === "live-wagers.json") {
+              clearWagersCache();
+              api.publishTopic(
+                "live-bets",
+                JSON.stringify({
+                  type: "topic-event",
+                  topic: "live-bets",
+                  event: "wagers-updated",
+                  timestamp: new Date().toISOString(),
+                }),
+              );
+            }
+          }),
+        );
       }
 
       watchers.push(
@@ -505,17 +517,10 @@ export function startDashboardServer(
               await import("../lib/wager_config.ts");
             const { changed, config } = await reloadTomlConfigIfChanged();
             if (changed) {
-              server.publish("tiers-updated", JSON.stringify(config));
-              for (const ws of clients) {
-                if (
-                  !ws.subscriptions ||
-                  ws.subscriptions.length === 0 ||
-                  ws.subscriptions.includes("tiers-updated") ||
-                  ws.subscriptions.includes("dashboard")
-                ) {
-                  ws.send("tiers-updated");
-                }
-              }
+              api.publishTopic(
+                "tiers-updated",
+                JSON.stringify({ type: "tiers-updated", tiers: config.tiers }),
+              );
             }
           } catch (err) {
             console.warn("File watch reload failed for wager_tiers.toml:", err);
