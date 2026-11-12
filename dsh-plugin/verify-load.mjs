@@ -1348,8 +1348,12 @@ await checkAsync(
       integrity.integrity.selections.placeholderCount === expectedPlaceholders,
       `placeholder tickets ${integrity.integrity.selections.placeholderCount} != source ${expectedPlaceholders}`,
     );
+    // An absent timestamp is not a timestamp: the tool skips empty values, so the expected
+    // count must too, or the assertion compares 8 real stamps against 9 distinct values.
     const expectedStamps = new Set(
-      ticketRows.map((ticket) => String(ticket.placed_at ?? "")),
+      ticketRows
+        .map((ticket) => String(ticket.placed_at ?? ""))
+        .filter((placed) => placed !== ""),
     ).size;
     assert(
       integrity.integrity.timestamps.distinct === expectedStamps,
