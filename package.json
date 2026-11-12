@@ -355,9 +355,9 @@
     "typecheck:ws": "bun check --no-script -p packages/contracts/tsconfig.json && bun check --no-script -p packages/ui/tsconfig.json && bun check --no-script -p packages/backend/tsconfig.json && bun check --no-script -p packages/api/tsconfig.json",
     "dev:ui": "bun run scripts/dev_dashboard.ts",
     "dev:api": "bun run scripts/dev_dashboard.ts",
-    "test:ws": "PRETEST_SKIP=1 bun test --parallel tests/dx_workspaces.test.ts tests/pm_policy_workspaces.test.ts",
+    "test:ws": "PRETEST_SKIP=1 bun test --parallel tests/workspace_packs.test.ts tests/dx_workspaces.test.ts tests/dashboard_build_and_markdown.test.ts tests/enhanced_dashboard_builder.test.ts tests/shadow_pricing_dashboard.test.ts tests/wager_tiers_toml.test.ts",
     "build:ws": "bun run scripts/build_dashboard.ts",
-    "pack:check": "bun run scripts/dx_workspaces.ts audit"
+    "pack:check": "bun run scripts/check_workspace_packs.ts"
   },
   "keywords": [
     "sportsdesk",
@@ -380,7 +380,9 @@
     "typescript": "5.9.3",
     "@deepseek-ai/dsh-plugin-market-index": "0.2.2-rc.1",
     "semver": "7.8.6",
-    "sportsdesk-ops": "workspace:packages/sportsdesk-ops"
+    "sportsdesk-ops": "workspace:packages/sportsdesk-ops",
+    "@sportsdesk-ops/contracts": "workspace:*",
+    "@sportsdesk-ops/ui": "workspace:*"
   },
   "repository": {
     "type": "git",
