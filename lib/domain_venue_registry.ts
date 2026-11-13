@@ -2,6 +2,8 @@
 // Complies with the Naming Constitution (no generation tags, no banned abbreviations)
 // and zero heap-collection lookups in hot resolution paths.
 
+import { DodGateFailureError } from "./bridge_and_channel_router.ts";
+
 /** Canonical upstream origin domain identifiers across all sportsdesk bridges. */
 export type OriginDomainId =
   | "ORIGIN_SPORTSBOOK_FANTASY402"
@@ -168,14 +170,33 @@ export const WRITER_LANE_REGISTRY: Readonly<
  */
 export type VenueKind = "sportsbook" | "exchange" | "internal";
 
-export type VenueEntry = {
+/** How a venue's exposure settles. Only tradeable venues have a settlement. */
+export type SettlementModel = "cash_stake" | "token_position";
+
+type VenueBase = {
   readonly venueId: VenueId;
   readonly displayLabel: string;
-  readonly kind: VenueKind;
   readonly brandColorHex: string;
-  /** Every origin domain that resolves to this venue. Checked by the test suite. */
   readonly originDomainIds: readonly OriginDomainId[];
 };
+
+/** A book that holds the stake; its liability is the payout. */
+export type BookVenueEntry = VenueBase & {
+  readonly kind: "sportsbook";
+  readonly settlement: "cash_stake";
+};
+
+/** An exchange that matches two sides; its exposure is the position. */
+export type ExchangeVenueEntry = VenueBase & {
+  readonly kind: "exchange";
+  readonly settlement: "token_position";
+};
+
+/** A venue that settles nothing. It deliberately HAS NO settlement field, so
+ *  asking an internal venue how it settles is a compile error, not a lie. */
+export type InternalVenueEntry = VenueBase & { readonly kind: "internal" };
+
+export type VenueEntry = BookVenueEntry | ExchangeVenueEntry | InternalVenueEntry;
 
 /**
  * The venue level the other two registries point at.
@@ -183,44 +204,56 @@ export type VenueEntry = {
  * ORIGIN_DOMAIN_REGISTRY says where a token came from and WRITER_LANE_REGISTRY
  * says which lane wrote it; neither answers "is this an exchange or a book?",
  * which is the question the risk maths depends on.
+ *
+ * `originDomainIds` and the venue colour are DERIVED from ORIGIN_DOMAIN_REGISTRY
+ * rather than listed here, because a hand-maintained second list is how the two
+ * tables drift apart. A venue with no origin fails at module load.
  */
-export const VENUE_REGISTRY: Readonly<Record<VenueId, VenueEntry>> = {
-  f402: {
-    venueId: "f402",
-    displayLabel: "Fantasy402",
-    kind: "sportsbook",
-    brandColorHex: "#1d84b5",
-    originDomainIds: ["ORIGIN_SPORTSBOOK_FANTASY402"],
-  },
+function venueBase(venueId: VenueId, displayLabel: string): VenueBase {
+  const origins = (Object.keys(ORIGIN_DOMAIN_REGISTRY) as OriginDomainId[]).filter(
+    (origin) => ORIGIN_DOMAIN_REGISTRY[origin].venueId === venueId,
+  );
+  if (origins.length === 0) {
+    // NAMING-GATE: spine modules throw the structured gate error, never a bare
+    // Error, so a registry that disagrees with itself fails with a section name.
+    throw new DodGateFailureError({
+      gate: 8,
+      section: "SEC_VENUE_ORIGIN_CONSISTENCY",
+      expected: "every VenueId has at least one origin domain",
+      actual: `venue ${venueId} has none`,
+    });
+  }
+  const primary = ORIGIN_DOMAIN_REGISTRY[origins[0]!];
+  return {
+    venueId,
+    displayLabel,
+    brandColorHex: primary.brandColorHex,
+    originDomainIds: origins,
+  };
+}
+
+export const VENUE_REGISTRY = {
+  f402: { ...venueBase("f402", "Fantasy402"), kind: "sportsbook", settlement: "cash_stake" },
   gslive_partner118: {
-    venueId: "gslive_partner118",
-    displayLabel: "GSLive Partner 118",
+    ...venueBase("gslive_partner118", "GSLive Partner 118"),
     kind: "sportsbook",
-    brandColorHex: "#28a745",
-    originDomainIds: ["ORIGIN_SPORTSBOOK_GSLIVE_PARTNER118"],
+    settlement: "cash_stake",
   },
-  polymarket: {
-    venueId: "polymarket",
-    displayLabel: "Polymarket",
-    kind: "exchange",
-    brandColorHex: "#38bdf8",
-    originDomainIds: ["ORIGIN_EXCHANGE_POLYMARKET_CTF"],
-  },
-  kalshi: {
-    venueId: "kalshi",
-    displayLabel: "Kalshi",
-    kind: "exchange",
-    brandColorHex: "#10b981",
-    originDomainIds: ["ORIGIN_EXCHANGE_KALSHI_REGULATED"],
-  },
-  internal: {
-    venueId: "internal",
-    displayLabel: "Desk Internal",
-    kind: "internal",
-    brandColorHex: "#f59e0b",
-    originDomainIds: ["ORIGIN_STORAGE_R2_LAKEHOUSE", "ORIGIN_HOST_NSH_DESK_LOCAL"],
-  },
-};
+  polymarket: { ...venueBase("polymarket", "Polymarket"), kind: "exchange", settlement: "token_position" },
+  kalshi: { ...venueBase("kalshi", "Kalshi"), kind: "exchange", settlement: "token_position" },
+  internal: { ...venueBase("internal", "Desk Internal"), kind: "internal" },
+} as const satisfies Readonly<Record<VenueId, VenueEntry>>;
+
+/**
+ * Narrows to a venue whose exposure can be held. The settlement field only
+ * exists on the tradeable variants, so after this guard the maths cannot ask an
+ * internal venue for a settlement model.
+ */
+export function isTradeableVenue(
+  entry: VenueEntry,
+): entry is BookVenueEntry | ExchangeVenueEntry {
+  return entry.kind !== "internal";
+}
 
 // NAMING-GATE-04: no Map/Set allocation on a resolution path. Ownership
 // lookups run against the frozen records themselves, which allocates nothing.
@@ -263,7 +296,7 @@ export function parseVenueId(raw: unknown): VenueId | null {
   return alias[token] ?? null;
 }
 
-/** Total lookup: a VenueId always has an entry because the Record is exhaustive. */
+/** Total lookup: a VenueId always has an entry because the literal is exhaustive. */
 export function venueEntry(venueId: VenueId): VenueEntry {
   return VENUE_REGISTRY[venueId];
 }

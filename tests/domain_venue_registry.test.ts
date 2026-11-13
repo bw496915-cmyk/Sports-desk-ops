@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   ORIGIN_DOMAIN_REGISTRY,
   VENUE_REGISTRY,
+  isTradeableVenue,
   WRITER_LANE_REGISTRY,
   isOriginDomainId,
   isVenueId,
@@ -45,6 +46,30 @@ describe("venue registry", () => {
       expect(resolveVenueIdForOrigin(entry.originDomainId)).toBe(entry.venueId);
       expect(resolveVenueIdForWriter(lane)).toBe(entry.venueId);
     }
+  });
+
+  test("a venue's origins are derived from the origin table, not a second list", () => {
+    for (const venueId of Object.keys(VENUE_REGISTRY) as VenueId[]) {
+      const derived = (Object.keys(ORIGIN_DOMAIN_REGISTRY) as OriginDomainId[]).filter(
+        (origin) => ORIGIN_DOMAIN_REGISTRY[origin].venueId === venueId,
+      );
+      expect(VENUE_REGISTRY[venueId].originDomainIds).toEqual(derived);
+      expect(VENUE_REGISTRY[venueId].brandColorHex).toBe(
+        ORIGIN_DOMAIN_REGISTRY[derived[0]!].brandColorHex,
+      );
+    }
+  });
+
+  test("only tradeable venues carry a settlement, and internal ones cannot be asked", () => {
+    const f402 = VENUE_REGISTRY.f402;
+    const poly = VENUE_REGISTRY.polymarket;
+    const internal = VENUE_REGISTRY.internal;
+    expect(f402.settlement).toBe("cash_stake");
+    expect(poly.settlement).toBe("token_position");
+    expect("settlement" in internal).toBe(false);
+    expect(isTradeableVenue(f402)).toBe(true);
+    expect(isTradeableVenue(poly)).toBe(true);
+    expect(isTradeableVenue(internal)).toBe(false);
   });
 
   test("the kind of book is stated per venue, not inferred from the colour", () => {
