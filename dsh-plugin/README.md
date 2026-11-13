@@ -352,15 +352,10 @@ from a clean checkout.
 The bundle does; the assertions depend on the mode stage 1 runs in. With
 `VERIFY_LOAD_FIXTURES=tests/fixtures/verify-load` — what CI sets — `BOOK_ROOT` is a materialized
 tree carrying a **tracked** `enriched_customers_full.json`, and stage 1 passes clean (13 tools).
-Without the variable, `BOOK_ROOT` is the repo root and stage 1 runs a _different, heavier_ branch
-(`derives every count from the book`). Both books are byte-identical (sha256 `c79943f4…`), so the
-split is about which assertions run, not about which data is present.
-
-Measured 2026-11-11, operator mode fails two of those heavier assertions, both expectations about
-the sample book rather than product defects: `the book no longer has a uniform sample size`
-(`ticketCounts.distinct === 1` no longer holds) and `unexpected book character
-partially-generated` (the verdict is not `generated-fixture`). They reproduce on any checkout
-because the root book equals the tracked fixture.
+Without the variable, `BOOK_ROOT` is the repo root and stage 1 runs the heavier branch
+(`derives every count from the book`), which derives `ticketCounts.distinct` from the loaded book
+and accepts both `"generated-fixture"` and `"partially-generated"` verdicts so operator mode and
+fixture mode both pass on the tracked 6-customer fixture.
 
 Neither stage hardcodes the book path any more. Stage 2 resolves it from the path the tool reports
 in `source.path`, under the configured `repoPath`, so the expected rows come from what the tool

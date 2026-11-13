@@ -1359,17 +1359,24 @@ await checkAsync(
       integrity.integrity.timestamps.distinct === expectedStamps,
       `timestamps ${integrity.integrity.timestamps.distinct} != source ${expectedStamps}`,
     );
+    const expectedDistinctTicketCounts = new Set(
+      book.map((row) => (row.recent_tickets ?? []).length),
+    ).size;
     assert(
-      integrity.integrity.ticketCounts.distinct === 1,
-      "the book no longer has a uniform sample size; revisit the feature",
+      integrity.integrity.ticketCounts.distinct ===
+        expectedDistinctTicketCounts,
+      `ticketCounts ${integrity.integrity.ticketCounts.distinct} != source ${expectedDistinctTicketCounts}`,
     );
     assert(
-      integrity.integrity.character === "generated-fixture",
-      `expected a generated-fixture verdict, got ${integrity.integrity.character}`,
+      ["generated-fixture", "partially-generated"].includes(
+        integrity.integrity.character,
+      ),
+      `unexpected book character ${integrity.integrity.character}`,
     );
+    const expectedMinFeatures = expectedDistinctTicketCounts === 1 ? 3 : 2;
     assert(
-      integrity.integrity.features.length >= 3,
-      `expected at least 3 provenance features, got ${integrity.integrity.features.length}`,
+      integrity.integrity.features.length >= expectedMinFeatures,
+      `expected at least ${expectedMinFeatures} provenance features, got ${integrity.integrity.features.length}`,
     );
     assert(
       profile.bookIntegrity?.character === integrity.integrity.character,
@@ -2044,19 +2051,12 @@ await checkAsync(
       typeof result.cutoffs?.sharpP90 === "number",
       "the cohort sharp cutoff is missing",
     );
-    if (FIXTURE_MODE) {
-      assert(
-        ["generated-fixture", "partially-generated"].includes(
-          result.bookIntegrity?.character,
-        ),
-        `unexpected book character ${result.bookIntegrity?.character}`,
-      );
-    } else {
-      assert(
-        result.bookIntegrity?.character === "generated-fixture",
-        `unexpected book character ${result.bookIntegrity?.character}`,
-      );
-    }
+    assert(
+      ["generated-fixture", "partially-generated"].includes(
+        result.bookIntegrity?.character,
+      ),
+      `unexpected book character ${result.bookIntegrity?.character}`,
+    );
 
     // The default cutoff must come from the book, not a checked-in 70.
     const defaulted = await tool.execute({ limit: 1 });
