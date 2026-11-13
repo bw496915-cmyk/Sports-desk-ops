@@ -9,7 +9,11 @@ declare module "@ganchrowsci/gs-sdk" {
   }
 
   export interface GsSdkConstructor {
-    new (options: { url: string; username?: string; password?: string }): GsSdkInstance;
+    new (options: {
+      url: string;
+      username?: string;
+      password?: string;
+    }): GsSdkInstance;
   }
 
   export const GsSdk: GsSdkConstructor;
