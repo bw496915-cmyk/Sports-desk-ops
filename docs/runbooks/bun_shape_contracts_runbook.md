@@ -260,7 +260,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/Glob)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `lib/pm_policy.ts`, `scripts/audit_data_handling.ts`
+- **Here:** `lib/pm_policy.ts`, `scripts/dx_workspaces.ts`
 - **Evidence:** `probe:data.glob`
 
 #### Bun.JSON5
