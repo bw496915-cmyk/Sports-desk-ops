@@ -154,10 +154,124 @@ export const WRITER_LANE_REGISTRY: Readonly<
     originDomainId: "ORIGIN_HOST_NSH_DESK_LOCAL",
     venueId: "internal",
     tokenProvenanceCode: "L19_N0518",
-    provenanceLabel: "BLOCKED",
-    brandColorHex: "#64748b",
+    // NOT "BLOCKED": an unparseable writer label is unresolved, and calling it
+    // blocked makes a parsing gap look like a compliance decision.
+    provenanceLabel: "UNRESOLVED",
+    brandColorHex: "#94a3b8",
   },
 };
+
+/**
+ * What kind of book a venue is. The maths differs: a sportsbook holds the stake
+ * (its liability is the payout), an exchange matches two sides (its exposure is
+ * the position), and internal venues settle nothing at all.
+ */
+export type VenueKind = "sportsbook" | "exchange" | "internal";
+
+export type VenueEntry = {
+  readonly venueId: VenueId;
+  readonly displayLabel: string;
+  readonly kind: VenueKind;
+  readonly brandColorHex: string;
+  /** Every origin domain that resolves to this venue. Checked by the test suite. */
+  readonly originDomainIds: readonly OriginDomainId[];
+};
+
+/**
+ * The venue level the other two registries point at.
+ *
+ * ORIGIN_DOMAIN_REGISTRY says where a token came from and WRITER_LANE_REGISTRY
+ * says which lane wrote it; neither answers "is this an exchange or a book?",
+ * which is the question the risk maths depends on.
+ */
+export const VENUE_REGISTRY: Readonly<Record<VenueId, VenueEntry>> = {
+  f402: {
+    venueId: "f402",
+    displayLabel: "Fantasy402",
+    kind: "sportsbook",
+    brandColorHex: "#1d84b5",
+    originDomainIds: ["ORIGIN_SPORTSBOOK_FANTASY402"],
+  },
+  gslive_partner118: {
+    venueId: "gslive_partner118",
+    displayLabel: "GSLive Partner 118",
+    kind: "sportsbook",
+    brandColorHex: "#28a745",
+    originDomainIds: ["ORIGIN_SPORTSBOOK_GSLIVE_PARTNER118"],
+  },
+  polymarket: {
+    venueId: "polymarket",
+    displayLabel: "Polymarket",
+    kind: "exchange",
+    brandColorHex: "#38bdf8",
+    originDomainIds: ["ORIGIN_EXCHANGE_POLYMARKET_CTF"],
+  },
+  kalshi: {
+    venueId: "kalshi",
+    displayLabel: "Kalshi",
+    kind: "exchange",
+    brandColorHex: "#10b981",
+    originDomainIds: ["ORIGIN_EXCHANGE_KALSHI_REGULATED"],
+  },
+  internal: {
+    venueId: "internal",
+    displayLabel: "Desk Internal",
+    kind: "internal",
+    brandColorHex: "#f59e0b",
+    originDomainIds: ["ORIGIN_STORAGE_R2_LAKEHOUSE", "ORIGIN_HOST_NSH_DESK_LOCAL"],
+  },
+};
+
+// NAMING-GATE-04: no Map/Set allocation on a resolution path. Ownership
+// lookups run against the frozen records themselves, which allocates nothing.
+export function isVenueId(value: unknown): value is VenueId {
+  return typeof value === "string" && Object.hasOwn(VENUE_REGISTRY, value);
+}
+
+export function isOriginDomainId(value: unknown): value is OriginDomainId {
+  return typeof value === "string" && Object.hasOwn(ORIGIN_DOMAIN_REGISTRY, value);
+}
+
+export function isWriterLaneId(value: unknown): value is WriterLaneId {
+  return typeof value === "string" && Object.hasOwn(WRITER_LANE_REGISTRY, value);
+}
+
+/**
+ * Parse a venue token arriving from outside the process (JSON, a CLI flag, an
+ * env var). Returns null instead of guessing: a caller that gets null must
+ * decide whether to reject the row or record it as unresolved, and those are
+ * different decisions.
+ *
+ * This is the strict counterpart of resolveWriterLaneId, which is deliberately
+ * forgiving about raw writer spellings.
+ */
+export function parseVenueId(raw: unknown): VenueId | null {
+  if (typeof raw !== "string") return null;
+  const token = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (Object.hasOwn(VENUE_REGISTRY, token)) return token as VenueId;
+  const alias: Readonly<Record<string, VenueId>> = {
+    fantasy402: "f402",
+    gslive: "gslive_partner118",
+    gs_live: "gslive_partner118",
+    partner118: "gslive_partner118",
+    partner_118: "gslive_partner118",
+    poly: "polymarket",
+    ctf: "polymarket",
+    desk: "internal",
+    host: "internal",
+  };
+  return alias[token] ?? null;
+}
+
+/** Total lookup: a VenueId always has an entry because the Record is exhaustive. */
+export function venueEntry(venueId: VenueId): VenueEntry {
+  return VENUE_REGISTRY[venueId];
+}
+
+/** One step from a raw writer label to the venue it traded on. */
+export function resolveVenueIdForWriter(rawWriter: string): VenueId {
+  return WRITER_LANE_REGISTRY[resolveWriterLaneId(rawWriter)].venueId;
+}
 
 /** Normalize a raw writer label from Fantasy402 / GSLive / Exchange payloads into a canonical WriterLaneId. */
 export function resolveWriterLaneId(rawWriter: string): WriterLaneId {
