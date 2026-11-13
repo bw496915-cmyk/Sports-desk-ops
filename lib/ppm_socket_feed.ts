@@ -131,11 +131,13 @@ export interface PpmCoefficientPayload {
 }
 
 /**
- * Decodes a coefficient frame. Measured 2026-11-13: an anonymous reader session
- * gets the market-group descriptor on subscribe and an **empty** coefficient
- * vector (`c: []`), even with groupId/lineSet in the socket metadata — the
- * values appear to need an established partner session. Empty stays empty; it
- * is never turned into a price.
+ * Decodes a coefficient frame.
+ *
+ * Corrected 2026-11-13: this topic ships the market-group descriptor on
+ * subscribe, and its coefficient vector is empty for events with no open
+ * market — not because of a session gate. The full price table comes from the
+ * HTTP bootstrap (`getUpdates?groupId=…`), which is not part of this branch.
+ * Empty stays empty; it is never turned into a price.
  */
 export function decodeCoefficientFrame(
   bytes: Uint8Array<ArrayBuffer>,
