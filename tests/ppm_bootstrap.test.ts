@@ -9,8 +9,22 @@ import { parsePpmBootstrap } from "../lib/ppm_bootstrap.ts";
 const CROP = new URL("./fixtures/ppm/bootstrap.crop.json", import.meta.url);
 const BOOTSTRAP = parsePpmBootstrap(await Bun.file(CROP).json());
 
+const ONE_SIDED_CROP = new URL(
+  "./fixtures/ppm/bootstrap.one-sided.crop.json",
+  import.meta.url,
+);
+const ONE_SIDED = parsePpmBootstrap(await Bun.file(ONE_SIDED_CROP).json());
+
 function event(eventId: string) {
   const found = BOOTSTRAP.events.find(
+    (candidate) => candidate.eventId === eventId,
+  );
+  if (!found) throw new Error(`event ${eventId} missing from the bootstrap`);
+  return found;
+}
+
+function oneSidedEvent(eventId: string) {
+  const found = ONE_SIDED.events.find(
     (candidate) => candidate.eventId === eventId,
   );
   if (!found) throw new Error(`event ${eventId} missing from the bootstrap`);
@@ -70,5 +84,55 @@ describe("parsePpmBootstrap", () => {
     expect(() => parsePpmBootstrap(null)).toThrow();
     expect(() => parsePpmBootstrap([])).toThrow();
     expect(() => parsePpmBootstrap([{ c: null }])).toThrow();
+  });
+});
+
+describe("one-sided quotes", () => {
+  test("a placeholder second element is not a price", () => {
+    const exact = oneSidedEvent("208809881").markets.find(
+      (m) => m.marketId === 16,
+    );
+    expect(exact).toBeDefined();
+    expect(exact!.points).toHaveLength(4);
+    expect(exact!.points.map((p) => p.decimal)).toEqual([4, 5, 2.2, 4.5]);
+    expect(exact!.points.every((p) => p.decimal > 1.01)).toBe(true);
+  });
+
+  test("a missing side of a line keeps the side that exists", () => {
+    const total = oneSidedEvent("189007771").markets.find(
+      (m) => m.marketId === 5,
+    );
+    expect(total).toBeDefined();
+    expect(total!.points).toHaveLength(1);
+    expect(total!.points[0]!.key).toBe("28.5");
+    expect(total!.points[0]!.line).toBe(28.5);
+    expect(total!.points[0]!.side).toBe(1);
+    expect(total!.points[0]!.decimal).toBeCloseTo(15.88, 5);
+  });
+
+  test("a per-outcome key is not a line, even when it is numeric", () => {
+    const exact = oneSidedEvent("208809881").markets.find(
+      (m) => m.marketId === 16,
+    );
+    expect(exact!.points.map((p) => p.line)).toEqual([null, null, null, null]);
+    expect(exact!.points.map((p) => p.side)).toEqual([null, null, null, null]);
+  });
+
+  test("moneyline selections stay lineless", () => {
+    const moneyline = oneSidedEvent("208809881").markets.find(
+      (m) => m.marketId === 3,
+    );
+    expect(moneyline!.points.map((p) => p.key)).toEqual(["1", "2"]);
+    expect(moneyline!.points.every((p) => p.line === null)).toBe(true);
+    expect(moneyline!.line).toBeNull();
+  });
+
+  test("set/period codes pass through instead of becoming 'full'", () => {
+    const markets = oneSidedEvent("208841951").markets;
+    expect(new Set(markets.map((m) => m.period))).toEqual(
+      new Set(["full", "s1"]),
+    );
+    const set1 = markets.find((m) => m.period === "s1");
+    expect(set1!.points.map((p) => p.decimal)).toEqual([2, 1.769231]);
   });
 });
