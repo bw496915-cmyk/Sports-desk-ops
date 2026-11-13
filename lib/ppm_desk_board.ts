@@ -68,6 +68,11 @@ export interface DeskGame {
 export interface DeskBoardOptions {
   /** Drop games starting before this epoch second (e.g. now, for a live board). */
   readonly sinceUnix?: number;
+  /**
+   * Sport names from `eventsMetadata`, which are authoritative. Falls back to
+   * the measured table, then to `null`.
+   */
+  readonly sportNames?: ReadonlyMap<number, string>;
 }
 
 export interface DeskBoard {
@@ -145,7 +150,10 @@ export function toDeskBoard(
         id: gameId(first, clusterStart),
         slateId: first.slateId,
         sportId: first.sportId,
-        sportName: PPM_SPORT_NAMES[first.sportId] ?? null,
+        sportName:
+          options.sportNames?.get(first.sportId) ??
+          PPM_SPORT_NAMES[first.sportId] ??
+          null,
         leagueId: first.leagueId,
         home: { name: tidyName(first.home.name), teamId: first.home.teamId },
         away: { name: tidyName(first.away.name), teamId: first.away.teamId },

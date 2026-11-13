@@ -14,6 +14,8 @@
  */
 import { parsePpmAllEvents } from "../lib/ppm_live_feed.ts";
 import { toDeskBoard } from "../lib/ppm_desk_board.ts";
+import { parsePpmMetadata } from "../lib/ppm_metadata.ts";
+import { assertSportIdSpaceOverlap } from "../lib/ppm_join_guard.ts";
 
 const BASE = Bun.env.PPM_BASE_URL ?? "https://ppm.sportswidgets.pro/live";
 
@@ -38,6 +40,18 @@ async function sessionCookie(): Promise<string> {
   return gsid.split(";")[0]!;
 }
 
+async function loadMetadata(): Promise<ReturnType<typeof parsePpmMetadata>> {
+  // The metadata endpoint lives at the host root, not under the app's /live/ path.
+  const url = new URL("/betLobbyV2/eventsMetadata/", BASE);
+  const response = await fetch(url, {
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`eventsMetadata failed: HTTP ${response.status}`);
+  }
+  return parsePpmMetadata(await response.json());
+}
+
 async function main(): Promise<void> {
   const cookie = await sessionCookie();
   const response = await fetch(`${BASE}/allEvents`, {
@@ -47,15 +61,18 @@ async function main(): Promise<void> {
     throw new Error(`allEvents failed: HTTP ${response.status}`);
   }
   const snapshot = parsePpmAllEvents(await response.json());
+  const metadata = await loadMetadata();
+  assertSportIdSpaceOverlap(metadata.sportNames.keys(), snapshot.sportIds);
   const wantsUpcoming = process.argv.includes("--upcoming");
-  const board = toDeskBoard(
-    snapshot,
-    wantsUpcoming ? { sinceUnix: Math.floor(Date.now() / 1000) } : {},
-  );
+  const board = toDeskBoard(snapshot, {
+    sportNames: metadata.sportNames,
+    ...(wantsUpcoming ? { sinceUnix: Math.floor(Date.now() / 1000) } : {}),
+  });
 
   const summary = {
     base: BASE,
     counts: snapshot.counts,
+    metadata: metadata.counts,
     board: board.counts,
     window: wantsUpcoming ? "upcoming-only" : "all",
     nextGames: board.games.slice(0, 5).map((game) => ({
