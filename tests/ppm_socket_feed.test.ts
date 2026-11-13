@@ -5,10 +5,13 @@
  */
 import { describe, expect, test } from "bun:test";
 import {
+  PPM_COEFFICIENTS_TOPIC_PREFIX,
   PPM_FEED_URL,
   PPM_HERITAGE_TOPIC,
   PpmFeedError,
+  coefficientTopic,
   connectPpmFeed,
+  decodeCoefficientFrame,
   decodePpmFrame,
   type PpmFrame,
   type PpmSocketLike,
@@ -168,5 +171,39 @@ describe("connectPpmFeed", () => {
     });
     handle.close();
     expect(socket.closed).toBe(true);
+  });
+});
+
+const DESCRIPTOR = new Uint8Array(
+  await Bun.file(
+    new URL("./fixtures/ppm/coefficients.descriptor.gz", import.meta.url),
+  ).arrayBuffer(),
+);
+
+describe("coefficient frames", () => {
+  test("builds the per-event topic", () => {
+    expect(coefficientTopic(51808859)).toBe(
+      "prematch.main.U0VWU1NWUkJSMFU9.eventCoefficients.51808859",
+    );
+    expect(PPM_COEFFICIENTS_TOPIC_PREFIX).toBe(
+      "prematch.main.U0VWU1NWUkJSMFU9.eventCoefficients",
+    );
+  });
+
+  test("decodes the market-group descriptor", () => {
+    const payload = decodeCoefficientFrame(DESCRIPTOR);
+    expect(payload.eventId).toBe("51808859");
+    expect(payload.coefficients).toEqual([]);
+    expect(payload.group).not.toBeNull();
+    expect(payload.group!.marketIds).toEqual([1, 2]);
+    expect(payload.group!.selections).toEqual([
+      [1, 0],
+      [0, 2],
+    ]);
+    expect(payload.group!.updatedAtMs).toBe(1794583115000);
+  });
+
+  test("keeps an empty vector empty rather than inventing prices", () => {
+    expect(decodeCoefficientFrame(DESCRIPTOR).coefficients).toHaveLength(0);
   });
 });

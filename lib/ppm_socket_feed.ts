@@ -106,6 +106,67 @@ export const PPM_FEED_URL =
   "wss://spandora.ganchrow.com/socket.io/?EIO=4&transport=websocket";
 export const PPM_HERITAGE_TOPIC = "prematch.main.U0VWU1NWUkJSMFU9.eventData";
 
+/** Prefix for the per-event coefficient topic: `<prefix>.<eventId>`. */
+export const PPM_COEFFICIENTS_TOPIC_PREFIX =
+  "prematch.main.U0VWU1NWUkJSMFU9.eventCoefficients";
+
+/** The per-event line topic. Subscribing to the prefix alone yields nothing. */
+export function coefficientTopic(eventId: string | number): string {
+  return `${PPM_COEFFICIENTS_TOPIC_PREFIX}.${eventId}`;
+}
+
+/** Market-group descriptor carried alongside the coefficient vector. */
+export interface PpmMarketGroup {
+  readonly gp: number;
+  readonly marketIds: readonly number[];
+  readonly selections: readonly (readonly number[])[];
+  readonly updatedAtMs: number | null;
+}
+
+export interface PpmCoefficientPayload {
+  readonly eventId: string;
+  /** Empty until the event has tradeable prices on this session. */
+  readonly coefficients: readonly number[];
+  readonly group: PpmMarketGroup | null;
+}
+
+/**
+ * Decodes a coefficient frame. Measured 2026-11-13: an anonymous reader session
+ * gets the market-group descriptor on subscribe and an **empty** coefficient
+ * vector (`c: []`), even with groupId/lineSet in the socket metadata — the
+ * values appear to need an established partner session. Empty stays empty; it
+ * is never turned into a price.
+ */
+export function decodeCoefficientFrame(
+  bytes: Uint8Array<ArrayBuffer>,
+): PpmCoefficientPayload {
+  const frame = decodePpmFrame(bytes);
+  const payload = frame.payload;
+  if (!payload || typeof payload.id !== "string") {
+    throw new PpmFeedError("coefficient frame is missing its event id");
+  }
+  const coefficients = Array.isArray(payload.c)
+    ? payload.c.filter((value): value is number => typeof value === "number")
+    : [];
+  const rawGroup = payload.m;
+  let group: PpmMarketGroup | null = null;
+  if (isRecord(rawGroup)) {
+    group = {
+      gp: typeof rawGroup.gp === "number" ? rawGroup.gp : 0,
+      marketIds: Array.isArray(rawGroup.m)
+        ? rawGroup.m.filter(
+            (value): value is number => typeof value === "number",
+          )
+        : [],
+      selections: Array.isArray(rawGroup.s)
+        ? rawGroup.s.filter(Array.isArray).map((row) => row as number[])
+        : [],
+      updatedAtMs: typeof rawGroup.tu === "number" ? rawGroup.tu : null,
+    };
+  }
+  return { eventId: payload.id, coefficients, group };
+}
+
 /**
  * Connects, performs the handshake, and forwards decoded frames. Returns a
  * handle with `close()`. Incoming events are processed in order; a frame that
