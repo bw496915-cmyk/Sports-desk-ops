@@ -9,7 +9,7 @@ import { describe, expect, test } from "bun:test";
 import { parsePpmBootstrap } from "../lib/ppm_bootstrap.ts";
 import { parsePpmAllEvents } from "../lib/ppm_live_feed.ts";
 import { parsePpmMetadata } from "../lib/ppm_metadata.ts";
-import { joinPpmPrices } from "../lib/ppm_price_join.ts";
+import { alignPpmPricesToGames, joinPpmPrices } from "../lib/ppm_price_join.ts";
 
 const SNAPSHOT = parsePpmAllEvents(
   await Bun.file(
@@ -114,5 +114,90 @@ describe("joinPpmPrices", () => {
     expect(
       JOIN.priced.find((entry) => entry.fixture.eventId === unpriced!.eventId),
     ).toBeUndefined();
+  });
+});
+
+const ALIGN_FIXTURES = [1, 2, 3].map((id) => ({
+  eventId: id,
+  slateId: 1,
+  sportId: 1,
+  leagueId: 1,
+  home: { name: `H${id}`, teamId: id * 10 },
+  away: { name: `A${id}`, teamId: id * 10 + 1 },
+  startTimeUnix: 1_800_000_000,
+}));
+const ALIGN_PRICES = parsePpmBootstrap([
+  {
+    t: 1,
+    c: {
+      "1": { c: { m: { "3": { o: { "1": 1.9, "2": 1.9 } } } } },
+      "2": { c: { m: { "3": { o: { "1": 2.1, "2": 1.7 } } } } },
+    },
+  },
+  {},
+  {},
+  {},
+]);
+const ALIGN_JOIN = joinPpmPrices(ALIGN_FIXTURES, ALIGN_PRICES);
+
+function game(id: string, eventIds: number[]) {
+  return {
+    id,
+    slateId: 1,
+    sportId: 1,
+    sportName: "Baseball",
+    leagueId: 1,
+    home: { name: `H${eventIds[0]}`, teamId: eventIds[0]! * 10 },
+    away: { name: `A${eventIds[0]}`, teamId: eventIds[0]! * 10 + 1 },
+    startTimeUnix: 1_800_000_000,
+    eventIds,
+  };
+}
+
+describe("alignPpmPricesToGames", () => {
+  const alignment = alignPpmPricesToGames(
+    {
+      games: [
+        game("first", [1]),
+        game("later", [99, 2]),
+        game("unpriced", [3]),
+        game("two-priced", [1, 2]),
+      ],
+    },
+    ALIGN_JOIN,
+  );
+
+  test("uses the priced event, even when it is not eventIds[0]", () => {
+    const later = alignment.games.find((entry) => entry.game.id === "later")!;
+    expect(later.eventId).toBe(2);
+    expect(later.markets).toHaveLength(1);
+    expect(alignment.counts.pricedNotFirst).toBe(1);
+  });
+
+  test("an unpriced game stays unpriced rather than zero-priced", () => {
+    const unpriced = alignment.games.find(
+      (entry) => entry.game.id === "unpriced",
+    )!;
+    expect(unpriced.eventId).toBeNull();
+    expect(unpriced.markets).toEqual([]);
+    expect(unpriced.ambiguous).toBe(false);
+  });
+
+  test("two priced events are reported as ambiguous, not merged", () => {
+    const ambiguous = alignment.games.find(
+      (entry) => entry.game.id === "two-priced",
+    )!;
+    expect(ambiguous.ambiguous).toBe(true);
+    expect(ambiguous.eventId).toBeNull();
+    expect(ambiguous.markets).toEqual([]);
+    expect(ambiguous.candidateEventIds).toEqual([1, 2]);
+    expect(alignment.counts.ambiguousGames).toBe(1);
+  });
+
+  test("counts partition the games", () => {
+    expect(alignment.counts.games).toBe(4);
+    expect(alignment.counts.pricedGames).toBe(2);
+    expect(alignment.counts.unpricedGames).toBe(1);
+    expect(alignment.counts.ambiguousGames).toBe(1);
   });
 });

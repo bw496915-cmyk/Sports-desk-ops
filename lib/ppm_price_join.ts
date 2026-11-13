@@ -35,6 +35,7 @@ import type {
   PpmSideRole,
 } from "./ppm_bootstrap.ts";
 import { referencePrices } from "./ppm_bootstrap.ts";
+import type { DeskBoard, DeskGame } from "./ppm_desk_board.ts";
 import type { PpmFixture } from "./ppm_live_feed.ts";
 import { decimalToAmerican } from "./ppm_odds.ts";
 
@@ -203,6 +204,98 @@ export function joinPpmPrices(
       twoSidedMarkets,
       unnamedMarkets,
       orphanPriceEvents: orphanPriceEvents.length,
+    },
+  };
+}
+
+/** One desk game with the priced event that belongs to it, if any. */
+export interface PpmAlignedGame {
+  readonly game: DeskGame;
+  /** The priced event chosen, or `null` when unpriced or ambiguous. */
+  readonly eventId: number | null;
+  readonly markets: readonly PpmPricedMarket[];
+  /** More than one of the game's events carried prices; nothing was merged. */
+  readonly ambiguous: boolean;
+  readonly candidateEventIds: readonly number[];
+}
+
+export interface PpmGameAlignment {
+  readonly games: readonly PpmAlignedGame[];
+  readonly counts: {
+    readonly games: number;
+    readonly pricedGames: number;
+    readonly unpricedGames: number;
+    /** Games with more than one priced event; left unpriced on purpose. */
+    readonly ambiguousGames: number;
+    /** Priced games whose price came from an event other than `eventIds[0]`. */
+    readonly pricedNotFirst: number;
+  };
+}
+
+/**
+ * Picks, per desk game, the one event that carries prices.
+ *
+ * Measured 2026-11-13: 3,331 games are priced, and in 86 of them (2.6%) the
+ * priced event is **not** `eventIds[0]` — a naive first-event join loses those.
+ * No game has two priced events, so the multi-price case has no precedent to
+ * copy; it is reported as `ambiguous` instead of merged or resolved by order.
+ */
+export function alignPpmPricesToGames(
+  board: Pick<DeskBoard, "games">,
+  join: PpmPriceJoin,
+): PpmGameAlignment {
+  const byEvent = new Map<number, PpmPricedFixture>();
+  for (const entry of join.priced) byEvent.set(entry.fixture.eventId, entry);
+
+  let pricedGames = 0;
+  let ambiguousGames = 0;
+  let pricedNotFirst = 0;
+  const games: PpmAlignedGame[] = [];
+
+  for (const game of board.games) {
+    const hits = game.eventIds.filter((eventId) => byEvent.has(eventId));
+    if (hits.length === 0) {
+      games.push({
+        game,
+        eventId: null,
+        markets: [],
+        ambiguous: false,
+        candidateEventIds: [],
+      });
+      continue;
+    }
+    if (hits.length > 1) {
+      ambiguousGames += 1;
+      games.push({
+        game,
+        eventId: null,
+        markets: [],
+        ambiguous: true,
+        candidateEventIds: hits,
+      });
+      continue;
+    }
+    const eventId = hits[0]!;
+    const entry = byEvent.get(eventId)!;
+    pricedGames += 1;
+    if (eventId !== game.eventIds[0]) pricedNotFirst += 1;
+    games.push({
+      game,
+      eventId,
+      markets: entry.markets,
+      ambiguous: false,
+      candidateEventIds: [],
+    });
+  }
+
+  return {
+    games,
+    counts: {
+      games: board.games.length,
+      pricedGames,
+      unpricedGames: board.games.length - pricedGames - ambiguousGames,
+      ambiguousGames,
+      pricedNotFirst,
     },
   };
 }
