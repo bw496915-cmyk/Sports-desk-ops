@@ -43,6 +43,15 @@ import {
 } from "./domain-enums.ts";
 
 export const NSH_FRAME_BYTE_LENGTH = 64;
+
+/**
+ * Decode scratch. `readNshBinaryFrameInto` copies the incoming 64 bytes here and
+ * reads through one module-level `DataView`, instead of constructing a DataView
+ * per call, so the caller's reusable target is the only allocation on the decode
+ * path. Not reentrant: the copy and reads are synchronous and never yield.
+ */
+const DECODE_SCRATCH = new Uint8Array(NSH_FRAME_BYTE_LENGTH);
+const DECODE_SCRATCH_VIEW = new DataView(DECODE_SCRATCH.buffer);
 export const NSH_FRAME_MAGIC = 0x4e; // "N"
 export const NSH_FRAME_VERSION = 6;
 export const NSH_MESSAGE_TYPE = Object.freeze({
@@ -312,7 +321,10 @@ export function readNshBinaryFrameInto(
     );
   }
 
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let i = 0; i < NSH_FRAME_BYTE_LENGTH; i += 1) {
+    DECODE_SCRATCH[i] = bytes[i]!;
+  }
+  const view = DECODE_SCRATCH_VIEW;
   if (view.getUint8(0) !== NSH_FRAME_MAGIC) {
     fail(
       "invalid_magic",

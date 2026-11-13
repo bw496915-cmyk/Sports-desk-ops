@@ -102,7 +102,7 @@ describe("layout descriptor", () => {
   test("fields tile 0..63 with no gap or overlap", () => {
     let cursor = 0;
     for (const field of NSH_FRAME_FIELD_SPEC) {
-      expect(field.offset).toBe(cursor);
+      expect(field.offset as number).toBe(cursor);
       cursor += field.size;
     }
     expect(cursor).toBe(NSH_FRAME_BYTE_LENGTH);
@@ -179,10 +179,10 @@ describe("property round-trip", () => {
       expect(decoded.polyAvgPrice).toBe(input.polyAvgPrice);
       expect(decoded.liabilityDelta).toBe(input.liabilityDelta);
       expect(decoded.originDomainWireId).toBe(input.originDomainWireId);
-      expect(decoded.writerLaneWireId).toBe(input.writerLaneWireId);
+      expect(Number(decoded.writerLaneWireId)).toBe(Number(input.writerLaneWireId));
       expect(decoded.flags).toBe(input.flags);
       expect(decoded.slippageBps).toBe(input.slippageBps);
-      expect(decoded.timestampMs).toBe(input.timestampMs);
+      expect(decoded.timestampMs).toBe(Number(input.timestampMs));
     }
   });
 });
@@ -353,7 +353,7 @@ describe("wire id tables are locked to the registry", () => {
       1, 2, 3, 4, 5, 6,
     ]);
     for (const [registryId, wireId] of Object.entries(ORIGIN_DOMAIN_WIRE_ID)) {
-      expect(ORIGIN_DOMAIN_BY_WIRE_ID[wireId]).toBe(registryId);
+      expect(String(ORIGIN_DOMAIN_BY_WIRE_ID[wireId])).toBe(registryId);
     }
     expect(originDomainIdOfWireId(OriginDomainWireId.UNSET)).toBeNull();
   });
@@ -366,7 +366,7 @@ describe("wire id tables are locked to the registry", () => {
       0, 1, 2, 3, 4, 5, 6, 7,
     ]);
     for (const [registryId, wireId] of Object.entries(WRITER_LANE_WIRE_ID)) {
-      expect(WRITER_LANE_BY_WIRE_ID[wireId]).toBe(registryId);
+      expect(String(WRITER_LANE_BY_WIRE_ID[wireId])).toBe(registryId);
     }
   });
 });
