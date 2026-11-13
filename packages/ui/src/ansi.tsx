@@ -4,6 +4,7 @@
  */
 
 import React from "react";
+import { rewriteBrokenDeskUrl } from "./links.ts";
 
 export interface AnsiSegment {
   readonly text: string;
@@ -51,7 +52,7 @@ export function parseAnsiTokens(raw: string): AnsiSegment[] {
   const segments: AnsiSegment[] = [];
   // eslint-disable-next-line no-control-regex -- ANSI and OSC 8 sequences require control characters
   const tokenRegex =
-    /\x1b]8;[^\x1b\\]*(?:\x1b\\|\x07)([^\x1b]*)\x1b]8;;\x1b\\|\x1b\[([0-9;]*)m/g;
+    /\x1b]8;[^\x1b\x07]*(?:\x1b\\|\x07)([^\x1b]*)\x1b]8;;(?:\x1b\\|\x07)|\x1b\[([0-9;]*)m/g;
 
   let lastIndex = 0;
   let currentColor: string | undefined;
@@ -186,7 +187,7 @@ export function renderAnsiReact(raw: string): React.ReactNode[] {
       return (
         <a
           key={i}
-          href={seg.linkUrl}
+          href={rewriteBrokenDeskUrl(seg.linkUrl)}
           target="_blank"
           rel="noreferrer"
           style={{ ...style, cursor: "pointer" }}

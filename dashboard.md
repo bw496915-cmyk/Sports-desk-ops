@@ -26,31 +26,31 @@
 
 ## 🏢 Top Sub-Agents & Downline Trees (30-Day Rollup)
 
-| Sub-Agent                                                 | Master Trunk | 30d Handle (USD) | Total Wagers | Customers | Top Customer                                                     | Top Cust Conc (%) |   Conduit Status    |
-| :-------------------------------------------------------- | :----------: | :--------------: | :----------: | :-------: | :--------------------------------------------------------------- | :---------------: | :-----------------: |
-| [FAKEMONEY](https://desk.bookdeskops.com/agent/FAKEMONEY) | `TRACKTHIS`  |  `$13,245,600`   |   `2,207`    |    `1`    | [BAR301](https://fantasy402.com/manager.html?customer=BAR301)    |      `89.2%`      | 🚨 `PROXY_CONDUIT`  |
-| [AG_SHARP](https://desk.bookdeskops.com/agent/AG_SHARP)   | `TRACKTHIS`  |  `$11,850,200`   |   `2,840`    |    `8`    | [BRT5229](https://fantasy402.com/manager.html?customer=BRT5229)  |      `85.2%`      | 🚨 `PROXY_CONDUIT`  |
-| [AG99](https://desk.bookdeskops.com/agent/AG99)           | `TRACKTHIS`  |   `$8,420,100`   |   `1,420`    |    `4`    | [GP301](https://fantasy402.com/manager.html?customer=GP301)      |      `78.6%`      | ⚠️ `MONITORED_RING` |
-| [VIPMIAMI](https://desk.bookdeskops.com/agent/VIPMIAMI)   | `TRACKTHIS`  |   `$6,140,800`   |    `952`     |    `5`    | [KENT99](https://fantasy402.com/manager.html?customer=KENT99)    |      `71.4%`      | ⚠️ `MONITORED_RING` |
-| [BIGDAD](https://desk.bookdeskops.com/agent/BIGDAD)       | `TRACKTHIS`  |   `$4,920,400`   |    `840`     |    `6`    | [BGD101](https://fantasy402.com/manager.html?customer=BGD101)    |      `64.8%`      | ⚠️ `MONITORED_RING` |
-| [FATSSIDE](https://desk.bookdeskops.com/agent/FATSSIDE)   |  `NOLAPPH`   |   `$3,850,000`   |   `2,604`    |   `42`    | [RETAIL_1](https://fantasy402.com/manager.html?customer=RETAIL1) |      `12.1%`      |  🟢 `DISTRIBUTED`   |
-| [FATSNOBOT](https://desk.bookdeskops.com/agent/FATSNOBOT) |  `NOLAPPH`   |   `$2,910,200`   |   `1,818`    |   `38`    | [RETAIL_2](https://fantasy402.com/manager.html?customer=RETAIL2) |      `10.4%`      |  🟢 `DISTRIBUTED`   |
-| [LAND225](https://desk.bookdeskops.com/agent/LAND225)     |  `NOLAPPH`   |   `$2,140,500`   |   `1,240`    |   `29`    | [RETAIL_3](https://fantasy402.com/manager.html?customer=RETAIL3) |      `9.8%`       |  🟢 `DISTRIBUTED`   |
+| Sub-Agent                     | Master Trunk | 30d Handle (USD) | Total Wagers | Customers | Top Customer                                                     | Top Cust Conc (%) |   Conduit Status    |
+| :---------------------------- | :----------: | :--------------: | :----------: | :-------: | :--------------------------------------------------------------- | :---------------: | :-----------------: |
+| [FAKEMONEY](/agent/FAKEMONEY) | `TRACKTHIS`  |  `$13,245,600`   |   `2,207`    |    `1`    | [BAR301](https://fantasy402.com/manager.html?customer=BAR301)    |      `89.2%`      | 🚨 `PROXY_CONDUIT`  |
+| [AG_SHARP](/agent/AG_SHARP)   | `TRACKTHIS`  |  `$11,850,200`   |   `2,840`    |    `8`    | [BRT5229](https://fantasy402.com/manager.html?customer=BRT5229)  |      `85.2%`      | 🚨 `PROXY_CONDUIT`  |
+| [AG99](/agent/AG99)           | `TRACKTHIS`  |   `$8,420,100`   |   `1,420`    |    `4`    | [GP301](https://fantasy402.com/manager.html?customer=GP301)      |      `78.6%`      | ⚠️ `MONITORED_RING` |
+| [VIPMIAMI](/agent/VIPMIAMI)   | `TRACKTHIS`  |   `$6,140,800`   |    `952`     |    `5`    | [KENT99](https://fantasy402.com/manager.html?customer=KENT99)    |      `71.4%`      | ⚠️ `MONITORED_RING` |
+| [BIGDAD](/agent/BIGDAD)       | `TRACKTHIS`  |   `$4,920,400`   |    `840`     |    `6`    | [BGD101](https://fantasy402.com/manager.html?customer=BGD101)    |      `64.8%`      | ⚠️ `MONITORED_RING` |
+| [FATSSIDE](/agent/FATSSIDE)   |  `NOLAPPH`   |   `$3,850,000`   |   `2,604`    |   `42`    | [RETAIL_1](https://fantasy402.com/manager.html?customer=RETAIL1) |      `12.1%`      |  🟢 `DISTRIBUTED`   |
+| [FATSNOBOT](/agent/FATSNOBOT) |  `NOLAPPH`   |   `$2,910,200`   |   `1,818`    |   `38`    | [RETAIL_2](https://fantasy402.com/manager.html?customer=RETAIL2) |      `10.4%`      |  🟢 `DISTRIBUTED`   |
+| [LAND225](/agent/LAND225)     |  `NOLAPPH`   |   `$2,140,500`   |   `1,240`    |   `29`    | [RETAIL_3](https://fantasy402.com/manager.html?customer=RETAIL3) |      `9.8%`       |  🟢 `DISTRIBUTED`   |
 
 ---
 
 ## ⚡ Live Incoming Wager Stream (Real-Time Tape)
 
-| Ticket ID   | Customer                                                          | Sub-Agent                                               | Sport / League | Market & Selection         | CLV Delta  |   Risk USD    | To Win USD | Alert Tag         | Action Directive    |
-| :---------- | :---------------------------------------------------------------- | :------------------------------------------------------ | :------------: | :------------------------- | :--------: | :-----------: | :--------: | :---------------- | :------------------ |
-| `#W-109281` | [GP301](https://fantasy402.com/manager.html?customer=GP301)       | [AG99](https://desk.bookdeskops.com/agent/AG99)         |    **NFL**     | KC Chiefs `-3½` (-110)     | `+215 bps` | **`$5,500`**  |  `$5,000`  | 🚨 CRITICAL_KEY   | 🚨 `ALERT_OPERATOR` |
-| `#W-109282` | [BRT5229](https://fantasy402.com/manager.html?customer=BRT5229)   | [AG_SHARP](https://desk.bookdeskops.com/agent/AG_SHARP) |    **NFL**     | BAL Ravens `-7½` (-105)    | `+185 bps` | **`$10,000`** |  `$9,524`  | 🚨 CRITICAL_KEY   | 🚨 `ALERT_OPERATOR` |
-| `#W-109283` | [CCC88412](https://fantasy402.com/manager.html?customer=CCC88412) | [AG_SHARP](https://desk.bookdeskops.com/agent/AG_SHARP) |    **CFB**     | UGA Bulldogs `-10½` (-110) | `+240 bps` | **`$7,500`**  |  `$6,818`  | 🚨 CRITICAL_BURST | 🚨 `ALERT_OPERATOR` |
-| `#W-109284` | [ST100](https://fantasy402.com/manager.html?customer=ST100)       | [AG_SHARP](https://desk.bookdeskops.com/agent/AG_SHARP) |    **NFL**     | Over `44½` (-110)          | `+140 bps` |   `$2,500`    |  `$2,272`  | ⚠️ STEAM_CHASE    | ⚠️ `ALERT_OPERATOR` |
-| `#W-109285` | [KENT99](https://fantasy402.com/manager.html?customer=KENT99)     | [VIPMIAMI](https://desk.bookdeskops.com/agent/VIPMIAMI) |    **NBA**     | BOS Celtics Live `-4½`     | `+160 bps` |   `$3,200`    |  `$2,909`  | ⚠️ LIVE_LATENCY   | ⚠️ `ALERT_OPERATOR` |
-| `#W-109286` | [BGD101](https://fantasy402.com/manager.html?customer=BGD101)     | [BIGDAD](https://desk.bookdeskops.com/agent/BIGDAD)     |    **CFB**     | Under `52½` (-110)         | `+125 bps` |   `$2,000`    |  `$1,818`  | 👁️ MONITOR_ORIG   | 👁️ `MONITOR`        |
-| `#W-109287` | [RF2003](https://fantasy402.com/manager.html?customer=RF2003)     | [FATSSIDE](https://desk.bookdeskops.com/agent/FATSSIDE) |    **NFL**     | SF 49ers ML (-165)         | `-15 bps`  |    `$350`     |   `$212`   | 🟢 RECREATIONAL   | ✅ `ACCEPT`         |
-| `#W-109288` | [SQUARE1](https://fantasy402.com/manager.html?customer=SQUARE1)   | [LAND225](https://desk.bookdeskops.com/agent/LAND225)   |    **NBA**     | 4-Leg Parlay (+1250)       | `-320 bps` |    `$100`     |  `$1,250`  | 🟢 SQUARE_PARLAY  | ✅ `ACCEPT`         |
+| Ticket ID   | Customer                                                          | Sub-Agent                   | Sport / League | Market & Selection         | CLV Delta  |   Risk USD    | To Win USD | Alert Tag         | Action Directive    |
+| :---------- | :---------------------------------------------------------------- | :-------------------------- | :------------: | :------------------------- | :--------: | :-----------: | :--------: | :---------------- | :------------------ |
+| `#W-109281` | [GP301](https://fantasy402.com/manager.html?customer=GP301)       | [AG99](/agent/AG99)         |    **NFL**     | KC Chiefs `-3½` (-110)     | `+215 bps` | **`$5,500`**  |  `$5,000`  | 🚨 CRITICAL_KEY   | 🚨 `ALERT_OPERATOR` |
+| `#W-109282` | [BRT5229](https://fantasy402.com/manager.html?customer=BRT5229)   | [AG_SHARP](/agent/AG_SHARP) |    **NFL**     | BAL Ravens `-7½` (-105)    | `+185 bps` | **`$10,000`** |  `$9,524`  | 🚨 CRITICAL_KEY   | 🚨 `ALERT_OPERATOR` |
+| `#W-109283` | [CCC88412](https://fantasy402.com/manager.html?customer=CCC88412) | [AG_SHARP](/agent/AG_SHARP) |    **CFB**     | UGA Bulldogs `-10½` (-110) | `+240 bps` | **`$7,500`**  |  `$6,818`  | 🚨 CRITICAL_BURST | 🚨 `ALERT_OPERATOR` |
+| `#W-109284` | [ST100](https://fantasy402.com/manager.html?customer=ST100)       | [AG_SHARP](/agent/AG_SHARP) |    **NFL**     | Over `44½` (-110)          | `+140 bps` |   `$2,500`    |  `$2,272`  | ⚠️ STEAM_CHASE    | ⚠️ `ALERT_OPERATOR` |
+| `#W-109285` | [KENT99](https://fantasy402.com/manager.html?customer=KENT99)     | [VIPMIAMI](/agent/VIPMIAMI) |    **NBA**     | BOS Celtics Live `-4½`     | `+160 bps` |   `$3,200`    |  `$2,909`  | ⚠️ LIVE_LATENCY   | ⚠️ `ALERT_OPERATOR` |
+| `#W-109286` | [BGD101](https://fantasy402.com/manager.html?customer=BGD101)     | [BIGDAD](/agent/BIGDAD)     |    **CFB**     | Under `52½` (-110)         | `+125 bps` |   `$2,000`    |  `$1,818`  | 👁️ MONITOR_ORIG   | 👁️ `MONITOR`        |
+| `#W-109287` | [RF2003](https://fantasy402.com/manager.html?customer=RF2003)     | [FATSSIDE](/agent/FATSSIDE) |    **NFL**     | SF 49ers ML (-165)         | `-15 bps`  |    `$350`     |   `$212`   | 🟢 RECREATIONAL   | ✅ `ACCEPT`         |
+| `#W-109288` | [SQUARE1](https://fantasy402.com/manager.html?customer=SQUARE1)   | [LAND225](/agent/LAND225)   |    **NBA**     | 4-Leg Parlay (+1250)       | `-320 bps` |    `$100`     |  `$1,250`  | 🟢 SQUARE_PARLAY  | ✅ `ACCEPT`         |
 
 > **Security & Signal Honesty Invariant**: `autoExecute: false`. Every action directive produces a recommendation for human desk operator review and does not automatically mutate production wagering rules.
 

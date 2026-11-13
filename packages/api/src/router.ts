@@ -508,6 +508,138 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
         return Response.json(buildWsStatusPayload());
       },
     },
+
+    "/api/bet-ticker": {
+      GET: async (req: Request): Promise<Response> => {
+        const denied = await enforceAuth(req);
+        if (denied) return denied;
+        const url = new URL(req.url);
+        const writer = url.searchParams.get("writer") ?? undefined;
+        const wagerType =
+          url.searchParams.get("type") ??
+          url.searchParams.get("wagerType") ??
+          undefined;
+        if (!deps.getBetTickerPayload) {
+          const observedAt = new Date().toISOString();
+          return Response.json({
+            schemaVersion: 1,
+            observedAt,
+            autoExecute: false,
+            provenance: {
+              kind: "unavailable",
+              label: "Bet-Ticker loader not configured",
+              sourcePath: null,
+              observedAt,
+            },
+            localFeed: {
+              rawRowCount: 0,
+              actionableTicketCount: 0,
+              sentinelNoiseCount: 0,
+              totalWageredCents: 0,
+              totalVolumeCents: 0,
+              totalToWinCents: 0,
+              volumeDiffersCount: 0,
+              vipCount: 0,
+              liveCount: 0,
+              flagCount: 0,
+              byRule: {},
+              byWriter: [],
+              byWagerType: [],
+              tickets: [],
+            },
+            bridge3aR2: {
+              available: false,
+              publicUrl: "",
+              state: "error",
+              lastModified: null,
+              ageSeconds: null,
+              generatedAt: null,
+              deskDate: null,
+              deskHour: null,
+              watermark: null,
+              rowCount: 0,
+              ticketCount: 0,
+              legCount: 0,
+              alertTwinCount: 0,
+              orphanCount: 0,
+              byChannel: {},
+              byWagerType: {},
+            },
+            pendingGames: {
+              available: false,
+              gameCount: 0,
+              pendingCount: 0,
+              totalWageredCents: 0,
+              totalToWinCents: 0,
+              capturedAt: null,
+              dataSource: null,
+              sourcePath: null,
+            },
+            captureHealth: {
+              available: false,
+              status: null,
+              capturedAt: null,
+              ageSeconds: null,
+              rowCount: null,
+              sourcePath: null,
+            },
+          });
+        }
+        return Response.json(
+          await deps.getBetTickerPayload({ writer, wagerType }),
+        );
+      },
+    },
+
+    "/api/r2/pipeline": {
+      GET: async (req: Request): Promise<Response> => {
+        const denied = await enforceAuth(req);
+        if (denied) return denied;
+        const url = new URL(req.url);
+        const refresh = url.searchParams.get("refresh") === "1";
+        if (!deps.getR2PipelinePayload) {
+          const observedAt = new Date().toISOString();
+          return Response.json({
+            schemaVersion: 1,
+            bucketPublicBase: "",
+            observedAt,
+            overallStatus: "degraded",
+            freshCount: 0,
+            totalCount: 0,
+            staleKeys: [],
+            dataStaleKeys: [],
+            sinks: [],
+            daemon4020: {
+              online: false,
+              url: "http://127.0.0.1:4020/health",
+              status: null,
+              latencyMs: null,
+              checkedAt: observedAt,
+              reason: "R2 pipeline probe not configured",
+            },
+          });
+        }
+        return Response.json(await deps.getR2PipelinePayload({ refresh }));
+      },
+    },
+
+    "/api/daemon/status": {
+      GET: async (req: Request): Promise<Response> => {
+        const denied = await enforceAuth(req);
+        if (denied) return denied;
+        if (!deps.getDaemonStatusPayload) {
+          return Response.json({
+            online: false,
+            url: "http://127.0.0.1:4020/health",
+            status: null,
+            latencyMs: null,
+            checkedAt: new Date().toISOString(),
+            reason: "Daemon probe not configured",
+          });
+        }
+        return Response.json(await deps.getDaemonStatusPayload());
+      },
+    },
   } satisfies Record<string, SimpleMethodHandlers>;
 
   const paramRoutes = {
@@ -570,6 +702,60 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
         });
       },
     },
+
+    "/api/agent/:id": {
+      GET: async (
+        req: RouteRequestWithParams<{ readonly id: string }>,
+      ): Promise<Response> => {
+        const denied = await enforceAuth(req);
+        if (denied) return denied;
+        const agentId = decodeURIComponent(req.params.id);
+        if (!deps.getAgentDetailPayload) {
+          return Response.json({
+            schemaVersion: 1,
+            agentId: agentId.trim().toUpperCase(),
+            found: false,
+            masterAgent: null,
+            level: null,
+            agentType: null,
+            childAgents: [],
+            conduit30d: null,
+            customers: [],
+            recentWagers: [],
+            observedAt: new Date().toISOString(),
+            autoExecute: false,
+          });
+        }
+        return Response.json(await deps.getAgentDetailPayload(agentId));
+      },
+    },
+
+    "/api/agents/:id": {
+      GET: async (
+        req: RouteRequestWithParams<{ readonly id: string }>,
+      ): Promise<Response> => {
+        const denied = await enforceAuth(req);
+        if (denied) return denied;
+        const agentId = decodeURIComponent(req.params.id);
+        if (!deps.getAgentDetailPayload) {
+          return Response.json({
+            schemaVersion: 1,
+            agentId: agentId.trim().toUpperCase(),
+            found: false,
+            masterAgent: null,
+            level: null,
+            agentType: null,
+            childAgents: [],
+            conduit30d: null,
+            customers: [],
+            recentWagers: [],
+            observedAt: new Date().toISOString(),
+            autoExecute: false,
+          });
+        }
+        return Response.json(await deps.getAgentDetailPayload(agentId));
+      },
+    },
   } satisfies Record<string, IdParamMethodHandlers>;
 
   const apiFallbackResponse = () =>
@@ -611,6 +797,23 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
         return Response.json({ error: "Method Not Allowed" }, { status: 405 });
       }
       const id = decodeURIComponent(alertActionMatch[1]);
+      const reqWithParams = Object.assign(req, {
+        params: { id },
+      }) as RouteRequestWithParams<{ readonly id: string }>;
+      return handler(reqWithParams);
+    }
+
+    const agentDetailMatch = /^\/api\/agents?\/([^/]+)$/.exec(url.pathname);
+    if (agentDetailMatch?.[1]) {
+      const routeKey = url.pathname.startsWith("/api/agents/")
+        ? "/api/agents/:id"
+        : "/api/agent/:id";
+      const handlers = paramRoutes[routeKey] as IdParamMethodHandlers;
+      const handler = handlers[method];
+      if (!handler) {
+        return Response.json({ error: "Method Not Allowed" }, { status: 405 });
+      }
+      const id = decodeURIComponent(agentDetailMatch[1]);
       const reqWithParams = Object.assign(req, {
         params: { id },
       }) as RouteRequestWithParams<{ readonly id: string }>;

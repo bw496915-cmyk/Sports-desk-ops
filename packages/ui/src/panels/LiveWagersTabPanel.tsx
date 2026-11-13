@@ -4,6 +4,7 @@ import {
   formatProvenanceBadge,
   SHOWCASE_WAGERS_PROVENANCE,
 } from "../hydration.ts";
+import { getLocalAgentHref } from "../links.ts";
 import { SAMPLE_LIVE_WAGERS } from "../showcase_data.ts";
 import type {
   DashboardSourceProvenance,
@@ -35,6 +36,7 @@ export interface LiveWagersTabPanelProps {
   readonly tiersConfig: TierStyleConfig | null;
   readonly onSelectCustomerById: (customerId: string) => void;
   readonly onInspectPty: (customerId: string) => void;
+  readonly onSelectAgent?: ((agentId: string) => void) | undefined;
 }
 
 const SPORT_PILLS = [
@@ -91,6 +93,7 @@ export function LiveWagersTabPanel({
   tiersConfig,
   onSelectCustomerById,
   onInspectPty,
+  onSelectAgent,
 }: LiveWagersTabPanelProps): React.ReactElement {
   const activeWagers = wagers;
   const activeProvenance: DashboardSourceProvenance = wagersError
@@ -500,16 +503,25 @@ export function LiveWagersTabPanel({
                     <td style={styles.td}>
                       <div>
                         <a
-                          href={`https://desk.bookdeskops.com/agent/${w.agentId}`}
-                          target="_blank"
-                          rel="noreferrer"
+                          href={getLocalAgentHref(w.agentId)}
                           style={{
                             color: "#38bdf8",
                             textDecoration: "none",
                             fontWeight: 600,
                           }}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Open Agent Desk Profile"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (
+                              onSelectAgent &&
+                              !e.metaKey &&
+                              !e.ctrlKey &&
+                              e.button === 0
+                            ) {
+                              e.preventDefault();
+                              onSelectAgent(w.agentId);
+                            }
+                          }}
+                          title="Open SportsDesk Agent Inspector"
                         >
                           {w.agentId} ↗
                         </a>
@@ -518,7 +530,10 @@ export function LiveWagersTabPanel({
                     </td>
                     <td style={styles.td}>
                       <div style={{ fontWeight: 600 }}>{w.sport}</div>
-                      <div style={styles.custSub}>{w.betType}</div>
+                      <div style={styles.custSub}>
+                        {w.betType}
+                        {w.ticketWriter ? ` · ${w.ticketWriter}` : ""}
+                      </div>
                     </td>
                     <td style={styles.td}>
                       <div style={{ fontWeight: 600 }}>{w.event}</div>

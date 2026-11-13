@@ -77,6 +77,117 @@ function buildMockDeps(
       wagers: [{ ticketId: "W-1", autoExecute: false }],
       autoExecute: false,
     }),
+    getBetTickerPayload: async (filters) => ({
+      schemaVersion: 1,
+      observedAt: "2026-11-12T00:00:00.000Z",
+      autoExecute: false,
+      provenance: {
+        kind: "fixture",
+        label: "mock",
+        sourcePath: null,
+        observedAt: "2026-11-12T00:00:00.000Z",
+      },
+      localFeed: {
+        rawRowCount: 1,
+        actionableTicketCount: 1,
+        sentinelNoiseCount: 0,
+        totalWageredCents: 10000,
+        totalVolumeCents: 10000,
+        totalToWinCents: 9091,
+        volumeDiffersCount: 0,
+        vipCount: 0,
+        liveCount: 0,
+        flagCount: 0,
+        byRule: {},
+        byWriter: [
+          {
+            writer: filters?.writer ?? "Internet",
+            count: 1,
+            wageredCents: 10000,
+            volumeCents: 10000,
+            toWinCents: 9091,
+            isSentinelNoise: false,
+          },
+        ],
+        byWagerType: [],
+        tickets: [],
+      },
+      bridge3aR2: {
+        available: false,
+        publicUrl: "",
+        state: "error",
+        lastModified: null,
+        ageSeconds: null,
+        generatedAt: null,
+        deskDate: null,
+        deskHour: null,
+        watermark: null,
+        rowCount: 0,
+        ticketCount: 0,
+        legCount: 0,
+        alertTwinCount: 0,
+        orphanCount: 0,
+        byChannel: {},
+        byWagerType: {},
+      },
+      pendingGames: {
+        available: false,
+        gameCount: 0,
+        pendingCount: 0,
+        totalWageredCents: 0,
+        totalToWinCents: 0,
+        capturedAt: null,
+        dataSource: null,
+        sourcePath: null,
+      },
+      captureHealth: {
+        available: false,
+        status: null,
+        capturedAt: null,
+        ageSeconds: null,
+        rowCount: null,
+        sourcePath: null,
+      },
+    }),
+    getR2PipelinePayload: async (opts) => ({
+      schemaVersion: 1,
+      bucketPublicBase: "https://pub-mock.r2.dev",
+      observedAt: "2026-11-12T00:00:00.000Z",
+      overallStatus: opts?.refresh ? "fresh" : "stale",
+      freshCount: 4,
+      totalCount: 4,
+      staleKeys: [],
+      dataStaleKeys: [],
+      sinks: [],
+      daemon4020: {
+        online: true,
+        url: "http://127.0.0.1:4020/health",
+        status: 200,
+        latencyMs: 2,
+        checkedAt: "2026-11-12T00:00:00.000Z",
+      },
+    }),
+    getDaemonStatusPayload: async () => ({
+      online: true,
+      url: "http://127.0.0.1:4020/health",
+      status: 200,
+      latencyMs: 2,
+      checkedAt: "2026-11-12T00:00:00.000Z",
+    }),
+    getAgentDetailPayload: async (agentId) => ({
+      schemaVersion: 1,
+      agentId: agentId.trim().toUpperCase(),
+      found: agentId.trim().toUpperCase() === "FAKEMONEY",
+      masterAgent: "NOLAWOLF",
+      level: 3,
+      agentType: "Agent",
+      childAgents: [],
+      conduit30d: null,
+      customers: [],
+      recentWagers: [],
+      observedAt: "2026-11-12T00:00:00.000Z",
+      autoExecute: false,
+    }),
     getTiersConfig: async () => ({ tiers: { CRITICAL: { fg: "#fff" } } }),
     alerts: {
       sweepOnce: async () => ({ sent: 1, failed: 0, dead: 0 }),
@@ -209,6 +320,31 @@ describe("@sportsdesk-ops/api in-memory router (zero port bind)", () => {
 
     expect((await call("/api/build-matrix")).status).toBe(200);
     expect((await call("/api/ws/status")).status).toBe(200);
+
+    const tickerRes = await call("/api/bet-ticker?writer=GSLIVE");
+    expect(tickerRes.status).toBe(200);
+    expect(
+      (
+        (await tickerRes.json()) as {
+          localFeed: { byWriter: Array<{ writer: string }> };
+        }
+      ).localFeed.byWriter[0]?.writer,
+    ).toBe("GSLIVE");
+
+    const r2Res = await call("/api/r2/pipeline?refresh=1");
+    expect(r2Res.status).toBe(200);
+    expect(
+      ((await r2Res.json()) as { overallStatus: string }).overallStatus,
+    ).toBe("fresh");
+
+    const daemonRes = await call("/api/daemon/status");
+    expect(daemonRes.status).toBe(200);
+    expect(((await daemonRes.json()) as { online: boolean }).online).toBe(true);
+
+    const agentRes = await call("/api/agent/FAKEMONEY");
+    expect(agentRes.status).toBe(200);
+    expect(((await agentRes.json()) as { found: boolean }).found).toBe(true);
+
     expect((await call("/api/not-a-route")).status).toBe(404);
     expect((await call("/unknown")).status).toBe(404);
   });

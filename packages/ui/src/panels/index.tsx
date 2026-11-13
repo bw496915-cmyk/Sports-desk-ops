@@ -1,4 +1,12 @@
+export {
+  AgentInspectorModal,
+  type AgentInspectorModalProps,
+} from "./AgentInspectorModal.tsx";
 export { AlertsTabPanel, type AlertsTabPanelProps } from "./AlertsTabPanel.tsx";
+export {
+  BetTickerTabPanel,
+  type BetTickerTabPanelProps,
+} from "./BetTickerTabPanel.tsx";
 export {
   BuildMatrixDrawer,
   type BuildMatrixDrawerProps,
@@ -11,6 +19,10 @@ export {
   LiveWagersTabPanel,
   type LiveWagersTabPanelProps,
 } from "./LiveWagersTabPanel.tsx";
+export {
+  R2PipelineTabPanel,
+  type R2PipelineTabPanelProps,
+} from "./R2PipelineTabPanel.tsx";
 export {
   RankingsTabPanel,
   type RankingsTabPanelProps,

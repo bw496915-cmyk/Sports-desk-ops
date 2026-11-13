@@ -1,20 +1,38 @@
 import type {
+  AgentDetailApiResponse,
+  BetTickerApiResponse,
+  BetTickerBridge3aSnapshot,
+  BetTickerChannelBucket,
+  BetTickerTicketRow,
+  BetTickerTypeBucket,
   CustomersApiResponse,
   CustomersCohortsSummary,
+  Daemon4020Status,
   DashboardFeedProvenanceKind,
   DashboardSourceProvenance,
   DashboardWsTopic,
   LiveWagersApiResponse,
+  R2PipelineApiResponse,
+  R2SinkDetail,
   WagerTier,
 } from "@sportsdesk-ops/contracts";
 
 export type {
+  AgentDetailApiResponse,
+  BetTickerApiResponse,
+  BetTickerBridge3aSnapshot,
+  BetTickerChannelBucket,
+  BetTickerTicketRow,
+  BetTickerTypeBucket,
   CustomersApiResponse,
   CustomersCohortsSummary,
+  Daemon4020Status,
   DashboardFeedProvenanceKind,
   DashboardSourceProvenance,
   DashboardWsTopic,
   LiveWagersApiResponse,
+  R2PipelineApiResponse,
+  R2SinkDetail,
 };
 
 export interface DashboardData {
@@ -115,6 +133,7 @@ export interface LiveWager {
   readonly customerId: string;
   readonly agentId: string;
   readonly masterAgent: string;
+  readonly ticketWriter?: string | undefined;
   readonly sport: string;
   readonly betType: string;
   readonly event: string;
@@ -122,8 +141,10 @@ export interface LiveWager {
   readonly lineDisplay: string;
   readonly oddsAmerican: string;
   readonly riskUsd: number;
+  readonly volumeUsd?: number | undefined;
   readonly toWinUsd: number;
   readonly clvCents: number;
+  readonly vip?: boolean | undefined;
   readonly alertTier: WagerTier;
   readonly alertBadge: string;
   readonly operatorDirective: string;
@@ -197,6 +218,8 @@ export type DashboardTabId =
   | "terminal"
   | "rankings"
   | "wagers"
+  | "bet-ticker"
+  | "r2"
   | "alerts"
   | "shadow";
 
