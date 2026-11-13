@@ -688,7 +688,7 @@ describe("NSH frame schema & BridgeChannelPackedWord32 integration", () => {
 
   test("unifies OriginDomainId, WriterLaneId, and VenueId across domain_venue_registry", () => {
     const inetLane: WriterLaneId = resolveWriterLaneId("Internet");
-    expect(inetLane).toBe("inet");
+    expect(inetLane).toBe("internet");
     expect(resolveWriterLaneId("GSLIVE")).toBe("gslive");
     expect(resolveOriginDomainForWriter("inet")).toBe(
       "ORIGIN_SPORTSBOOK_FANTASY402",

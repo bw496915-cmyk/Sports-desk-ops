@@ -188,3 +188,31 @@ diff of the counterexample set, not a red dot: the empty set is the target.
 1. **Gateway** — real F402 lane, or a deployment detail that should not be a lane?
 2. **Channel casing** — is the openapi `channel` the field the grammar means (C4)?
 3. **DB enum authority** — registry or `schema.snapshot.json` (C7)?
+
+## 8. Status after implementation
+
+Steps 1–5 of §4 landed. Measured on the working tree:
+
+```
+bun scripts/naming_fitness.ts   ->  all guarantees hold (exit 0)
+```
+
+| Decision | Result |
+|---|---|
+| D1 sentinels are not lanes | lanes are `internet, gslive, gsbuilder, cslevel2, gateway, inet_mirror`; sentinels `alert, blocked, non_sports_drop, unknown` |
+| D2 `alert` → `inet_mirror` (venue f402) | `resolveWriterChannel("ALERT") === "inet_mirror"`; `resolveVenueIdForWriter("ALERT") === "f402"` |
+| D3 label vs signal code | `WriterLaneEntry.signalChannelCode` added; frame schema keys the wire map off it, so frozen bytes are untouched |
+| D4 `inet` → `internet` | label `INTERNET`, signal code `Internet` (display unchanged) |
+| D5 `internal` → `desk` + `lakehouse` | six venues, each with exactly one origin; neither internal venue has a settlement field |
+| D6 channel casing | `channelSlug` kind added with the published kebab pattern; camelCase retained for payload keys |
+| D7 DB enum from the registry | `COMBO_LEGS_SCHEMA.venue.description` derives `Object.keys(VENUE_REGISTRY)`; `ComboVenue = VenueId`; writes assert, reads normalize legacy `internal` → `desk` |
+| T2 token-match scoping | `everyOriginHasTokenMatchedLane` checks only origins with derived writer lanes; Kalshi claims none (trades via its own API) |
+| T1 gateway | **still conditional**: lane kept with wire byte 6 and no raw witness; removal is a one-commit follow-up |
+
+Wire ids: lanes keep 1–6, sentinels keep 0/7 and take append-only byte 8 for `non_sports_drop`. Byte 1 aliases lane `inet_mirror` and sentinel `alert`; the decoder prefers the lane and the sentinel is derived from the row label.
+
+Not done, and named here rather than implied:
+
+- `reports/schema.snapshot.json` still contains the stale enum text until the snapshot is regenerated (`bun run schema:gate`); the schema registry now derives the description, so regeneration closes it.
+- The production `combo_legs` table needs the attribution audit before any CHECK constraint: rows stored as `internal` cannot be distinguished from `desk` vs `lakehouse` by value alone. Reads currently normalize to `desk` and surface unmapped values as `SEC_COMBO_VENUE_READ`.
+- `get_channel_provenance` with a sentinel writer now raises (the tool resolves lanes); the error names `SEC_WRITER_LANE_NOT_A_FEED`. If operators need sentinel lookups there, it should return the sentinel block the way `decode_nsh_frame` does.

@@ -30,12 +30,16 @@ import { OriginDomainWireId, WriterLaneWireId } from "../lib/domain-enums.ts";
 import {
   ORIGIN_DOMAIN_BY_WIRE_ID,
   ORIGIN_DOMAIN_WIRE_ID,
+  SENTINEL_CHANNEL_BY_WIRE_ID,
+  SENTINEL_CHANNEL_WIRE_ID,
   WRITER_LANE_BY_WIRE_ID,
   WRITER_LANE_WIRE_ID,
   originDomainIdOfWireId,
+  writerLaneIdOfWireId,
 } from "../lib/domain-enums.ts";
 import {
   ORIGIN_DOMAIN_REGISTRY,
+  SENTINEL_CHANNEL_REGISTRY,
   WRITER_LANE_REGISTRY,
 } from "../lib/domain_venue_registry.ts";
 import { buildCorpus } from "../scripts/nsh_frame_differential.ts";
@@ -360,15 +364,36 @@ describe("wire id tables are locked to the registry", () => {
     expect(originDomainIdOfWireId(OriginDomainWireId.UNSET)).toBeNull();
   });
 
-  test("writer lane ids cover the registry exactly and round-trip", () => {
+  test("lane and sentinel wire ids cover their registries and round-trip", () => {
     expect(Object.keys(WRITER_LANE_WIRE_ID).sort()).toEqual(
       Object.keys(WRITER_LANE_REGISTRY).sort(),
     );
+    // Bytes 1..6 remain the writable lanes; 0, 7 and 8 are sentinel classes.
     expect(Object.values(WRITER_LANE_WIRE_ID).sort((a, b) => a - b)).toEqual([
-      0, 1, 2, 3, 4, 5, 6, 7,
+      1, 2, 3, 4, 5, 6,
     ]);
     for (const [registryId, wireId] of Object.entries(WRITER_LANE_WIRE_ID)) {
       expect(String(WRITER_LANE_BY_WIRE_ID[wireId])).toBe(registryId);
     }
+    expect(Object.keys(SENTINEL_CHANNEL_WIRE_ID).sort()).toEqual(
+      Object.keys(SENTINEL_CHANNEL_REGISTRY).sort(),
+    );
+    expect(
+      (Object.values(SENTINEL_CHANNEL_WIRE_ID) as number[]).sort(
+        (a, b) => a - b,
+      ),
+    ).toEqual([0, 1, 7, 8]);
+    for (const [sentinelId, wireId] of Object.entries(
+      SENTINEL_CHANNEL_WIRE_ID,
+    )) {
+      // Byte 1 aliases the mirror lane, so it decodes as the LANE.
+      if (wireId === 1) {
+        expect(writerLaneIdOfWireId(wireId)).toBe("inet_mirror");
+        continue;
+      }
+      expect(String(SENTINEL_CHANNEL_BY_WIRE_ID[wireId])).toBe(sentinelId);
+    }
+    expect(writerLaneIdOfWireId(0)).toBe("unknown");
+    expect(writerLaneIdOfWireId(99)).toBeNull();
   });
 });

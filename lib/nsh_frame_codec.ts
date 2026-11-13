@@ -34,7 +34,11 @@
  * returned array is valid only until the next `write()`; copy it if the
  * transport retains it. `packNshBinaryFrame` is the allocating convenience.
  */
-import type { OriginDomainId, WriterLaneId } from "./domain_venue_registry.ts";
+import type {
+  OriginDomainId,
+  WriterChannelId,
+  WriterLaneId,
+} from "./domain_venue_registry.ts";
 import {
   OriginDomainWireId,
   WriterLaneWireId,
@@ -137,7 +141,8 @@ export interface NshMatchFrame {
   /** Writer lane wire id, read from byte 57 and validated against the table. */
   writerLaneWireId: WriterLaneWireId;
   /** Canonical writer lane resolved from byte 57. */
-  writerLaneId: WriterLaneId;
+  /** Lane, or a sentinel class when no feed wrote the row. */
+  writerLaneId: WriterChannelId;
   flags: number;
   slippageBps: number;
 }

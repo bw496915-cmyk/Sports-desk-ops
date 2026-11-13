@@ -13,7 +13,12 @@
  * so an unknown byte fails closed instead of decoding into a wrong domain.
  */
 
-import type { OriginDomainId, WriterLaneId } from "./domain_venue_registry.ts";
+import type {
+  OriginDomainId,
+  SentinelChannelId,
+  WriterChannelId,
+  WriterLaneId,
+} from "./domain_venue_registry.ts";
 import type { SignalChannelCode } from "../design/domain-branded-types.ts";
 
 /**
@@ -34,8 +39,9 @@ export type OriginDomainWireId =
   (typeof OriginDomainWireId)[keyof typeof OriginDomainWireId];
 
 /**
- * Writer lane, uint8 @ byte 57. Values mirror the eight entries of
- * `WRITER_LANE_REGISTRY`.
+ * Writer lane, uint8 @ byte 57. Values mirror the six entries of
+ * `WRITER_LANE_REGISTRY`. Bytes 0, 1 and 7 are retained for the sentinel
+ * classifications that used to be lanes; byte 8 is new and append-only.
  */
 export const WriterLaneWireId = Object.freeze({
   UNKNOWN: 0,
@@ -51,6 +57,24 @@ export const WriterLaneWireId = Object.freeze({
 export type WriterLaneWireId =
   (typeof WriterLaneWireId)[keyof typeof WriterLaneWireId];
 
+/**
+ * Sentinel row class, uint8 @ byte 57 when no lane wrote the row.
+ *
+ * ALERT shares byte 1 with lane `inet_mirror` ON PURPOSE: the sentinel is the
+ * money-exclusion applied to that lane's rows, not a different writer. Encoding
+ * always prefers the lane; decoding byte 1 returns the lane, and the sentinel is
+ * derived from the row label.
+ */
+export const SentinelChannelWireId = Object.freeze({
+  UNKNOWN: 0,
+  ALERT: 1,
+  BLOCKED: 7,
+  NON_SPORTS_DROP: 8,
+} as const);
+
+export type SentinelChannelWireId =
+  (typeof SentinelChannelWireId)[keyof typeof SentinelChannelWireId];
+
 /** Registry id -> wire id. Total over `OriginDomainId`. */
 export const ORIGIN_DOMAIN_WIRE_ID: Readonly<
   Record<OriginDomainId, OriginDomainWireId>
@@ -63,18 +87,26 @@ export const ORIGIN_DOMAIN_WIRE_ID: Readonly<
   ORIGIN_HOST_NSH_DESK_LOCAL: OriginDomainWireId.HOST_NSH_DESK_LOCAL,
 });
 
-/** Registry id -> wire id. Total over `WriterLaneId`. */
+/** Registry id -> wire id. Total over `WriterLaneId` (writable feeds only). */
 export const WRITER_LANE_WIRE_ID: Readonly<
   Record<WriterLaneId, WriterLaneWireId>
 > = Object.freeze({
-  unknown: WriterLaneWireId.UNKNOWN,
-  alert: WriterLaneWireId.ALERT,
+  internet: WriterLaneWireId.INTERNET,
   gslive: WriterLaneWireId.GSLIVE,
-  inet: WriterLaneWireId.INTERNET,
   gsbuilder: WriterLaneWireId.GSBUILDER,
   cslevel2: WriterLaneWireId.CSLEVEL2,
   gateway: WriterLaneWireId.GATEWAY,
-  blocked: WriterLaneWireId.BLOCKED,
+  inet_mirror: WriterLaneWireId.ALERT,
+});
+
+/** Sentinel class -> wire id. Total over `SentinelChannelId`. */
+export const SENTINEL_CHANNEL_WIRE_ID: Readonly<
+  Record<SentinelChannelId, SentinelChannelWireId>
+> = Object.freeze({
+  alert: SentinelChannelWireId.ALERT,
+  blocked: SentinelChannelWireId.BLOCKED,
+  non_sports_drop: SentinelChannelWireId.NON_SPORTS_DROP,
+  unknown: SentinelChannelWireId.UNKNOWN,
 });
 
 /** Wire id -> registry id; the inverse of `ORIGIN_DOMAIN_WIRE_ID`. */
@@ -89,18 +121,25 @@ export const ORIGIN_DOMAIN_BY_WIRE_ID: Readonly<
   [OriginDomainWireId.HOST_NSH_DESK_LOCAL]: "ORIGIN_HOST_NSH_DESK_LOCAL",
 });
 
-/** Wire id -> registry id; the inverse of `WRITER_LANE_WIRE_ID`. */
+/** Wire id -> lane id; the inverse of `WRITER_LANE_WIRE_ID` (byte 1 = inet_mirror). */
 export const WRITER_LANE_BY_WIRE_ID: Readonly<Record<number, WriterLaneId>> =
   Object.freeze({
-    [WriterLaneWireId.UNKNOWN]: "unknown",
-    [WriterLaneWireId.ALERT]: "alert",
+    [WriterLaneWireId.INTERNET]: "internet",
     [WriterLaneWireId.GSLIVE]: "gslive",
-    [WriterLaneWireId.INTERNET]: "inet",
     [WriterLaneWireId.GSBUILDER]: "gsbuilder",
     [WriterLaneWireId.CSLEVEL2]: "cslevel2",
     [WriterLaneWireId.GATEWAY]: "gateway",
-    [WriterLaneWireId.BLOCKED]: "blocked",
+    [WriterLaneWireId.ALERT]: "inet_mirror",
   });
+
+/** Wire id -> sentinel class; byte 1 is NOT here (it decodes as the lane). */
+export const SENTINEL_CHANNEL_BY_WIRE_ID: Readonly<
+  Record<number, SentinelChannelId>
+> = Object.freeze({
+  [SentinelChannelWireId.UNKNOWN]: "unknown",
+  [SentinelChannelWireId.BLOCKED]: "blocked",
+  [SentinelChannelWireId.NON_SPORTS_DROP]: "non_sports_drop",
+});
 
 /**
  * Router provenance token -> writer lane. The bridge resolver yields a
@@ -138,7 +177,23 @@ export function originDomainIdOfWireId(wireId8: number): OriginDomainId | null {
   return ORIGIN_DOMAIN_BY_WIRE_ID[wireId8] ?? null;
 }
 
-/** Inverse of `writerLaneWireIdOf`; `null` for an unmapped byte. */
-export function writerLaneIdOfWireId(wireId8: number): WriterLaneId | null {
-  return WRITER_LANE_BY_WIRE_ID[wireId8] ?? null;
+/**
+ * Inverse of `writerLaneWireIdOf`; `null` for an unmapped byte.
+ *
+ * Returns the WIDER `WriterChannelId`: bytes 0, 7 and 8 decode to sentinel
+ * classes because no feed writes them, while byte 1 decodes to the lane.
+ */
+export function writerLaneIdOfWireId(wireId8: number): WriterChannelId | null {
+  return (
+    WRITER_LANE_BY_WIRE_ID[wireId8] ??
+    SENTINEL_CHANNEL_BY_WIRE_ID[wireId8] ??
+    null
+  );
+}
+
+/** Maps a sentinel class onto its wire id. */
+export function sentinelChannelWireIdOf(
+  sentinelChannelId: SentinelChannelId,
+): SentinelChannelWireId {
+  return SENTINEL_CHANNEL_WIRE_ID[sentinelChannelId];
 }

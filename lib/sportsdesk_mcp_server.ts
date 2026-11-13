@@ -19,6 +19,7 @@
  */
 
 import { createHash, timingSafeEqual } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -50,9 +51,13 @@ import {
 } from "./bridge_and_channel_router.ts";
 import {
   ORIGIN_DOMAIN_REGISTRY,
+  sentinelChannelEntryFor,
+  writerLaneEntryForChannel,
   WRITER_LANE_REGISTRY,
+  resolveWriterChannel,
   resolveWriterLaneId,
   type OriginDomainEntry,
+  type SentinelChannelEntry,
   type WriterLaneEntry,
 } from "./domain_venue_registry.ts";
 import {
@@ -91,6 +96,10 @@ import {
   provenanceCssForColor,
 } from "./provenance_palette.ts";
 import { SPORT_CATEGORIES, sportCategoryFor } from "./sport_taxonomy.ts";
+
+export const DEFAULT_MCP_WORKSPACE_ROOT: string = fileURLToPath(
+  new URL("..", import.meta.url),
+);
 
 export const SPORTSDESK_MCP_SERVER_NAME = "sportsdesk-ops" as const;
 export const SPORTSDESK_MCP_SERVER_VERSION = "1.0.0" as const;
@@ -224,6 +233,7 @@ const WRITER_LANE_ITEM_SCHEMA = z.object({
   venueId: z.string(),
   tokenProvenanceCode: z.string(),
   provenanceLabel: z.string(),
+  signalChannelCode: z.string(),
   brandColorHex: z.string(),
 });
 
@@ -237,6 +247,15 @@ function serializeOriginDomainEntry(entry: OriginDomainEntry) {
   };
 }
 
+const SENTINEL_CHANNEL_ITEM_SCHEMA = z.object({
+  sentinelId: z.string(),
+  provenanceLabel: z.string(),
+  signalChannelCode: z.string().nullable(),
+  laneId: z.string().nullable(),
+  brandColorHex: z.string(),
+  isMoneyExcluded: z.literal(true),
+});
+
 function serializeWriterLaneEntry(entry: WriterLaneEntry) {
   return {
     writerLaneId: entry.writerLaneId,
@@ -244,7 +263,19 @@ function serializeWriterLaneEntry(entry: WriterLaneEntry) {
     venueId: entry.venueId,
     tokenProvenanceCode: entry.tokenProvenanceCode,
     provenanceLabel: entry.provenanceLabel,
+    signalChannelCode: entry.signalChannelCode,
     brandColorHex: entry.brandColorHex,
+  };
+}
+
+function serializeSentinelChannelEntry(entry: SentinelChannelEntry) {
+  return {
+    sentinelId: entry.sentinelId,
+    provenanceLabel: entry.provenanceLabel,
+    signalChannelCode: entry.signalChannelCode,
+    laneId: entry.laneId,
+    brandColorHex: entry.brandColorHex,
+    isMoneyExcluded: entry.isMoneyExcluded,
   };
 }
 
@@ -1551,9 +1582,11 @@ const DECODE_NSH_FRAME_OUTPUT = {
   originBrandColorHex: z.string(),
   originDomain: ORIGIN_DOMAIN_ITEM_SCHEMA,
   writerLaneWireId: z.number().int(),
-  writerLaneId: z.string(),
-  writerBrandColorHex: z.string(),
-  writerLane: WRITER_LANE_ITEM_SCHEMA,
+  writerChannelId: z.string(),
+  writerLaneId: z.string().nullable(),
+  writerBrandColorHex: z.string().nullable(),
+  writerLane: WRITER_LANE_ITEM_SCHEMA.nullable(),
+  writerSentinel: SENTINEL_CHANNEL_ITEM_SCHEMA.nullable(),
   flagsBitSet16: z.number().int(),
   slippageBps: z.number().int(),
   sor1Compliant: z.boolean(),
@@ -1656,7 +1689,8 @@ export function runDecodeNshFrameTool(
     ) as number;
     const channelColorCss = provenanceCssFor(provenanceChannelCode);
     const originEntry = ORIGIN_DOMAIN_REGISTRY[frame.originDomainId];
-    const writerEntry = WRITER_LANE_REGISTRY[frame.writerLaneId];
+    const writerEntry = writerLaneEntryForChannel(frame.writerLaneId);
+    const sentinelEntry = sentinelChannelEntryFor(frame.writerLaneId);
     const betGroupDecimal = frame.betGroupId.toString(10);
     const timestampIso =
       frame.timestampMs <= MAX_ECMA_DATE_TIMESTAMP_MS
@@ -1696,9 +1730,13 @@ export function runDecodeNshFrameTool(
       originBrandColorHex: originEntry.brandColorHex,
       originDomain: serializeOriginDomainEntry(originEntry),
       writerLaneWireId: frame.writerLaneWireId,
-      writerLaneId: frame.writerLaneId,
-      writerBrandColorHex: writerEntry.brandColorHex,
-      writerLane: serializeWriterLaneEntry(writerEntry),
+      writerChannelId: frame.writerLaneId,
+      writerLaneId: writerEntry?.writerLaneId ?? null,
+      writerBrandColorHex:
+        writerEntry?.brandColorHex ?? sentinelEntry?.brandColorHex ?? null,
+      writerLane:
+        writerEntry === null ? null : serializeWriterLaneEntry(writerEntry),
+      writerSentinel: sentinelEntry,
       flagsBitSet16: frame.flags,
       slippageBps: frame.slippageBps,
       sor1Compliant: frame.slippageBps <= SOR1_MAX_SLIPPAGE_BPS,
@@ -2502,7 +2540,48 @@ export function runGetLiveLineTradingBoardTool(
       (input.matches !== undefined ? "caller_snapshot" : "none");
     const leagueFilterNorm = input.leagueFilter?.trim().toLowerCase() ?? "";
     const statusFilter = input.statusFilter ?? "all";
-    const rawMatches = input.matches ?? [];
+    const callerMatches = input.matches ?? [];
+    const rawMatches: Array<(typeof callerMatches)[number]> = [];
+    const indexByGameNum: Record<number, number> = Object.create(null);
+    for (let i = 0; i < callerMatches.length; i++) {
+      const candidate = callerMatches[i]!;
+      if (
+        !Number.isSafeInteger(candidate.gameNum) ||
+        candidate.gameNum < 0 ||
+        candidate.gameNum > 1_048_575
+      ) {
+        throw new SportsdeskMcpWireError(
+          "invalid_board_input",
+          `matches[${i}].gameNum must fit 20-bit rotation range [0, 1048575]`,
+        );
+      }
+      const existingIdx = indexByGameNum[candidate.gameNum];
+      if (existingIdx === undefined) {
+        indexByGameNum[candidate.gameNum] = rawMatches.length;
+        rawMatches.push(candidate);
+      } else {
+        const prev = rawMatches[existingIdx]!;
+        rawMatches[existingIdx] = {
+          ...prev,
+          status:
+            prev.status === "live" || candidate.status !== "live"
+              ? prev.status
+              : candidate.status,
+          clock: prev.clock !== "-" ? prev.clock : candidate.clock,
+          moneyline: prev.moneyline ?? candidate.moneyline,
+          spread: prev.spread ?? candidate.spread,
+          total: prev.total ?? candidate.total,
+          pointSeries:
+            (prev.pointSeries?.length ?? 0) > 0
+              ? prev.pointSeries
+              : candidate.pointSeries,
+          historicOddsSeries:
+            (prev.historicOddsSeries?.length ?? 0) > 0
+              ? prev.historicOddsSeries
+              : candidate.historicOddsSeries,
+        };
+      }
+    }
 
     const evaluatedCards: Array<
       z.infer<typeof EVALUATED_MATCH_BOARD_ITEM_SCHEMA>
@@ -2512,16 +2591,6 @@ export function runGetLiveLineTradingBoardTool(
 
     for (let i = 0; i < rawMatches.length; i++) {
       const m = rawMatches[i]!;
-      if (
-        !Number.isSafeInteger(m.gameNum) ||
-        m.gameNum < 0 ||
-        m.gameNum > 1_048_575
-      ) {
-        throw new SportsdeskMcpWireError(
-          "invalid_board_input",
-          `matches[${i}].gameNum must fit 20-bit rotation range [0, 1048575]`,
-        );
-      }
       const leagueClean = m.league.trim().toUpperCase();
       if (
         leagueFilterNorm !== "" &&
@@ -2787,7 +2856,7 @@ export const GET_ACTIVE_BET_BLOTTER_INPUT = {
         league: z.string().min(1).max(64),
         marketLabel: z.string().min(1).max(160),
         writer: z.string().min(1).max(64),
-        bookDecimalOdds: z.number().gt(1).max(1_000),
+        bookDecimalOdds: z.number().gt(1).max(1_000).nullable().optional(),
         polymarketMidProb: z.number().gt(0).lt(1).nullable().optional(),
         stakeCents: z.number().int().min(0).max(1_000_000_000),
         liabilityCents: z.number().int().min(0).max(1_000_000_000).optional(),
@@ -2837,8 +2906,8 @@ const BLOTTER_ROW_OUTPUT_SCHEMA = z.object({
   provenanceColorHexInt: z.number().int().min(0).max(0xffffff),
   provenanceColorCss: z.string(),
   volumeExcludedNoise: z.boolean(),
-  bookDecimalOdds: z.number(),
-  impliedBookProb: z.number(),
+  bookDecimalOdds: z.number().nullable(),
+  impliedBookProb: z.number().nullable(),
   polymarketMidProb: z.number().nullable(),
   edgeBpsVsPolymarket: z.number().int().nullable(),
   stakeCents: z.number().int(),
@@ -2906,11 +2975,15 @@ function resolveBlotterProvenanceChannel(rawWriter: string): {
 } {
   const tickerWriterClass = writerOf(rawWriter);
   const noiseByTicker = isTickerNoise({ writer: tickerWriterClass });
-  const laneId = resolveWriterLaneId(rawWriter);
-  const laneEntry = WRITER_LANE_REGISTRY[laneId];
-  const candidateLabel = laneEntry.provenanceLabel as SignalChannelCode;
+  // A writer may be a lane OR a sentinel class; asking for a lane would throw
+  // for BLOCKED/UNRESOLVED rows and silence the blotter.
+  const channel = resolveWriterChannel(rawWriter);
+  const laneEntry = writerLaneEntryForChannel(channel);
+  const sentinelEntry = sentinelChannelEntryFor(channel);
+  const candidateLabel =
+    sentinelEntry?.signalChannelCode ?? laneEntry?.signalChannelCode ?? null;
   const provenanceChannelCode: SignalChannelCode =
-    PROVENANCE_CHANNEL_CODES.includes(candidateLabel)
+    candidateLabel !== null && PROVENANCE_CHANNEL_CODES.includes(candidateLabel)
       ? candidateLabel
       : tickerWriterClass === "alert"
         ? "ALERT"
@@ -2918,12 +2991,13 @@ function resolveBlotterProvenanceChannel(rawWriter: string): {
           ? "BLOCKED"
           : "Internet";
   const volumeExcludedNoise =
+    (sentinelEntry?.isMoneyExcluded ?? false) ||
     noiseByTicker ||
     provenanceChannelCode === "ALERT" ||
     provenanceChannelCode === "BLOCKED";
   return {
-    writerLaneId: laneEntry.writerLaneId,
-    venueId: laneEntry.venueId,
+    writerLaneId: laneEntry?.writerLaneId ?? channel,
+    venueId: laneEntry?.venueId ?? "desk",
     provenanceChannelCode,
     volumeExcludedNoise,
   };
@@ -2970,10 +3044,10 @@ export function runGetActiveBetBlotterTool(
           `tickets[${i}].writer must be non-empty`,
         );
       }
+      const bookOdds = t.bookDecimalOdds ?? null;
       if (
-        !Number.isFinite(t.bookDecimalOdds) ||
-        t.bookDecimalOdds <= 1 ||
-        t.bookDecimalOdds > 1_000
+        bookOdds !== null &&
+        (!Number.isFinite(bookOdds) || bookOdds <= 1 || bookOdds > 1_000)
       ) {
         throw new SportsdeskMcpWireError(
           "invalid_blotter_query",
@@ -3006,16 +3080,20 @@ export function runGetActiveBetBlotterTool(
 
       const grossLiability =
         t.liabilityCents ??
-        Math.max(0, Math.round(t.stakeCents * (t.bookDecimalOdds - 1)));
+        (bookOdds !== null
+          ? Math.max(0, Math.round(t.stakeCents * (bookOdds - 1)))
+          : 0);
       const hedgedCents = Math.min(grossLiability, t.hedgedCents ?? 0);
       const rowUnhedgedCents = resolvedProv.volumeExcludedNoise
         ? 0
         : Math.max(0, grossLiability - hedgedCents);
 
       const impliedBookProb =
-        Math.round((1 / t.bookDecimalOdds) * 10_000) / 10_000;
+        bookOdds !== null ? Math.round((1 / bookOdds) * 10_000) / 10_000 : null;
       const edgeBpsVsPolymarket =
-        pmMid !== null ? Math.round((pmMid - impliedBookProb) * 10_000) : null;
+        pmMid !== null && impliedBookProb !== null
+          ? Math.round((pmMid - impliedBookProb) * 10_000)
+          : null;
 
       const inferredRiskStatus: (typeof BLOTTER_RISK_STATUS_VALUES)[number] =
         t.riskStatus ??
@@ -3098,7 +3176,7 @@ export function runGetActiveBetBlotterTool(
           resolvedProv.provenanceChannelCode,
         ),
         volumeExcludedNoise: resolvedProv.volumeExcludedNoise,
-        bookDecimalOdds: t.bookDecimalOdds,
+        bookDecimalOdds: bookOdds,
         impliedBookProb,
         polymarketMidProb: pmMid,
         edgeBpsVsPolymarket,

@@ -6,10 +6,11 @@ Origins and colours are derived from `ORIGIN_DOMAIN_REGISTRY`; writer lanes from
 
 | Venue | Kind | Tradeable | Settlement | Colour | Origins | Writer lanes |
 |---|---|---|---|---|---|---|
-| `f402` | sportsbook | yes | `cash_stake` | `#1d84b5` | ORIGIN_SPORTSBOOK_FANTASY402 | `inet`, `gateway`, `gsbuilder` |
+| `f402` | sportsbook | yes | `cash_stake` | `#1d84b5` | ORIGIN_SPORTSBOOK_FANTASY402 | `internet`, `gateway`, `gsbuilder`, `inet_mirror` |
 | `gslive_partner118` | sportsbook | yes | `cash_stake` | `#28a745` | ORIGIN_SPORTSBOOK_GSLIVE_PARTNER118 | `gslive` |
 | `polymarket` | exchange | yes | `token_position` | `#38bdf8` | ORIGIN_EXCHANGE_POLYMARKET_CTF | `cslevel2` |
-| `kalshi` | exchange | yes | `token_position` | `#10b981` | ORIGIN_EXCHANGE_KALSHI_REGULATED | `alert` |
-| `internal` | internal | **no** | — | `#f59e0b` | ORIGIN_STORAGE_R2_LAKEHOUSE, ORIGIN_HOST_NSH_DESK_LOCAL | `blocked`, `unknown` |
+| `kalshi` | exchange | yes | `token_position` | `#10b981` | ORIGIN_EXCHANGE_KALSHI_REGULATED | _(none)_ |
+| `desk` | internal | **no** | — | `#64748b` | ORIGIN_HOST_NSH_DESK_LOCAL | _(none)_ |
+| `lakehouse` | internal | **no** | — | `#f59e0b` | ORIGIN_STORAGE_R2_LAKEHOUSE | _(none)_ |
 
-venues=5  origins=6  lanes=8
+venues=6  origins=6  lanes=6

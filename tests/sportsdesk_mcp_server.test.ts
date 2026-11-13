@@ -21,6 +21,7 @@ import {
 } from "../lib/domain-enums.ts";
 import {
   ORIGIN_DOMAIN_REGISTRY,
+  SENTINEL_CHANNEL_REGISTRY,
   WRITER_LANE_REGISTRY,
 } from "../lib/domain_venue_registry.ts";
 import {
@@ -318,7 +319,8 @@ describe("Direct TypeScript spine MCP tools (unit & edge cases)", () => {
       }>;
       matchedChannel: { channelCode: string } | null;
       writerResolution: {
-        writerLaneId: string;
+        writerLaneId: string | null;
+        writerChannelId: string;
         provenanceLabel: string;
         venueId: string;
       } | null;
@@ -604,7 +606,8 @@ describe("Direct TypeScript spine MCP tools (unit & edge cases)", () => {
       originDomainWireId: number;
       originDomainId: string;
       writerLaneWireId: number;
-      writerLaneId: string;
+      writerLaneId: string | null;
+      writerChannelId: string;
       slippageBps: number;
       sor1Compliant: boolean;
       handle: {
@@ -637,13 +640,13 @@ describe("Direct TypeScript spine MCP tools (unit & edge cases)", () => {
     const decodedB64 = extractStructured<{
       betGroupId: string;
       originDomainId: string;
-      writerLaneId: string;
+      writerChannelId: string;
     }>(runDecodeNshFrameTool({ payload: b64Payload }));
     expect(decodedB64.betGroupId).toBe("18446744073709551615");
     expect(decodedB64.originDomainId).toBe(
       "ORIGIN_SPORTSBOOK_GSLIVE_PARTNER118",
     );
-    expect(decodedB64.writerLaneId).toBe("gslive");
+    expect(decodedB64.writerChannelId).toBe("gslive");
 
     // 63B short frame
     expect(
@@ -1201,7 +1204,8 @@ describe("Direct TypeScript spine MCP tools (unit & edge cases)", () => {
         brandColorHex: string;
         defaultTokenCode: string;
       };
-      writerLaneId: string;
+      writerLaneId: string | null;
+      writerChannelId: string;
       writerBrandColorHex: string;
       writerLane: {
         writerLaneId: string;
@@ -1295,11 +1299,19 @@ describe("Direct TypeScript spine MCP tools (unit & edge cases)", () => {
           decodedFixture.originDomainId as keyof typeof ORIGIN_DOMAIN_REGISTRY
         ].brandColorHex,
       );
-      expect(decodedFixture.writerBrandColorHex).toBe(
-        WRITER_LANE_REGISTRY[
-          decodedFixture.writerLaneId as keyof typeof WRITER_LANE_REGISTRY
-        ].brandColorHex,
-      );
+      // A golden fixture may carry a sentinel byte; the payload resolves the
+      // colour from the lane when one exists, else from the sentinel class.
+      const fixtureChannel = decodedFixture.writerChannelId as
+        | keyof typeof WRITER_LANE_REGISTRY
+        | keyof typeof SENTINEL_CHANNEL_REGISTRY;
+      const expectedWriterColor =
+        (WRITER_LANE_REGISTRY as Record<string, { brandColorHex: string }>)[
+          fixtureChannel
+        ]?.brandColorHex ??
+        (
+          SENTINEL_CHANNEL_REGISTRY as Record<string, { brandColorHex: string }>
+        )[fixtureChannel]?.brandColorHex;
+      expect(decodedFixture.writerBrandColorHex).toBe(expectedWriterColor!);
     }
   });
 });

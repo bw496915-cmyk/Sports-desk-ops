@@ -19,10 +19,12 @@ describe("identifier grammar", () => {
   test("declares all six kinds with a rule and an example", () => {
     expect(Object.keys(IDENTIFIER_GRAMMAR).sort()).toEqual([
       "channel",
+      "channelSlug",
       "lane",
       "origin",
       "provenanceLabel",
       "rowFlag",
+      "sentinel",
       "venue",
     ]);
     for (const rule of Object.values(IDENTIFIER_GRAMMAR)) {

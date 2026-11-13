@@ -16,19 +16,33 @@
 // ============================================================================
 import {
   ORIGIN_DOMAIN_REGISTRY,
+  SENTINEL_CHANNEL_REGISTRY,
   VENUE_REGISTRY,
+  WRITER_LANES_BY_ORIGIN,
   WRITER_LANE_REGISTRY,
   type OriginDomainId,
+  type SentinelChannelId,
   type VenueId,
   type WriterLaneId,
 } from "../lib/domain_venue_registry.ts";
+import { SENTINEL_CHANNEL_WIRE_ID } from "../lib/domain-enums.ts";
 import { F402_BET_TICKER_SENTINEL_CHANNELS } from "../lib/f402_bet_ticker_delta.ts";
-import { IDENTIFIER_GRAMMAR, RESERVED_SENTINEL_WORDS, matchesGrammar } from "../lib/identifier_grammar.ts";
+import {
+  IDENTIFIER_GRAMMAR,
+  RESERVED_SENTINEL_WORDS,
+  matchesGrammar,
+} from "../lib/identifier_grammar.ts";
 
 const venueIds = Object.keys(VENUE_REGISTRY) as VenueId[];
 const originIds = Object.keys(ORIGIN_DOMAIN_REGISTRY) as OriginDomainId[];
 const laneIds = Object.keys(WRITER_LANE_REGISTRY) as WriterLaneId[];
-const rowFlags = [...F402_BET_TICKER_SENTINEL_CHANNELS];
+const sentinelIds = Object.keys(
+  SENTINEL_CHANNEL_REGISTRY,
+) as SentinelChannelId[];
+const rowFlags = [
+  ...F402_BET_TICKER_SENTINEL_CHANNELS,
+  ...sentinelIds.map((id) => SENTINEL_CHANNEL_REGISTRY[id].provenanceLabel),
+];
 
 interface Check {
   readonly guarantee: string;
@@ -51,56 +65,99 @@ const checks: readonly Check[] = [
     run: () =>
       venueIds
         .filter((id) => VENUE_REGISTRY[id].originDomainIds.length !== 1)
-        .map((id) => `${id}: ${VENUE_REGISTRY[id].originDomainIds.length} origins`),
+        .map(
+          (id) => `${id}: ${VENUE_REGISTRY[id].originDomainIds.length} origins`,
+        ),
   },
   {
     guarantee: "laneIdMatchesProvenanceLabel",
     rule: "each lane's provenance label is its id in UPPER_SNAKE",
     run: () =>
       laneIds
-        .filter((lane) => WRITER_LANE_REGISTRY[lane].provenanceLabel !== lane.toUpperCase())
-        .map((lane) => `${lane} -> "${WRITER_LANE_REGISTRY[lane].provenanceLabel}"`),
+        .filter(
+          (lane) =>
+            WRITER_LANE_REGISTRY[lane].provenanceLabel !== lane.toUpperCase(),
+        )
+        .map(
+          (lane) =>
+            `${lane} -> "${WRITER_LANE_REGISTRY[lane].provenanceLabel}"`,
+        ),
   },
   {
     guarantee: "sentinelsAreNotWritableFeeds",
     rule: "no venue id or lane id is a reserved sentinel word",
     run: () => [
-      ...venueIds.filter((id) => RESERVED_SENTINEL_WORDS.includes(id)).map((id) => `venue ${id}`),
-      ...laneIds.filter((id) => RESERVED_SENTINEL_WORDS.includes(id)).map((id) => `lane ${id}`),
+      ...venueIds
+        .filter((id) => RESERVED_SENTINEL_WORDS.includes(id))
+        .map((id) => `venue ${id}`),
+      ...laneIds
+        .filter((id) => RESERVED_SENTINEL_WORDS.includes(id))
+        .map((id) => `lane ${id}`),
     ],
   },
   {
     guarantee: "everyOriginHasTokenMatchedLane",
-    rule: "each origin's default token is worn by a lane on that origin",
+    // Scoped to origins that CLAIM a writer lane: an exchange that trades over
+    // its own API publishes no ticket writer, so having no lane is a fact to
+    // state, not a violation to paper over.
+    rule: "each origin with writer lanes wears its default token on one of them",
     run: () =>
-      originIds.filter((origin) => {
-        const token = ORIGIN_DOMAIN_REGISTRY[origin].defaultTokenCode;
-        return !laneIds.some(
-          (lane) =>
-            WRITER_LANE_REGISTRY[lane].originDomainId === origin &&
-            WRITER_LANE_REGISTRY[lane].tokenProvenanceCode === token,
+      originIds
+        .filter((origin) => WRITER_LANES_BY_ORIGIN[origin].length > 0)
+        .filter((origin) => {
+          const token = ORIGIN_DOMAIN_REGISTRY[origin].defaultTokenCode;
+          return !WRITER_LANES_BY_ORIGIN[origin].some(
+            (lane) => WRITER_LANE_REGISTRY[lane].tokenProvenanceCode === token,
+          );
+        }),
+  },
+  {
+    guarantee: "everySentinelChannelHasAPinnedWireId",
+    rule: "each sentinel class keeps its frozen byte (alert 1, blocked 7, non_sports_drop 8, unknown 0)",
+    run: () => {
+      const pinned: Record<SentinelChannelId, number> = {
+        alert: 1,
+        blocked: 7,
+        non_sports_drop: 8,
+        unknown: 0,
+      };
+      return sentinelIds
+        .filter((id) => SENTINEL_CHANNEL_WIRE_ID[id] !== pinned[id])
+        .map(
+          (id) =>
+            `${id}: wire ${SENTINEL_CHANNEL_WIRE_ID[id]} != ${pinned[id]}`,
         );
-      }),
+    },
   },
   {
     guarantee: "identifiersMatchTheirCasingRule",
     rule: "every declared id matches the grammar for its kind",
     run: () => {
       const violations: string[] = [];
-      for (const id of venueIds) if (!matchesGrammar("venue", id)) violations.push(`venue ${id}`);
-      for (const id of originIds) if (!matchesGrammar("origin", id)) violations.push(`origin ${id}`);
-      for (const id of laneIds) if (!matchesGrammar("lane", id)) violations.push(`lane ${id}`);
-      for (const flag of rowFlags) if (!matchesGrammar("rowFlag", flag)) violations.push(`rowFlag ${flag}`);
+      for (const id of venueIds)
+        if (!matchesGrammar("venue", id)) violations.push(`venue ${id}`);
+      for (const id of originIds)
+        if (!matchesGrammar("origin", id)) violations.push(`origin ${id}`);
+      for (const id of laneIds)
+        if (!matchesGrammar("lane", id)) violations.push(`lane ${id}`);
+      for (const flag of rowFlags)
+        if (!matchesGrammar("rowFlag", flag))
+          violations.push(`rowFlag ${flag}`);
       for (const lane of laneIds) {
         const label = WRITER_LANE_REGISTRY[lane].provenanceLabel;
-        if (!matchesGrammar("provenanceLabel", label)) violations.push(`provenanceLabel "${label}" (lane ${lane})`);
+        if (!matchesGrammar("provenanceLabel", label))
+          violations.push(`provenanceLabel "${label}" (lane ${lane})`);
       }
       return violations;
     },
   },
 ];
 
-const results = checks.map((check) => ({ guarantee: check.guarantee, rule: check.rule, violations: check.run() }));
+const results = checks.map((check) => ({
+  guarantee: check.guarantee,
+  rule: check.rule,
+  violations: check.run(),
+}));
 const failed = results.filter((r) => r.violations.length > 0);
 
 if (process.argv.includes("--json")) {
@@ -110,7 +167,8 @@ if (process.argv.includes("--json")) {
     const status = result.violations.length === 0 ? "PASS" : "FAIL";
     console.log(`${status}  ${result.guarantee}`);
     console.log(`      ${result.rule}`);
-    for (const violation of result.violations) console.log(`      - ${violation}`);
+    for (const violation of result.violations)
+      console.log(`      - ${violation}`);
   }
   console.log(
     failed.length === 0
@@ -119,8 +177,9 @@ if (process.argv.includes("--json")) {
   );
 }
 // Grammar reference is exported so the gate and the contract layer cannot drift.
-if (Object.keys(IDENTIFIER_GRAMMAR).length !== 6) {
-  console.error("identifier grammar does not declare all six identifier kinds");
+const GRAMMAR_KINDS = 8;
+if (Object.keys(IDENTIFIER_GRAMMAR).length !== GRAMMAR_KINDS) {
+  console.error(`identifier grammar declares ${Object.keys(IDENTIFIER_GRAMMAR).length} kinds, expected ${GRAMMAR_KINDS}`);
   process.exit(2);
 }
 process.exit(failed.length === 0 ? 0 : 1);

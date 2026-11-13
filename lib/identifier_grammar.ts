@@ -29,7 +29,9 @@ export type IdentifierKind =
   | "lane"
   | "rowFlag"
   | "provenanceLabel"
-  | "channel";
+  | "channel"
+  | "sentinel"
+  | "channelSlug";
 
 interface GrammarRule {
   readonly pattern: RegExp;
@@ -44,6 +46,10 @@ export const IDENTIFIER_GRAMMAR: Readonly<Record<IdentifierKind, GrammarRule>> =
   rowFlag: { pattern: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/, rule: "UPPER_SNAKE", example: "NON_SPORTS_DROP" },
   provenanceLabel: { pattern: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/, rule: "UPPER_SNAKE", example: "GSLIVE" },
   channel: { pattern: /^[a-z][A-Za-z0-9]*$/, rule: "camelCase", example: "inetMirror" },
+  sentinel: { pattern: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/, rule: "UPPER_SNAKE", example: "NON_SPORTS_DROP" },
+  // NOT camelCase: the published `/api/v1/live-bets` channel is a kebab-case
+  // slug (`^[a-z0-9-]{1,32}$`). Recorded as an exception, not smoothed over.
+  channelSlug: { pattern: /^[a-z0-9-]{1,32}$/, rule: "kebab-case, 1..32 chars", example: "inet-mirror" },
 };
 
 /**
