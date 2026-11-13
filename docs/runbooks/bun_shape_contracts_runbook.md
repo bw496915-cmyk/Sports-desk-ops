@@ -260,7 +260,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/Glob)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `lib/pm_policy.ts`, `scripts/dx_workspaces.ts`
+- **Here:** `lib/pm_policy.ts`, `scripts/audit_data_handling.ts`
 - **Evidence:** `probe:data.glob`
 
 #### Bun.JSON5
@@ -462,7 +462,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/secrets)
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (3):** `delete`, `get`, `set`
-- **Here:** `scripts/secrets_r2.ts`, `lib/secrets.ts`
+- **Here:** `scripts/secrets_r2.ts`, `lib/github_token.ts`
 - **Evidence:** `surface:secrets.get`, `test:tests/bun_capabilities.test.ts`
 
 ## Crypto, hashing and compression
@@ -693,7 +693,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/env)
 - **Shape:** value: `object` · writable false · enumerable true
-- **Here:** `services/sportsdesk_webview_server.ts`, `scripts/probe/parse-tree-only.ts`
+- **Here:** `scripts/probe/parse-tree-only.ts`, `services/sportsdesk_webview_server.ts`
 - **Evidence:** `probe:proc.shell`
 
 #### Bun.revision
