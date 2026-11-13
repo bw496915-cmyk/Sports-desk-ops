@@ -30,7 +30,7 @@ describe("parsePpmAllEvents on a real snapshot crop", () => {
   test("maps a known fixture to the desk fields", () => {
     const fixture = snapshot.fixtures.find((f) => f.eventId === 185442391);
     expect(fixture).toBeDefined();
-    expect(fixture!.fixtureId).toBe(9430);
+    expect(fixture!.slateId).toBe(9430);
     expect(fixture!.sportId).toBe(1);
     expect(fixture!.leagueId).toBe(4);
     expect(fixture!.home).toEqual({ name: "Great Britain", teamId: 3434274 });

@@ -40,10 +40,10 @@ export interface PpmFixture {
   /** The betting event id (inner key) — what the desk prices. */
   readonly eventId: number;
   /**
-   * The stat-score fixture id (outer key). One fixture carries several betting
-   * events (periods/markets), so this is the grouping key for a desk match.
+   * The feed's outer bucket (a card, a day, a schedule window) — not a game.
+   * Measured 2026-11-12: 750 slates hold 5,916 events; the largest holds 281.
    */
-  readonly fixtureId: number;
+  readonly slateId: number;
   readonly sportId: number;
   readonly leagueId: number;
   readonly home: PpmTeam;
@@ -142,7 +142,7 @@ function parseFixture(
   value: unknown,
   sportId: number,
   leagueId: number,
-  fixtureId: number,
+  slateId: number,
   eventId: number,
 ): FixtureResult {
   if (!Array.isArray(value) || value.length < 3) {
@@ -170,7 +170,7 @@ function parseFixture(
     kind: "ok",
     fixture: {
       eventId,
-      fixtureId,
+      slateId,
       sportId,
       leagueId,
       home: home.team,
@@ -181,6 +181,9 @@ function parseFixture(
 }
 
 /**
+ * The wire calls the outer key `fixtureId`; it is a slate (a card/day bucket,
+ * not a game), so the code names it `slateId` throughout.
+ *
  * Validates and flattens an `/live/allEvents` payload. Throws `PpmFeedError`
  * on the first structural problem rather than returning a partial book: a
  * half-parsed odds tree is worse than a visible failure.
@@ -224,7 +227,7 @@ export function parsePpmAllEvents(payload: unknown): PpmAllEventsSnapshot {
       }
 
       for (const [fixtureKey, events] of Object.entries(leagueEvents)) {
-        const fixtureId = toId(fixtureKey, "fixtureId");
+        const slateId = toId(fixtureKey, "slateId");
         if (!isRecord(events)) {
           throw new PpmFeedError(
             "invalid_fixture",
@@ -237,7 +240,7 @@ export function parsePpmAllEvents(payload: unknown): PpmAllEventsSnapshot {
             value,
             sportId,
             leagueId,
-            fixtureId,
+            slateId,
             eventId,
           );
           if (parsed.kind === "ok") {

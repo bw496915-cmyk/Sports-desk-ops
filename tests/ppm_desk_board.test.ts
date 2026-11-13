@@ -14,16 +14,108 @@ const BOARD = toDeskBoard(SNAPSHOT);
 describe("toDeskBoard on the real crop", () => {
   test("groups betting events into games", () => {
     expect(BOARD.counts.games).toBeGreaterThan(0);
+    expect(BOARD.counts.games).toBeLessThanOrEqual(BOARD.counts.events);
     expect(BOARD.counts.events).toBe(SNAPSHOT.fixtures.length);
-    // The crop has a fixture carrying three betting events; grouping must
-    // collapse it rather than emit three games.
-    expect(BOARD.counts.games).toBeLessThan(BOARD.counts.events);
+  });
+
+  test("a fixture is a slate: distinct matchups become distinct games", () => {
+    // Same fixture id, three different matchups — one slate, three games.
+    const slate = parsePpmAllEvents({
+      s: {
+        3: {
+          6: {
+            4: {
+              90: [["Bears", "", "", 1], ["Lions", "", "", 2], 1_794_753_000],
+              91: [["Bills", "", "", 3], ["Broncos", "", "", 4], 1_794_753_000],
+            },
+          },
+        },
+      },
+    });
+    const board = toDeskBoard(slate);
+    expect(board.games).toHaveLength(2);
+    expect(board.games.map((g) => g.home.teamId).sort()).toEqual([1, 3]);
+  });
+
+  test("second-level start jitter does not split one game", () => {
+    const jittered = parsePpmAllEvents({
+      s: {
+        8: {
+          252: {
+            47367: {
+              90: [["Yao", "", "", 1], ["Jones", "", "", 2], 1_794_538_500],
+              91: [["Yao", "", "", 1], ["Jones", "", "", 2], 1_794_538_530],
+            },
+          },
+        },
+      },
+    });
+    const board = toDeskBoard(jittered);
+    expect(board.games).toHaveLength(1);
+    expect(board.games[0]!.eventIds).toEqual([90, 91]);
+    expect(board.games[0]!.startTimeUnix).toBe(1_794_538_500);
+  });
+
+  test("a doubleheader hours apart stays two games", () => {
+    const double = parsePpmAllEvents({
+      s: {
+        1: {
+          6: {
+            8: {
+              90: [
+                ["Rangers", "", "", 1],
+                ["Angels", "", "", 2],
+                1_794_538_500,
+              ],
+              91: [
+                ["Rangers", "", "", 1],
+                ["Angels", "", "", 2],
+                1_794_549_300,
+              ],
+            },
+          },
+        },
+      },
+    });
+    expect(toDeskBoard(double).games).toHaveLength(2);
+  });
+
+  test("one matchup at one start is one game; a rematch days later is another", () => {
+    const fixture = parsePpmAllEvents({
+      s: {
+        2: {
+          6: {
+            6: {
+              90: [
+                ["Knicks", "", "", 1],
+                ["Raptors", "", "", 2],
+                1_794_783_600,
+              ],
+              91: [
+                ["Knicks", "", "", 1],
+                ["Raptors", "", "", 2],
+                1_794_783_600,
+              ],
+              92: [
+                ["Knicks", "", "", 1],
+                ["Raptors", "", "", 2],
+                1_794_961_800,
+              ],
+            },
+          },
+        },
+      },
+    });
+    const board = toDeskBoard(fixture);
+    expect(board.games).toHaveLength(2);
+    expect(board.games[0]!.eventIds).toEqual([90, 91]);
+    expect(board.games[1]!.eventIds).toEqual([92]);
   });
 
   test("keeps a known game with its event ids", () => {
-    const game = BOARD.games.find((candidate) => candidate.fixtureId === 9430);
+    const game = BOARD.games.find((candidate) => candidate.slateId === 9430);
     expect(game).toBeDefined();
-    expect(game!.id).toBe("ppm:1:4:9430");
+    expect(game!.id).toBe("ppm:1:4:9430:3434274-3434273:1795669200");
     expect(game!.sportId).toBe(1);
     expect(game!.sportName).toBe("Baseball");
     expect(game!.home.name).toBe("Great Britain");
