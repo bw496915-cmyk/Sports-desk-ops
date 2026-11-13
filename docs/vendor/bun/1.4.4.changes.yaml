@@ -1,0 +1,609 @@
+# Bun 1.4.4 change manifest. Schema and workflow: docs/vendor/bun/README.md.
+# Every `old`, `new` and `escape_hatch` string is a verbatim substring of 1.4.4.md, and every
+# `section` is a heading line in it; tests/bun_release_vendor.test.ts enforces both.
+schema: bun-release-changes/1
+release:
+  version: 1.4.4
+  tag: bun-v1.4.4
+  commit: 38afee6c84fcf48c0edb2466aa4b27d287a59c30
+  published: 2026-10-22T10:11:32Z
+source:
+  doc: 1.4.4.md
+  url: https://bun.com/blog/bun-v1.4.4.md
+  fetched: 2026-11-13
+  sha256: 8f790be8eaa740fd8969f2fa814f5fb1b86e9d8069e42356b2a726e88290c8a7
+  # Upstream labels no change as breaking, deprecated or security-scoped beyond the "## Security"
+  # list, so every `kind` below is an agent classification awaiting human promotion.
+  classification: derived
+  # `pr` values come from `gh api repos/oven-sh/bun/commits/<upstream>/pulls`; `upstream` is the
+  # commit the doc cites (an HTML comment) directly after the quoted bullet group.
+  pr_source: github-commit-pulls
+grep_exclude:
+  - node_modules/**
+  - "**/node_modules/**"
+  - dist/**
+  - scratch/**
+  - docs/vendor/**
+  - bun.lock
+  - bun.lockb
+  - "**/*.lock"
+  - verification/manager-boot-oracle/pinned/**
+  - verification/manager-boot-oracle/extracted/**
+changes:
+  - id: BUN144-SEC-001
+    slug: security-fixes-protocols-and-pm
+    kind: security
+    section: "## Security"
+    surface: [TLS, HTTP/1.1, HTTP/2, WebSocket, Bun.serve, Bun.SQL, Bun.password, fetch, node:http, node:https, node:tls, node:crypto, bun install, bunx]
+    new: "This release includes security fixes for TLS, WebSocket, the database clients and the package manager."
+    grep:
+      - 'Bun\.serve\('
+      - '\bfetch\('
+      - 'new WebSocket\('
+      - 'new (Bun\.)?SQL\('
+      - 'Bun\.password\.'
+      - 'from "node:(tls|https|http|http2|net|crypto|vm)"'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-SEC-002
+    slug: root-certificates-nss-3-131-1
+    kind: security
+    section: "## Other improvements"
+    surface: [TLS trust store, fetch, WebSocket, Bun.SQL]
+    new: "Improved: root certificates are updated to NSS 3.131.1."
+    grep:
+      - 'NODE_EXTRA_CA_CERTS|NODE_USE_SYSTEM_CA|--use-system-ca'
+      - 'rejectUnauthorized'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-001
+    slug: websocket-close-handshake
+    kind: breaking
+    section: "### `WebSocket` waits for the closing handshake"
+    surface: [WebSocket client, Bun.serve websocket.close]
+    old: "It used to fire right after `close()` with your own code and `wasClean: true`, regardless of what the server did."
+    new: "`close()` without a code sends an empty Close frame. Both ends report 1005 instead of 1000, including the `close(ws, code)` handler in `Bun.serve`."
+    escape_hatch: "`BUN_CONFIG_WS_CLOSE_TIMEOUT` changes the 30 second timeout. `ws.terminate()` closes immediately."
+    grep:
+      - 'new WebSocket\('
+      - 'wasClean'
+      - 'code\s*={2,3}\s*100[05]\b'
+      - 'toBe\(100[05]\)'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-002
+    slug: websocket-failed-connection-1006
+    kind: breaking
+    section: "### Failed `WebSocket` connections fire `error`, then `close` with 1006"
+    surface: [WebSocket client]
+    old: "Before, `close` fired with 1002, 1007, 1009, 1011 or 1015 and an English reason, sometimes with `wasClean: true`, and often no `error` event fired."
+    new: "A bad handshake, a TLS or proxy error, a protocol error, an oversized message and invalid UTF-8 are all reported the same way, like in browsers and Node.js."
+    grep:
+      - 'new WebSocket\('
+      - 'toBe\(10(0[2-9]|1[0-5])\)'
+      - 'code\s*={2,3}\s*10(0[2-9]|1[0-5])\b'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-003
+    slug: ws-package-node-parity
+    kind: breaking
+    section: "### `ws` events match Node.js"
+    surface: [ws npm package (built-in)]
+    old:
+      - "reason; // a Buffer, was a string"
+      - "They used to inherit `Bun.serve`'s defaults: a 120 second idle timeout, a ping at 104 seconds and a 16 MiB limit."
+    new:
+      - "An `'error'` event without a listener is an uncaught exception, like in Node.js. Add an `'error'` listener to every client and every server socket."
+      - "The default `maxPayload` is 100 MiB, up from 16 MiB."
+    grep:
+      - 'from\s+["'']ws["'']'
+      - 'require\(\s*["'']ws["'']\s*\)'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-004
+    slug: bun-serve-websocket-server-close-codes
+    kind: breaking
+    section: "#### `Bun.serve` WebSocket servers"
+    surface: [Bun.serve websocket]
+    old:
+      - "Fixed: `server.stop(true)` closed WebSockets with 1006."
+      - "Fixed: `idleTimeout: 0` closed idle connections after about 256 seconds instead of never."
+    new:
+      - "They now close with 1001 \"Server closed\"."
+      - "It now receives a Close frame with 1002, 1007 or 1009 and a reason."
+    grep:
+      - 'websocket:\s*\{'
+      - 'idleTimeout:\s*0\b'
+      - 'maxPayloadLength'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-005
+    slug: glob-extglob-brace-ranges
+    kind: breaking
+    section: "### `Bun.Glob` supports extglob and brace ranges"
+    surface: [Bun.Glob, package.json workspaces, package.json files, package.json sideEffects, --filter]
+    old: "These patterns used to be matched literally."
+    new: "They now have a different meaning, consistent with picomatch, minimatch and bash's `extglob`:"
+    escape_hatch: "Write `*[(]1).txt` instead."
+    grep:
+      - 'new (Bun\.)?Glob\('
+      - '["''`][^"''`]*[?*+@!]\([^)]*\)[^"''`]*["''`]'
+      - '\{[A-Za-z0-9]+\.\.[A-Za-z0-9]+\}'
+    upstream: bfa1209e35663056248406661f1b90851e5c72fa
+    pr: 45043
+    advisory: null
+
+  - id: BUN144-BRK-006
+    slug: pm-unknown-flags-rejected
+    kind: breaking
+    section: "### `bun install` understands npm, Yarn and pnpm flags, and rejects unknown ones"
+    surface: [bun install, bun ci, bun add, bun remove, bun update, bunx]
+    old: "Package manager commands and `bunx` used to ignore unknown flags, so this typo would silently run a normal install in CI."
+    new: "Flags that none of these tools support are an error."
+    grep:
+      - '\bbun\s+(install|i|add|remove|rm|update|ci|link|unlink|outdated|publish|audit|pm)\b[^\n]*\s--?[A-Za-z]'
+      - '\bbunx\s+--'
+      - '\bbun\s+x\s+--'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-007
+    slug: pm-libc-filter
+    kind: breaking
+    section: "### Linux installs skip native packages built for the other libc"
+    surface: [bun install, bun ci]
+    old: "Bun previously ignored that field, so every Linux install downloaded both builds."
+    new: "Now it only installs the one that matches your system, like npm and pnpm."
+    escape_hatch: "bun install --libc '*'"
+    grep:
+      - '--libc'
+      - '\bmusl\b'
+      - '\balpine\b'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-008
+    slug: pm-peer-dependency-resolution
+    kind: breaking
+    section: "### Peer dependencies resolve more like pnpm"
+    surface: [bun install]
+    old: "Before, the package got whatever version an unrelated package happened to install."
+    new: "When nothing in your project provides a package's peer dependency, Bun installs a version that satisfies the peer range."
+    escape_hatch: "Versions already in `bun.lock` don't change."
+    grep:
+      - '"peerDependencies"'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-009
+    slug: tls-request-cert-explicit
+    kind: breaking
+    section: "### TLS"
+    surface: [Bun.serve tls, Bun.listen tls, node:tls createServer]
+    old: "Setting `ca` alone no longer does."
+    new: "Improved: `Bun.serve`, `Bun.listen` and `node:tls` servers now only request a client certificate when `requestCert: true` is set, which matches the docs and Node.js."
+    escape_hatch: "For mTLS, set both."
+    grep:
+      - 'requestCert'
+      - 'tls\.createServer\('
+      - 'Bun\.listen\('
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-010
+    slug: disallow-code-generation-strict
+    kind: breaking
+    section: "### `--disallow-code-generation-from-strings=strict` only runs code that ships with your program"
+    surface: [--disallow-code-generation-from-strings]
+    old: "`=strict` used to block a fixed list of APIs."
+    new: "Now JavaScriptCore refuses to run any code that isn't a Bun built-in or one of your program's own files, regardless of which API it came from."
+    grep:
+      - 'disallow-code-generation-from-strings'
+    upstream: 5f5799ed16568240de19fef364bd4c9bf22ca1c7
+    pr: 45173
+    advisory: null
+
+  - id: BUN144-BRK-011
+    slug: jsc-unary-plus-bigint
+    kind: breaking
+    section: "### JavaScriptCore upgrade"
+    surface: [JavaScriptCore]
+    old: "It used to return `2n`."
+    new: "`+1n * 2n` throws a `TypeError`."
+    grep:
+      - '(^|[^\w$)\]\s])\s*\+\s*\d+n\b'
+    upstream: f2405c382d43b89d91a2e7c90d9c5f53505a1e71
+    pr: 45303
+    advisory: null
+
+  - id: BUN144-BRK-012
+    slug: sql-password-env-ignored
+    kind: breaking
+    section: "#### `Bun.SQL` connection options"
+    surface: [Bun.SQL]
+    new: "Improved: `Bun.SQL` no longer reads the `PASSWORD` environment variable."
+    escape_hatch: "Use `PGPASSWORD`, `MYSQL_PASSWORD`, the URL or the `password` option."
+    grep:
+      - 'env\.PASSWORD\b|env\[\s*["'']PASSWORD["'']|^\s*(export\s+)?PASSWORD='
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-013
+    slug: sql-postgres-array-types-decoded
+    kind: breaking
+    section: "### Pass JavaScript arrays to PostgreSQL array columns"
+    surface: [Bun.SQL PostgreSQL]
+    new: "35 more built-in array types, such as `uuid[]`, `int4range[]` and `tsvector[]`, are returned as arrays instead of the string `\"{...}\"`."
+    grep:
+      - 'new (Bun\.)?SQL\('
+      - '::[a-z0-9_]+\[\]'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-014
+    slug: sql-array-untyped-no-json-cast
+    kind: breaking
+    section: "#### `Bun.SQL` with PostgreSQL"
+    surface: [Bun.SQL PostgreSQL]
+    old: "Fixed: `sql.array([\"a\", \"b\"])` without a type was cast to `JSON[]`, so a `text[]` column stored JSON-quoted elements."
+    new: "Bun no longer adds a cast."
+    grep:
+      - 'sql\.array\('
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-015
+    slug: sql-affected-rows-populated
+    kind: breaking
+    section: "#### `Bun.SQL` queries and results"
+    surface: [Bun.SQL]
+    old: "Fixed: `affectedRows` was always `null` on PostgreSQL and SQLite."
+    new: "It's now the number of rows written, and `0` for a `SELECT`."
+    grep:
+      - 'affectedRows'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-016
+    slug: sql-sqlite-adapter-mode
+    kind: breaking
+    section: "#### `Bun.SQL` connection options"
+    surface: [Bun.SQL SQLite adapter]
+    old: "Fixed: with the SQLite adapter, `?mode=rw` created the file, and `?mode=RO` or `{ readwrite: false }` opened it read-write."
+    grep:
+      - '\?mode=(rw|ro|RO|rwc)'
+      - 'readwrite:\s*false'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-017
+    slug: sqlite-exec-multistatement-throws
+    kind: breaking
+    section: "#### `bun:sqlite`"
+    surface: [bun:sqlite Database.run, Database.exec]
+    old: "Fixed: `db.run(\"a; b; c\")` and `db.exec()` swallowed runtime errors in every statement except the last."
+    new: "They now throw at the failing statement and skip the rest."
+    grep:
+      - '\.(exec|run)\(\s*`'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-018
+    slug: sqlite-open-flags-validated
+    kind: breaking
+    section: "#### `bun:sqlite`"
+    surface: [bun:sqlite Database constructor]
+    old: "Fixed: `{ readonly: true, create: true }` opened the database read-write."
+    new: "It now throws a `TypeError`."
+    grep:
+      - 'new Database\([^)]*create:\s*true'
+      - 'readonly:\s*true[^}]*create:\s*true'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-019
+    slug: sqlite-changes-own-rows
+    kind: breaking
+    section: "#### `bun:sqlite`"
+    surface: [bun:sqlite Statement.run changes]
+    old: "Fixed: `changes` also counted rows written by triggers, foreign key cascades and FTS5 shadow tables."
+    new: "It now counts the statement's own rows, like `node:sqlite`."
+    grep:
+      - '\.changes\b'
+      - 'CREATE TRIGGER'
+      - 'ON (DELETE|UPDATE) CASCADE'
+      - '\bfts5\b'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-020
+    slug: sqlite-bind-non-primitive-throws
+    kind: breaking
+    section: "#### `bun:sqlite`"
+    surface: [bun:sqlite Statement binding]
+    old: "Fixed: `stmt.run(new Date())`, or a `Map` or a `Promise` as the only argument, bound `NULL`."
+    new: "It now throws a `TypeError`."
+    grep:
+      - '\.(run|get|all|values)\(\s*new (Date|Map)\b'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-021
+    slug: sqlite-heap-limit-unenforced
+    kind: breaking
+    section: "#### `bun:sqlite`"
+    surface: [bun:sqlite PRAGMA]
+    new: "As a result, `PRAGMA hard_heap_limit` and `soft_heap_limit` are accepted but no longer enforced, like in `node:sqlite`."
+    grep:
+      - 'heap_limit'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-022
+    slug: hash-rejects-file-and-nullish
+    kind: breaking
+    section: "#### `Bun.hash` and `Bun.CryptoHasher`"
+    surface: [Bun.hash, Bun.CryptoHasher, Bun.sha]
+    old:
+      - "Fixed: `Bun.hash()`, `Bun.hash(undefined)` and `Bun.hash(null)` returned the hash of `\"\"`, `\"undefined\"` and `\"null\"`."
+      - "Fixed: hashing an S3 file with `Bun.CryptoHasher`, `Bun.SHA1.hash()`, `Bun.sha()` or `crypto.hash()` returned the digest of an empty input."
+    new:
+      - "They now throw a `TypeError`, and so do `Bun.hash.crc32()` and the other algorithms."
+      - "It now throws a `TypeError`, like it does for `Bun.file()`."
+    grep:
+      - 'Bun\.hash(\.[a-z0-9]+)?\('
+      - 'CryptoHasher\.hash\(|\.update\(\s*Bun\.(file|s3)'
+      - 'Bun\.sha\('
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-023
+    slug: node-http-invalid-status-throws
+    kind: breaking
+    section: "#### `node:http`"
+    surface: [node:http server]
+    old: "Fixed: in a `node:http` server, `res.end()` sent `200` when `res.statusCode` was `NaN` or `undefined`."
+    new: "It now throws `ERR_HTTP_INVALID_STATUS_CODE`, like Node.js."
+    grep:
+      - '\.statusCode\s*='
+    upstream: 59c1ac474cdbafe9d77b395bd2712b767b617767
+    pr: 46128
+    advisory: null
+
+  - id: BUN144-BRK-024
+    slug: process-on-duplicate-listener
+    kind: breaking
+    section: "#### `process`"
+    surface: [process.on]
+    old: "Fixed: registering the same function twice with `process.on()` only added it once."
+    new: "It's now added and called twice, like in Node.js."
+    grep:
+      - 'process\.on\('
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-025
+    slug: fs-realpath-posix-semantics
+    kind: breaking
+    section: "#### `node:fs`"
+    surface: [fs.realpath, fs.realpathSync.native, fs.promises.realpath]
+    old: "Fixed: on Linux and macOS, `fs.realpath.native()`, `fs.realpathSync.native()` and `fs.promises.realpath()` collapsed `..` before following symlinks, so `link/../y` resolved next to the link instead of its target, and `missing/..` didn't throw."
+    new: "Like Node.js, they now return the file's path."
+    grep:
+      - 'realpath(Sync)?(\.native)?\('
+    upstream: c0e1716f17386fb1683320ea1c7ac78c33c48a3a
+    pr: 45423
+    advisory: null
+
+  - id: BUN144-BRK-026
+    slug: test-coverage-accounting
+    kind: breaking
+    section: "### bun test"
+    surface: [bun test --coverage]
+    old: "Fixed: `bun test --coverage` counted the lines after an `await` or `yield` as covered when the function never resumed past it."
+    new: "`% Lines` can drop after upgrading, so check your `coverageThreshold`."
+    grep:
+      - 'coverageThreshold'
+      - '--coverage'
+      - '^\s*coverage\s*='
+    upstream: 6f58f6b89446918c534223c3c32df7feec62abea
+    pr: 45677
+    advisory: null
+
+  - id: BUN144-BRK-027
+    slug: git-dependencies-min-version
+    kind: breaking
+    section: "#### Git dependencies"
+    surface: [bun install git dependencies]
+    new: "Improved: git dependencies now require Git 2.24 or newer."
+    grep:
+      - '"(git\+|github:|gitlab:|bitbucket:)'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-028
+    slug: publish-provenance-errors
+    kind: breaking
+    section: "#### `bun pm pack` and `bun publish`"
+    surface: [bun publish]
+    old: "Fixed: `bun publish --provenance`, `publishConfig.provenance` and `NPM_CONFIG_PROVENANCE` were ignored, so the package was published without provenance."
+    new: "They're now errors until Bun supports generating it."
+    grep:
+      - '\bbun\s+publish\b'
+      - '--provenance|NPM_CONFIG_PROVENANCE|"provenance"\s*:\s*true'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-029
+    slug: publish-prerelease-requires-tag
+    kind: breaking
+    section: "### More in `bun install`"
+    surface: [bun publish]
+    new: "Like npm 11, `bun publish` refuses to publish a prerelease version like `2.0.0-beta.1` without `--tag` or `publishConfig.tag`, instead of tagging it `latest`."
+    grep:
+      - '\bbun\s+publish\b'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-030
+    slug: pm-relative-config-paths
+    kind: breaking
+    section: "#### Registries, `.npmrc` and `bunfig.toml`"
+    surface: [bun install --config, --cache-dir, --cafile, bunfig.toml, .npmrc]
+    new:
+      - "Fixed: a relative `cafile`, `cache`, `globalDir` or `globalBinDir` in `bunfig.toml` or `.npmrc` is now resolved relative to that file."
+      - "Fixed: a relative `--config`, `--cache-dir` or `--cafile` is now resolved relative to the current working directory instead of the project root."
+    grep:
+      - '\bbun\b[^\n]*\s--(config|cache-dir|cafile)[= ]'
+      - '^\s*(cafile|globalDir|globalBinDir)\s*='
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-031
+    slug: bun-check-drops-ts2321
+    kind: breaking
+    section: "### bun check"
+    surface: [bun check]
+    new: "Improved: `bun check` follows TypeScript 7.1 and no longer reports TS2321."
+    grep:
+      - 'TS2321'
+      - '@ts-expect-error[^\n]*(stack depth|2321)'
+    upstream: 6bb5dc1956505dd1113455f58d4757c924f3ad54
+    pr: 45800
+    advisory: null
+
+  - id: BUN144-BRK-032
+    slug: csrf-dns-nan-range-error
+    kind: breaking
+    section: "#### Other Bun APIs"
+    surface: [Bun.CSRF.generate, Bun.CSRF.verify, Bun.dns.prefetch]
+    new: "Improved: `expiresIn: NaN` in `Bun.CSRF.generate()`, `maxAge: NaN` in `Bun.CSRF.verify()` and a `NaN` port in `Bun.dns.prefetch()` throw a `RangeError` instead of falling back to the default."
+    grep:
+      - 'CSRF\.(generate|verify)\('
+      - 'dns\.prefetch\('
+    upstream: 21620e2be3959ed985d971c60565a98a142e4503
+    pr: 45450
+    advisory: null
+
+  - id: BUN144-BRK-033
+    slug: shell-escape-returns-string
+    kind: breaking
+    section: "#### Other Bun APIs"
+    surface: [Bun.$.escape]
+    old: "Fixed: `Bun.$.escape()` returned non-string arguments like `null`, `true` or `new String(\"foo\")` unchanged when they didn't need escaping."
+    new: "It now always returns a string."
+    grep:
+      - '\$\.escape\('
+    upstream: 21620e2be3959ed985d971c60565a98a142e4503
+    pr: 45450
+    advisory: null
+
+  - id: BUN144-BRK-034
+    slug: gzip-deflate-options-validated
+    kind: breaking
+    section: "#### Other Bun APIs"
+    surface: [Bun.gzipSync, Bun.deflateSync]
+    old: "Fixed: `Bun.gzipSync()` and `Bun.deflateSync()` ignored the `memLevel` and `strategy` options and always compressed with the defaults."
+    new: "A `memLevel` outside 1 to 9 or a `strategy` outside 0 to 4 now throws."
+    grep:
+      - '(gzipSync|deflateSync)\([^)]*,'
+      - 'memLevel'
+    upstream: d0831bc9fe53ceec29281fb9b7dfdebea39bc351
+    pr: 45794
+    advisory: null
+
+  - id: BUN144-BRK-035
+    slug: index-of-line-throws
+    kind: breaking
+    section: "#### Other Bun APIs"
+    surface: [Bun.indexOfLine]
+    old: "Fixed: `Bun.indexOfLine()` returned `-1` when its first argument wasn't a buffer, such as a string that contains a newline."
+    new: "It now throws a `TypeError`."
+    grep:
+      - 'indexOfLine\('
+    upstream: 0a2f1c815699d8fd7ab5a7db52493d8e79e34109
+    pr: 45454
+    advisory: null
+
+  - id: BUN144-BRK-036
+    slug: json5-parse-stricter
+    kind: breaking
+    section: "#### Other Bun APIs"
+    surface: [Bun.JSON5.parse]
+    old: "Fixed: `Bun.JSON5.parse()` accepted two invalid inputs."
+    new: "Both throw a `SyntaxError`."
+    grep:
+      - 'JSON5\.parse\('
+    upstream: 788087c0a4e0c4e57dfe78156ba57a70e329d1b1
+    pr: 45595
+    advisory: null
+
+  - id: BUN144-BRK-037
+    slug: semver-satisfies-stricter
+    kind: breaking
+    section: "#### Resolving versions"
+    surface: [Bun.semver.satisfies, Bun.semver.order]
+    old: "Fixed: `Bun.semver.satisfies()` returned `true` for versions that aren't valid semver, such as `\"\"`, `\"1.2.3.4\"` and `\"1.2.3 junk\"`, and `false` for `1.0.0+build-1` against `^1.0.0`."
+    grep:
+      - 'semver\.(satisfies|order)\('
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-038
+    slug: websocket-send-file-throws
+    kind: breaking
+    section: "#### `WebSocket` client"
+    surface: [WebSocket client send, ping, pong]
+    old: "Fixed: `send()`, `ping()` and `pong()` with `Bun.file()` or an S3 file sent an empty frame."
+    new: "They now throw."
+    grep:
+      - '\.(send|ping|pong)\(\s*Bun\.(file|s3)'
+    upstream: null
+    pr: null
+    advisory: null
+
+  - id: BUN144-BRK-039
+    slug: websocket-proxy-headers-validated
+    kind: breaking
+    section: "#### `WebSocket` client"
+    surface: [WebSocket client proxy]
+    old: "Fixed: one invalid entry in `proxy.headers` silently dropped all of them, including `Proxy-Authorization`."
+    new: "It now throws instead."
+    grep:
+      - 'proxy:\s*\{'
+    upstream: null
+    pr: null
+    advisory: null

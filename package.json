@@ -317,6 +317,7 @@
     "blob:formdata": "bun run bin/blob-formdata.ts",
     "xml:parse": "bun run bin/xml-parse.ts",
     "bun:surface": "bun run bin/bun_surface.ts",
+    "bun:release": "bun run scripts/bun_release_vendor.ts",
     "sql:query": "bun run bin/sql-query.ts",
     "fetch-config": "bun run scripts/fetch-config.ts",
     "fetch-live-data": "bun run scripts/fetch-live-data.ts",
