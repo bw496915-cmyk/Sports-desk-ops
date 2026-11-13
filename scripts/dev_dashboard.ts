@@ -51,6 +51,10 @@ import {
 import { encodedResponse } from "../lib/http_compression.ts";
 import { SUBSPORT_TAXONOMY_CATALOG } from "../lib/market_taxonomy_catalog.ts";
 import { runShadowPricingDashboard } from "../lib/shadow_pricing_engine.ts";
+import {
+  createSportsdeskMcpHttpHandler,
+  resolveMcpAllowedOrigins,
+} from "../lib/sportsdesk_mcp_server.ts";
 import { executeTerminalQuery } from "../lib/terminal_emulator.ts";
 import indexHtml from "../src/dashboard/index.html";
 import { runBunBuild } from "./build.ts";
@@ -63,6 +67,7 @@ export interface DashboardServerOptions {
   readonly shadowDbPath?: string | undefined;
   readonly forceShadowFixture?: boolean | undefined;
   readonly apiOnly?: boolean | undefined;
+  readonly mcpStateless?: boolean | undefined;
 }
 
 export interface DashboardServerHandle {
@@ -104,6 +109,13 @@ export function startDashboardServer(
   const clients = new Set<ServerWebSocket<undefined>>();
   const watchers: FSWatcher[] = [];
   let serverRef: Server<undefined> | null = null;
+  const isDevelopment = Bun.env.NODE_ENV !== "production";
+  const mcpHandler = createSportsdeskMcpHttpHandler({
+    stateless:
+      options.mcpStateless ??
+      /^(1|true)$/i.test(Bun.env.SPORTSDESK_MCP_STATELESS ?? ""),
+    allowedOrigins: resolveMcpAllowedOrigins(isDevelopment),
+  });
 
   const alertDispatcher = new AlertDispatcher({
     sweepIntervalMs: 5000,
@@ -383,6 +395,7 @@ export function startDashboardServer(
         }
         return cachedDceMatrix;
       },
+      handleMcp: (req: Request) => mcpHandler.handleRequest(req),
     },
     { clients },
   );
@@ -538,6 +551,9 @@ export function startDashboardServer(
     port: server.port ?? port,
     stop(closeActiveConnections = true) {
       alertDispatcher.stop();
+      mcpHandler.closeAll().catch(() => {
+        // signal-honesty: intentional-teardown-cleanup
+      });
       for (const w of watchers) {
         w.close();
       }
@@ -560,8 +576,14 @@ if (import.meta.main) {
   }
 
   const apiOnly = Bun.argv.includes("--api-only");
+  const mcpStateless =
+    Bun.argv.includes("--stateless") || Bun.argv.includes("--mcp-stateless");
   prefetchSportsDeskEndpoints();
-  const handle = startDashboardServer({ watchFiles: true, apiOnly });
+  const handle = startDashboardServer({
+    watchFiles: true,
+    apiOnly,
+    ...(mcpStateless ? { mcpStateless: true } : {}),
+  });
 
   console.log(
     `\n⚡ SportsDesk ${apiOnly ? "API-Only" : "Enhanced Dashboard"} Server running!`,

@@ -28,7 +28,8 @@ import {
   type WsLike,
 } from "./ws.ts";
 
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+type HttpMethod =
+  "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
 
 type SimpleMethodHandlers = {
   readonly [M in HttpMethod]?: (req: Request) => Response | Promise<Response>;
@@ -106,6 +107,52 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
       GET: async (): Promise<Response> => {
         return Response.json(await deps.getHealthPayload());
       },
+    },
+
+    "/mcp": {
+      GET: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : Response.json(
+              { error: "MCP endpoint not configured" },
+              { status: 404 },
+            ),
+      HEAD: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : new Response(null, { status: 404 }),
+      POST: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : Response.json(
+              { error: "MCP endpoint not configured" },
+              { status: 404 },
+            ),
+      PUT: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : Response.json(
+              { error: "MCP endpoint not configured" },
+              { status: 404 },
+            ),
+      PATCH: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : Response.json(
+              { error: "MCP endpoint not configured" },
+              { status: 404 },
+            ),
+      DELETE: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : Response.json(
+              { error: "MCP endpoint not configured" },
+              { status: 404 },
+            ),
+      OPTIONS: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : new Response(null, { status: 204 }),
     },
 
     "/api/auth/login": {

@@ -173,6 +173,7 @@
     "session:login": "bun run scripts/session_login.ts",
     "session:status": "bun run scripts/session_login.ts --status",
     "mcp:dx": "bun run scripts/mcp_dx_server.ts",
+    "mcp:serve": "bun --no-orphans run cli/sportsdesk_mcp_cli.ts",
     "cli": "bun run cli/sportsdesk_cli.ts",
     "replay": "bun run cli/sportsdesk_replay_cli.ts",
     "ingestion:enrich-xml-golden": "bun run scripts/enrich_ingestion_jsonl_xml_golden.ts",
