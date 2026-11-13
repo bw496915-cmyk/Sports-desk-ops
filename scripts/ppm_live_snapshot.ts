@@ -13,6 +13,7 @@
  * to the repository: the default output is stdout.
  */
 import { parsePpmAllEvents } from "../lib/ppm_live_feed.ts";
+import { toDeskBoard } from "../lib/ppm_desk_board.ts";
 
 const BASE = Bun.env.PPM_BASE_URL ?? "https://ppm.sportswidgets.pro/live";
 
@@ -46,29 +47,37 @@ async function main(): Promise<void> {
     throw new Error(`allEvents failed: HTTP ${response.status}`);
   }
   const snapshot = parsePpmAllEvents(await response.json());
+  const wantsUpcoming = process.argv.includes("--upcoming");
+  const board = toDeskBoard(
+    snapshot,
+    wantsUpcoming ? { sinceUnix: Math.floor(Date.now() / 1000) } : {},
+  );
 
   const summary = {
     base: BASE,
     counts: snapshot.counts,
-    sports: snapshot.sportIds.length,
-    leagues: snapshot.leagues.length,
-    nextFixtures: snapshot.fixtures.slice(0, 5).map((fixture) => ({
-      eventId: fixture.eventId,
-      sportId: fixture.sportId,
-      leagueId: fixture.leagueId,
-      home: fixture.home.name,
-      away: fixture.away.name,
-      startsAt: new Date(fixture.startTimeUnix * 1000).toISOString(),
+    board: board.counts,
+    window: wantsUpcoming ? "upcoming-only" : "all",
+    nextGames: board.games.slice(0, 5).map((game) => ({
+      id: game.id,
+      sport: game.sportName ?? `sport ${game.sportId}`,
+      leagueId: game.leagueId,
+      home: game.home.name,
+      away: game.away.name,
+      startsAt: new Date(game.startTimeUnix * 1000).toISOString(),
+      pricedEvents: game.eventIds.length,
     })),
   };
 
   const out = parseOutputPath(process.argv);
+  const wantsBoard = process.argv.includes("--board");
+  const payload = wantsBoard ? { summary, board } : summary;
   if (out) {
-    await Bun.write(out, `${JSON.stringify(snapshot, null, 2)}\n`);
+    await Bun.write(out, `${JSON.stringify(payload, null, 2)}\n`);
     console.log(JSON.stringify({ ...summary, writtenTo: out }, null, 2));
     return;
   }
-  console.log(JSON.stringify(summary, null, 2));
+  console.log(JSON.stringify(payload, null, 2));
 }
 
 if (import.meta.main) {
