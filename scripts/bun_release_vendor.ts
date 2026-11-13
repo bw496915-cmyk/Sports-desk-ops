@@ -13,11 +13,13 @@
  */
 
 import { parseArgs } from "node:util";
+import { z } from "zod";
 import {
   AUDIT_KINDS,
   BUN_VENDOR_DIR,
+  BunVersionSchema,
   CHANGE_KINDS,
-  type ChangeKind,
+  ChangeKindSchema,
   parseBunReleaseManifest,
   renderBunReleaseDigest,
   scanBunReleaseSurfaces,
@@ -46,17 +48,21 @@ const { values, positionals } = parseArgs({
   },
 });
 
-const [command, version] = positionals;
-if (values.help || command === undefined || version === undefined) {
+if (values.help) {
   console.log(USAGE);
-  process.exit(values.help ? 0 : 2);
+  process.exit(0);
 }
-if (!/^\d+\.\d+\.\d+$/.test(version)) {
-  console.error(
-    `bun:release: version must look like 1.4.4, got ${JSON.stringify(version)}`,
-  );
+
+const Args = z.tuple([
+  z.enum(["fetch", "check", "digest", "grep"]),
+  BunVersionSchema,
+]);
+const args = Args.safeParse(positionals);
+if (!args.success) {
+  console.error(`bun:release: ${z.prettifyError(args.error)}\n${USAGE}`);
   process.exit(2);
 }
+const [command, version] = args.data;
 
 const docPath = `${BUN_VENDOR_DIR}/${version}.md`;
 const manifestPath = `${BUN_VENDOR_DIR}/${version}.changes.yaml`;
@@ -151,17 +157,17 @@ switch (command) {
   }
   case "grep": {
     const manifest = await loadManifest();
-    const unknownKind = (values.kind ?? []).find(
-      (kind) => !(CHANGE_KINDS as readonly string[]).includes(kind),
-    );
-    if (unknownKind !== undefined) {
+    const parsedKinds = z
+      .array(ChangeKindSchema)
+      .optional()
+      .safeParse(values.kind);
+    if (!parsedKinds.success) {
       console.error(
-        `bun:release: unknown --kind ${unknownKind}; expected one of ${CHANGE_KINDS.join(", ")}`,
+        `bun:release: unknown --kind; expected one of ${CHANGE_KINDS.join(", ")}`,
       );
       process.exit(2);
     }
-    const kinds =
-      values.kind === undefined ? AUDIT_KINDS : (values.kind as ChangeKind[]);
+    const kinds = parsedKinds.data ?? AUDIT_KINDS;
     const scans = scanBunReleaseSurfaces(
       manifest,
       await trackedFiles(),
@@ -183,9 +189,8 @@ switch (command) {
     }
     break;
   }
-  default:
-    console.error(
-      `bun:release: unknown command ${JSON.stringify(command)}\n${USAGE}`,
-    );
-    process.exit(2);
+  default: {
+    const unhandled: never = command;
+    throw new Error(`unhandled command ${String(unhandled)}`);
+  }
 }

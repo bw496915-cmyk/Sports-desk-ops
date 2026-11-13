@@ -133,6 +133,26 @@ describe("validateBunReleaseManifest", () => {
     ]);
   });
 
+  test("schema rejects an id code no kind owns and a malformed version", () => {
+    const manifest = base();
+    expect(() =>
+      parseBunReleaseManifest(
+        Bun.YAML.stringify({
+          ...manifest,
+          changes: [{ ...manifest.changes[0], id: "BUN999-XYZ-001" }],
+        }),
+      ),
+    ).toThrow();
+    expect(() =>
+      parseBunReleaseManifest(
+        Bun.YAML.stringify({
+          ...manifest,
+          release: { ...manifest.release, version: "1.4" },
+        }),
+      ),
+    ).toThrow("version must look like 1.4.4");
+  });
+
   test("schema rejects a change without old or new", () => {
     expect(() =>
       parseBunReleaseManifest(

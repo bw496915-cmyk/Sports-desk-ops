@@ -30,6 +30,8 @@ export const AUDIT_KINDS: readonly ChangeKind[] = [
   "deprecation",
 ];
 
+export const ChangeKindSchema = z.enum(CHANGE_KINDS);
+
 const KIND_CODE: Record<ChangeKind, string> = {
   security: "SEC",
   breaking: "BRK",
@@ -39,13 +41,32 @@ const KIND_CODE: Record<ChangeKind, string> = {
   fix: "FIX",
 };
 
+const KIND_TITLE: Record<ChangeKind, string> = {
+  security: "Security",
+  breaking: "Breaking",
+  deprecation: "Deprecation",
+  perf: "Perf",
+  new: "New",
+  fix: "Fix",
+};
+
+const CHANGE_ID = new RegExp(
+  `^BUN(\\d+)-(${Object.values(KIND_CODE).join("|")})-\\d{3}$`,
+);
+
+export const BunVersionSchema = z
+  .string()
+  .regex(/^\d+\.\d+\.\d+$/, "version must look like 1.4.4")
+  .brand<"BunVersion">();
+export type BunVersion = z.infer<typeof BunVersionSchema>;
+
 const Quote = z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]);
 
 const ChangeSchema = z
   .strictObject({
-    id: z.string().regex(/^BUN\d+-(SEC|BRK|DEP|PRF|NEW|FIX)-\d{3}$/),
+    id: z.string().regex(CHANGE_ID),
     slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-    kind: z.enum(CHANGE_KINDS),
+    kind: ChangeKindSchema,
     section: z.string().regex(/^#{1,6} \S/),
     surface: z.array(z.string().min(1)).min(1),
     old: Quote.optional(),
@@ -69,7 +90,7 @@ const ChangeSchema = z
 export const BunReleaseManifestSchema = z.strictObject({
   schema: z.literal("bun-release-changes/1"),
   release: z.strictObject({
-    version: z.string().regex(/^\d+\.\d+\.\d+$/),
+    version: BunVersionSchema,
     tag: z.string().min(1),
     commit: z.string().regex(/^[0-9a-f]{40}$/),
     published: z.string().min(1),
@@ -138,8 +159,8 @@ export function validateBunReleaseManifest(
     if (seen.has(change.id)) problems.push(`${label}: duplicate id`);
     seen.add(change.id);
 
-    const [prefix, code] = change.id.split("-");
-    if (prefix !== `BUN${versionDigits}`) {
+    const [, digits, code] = CHANGE_ID.exec(change.id) ?? [];
+    if (digits !== versionDigits) {
       problems.push(`${label}: id prefix must be BUN${versionDigits}`);
     }
     if (code !== KIND_CODE[change.kind]) {
@@ -166,7 +187,7 @@ export function validateBunReleaseManifest(
         new RegExp(pattern);
       } catch (error) {
         problems.push(
-          `${label}: grep ${JSON.stringify(pattern)} does not compile: ${(error as Error).message}`,
+          `${label}: grep ${JSON.stringify(pattern)} does not compile: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -229,7 +250,7 @@ export function renderBunReleaseDigest(manifest: BunReleaseManifest): string {
   }
   for (const kind of order) {
     const changes = manifest.changes.filter((c) => c.kind === kind);
-    out.push("", `## ${kind[0]!.toUpperCase()}${kind.slice(1)}`);
+    out.push("", `## ${KIND_TITLE[kind]}`);
     if (changes.length === 0) {
       out.push("", `None in ${version}.md.`);
       continue;
