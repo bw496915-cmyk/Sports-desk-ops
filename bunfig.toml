@@ -30,6 +30,9 @@ ignorePatterns = [
   # heading), so formatting it only makes the next gate run dirty the tree again.
   "verification/gen-tokens-zero-drift-gate/report.md",
   "verification/gen-tokens-zero-drift-gate/out/**",
+  # Vendored upstream release notes: the manifest pins each doc's sha256, and the digest is
+  # rendered by `bun run bun:release digest`.
+  "docs/vendor/**",
 ]
 
 # Install keys (linker, globalStore, cache.dir, frozenLockfile, minimumReleaseAge) are owned by the
