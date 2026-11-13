@@ -24,29 +24,41 @@
  * Prices are **decimal** already (1.909091 = -110), so they never pass through
  * the display quantization that `ppm_price_math` documents.
  *
- * Two value encodings share the same object, and they do not mean the same
- * thing:
+ * A pair is either two offers or one offer plus a filler, and the difference
+ * is arithmetic, not positional: two offers price a book (`1/a + 1/b` in
+ * 1.03–1.23 on this feed), while the filler is `1.00001` / `1.000001` and is
+ * filtered before the test. When both elements survive, both are emitted, with
+ * `side` 0/1 and — where the market type says so — a named `role`:
  *
- * - `[over, under]` on a line key (`"48.5"`, `"-3.5"`) — both elements are
- *   prices and the key is the line.
- * - `[price, 1.00001]` on an outcome key (`"2"`, `"65538"`, a player id) — one
- *   real price and one placeholder. The second element is not a 1.00001-odds
- *   offer; emitting it would invent a price no book quotes.
+ * - totals (5/7/8): `over` / `under`
+ * - spread (6): `quoted` / `other`
+ * - any other two-price pair (an exact total, a player prop): role `null`,
+ *   because the payload does not say what the second side means
  *
- * Only the first form carries a line; a per-outcome key never does, even when
- * it happens to be numeric.
+ * A key is a line only in the line-keyed markets; elsewhere it is a
+ * selection/outcome id, even when it is numeric. `line`, `side`, `role` and
+ * `twoSided` record exactly that, so a consumer never has to re-guess.
  */
+
+/** Which side of a pair a price is, where the market type names them. */
+export type PpmSideRole = "over" | "under" | "quoted" | "other";
+
+/** What a market's `o` keys name. */
+export type PpmMarketKeyKind = "line" | "outcome";
 
 export interface PpmPricePoint {
   /** Selection id (`"1"`, `"2"`) or the line as a string (`"48.5"`, `"-3.5"`). */
   readonly key: string;
   /** Numeric value of the key when it is a line; `null` for a selection id. */
   readonly line: number | null;
-  /**
-   * Index inside the pair for a line-keyed market (0 = over/home, 1 =
-   * under/away); `null` for an outcome-keyed or scalar value.
-   */
+  /** Index inside a two-price pair; `null` for a single price. */
   readonly side: number | null;
+  /**
+   * Named role of the side when the market type encodes it: totals are
+   * `over`/`under`, a spread is the `quoted` side and `other`. `null` when only
+   * the pair position is known (an outcome-keyed two-price quote).
+   */
+  readonly role: PpmSideRole | null;
   readonly decimal: number;
 }
 
@@ -60,6 +72,14 @@ export interface PpmMarketPrices {
   readonly period: string;
   /** Line carried by the market node itself (`r`), when present. */
   readonly line: number | null;
+  /** What the keys mean: a line (Total/Spread/Team Total) or an outcome id. */
+  readonly keyKind: PpmMarketKeyKind;
+  /**
+   * True when at least one key prices both sides of a book. Measured: 101,643
+   * two-real pairs in markets 5/6/7/8 sum to 1.0289–1.2329 implied probability
+   * (median 1.0722), i.e. a 3–23% hold — see `pairPricesLikeBook`.
+   */
+  readonly twoSided: boolean;
   readonly points: readonly PpmPricePoint[];
 }
 
@@ -94,14 +114,12 @@ function asDecimal(value: unknown): number | null {
  * Markets whose `o` is keyed by a **line** and whose pair is the two sides of
  * that line (`[over, under]`, `[home, away]`). GSLive's wagertype metadata
  * names them: 5 Total (bId 2), 6 Spread (bId 1), 7/8 Team Total (bId 3/4).
- * Every other market keys on an outcome/selection id and quotes one price per
- * key; its second element is a placeholder.
+ * Every other market keys on an outcome/selection id; its pair is two offers
+ * only when it passes `pairPricesLikeBook` (e.g. a player prop quoted both
+ * ways), and the second side is then emitted without a named role.
  *
  * This is metadata the payload does not carry — `parsePpmBootstrap` accepts an
  * override so a caller holding `eventsMetadata` can extend or replace it.
- * Outside the set, a market is read one price per key: an exotic two-price
- * quote (exact total, winning margin) names its outcome in the key, not a line,
- * so it is not given sides here.
  */
 export const PPM_LINE_KEYED_MARKETS: ReadonlySet<number> = new Set([
   5, 6, 7, 8,
@@ -109,6 +127,40 @@ export const PPM_LINE_KEYED_MARKETS: ReadonlySet<number> = new Set([
 
 export interface PpmBootstrapOptions {
   readonly lineKeyedMarkets?: ReadonlySet<number>;
+}
+
+/**
+ * A pair prices a book when its two implied probabilities (1/decimal each) sum
+ * to a positive hold. Measured on the 2026-11-13 bootstrap: 101,643 pairs in
+ * the known line markets land in 1.0289–1.2329, median 1.0722. Outside that
+ * band the two numbers are not two sides of the same market (the feed also
+ * writes `[price, 1.00001]`, which is filtered before this test).
+ */
+const BOOK_SUM_MIN = 1.0;
+const BOOK_SUM_MAX = 1.3;
+
+function pairPricesLikeBook(a: number | null, b: number | null): boolean {
+  if (a === null || b === null) return false;
+  const sum = 1 / a + 1 / b;
+  return sum >= BOOK_SUM_MIN && sum <= BOOK_SUM_MAX;
+}
+
+function sideRole(
+  marketId: number,
+  side: number,
+  lineKeyed: boolean,
+): PpmSideRole | null {
+  if (!lineKeyed) return null;
+  if (marketId === 6) return side === 0 ? "quoted" : "other";
+  return side === 0 ? "over" : "under";
+}
+
+/** Prices quoted at the market's reference line (`r`), if it is a line market. */
+export function referencePrices(
+  market: PpmMarketPrices,
+): readonly PpmPricePoint[] {
+  if (market.line === null) return [];
+  return market.points.filter((point) => point.line === market.line);
 }
 
 function parseMarketNode(
@@ -119,37 +171,64 @@ function parseMarketNode(
 ): PpmMarketPrices | null {
   if (!isRecord(node) || !isRecord(node.o)) return null;
   const points: PpmPricePoint[] = [];
+  let twoSided = false;
   for (const [key, raw] of Object.entries(node.o)) {
     const numericKey = Number(key);
     const numeric = Number.isFinite(numericKey) && key.trim() !== "";
     if (Array.isArray(raw)) {
       const values = raw.map(asDecimal);
+      const bothSides = pairPricesLikeBook(
+        values[0] ?? null,
+        values[1] ?? null,
+      );
+      if (bothSides) {
+        // Both elements price a book, so both are offers. On a line market the
+        // key is the line; on an outcome market it is a selection/player id.
+        twoSided = true;
+        values.forEach((decimal, side) => {
+          if (decimal === null) return;
+          points.push({
+            key,
+            line: lineKeyed && numeric ? numericKey : null,
+            side,
+            role: sideRole(marketId, side, lineKeyed),
+            decimal,
+          });
+        });
+        continue;
+      }
+      // One-sided. On a line market the missing side is a placeholder, so the
+      // offer that exists keeps its own index (`[1.000001, 15.88]` is side 1).
+      // On an outcome market only the first element is a price at all.
       if (lineKeyed) {
-        // Both sides of a line. A side that is unavailable is a placeholder,
-        // not a 1.000001 offer: drop it and keep its sibling, so the line is
-        // one-sided rather than mispriced.
         values.forEach((decimal, side) => {
           if (decimal !== null) {
             points.push({
               key,
               line: numeric ? numericKey : null,
               side,
+              role: sideRole(marketId, side, true),
               decimal,
             });
           }
         });
         continue;
       }
-      // Outcome-keyed: the first element is the price, the rest is filler.
       const decimal = values[0] ?? null;
       if (decimal !== null) {
-        points.push({ key, line: null, side: null, decimal });
+        points.push({
+          key,
+          line: null,
+          side: null,
+          role: null,
+          decimal,
+        });
       }
       continue;
     }
     const decimal = asDecimal(raw);
     if (decimal !== null) {
-      points.push({ key, line: null, side: null, decimal });
+      points.push({ key, line: null, side: null, role: null, decimal });
     }
   }
   if (points.length === 0) return null;
@@ -157,6 +236,8 @@ function parseMarketNode(
     marketId,
     period,
     line: typeof node.r === "number" ? node.r : null,
+    keyKind: lineKeyed ? "line" : "outcome",
+    twoSided,
     points,
   };
 }
@@ -200,6 +281,7 @@ export interface PpmBootstrap {
   readonly counts: {
     readonly eventsWithPrices: number;
     readonly markets: number;
+    readonly twoSidedMarkets: number;
     readonly pricePoints: number;
   };
 }
@@ -219,12 +301,16 @@ export function parsePpmBootstrap(
   }
   const events: PpmEventPrices[] = [];
   let markets = 0;
+  let twoSidedMarkets = 0;
   let pricePoints = 0;
   for (const [eventId, entry] of Object.entries(first.c)) {
     const parsed = parsePpmEventPrices(eventId, entry, options);
     events.push(parsed);
     markets += parsed.markets.length;
-    for (const market of parsed.markets) pricePoints += market.points.length;
+    for (const market of parsed.markets) {
+      pricePoints += market.points.length;
+      if (market.twoSided) twoSidedMarkets += 1;
+    }
   }
   return {
     updatedAtMs: typeof first.t === "number" ? first.t : null,
@@ -233,6 +319,7 @@ export function parsePpmBootstrap(
       eventsWithPrices: events.filter((event) => event.markets.length > 0)
         .length,
       markets,
+      twoSidedMarkets,
       pricePoints,
     },
   };
