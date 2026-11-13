@@ -121,6 +121,10 @@ with `bun run audit:tool-calls`.
 - **`Bun.semver` vs npm `semver`:** `Bun.semver.satisfies` takes only `(version, range)` and does
   NOT support `{ includePrerelease: true }`. The npm `semver` package in `devDependencies` is required by
   `tests/market_index.test.ts` to match upstream Harness install behaviour. Do not swap it out.
+- **Bun upgrade audits start from `docs/vendor/bun/`.** Each audited release has the pinned blog
+  markdown, a `<version>.changes.yaml` manifest that quotes it verbatim, and a generated digest;
+  `bun run bun:release fetch|check|digest|grep <version>` maintains them, and
+  [`docs/vendor/bun/AUDIT_PROMPT.md`](docs/vendor/bun/AUDIT_PROMPT.md) is the audit to run.
 
 **Environment and tooling**
 
