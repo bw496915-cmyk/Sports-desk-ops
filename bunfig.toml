@@ -118,6 +118,8 @@ pathIgnorePatterns = [
   "verification/**",
   "tests/fixtures/**",
   "packages/nsh-desk/**",
+  # One-off OpenAPI authoring script (`*_spec.mjs` otherwise matches Bun's test glob):
+  "scripts/author_openapi_spec.mjs",
 ]
 
 # Dual coverage reporting: preserves console text table while producing lcov.info for CI
