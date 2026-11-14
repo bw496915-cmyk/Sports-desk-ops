@@ -76,7 +76,8 @@ export type ProbeParam =
   | "placeLateFlag"
   // Customer front-end graded-wager read (`getWagersByFigureDate`): wire-observed sort pair.
   | "sort"
-  | "typeSort";
+  | "typeSort"
+  | "path";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -282,6 +283,7 @@ export const PROBE_OPS: readonly ProbeOp[] = [
       "token",
       "typeSort",
       "week",
+      "path",
     ],
     defaultPrefix: "/cloud/api/Report",
   },
@@ -1316,8 +1318,11 @@ function resolveParamMap(
       out[name] = options.sort ?? "1";
     } else if (name === "typeSort") {
       out[name] = options.typeSort ?? "2";
+    } else if (name === "path") {
+      out[name] = `${op.defaultPrefix}/${op.operation}`;
     } else if (name === "graded") {
-      out[name] = "1";
+      // Graded wagers are read with graded=0 in the observed 2026-11-13 body.
+      out[name] = op.operation === "getWagersByFigureDate" ? "0" : "1";
     } else if (name === "sortCustom") {
       out[name] = options.sortCustom ?? "1";
     } else if (name === "propDescription") {
