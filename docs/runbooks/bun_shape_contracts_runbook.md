@@ -129,7 +129,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.build
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · no reference page (see [docs](https://bun.com/docs/bundler))
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `packages/contracts/scripts/build.ts`
 - **Evidence:** `test:tests/bun_bundler_plugin_contract.test.ts`
