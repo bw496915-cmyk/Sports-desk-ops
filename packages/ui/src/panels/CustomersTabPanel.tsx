@@ -7,6 +7,7 @@ import {
   PENDING_COHORTS_PROVENANCE,
 } from "../hydration.ts";
 import { getLocalAgentHref } from "../links.ts";
+import { SharpnessDecomposition } from "../viz/SharpnessDecomposition.tsx";
 import type {
   CustomersApiResponse,
   CustomerSortKey,
@@ -76,7 +77,6 @@ interface RadarAxisSpec {
   readonly valueKey:
     "clvScore" | "skillScore" | "sizingScore" | "sigScore" | "timingScore";
   readonly max: number;
-  readonly color: string;
 }
 
 const RADAR_AXES: readonly RadarAxisSpec[] = [
@@ -84,31 +84,26 @@ const RADAR_AXES: readonly RadarAxisSpec[] = [
     label: "CLV Beat Margin",
     valueKey: "clvScore",
     max: 3.0,
-    color: "#38bdf8",
   },
   {
     label: "Bayesian Skill",
     valueKey: "skillScore",
     max: 2.5,
-    color: "#a855f7",
   },
   {
     label: "Sizing Discipline",
     valueKey: "sizingScore",
     max: 1.5,
-    color: "#22c55e",
   },
   {
     label: "Signature Specialization",
     valueKey: "sigScore",
     max: 2.0,
-    color: "#f59e0b",
   },
   {
     label: "Timing / Parlay Exploitation",
     valueKey: "timingScore",
     max: 1.0,
-    color: "#ef4444",
   },
 ];
 
@@ -953,52 +948,20 @@ export function CustomersTabPanel({
                     </div>
                   </div>
 
-                  {/* Decomposed Score Progress Bars */}
+                  {/* Decomposed Score: common-scale aligned bars */}
                   <div style={styles.radarCard}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <h4 style={styles.cardHeader}>
-                        🎯 Decomposed Sharpness Radars
-                      </h4>
-                      <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-                        Sum:{" "}
-                        <b style={{ color: "#f8fafc" }}>
-                          {(
-                            selectedCustomer.clvScore +
-                            selectedCustomer.skillScore +
-                            selectedCustomer.sizingScore +
-                            selectedCustomer.sigScore +
-                            selectedCustomer.timingScore
-                          ).toFixed(1)}
-                        </b>
-                        /10.0
-                      </span>
-                    </div>
-                    {RADAR_AXES.map((axis) => {
-                      const val = selectedCustomer[axis.valueKey];
-                      const pct = Math.min(
-                        100,
-                        Math.max(0, (val / axis.max) * 100),
-                      );
-                      return (
-                        <div key={axis.valueKey} style={styles.radarRow}>
-                          <span>
-                            {axis.label} ({val.toFixed(1)}/{axis.max.toFixed(1)}
-                            ):
-                          </span>
-                          <div style={styles.progressBarBg}>
-                            <div
-                              style={styles.progressBarFill(pct, axis.color)}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <h4 style={styles.cardHeader}>
+                      🎯 Decomposed Sharpness Radars
+                    </h4>
+                    <SharpnessDecomposition
+                      score={selectedCustomer.score}
+                      components={RADAR_AXES.map((axis) => ({
+                        key: axis.valueKey,
+                        label: axis.label,
+                        value: selectedCustomer[axis.valueKey],
+                        cap: axis.max,
+                      }))}
+                    />
                   </div>
 
                   {/* Sizing & Portfolio Risk */}
