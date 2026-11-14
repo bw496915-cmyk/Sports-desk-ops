@@ -12,7 +12,25 @@ const FEED_PATHS: ReadonlySet<string> = new Set([
   "/api/customers",
   "/api/wagers",
   "/api/dashboard",
+  "/api/bet-ticker",
+  "/api/build-matrix",
+  "/api/dns",
+  "/api/r2/pipeline",
+  "/api/shadow-pricing",
+  "/api/shift/summary",
+  "/api/terminal/exec",
 ]);
+
+/** Path families the React app calls under a parameter (`/api/alerts/:id/ack`). */
+const FEED_PREFIXES: readonly string[] = [
+  "/api/agent/",
+  "/api/agents/",
+  "/api/alerts",
+  "/api/customer/",
+  "/api/dns/",
+  "/api/live-wagers",
+  "/api/rankings/",
+];
 
 export type PreviewProxyTargets = {
   /** The daemon that answers most `/api/*` routes. */
@@ -26,6 +44,11 @@ export function pickApiTarget(
   pathname: string,
   targets: PreviewProxyTargets,
 ): string {
-  if (targets.feedsApi && FEED_PATHS.has(pathname)) return targets.feedsApi;
+  if (targets.feedsApi) {
+    if (FEED_PATHS.has(pathname)) return targets.feedsApi;
+    if (FEED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+      return targets.feedsApi;
+    }
+  }
   return targets.api;
 }
