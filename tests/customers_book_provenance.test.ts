@@ -57,6 +57,19 @@ describe("computeCustomersCohortPayload book passthrough", () => {
 });
 
 describe("computeCustomersCohortPayload provenance", () => {
+  test("a present but empty book is a capture with zero rows", () => {
+    const payload = computeCustomersCohortPayload({
+      backtestLeaderboard: [],
+      fixtures: [{ customer_id: "SYNTH_X" }],
+      keyNumberBuyerIds: [],
+      hookSyndicateIds: [],
+      localBookRows: [],
+    });
+    expect(payload.provenance.kind).toBe("capture");
+    expect(payload.book).toEqual([]);
+    expect(payload.cohorts.fullBookSpecCount).toBe(0);
+  });
+
   test("does not claim capture for a synthetic local book", () => {
     const payload = computeCustomersCohortPayload({
       backtestLeaderboard: [],

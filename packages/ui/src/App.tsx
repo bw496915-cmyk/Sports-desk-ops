@@ -11,7 +11,7 @@ import {
 } from "./hydration.ts";
 import { DASHBOARD_API, dashboardApiUrl } from "./config/dashboard.ts";
 import { resolveInitialTab, tabHref } from "./tab_routes.ts";
-import { bookRowsToProfiles } from "./profile_rows.ts";
+import { selectProfileRows } from "./profile_rows.ts";
 import {
   AgentInspectorModal,
   AlertsTabPanel,
@@ -179,7 +179,10 @@ export function App(): React.ReactElement {
   >(null);
   // Keep the detail panel on a row that exists after the book replaces the sample rows.
   useEffect(() => {
-    if (profileRows.length === 0) return;
+    if (profileRows.length === 0) {
+      setSelectedCustomer(null);
+      return;
+    }
     if (profileRows.some((row) => row.id === selectedCustomer?.id)) return;
     setSelectedCustomer(profileRows[0] ?? null);
   }, [profileRows, selectedCustomer?.id]);
@@ -274,11 +277,7 @@ export function App(): React.ReactElement {
         return;
       }
       setCohortsReport(normalized);
-      const bookRows = normalized.book ?? [];
-      const mappedRows = bookRowsToProfiles(
-        bookRows.length > 0 ? bookRows : (normalized.fixtures ?? []),
-      );
-      if (mappedRows.length > 0) setProfileRows(mappedRows);
+      setProfileRows(selectProfileRows(normalized));
       setCohortsStatus("ready");
       setCohortsError(null);
     } catch (err) {

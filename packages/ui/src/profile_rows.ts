@@ -59,6 +59,14 @@ function topKey(tickets: readonly Row[], key: string): string {
   return best;
 }
 
+const SOURCE_TIERS: ReadonlySet<string> = new Set([
+  "TIER_1_ELITE_ORIGINATOR",
+  "TIER_2_STEAM_SYNDICATE",
+  "TIER_3_SHARP_DISCIPLINED",
+  "TIER_4_SEMI_SHARP",
+  "TIER_5_RECREATIONAL",
+]);
+
 function tierFor(score: number): ShowcaseCustomer["tier"] {
   if (score >= 9) return "TIER_1_ELITE_ORIGINATOR";
   if (score >= 7) return "TIER_2_STEAM_SYNDICATE";
@@ -112,7 +120,12 @@ export function bookRowsToProfiles(
       name: id,
       agentId: String(row.agent_id ?? row.agentId ?? "—"),
       masterAgent: String(row.master_agent ?? row.masterAgent ?? "—"),
-      tier: tierFor(score),
+      // A source tier wins when present; the score derivation is the fallback, not a replacement.
+      tier:
+        typeof row.tier === "string" &&
+        SOURCE_TIERS.has(row.tier.trim().toUpperCase())
+          ? (row.tier.trim().toUpperCase() as ShowcaseCustomer["tier"])
+          : tierFor(score),
       score: round(score, 2),
       clvScore: round(clvScore, 2),
       skillScore: clvScore,
@@ -144,4 +157,21 @@ export function bookRowsToProfiles(
       unknown,
     };
   });
+}
+
+/**
+ * Which array is the data? `provenance.kind` answers it, so an empty capture stays empty instead
+ * of falling back to the fixture corpus (a loaded-but-empty book is not "no book").
+ */
+export function selectProfileRows(payload: {
+  readonly book?: ReadonlyArray<Row> | undefined;
+  readonly fixtures: ReadonlyArray<Row>;
+  readonly provenance: { readonly kind: string };
+}): ShowcaseCustomer[] {
+  const kind = payload.provenance.kind;
+  const authoritative =
+    kind === "capture" || kind === "live"
+      ? (payload.book ?? [])
+      : payload.fixtures;
+  return bookRowsToProfiles(authoritative);
 }

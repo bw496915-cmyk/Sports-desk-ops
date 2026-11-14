@@ -205,9 +205,8 @@ export function computeCustomersCohortPayload(
   }
 
   const nowIso = new Date().toISOString();
-  const hasLocalBook = Boolean(
-    input.localBookRows && input.localBookRows.length > 0,
-  );
+  // Present-and-empty is a loaded book with zero rows, not "no book".
+  const hasLocalBook = input.localBookRows !== undefined;
   const provenance: DashboardSourceProvenance =
     input.provenance ??
     (hasLocalBook

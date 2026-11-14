@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { bookRowsToProfiles } from "../packages/ui/src/profile_rows.ts";
+import {
+  bookRowsToProfiles,
+  selectProfileRows,
+} from "../packages/ui/src/profile_rows.ts";
 
 const row = {
   customer_id: "SYNTH_SYN_01",
@@ -120,8 +123,8 @@ describe("bookRowsToProfiles", () => {
       },
     ]);
     expect(extra?.id).toBe("SYNTH_SYN_01");
-    // The mapper derives tier from score; a source tier is a next-PR field, not silently mixed in.
-    expect(extra?.tier).toBe("TIER_2_STEAM_SYNDICATE");
+    // A source tier now wins over the derivation; the other unread fields are ignored.
+    expect(extra?.tier).toBe("TIER_1_ELITE_ORIGINATOR");
   });
 
   test("marks fields the book does not carry as none, not a guess", () => {
@@ -129,5 +132,77 @@ describe("bookRowsToProfiles", () => {
     expect(profile?.syndicateProb).toBe(0);
     expect(profile?.correlatedRisk).toBe("NONE");
     expect(profile?.lineShadeCents).toBe(0);
+  });
+});
+
+describe("selectProfileRows", () => {
+  const payload = (
+    kind: string,
+    book: unknown[] | undefined,
+    fixtures: unknown[],
+  ) => ({
+    book: book as never,
+    fixtures: fixtures as never,
+    provenance: { kind },
+  });
+
+  test("a capture with zero rows stays empty instead of falling back to fixtures", () => {
+    expect(
+      selectProfileRows(payload("capture", [], [{ customer_id: "SYNTH_X" }])),
+    ).toEqual([]);
+  });
+
+  test("a capture reads book even when fixtures are present", () => {
+    const rows = selectProfileRows(
+      payload(
+        "capture",
+        [{ customer_id: "ML284" }],
+        [{ customer_id: "SYNTH_X" }],
+      ),
+    );
+    expect(rows.map((r) => r.id)).toEqual(["ML284"]);
+  });
+
+  test("a fixture reads fixtures even when a book is present", () => {
+    const rows = selectProfileRows(
+      payload(
+        "fixture",
+        [{ customer_id: "ML284" }],
+        [{ customer_id: "SYNTH_X" }],
+      ),
+    );
+    expect(rows.map((r) => r.id)).toEqual(["SYNTH_X"]);
+  });
+
+  test("live behaves like capture", () => {
+    const rows = selectProfileRows(
+      payload("live", [{ customer_id: "HT5009" }], []),
+    );
+    expect(rows.map((r) => r.id)).toEqual(["HT5009"]);
+  });
+});
+
+describe("source tier", () => {
+  test("wins over the score derivation", () => {
+    const [row] = bookRowsToProfiles([
+      {
+        customer_id: "C1",
+        sharp_score: 81.5,
+        tier: "TIER_3_SHARP_DISCIPLINED",
+      },
+    ]);
+    expect(row?.tier).toBe("TIER_3_SHARP_DISCIPLINED");
+    expect(row?.score).toBe(8.15);
+  });
+
+  test("is case-insensitive and falls back on an unknown value", () => {
+    const [lower] = bookRowsToProfiles([
+      { customer_id: "C1", sharp_score: 81.5, tier: "tier_2_steam_syndicate" },
+    ]);
+    expect(lower?.tier).toBe("TIER_2_STEAM_SYNDICATE");
+    const [bogus] = bookRowsToProfiles([
+      { customer_id: "C2", sharp_score: 81.5, tier: "GOLD" },
+    ]);
+    expect(bogus?.tier).toBe("TIER_2_STEAM_SYNDICATE");
   });
 });
