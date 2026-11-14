@@ -414,9 +414,15 @@ export function createDevLiveWagersLoader(options: DevLiveWagersLoaderOptions) {
             const actionableRows = projected.filter(
               (row) => !row.isSentinelNoise,
             );
+            // Freeze the raw rows: `lib/wagers_wire_contract.ts` memoizes its
+            // scan on this array's identity, so an in-place edit would serve a
+            // stale summary. A new file load builds a new frozen array.
+            const frozenRawRows = Object.freeze(
+              list.map((row) => Object.freeze(row)),
+            );
             const result: DevLiveWagersLoadResult = {
               rows: actionableRows,
-              rawRows: list,
+              rawRows: frozenRawRows,
               rawRowCount: projected.length,
               sentinelNoiseCount: projected.length - actionableRows.length,
               source: classifyWagerCandidateSource(candidatePath, cwd),

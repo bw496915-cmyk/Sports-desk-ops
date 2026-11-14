@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { utimes } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { createDevLiveWagersLoader } from "@sportsdesk-ops/backend";
 import { parseShortDesc } from "../lib/live_wagers.ts";
@@ -127,6 +130,142 @@ describe("vendor wire contract at ingest", () => {
     ).not.toBe(first);
   });
 
+  test("cited captures resolve from the registry's grandparent, not the file path", async () => {
+    const root = mkdtempSync(`${tmpdir()}/sd-wire-layout-`);
+    try {
+      mkdirSync(`${root}/schema`, { recursive: true });
+      mkdirSync(`${root}/captures`, { recursive: true });
+      writeFileSync(
+        `${root}/captures/cap.json`,
+        JSON.stringify({
+          response: {
+            bodySkeleton: {
+              fields: {
+                List: {
+                  items: {
+                    fields: {
+                      WagerType: { type: "string", nullable: false },
+                      VIP: { type: "string", nullable: false },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }),
+      );
+      const registryPath = `${root}/schema/contract.json`;
+      writeFileSync(
+        registryPath,
+        JSON.stringify({
+          captureSets: {
+            cap: {
+              path: "captures/cap.json",
+              sha256: "",
+              skeletonPath: "response.bodySkeleton.fields.List.items.fields",
+            },
+          },
+          fields: { WagerType: { capture: "cap" }, VIP: { capture: "cap" } },
+        }),
+      );
+
+      const summary = await inspectWagersWireContract(
+        [{ WagerType: "L", VIP: "0" }],
+        registryPath,
+      );
+      expect(summary.ok).toBe(true);
+      expect(summary.capture).toBe("cap");
+      expect(summary.fields_checked).toEqual(["WagerType", "VIP"]);
+      // No absolute host path reaches the payload: schema-relative label only.
+      expect(summary.registry).toBe("schema/contract.json");
+      expect(summary.registry.startsWith("/")).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a registry edit invalidates the scan for the same (unchanged) row array", async () => {
+    const root = mkdtempSync(`${tmpdir()}/sd-wire-reload-`);
+    try {
+      mkdirSync(`${root}/schema`, { recursive: true });
+      mkdirSync(`${root}/captures`, { recursive: true });
+      writeFileSync(
+        `${root}/captures/cap.json`,
+        JSON.stringify({
+          response: {
+            bodySkeleton: {
+              fields: {
+                List: {
+                  items: {
+                    fields: {
+                      WagerType: { type: "string", nullable: false },
+                      VIP: { type: "string", nullable: false },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }),
+      );
+      const registryPath = `${root}/schema/contract.json`;
+      const writeRegistry = (fields: Record<string, { capture: string }>) =>
+        writeFileSync(
+          registryPath,
+          JSON.stringify({
+            captureSets: {
+              cap: {
+                path: "captures/cap.json",
+                sha256: "",
+                skeletonPath: "response.bodySkeleton.fields.List.items.fields",
+              },
+            },
+            fields,
+          }),
+        );
+
+      writeRegistry({ WagerType: { capture: "cap" }, VIP: { capture: "cap" } });
+      const rows = [{ WagerType: "L", VIP: "0" }];
+      const first = await inspectWagersWireContract(rows, registryPath);
+      expect(first.fields_checked).toEqual(["WagerType", "VIP"]);
+
+      // Same array identity, edited registry: a memo keyed only on the rows
+      // would keep reporting the old field set here.
+      writeRegistry({ WagerType: { capture: "cap" } });
+      const later = new Date(Date.now() + 5_000);
+      await utimes(registryPath, later, later);
+      const second = await inspectWagersWireContract(rows, registryPath);
+      expect(second).not.toBe(first);
+      expect(second.fields_checked).toEqual(["WagerType"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a registry whose fields cite different captures is rejected, not partially checked", async () => {
+    const root = mkdtempSync(`${tmpdir()}/sd-wire-mixed-`);
+    try {
+      mkdirSync(`${root}/schema`, { recursive: true });
+      const registryPath = `${root}/schema/contract.json`;
+      writeFileSync(
+        registryPath,
+        JSON.stringify({
+          captureSets: {
+            a: { path: "a.json", sha256: "", skeletonPath: "x" },
+            b: { path: "b.json", sha256: "", skeletonPath: "x" },
+          },
+          fields: { WagerType: { capture: "a" }, VIP: { capture: "b" } },
+        }),
+      );
+      const summary = await inspectWagersWireContract([], registryPath);
+      expect(summary.ok).toBe(false);
+      expect(summary.error).toContain("exactly one capture");
+      expect(summary.error).toContain("a, b");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("WAGERS_WIRE_CONTRACT_PATH points at the committed registry by default", () => {
     expect(
       wagersWireContractPath().endsWith("schema/wagers_field_contract.json"),
@@ -151,5 +290,11 @@ describe("vendor wire contract at ingest", () => {
     expect(payload.wire_contract?.rows).toBe(100);
     expect(payload.wire_contract?.ok).toBe(true);
     expect(payload.wire_contract?.violations).toEqual([]);
+
+    // The wire-contract memo keys on the raw array's identity: frozen rows mean
+    // an in-place edit cannot silently outlive its scan.
+    const detailed = await loader.loadDevLiveWagersDetailed();
+    expect(Object.isFrozen(detailed.rawRows)).toBe(true);
+    expect(detailed.rawRows?.every((row) => Object.isFrozen(row))).toBe(true);
   });
 });
