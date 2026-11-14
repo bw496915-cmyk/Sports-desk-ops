@@ -11,10 +11,10 @@ import { join } from "node:path";
  *    Measured: assigning build.config.outdir inside onStart DID take effect (the
  *    output landed in the mutated directory). This test pins the version we ship
  *    on, not the page.
- *  - The page's onLoad result type includes `exports`, but 1.4.4 rejects it with
- *    "onLoad plugins must return an object with \"contents\" as a string or
- *    Uint8Array". That assertion is a ratchet: when Bun gains support, this test
- *    fails and the slab guard can be revisited.
+ *  - The page's onLoad result type shows `exports` as a plain optional field.
+ *    1.4.4 requires the `loader: "object"` discriminator alongside it; without
+ *    that the build fails with "onLoad plugins must return an object with
+ *    \"contents\" as a string or Uint8Array". Both shapes are pinned below.
  *
  * Also pinned: onStart is awaited before the build proceeds; onEnd sees the
  * result but a returned { errors } is ignored; defer() may be called only once
@@ -139,7 +139,7 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     }
   }, 60_000);
 
-  test("onLoad `exports` is rejected on 1.4.4 (ratchet)", async () => {
+  test("onLoad `exports` without loader:'object' is rejected", async () => {
     const root = project();
     try {
       const error = (await Bun.build({
@@ -160,6 +160,43 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
         .map((e) => (e as Error).message)
         .join("; ");
       expect(details).toContain("contents");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("onLoad exports WITH loader:'object' is accepted and tree-shakes", async () => {
+    const root = project();
+    writeFileSync(
+      join(root, "entry.ts"),
+      'import { b } from "virtual";\nconsole.log(JSON.stringify(b));\n',
+    );
+    try {
+      const result = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, "out"),
+        plugins: [
+          {
+            name: "exports-object",
+            setup(build) {
+              // onLoad sees the resolved path, so a bare specifier needs a
+              // namespace via onResolve before the object form can apply.
+              build.onResolve({ filter: /^virtual$/ }, () => ({
+                path: "virtual",
+                namespace: "v",
+              }));
+              build.onLoad({ filter: /.*/, namespace: "v" }, () => ({
+                exports: { a: 1, b: 2 },
+                loader: "object",
+              }));
+            },
+          },
+        ],
+      });
+      expect(result.success).toBe(true);
+      const js = await Bun.file(join(root, "out/entry.js")).text();
+      expect(js).toContain("b = 2");
+      expect(js).not.toContain("a = 1");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
