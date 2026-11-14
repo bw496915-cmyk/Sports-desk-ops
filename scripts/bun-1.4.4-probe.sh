@@ -259,6 +259,28 @@ else
   fail minimum-release-age "\"3d\" units rejected by bun install"
 fi
 
+# ---- P16: --audit-level filters advisories by severity ----------------------
+# Two seeds: one whose advisories are all moderate, one with high advisories.
+mkproj "$ROOT/p16a" '{"name":"p16a","version":"1.0.0","dependencies":{"@hono/node-server":"2.1.5"}}'
+run bash -c "cd '$ROOT/p16a' && bun install"
+set +e
+moderate_plain="$(cd "$ROOT/p16a" && bun audit 2>&1)"; moderate_plain_code=$?
+moderate_high="$(cd "$ROOT/p16a" && bun audit --audit-level=high 2>&1)"; moderate_high_code=$?
+set -e
+mkproj "$ROOT/p16b" '{"name":"p16b","version":"1.0.0","dependencies":{"lodash":"4.17.20"},"overrides":{"lodash":"4.17.20"}}'
+run bash -c "cd '$ROOT/p16b' && bun install"
+set +e
+high_plain="$(cd "$ROOT/p16b" && bun audit 2>&1)"; high_plain_code=$?
+high_high="$(cd "$ROOT/p16b" && bun audit --audit-level=high 2>&1)"; high_high_code=$?
+set -e
+moderate_filtered=$([ "$moderate_plain_code" -eq 1 ] && [ "$moderate_high_code" -eq 0 ] && echo yes || echo no)
+high_kept=$([ "$high_plain_code" -eq 1 ] && [ "$high_high_code" -eq 1 ] && printf '%s' "$high_high" | grep -q "high" && echo yes || echo no)
+if [ "$moderate_filtered" = yes ] && [ "$high_kept" = yes ]; then
+  pass audit-level "moderate-only: plain exit 1, high exit 0; high-severity: high exit 1"
+else
+  fail audit-level "moderate filtered=$moderate_filtered, high kept=$high_kept"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip migrate-speed "needs a ~20k-entry yarn.lock; manual: time bun pm migrate"
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
