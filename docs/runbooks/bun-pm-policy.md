@@ -357,6 +357,30 @@ If a private scope is ever needed, configure it **outside** the repo:
 - `bun install --registry <url>` and `bun publish --registry <url>` override every config source for a one-off command.
 - Verify the result with `bun run registry:check <name>` (resolves and probes) and `bun run pm:doctor` (warn-level when a configured scope is unreachable).
 
+### Publishing a scoped workspace package
+
+Workspace packages are **private by default**, and `scripts/check_workspace_packs.ts` enforces it: a package without `"private": true` must opt in explicitly with `publishConfig { access: "public", registry: "https://…" }`. Loopback or plain-http registries never qualify (measured 2026-11-14).
+
+`@sportsdesk-ops/contracts` is the pilot: `private` removed, `publishConfig.access: "public"` against npmjs, `repository.directory` set, exports still pointing at TypeScript source in `src/` (consumers need Bun or a TS-aware resolver).
+
+Before the first publish:
+
+1. Create the npm scope: an npm account must own `@sportsdesk-ops` (npm org or user scope). Without it, publish fails authorization even with a valid token.
+2. Decide a license — the repo has no `LICENSE` file, and npm warns on a package without one.
+3. Authenticate: `bunx npm login` locally, and put `NPM_TOKEN` in the GitHub repository secrets for the workflow.
+
+Publish:
+
+```sh
+cd packages/contracts && bun pm pack --dry-run  # inspect the tarball contents
+bun publish --cwd packages/contracts --dry-run # resolves the registry + access, then asks for auth
+bun publish --cwd packages/contracts           # real publish
+```
+
+`.github/workflows/publish-contracts.yml` publishes on a `contracts-v*` tag (or manual dispatch) using `NPM_TOKEN`; it writes a temporary npmrc and points `NPM_CONFIG_USERCONFIG` at it, which Bun reads (the same mechanism `actions/setup-node` uses). Prerelease versions need `--tag` (Bun refuses `2.0.0-beta.1` without one).
+
+Other workspace packages are not publishable yet: `api`, `backend` and `ui` depend on `@sportsdesk-ops/contracts` via `workspace:*`, which npm consumers cannot resolve; enabling them needs real version ranges and a publish order (contracts first).
+
 ### CI install vs local doctor
 
 | Step                    | Where                                                      | Notes                                                                                                                                                                                           |

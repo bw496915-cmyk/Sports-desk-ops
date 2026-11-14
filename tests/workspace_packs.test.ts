@@ -2,12 +2,50 @@ import { describe, expect, test } from "bun:test";
 import path from "node:path";
 import {
   checkWorkspacePacks,
+  isPublishableManifest,
   parseBunPackDryRunFiles,
   WORKSPACE_PACK_DIRS,
 } from "../scripts/check_workspace_packs.ts";
 import { buildWorkspaceRunPlan } from "../scripts/dx_workspaces.ts";
 
 const ROOT = path.resolve(import.meta.dir, "..");
+
+describe("publish opt-in", () => {
+  test("private is the default and never publishable", () => {
+    expect(isPublishableManifest({ private: true })).toBe(false);
+    expect(isPublishableManifest({})).toBe(false);
+  });
+
+  test("public access to an https registry opts in", () => {
+    expect(
+      isPublishableManifest({
+        publishConfig: {
+          access: "public",
+          registry: "https://registry.npmjs.org/",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("loopback, http, or missing access does not opt in", () => {
+    expect(
+      isPublishableManifest({
+        publishConfig: {
+          access: "public",
+          registry: "http://127.0.0.1:50851/",
+        },
+      }),
+    ).toBe(false);
+    expect(
+      isPublishableManifest({
+        publishConfig: {
+          access: "restricted",
+          registry: "https://registry.npmjs.org/",
+        },
+      }),
+    ).toBe(false);
+  });
+});
 
 describe("workspace pack boundaries", () => {
   test("parses bun pm pack --dry-run file listing", () => {

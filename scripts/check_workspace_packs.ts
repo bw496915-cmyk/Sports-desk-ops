@@ -42,12 +42,28 @@ export interface WorkspacePackReport {
 interface RawWorkspaceManifest {
   readonly name?: string;
   readonly private?: boolean;
+  readonly publishConfig?: {
+    readonly access?: string;
+    readonly registry?: string;
+  };
   readonly files?: unknown;
   readonly exports?: unknown;
   readonly dependencies?: Record<string, string>;
   readonly devDependencies?: Record<string, string>;
   readonly peerDependencies?: Record<string, string>;
   readonly optionalDependencies?: Record<string, string>;
+}
+
+/**
+ * Workspace packages are private by default. Publication is an explicit opt-in:
+ * no "private": true plus publishConfig access "public" to an https registry.
+ * A loopback or plain-http registry never qualifies. Measured 2026-11-14.
+ */
+export function isPublishableManifest(manifest: RawWorkspaceManifest): boolean {
+  if (manifest.private === true) return false;
+  const access = manifest.publishConfig?.access;
+  const registry = manifest.publishConfig?.registry ?? "";
+  return access === "public" && registry.startsWith("https://");
 }
 
 /** Parse file paths emitted by `bun --no-env-file pm pack --dry-run`. */
@@ -125,8 +141,10 @@ export async function checkWorkspacePacks(
     ).json()) as RawWorkspaceManifest;
     name = manifest.name ?? relDir;
 
-    if (manifest.private !== true) {
-      issues.push(`${relDir}: expected "private": true`);
+    if (manifest.private !== true && !isPublishableManifest(manifest)) {
+      issues.push(
+        `${relDir}: expected "private": true, or publishConfig { access: "public", registry: "https://…" } to publish`,
+      );
     }
 
     const filesAllowlist = Array.isArray(manifest.files)
