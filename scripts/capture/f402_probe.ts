@@ -147,7 +147,7 @@ Options:
   --base <url>                  Portal origin (default: F402_BASE_URL or https://fantasy402.com)
   --backend <name>              webkit (macOS default, zero deps) or chrome
   --suite <name>                report (default) | manager-boot (9 v1.0.280 boot ops) | all
-  --prefix <path>               Route prefix (default: /cloud/api/Manager)
+  --prefix <path>               Route prefix override (default: each operation's own prefix)
   --ops <a,b>                   Only these operations (searches across report + manager-boot ops)
   --json-body                   Force application/json request serialization (auto-enabled for getAccountInfoOwner & getDailyFiguresByCustomer)
   --body <form>                 Override the request body; __CUSTOMER_ID__ is resolved in-page
@@ -329,7 +329,7 @@ async function main(): Promise<number> {
   const sportTypeValue = flagValue(parsed, "--sport-type", "").trim();
   const sortCustomValue = flagValue(parsed, "--sort-custom", "").trim();
   const agentOwnerValue = flagValue(parsed, "--agent-owner", "").trim();
-  const prefix = flagValue(parsed, "--prefix", PROBE_PREFIXES[0]!);
+  const prefix = flagValue(parsed, "--prefix", "");
   const suiteRaw = flagValue(parsed, "--suite", "").toLowerCase();
   const opsArg = flagValue(parsed, "--ops", "");
   const loginWaitMs = Number(flagValue(parsed, "--login-wait-ms", "180000"));
@@ -396,7 +396,7 @@ async function main(): Promise<number> {
       `capture:f402: --ops matched nothing. Available: ${selected.map((op) => op.operation).join(", ")}`,
     );
     console.error(
-      "  bun run capture:f402 --ops Pending --prefix /cloud/api/Report",
+      "  bun run capture:f402 --ops Pending   # the op prefix is applied automatically",
     );
     return 2;
   }
@@ -434,7 +434,7 @@ async function main(): Promise<number> {
 
   if (dryRun) {
     console.error(
-      `capture:f402: plan for ${base} (${ops.length} operations, suite ${suite}, prefix ${prefix}, backend ${backend})`,
+      `capture:f402: plan for ${base} (${ops.length} operations, suite ${suite}, prefix ${prefix || "per-op"}, backend ${backend})`,
     );
     for (const op of ops) {
       const shown =
@@ -442,7 +442,7 @@ async function main(): Promise<number> {
           ? bodyFor(op)
           : bodyFor(op).replaceAll(agentId, "<agent>");
       console.log(
-        `${op.operation.padEnd(30)} ${op.method.padEnd(4)} ${probeUrl(base, op, prefix)}  contentType=${contentTypeFor(op)}  body=${shown}  ${op.readOnly ? "" : "[unconfirmed]"}`,
+        `${op.operation.padEnd(30)} ${op.method.padEnd(4)} ${probeUrl(base, op, prefix || undefined)}  contentType=${contentTypeFor(op)}  body=${shown}  ${op.readOnly ? "" : "[unconfirmed]"}`,
       );
     }
     console.error("capture:f402: dry run; nothing launched");
@@ -707,7 +707,7 @@ async function main(): Promise<number> {
           startedAt: new Date().toISOString(),
           base,
           suite,
-          prefix,
+          prefix: prefix || "(per-op)",
           backend,
           authMode,
           tls,
@@ -731,7 +731,7 @@ async function main(): Promise<number> {
     const jsonlLines: string[] = [];
 
     for (const op of ops) {
-      const url = probeUrl(base, op, prefix);
+      const url = probeUrl(base, op, prefix || undefined);
       const reqContentType = contentTypeFor(op);
       const hasWeek = op.params.includes("week");
       const sweepValues =
@@ -889,7 +889,7 @@ async function main(): Promise<number> {
             result.status >= 200 &&
             result.status <= 299
           ) {
-            const opPath = `${prefix.replace(/\/$/, "")}/${op.operation}`;
+            const opPath = `${(prefix || op.defaultPrefix || PROBE_PREFIXES[0]!).replace(/\/$/, "")}/${op.operation}`;
             const wireText = bodyText ?? result.preview;
             const captureRecord = buildCaptureRecord({
               mode: "live",

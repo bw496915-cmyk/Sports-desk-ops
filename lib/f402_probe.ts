@@ -1402,17 +1402,15 @@ export function buildJsonProbeBody(
 }
 
 /** Absolute probe URL from a portal base and a route prefix; rejects non-http(s) bases. */
-export function probeUrl(
-  base: string,
-  op: ProbeOp,
-  prefix: string = PROBE_PREFIXES[0],
-): string {
+export function probeUrl(base: string, op: ProbeOp, prefix?: string): string {
+  // Per-op when the caller does not force one: report ops live under /cloud/api/Report.
+  const effective = prefix ?? op.defaultPrefix ?? PROBE_PREFIXES[0]!;
   const parsed = new URL(base);
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
     throw new Error(`probe base must be http(s), got ${parsed.protocol}`);
   }
-  if (!prefix.startsWith("/"))
-    throw new Error(`probe prefix must start with /, got ${prefix}`);
+  if (!effective.startsWith("/"))
+    throw new Error(`probe prefix must start with /, got ${effective}`);
   const root = `${parsed.origin}${parsed.pathname.replace(/\/$/, "")}`;
-  return `${root}${prefix.replace(/\/$/, "")}/${op.operation}`;
+  return `${root}${effective.replace(/\/$/, "")}/${op.operation}`;
 }

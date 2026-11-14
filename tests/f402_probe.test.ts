@@ -78,16 +78,23 @@ describe("f402 probe plan", () => {
     expect(allReadOnly).toHaveLength(37);
   });
 
-  test("builds URLs from the observed route prefix", () => {
+  test("builds URLs from each operation's observed route prefix", () => {
     const op = PROBE_OPS[0]!;
     expect(probeUrl("https://fantasy402.com", op)).toBe(
-      "https://fantasy402.com/cloud/api/Manager/Pending",
-    );
-    expect(probeUrl("https://fantasy402.com", op, "/cloud/api/Report")).toBe(
       "https://fantasy402.com/cloud/api/Report/Pending",
     );
+    expect(probeUrl("https://fantasy402.com", op, "/cloud/api/Manager")).toBe(
+      "https://fantasy402.com/cloud/api/Manager/Pending",
+    );
     expect(probeUrl("https://fantasy402.com/base/", op)).toBe(
-      "https://fantasy402.com/base/cloud/api/Manager/Pending",
+      "https://fantasy402.com/base/cloud/api/Report/Pending",
+    );
+    const managerOp = PROBE_OPS.find(
+      (o) => o.operation === "getAuthorizations",
+    );
+    if (managerOp === undefined) throw new Error("getAuthorizations missing");
+    expect(probeUrl("https://fantasy402.com", managerOp)).toBe(
+      "https://fantasy402.com/cloud/api/Manager/getAuthorizations",
     );
     expect(() => probeUrl("file:///tmp/x", op)).toThrow("http(s)");
     expect(() => probeUrl("https://fantasy402.com", op, "cloud")).toThrow(
