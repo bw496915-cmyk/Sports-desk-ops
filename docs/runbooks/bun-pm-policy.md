@@ -187,7 +187,7 @@ Implementation: `scripts/pm_doctor.ts`. Exit **1** if any selected check has sta
 | `patchedDependencies` in manifest, lock stale | **Pass** (if frozen allows)     | **Fail** (`patches`)                                                                         | **Fail**                         |
 | Hoisted `node_modules` (no `.bun`)            | **Pass** if lock OK             | **Pass**                                                                                     | **Warn** (`installed tree`)      |
 | Global bunfig missing / wrong linker          | **Pass** on CI (ubuntu default) | **Pass**                                                                                     | **Fail**                         |
-| `@tennis-hq` registry down                    | **Pass** for npmjs root deps    | **Pass**                                                                                     | **Warn**                         |
+| a scoped registry (user `~/.npmrc`) is down   | **Pass** for npmjs root deps    | **Pass**                                                                                     | **Warn**                         |
 
 ### Frozen install traps (repo checks)
 
@@ -211,7 +211,7 @@ Catalog and workspace-scoped adds: run **`bun-deps`** (or `bun run deps` / `./bi
 | Manifest vs lock (no install) | `bun install --frozen-lockfile --dry-run`                                                                            |
 | Change dependencies           | `bun-deps add                                                                                                        | remove | update | install …`via`deps`/`dx deps`(uses`~/dotfiles/bun/unfrozen.bunfig.toml`with`frozenLockfile = false` only) |
 
-`pm:doctor` is read-only (no install). Registry probes for `@tennis-hq` are **warn**-level and skipped when `--only` filters exclude registry/token names.
+`pm:doctor` is read-only (no install). Registry probes for scopes declared in the user-level `~/.npmrc` are **warn**-level and skipped when `--only` filters exclude registry/token names.
 
 ### Which config loads for which command
 
@@ -344,9 +344,18 @@ Root manifest: `"private": true` and `"workspaces": ["packages/*"]` ([workspaces
 
 Root `dependencies` / `devDependencies` use **exact** versions (no `^` on pinned packages in `package.json`; the lock holds the same pins). CI installs on **linux x64**; `bun.lock` still lists every `@oxlint/binding-*` optional platform package so the lock stays cross-platform ([install → platform-specific](https://bun.com/docs/pm/cli/install#platform-specific-dependencies)). Prod license audit: regenerate gitignored `licenses.json` with `bun pm licenses --prod --json` (see `.gitignore`).
 
-### Scoped registry (`@tennis-hq`)
+### Scoped registries
 
-Committed [`.npmrc`](../../.npmrc) routes `@tennis-hq` to the machine-local registry (`127.0.0.1:50851`); **tokens stay in `~/.npmrc`** (`TENNIS_NPM_TOKEN` or similar), never in git (`tests/bun_config_policy.test.ts`). Root `publishConfig.registry` matches that scope for workspace publishes. `pm:doctor` pings the registry and warns when the token env var is unset — relevant for publish and scoped installs, not for day-to-day npmjs devDeps on the root workspace.
+No registry is configured in the repository. Everything resolves through the user-level `~/.npmrc` default (`https://registry.npmjs.org/`), which is all this workspace needs: it publishes nothing, and its DSH plugin bundles install from git commits, not npm.
+
+The previous setup — a committed `.npmrc` routing `@tennis-hq` to `http://127.0.0.1:50851/`, a matching root `publishConfig`, and a `TENNIS_NPM_TOKEN` — was removed 2026-11-14. It never worked: the registry was down when committed (acf8140), the token was never present, the scope had no dependents, and the package name was later reverted to unscoped `sportsdesk-ops`, so `publishConfig.access: restricted` also produced `unable to restrict access to unscoped package`. `tests/bun_config_policy.test.ts` now rejects any committed loopback registry or `_authToken` instead of pinning that dead route.
+
+If a private scope is ever needed, configure it **outside** the repo:
+
+- Scope and token go in the user-level `~/.npmrc` (or the file named by `NPM_CONFIG_USERCONFIG`, which is what `actions/setup-node` writes): `@scope:registry=https://…/` plus `//host/:_authToken=${TOKEN}`. Tokens never enter git.
+- `publishConfig.registry` / `publishConfig["@scope:registry"]` belong on a scoped, non-private package — `access: restricted` is invalid for an unscoped name (measured 2026-11-14).
+- `bun install --registry <url>` and `bun publish --registry <url>` override every config source for a one-off command.
+- Verify the result with `bun run registry:check <name>` (resolves and probes) and `bun run pm:doctor` (warn-level when a configured scope is unreachable).
 
 ### CI install vs local doctor
 
@@ -438,7 +447,7 @@ What CI and tests enforce without a maintainer machine bunfig.
 | lockfile workspace versions match                      | `lockWorkspaceVersions` parity (excludes root `""` version)                                                        |
 | every declared patch in lock and on disk               | `patchState` declared = locked, files exist                                                                        |
 | global bunfig path XDG rule                            | `globalBunfigPath()` unit cases                                                                                    |
-| registry scope without token in git                    | `.npmrc` has `@tennis-hq:registry`, no `_authToken`                                                                |
+| no committed loopback registry or token                | `.npmrc` (if present) and root `publishConfig` reject `127.0.0.1` / `localhost` and `_authToken`                   |
 
 ### `tests/pm_policy_workspaces.test.ts`
 
