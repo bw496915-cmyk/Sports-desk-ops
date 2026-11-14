@@ -13,6 +13,7 @@ import type {
   LiveWager,
   TierStyleConfig,
 } from "./types.ts";
+import { DASHBOARD_API, dashboardApiUrl } from "./config/dashboard.ts";
 
 export const SHOWCASE_WAGERS_PROVENANCE: DashboardSourceProvenance = {
   kind: "showcase",
@@ -108,25 +109,44 @@ function normalizeProvenance(
 /** Format a Signal-Honesty provenance badge (explicitly distinguishing `[not live]` & failures). */
 export function formatProvenanceBadge(
   provenance: DashboardSourceProvenance,
+  options: {
+    readonly staleAfterMinutes?: number | undefined;
+    readonly nowMs?: number | undefined;
+  } = {},
 ): ProvenanceBadgePresentation {
   const detail = provenance.sourcePath
     ? `${provenance.label} (${provenance.sourcePath})`
     : provenance.label;
+  const observedMs = Date.parse(provenance.observedAt);
+  const stale =
+    options.staleAfterMinutes !== undefined &&
+    Number.isFinite(observedMs) &&
+    (options.nowMs ?? Date.now()) - observedMs >
+      options.staleAfterMinutes * 60_000;
+  const suffix = stale ? " · STALE" : "";
 
   switch (provenance.kind) {
     case "live":
-    case "capture":
       return {
-        badgeText: "● LIVE CAPTURE",
+        badgeText: `● LIVE CAPTURE${suffix}`,
         fg: "#4ade80",
         bg: "rgba(34, 197, 94, 0.14)",
         border: "rgba(34, 197, 94, 0.4)",
         isLive: true,
         detail,
       };
+    case "capture":
+      return {
+        badgeText: `● LOCAL CAPTURE${suffix}`,
+        fg: "#4ade80",
+        bg: "rgba(34, 197, 94, 0.14)",
+        border: "rgba(34, 197, 94, 0.4)",
+        isLive: false,
+        detail,
+      };
     case "fixture":
       return {
-        badgeText: "◐ FIXTURE [not live]",
+        badgeText: `◐ FIXTURE [not live]${suffix}`,
         fg: "#fbbf24",
         bg: "rgba(245, 158, 11, 0.14)",
         border: "rgba(245, 158, 11, 0.4)",
@@ -136,7 +156,7 @@ export function formatProvenanceBadge(
     case "fallback":
     case "showcase":
       return {
-        badgeText: "◌ SHOWCASE [not live]",
+        badgeText: `◌ SHOWCASE [not live]${suffix}`,
         fg: "#fb923c",
         bg: "rgba(251, 146, 60, 0.14)",
         border: "rgba(251, 146, 60, 0.4)",
@@ -271,6 +291,9 @@ export function normalizeCustomersCohortResponse(
     fixtures: Array.isArray(rec.fixtures)
       ? (rec.fixtures as ReadonlyArray<Record<string, unknown>>)
       : [],
+    book: Array.isArray(rec.book)
+      ? (rec.book as ReadonlyArray<Record<string, unknown>>)
+      : [],
     provenance: normalizeProvenance(
       rec.provenance,
       "fixture",
@@ -369,7 +392,7 @@ export function deriveCustomerCohortKpiCards(options: {
     {
       label: "Unique Surveillance",
       value: `${cohorts.uniqueSurveillanceCount.toLocaleString()} IDs`,
-      sub: `Deduplicated Across Cohorts (${provenance.kind})`,
+      sub: `Deduplicated Across Cohorts (${provenance.kind === "capture" ? "local capture" : provenance.kind})`,
     },
   ];
 }
@@ -423,19 +446,19 @@ export async function hydrateDashboardFeeds(
   const [wagers, customers, tiers] = await Promise.all([
     fetchJsonSlice(
       fetchImpl,
-      "/api/wagers",
+      dashboardApiUrl(DASHBOARD_API.wagers),
       normalizeLiveWagersResponse,
       "LiveWagersApiResponse",
     ),
     fetchJsonSlice(
       fetchImpl,
-      "/api/customers",
+      dashboardApiUrl(DASHBOARD_API.customers),
       normalizeCustomersCohortResponse,
       "CustomersApiResponse",
     ),
     fetchJsonSlice<TierStyleConfig>(
       fetchImpl,
-      "/api/config/tiers",
+      dashboardApiUrl(DASHBOARD_API.tiers),
       (raw) => {
         if (typeof raw !== "object" || raw === null) return null;
         const rec = raw as { tiers?: unknown };

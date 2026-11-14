@@ -1,5 +1,6 @@
 import type React from "react";
 import { styles } from "../dashboard_styles.ts";
+import { DASHBOARD_FRESHNESS } from "../config/dashboard.ts";
 import {
   formatProvenanceBadge,
   SHOWCASE_WAGERS_PROVENANCE,
@@ -104,7 +105,9 @@ export function LiveWagersTabPanel({
         observedAt: provenance.observedAt,
       }
     : provenance;
-  const provenanceBadge = formatProvenanceBadge(activeProvenance);
+  const provenanceBadge = formatProvenanceBadge(activeProvenance, {
+    staleAfterMinutes: DASHBOARD_FRESHNESS.stale_after_minutes,
+  });
 
   const criticalSteamCount = activeWagers.filter(
     (w) => w.alertTier === "CRITICAL" || w.alertTier === "STEAM",

@@ -276,6 +276,12 @@ jobs:
           test "$(jq -r .version .ci/deepseek-harness/package.json)" = "0.2.2-rc.1"
           test "$(git -C .ci/deepseek-harness rev-parse HEAD)" = "$HARNESS_VALIDATOR_SHA"
           bun run test:market-index
+      - name: Validate dashboard config (build + inline/tree-shake probes)
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run validate:dashboard
       - name: Execute Full Verification Test Suite
         timeout-minutes: 5
         run: bun test tests/ --parallel --reporter=junit --reporter-outfile=junit-report.xml

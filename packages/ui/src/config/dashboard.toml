@@ -1,0 +1,34 @@
+# Dashboard dispatch thresholds and panel vocabulary.
+#
+# Quoted dates only: an unquoted TOML date parses to Temporal.* and crashes
+# the browser bundle at module load (enforced by scripts/validate_dashboard_config.ts).
+# Every key defined here is validated at build time against the inlined bundle.
+
+[meta]
+generated_at = "2026-11-13T00:00:00Z" # quoted — unquoted fails the Temporal guard
+
+[thresholds]
+sharp = 70
+steam = 0.05
+
+[leagues]
+names = ["NFL", "NBA", "CFB"]
+
+# Data feeds the React panels read. Paths are same-origin; `base` is an origin only
+# (no path — the schema rejects one) for a split host. For dev, no edit is needed:
+# `?apiBase=http://127.0.0.1:4021` overrides it at runtime, loopback hosts only
+# (bun run dev:api serves these routes on 4021).
+[api]
+base = ""
+tiers = "/api/config/tiers"
+customers = "/api/customers"
+wagers = "/api/wagers"
+dashboard = "/api/dashboard"
+
+[freshness]
+stale_after_minutes = 30
+
+# Sentinel: defined here, never imported by any component. If this key appears
+# in dist/dashboard/*.js, tree-shaking is broken and the whole document leaked.
+[churn]
+window_days = 30

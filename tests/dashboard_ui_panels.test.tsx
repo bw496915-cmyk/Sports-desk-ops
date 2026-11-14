@@ -16,6 +16,7 @@ import {
   ShiftHandoffModal,
   SurveillanceTabPanel,
   TerminalTabPanel,
+  ThresholdsPanel,
 } from "../packages/ui/src/panels/index.tsx";
 import {
   PROXY_CONDUITS_30D,
@@ -35,27 +36,48 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(html).toContain("GP301");
   });
 
-  test("BuildMatrixDrawer renders sentinel, token swatches, and target table", () => {
+  test("BuildMatrixDrawer renders sentinel, all 18 Houdini tokens, DCE flags, delta vs dev, and active target", () => {
     const html = renderToStaticMarkup(
       React.createElement(BuildMatrixDrawer, {
-        dceMarker: "[DCE_UNBUNDLED_HMR]",
+        dceMarker: "[DCE_PROD_TARGET_ACTIVE]",
         loading: false,
+        target: "prod",
+        enabledFeatures: ["PROD", "ANALYTICS"],
+        error: null,
+        onRefresh: () => {},
         rows: [
           {
             target: "prod",
-            features: ["PROD"],
+            features: ["PROD", "ANALYTICS"],
             totalJsBytes: 40960,
             totalCssBytes: 8192,
             hasDebugSentinel: false,
             hasExperimentalSentinel: false,
             hasProdSentinel: true,
           },
+          {
+            target: "dev",
+            features: ["DEBUG", "TEST", "ANALYTICS", "EXPERIMENTAL"],
+            totalJsBytes: 81920,
+            totalCssBytes: 8192,
+            hasDebugSentinel: true,
+            hasExperimentalSentinel: true,
+            hasProdSentinel: false,
+          },
         ],
       }),
     );
-    expect(html).toContain("[DCE_UNBUNDLED_HMR]");
+    expect(html).toContain("[DCE_PROD_TARGET_ACTIVE]");
+    expect(html).toContain("Active Target: prod");
+    expect(html).toContain("All Tokens (18)");
     expect(html).toContain("Obsidian: --sd-surface-bg");
+    expect(html).toContain("CLI: --sd-surface-cli");
+    expect(html).toContain("Pending R01: --sd-route-pending");
+    expect(html).toContain("#070b14");
     expect(html).toContain("40.0 KB");
+    expect(html).toContain("-40.0 KB (-50.0%)");
+    expect(html).toContain("ACTIVE");
+    expect(html).toContain("ANALYTICS");
     expect(html).toContain("✅ Kept");
     expect(html).toContain("✂️ Pruned (DCE)");
   });
@@ -87,12 +109,73 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
       }),
     );
     expect(html).toContain(`Profiled Bettors (${SAMPLE_PROFILE_DATA.length})`);
+    expect(html).toContain("Avg Sharp:");
+    expect(html).toContain("Alerts");
+    expect(html).toContain("Σ VaR:");
+    expect(html).toContain(`#1 / ${SAMPLE_PROFILE_DATA.length}`);
+    expect(html).toContain("← Prev");
+    expect(html).toContain("Next →");
+    expect(html).toContain("VaR / Max Cap:");
     expect(html).toContain("Pending…");
     expect(html).not.toContain("49 Accounts");
     expect(html).not.toContain("4,914 IDs");
     expect(html).toContain("Decomposed Sharpness Radars");
     expect(html).toContain("Golden Punter Syndicate Seat 1");
     expect(html).toContain("Datacenter check clean");
+
+    const emptyHtml = renderToStaticMarkup(
+      React.createElement(CustomersTabPanel, {
+        bannerDismissed: true,
+        onDismissBanner: noop,
+        kpisCollapsed: true,
+        onToggleKpis: noop,
+        searchQuery: "NONEXISTENT",
+        onSearchQueryChange: noop,
+        filterTier: "ALL",
+        onFilterTierChange: noop,
+        sortedCustomers: [],
+        customerSort: { key: "score", dir: -1 },
+        onCustomerSort: noop,
+        selectedCustomer: null,
+        onSelectCustomer: noop,
+        copiedCliId: null,
+        onCopyCli: noop,
+        customerForensicResult: null,
+        onClearForensicResult: noop,
+        onRunReverseLookup: noop,
+        onOpenTerminalProfile: noop,
+      }),
+    );
+    expect(emptyHtml).toContain("No profiled bettors match current filters.");
+    expect(emptyHtml).toContain("Reset filters");
+  });
+
+  test("ThresholdsPanel renders dispatch thresholds, leagues, and FRESH vs STALE feed SLA", () => {
+    const fixedNow = Date.parse("2026-11-13T12:20:00Z");
+    const freshHtml = renderToStaticMarkup(
+      React.createElement(ThresholdsPanel, {
+        dataUpdatedAt: "2026-11-13T12:10:00Z",
+        nowMs: fixedNow,
+      }),
+    );
+    expect(freshHtml).toContain("⚙ Dispatch thresholds:");
+    expect(freshHtml).toContain("FRESH · feed 10m");
+    expect(freshHtml).toContain("70");
+    expect(freshHtml).toContain("0.05");
+    expect(freshHtml).toContain("5.0% delta");
+    expect(freshHtml).toContain("Leagues (3):");
+    expect(freshHtml).toContain("NFL");
+    expect(freshHtml).toContain("NBA");
+    expect(freshHtml).toContain("CFB");
+    expect(freshHtml).toContain("config 2026-11-13 · stale &gt;30m");
+    expect(freshHtml).toContain("▾ Config SSOT");
+
+    const staleHtml = renderToStaticMarkup(
+      React.createElement(ThresholdsPanel, {
+        nowMs: fixedNow,
+      }),
+    );
+    expect(staleHtml).toContain("STALE · config 12h 20m");
   });
 
   test("SurveillanceTabPanel renders DNS telemetry, benchmark controls, and markdown/html view", () => {
@@ -107,8 +190,19 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
             cacheHitsInflight: 3,
             cacheMisses: 2,
             defaultTtlSeconds: 30,
+            errors: 0,
+            totalCount: 125,
           },
+          coreHosts: [
+            {
+              hostname: "fantasy402.com",
+              port: 443,
+              serviceName: "Fantasy402 Manager Portal",
+            },
+          ],
+          generatedAt: "2026-11-13T12:34:56Z",
         },
+        onRefreshDns: noop,
         benchLoading: false,
         benchResult: "c-ares: 1.2ms",
         onRunBenchmark: noop,
@@ -125,9 +219,88 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
         },
       }),
     );
+    expect(html).toContain("WARM");
+    expect(html).toContain("4/256");
+    expect(html).toContain("1.6%");
     expect(html).toContain("98.5%");
+    expect(html).toContain("Lookups:");
+    expect(html).toContain("125");
+    expect(html).toContain("2% coalesced");
+    expect(html).toContain("12:34:56 UTC");
+    expect(html).toContain("Prefetched Hosts (1)");
+    expect(html).toContain("↻ Refresh");
     expect(html).toContain("c-ares: 1.2ms");
+    expect(html).toContain("📝 Surveillance Brief");
+    expect(html).toContain("Bun.markdown.html()");
+    expect(html).toContain("⧉ Copy MD");
     expect(html).toContain("# Live Desk Status");
+  });
+
+  test("SurveillanceTabPanel renders interactive markdown brief telemetry, outline toggle, and sd-markdown-doc wrapper", () => {
+    const noop = () => {};
+    const html = renderToStaticMarkup(
+      React.createElement(SurveillanceTabPanel, {
+        dnsData: null,
+        benchLoading: false,
+        benchResult: null,
+        onRunBenchmark: noop,
+        reverseIp: "1.1.1.1",
+        onReverseIpChange: noop,
+        reverseResult: null,
+        onRunReverseLookup: noop,
+        viewMode: "interactive",
+        onViewModeChange: noop,
+        data: {
+          markdown:
+            "# 📊 SportsDesk\n\n> Live Risk Telemetry · Desk Hotline\n\n## 🎯 Top Sharps\n\n| A | B |\n| - | - |\n| 1 | 2 |",
+          html: '<h1 id="sportsdesk">📊 SportsDesk</h1><blockquote><p>Live Risk Telemetry · Desk Hotline</p></blockquote><h2 id="top-sharps">🎯 Top Sharps</h2><table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>',
+          renderDurationMs: 0.42,
+          updatedAt: "2026-11-12T08:15:30Z",
+        },
+      }),
+    );
+    expect(html).toContain("sd-markdown-doc");
+    expect(html).toContain("#ids");
+    expect(html).toContain("Outline (1)");
+    expect(html).toContain("3 glyphs");
+    expect(html).toContain("0.42 ms");
+    expect(html).toContain("08:15:30 UTC");
+    expect(html).toContain("Tables:");
+  });
+
+  test("SurveillanceTabPanel renders DNS error badge and refresh warning when degraded", () => {
+    const noop = () => {};
+    const html = renderToStaticMarkup(
+      React.createElement(SurveillanceTabPanel, {
+        dnsData: {
+          telemetry: {
+            size: 6,
+            hitRatePercent: 40,
+            cacheHitsCompleted: 4,
+            cacheHitsInflight: 0,
+            cacheMisses: 6,
+            defaultTtlSeconds: 30,
+            errors: 2,
+          },
+        },
+        dnsRefreshing: true,
+        dnsError: "HTTP 503",
+        onRefreshDns: noop,
+        benchLoading: false,
+        benchResult: null,
+        onRunBenchmark: noop,
+        reverseIp: "1.1.1.1",
+        onReverseIpChange: noop,
+        reverseResult: null,
+        onRunReverseLookup: noop,
+        viewMode: "interactive",
+        onViewModeChange: noop,
+        data: null,
+      }),
+    );
+    expect(html).toContain("2 ERR");
+    expect(html).toContain("Refreshing...");
+    expect(html).toContain("DNS refresh warning: HTTP 503");
   });
 
   test("TerminalTabPanel renders PTY window, quick chips, and ANSI history", () => {

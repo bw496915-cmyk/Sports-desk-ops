@@ -134,6 +134,18 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
         const payload = {
           markdown: rendered.markdown,
           html: rendered.html,
+          ...(rendered.renderDurationMs !== undefined
+            ? { renderDurationMs: rendered.renderDurationMs }
+            : {}),
+          ...(rendered.markdownBytes !== undefined
+            ? { markdownBytes: rendered.markdownBytes }
+            : {}),
+          ...(rendered.htmlBytes !== undefined
+            ? { htmlBytes: rendered.htmlBytes }
+            : {}),
+          ...(rendered.nonAsciiChars !== undefined
+            ? { nonAsciiChars: rendered.nonAsciiChars }
+            : {}),
           updatedAt: new Date().toISOString(),
         };
         return encodeResponse(req, {

@@ -21,6 +21,94 @@ import {
 import { sportCategoryFor } from "./sport_taxonomy.ts";
 import type { BunInspectOptions } from "./cli_inspect.ts";
 
+/** The three envelopes the portal and the probe emit for this read. */
+export function parseFigureDateWagersPayload(raw: unknown): FigureDateWager[] {
+  if (Array.isArray(raw)) return raw as FigureDateWager[];
+  if (raw && typeof raw === "object") {
+    const list = (raw as { LIST?: unknown }).LIST;
+    if (
+      list &&
+      typeof list === "object" &&
+      Array.isArray((list as { INFO?: unknown }).INFO)
+    ) {
+      return (list as { INFO: FigureDateWager[] }).INFO;
+    }
+    const rows = (raw as { rows?: unknown }).rows;
+    if (Array.isArray(rows)) return rows as FigureDateWager[];
+  }
+  throw new Error(
+    "unrecognised getWagersByFigureDate payload: expected LIST.INFO, rows[], or an array",
+  );
+}
+
+/** The read that returns settled wagers for one customer and one figure date. */
+export const FIGURE_DATE_WAGERS_PATH =
+  "/cloud/api/Report/getWagersByFigureDate" as const;
+
+export type FigureDateWagersPath = typeof FIGURE_DATE_WAGERS_PATH;
+
+/**
+ * The request body `customer/report/report.js` posts (observed 2026-11-13).
+ *
+ * `date` is the request day, `figureDate` the graded day; the two are deliberately separate.
+ */
+export interface FigureDateWagersRequest {
+  readonly agentID: string;
+  readonly agentOwner: string;
+  readonly customerID: string;
+  readonly date: string;
+  readonly figureDate: string;
+  readonly graded: 0 | 1;
+  readonly path: FigureDateWagersPath;
+  readonly RRO: 1;
+  readonly sort: number;
+  readonly typeSort: number;
+  readonly week: number;
+}
+
+export interface FigureDateWagersRequestInput {
+  readonly customerID: string;
+  readonly date: string;
+  readonly figureDate: string;
+  readonly agentID: string;
+  readonly agentOwner?: string;
+  readonly graded?: 0 | 1;
+  readonly sort?: number;
+  readonly typeSort?: number;
+  readonly week?: number;
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Build the request body with the wire defaults; throws on a malformed day. */
+export function buildFigureDateWagersRequest(
+  input: FigureDateWagersRequestInput,
+): FigureDateWagersRequest {
+  for (const [name, value] of [
+    ["date", input.date],
+    ["figureDate", input.figureDate],
+  ] as const) {
+    if (!ISO_DAY.test(value)) {
+      throw new Error(
+        `${name} must be YYYY-MM-DD, got ${JSON.stringify(value)}`,
+      );
+    }
+  }
+  return {
+    agentID: input.agentID,
+    agentOwner: input.agentOwner ?? input.agentID,
+    customerID: input.customerID,
+    date: input.date,
+    figureDate: input.figureDate,
+    graded: input.graded ?? 0,
+    path: FIGURE_DATE_WAGERS_PATH,
+    RRO: 1,
+    sort: input.sort ?? 1,
+    typeSort: input.typeSort ?? 2,
+    week: input.week ?? 0,
+  };
+}
+
 export interface FigureDateWager {
   readonly TicketNumber: number | string;
   readonly WagerNumber: number;

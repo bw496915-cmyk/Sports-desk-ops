@@ -112,6 +112,10 @@ export interface CustomersCohortInput {
   readonly keyNumberBuyerIds: Iterable<string>;
   readonly hookSyndicateIds: Iterable<string>;
   readonly localBookRows?: ReadonlyArray<Record<string, unknown>> | undefined;
+  /** Where the local book came from, for provenance classification. */
+  readonly localBookSourcePath?: string | undefined;
+  /** The book file's mtime as ISO; without it the provenance timestamp is classification time. */
+  readonly localBookObservedAt?: string | undefined;
   readonly provenance?: DashboardSourceProvenance | undefined;
 }
 
@@ -119,7 +123,48 @@ export interface CustomersCohortPayload {
   readonly cohorts: CustomersCohortsSummary;
   readonly backtestTop: ReadonlyArray<Record<string, unknown>>;
   readonly fixtures: ReadonlyArray<Record<string, unknown>>;
+  /** The local enriched book rows (the real data when one is present). */
+  readonly book: ReadonlyArray<Record<string, unknown>>;
   readonly provenance: DashboardSourceProvenance;
+}
+
+const SYNTHETIC_CUSTOMER_ID = /^SYNTH/i;
+
+/**
+ * Name the local book by what it is.
+ *
+ * Loading a book is not evidence that it is real: `enriched_customers_full.json` in this repo is a
+ * six-row synthetic fixture, and labelling it `kind: "capture"` made the Profiles tab assert
+ * capture provenance over `SYNTH_*` ids. A book is a fixture when its path is under `fixtures/`
+ * or any row id carries the synthetic prefix.
+ */
+export function classifyCustomerBook(
+  rows: ReadonlyArray<Record<string, unknown>>,
+  sourcePath: string,
+  observedAt?: string,
+): DashboardSourceProvenance {
+  const normalized = sourcePath.replace(/\\/g, "/");
+  const synthetic =
+    normalized.includes("/fixtures/") ||
+    rows.some((row) =>
+      SYNTHETIC_CUSTOMER_ID.test(
+        String(row.customer_id ?? row.customerId ?? "").trim(),
+      ),
+    );
+  const stamp = observedAt ?? new Date().toISOString();
+  return synthetic
+    ? {
+        kind: "fixture",
+        label: "Synthetic Customer Book",
+        sourcePath,
+        observedAt: stamp,
+      }
+    : {
+        kind: "capture",
+        label: "Enriched Local Book + Backtest",
+        sourcePath,
+        observedAt: stamp,
+      };
 }
 
 /** Dynamically compute surveillance cohort counts with zero hardcoded numbers. */
@@ -160,18 +205,16 @@ export function computeCustomersCohortPayload(
   }
 
   const nowIso = new Date().toISOString();
-  const hasLocalBook = Boolean(
-    input.localBookRows && input.localBookRows.length > 0,
-  );
+  // Present-and-empty is a loaded book with zero rows, not "no book".
+  const hasLocalBook = input.localBookRows !== undefined;
   const provenance: DashboardSourceProvenance =
     input.provenance ??
     (hasLocalBook
-      ? {
-          kind: "capture",
-          label: "Enriched Local Book + Backtest",
-          sourcePath: "enriched_customers_full.json",
-          observedAt: nowIso,
-        }
+      ? classifyCustomerBook(
+          input.localBookRows!,
+          input.localBookSourcePath ?? "enriched_customers_full.json",
+          input.localBookObservedAt,
+        )
       : input.backtestLeaderboard.length > 0 || input.fixtures.length > 0
         ? {
             kind: "fixture",
@@ -198,6 +241,7 @@ export function computeCustomersCohortPayload(
       uniqueSurveillanceCount: uniqueSurveillanceIds.size,
     },
     backtestTop: input.backtestLeaderboard.slice(0, 20),
+    book: input.localBookRows ?? [],
     fixtures: input.fixtures,
     provenance,
   };

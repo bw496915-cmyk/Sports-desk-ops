@@ -73,7 +73,11 @@ export type ProbeParam =
   | "periodNumber"
   | "periods"
   | "rotOrder"
-  | "placeLateFlag";
+  | "placeLateFlag"
+  // Customer front-end graded-wager read (`getWagersByFigureDate`): wire-observed sort pair.
+  | "sort"
+  | "typeSort"
+  | "path";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -250,23 +254,30 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     operation: "getPerformancePlayer",
     method: "POST",
     readOnly: true,
-    note: "customer-admin performance tab (manager/module/customer-admin/performance.html)",
-    params: [
-      "agentID",
-      "agentOwner",
-      "customerID",
-      "token",
-      "operation",
-      "RRO",
-    ],
+    note: "customer-admin performance tab (2026-11-13 body: acc, period=0, operation, RRO=1, agentID, agentOwner)",
+    params: ["acc", "period", "operation", "RRO", "agentID", "agentOwner"],
     defaultPrefix: "/cloud/api/Manager",
   },
   {
     operation: "getWagersByFigureDate",
     method: "POST",
     readOnly: true,
-    note: "customer-admin performance tab & daily-figures drill-down (report.js:46608,60279: customerID, figureDate, graded, operation, RRO)",
-    params: ["customerID", "figureDate", "graded", "token", "operation", "RRO"],
+    note: "customer-admin performance tab & daily-figures drill-down (2026-11-13 request: agentID, agentOwner, customerID, date, figureDate, graded, path, RRO, sort, typeSort, week)",
+    params: [
+      "agentID",
+      "agentOwner",
+      "customerID",
+      "date",
+      "figureDate",
+      "graded",
+      "operation",
+      "RRO",
+      "sort",
+      "token",
+      "typeSort",
+      "week",
+      "path",
+    ],
     defaultPrefix: "/cloud/api/Report",
   },
   {
@@ -605,7 +616,10 @@ export const CLIENT_JS_CONFIRMED_READ_ONLY_OPS = new Set<string>([
 ]);
 
 /** Player-info tab calls use form field `acc` (padded customer id), not `customerID`. */
-export const PROBE_ACC_IS_CUSTOMER_OPS = new Set<string>(["getTeaserProfile"]);
+export const PROBE_ACC_IS_CUSTOMER_OPS = new Set<string>([
+  "getTeaserProfile",
+  "getPerformancePlayer",
+]);
 
 /**
  * A read whose contract is confirmed by client JS or a prior capture. An unconfirmed read
@@ -1174,6 +1188,8 @@ export interface ProbeBodyOptions {
   readonly periods?: string;
   readonly rotOrder?: string;
   readonly placeLateFlag?: string;
+  readonly sort?: string;
+  readonly typeSort?: string;
 }
 
 function resolveParamMap(
@@ -1294,8 +1310,15 @@ function resolveParamMap(
       out[name] = "true";
     } else if (name === "figureDate") {
       out[name] = "__DATE__";
+    } else if (name === "sort") {
+      out[name] = options.sort ?? "1";
+    } else if (name === "typeSort") {
+      out[name] = options.typeSort ?? "2";
+    } else if (name === "path") {
+      out[name] = `${op.defaultPrefix}/${op.operation}`;
     } else if (name === "graded") {
-      out[name] = "1";
+      // Graded wagers are read with graded=0 in the observed 2026-11-13 body.
+      out[name] = op.operation === "getWagersByFigureDate" ? "0" : "1";
     } else if (name === "sortCustom") {
       out[name] = options.sortCustom ?? "1";
     } else if (name === "propDescription") {
@@ -1303,8 +1326,12 @@ function resolveParamMap(
     } else if (name === "sportSubType") {
       out[name] = options.sportSubType ?? ".";
     } else if (name === "period") {
-      // `Util.typePeriod.GAME` in util.js (bundle sha256 fba79858…).
-      out[name] = options.period ?? "Game";
+      // `Util.typePeriod.GAME` in util.js (bundle sha256 fba79858…) for line reads; the
+      // player-performance read uses period=0 in the observed 2026-11-13 body.
+      out[name] =
+        op.operation === "getPerformancePlayer"
+          ? (options.period ?? "0")
+          : (options.period ?? "Game");
     } else if (name === "hourFilter") {
       out[name] = options.hourFilter ?? "0";
     } else if (name === "wagerType") {
@@ -1375,17 +1402,15 @@ export function buildJsonProbeBody(
 }
 
 /** Absolute probe URL from a portal base and a route prefix; rejects non-http(s) bases. */
-export function probeUrl(
-  base: string,
-  op: ProbeOp,
-  prefix: string = PROBE_PREFIXES[0],
-): string {
+export function probeUrl(base: string, op: ProbeOp, prefix?: string): string {
+  // Per-op when the caller does not force one: report ops live under /cloud/api/Report.
+  const effective = prefix ?? op.defaultPrefix ?? PROBE_PREFIXES[0]!;
   const parsed = new URL(base);
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
     throw new Error(`probe base must be http(s), got ${parsed.protocol}`);
   }
-  if (!prefix.startsWith("/"))
-    throw new Error(`probe prefix must start with /, got ${prefix}`);
+  if (!effective.startsWith("/"))
+    throw new Error(`probe prefix must start with /, got ${effective}`);
   const root = `${parsed.origin}${parsed.pathname.replace(/\/$/, "")}`;
-  return `${root}${prefix.replace(/\/$/, "")}/${op.operation}`;
+  return `${root}${effective.replace(/\/$/, "")}/${op.operation}`;
 }

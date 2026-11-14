@@ -135,6 +135,34 @@ export interface ProjectLiveWagerDeps {
 }
 
 /** Normalize a raw live-wager record and classify its surveillance directive (`autoExecute: false`). */
+/**
+ * The portal's LIST rows carry HTML entities (`&#189;`, `&amp;`, `<strong>` markup in
+ * `TicketWriter`). Display fields are decoded here so the table shows `49½`, not `&#189;`,
+ * while the raw writer string is left intact for `isSentinelTickerWriter`.
+ */
+const NAMED_ENTITIES: Readonly<Record<string, string>> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+export function decodeWagerEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_, code: string) =>
+      String.fromCodePoint(Number(code)),
+    )
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16)),
+    )
+    .replace(
+      /&(amp|lt|gt|quot|apos|nbsp);/g,
+      (_, name: string) => NAMED_ENTITIES[name] ?? `&${name};`,
+    );
+}
+
 export function projectLiveWagerRow(
   item: Record<string, unknown>,
   idx: number,
@@ -237,9 +265,15 @@ export function projectLiveWagerRow(
               : item.WagerType === "T"
                 ? "Teaser"
                 : String(item.betType ?? "Straight"),
-    event: String(firstLeg?.game || (item.event ?? "Event Matchup")),
-    selection: String(firstLeg?.pick || (item.selection ?? "Selection")),
-    lineDisplay: String(firstLeg?.pick || (item.lineDisplay ?? "ML")),
+    event: decodeWagerEntities(
+      String(firstLeg?.game || (item.event ?? "Event Matchup")),
+    ),
+    selection: decodeWagerEntities(
+      String(firstLeg?.pick || (item.selection ?? "Selection")),
+    ),
+    lineDisplay: decodeWagerEntities(
+      String(firstLeg?.pick || (item.lineDisplay ?? "ML")),
+    ),
     oddsAmerican:
       typeof item.oddsAmerican === "string" ? item.oddsAmerican : "-110",
     riskUsd,

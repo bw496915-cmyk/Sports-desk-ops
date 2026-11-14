@@ -62,6 +62,10 @@ export interface DashboardApiDeps {
     readonly stamp: string;
     readonly markdown: string;
     readonly html: string;
+    readonly renderDurationMs?: number;
+    readonly markdownBytes?: number;
+    readonly htmlBytes?: number;
+    readonly nonAsciiChars?: number;
   } | null>;
   readonly dns: {
     readonly getTelemetryPayload: () => Record<string, unknown>;

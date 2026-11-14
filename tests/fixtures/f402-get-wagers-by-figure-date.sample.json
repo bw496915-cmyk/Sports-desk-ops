@@ -1,0 +1,37 @@
+{
+  "_note": "Shape sample for /cloud/api/Report/getWagersByFigureDate. Not a capture: values mirror the field names and the inline fixture in tests/f402_figure_date_enricher.test.ts so the pipeline can be exercised without a portal session.",
+  "LIST": {
+    "INFO": [
+      {
+        "TicketNumber": 1075710577,
+        "WagerNumber": 1,
+        "PlayNumber": 1,
+        "AmountWagered": 230000,
+        "ToWinAmount": 200000,
+        "WagerType": "S",
+        "AmountWon": 0,
+        "AmountLost": 230000,
+        "WagerStatus": "L",
+        "Description": "Basketball #546 Grizzlies +1 -115 - For 1st Quarter",
+        "AcceptedDateTime": "2026-11-06 20:09:35.077",
+        "CustomerID": "DAN245    ",
+        "TicketWriter": "Internet",
+        "GameDateTime": "2026-11-06 20:10:00.000",
+        "SportType": "Basketball          ",
+        "SportSubType": "NBA                 ",
+        "AdjSpread": 1,
+        "AdjTotalPoints": 0,
+        "FinalMoney": -115,
+        "TotalPicks": 1,
+        "ChosenTeamID": "Memphis Grizzlies",
+        "Outcome": "L",
+        "PeriodDescription": "1st Quarter         ",
+        "Team1ID": "Oklahoma City Thunder",
+        "Team1FinalScore": 35,
+        "Team2ID": "Memphis Grizzlies",
+        "Team2FinalScore": 28,
+        "DailyFigureDate": "2026-11-06"
+      }
+    ]
+  }
+}

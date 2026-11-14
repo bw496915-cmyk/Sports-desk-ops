@@ -26,6 +26,10 @@ export interface GetInfoPlayerData {
   readonly CurrentBalance?: number;
   readonly PendingWagerBalance?: number;
   readonly PendingWagerCount?: number;
+  readonly CarryOverAmount?: number;
+  readonly SettleFigure?: number;
+  readonly WagerLimit?: number;
+  readonly SuspectedBot?: string;
   readonly ParlayName?: string;
   readonly Currency?: string;
   readonly [key: string]: unknown;
@@ -42,7 +46,7 @@ export interface GetInfoPlayerEnvelope {
       readonly NotifyTelegram?: string;
       readonly [key: string]: unknown;
     };
-    readonly thisWeek?: boolean;
+    readonly thisWeek?: { readonly PreviousBalance?: number } | boolean;
     readonly parlaySpecs?: ParlaySpecRow[];
   };
 }
@@ -164,6 +168,12 @@ export interface GetInfoPlayerSummary {
   readonly currentBalance: number | null;
   readonly availableBalance: number | null;
   readonly pendingWagerCount: number | null;
+  readonly pendingWagerBalance: number | null;
+  readonly carryOverAmount: number | null;
+  readonly settleFigure: number | null;
+  readonly wagerLimit: number | null;
+  readonly suspectedBot: string | null;
+  readonly previousBalance: number | null;
   readonly assignedParlayName: string | null;
   readonly parlaySpecCount: number;
 }
@@ -195,6 +205,22 @@ export function summarizeGetInfoPlayer(
     pendingWagerCount:
       typeof data.PendingWagerCount === "number"
         ? data.PendingWagerCount
+        : null,
+    pendingWagerBalance:
+      typeof data.PendingWagerBalance === "number"
+        ? data.PendingWagerBalance
+        : null,
+    carryOverAmount:
+      typeof data.CarryOverAmount === "number" ? data.CarryOverAmount : null,
+    settleFigure:
+      typeof data.SettleFigure === "number" ? data.SettleFigure : null,
+    wagerLimit: typeof data.WagerLimit === "number" ? data.WagerLimit : null,
+    suspectedBot: data.SuspectedBot ?? null,
+    previousBalance:
+      typeof envelope.INFO.thisWeek === "object" &&
+      envelope.INFO.thisWeek !== null &&
+      typeof envelope.INFO.thisWeek.PreviousBalance === "number"
+        ? envelope.INFO.thisWeek.PreviousBalance
         : null,
     assignedParlayName: trimPaddedId(data.ParlayName) || null,
     parlaySpecCount: parlaySpecs?.length ?? 0,

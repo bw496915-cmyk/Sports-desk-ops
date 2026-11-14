@@ -138,6 +138,40 @@ function buildHydrationApi(options: {
   });
 }
 
+describe("formatProvenanceBadge staleness", () => {
+  const now = Date.parse("2026-11-14T12:00:00Z");
+  const provenance = (minutesAgo: number) => ({
+    kind: "capture" as const,
+    label: "Local Capture",
+    sourcePath: "data/live-wagers.json",
+    observedAt: new Date(now - minutesAgo * 60_000).toISOString(),
+  });
+
+  test("appends STALE past the budget", () => {
+    const badge = formatProvenanceBadge(provenance(90), {
+      staleAfterMinutes: 30,
+      nowMs: now,
+    });
+    expect(badge.badgeText).toBe("● LOCAL CAPTURE · STALE");
+    expect(badge.isLive).toBe(false);
+  });
+
+  test("stays clean inside the budget", () => {
+    expect(
+      formatProvenanceBadge(provenance(5), {
+        staleAfterMinutes: 30,
+        nowMs: now,
+      }).badgeText,
+    ).toBe("● LOCAL CAPTURE");
+  });
+
+  test("is opt-in for callers that pass no budget", () => {
+    expect(formatProvenanceBadge(provenance(900)).badgeText).toBe(
+      "● LOCAL CAPTURE",
+    );
+  });
+});
+
 describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero port bind)", () => {
   test("hydrates /api/wagers, /api/customers, and /api/config/tiers end-to-end through createDashboardApi.fetch", async () => {
     const api = buildHydrationApi({ wagerProvenanceKind: "capture" });
@@ -157,7 +191,7 @@ describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero po
     expect(bundle.wagers.data.wagers[0]?.autoExecute).toBe(false);
     expect(bundle.wagers.data.provenance.kind).toBe("capture");
     expect(formatProvenanceBadge(bundle.wagers.data.provenance).badgeText).toBe(
-      "● LIVE CAPTURE",
+      "● LOCAL CAPTURE",
     );
 
     const noop = () => {};
@@ -195,7 +229,7 @@ describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero po
     );
     expect(bundle.customers.data.cohorts.backtestCount).toBe(3);
     expect(bundle.customers.data.cohorts.uniqueSurveillanceCount).toBe(7);
-    expect(customersHtml).toContain("● LIVE CAPTURE");
+    expect(customersHtml).toContain("● LOCAL CAPTURE");
     expect(customersHtml).toContain("enriched_customers_full.json");
     expect(customersHtml).not.toContain("49 Accounts");
     expect(customersHtml).not.toContain("4,914 IDs");
@@ -226,7 +260,7 @@ describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero po
     );
 
     expect(wagersHtml).toContain("#W-88401");
-    expect(wagersHtml).toContain("● LIVE CAPTURE");
+    expect(wagersHtml).toContain("● LOCAL CAPTURE");
     expect(wagersHtml).toContain("data/live-wagers.json");
     expect(wagersHtml).toContain("1 Wagers");
   });
