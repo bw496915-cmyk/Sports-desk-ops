@@ -5,7 +5,12 @@
 // The shape itself is enforced at build time by scripts/validate_dashboard_config.ts,
 // which parses the same bytes and fails on drift.
 // @ts-expect-error - Bun's .toml loader has no TS module declaration
-import { thresholds, leagues } from "./dashboard.toml";
+import { meta, thresholds, leagues } from "./dashboard.toml";
+
+export interface DashboardMeta {
+  /** ISO-8601 string: unquoted TOML dates become Temporal and crash the bundle. */
+  readonly generated_at: string;
+}
 
 export interface DashboardThresholds {
   readonly sharp: number;
@@ -16,5 +21,6 @@ export interface DashboardLeagues {
   readonly names: readonly string[];
 }
 
+export const DASHBOARD_META: DashboardMeta = meta;
 export const DASHBOARD_THRESHOLDS: DashboardThresholds = thresholds;
 export const DASHBOARD_LEAGUES: DashboardLeagues = leagues;

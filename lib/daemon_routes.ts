@@ -68,6 +68,15 @@ export const DAEMON_ROUTES: readonly DaemonRoute[] = [
     surface: "surface.daemon-dashboard",
   }),
   defineRoute({
+    // The React SPA mount. It serves static build assets only; its data arrives through the
+    // same guarded APIs as the legacy dashboard, so the page itself is `static`.
+    path: "/app",
+    method: "ANY",
+    guard: "none",
+    dataClass: "static",
+    surface: null,
+  }),
+  defineRoute({
     path: "/agent-graph.webp",
     method: "ANY",
     // A rendering of the graph `/graph` serves: the node labels are logins.

@@ -15,6 +15,7 @@
  */
 
 import type { TrackerState } from "../lib/tracker_dashboard.ts";
+import { serveDashboardAsset } from "../lib/dashboard_static.ts";
 import crypto from "node:crypto";
 import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1785,6 +1786,19 @@ export function startServer(options?: ServerOptions) {
           "text/html; charset=utf-8",
           cors,
         );
+      }
+
+      // 8a. React dashboard (GET /app, /app/*): the built SPA in dist/dashboard.
+      // The legacy dashboard keeps / and /dashboard; /app is the new mount so the route
+      // table's existing entries and the page-ref tests stay unchanged.
+      if (pathname === "/app" || pathname.startsWith("/app/")) {
+        const relativePath =
+          pathname === "/app" ? "/" : pathname.slice("/app".length);
+        const served = await serveDashboardAsset(relativePath, {
+          root: resolve(repoRoot, "dist/dashboard"),
+          headers: cors,
+        });
+        if (served) return served;
       }
 
       // 8. Executive Dashboard (GET / or GET /dashboard)

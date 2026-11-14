@@ -28,7 +28,7 @@ const SENTINEL_PROBE = "churn"; // defined in the TOML, never imported
 
 type Issue = { path: string; message: string };
 
-function temporalType(v: unknown): string | null {
+export function temporalType(v: unknown): string | null {
   const m =
     /^\[object Temporal\.(Instant|PlainDateTime|PlainDate|PlainTime)\]$/.exec(
       Object.prototype.toString.call(v),
@@ -36,7 +36,7 @@ function temporalType(v: unknown): string | null {
   return m ? m[1]! : null;
 }
 
-function findTemporal(value: unknown, path = "$"): string[] {
+export function findTemporal(value: unknown, path = "$"): string[] {
   const t = temporalType(value);
   if (t) return [`${path} is Temporal.${t} (quote it as a string)`];
   if (Array.isArray(value)) {
@@ -50,7 +50,7 @@ function findTemporal(value: unknown, path = "$"): string[] {
   return [];
 }
 
-function hasKeyDeep(obj: unknown, key: string): boolean {
+export function hasKeyDeep(obj: unknown, key: string): boolean {
   if (Array.isArray(obj)) return obj.some((v) => hasKeyDeep(v, key));
   if (obj && typeof obj === "object") {
     return Object.entries(obj).some(
@@ -60,7 +60,7 @@ function hasKeyDeep(obj: unknown, key: string): boolean {
   return false;
 }
 
-function checkSchema(v: unknown, file: string): Issue[] {
+export function checkSchema(v: unknown, file: string): Issue[] {
   const out: Issue[] = [];
   if (!v || typeof v !== "object") {
     return [{ path: file, message: "$ is not a table" }];

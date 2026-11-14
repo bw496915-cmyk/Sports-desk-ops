@@ -1,6 +1,7 @@
 import type React from "react";
 import {
   DASHBOARD_LEAGUES,
+  DASHBOARD_META,
   DASHBOARD_THRESHOLDS,
 } from "../config/dashboard.ts";
 import { styles } from "../dashboard_styles.ts";
@@ -26,6 +27,7 @@ export function ThresholdsPanel(): React.ReactElement {
       <span>
         Leagues: <b>{DASHBOARD_LEAGUES.names.join(", ")}</b>
       </span>
+      <span style={styles.dnsLabel}>config {DASHBOARD_META.generated_at}</span>
     </div>
   );
 }

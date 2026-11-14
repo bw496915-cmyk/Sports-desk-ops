@@ -14,9 +14,6 @@ steam = 0.05
 [leagues]
 names = ["NFL", "NBA", "CFB"]
 
-[panels]
-columns = ["team", "spread", "total"]
-
 # Sentinel: defined here, never imported by any component. If this key appears
 # in dist/dashboard/*.js, tree-shaking is broken and the whole document leaked.
 [churn]
