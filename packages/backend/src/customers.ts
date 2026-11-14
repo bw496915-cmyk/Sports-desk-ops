@@ -114,6 +114,8 @@ export interface CustomersCohortInput {
   readonly localBookRows?: ReadonlyArray<Record<string, unknown>> | undefined;
   /** Where the local book came from, for provenance classification. */
   readonly localBookSourcePath?: string | undefined;
+  /** The book file's mtime as ISO; without it the provenance timestamp is classification time. */
+  readonly localBookObservedAt?: string | undefined;
   readonly provenance?: DashboardSourceProvenance | undefined;
 }
 
@@ -137,6 +139,7 @@ const SYNTHETIC_CUSTOMER_ID = /^SYNTH/i;
 export function classifyCustomerBook(
   rows: ReadonlyArray<Record<string, unknown>>,
   sourcePath: string,
+  observedAt?: string,
 ): DashboardSourceProvenance {
   const normalized = sourcePath.replace(/\\/g, "/");
   const synthetic =
@@ -146,18 +149,19 @@ export function classifyCustomerBook(
         String(row.customer_id ?? row.customerId ?? "").trim(),
       ),
     );
+  const stamp = observedAt ?? new Date().toISOString();
   return synthetic
     ? {
         kind: "fixture",
         label: "Synthetic Customer Book",
         sourcePath,
-        observedAt: new Date().toISOString(),
+        observedAt: stamp,
       }
     : {
         kind: "capture",
         label: "Enriched Local Book + Backtest",
         sourcePath,
-        observedAt: new Date().toISOString(),
+        observedAt: stamp,
       };
 }
 
@@ -208,6 +212,7 @@ export function computeCustomersCohortPayload(
       ? classifyCustomerBook(
           input.localBookRows!,
           input.localBookSourcePath ?? "enriched_customers_full.json",
+          input.localBookObservedAt,
         )
       : input.backtestLeaderboard.length > 0 || input.fixtures.length > 0
         ? {

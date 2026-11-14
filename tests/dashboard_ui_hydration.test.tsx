@@ -138,6 +138,40 @@ function buildHydrationApi(options: {
   });
 }
 
+describe("formatProvenanceBadge staleness", () => {
+  const now = Date.parse("2026-11-14T12:00:00Z");
+  const provenance = (minutesAgo: number) => ({
+    kind: "capture" as const,
+    label: "Local Capture",
+    sourcePath: "data/live-wagers.json",
+    observedAt: new Date(now - minutesAgo * 60_000).toISOString(),
+  });
+
+  test("appends STALE past the budget", () => {
+    const badge = formatProvenanceBadge(provenance(90), {
+      staleAfterMinutes: 30,
+      nowMs: now,
+    });
+    expect(badge.badgeText).toBe("● LOCAL CAPTURE · STALE");
+    expect(badge.isLive).toBe(false);
+  });
+
+  test("stays clean inside the budget", () => {
+    expect(
+      formatProvenanceBadge(provenance(5), {
+        staleAfterMinutes: 30,
+        nowMs: now,
+      }).badgeText,
+    ).toBe("● LOCAL CAPTURE");
+  });
+
+  test("is opt-in for callers that pass no budget", () => {
+    expect(formatProvenanceBadge(provenance(900)).badgeText).toBe(
+      "● LOCAL CAPTURE",
+    );
+  });
+});
+
 describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero port bind)", () => {
   test("hydrates /api/wagers, /api/customers, and /api/config/tiers end-to-end through createDashboardApi.fetch", async () => {
     const api = buildHydrationApi({ wagerProvenanceKind: "capture" });

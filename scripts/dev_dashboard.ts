@@ -442,6 +442,12 @@ export function startDashboardServer(
           const backtestJson = backtestCached?.value ?? {
             customerLeaderboard: [],
           };
+          const localBookMtimeMs = Number(
+            localBookCached?.stamp?.split(":")[0],
+          );
+          const localBookObservedAt = Number.isFinite(localBookMtimeMs)
+            ? new Date(localBookMtimeMs).toISOString()
+            : undefined;
           const fixtureJson = fixtureCached?.value ?? [];
           const {
             KEY_NUMBER_BUYER_PROFILES,
@@ -453,6 +459,7 @@ export function startDashboardServer(
             fixtures: fixtureJson,
             localBookRows: localBookCached?.value,
             localBookSourcePath: "enriched_customers_full.json",
+            localBookObservedAt: localBookObservedAt,
             keyNumberBuyerIds: KEY_NUMBER_BUYER_PROFILES.keys(),
             hookSyndicateIds: HALF_POINT_HOOK_SYNDICATE_PROFILES.keys(),
           });

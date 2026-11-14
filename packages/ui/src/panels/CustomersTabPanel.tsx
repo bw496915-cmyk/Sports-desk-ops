@@ -1,5 +1,6 @@
 import type React from "react";
 import { styles } from "../dashboard_styles.ts";
+import { DASHBOARD_FRESHNESS } from "../config/dashboard.ts";
 import {
   deriveCustomerCohortKpiCards,
   formatProvenanceBadge,
@@ -85,6 +86,7 @@ export function CustomersTabPanel({
           observedAt: "",
         }
       : (cohortsReport?.provenance ?? PENDING_COHORTS_PROVENANCE),
+    { staleAfterMinutes: DASHBOARD_FRESHNESS.stale_after_minutes },
   );
 
   return (

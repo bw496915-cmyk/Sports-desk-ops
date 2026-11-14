@@ -22,6 +22,15 @@ describe("classifyCustomerBook", () => {
     ).toBe("fixture");
   });
 
+  test("carries the file mtime into observedAt when given", () => {
+    const provenance = classifyCustomerBook(
+      [{ customer_id: "ML284" }],
+      "enriched_customers_full.json",
+      "2026-11-13T20:00:00.000Z",
+    );
+    expect(provenance.observedAt).toBe("2026-11-13T20:00:00.000Z");
+  });
+
   test("labels a real-looking book as a capture", () => {
     const book = [{ customer_id: "ML284" }, { customer_id: "HT5009" }];
     const provenance = classifyCustomerBook(

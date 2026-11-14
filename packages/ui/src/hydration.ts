@@ -109,15 +109,26 @@ function normalizeProvenance(
 /** Format a Signal-Honesty provenance badge (explicitly distinguishing `[not live]` & failures). */
 export function formatProvenanceBadge(
   provenance: DashboardSourceProvenance,
+  options: {
+    readonly staleAfterMinutes?: number | undefined;
+    readonly nowMs?: number | undefined;
+  } = {},
 ): ProvenanceBadgePresentation {
   const detail = provenance.sourcePath
     ? `${provenance.label} (${provenance.sourcePath})`
     : provenance.label;
+  const observedMs = Date.parse(provenance.observedAt);
+  const stale =
+    options.staleAfterMinutes !== undefined &&
+    Number.isFinite(observedMs) &&
+    (options.nowMs ?? Date.now()) - observedMs >
+      options.staleAfterMinutes * 60_000;
+  const suffix = stale ? " · STALE" : "";
 
   switch (provenance.kind) {
     case "live":
       return {
-        badgeText: "● LIVE CAPTURE",
+        badgeText: `● LIVE CAPTURE${suffix}`,
         fg: "#4ade80",
         bg: "rgba(34, 197, 94, 0.14)",
         border: "rgba(34, 197, 94, 0.4)",
@@ -126,7 +137,7 @@ export function formatProvenanceBadge(
       };
     case "capture":
       return {
-        badgeText: "● LOCAL CAPTURE",
+        badgeText: `● LOCAL CAPTURE${suffix}`,
         fg: "#4ade80",
         bg: "rgba(34, 197, 94, 0.14)",
         border: "rgba(34, 197, 94, 0.4)",
@@ -135,7 +146,7 @@ export function formatProvenanceBadge(
       };
     case "fixture":
       return {
-        badgeText: "◐ FIXTURE [not live]",
+        badgeText: `◐ FIXTURE [not live]${suffix}`,
         fg: "#fbbf24",
         bg: "rgba(245, 158, 11, 0.14)",
         border: "rgba(245, 158, 11, 0.4)",
@@ -145,7 +156,7 @@ export function formatProvenanceBadge(
     case "fallback":
     case "showcase":
       return {
-        badgeText: "◌ SHOWCASE [not live]",
+        badgeText: `◌ SHOWCASE [not live]${suffix}`,
         fg: "#fb923c",
         bg: "rgba(251, 146, 60, 0.14)",
         border: "rgba(251, 146, 60, 0.4)",
