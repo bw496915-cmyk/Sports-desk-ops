@@ -14,6 +14,7 @@ export interface SurveillanceTabPanelProps {
   readonly viewMode: "interactive" | "raw";
   readonly onViewModeChange: (mode: "interactive" | "raw") => void;
   readonly data: DashboardData | null;
+  readonly onSelectAgent?: ((agentId: string) => void) | undefined;
 }
 
 export function SurveillanceTabPanel({
@@ -28,6 +29,7 @@ export function SurveillanceTabPanel({
   viewMode,
   onViewModeChange,
   data,
+  onSelectAgent,
 }: SurveillanceTabPanelProps): React.ReactElement {
   return (
     <div>
@@ -110,6 +112,23 @@ export function SurveillanceTabPanel({
         viewMode === "interactive" ? (
           <div
             style={styles.renderedHtml}
+            onClick={(e) => {
+              if (!onSelectAgent) return;
+              const target = e.target as HTMLElement | null;
+              const anchor = target?.closest?.("a");
+              if (!anchor) return;
+              const href = anchor.getAttribute("href") ?? "";
+              const agentMatch = /^\/agent\/([^/?#]+)/i.exec(href);
+              if (
+                agentMatch?.[1] &&
+                !e.metaKey &&
+                !e.ctrlKey &&
+                e.button === 0
+              ) {
+                e.preventDefault();
+                onSelectAgent(decodeURIComponent(agentMatch[1]));
+              }
+            }}
             dangerouslySetInnerHTML={{ __html: data.html }}
           />
         ) : (

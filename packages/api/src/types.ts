@@ -4,8 +4,12 @@
  */
 
 import type {
+  AgentDetailApiResponse,
+  BetTickerApiResponse,
+  Daemon4020Status,
   MarketFilter,
   PeriodFilter,
+  R2PipelineApiResponse,
   RouterAuditMode,
   ShadowRepriceMode,
   SportFilter,
@@ -108,4 +112,22 @@ export interface DashboardApiDeps {
   readonly getBuildMatrix: () => Promise<readonly unknown[]>;
   readonly handleMcp?:
     ((req: Request) => Response | Promise<Response>) | undefined;
+  readonly getBetTickerPayload?:
+    | ((filters?: {
+        readonly writer?: string | undefined;
+        readonly wagerType?: string | undefined;
+      }) => Promise<BetTickerApiResponse> | BetTickerApiResponse)
+    | undefined;
+  readonly getR2PipelinePayload?:
+    | ((options?: {
+        readonly refresh?: boolean | undefined;
+      }) => Promise<R2PipelineApiResponse> | R2PipelineApiResponse)
+    | undefined;
+  readonly getDaemonStatusPayload?:
+    (() => Promise<Daemon4020Status> | Daemon4020Status) | undefined;
+  readonly getAgentDetailPayload?:
+    | ((
+        agentId: string,
+      ) => Promise<AgentDetailApiResponse> | AgentDetailApiResponse)
+    | undefined;
 }

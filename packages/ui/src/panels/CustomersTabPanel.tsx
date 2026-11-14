@@ -5,6 +5,7 @@ import {
   formatProvenanceBadge,
   PENDING_COHORTS_PROVENANCE,
 } from "../hydration.ts";
+import { getLocalAgentHref } from "../links.ts";
 import type {
   CustomersApiResponse,
   CustomerSortKey,
@@ -37,6 +38,7 @@ export interface CustomersTabPanelProps {
   readonly onClearForensicResult: () => void;
   readonly onRunReverseLookup: (ipAddress: string) => void;
   readonly onOpenTerminalProfile: (customerId: string) => void;
+  readonly onSelectAgent?: ((agentId: string) => void) | undefined;
 }
 
 export function CustomersTabPanel({
@@ -62,6 +64,7 @@ export function CustomersTabPanel({
   onClearForensicResult,
   onRunReverseLookup,
   onOpenTerminalProfile,
+  onSelectAgent,
 }: CustomersTabPanelProps): React.ReactElement {
   const effectiveStatus: "pending" | "ready" | "unavailable" =
     cohortsStatus ?? (cohortsReport !== null ? "ready" : "pending");
@@ -420,15 +423,24 @@ export function CustomersTabPanel({
                         <div style={styles.custAgent}>
                           Agent:{" "}
                           <a
-                            href={`https://desk.bookdeskops.com/agent/${cust.agentId}`}
-                            target="_blank"
-                            rel="noreferrer"
+                            href={getLocalAgentHref(cust.agentId)}
                             style={{
                               color: "#38bdf8",
                               textDecoration: "none",
                             }}
-                            onClick={(e) => e.stopPropagation()}
-                            title="Open Agent Desk Profile"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (
+                                onSelectAgent &&
+                                !e.metaKey &&
+                                !e.ctrlKey &&
+                                e.button === 0
+                              ) {
+                                e.preventDefault();
+                                onSelectAgent(cust.agentId);
+                              }
+                            }}
+                            title="Open SportsDesk Agent Inspector"
                           >
                             {cust.agentId} ↗
                           </a>

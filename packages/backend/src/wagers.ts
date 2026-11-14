@@ -21,12 +21,19 @@ export interface ParsedShortDescLike {
   readonly legs: readonly ParsedShortDescLeg[];
 }
 
+export function isSentinelTickerWriter(raw: unknown): boolean {
+  if (typeof raw !== "string") return false;
+  const normalized = raw.trim().toUpperCase();
+  return normalized === "ALERT" || normalized === "BLOCKED";
+}
+
 export interface ProjectedDevWagerRow {
   readonly ticketId: string;
   readonly timestamp: string;
   readonly customerId: string;
   readonly agentId: string;
   readonly masterAgent: string;
+  readonly ticketWriter: string;
   readonly sport: string;
   readonly betType: string;
   readonly event: string;
@@ -34,8 +41,11 @@ export interface ProjectedDevWagerRow {
   readonly lineDisplay: string;
   readonly oddsAmerican: string;
   readonly riskUsd: number;
+  readonly volumeUsd: number;
   readonly toWinUsd: number;
   readonly clvCents: number;
+  readonly vip: boolean;
+  readonly isSentinelNoise: boolean;
   readonly alertTier: WagerTier;
   readonly alertBadge: string;
   readonly operatorDirective: string;
@@ -183,6 +193,24 @@ export function projectLiveWagerRow(
     maxRecommendedStake = 1000;
   }
 
+  const ticketWriter =
+    typeof item.TicketWriter === "string" && item.TicketWriter.trim() !== ""
+      ? item.TicketWriter.trim()
+      : typeof item.ticketWriter === "string" && item.ticketWriter.trim() !== ""
+        ? item.ticketWriter.trim()
+        : typeof item.writer === "string" && item.writer.trim() !== ""
+          ? item.writer.trim()
+          : "Internet";
+  const sentinelNoise = isSentinelTickerWriter(ticketWriter);
+  const rawVolume = Number(
+    item.VolumeAmount ?? item.volumeAmount ?? item.volumeUsd ?? riskUsd,
+  );
+  const volumeUsd = Number.isFinite(rawVolume) ? rawVolume : riskUsd;
+  const vip =
+    item.VIP === true ||
+    item.vip === true ||
+    String(item.VIP ?? "").trim() === "1";
+
   return {
     ticketId: String(item.WagerNumber ?? item.ticketId ?? `W-${109280 + idx}`),
     timestamp:
@@ -195,6 +223,7 @@ export function projectLiveWagerRow(
     masterAgent: String(
       item.AgentLogin ?? item.masterAgent ?? "MASTER_A",
     ).trim(),
+    ticketWriter,
     sport: String(firstLeg?.sport?.toUpperCase() || (item.sport ?? "FOOTBALL")),
     betType:
       item.WagerType === "M"
@@ -203,15 +232,22 @@ export function projectLiveWagerRow(
           ? "Spread"
           : item.WagerType === "P"
             ? "Parlay"
-            : String(item.betType ?? "Straight"),
+            : item.WagerType === "L"
+              ? "Live"
+              : item.WagerType === "T"
+                ? "Teaser"
+                : String(item.betType ?? "Straight"),
     event: String(firstLeg?.game || (item.event ?? "Event Matchup")),
     selection: String(firstLeg?.pick || (item.selection ?? "Selection")),
     lineDisplay: String(firstLeg?.pick || (item.lineDisplay ?? "ML")),
     oddsAmerican:
       typeof item.oddsAmerican === "string" ? item.oddsAmerican : "-110",
     riskUsd,
+    volumeUsd,
     toWinUsd,
     clvCents,
+    vip,
+    isSentinelNoise: sentinelNoise,
     alertTier,
     alertBadge,
     operatorDirective,
@@ -234,6 +270,8 @@ export interface WagerSourceDescriptor {
 
 export interface DevLiveWagersLoadResult {
   readonly rows: Array<Record<string, unknown>>;
+  readonly rawRowCount?: number | undefined;
+  readonly sentinelNoiseCount?: number | undefined;
   readonly source: WagerSourceDescriptor | null;
 }
 
@@ -307,11 +345,16 @@ export function createDevLiveWagersLoader(options: DevLiveWagersLoaderOptions) {
 
           if (list && list.length > 0) {
             const sharpDeps = await options.loadSharpDeps();
-            const rows = list.map((item, idx) =>
+            const projected = list.map((item, idx) =>
               projectLiveWagerRow(item, idx, sharpDeps),
             );
+            const actionableRows = projected.filter(
+              (row) => !row.isSentinelNoise,
+            );
             const result: DevLiveWagersLoadResult = {
-              rows,
+              rows: actionableRows,
+              rawRowCount: projected.length,
+              sentinelNoiseCount: projected.length - actionableRows.length,
               source: classifyWagerCandidateSource(candidatePath, cwd),
             };
             cache.set(candidatePath, stamp, result);
