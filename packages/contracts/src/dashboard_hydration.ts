@@ -55,6 +55,19 @@ export interface HydratedWagerRow {
   readonly autoExecute: false;
 }
 
+/** Validated `config/slab.toml` summary; read-only and path-free. */
+export interface SlabPolicySummary {
+  readonly schema: string;
+  readonly version: string;
+  readonly window_bytes: number;
+  readonly unsafe_allowed: boolean;
+  readonly sentinels: {
+    readonly null_clv: number;
+    readonly null_customer_handle32: number;
+    readonly null_bridge_channel_word32: number;
+  };
+}
+
 export interface WagersWireViolation {
   readonly field: string;
   readonly kind: "type" | "nullable";
@@ -102,6 +115,8 @@ export interface LiveWagersApiResponse {
   readonly policy_schema?: string;
   /** Raw-row conformance against `schema/wagers_field_contract.json`, when a host checks it. */
   readonly wire_contract?: WagersWireContractSummary;
+  /** Slab policy when the host exposes it. */
+  readonly slab_policy?: SlabPolicySummary;
 }
 
 export interface CustomersCohortsSummary {

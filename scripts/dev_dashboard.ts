@@ -56,6 +56,7 @@ import {
 import { encodedResponse } from "../lib/http_compression.ts";
 import { parseShortDesc } from "../lib/live_wagers.ts";
 import { isSentinelTickerWriter } from "@sportsdesk-ops/backend";
+import { SLAB_SERVER } from "../lib/slab_config.ts";
 import { inspectWagersWireContract } from "../lib/wagers_wire_contract.ts";
 import { loadWagersTabPolicyStamp } from "../lib/wagers_tab_policy.ts";
 import { SUBSPORT_TAXONOMY_CATALOG } from "../lib/market_taxonomy_catalog.ts";
@@ -269,6 +270,14 @@ export function startDashboardServer(
         inspectWagersWireContract(rows, undefined, {
           skipRow: (row) => isSentinelTickerWriter(row.TicketWriter),
         }),
+      // Validated config/slab.toml summary; path-free by construction.
+      describeSlab: () => ({
+        schema: SLAB_SERVER.meta.schema,
+        version: SLAB_SERVER.meta.version,
+        window_bytes: SLAB_SERVER.capacity.ticker_window_bytes,
+        unsafe_allowed: SLAB_SERVER.unsafe.allowed,
+        sentinels: SLAB_SERVER.sentinels,
+      }),
       loadSharpDeps: async () => {
         const [{ parseShortDesc: parseDesc }, { KEY_NUMBER_BUYER_PROFILES }] =
           await Promise.all([

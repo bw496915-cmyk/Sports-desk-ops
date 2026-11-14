@@ -180,6 +180,49 @@ describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero po
     expect(normalizeLiveWagersResponse(base)?.wireContract).toBeNull();
   });
 
+  test("normalizeLiveWagersResponse carries slab_policy, and drops a malformed block", () => {
+    const base = {
+      wagers: [],
+      provenance: {
+        kind: "capture",
+        label: "Local Capture",
+        sourcePath: "data/live-wagers.json",
+        observedAt: "2026-11-14T00:00:00Z",
+      },
+    };
+    const withSlab = normalizeLiveWagersResponse({
+      ...base,
+      slab_policy: {
+        schema: "sportsdesk-slab/v1",
+        version: "1.0.0",
+        window_bytes: 2_000_000,
+        unsafe_allowed: true,
+        sentinels: {
+          null_clv: -2147483648,
+          null_customer_handle32: 4294967295,
+          null_bridge_channel_word32: 4294967295,
+        },
+      },
+    });
+    expect(withSlab?.slabPolicy?.window_bytes).toBe(2_000_000);
+    expect(withSlab?.slabPolicy?.sentinels.null_clv).toBe(-2147483648);
+    expect(withSlab?.slabPolicy?.unsafe_allowed).toBe(true);
+
+    // A missing sentinel key makes the block unusable: drop it rather than guess.
+    const malformed = normalizeLiveWagersResponse({
+      ...base,
+      slab_policy: {
+        schema: "sportsdesk-slab/v1",
+        version: "1.0.0",
+        window_bytes: 2_000_000,
+        unsafe_allowed: true,
+        sentinels: { null_clv: -2147483648 },
+      },
+    });
+    expect(malformed?.slabPolicy).toBeNull();
+    expect(normalizeLiveWagersResponse(base)?.slabPolicy).toBeNull();
+  });
+
   test("hydrates /api/wagers, /api/customers, and /api/config/tiers end-to-end through createDashboardApi.fetch", async () => {
     const api = buildHydrationApi({ wagerProvenanceKind: "capture" });
     const bundle = await hydrateDashboardFeeds((path) =>

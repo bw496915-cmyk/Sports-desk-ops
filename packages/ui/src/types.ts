@@ -15,6 +15,7 @@ import type {
   LiveWagersApiResponse,
   R2PipelineApiResponse,
   R2SinkDetail,
+  SlabPolicySummary,
   WagerTier,
   WagersWireContractSummary,
 } from "@sportsdesk-ops/contracts";
@@ -37,6 +38,7 @@ export type {
   R2PipelineApiResponse,
   R2SinkDetail,
   WagersWireContractSummary,
+  SlabPolicySummary,
 };
 
 export interface DashboardData {
