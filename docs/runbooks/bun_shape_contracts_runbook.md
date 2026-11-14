@@ -283,7 +283,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/JSONC)
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (1):** `parse`
-- **Here:** `lib/pm_policy.ts`
+- **Here:** `lib/pm_policy.ts`, `scripts/bun_native_rules.ts`
 - **Evidence:** `probe:data.json`
 
 #### Bun.JSONL
