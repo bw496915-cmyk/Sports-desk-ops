@@ -350,9 +350,21 @@ No registry is configured in the repository. Everything resolves through the use
 
 The previous setup — a committed `.npmrc` routing `@tennis-hq` to `http://127.0.0.1:50851/`, a matching root `publishConfig`, and a `TENNIS_NPM_TOKEN` — was removed 2026-11-14. It never worked: the registry was down when committed (acf8140), the token was never present, the scope had no dependents, and the package name was later reverted to unscoped `sportsdesk-ops`, so `publishConfig.access: restricted` also produced `unable to restrict access to unscoped package`. `tests/bun_config_policy.test.ts` now rejects any committed loopback registry or `_authToken` instead of pinning that dead route.
 
-If a private scope is ever needed, configure it **outside** the repo:
+If a private registry is ever needed, configure it **outside** the repo. Bun recommends `bunfig.toml`; `.npmrc` works too. Both were verified against a fake registry on 2026-11-14 (`tests/bun_registry_config.test.ts` records the routing and the Authorization header each form sends):
 
-- Scope and token go in the user-level `~/.npmrc` (or the file named by `NPM_CONFIG_USERCONFIG`, which is what `actions/setup-node` writes): `@scope:registry=https://…/` plus `//host/:_authToken=${TOKEN}`. Tokens never enter git.
+```toml
+# machine-level bunfig (~/.bunfig.toml); repo files stay registry-free
+[install]
+registry = { url = "https://registry.myorg.com/", token = "$npm_token" }  # global default
+# registry = "https://username:password@registry.myorg.com/"              # userinfo form
+# registry = "https://registry.npmjs.org"                                 # bare url
+
+[install.scopes]
+"@myorg" = { token = "$npm_token", url = "https://registry.myorg.com/" }  # or a plain URL string
+"@myorg2" = { username = "u", password = "$npm_pass", url = "https://…/" }
+```
+
+- Credentials are **environment references** (`$name`), never literals in a tracked file. `bun install` auto-loads `.env.production.local`, `.env.local`, `.env.production`, `.env` (first file wins); `BUN_ENV`/`NODE_ENV=development` substitutes `.env.development.local`/`.env.development`. Measured divergence from the docs: `NODE_ENV=test` **does** load `.env.test` (it is ignored otherwise). `--env-file` / `--no-env-file` override the set.
 - `publishConfig.registry` / `publishConfig["@scope:registry"]` belong on a scoped, non-private package — `access: restricted` is invalid for an unscoped name (measured 2026-11-14).
 - `bun install --registry <url>` and `bun publish --registry <url>` override every config source for a one-off command.
 - Verify the result with `bun run registry:check <name>` (resolves and probes) and `bun run pm:doctor` (warn-level when a configured scope is unreachable).
