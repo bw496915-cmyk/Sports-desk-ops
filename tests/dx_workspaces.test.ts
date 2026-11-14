@@ -49,15 +49,15 @@ describe("dx workspaces — monorepo workspace dev control", () => {
       "packages/ui",
     ]);
     const nshRow = report.rows.find((r) => r.dir === "packages/nsh-desk");
-    expect(nshRow?.name).toBe("@sportsdesk-ops/nsh-desk");
+    expect(nshRow?.name).toBe("@sportsdesk/nsh-desk");
     expect(nshRow?.version).toBe("0.2.0");
     expect(nshRow?.private).toBe(true);
-    expect(nshRow?.wave).toBe(0);
+    expect(nshRow?.wave).toBe(1);
 
     const rootRow = report.rows.find((r) => r.dir === ".");
     expect(rootRow?.wave).toBe(3);
     expect(rootRow?.workspaceDeps).toEqual([
-      "sportsdesk-ops@workspace:packages/sportsdesk-ops",
+      "@sportsdesk/ops@workspace:*",
       "@sportsdesk-ops/api@workspace:*",
       "@sportsdesk-ops/backend@workspace:*",
       "@sportsdesk-ops/contracts@workspace:*",
@@ -71,13 +71,15 @@ describe("dx workspaces — monorepo workspace dev control", () => {
     const mermaid = renderWorkspaceMermaid(graph);
     expect(mermaid).toContain("flowchart LR");
     expect(mermaid).toContain('subgraph wave_0["Wave 0"]');
-    expect(mermaid).toContain("@sportsdesk-ops/nsh-desk v0.2.0");
-    expect(mermaid).toContain('-->|"workspace:packages/sportsdesk-ops"|');
+    expect(mermaid).toContain("@sportsdesk/nsh-desk v0.2.0");
+    expect(mermaid).toContain(
+      'ws_packages_nsh_desk -->|"workspace:*"| ws_packages_sportsdesk_ops',
+    );
 
     const dot = renderWorkspaceDot(graph);
     expect(dot).toContain("digraph workspaces {");
     expect(dot).toContain(
-      '"." -> "packages/sportsdesk-ops" [label="workspace:packages/sportsdesk-ops"];',
+      '"." -> "packages/sportsdesk-ops" [label="workspace:*"];',
     );
   });
 
@@ -103,19 +105,19 @@ describe("dx workspaces — monorepo workspace dev control", () => {
       ROOT,
       "add",
       "ba-example",
-      ["@sportsdesk-ops/nsh-desk", "zod@4.6.7"],
+      ["@sportsdesk/nsh-desk", "zod@4.6.7"],
       { dev: true, env },
     );
     expect(siblingPlan.workspaceDir).toBe("packages/ba-example");
     expect(siblingPlan.cwd).toBe(path.join(ROOT, "packages/ba-example"));
     expect(siblingPlan.specs.map((s) => s.normalizedArg)).toEqual([
-      "@sportsdesk-ops/nsh-desk@workspace:*",
+      "@sportsdesk/nsh-desk@workspace:*",
       "zod@4.6.7",
     ]);
     expect(siblingPlan.specs[0]?.isWorkspaceLink).toBe(true);
     expect(siblingPlan.specs[1]?.isWorkspaceLink).toBe(false);
 
-    // Root and packages/sportsdesk-ops share "name": "sportsdesk-ops", so linking to it uses workspace:packages/sportsdesk-ops
+    // A path argument resolves to the package at that path (packages/sportsdesk-ops is @sportsdesk/ops)
     const disambiguated = await buildWorkspaceMutationPlan(
       ROOT,
       "add",
@@ -124,7 +126,7 @@ describe("dx workspaces — monorepo workspace dev control", () => {
       { env },
     );
     expect(disambiguated.specs[0]?.normalizedArg).toBe(
-      "sportsdesk-ops@workspace:packages/sportsdesk-ops",
+      "@sportsdesk/ops@workspace:*",
     );
 
     await expect(

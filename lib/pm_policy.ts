@@ -1331,7 +1331,7 @@ export async function auditRootWorkspaceHygiene(
 
 /**
  * Resolves a user-supplied workspace selector (`packages/ba-example`, `ba-example`,
- * `@sportsdesk-ops/nsh-desk`, `root`, `.`) to a canonical `WorkspacePackageInfo`.
+ * `@sportsdesk/nsh-desk`, `root`, `.`) to a canonical `WorkspacePackageInfo`.
  */
 export function resolveWorkspaceSelector(
   inspection: WorkspaceInspection,

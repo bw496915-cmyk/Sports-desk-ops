@@ -1245,7 +1245,7 @@ Examples:
   ./bin/dx workspaces add ba-example zod --dry-run
   ./bin/dx workspaces publish --dry-run
   ./bin/dx workspaces x ui oxlint --dry-run
-  ./bin/dx workspaces link ba-example @sportsdesk-ops/nsh-desk --dry-run
+  ./bin/dx workspaces link ba-example @sportsdesk/nsh-desk --dry-run
 `;
 
 function parseFormat(flags: {

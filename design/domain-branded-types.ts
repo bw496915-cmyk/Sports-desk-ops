@@ -943,9 +943,15 @@ export const UI_TOKENS: readonly UiTokenDefinition[] = [
   },
   {
     tokenName: "--sd-surface-hover",
-    hex: "#131f38",
+    hex: "#192849",
     role: "surface",
     description: "Hovered cards and table rows",
+  },
+  {
+    tokenName: "--sd-surface-selected",
+    hex: "#142478",
+    role: "surface",
+    description: "Selected rows, active tabs, and pinned cards",
   },
   {
     tokenName: "--sd-surface-raised",
@@ -961,9 +967,16 @@ export const UI_TOKENS: readonly UiTokenDefinition[] = [
   },
   {
     tokenName: "--sd-border-strong",
-    hex: "#334155",
+    hex: "#7b8aa1",
     role: "border",
-    description: "Emphasized panel borders, active rings, and keycaps",
+    description:
+      "Interactive control borders and keycaps (>= 3:1 on every surface)",
+  },
+  {
+    tokenName: "--sd-focus-ring",
+    hex: "#38bdf8",
+    role: "border",
+    description: "Keyboard focus outline (>= 3:1 on every surface)",
   },
   {
     tokenName: "--sd-text-primary",

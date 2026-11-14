@@ -59,9 +59,7 @@ describe("Zero root command scripts & bun x CLI workspace contract", () => {
       scripts?: Record<string, string>;
     };
 
-    expect(rootPkg.devDependencies?.["sportsdesk-ops"]).toBe(
-      "workspace:packages/sportsdesk-ops",
-    );
+    expect(rootPkg.devDependencies?.["@sportsdesk/ops"]).toBe("workspace:*");
 
     const rootBins = Object.keys(rootPkg.bin ?? {}).sort();
     const wsBins = Object.keys(wsPkg.bin ?? {}).sort();

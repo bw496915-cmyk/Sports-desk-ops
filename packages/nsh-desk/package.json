@@ -1,5 +1,5 @@
 {
-  "name": "@sportsdesk-ops/nsh-desk",
+  "name": "@sportsdesk/nsh-desk",
   "version": "0.2.0",
   "private": true,
   "description": "SportsDesk Native Shell (NSH) multi-plane terminal workspace package",
@@ -13,6 +13,12 @@
     "package:web": "bun run --cwd ../.. nsh:package:web",
     "sign:verify": "bun run --cwd ../.. nsh:sign:verify",
     "schema": "bun run --cwd ../.. schema"
+  },
+  "dependencies": {
+    "@sportsdesk/ops": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4"
   },
   "engines": {
     "bun": "1.4.4"

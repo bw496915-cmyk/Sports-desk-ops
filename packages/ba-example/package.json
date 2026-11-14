@@ -7,6 +7,9 @@
   "scripts": {
     "schema": "bun run --cwd ../.. schema"
   },
+  "devDependencies": {
+    "@types/bun": "1.4.4"
+  },
   "engines": {
     "bun": "1.4.4"
   }

@@ -33,7 +33,7 @@ describe("Declarative Wager Tiers TOML Config (Bun.TOML v3)", () => {
     expect(config.surface.text).toBe("#f1f5f9"); // Drift fixed from #f8fafc
     expect(config.surface.textSecondary).toBe("#cbd5e1");
     expect(config.surface.border).toBe("#1e293b");
-    expect(config.surface.borderStrong).toBe("#334155");
+    expect(config.surface.borderStrong).toBe("#7b8aa1");
     expect(config.surface.provenance?.liveFg).toBe("#34d399");
     expect(config.surface.provenance?.staleFg).toBe("#fbbf24");
 

@@ -66,7 +66,12 @@
       @property --sd-surface-hover {
         syntax: "<color>";
         inherits: true;
-        initial-value: #131f38;
+        initial-value: #192849;
+      }
+      @property --sd-surface-selected {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #142478;
       }
       @property --sd-surface-raised {
         syntax: "<color>";
@@ -81,7 +86,12 @@
       @property --sd-border-strong {
         syntax: "<color>";
         inherits: true;
-        initial-value: #334155;
+        initial-value: #7b8aa1;
+      }
+      @property --sd-focus-ring {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #38bdf8;
       }
       @property --sd-text-primary {
         syntax: "<color>";
@@ -158,15 +168,17 @@
        2. TMA Theme Mapping with Fallback to Canonical Tokens
        ========================================================================== */
       :root {
-        /* Generated from tokens.toml (v1.2.0) */
+        /* Generated from tokens.toml (v1.3.0) */
         --sd-surface-bg: #070b14;
         --sd-surface-cli: #04070e;
         --sd-surface-card: #0d1527;
         --sd-surface-elevated: #111c33;
-        --sd-surface-hover: #131f38;
+        --sd-surface-hover: #192849;
+        --sd-surface-selected: #142478;
         --sd-surface-raised: #1a2436;
         --sd-surface-border: #1e293b;
-        --sd-border-strong: #334155;
+        --sd-border-strong: #7b8aa1;
+        --sd-focus-ring: #38bdf8;
         --sd-text-primary: #f1f5f9;
         --sd-text-secondary: #cbd5e1;
         --sd-text-muted: #94a3b8;

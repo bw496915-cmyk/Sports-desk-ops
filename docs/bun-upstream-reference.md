@@ -4,13 +4,13 @@ Canonical commit links for the pinned runtime (`Bun 1.4.4`, `38afee6c84fcf48c0ed
 
 ## Runtime & `bun-types` SSOT
 
-| Surface           | Canonical pin                                                                                                                          | Local verification                                                                 |
-| :---------------- | :------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------- |
-| Release tag       | [`bun-v1.4.4`](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4) (`2026-10-22`)                                                  | `package.json` `engines.bun` / `.bun-version`                                      |
-| Release commit    | [`38afee6c84fcf48c0edb2466aa4b27d287a59c30`](https://github.com/oven-sh/bun/tree/38afee6c84fcf48c0edb2466aa4b27d287a59c30)             | `Bun.revision` (`bun run probe:bun` vs `tests/bun_baseline.json`)                  |
-| `bun-types` root  | [`packages/bun-types` @ `38afee6c84`](https://github.com/oven-sh/bun/tree/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types) | `@types/bun@1.4.4` (`./bin/dx bun --types --strict`)                               |
-| Shape catalog     | [`docs/runbooks/bun_shape_contracts_runbook.md`](./runbooks/bun_shape_contracts_runbook.md)                                            | `bun scripts/bun_shape_contracts.ts --check` (`tests/bun_shapes_coverage.test.ts`) |
-| Docs MCP baseline | [`https://bun.sh/docs/mcp`](https://bun.com/docs/mcp)                                                                                  | `bun run bun:docs-mcp surfaces --check tests/bun_docs_surface_baseline.json`       |
+| Surface           | Canonical pin                                                                                                                                       | Local verification                                                                 |
+| :---------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------- |
+| Release tag       | [`bun-v1.4.4`](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4) (`2026-10-22`)                                                               | `package.json` `engines.bun` / `.bun-version`                                      |
+| Release commit    | [`38afee6c84fcf48c0edb2466aa4b27d287a59c30`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/package.json)             | `Bun.revision` (`bun run probe:bun` vs `tests/bun_baseline.json`)                  |
+| `bun-types` root  | [`packages/bun-types` @ `38afee6c84`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/package.json) | `@types/bun@1.4.4` (`./bin/dx bun --types --strict`)                               |
+| Shape catalog     | [`docs/runbooks/bun_shape_contracts_runbook.md`](./runbooks/bun_shape_contracts_runbook.md)                                                         | `bun scripts/bun_shape_contracts.ts --check` (`tests/bun_shapes_coverage.test.ts`) |
+| Docs MCP baseline | [`https://bun.sh/docs/mcp`](https://bun.com/docs/mcp)                                                                                               | `bun run bun:docs-mcp surfaces --check tests/bun_docs_surface_baseline.json`       |
 
 ## Canonical `bun-types` files (`38afee6c84fcf48c0edb2466aa4b27d287a59c30`)
 
@@ -41,12 +41,12 @@ Do not hardcode member counts; run `./bin/dx bun --types` (or `./bin/dx bun --js
 
 ## Upstream doc commit pins
 
-| Pin                                                                                                            | Tree                               | Use                                                                       |
-| :------------------------------------------------------------------------------------------------------------- | :--------------------------------- | :------------------------------------------------------------------------ |
-| [`38afee6c`](https://github.com/oven-sh/bun/tree/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs)                | `oven-sh/bun/docs` at `bun-v1.4.4` | Baseline runtime docs for the pinned binary                               |
-| [`6cdb3835`](https://github.com/oven-sh/bun/tree/6cdb3835d90f8e05e4ebff86c7135078c9eb7e88/docs#contributing)   | `docs#contributing`                | MDX [voice](https://bun.com/docs/project/contributing#voice)              |
-| [`6a380492`](https://github.com/oven-sh/bun/tree/6a38049270e99f0989c912aaa335f177c9d1bbf0/docs/snippets)       | `docs/snippets`                    | `guides.jsx` (guide index), `cli/*.mdx` (CLI flag blocks)                 |
-| [`b6e7b9cd`](https://github.com/oven-sh/bun/blob/b6e7b9cdc4e7e1720b65f2e43a62debb3ab61283/docs/runtime/s3.mdx) | `docs/runtime/s3.mdx`              | `Bun.S3Client`, `S3File`, `new Response(s3file)` 302 redirect, `ERR_S3_*` |
+| Pin                                                                                                                    | Tree                               | Use                                                                       |
+| :--------------------------------------------------------------------------------------------------------------------- | :--------------------------------- | :------------------------------------------------------------------------ |
+| [`38afee6c`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/README.md)              | `oven-sh/bun/docs` at `bun-v1.4.4` | Baseline runtime docs for the pinned binary                               |
+| [`38afee6c`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/README.md#contributing) | `docs#contributing`                | MDX [voice](https://bun.com/docs/project/contributing#voice)              |
+| [`38afee6c`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/snippets/guides.jsx)    | `docs/snippets`                    | `guides.jsx` (guide index), `cli/*.mdx` (CLI flag blocks)                 |
+| [`38afee6c`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/runtime/s3.mdx)         | `docs/runtime/s3.mdx`              | `Bun.S3Client`, `S3File`, `new Response(s3file)` 302 redirect, `ERR_S3_*` |
 
 ## Related runbooks in this repo
 

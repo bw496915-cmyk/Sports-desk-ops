@@ -6,12 +6,14 @@
  * JSON, and `createDod6V54LifetimeReader` checks magic/version/capacity at open. Do not redefine
  * these values in a reader.
  */
+import { FROZEN_DODBIN_MAGIC_LE32 } from "./dodspine_magic.ts";
+
 export const DOD6_SCHEMA_PATH = "schema/dod6-v54.schema.json" as const;
 /** SHA-256 of the vendored JSON bytes; the byte-level pin for this checkout. */
 export const DOD6_SCHEMA_SHA256 =
   "c68c87fa9cb371d865a8e0e6df0b2e2f9bbcd0dbe67a35ff4a5163ff630bb3f8" as const;
 
-export const DOD6_MAGIC = 0x444f4436;
+export const DOD6_MAGIC = FROZEN_DODBIN_MAGIC_LE32;
 export const DOD6_MAGIC_ASCII = "DOD6";
 export const DOD6_VERSION = 54;
 export const DOD6_SUPPORTED_VERSIONS: readonly number[] = [54];

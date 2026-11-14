@@ -26,6 +26,6 @@
     "@sportsdesk-ops/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@types/bun": "catalog:"
+    "@types/bun": "1.4.4"
   }
 }

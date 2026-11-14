@@ -14,7 +14,7 @@ describe("parseTokensToml", () => {
     ).text();
     const ssot = parseTokensToml(tomlText);
 
-    expect(ssot.meta.version).toBe("1.2.0");
+    expect(ssot.meta.version).toBe("1.3.0");
     expect(ssot.meta.schema).toBe("sportsdesk-tokens/v1");
     expect(ssot.meta.updated_at).toBe("2026-11-14T00:00:00Z");
     expect(ssot.surfaces).toHaveLength(2);

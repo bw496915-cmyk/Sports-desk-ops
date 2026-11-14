@@ -7,6 +7,7 @@
  */
 import { existsSync, openSync, readSync, closeSync } from "node:fs";
 import { resolve } from "node:path";
+import { FROZEN_DODBIN_MAGIC_LE32 } from "./dodspine_magic.ts";
 
 /** Locked v5.4 gate from the weight engine spec (spread/ML CLV legs). */
 export const SHARP_CAND_MIN_CLV_LEGS_V54 = 3;
@@ -77,7 +78,7 @@ export function readDod6SpineHeader(path: string): Dod6SpineHeader | null {
     const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
     const magicU32 = dv.getUint32(0, true);
     const magic =
-      magicU32 === 0x444f4436
+      magicU32 === FROZEN_DODBIN_MAGIC_LE32
         ? "DOD6"
         : new TextDecoder().decode(buf.subarray(0, 4));
     return {

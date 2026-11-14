@@ -51,7 +51,7 @@ export type RouteThresholdToml =
     }
   | {
       threshold_kind: "bayes_shrinkage";
-      tau_star: number;
+      tau_star_basis_points: number;
       min_tickets: number;
     }
   | {
@@ -115,6 +115,20 @@ function reqNumber(
   const v = obj[key];
   if (typeof v !== "number" || !Number.isFinite(v)) {
     throw new Error(`[tokens_ssot] ${ctx}: missing or invalid number ${key}`);
+  }
+  return v;
+}
+
+function reqBasisPoints(
+  obj: Record<string, unknown>,
+  key: string,
+  ctx: string,
+): number {
+  const v = reqNumber(obj, key, ctx);
+  if (!Number.isSafeInteger(v) || v < 0 || v > 10_000) {
+    throw new Error(
+      `[tokens_ssot] ${ctx}: ${key} must be an integer in [0, 10000] basis points, got ${v}`,
+    );
   }
   return v;
 }
@@ -214,7 +228,11 @@ function parseRouteThreshold(
     case "bayes_shrinkage":
       return {
         threshold_kind: kind,
-        tau_star: reqNumber(raw, "tau_star", `routes.${key}`),
+        tau_star_basis_points: reqBasisPoints(
+          raw,
+          "tau_star_basis_points",
+          `routes.${key}`,
+        ),
         min_tickets: reqNumber(raw, "min_tickets", `routes.${key}`),
       };
     case "liquidity_depth":

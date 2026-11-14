@@ -20,6 +20,7 @@
         "@sportsdesk-ops/backend": "workspace:*",
         "@sportsdesk-ops/contracts": "workspace:*",
         "@sportsdesk-ops/ui": "workspace:*",
+        "@sportsdesk/ops": "workspace:*",
         "@types/bun": "1.4.4",
         "@types/react": "18.3.31",
         "@types/react-dom": "18.3.7",
@@ -27,7 +28,6 @@
         "oxlint-tsgolint": "7.0.2005",
         "pele": "1.9.0",
         "semver": "7.8.6",
-        "sportsdesk-ops": "workspace:packages/sportsdesk-ops",
         "typescript": "5.9.3",
       },
     },
@@ -39,12 +39,15 @@
         "@sportsdesk-ops/contracts": "workspace:*",
       },
       "devDependencies": {
-        "@types/bun": "catalog:",
+        "@types/bun": "1.4.4",
       },
     },
     "packages/ba-example": {
       "name": "ba-example",
       "version": "1.0.0",
+      "devDependencies": {
+        "@types/bun": "1.4.4",
+      },
     },
     "packages/backend": {
       "name": "@sportsdesk-ops/backend",
@@ -53,23 +56,29 @@
         "@sportsdesk-ops/contracts": "workspace:*",
       },
       "devDependencies": {
-        "@types/bun": "catalog:",
+        "@types/bun": "1.4.4",
       },
     },
     "packages/contracts": {
       "name": "@sportsdesk-ops/contracts",
       "version": "0.1.0",
       "devDependencies": {
-        "@types/bun": "catalog:",
+        "@types/bun": "1.4.4",
         "@types/react": "catalog:",
       },
     },
     "packages/nsh-desk": {
-      "name": "@sportsdesk-ops/nsh-desk",
+      "name": "@sportsdesk/nsh-desk",
       "version": "0.2.0",
+      "dependencies": {
+        "@sportsdesk/ops": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "1.4.4",
+      },
     },
     "packages/sportsdesk-ops": {
-      "name": "sportsdesk-ops",
+      "name": "@sportsdesk/ops",
       "version": "1.0.0",
       "bin": {
         "sportsdesk": "./bin/sportsdesk.ts",
@@ -96,6 +105,9 @@
         "sql-query": "./bin/sql-query.ts",
         "desk-provenance": "./bin/desk-provenance.ts",
       },
+      "devDependencies": {
+        "@types/bun": "1.4.4",
+      },
     },
     "packages/ui": {
       "name": "@sportsdesk-ops/ui",
@@ -106,7 +118,7 @@
         "react-dom": "catalog:",
       },
       "devDependencies": {
-        "@types/bun": "catalog:",
+        "@types/bun": "1.4.4",
         "@types/react": "catalog:",
         "@types/react-dom": "catalog:",
       },
@@ -198,9 +210,11 @@
 
     "@sportsdesk-ops/contracts": ["@sportsdesk-ops/contracts@workspace:packages/contracts"],
 
-    "@sportsdesk-ops/nsh-desk": ["@sportsdesk-ops/nsh-desk@workspace:packages/nsh-desk"],
-
     "@sportsdesk-ops/ui": ["@sportsdesk-ops/ui@workspace:packages/ui"],
+
+    "@sportsdesk/nsh-desk": ["@sportsdesk/nsh-desk@workspace:packages/nsh-desk"],
+
+    "@sportsdesk/ops": ["@sportsdesk/ops@workspace:packages/sportsdesk-ops"],
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
@@ -473,8 +487,6 @@
     "side-channel-map": ["side-channel-map@1.0.1", "", { "dependencies": { "call-bound": "^1.0.2", "es-errors": "^1.3.0", "get-intrinsic": "^1.2.5", "object-inspect": "^1.13.3" } }, "sha512-VCjCNfgMsby3tTdo02nbjtM/ewra6jPHmpThenkTYh8pG9ucZ/1P8So4u4FGBek/BjpOVsDCMoLA/iuBKIFXRA=="],
 
     "side-channel-weakmap": ["side-channel-weakmap@1.0.2", "", { "dependencies": { "call-bound": "^1.0.2", "es-errors": "^1.3.0", "get-intrinsic": "^1.2.5", "object-inspect": "^1.13.3", "side-channel-map": "^1.0.1" } }, "sha512-WPS/HvHQTYnHisLo9McqBHOJk2FkHO/tlpvldyrnem4aeQp4hai3gythswg6p01oSoTl58rcpiFAjF2br2Ak2A=="],
-
-    "sportsdesk-ops": ["sportsdesk-ops@workspace:packages/sportsdesk-ops"],
 
     "statuses": ["statuses@2.0.2", "", {}, "sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw=="],
 

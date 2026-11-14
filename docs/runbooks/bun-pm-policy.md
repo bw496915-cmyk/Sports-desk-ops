@@ -93,11 +93,11 @@ Also avoid duplicating scoped registries in bunfig; Bun reads **`~/.npmrc`** for
 
 ### Lifecycle scripts (upstream three modes)
 
-| `trustedDependencies` in root `package.json` | Dependency postinstall behavior                                                                                                                |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Omitted**                                  | Bun’s [default allow list](https://github.com/oven-sh/bun/blob/main/src/install/default-trusted-dependencies.txt) (npm registry packages only) |
-| **Explicit array**                           | **Only** listed names; default list ignored                                                                                                    |
-| **`[]` (this repo)**                         | **No** dependency lifecycle scripts, including none from the default list                                                                      |
+| `trustedDependencies` in root `package.json` | Dependency postinstall behavior                                                                                                                                                    |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Omitted**                                  | Bun’s [default allow list](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/src/install/default-trusted-dependencies.txt) (npm registry packages only) |
+| **Explicit array**                           | **Only** listed names; default list ignored                                                                                                                                        |
+| **`[]` (this repo)**                         | **No** dependency lifecycle scripts, including none from the default list                                                                                                          |
 
 Root `package.json` `{pre|post}install` / `{pre|post}prepare` still run on install unless `--ignore-scripts`. This repo pins `trustedDependencies` to `[]` and mirrors it in `bun.lock` so lockfile-only drift is visible. **Oxlint** ships platform `@oxlint/binding-*` optional packages as prebuilt tarballs (lockfile lists `os` / `cpu` / `libc`); there are no `patchedDependencies` / `overrides` on the root manifest today.
 
@@ -305,12 +305,12 @@ flowchart TD
 
 Root manifest: `"private": true` and `"workspaces": ["packages/*"]` ([workspaces](https://bun.com/docs/pm/workspaces)). Every subdirectory under `packages/` is enrolled as an explicit, self-contained workspace package:
 
-| Workspace directory       | Package `name`             | Role                                                                                    |
-| ------------------------- | -------------------------- | --------------------------------------------------------------------------------------- |
-| `.` (root)                | `sportsdesk-ops`           | Private monorepo root & shared `cli/`/`lib/`/`services/` host (`"private": true`)       |
-| `packages/sportsdesk-ops` | `sportsdesk-ops`           | Zero-spawn CLI `bin` symlink package (`bun x sportsdesk`, `bun x dx`, `bun x nsh-desk`) |
-| `packages/nsh-desk`       | `@sportsdesk-ops/nsh-desk` | Native Shell (NSH) multi-plane terminal workspace (`version` locked to `nsh.json`)      |
-| `packages/ba-example`     | `ba-example`               | Doc-style reference workspace for `bun run --filter`                                    |
+| Workspace directory       | Package `name`         | Role                                                                                    |
+| ------------------------- | ---------------------- | --------------------------------------------------------------------------------------- |
+| `.` (root)                | `sportsdesk-ops`       | Private monorepo root & shared `cli/`/`lib/`/`services/` host (`"private": true`)       |
+| `packages/sportsdesk-ops` | `@sportsdesk/ops`      | Zero-spawn CLI `bin` symlink package (`bun x sportsdesk`, `bun x dx`, `bun x nsh-desk`) |
+| `packages/nsh-desk`       | `@sportsdesk/nsh-desk` | Native Shell (NSH) multi-plane terminal workspace (`version` locked to `nsh.json`)      |
+| `packages/ba-example`     | `ba-example`           | Doc-style reference workspace for `bun run --filter`                                    |
 
 **Workspace Dev Control CLI (`scripts/dx_workspaces.ts` / `./bin/dx workspaces`):**
 
@@ -321,7 +321,7 @@ Root manifest: `"private": true` and `"workspaces": ["packages/*"]` ([workspaces
 ./bin/dx workspaces run --topological test              # Execute waves dependency-first (--parallel per wave)
 ./bin/dx workspaces run --filter '@sportsdesk-ops/*' check
 ./bin/dx workspaces add ba-example zod                  # Runs unfrozen bun-deps in packages/ba-example + lock check
-./bin/dx workspaces link ba-example @sportsdesk-ops/nsh-desk --dry-run
+./bin/dx workspaces link ba-example @sportsdesk/nsh-desk --dry-run
 ./bin/dx workspaces init telemetry-core --scoped        # Scaffold self-contained packages/telemetry-core + lock refresh
 ./bin/dx scripts --workspaces                           # List scripts across all packages/* workspaces
 ```

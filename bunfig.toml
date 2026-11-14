@@ -32,8 +32,18 @@ ignorePatterns = [
   "verification/gen-tokens-zero-drift-gate/out/**",
 ]
 
-# Install keys (linker, globalStore, cache.dir, frozenLockfile, minimumReleaseAge) are owned by the
-# machine config at ~/.bunfig.toml. Setting them here would override that SSOT, so they stay out.
+# Supply-chain floor, checked by scripts/verify_ci_gates.ts. Machine-owned keys (linker, globalStore,
+# cache, frozenLockfile, minimumReleaseAge) stay in ~/.bunfig.toml (tests/bun_config_policy.test.ts);
+# the linker is isolated through bun.lock "configVersion": 1, which the gate asserts instead.
+# ignoreScripts: no lifecycle scripts run on install (root and workspaces define none today).
+[install]
+exact = true
+ignoreScripts = true
+
+# Credentials are $ENV_VAR references only; the value never enters git.
+[install.scopes."@sportsdesk"]
+url = "https://registry.npmjs.org/"
+token = "$NPM_READ_TOKEN"
 
 # Native Bun lint (Bun 1.5+). Bun 1.4.4 accepts but ignores this section; the enforced
 # gate is `bun run lint:check` (oxlint 1.90 + oxlint-tsgolint). Keep this block aligned
