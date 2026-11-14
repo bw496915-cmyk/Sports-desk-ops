@@ -677,6 +677,106 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     }
   }, 60_000);
 
+  test("namespaces: explicit namespace:'file' matches the docs' redirect pattern", async () => {
+    const root = project();
+    writeFileSync(join(root, "entry.ts"), 'import { img } from "images/logo.png";\nconsole.log(img);\n');
+    const seen: string[] = [];
+    try {
+      const result = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, "out"),
+        target: "browser",
+        plugins: [
+          {
+            name: "file-ns-redirect",
+            setup(build) {
+              build.onResolve({ filter: /^images\//, namespace: "file" }, (args) => {
+                seen.push(args.path);
+                return { path: "virtual-image", namespace: "assets" };
+              });
+              build.onLoad({ filter: /.*/, namespace: "assets" }, () => ({
+                contents: "export const img = 'x';",
+                loader: "js",
+              }));
+            },
+          },
+        ],
+      });
+      expect(result.success).toBe(true);
+      expect(seen).toEqual(["images/logo.png"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("namespaces: node: builtins arrive as file paths for browser builds; bun: bypass plugins", async () => {
+    // The page lists "bun" and "node" as common namespaces. Measured, and
+    // target-dependent:
+    //   target browser, import "node:fs"  -> onResolve sees path "node:fs",
+    //                                        namespace "file"; a namespace-"node"
+    //                                        resolver never fires
+    //   target bun, import "node:fs"      -> externalized, no plugin call at all
+    //   import "bun:test"                 -> never reaches onResolve
+    const root = project();
+    const seenBrowser: string[] = [];
+    writeFileSync(
+      join(root, "browser-entry.ts"),
+      'import { readFileSync } from "node:fs";\nconsole.log(typeof readFileSync);\n',
+    );
+    writeFileSync(
+      join(root, "bun-entry.ts"),
+      'import { test } from "bun:test";\nimport { readFileSync } from "node:fs";\nconsole.log(typeof test, typeof readFileSync);\n',
+    );
+    const seenBun: string[] = [];
+    try {
+      const browser = await Bun.build({
+        entrypoints: [join(root, "browser-entry.ts")],
+        outdir: join(root, "out-browser"),
+        target: "browser",
+        plugins: [
+          {
+            name: "node-ns-browser",
+            setup(build) {
+              build.onResolve({ filter: /.*/ }, (args) => {
+                seenBrowser.push(`${args.path}@${args.namespace}`);
+                return undefined;
+              });
+              build.onResolve({ filter: /.*/, namespace: "node" }, (args) => {
+                seenBrowser.push(`node-scoped:${args.path}`);
+                return undefined;
+              });
+            },
+          },
+        ],
+      });
+      expect(browser.success).toBe(true);
+      expect(seenBrowser).toContain("node:fs@file");
+      expect(seenBrowser.some((e) => e.startsWith("node-scoped:"))).toBe(false);
+
+      const bun = await Bun.build({
+        entrypoints: [join(root, "bun-entry.ts")],
+        outdir: join(root, "out-bun"),
+        target: "bun",
+        plugins: [
+          {
+            name: "node-ns-bun",
+            setup(build) {
+              build.onResolve({ filter: /.*/ }, (args) => {
+                seenBun.push(`${args.path}@${args.namespace}`);
+                return undefined;
+              });
+            },
+          },
+        ],
+      });
+      expect(bun.success).toBe(true);
+      expect(seenBun.some((e) => e.includes("bun:test"))).toBe(false);
+      expect(seenBun.some((e) => e.includes("node:fs"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   test("onStart is awaited before building", async () => {
     const root = project();
     const marks: string[] = [];
