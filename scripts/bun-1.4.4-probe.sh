@@ -160,6 +160,75 @@ else
   fail workspace-root "bun install rejected workspace:* against the root package"
 fi
 
+# ---- P8: unknown flags are an error, not silently ignored -------------------
+mkproj "$ROOT/p8" '{"name":"p8","version":"1.0.0","dependencies":{}}'
+set +e
+unknown_out="$(cd "$ROOT/p8" && bun install --frozen-lockfil 2>&1)"; unknown_code=$?
+set -e
+if [ "$unknown_code" -ne 0 ] && printf '%s' "$unknown_out" | grep -q "no --frozen-lockfil flag"; then
+  pass unknown-flag-rejected "typo'd flag exits $unknown_code and is named"
+else
+  fail unknown-flag-rejected "exit $unknown_code; typo was not rejected by name"
+fi
+
+# ---- P9: bun add -d moves a group -------------------------------------------
+mkproj "$ROOT/p9" '{"name":"p9","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+run bash -c "cd '$ROOT/p9' && bun install"
+run bash -c "cd '$ROOT/p9' && bun add -d lodash"
+group_state="$(cd "$ROOT/p9" && bun -e 'const p = await Bun.file("package.json").json(); console.log(JSON.stringify({ dep: p.dependencies?.lodash ?? null, dev: p.devDependencies?.lodash ?? null }))')"
+if printf '%s' "$group_state" | grep -q '"dep":null' && printf '%s' "$group_state" | grep -q '"dev":"'; then
+  pass add-dev-moves-group "moved to devDependencies: $group_state"
+else
+  fail add-dev-moves-group "group move did not happen: $group_state"
+fi
+
+# ---- P10: --env-file is an env file, not a package ---------------------------
+mkproj "$ROOT/p10" '{"name":"p10","version":"1.0.0","dependencies":{}}'
+printf 'PROBE=1\n' > "$ROOT/p10/ci.env"
+set +e
+envfile_out="$(cd "$ROOT/p10" && bun install --env-file ci.env 2>&1)"; envfile_code=$?
+set -e
+if [ "$envfile_code" -eq 0 ] && ! printf '%s' "$envfile_out" | grep -qiE "not found|missing package|ci\.env@"; then
+  pass env-file-install "--env-file accepted as an env file, install exit 0"
+else
+  fail env-file-install "exit $envfile_code; output suggests ci.env was treated as a dependency"
+fi
+
+# ---- P11: bun pm fetch warms the cache and nothing else ----------------------
+mkproj "$ROOT/p11" '{"name":"p11","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+run bash -c "cd '$ROOT/p11' && bun pm fetch"
+if [ ! -d "$ROOT/p11/node_modules" ]; then
+  pass pm-fetch "cache warmed, no node_modules created, no scripts run"
+else
+  fail pm-fetch "pm fetch created node_modules"
+fi
+
+# ---- P12: recursive publish skips private workspaces -------------------------
+mkdir -p "$ROOT/p12/packages/a"
+printf '%s' '{"name":"p12root","version":"1.0.0","private":true,"workspaces":["packages/*"]}' > "$ROOT/p12/package.json"
+printf '%s' '{"name":"p12a","version":"1.0.0","private":true}' > "$ROOT/p12/packages/a/package.json"
+set +e
+recursive_out="$(cd "$ROOT/p12" && bun publish --recursive 2>&1)"; recursive_code=$?
+set -e
+if [ "$recursive_code" -eq 0 ] && printf '%s' "$recursive_out" | grep -q "skipped p12a: private"; then
+  pass publish-recursive "all-private workspace: exit 0, both packages skipped by name"
+else
+  fail publish-recursive "exit $recursive_code; recursive publish did not skip private workspaces as expected"
+fi
+
+# ---- P13: frozen-lockfile names the dependency that changed ------------------
+mkproj "$ROOT/p13" '{"name":"p13","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+run bash -c "cd '$ROOT/p13' && bun install"
+mkproj "$ROOT/p13" '{"name":"p13","version":"1.0.0","dependencies":{"lodash":"4.17.21","is-odd":"3.0.1"}}'
+set +e
+frozen_out="$(cd "$ROOT/p13" && bun install --frozen-lockfile 2>&1)"; frozen_code=$?
+set -e
+if [ "$frozen_code" -ne 0 ] && printf '%s' "$frozen_out" | grep -q "is-odd was added"; then
+  pass frozen-lockfile-names-dep "error names 'is-odd was added'"
+else
+  fail frozen-lockfile-names-dep "exit $frozen_code; error did not name the added dependency"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip migrate-speed "needs a ~20k-entry yarn.lock; manual: time bun pm migrate"
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
