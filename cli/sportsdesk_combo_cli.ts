@@ -69,7 +69,9 @@ async function cmdDerive(args: string[], opts: GlobalOpts): Promise<number> {
     if (args[i] === "--side" && args[i + 1]) {
       const parsed = parseVenueId(args[++i]);
       if (parsed !== "desk" && parsed !== "polymarket") {
-        console.error(`derive: --side must be desk or polymarket (got ${JSON.stringify(args[i])})`);
+        console.error(
+          `derive: --side must be desk or polymarket (got ${JSON.stringify(args[i])})`,
+        );
         return 2;
       }
       side = parsed;
@@ -109,7 +111,9 @@ async function cmdIngest(args: string[], opts: GlobalOpts): Promise<number> {
     else if (a === "--side" && args[i + 1]) {
       const parsed = parseVenueId(args[++i]);
       if (parsed !== "desk" && parsed !== "polymarket") {
-        console.error(`ingest: --side must be desk or polymarket (got ${JSON.stringify(args[i])})`);
+        console.error(
+          `ingest: --side must be desk or polymarket (got ${JSON.stringify(args[i])})`,
+        );
         return 2;
       }
       side = parsed;

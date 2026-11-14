@@ -18,10 +18,14 @@ import {
   type VenueId,
 } from "../lib/domain_venue_registry.ts";
 
-const lanes = Object.keys(WRITER_LANE_REGISTRY) as (keyof typeof WRITER_LANE_REGISTRY)[];
+const lanes = Object.keys(
+  WRITER_LANE_REGISTRY,
+) as (keyof typeof WRITER_LANE_REGISTRY)[];
 const rows = (Object.keys(VENUE_REGISTRY) as VenueId[]).map((id) => {
   const venue = VENUE_REGISTRY[id];
-  const venueLanes = lanes.filter((lane) => WRITER_LANE_REGISTRY[lane].venueId === id);
+  const venueLanes = lanes.filter(
+    (lane) => WRITER_LANE_REGISTRY[lane].venueId === id,
+  );
   return {
     venue: id,
     label: venue.displayLabel,
@@ -40,7 +44,8 @@ const asJson = argv.includes("--json");
 const outPath = argv[argv.indexOf("--md") + 1];
 
 function markdown(): string {
-  const head = "| Venue | Kind | Tradeable | Settlement | Colour | Origins | Writer lanes |";
+  const head =
+    "| Venue | Kind | Tradeable | Settlement | Colour | Origins | Writer lanes |";
   const rule = "|---|---|---|---|---|---|---|";
   const body = rows.map(
     (r) =>
@@ -63,11 +68,33 @@ function markdown(): string {
 }
 
 if (asJson) {
-  console.log(JSON.stringify({ rows, totals: { venues: rows.length, origins: Object.keys(ORIGIN_DOMAIN_REGISTRY).length, lanes: lanes.length } }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        rows,
+        totals: {
+          venues: rows.length,
+          origins: Object.keys(ORIGIN_DOMAIN_REGISTRY).length,
+          lanes: lanes.length,
+        },
+      },
+      null,
+      2,
+    ),
+  );
 } else if (asCsv) {
   const header = "venue,label,kind,tradeable,settlement,colour,origins,lanes";
   const lines = rows.map((r) =>
-    [r.venue, r.label, r.kind, String(r.tradeable), r.settlement, r.colour, `"${r.origins}"`, `"${r.lanes}"`].join(","),
+    [
+      r.venue,
+      r.label,
+      r.kind,
+      String(r.tradeable),
+      r.settlement,
+      r.colour,
+      `"${r.origins}"`,
+      `"${r.lanes}"`,
+    ].join(","),
   );
   console.log([header, ...lines].join("\n"));
 } else if (outPath) {

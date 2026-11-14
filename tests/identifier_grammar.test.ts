@@ -36,7 +36,9 @@ describe("identifier grammar", () => {
 
   test("accepts the canonical shapes", () => {
     expect(matchesGrammar("venue", "gslive_partner118")).toBe(true);
-    expect(matchesGrammar("origin", "ORIGIN_SPORTSBOOK_GSLIVE_PARTNER118")).toBe(true);
+    expect(
+      matchesGrammar("origin", "ORIGIN_SPORTSBOOK_GSLIVE_PARTNER118"),
+    ).toBe(true);
     expect(matchesGrammar("lane", "cslevel2")).toBe(true);
     expect(matchesGrammar("rowFlag", "NON_SPORTS_DROP")).toBe(true);
     expect(matchesGrammar("provenanceLabel", "GSLIVE")).toBe(true);
@@ -55,12 +57,20 @@ describe("identifier grammar", () => {
   });
 
   test("a boundary write of a non-identifier fails with a structured error", () => {
-    expect(() => assertIdentifier("lane", "inet_mirror", "SEC_API_CHANNEL")).not.toThrow();
-    expect(() => assertIdentifier("lane", "INET", "SEC_API_CHANNEL")).toThrow(/GATE-04/);
+    expect(() =>
+      assertIdentifier("lane", "inet_mirror", "SEC_API_CHANNEL"),
+    ).not.toThrow();
+    expect(() => assertIdentifier("lane", "INET", "SEC_API_CHANNEL")).toThrow(
+      /GATE-04/,
+    );
     expect(assertNotSentinel("venue", "f402", "SEC_VENUE_WRITE")).toBe("f402");
-    expect(() => assertNotSentinel("venue", "internal", "SEC_VENUE_WRITE")).toThrow(/GATE-04/);
+    expect(() =>
+      assertNotSentinel("venue", "internal", "SEC_VENUE_WRITE"),
+    ).toThrow(/GATE-04/);
     for (const sentinel of RESERVED_SENTINEL_WORDS) {
-      expect(() => assertNotSentinel("lane", sentinel, "SEC_LANE_WRITE")).toThrow();
+      expect(() =>
+        assertNotSentinel("lane", sentinel, "SEC_LANE_WRITE"),
+      ).toThrow();
     }
   });
 });

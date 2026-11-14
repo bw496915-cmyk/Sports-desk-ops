@@ -179,7 +179,9 @@ if (process.argv.includes("--json")) {
 // Grammar reference is exported so the gate and the contract layer cannot drift.
 const GRAMMAR_KINDS = 8;
 if (Object.keys(IDENTIFIER_GRAMMAR).length !== GRAMMAR_KINDS) {
-  console.error(`identifier grammar declares ${Object.keys(IDENTIFIER_GRAMMAR).length} kinds, expected ${GRAMMAR_KINDS}`);
+  console.error(
+    `identifier grammar declares ${Object.keys(IDENTIFIER_GRAMMAR).length} kinds, expected ${GRAMMAR_KINDS}`,
+  );
   process.exit(2);
 }
 process.exit(failed.length === 0 ? 0 : 1);

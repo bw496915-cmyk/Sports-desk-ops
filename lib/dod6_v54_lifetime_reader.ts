@@ -110,8 +110,13 @@ const WORD_BYTES = 4;
 export const SECTION_TABLE_STRIDE_WORDS = 3;
 
 /** The declared byte offset of one section, straight out of the header table. */
-export function sectionOffset(header: Uint32Array, sectionIndex: number): number {
-  return header[HEADER_SECTION_TABLE_START + sectionIndex * SECTION_TABLE_STRIDE_WORDS]!;
+export function sectionOffset(
+  header: Uint32Array,
+  sectionIndex: number,
+): number {
+  return header[
+    HEADER_SECTION_TABLE_START + sectionIndex * SECTION_TABLE_STRIDE_WORDS
+  ]!;
 }
 
 /**

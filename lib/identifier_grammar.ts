@@ -39,18 +39,51 @@ interface GrammarRule {
   readonly example: string;
 }
 
-export const IDENTIFIER_GRAMMAR: Readonly<Record<IdentifierKind, GrammarRule>> = {
-  venue: { pattern: /^[a-z][a-z0-9_]*$/, rule: "lower_snake", example: "gslive_partner118" },
-  origin: { pattern: /^ORIGIN_[A-Z0-9]+(?:_[A-Z0-9]+)*$/, rule: "UPPER_ with ORIGIN_ prefix", example: "ORIGIN_SPORTSBOOK_FANTASY402" },
-  lane: { pattern: /^[a-z][a-z0-9_]*$/, rule: "lower_snake", example: "cslevel2" },
-  rowFlag: { pattern: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/, rule: "UPPER_SNAKE", example: "NON_SPORTS_DROP" },
-  provenanceLabel: { pattern: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/, rule: "UPPER_SNAKE", example: "GSLIVE" },
-  channel: { pattern: /^[a-z][A-Za-z0-9]*$/, rule: "camelCase", example: "inetMirror" },
-  sentinel: { pattern: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/, rule: "UPPER_SNAKE", example: "NON_SPORTS_DROP" },
-  // NOT camelCase: the published `/api/v1/live-bets` channel is a kebab-case
-  // slug (`^[a-z0-9-]{1,32}$`). Recorded as an exception, not smoothed over.
-  channelSlug: { pattern: /^[a-z0-9-]{1,32}$/, rule: "kebab-case, 1..32 chars", example: "inet-mirror" },
-};
+export const IDENTIFIER_GRAMMAR: Readonly<Record<IdentifierKind, GrammarRule>> =
+  {
+    venue: {
+      pattern: /^[a-z][a-z0-9_]*$/,
+      rule: "lower_snake",
+      example: "gslive_partner118",
+    },
+    origin: {
+      pattern: /^ORIGIN_[A-Z0-9]+(?:_[A-Z0-9]+)*$/,
+      rule: "UPPER_ with ORIGIN_ prefix",
+      example: "ORIGIN_SPORTSBOOK_FANTASY402",
+    },
+    lane: {
+      pattern: /^[a-z][a-z0-9_]*$/,
+      rule: "lower_snake",
+      example: "cslevel2",
+    },
+    rowFlag: {
+      pattern: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/,
+      rule: "UPPER_SNAKE",
+      example: "NON_SPORTS_DROP",
+    },
+    provenanceLabel: {
+      pattern: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/,
+      rule: "UPPER_SNAKE",
+      example: "GSLIVE",
+    },
+    channel: {
+      pattern: /^[a-z][A-Za-z0-9]*$/,
+      rule: "camelCase",
+      example: "inetMirror",
+    },
+    sentinel: {
+      pattern: /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/,
+      rule: "UPPER_SNAKE",
+      example: "NON_SPORTS_DROP",
+    },
+    // NOT camelCase: the published `/api/v1/live-bets` channel is a kebab-case
+    // slug (`^[a-z0-9-]{1,32}$`). Recorded as an exception, not smoothed over.
+    channelSlug: {
+      pattern: /^[a-z0-9-]{1,32}$/,
+      rule: "kebab-case, 1..32 chars",
+      example: "inet-mirror",
+    },
+  };
 
 /**
  * Words that name a state rather than a feed. After the refactor none of them
@@ -64,17 +97,29 @@ export const RESERVED_SENTINEL_WORDS: readonly string[] = [
   "blocked",
 ];
 
-export function matchesGrammar(kind: IdentifierKind, value: unknown): value is string {
-  return typeof value === "string" && IDENTIFIER_GRAMMAR[kind].pattern.test(value);
+export function matchesGrammar(
+  kind: IdentifierKind,
+  value: unknown,
+): value is string {
+  return (
+    typeof value === "string" && IDENTIFIER_GRAMMAR[kind].pattern.test(value)
+  );
 }
 
 /** Parse at an I/O boundary: null means "not an identifier of this kind". */
-export function parseIdentifier(kind: IdentifierKind, value: unknown): string | null {
+export function parseIdentifier(
+  kind: IdentifierKind,
+  value: unknown,
+): string | null {
   return matchesGrammar(kind, value) ? value : null;
 }
 
 /** Assert at a write boundary: a structured failure naming the violated rule. */
-export function assertIdentifier(kind: IdentifierKind, value: unknown, section: string): string {
+export function assertIdentifier(
+  kind: IdentifierKind,
+  value: unknown,
+  section: string,
+): string {
   if (!matchesGrammar(kind, value)) {
     throw new DodGateFailureError({
       gate: 4,
@@ -87,7 +132,11 @@ export function assertIdentifier(kind: IdentifierKind, value: unknown, section: 
 }
 
 /** A reserved sentinel word presented as a feed id is a boundary error. */
-export function assertNotSentinel(kind: "venue" | "lane", value: string, section: string): string {
+export function assertNotSentinel(
+  kind: "venue" | "lane",
+  value: string,
+  section: string,
+): string {
   if (RESERVED_SENTINEL_WORDS.includes(value)) {
     throw new DodGateFailureError({
       gate: 4,
