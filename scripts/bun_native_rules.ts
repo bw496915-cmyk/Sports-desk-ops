@@ -446,6 +446,9 @@ export function checkGlobalInstalls(root: string): RuleResult[] {
   const hits: string[] = [];
   for (const path of git.stdout.toString().split("\0")) {
     if (path === "") continue;
+    // This module names the forbidden command in its own regex source; scanning it would
+    // always match itself. Its only job is the pattern, not a global install.
+    if (path === "scripts/bun_native_rules.ts") continue;
     const inPrefix = COMMAND_PREFIXES.some((prefix) => path.startsWith(prefix));
     const isCommandFile = (COMMAND_FILES as readonly string[]).includes(path);
     const extension = path.slice(path.lastIndexOf("."));

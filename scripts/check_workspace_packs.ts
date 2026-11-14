@@ -61,10 +61,6 @@ interface RawWorkspaceManifest {
 const AUTO_INCLUDED_FILE =
   /^(?:package\.json|readme(?:\.[a-z0-9]+)?|license(?:\.[a-z0-9]+)?|changelog(?:\.[a-z0-9]+)?)$/i;
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /**
  * Is a packed file covered by the manifest's "files" allowlist? Semantics measured
  * against `bun pm pack --dry-run` on 2026-11-14 and matched with Bun.Glob:

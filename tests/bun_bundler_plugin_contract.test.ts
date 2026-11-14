@@ -972,9 +972,9 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
           {
             name: "exports-shape",
             setup(build) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               build.onLoad(
                 { filter: /entry\.ts$/ },
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 () => ({ exports: { x: 1 } }) as any,
               );
             },
