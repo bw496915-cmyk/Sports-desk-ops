@@ -33,7 +33,17 @@ ignorePatterns = [
 ]
 
 # Install keys (linker, globalStore, cache.dir, frozenLockfile, minimumReleaseAge) are owned by the
-# machine config at ~/.bunfig.toml. Setting them here would override that SSOT, so they stay out.
+# machine config at ~/.bunfig.toml. Setting them here would override that SSOT, so they stay out:
+# `pm:doctor` fails the "project bunfig" check when one is present (`lib/pm_policy.ts`
+# MACHINE_OWNED_INSTALL_KEYS). Non-machine keys are safe and are pinned here.
+#
+# `exact` makes `bun add` write the resolved version instead of a caret range, matching the
+# exact-pin policy the root manifest already follows. `ignoreScripts` is a no-op today — the root
+# `trustedDependencies` is `[]` and the root has no install lifecycle — and keeps it that way if a
+# dependency or a `prepare` script is ever added. Both are project keys, not machine overrides.
+[install]
+exact = true
+ignoreScripts = true
 
 # Native Bun lint (Bun 1.5+). Bun 1.4.4 accepts but ignores this section; the enforced
 # gate is `bun run lint:check` (oxlint 1.90 + oxlint-tsgolint). Keep this block aligned

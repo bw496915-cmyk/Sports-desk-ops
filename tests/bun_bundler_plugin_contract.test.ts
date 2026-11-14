@@ -272,6 +272,7 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
       });
     const loadWith = (ret: unknown) => ({
       name: "precedence",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setup(build: any) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         build.onLoad({ filter: /entry\.ts$/ }, () => ret as any);
