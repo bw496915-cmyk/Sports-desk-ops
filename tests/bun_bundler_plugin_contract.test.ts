@@ -477,6 +477,47 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     }
   }, 60_000);
 
+  test("plugin array order decides which plugin loads a module (first wins)", async () => {
+    // Two plugins with the same onLoad filter: the earlier entry in `plugins`
+    // supplies the module and the later one never runs. Duplicate names are
+    // allowed and behave the same way; an empty array is a no-op.
+    const root = project();
+    writeFileSync(join(root, "entry.ts"), "export const answer = 42;\n");
+    const plugin = (name: string, value: number) => ({
+      name,
+      setup(build: {
+        onLoad: (
+          opts: { filter: RegExp },
+          cb: () => { contents: string; loader: "js" },
+        ) => void;
+      }) {
+        build.onLoad({ filter: /entry\.ts$/ }, () => ({
+          contents: `export const answer = ${value};`,
+          loader: "js" as const,
+        }));
+      },
+    });
+    const buildWith = async (label: string, plugins: ReturnType<typeof plugin>[]) => {
+      const result = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, `out-${label}`),
+        plugins,
+      });
+      expect(result.success).toBe(true);
+      const js = await Bun.file(join(root, `out-${label}/entry.js`)).text();
+      const match = js.match(/answer = (\d+)/);
+      return match?.[1];
+    };
+    try {
+      expect(await buildWith("a-then-b", [plugin("a", 100), plugin("b", 200)])).toBe("100");
+      expect(await buildWith("b-then-a", [plugin("b", 200), plugin("a", 100)])).toBe("200");
+      expect(await buildWith("dupes", [plugin("same", 1), plugin("same", 2)])).toBe("1");
+      expect(await buildWith("empty", [])).toBe("42");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   test("onStart is awaited before building", async () => {
     const root = project();
     const marks: string[] = [];
