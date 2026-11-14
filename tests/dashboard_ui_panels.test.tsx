@@ -476,6 +476,25 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(clean).toContain("✓ wire: 237 rows");
     expect(clean).toContain("63 sentinel row(s) skipped");
 
+    const withSlab = renderToStaticMarkup(
+      React.createElement(LiveWagersTabPanel, {
+        ...baseProps,
+        slabPolicy: {
+          schema: "sportsdesk-slab/v1",
+          version: "1.0.0",
+          window_bytes: 2_000_000,
+          unsafe_allowed: true,
+          sentinels: {
+            null_clv: -2147483648,
+            null_customer_handle32: 4294967295,
+            null_bridge_channel_word32: 4294967295,
+          },
+        },
+      }),
+    );
+    expect(withSlab).toContain("slab 2.0 MB");
+    expect(withSlab).toContain("sentinels null_clv=-2147483648");
+
     const dirty = renderToStaticMarkup(
       React.createElement(LiveWagersTabPanel, {
         ...baseProps,

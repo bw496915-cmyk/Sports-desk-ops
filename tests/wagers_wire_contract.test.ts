@@ -283,13 +283,27 @@ describe("vendor wire contract at ingest", () => {
         sharpCustomerIds: new Set<string>(),
       }),
       inspectRawRows: (rows) => inspectWagersWireContract(rows, REGISTRY),
+      describeSlab: () => ({
+        schema: "sportsdesk-slab/v1",
+        version: "1.0.0",
+        window_bytes: 2_000_000,
+        unsafe_allowed: true,
+        sentinels: {
+          null_clv: -2147483648,
+          null_customer_handle32: 4294967295,
+          null_bridge_channel_word32: 4294967295,
+        },
+      }),
     });
     const payload = (await loader.buildLiveWagersPayload()) as {
       wire_contract?: { ok: boolean; rows: number; violations: unknown[] };
+      slab_policy?: { window_bytes: number; unsafe_allowed: boolean };
     };
     expect(payload.wire_contract?.rows).toBe(100);
     expect(payload.wire_contract?.ok).toBe(true);
     expect(payload.wire_contract?.violations).toEqual([]);
+    expect(payload.slab_policy?.window_bytes).toBe(2_000_000);
+    expect(payload.slab_policy?.unsafe_allowed).toBe(true);
 
     // The wire-contract memo keys on the raw array's identity: frozen rows mean
     // an in-place edit cannot silently outlive its scan.

@@ -23,6 +23,7 @@ import type {
   DashboardSourceProvenance,
   LiveWager,
   TierStyleConfig,
+  SlabPolicySummary,
   WagerSortField,
   WagersWireContractSummary,
 } from "../types.ts";
@@ -50,6 +51,8 @@ export interface LiveWagersTabPanelProps {
   readonly tiersConfig: TierStyleConfig | null;
   /** Vendor wire-contract check from the feed; absent when the host doesn't check. */
   readonly wireContract?: WagersWireContractSummary | null | undefined;
+  /** Validated slab policy from config/slab.toml, when the host exposes it. */
+  readonly slabPolicy?: SlabPolicySummary | null | undefined;
   readonly onSelectCustomerById: (customerId: string) => void;
   readonly onInspectPty: (customerId: string) => void;
   readonly onSelectAgent?: ((agentId: string) => void) | undefined;
@@ -91,6 +94,7 @@ export function LiveWagersTabPanel({
   onCopyText,
   tiersConfig,
   wireContract = null,
+  slabPolicy = null,
   onSelectCustomerById,
   onInspectPty,
   onSelectAgent,
@@ -440,6 +444,23 @@ export function LiveWagersTabPanel({
               📄 {WAGERS_TABLE.policy_tag}
             </span>
             <WireContractChip summary={wireContract} error={wireError} />
+            {slabPolicy ? (
+              <span
+                title={`config/slab.toml ${slabPolicy.schema} v${slabPolicy.version}: ${slabPolicy.window_bytes} byte window; sentinels null_clv=${slabPolicy.sentinels.null_clv}, null_customer_handle32=${slabPolicy.sentinels.null_customer_handle32}, null_bridge_channel_word32=${slabPolicy.sentinels.null_bridge_channel_word32}; unsafe_allowed=${String(slabPolicy.unsafe_allowed)}`}
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: "999px",
+                  color: "#94a3b8",
+                  backgroundColor: "rgba(148, 163, 184, 0.12)",
+                  border: "1px solid rgba(148, 163, 184, 0.35)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ⚙ slab {(slabPolicy.window_bytes / 1_000_000).toFixed(1)} MB
+              </span>
+            ) : null}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ fontSize: "11px", color: "#64748b" }}>

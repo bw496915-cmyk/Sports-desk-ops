@@ -5,6 +5,7 @@
  */
 
 import type {
+  SlabPolicySummary,
   WagerTier,
   WagersWireContractSummary,
   WagersWireViolation,
@@ -49,6 +50,8 @@ export interface NormalizedLiveWagersResult {
   readonly provenance: DashboardSourceProvenance;
   /** Vendor wire-contract summary when the feed host checks it; null otherwise. */
   readonly wireContract: WagersWireContractSummary | null;
+  /** Slab policy when the host exposes it; null otherwise. */
+  readonly slabPolicy: SlabPolicySummary | null;
 }
 
 export type CustomerCohortKpiId =
@@ -264,6 +267,42 @@ export function normalizeLiveWagersResponse(
       "API Wagers Feed",
     ),
     wireContract: normalizeWireContract(rec.wire_contract),
+    slabPolicy: normalizeSlabPolicy(rec.slab_policy),
+  };
+}
+
+/** Structural parse of `slab_policy`; a malformed block is dropped, not guessed. */
+function normalizeSlabPolicy(raw: unknown): SlabPolicySummary | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+    return null;
+  const rec = raw as Record<string, unknown>;
+  const sentinels = rec["sentinels"];
+  if (typeof rec["schema"] !== "string" || typeof rec["version"] !== "string") {
+    return null;
+  }
+  if (typeof rec["window_bytes"] !== "number" || rec["window_bytes"] <= 0) {
+    return null;
+  }
+  if (typeof rec["unsafe_allowed"] !== "boolean") return null;
+  if (typeof sentinels !== "object" || sentinels === null) return null;
+  const s = sentinels as Record<string, unknown>;
+  for (const key of [
+    "null_clv",
+    "null_customer_handle32",
+    "null_bridge_channel_word32",
+  ]) {
+    if (typeof s[key] !== "number") return null;
+  }
+  return {
+    schema: rec["schema"],
+    version: rec["version"],
+    window_bytes: rec["window_bytes"],
+    unsafe_allowed: rec["unsafe_allowed"],
+    sentinels: {
+      null_clv: s["null_clv"] as number,
+      null_customer_handle32: s["null_customer_handle32"] as number,
+      null_bridge_channel_word32: s["null_bridge_channel_word32"] as number,
+    },
   };
 }
 

@@ -67,6 +67,7 @@ import {
   type TerminalCategory,
   type TerminalHistoryEntry,
   type TierStyleConfig,
+  type SlabPolicySummary,
   type WagerSortField,
   type WagersWireContractSummary,
 } from "./types.ts";
@@ -198,6 +199,7 @@ export function App(): React.ReactElement {
   const [wagersError, setWagersError] = useState<string | null>(null);
   const [wireContract, setWireContract] =
     useState<WagersWireContractSummary | null>(null);
+  const [slabPolicy, setSlabPolicy] = useState<SlabPolicySummary | null>(null);
   const [betTickerData, setBetTickerData] =
     useState<BetTickerApiResponse | null>(null);
   const [betTickerLoading, setBetTickerLoading] = useState<boolean>(false);
@@ -248,6 +250,7 @@ export function App(): React.ReactElement {
       setLiveWagers(normalized.wagers);
       setWagersProvenance(normalized.provenance);
       setWireContract(normalized.wireContract);
+      setSlabPolicy(normalized.slabPolicy);
       setWagersError(null);
       if (normalized.wagers.length > 0) {
         setSelectedWager((prev) =>
@@ -1782,6 +1785,7 @@ export function App(): React.ReactElement {
             provenance={wagersProvenance}
             wagersError={wagersError}
             wireContract={wireContract}
+            slabPolicy={slabPolicy}
             onRefreshWagers={() => {
               void fetchLiveWagers();
             }}

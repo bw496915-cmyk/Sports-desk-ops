@@ -72,6 +72,8 @@ export interface LiveWagersPayload {
   readonly provenance: DashboardSourceProvenance;
   /** Host-supplied raw-row conformance check (see lib/wagers_wire_contract.ts). */
   readonly wire_contract?: unknown;
+  /** Host-supplied slab policy summary (see config/slab.toml). */
+  readonly slab_policy?: unknown;
 }
 
 export const FALLBACK_DEV_WAGERS: ReadonlyArray<Record<string, unknown>> = [
@@ -321,6 +323,11 @@ export interface DevLiveWagersLoaderOptions {
   readonly inspectRawRows?:
     | ((rows: readonly Record<string, unknown>[]) => unknown | Promise<unknown>)
     | undefined;
+  /**
+   * Optional slab-policy descriptor. The host injects the validated
+   * `config/slab.toml` summary so this package stays config-agnostic.
+   */
+  readonly describeSlab?: (() => unknown) | undefined;
 }
 
 export interface WagerSourceDescriptor {
@@ -477,9 +484,12 @@ export function createDevLiveWagersLoader(options: DevLiveWagersLoaderOptions) {
       }
     }
 
+    const slab_policy = options.describeSlab?.();
+
     return {
       wagers,
       ...(wire_contract === undefined ? {} : { wire_contract }),
+      ...(slab_policy === undefined ? {} : { slab_policy }),
       totalRiskUsd: wagers.reduce(
         (sum, w) => sum + (Number(w.riskUsd) || 0),
         0,
