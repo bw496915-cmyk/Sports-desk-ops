@@ -39,3 +39,4 @@ export {
   TerminalTabPanel,
   type TerminalTabPanelProps,
 } from "./TerminalTabPanel.tsx";
+export { ThresholdsPanel } from "./ThresholdsPanel.tsx";

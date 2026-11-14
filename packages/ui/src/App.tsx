@@ -21,6 +21,7 @@ import {
   ShiftHandoffModal,
   SurveillanceTabPanel,
   TerminalTabPanel,
+  ThresholdsPanel,
 } from "./panels/index.tsx";
 import {
   debugDashboardTrace,
@@ -1368,24 +1369,27 @@ export function App(): React.ReactElement {
             onSelectAgent={(agentId) => setSelectedAgentId(agentId)}
           />
         ) : activeTab === "surveillance" ? (
-          <SurveillanceTabPanel
-            dnsData={dnsData}
-            benchLoading={benchLoading}
-            benchResult={benchResult}
-            onRunBenchmark={() => {
-              void runBenchmark();
-            }}
-            reverseIp={reverseIp}
-            onReverseIpChange={setReverseIp}
-            reverseResult={reverseResult}
-            onRunReverseLookup={() => {
-              void runReverseLookup();
-            }}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            data={data}
-            onSelectAgent={(agentId) => setSelectedAgentId(agentId)}
-          />
+          <>
+            <ThresholdsPanel />
+            <SurveillanceTabPanel
+              dnsData={dnsData}
+              benchLoading={benchLoading}
+              benchResult={benchResult}
+              onRunBenchmark={() => {
+                void runBenchmark();
+              }}
+              reverseIp={reverseIp}
+              onReverseIpChange={setReverseIp}
+              reverseResult={reverseResult}
+              onRunReverseLookup={() => {
+                void runReverseLookup();
+              }}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              data={data}
+              onSelectAgent={(agentId) => setSelectedAgentId(agentId)}
+            />
+          </>
         ) : activeTab === "terminal" ? (
           <TerminalTabPanel
             terminalCategory={terminalCategory}
