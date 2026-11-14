@@ -73,7 +73,10 @@ export type ProbeParam =
   | "periodNumber"
   | "periods"
   | "rotOrder"
-  | "placeLateFlag";
+  | "placeLateFlag"
+  // Customer front-end graded-wager read (`getWagersByFigureDate`): wire-observed sort pair.
+  | "sort"
+  | "typeSort";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -265,8 +268,21 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     operation: "getWagersByFigureDate",
     method: "POST",
     readOnly: true,
-    note: "customer-admin performance tab & daily-figures drill-down (report.js:46608,60279: customerID, figureDate, graded, operation, RRO)",
-    params: ["customerID", "figureDate", "graded", "token", "operation", "RRO"],
+    note: "customer-admin performance tab & daily-figures drill-down (2026-11-13 request: agentID, agentOwner, customerID, date, figureDate, graded, path, RRO, sort, typeSort, week)",
+    params: [
+      "agentID",
+      "agentOwner",
+      "customerID",
+      "date",
+      "figureDate",
+      "graded",
+      "operation",
+      "RRO",
+      "sort",
+      "token",
+      "typeSort",
+      "week",
+    ],
     defaultPrefix: "/cloud/api/Report",
   },
   {
@@ -1174,6 +1190,8 @@ export interface ProbeBodyOptions {
   readonly periods?: string;
   readonly rotOrder?: string;
   readonly placeLateFlag?: string;
+  readonly sort?: string;
+  readonly typeSort?: string;
 }
 
 function resolveParamMap(
@@ -1294,6 +1312,10 @@ function resolveParamMap(
       out[name] = "true";
     } else if (name === "figureDate") {
       out[name] = "__DATE__";
+    } else if (name === "sort") {
+      out[name] = options.sort ?? "1";
+    } else if (name === "typeSort") {
+      out[name] = options.typeSort ?? "2";
     } else if (name === "graded") {
       out[name] = "1";
     } else if (name === "sortCustom") {
