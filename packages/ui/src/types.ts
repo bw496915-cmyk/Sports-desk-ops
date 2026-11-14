@@ -99,6 +99,8 @@ export interface ShowcaseCustomer {
   readonly shadowCopyMultiplier: number;
   readonly action: string;
   readonly ipAddress: string;
+  /** Fields the source does not carry, so the UI can render "—" instead of a measured zero. */
+  readonly unknown?: readonly string[];
 }
 
 export interface RankedPlayer30d {

@@ -84,11 +84,20 @@ export function bookRowsToProfiles(
       : 0;
     const sd = Math.sqrt(variance);
     const cv = meanStake > 0 ? sd / meanStake : 0;
-    const score = clamp(num(row.sharp_score) / 10, 0, 10);
+    const rawSharp = Number(row.sharp_score);
+    const sharpKnown = Number.isFinite(rawSharp);
+    const score = sharpKnown ? clamp(rawSharp / 10, 0, 10) : 0;
     const clvScore = clamp(num(row.clv_bps) / 100, -10, 10);
     const delay = num(row.delay_seconds);
     const league = topKey(tickets, "league");
     const market = topKey(tickets, "market");
+
+    const unknown: string[] = [];
+    if (!sharpKnown) unknown.push("sharpness");
+    if (stakes.length === 0) unknown.push("sizing", "gini", "var95");
+    if (!league && !market) unknown.push("specialization");
+    // The book carries no syndicate or correlation signal at all.
+    unknown.push("syndicate", "correlation");
 
     return {
       id,
@@ -124,6 +133,7 @@ export function bookRowsToProfiles(
       shadowCopyMultiplier: 1,
       action: score >= 7 ? "ALERT_OPERATOR" : "ACCEPT_NORMAL",
       ipAddress: String(row.ip_subnet ?? "—"),
+      unknown,
     };
   });
 }

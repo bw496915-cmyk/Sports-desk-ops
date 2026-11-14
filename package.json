@@ -359,7 +359,8 @@
     "build:ws": "bun run scripts/build_dashboard.ts",
     "pack:check": "bun run scripts/check_workspace_packs.ts",
     "validate:dashboard": "bun scripts/validate_dashboard_config.ts",
-    "desk:preview": "bun scripts/dashboard_preview.ts"
+    "desk:preview": "bun scripts/dashboard_preview.ts",
+    "desk:preview:up": "bash scripts/bring_up_preview.sh"
   },
   "keywords": [
     "sportsdesk",

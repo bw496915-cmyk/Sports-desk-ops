@@ -455,14 +455,26 @@ export function CustomersTabPanel({
                               : cust.score >= 7.0
                                 ? "⚠️ "
                                 : "✅ "}
-                          {cust.score.toFixed(1)} ·{" "}
-                          {cust.tier.replace("TIER_", "T")}
+                          {cust.unknown?.includes("sharpness")
+                            ? "—"
+                            : cust.score.toFixed(1)}{" "}
+                          ·{" "}
+                          {cust.unknown?.includes("sharpness")
+                            ? "UNKNOWN"
+                            : cust.tier.replace("TIER_", "T")}
                         </span>
                       </td>
                       <td style={styles.td}>
-                        <div>{cust.sizingStrategy}</div>
+                        <div>
+                          {cust.unknown?.includes("sizing")
+                            ? "—"
+                            : cust.sizingStrategy}
+                        </div>
                         <div style={styles.custSub}>
-                          Gini: {cust.gini.toFixed(3)}
+                          Gini:{" "}
+                          {cust.unknown?.includes("gini")
+                            ? "—"
+                            : cust.gini.toFixed(3)}
                         </div>
                       </td>
                       <td style={styles.td}>
@@ -566,7 +578,10 @@ export function CustomersTabPanel({
                   </a>
                   <span style={styles.tierBadge(selectedCustomer.tier)}>
                     {selectedCustomer.tier} (Score:{" "}
-                    {selectedCustomer.score.toFixed(1)}/10.0)
+                    {selectedCustomer.unknown?.includes("sharpness")
+                      ? "—"
+                      : selectedCustomer.score.toFixed(1)}
+                    /10.0)
                   </span>
                 </div>
               </div>
@@ -652,7 +667,12 @@ export function CustomersTabPanel({
                     Strategy: <b>{selectedCustomer.sizingStrategy}</b>
                   </div>
                   <div>
-                    Gini Inequality: <b>{selectedCustomer.gini}</b>
+                    Gini Inequality:{" "}
+                    <b>
+                      {selectedCustomer.unknown?.includes("gini")
+                        ? "—"
+                        : selectedCustomer.gini}
+                    </b>
                   </div>
                   <div>
                     Mean Stake:{" "}

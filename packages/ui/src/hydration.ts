@@ -116,13 +116,21 @@ export function formatProvenanceBadge(
 
   switch (provenance.kind) {
     case "live":
-    case "capture":
       return {
         badgeText: "● LIVE CAPTURE",
         fg: "#4ade80",
         bg: "rgba(34, 197, 94, 0.14)",
         border: "rgba(34, 197, 94, 0.4)",
         isLive: true,
+        detail,
+      };
+    case "capture":
+      return {
+        badgeText: "● LOCAL CAPTURE",
+        fg: "#4ade80",
+        bg: "rgba(34, 197, 94, 0.14)",
+        border: "rgba(34, 197, 94, 0.4)",
+        isLive: false,
         detail,
       };
     case "fixture":

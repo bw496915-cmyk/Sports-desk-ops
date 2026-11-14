@@ -52,6 +52,58 @@ describe("bookRowsToProfiles", () => {
     expect(profile?.holdPct).toBe(-15);
   });
 
+  test("sharp_score is a 0-100 value divided by ten", () => {
+    // Assert the unit so a row that is already 0-10 cannot silently be divided twice.
+    expect(bookRowsToProfiles([row])[0]?.score).toBe(8.15);
+  });
+
+  test("empty tickets mark sizing, Gini, VaR and specialization unknown", () => {
+    const [empty] = bookRowsToProfiles([{ ...row, recent_tickets: [] }]);
+    expect(empty?.meanStake).toBe(0);
+    expect(empty?.unknown).toContain("sizing");
+    expect(empty?.unknown).toContain("gini");
+    expect(empty?.unknown).toContain("var95");
+    expect(empty?.specialization).toBe("STEAM_CHASER");
+  });
+
+  test("a missing sharp_score does not produce NaN", () => {
+    const bare = { ...row, sharp_score: undefined, recent_tickets: [] };
+    const [profile] = bookRowsToProfiles([bare]);
+    expect(Number.isNaN(profile?.score)).toBe(false);
+    expect(profile?.score).toBe(0);
+    expect(profile?.unknown).toContain("sharpness");
+  });
+
+  test("a measured zero score is not marked unknown", () => {
+    const [zero] = bookRowsToProfiles([{ ...row, sharp_score: 0 }]);
+    expect(zero?.score).toBe(0);
+    expect(zero?.unknown).not.toContain("sharpness");
+  });
+
+  test("a single ticket is its own most common league and market", () => {
+    const [single] = bookRowsToProfiles([
+      {
+        ...row,
+        recent_tickets: [{ league: "NBA", market: "TOTAL", risk_usd: 100 }],
+      },
+    ]);
+    expect(single?.specialization).toBe("NBA TOTAL");
+    expect(single?.gini).toBe(0);
+  });
+
+  test("a tie keeps the first-seen league", () => {
+    const [tie] = bookRowsToProfiles([
+      {
+        ...row,
+        recent_tickets: [
+          { league: "CFB", market: "SPREAD", risk_usd: 100 },
+          { league: "NFL", market: "TOTAL", risk_usd: 100 },
+        ],
+      },
+    ]);
+    expect(tie?.specialization).toBe("CFB SPREAD");
+  });
+
   test("marks fields the book does not carry as none, not a guess", () => {
     expect(profile?.syndicateRisk).toBe("LOW");
     expect(profile?.syndicateProb).toBe(0);
