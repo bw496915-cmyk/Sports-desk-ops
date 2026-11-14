@@ -510,10 +510,25 @@ else
   fail monorepo-memory "install=$mono_ok peak=${rss_mb:-?} MB"
 fi
 
+# ---- P28: prerelease publish is refused without a tag (no auth needed) ------
+# The refusal is a local check: it fires before Bun looks for credentials, which
+# makes it testable on a machine with no registry access.
+mkproj "$ROOT/p28" '{"name":"probe-prerelease-xyz","version":"2.0.0-beta.1"}'
+set +e
+pre_out="$(cd "$ROOT/p28" && bun publish --dry-run 2>&1)"; pre_code=$?
+pre_tag_out="$(cd "$ROOT/p28" && bun publish --dry-run --tag next 2>&1)"; pre_tag_code=$?
+set -e
+refused=$(printf '%s' "$pre_out" | grep -q "prerelease needs a tag" && printf '%s' "$pre_out" | grep -q "would become .latest." && echo yes || echo no)
+tag_bypassed=$(printf '%s' "$pre_tag_out" | grep -q "prerelease needs a tag" && echo no || echo yes)
+if [ "$pre_code" -ne 0 ] && [ "$pre_tag_code" -ne 0 ] && [ "$refused" = yes ] && [ "$tag_bypassed" = yes ]; then
+  pass publish-prerelease "2.0.0-beta.1 refused without a tag; --tag next moves past the check (fails later on auth)"
+else
+  fail publish-prerelease "code=$pre_code/$pre_tag_code refused=$refused tagBypassed=$tag_bypassed"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
-skip publish-registry "needs a reachable registry + auth; manual: bun publish --dry-run"
-skip publish-prerelease "needs auth; manual: set version 2.0.0-beta.1 and bun publish (expect refusal without --tag)"
+skip publish-registry "publish fails at auth/packing before any registry contact can be observed; needs a real registry"
 
 echo
 printf 'summary: %d pass, %d fail, %d skip (of %d probes)\n' "$PASS" "$FAIL" "$SKIP" "$((PASS+FAIL+SKIP))"
