@@ -260,6 +260,141 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     }
   }, 60_000);
 
+  test("exports wins only with loader:'object'; contents wins otherwise", async () => {
+    const root = project();
+    writeFileSync(join(root, "entry.ts"), "export const original = 0;\n");
+    const build = (plugin: unknown) =>
+      Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, `out-${Math.random().toString(36).slice(2)}`),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        plugins: [plugin as any],
+      });
+    const loadWith = (ret: unknown) => ({
+      name: "precedence",
+      setup(build: any) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        build.onLoad({ filter: /entry\.ts$/ }, () => ret as any);
+      },
+    });
+    try {
+      // object loader: exports defines the module, contents ignored
+      const objectBuild = await build(
+        loadWith({ contents: "export const x = 1;", exports: { y: 2 }, loader: "object" }),
+      );
+      expect(objectBuild.success).toBe(true);
+      const objectJs = await Bun.file(objectBuild.outputs[0]!.path).text();
+      expect(objectJs).toContain("y = 2");
+      expect(objectJs).not.toContain("x = 1");
+
+      // js loader: contents wins, exports ignored
+      const jsBuild = await build(
+        loadWith({ contents: "export const x = 1;", exports: { y: 2 }, loader: "js" }),
+      );
+      expect(jsBuild.success).toBe(true);
+      const jsOut = await Bun.file(jsBuild.outputs[0]!.path).text();
+      expect(jsOut).toContain("x = 1");
+      expect(jsOut).not.toContain("y = 2");
+
+      // non-object loader without contents: exports alone is not enough
+      let error: Error | undefined;
+      try {
+        await build(loadWith({ exports: { y: 2 }, loader: "js" }));
+      } catch (e) {
+        error = e as Error;
+      }
+      expect(error).toBeInstanceOf(Error);
+      const details = [...((error as AggregateError).errors ?? [])]
+        .map((e) => (e as Error).message)
+        .join("; ");
+      expect(details).toContain("contents");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("object exports tree-shakes named imports like the default toml loader", async () => {
+    const root = project();
+    writeFileSync(
+      join(root, "slab.toml"),
+      '[meta]\nschema = "v1"\n\n[unsafe]\nallowed = false\n\n[capacity]\nticker_window_bytes = 4096\n',
+    );
+    writeFileSync(join(root, "a.ts"), 'import { meta } from "./slab.toml";\nconsole.log(JSON.stringify(meta));\n');
+    writeFileSync(join(root, "b.ts"), 'import { meta } from "virt";\nconsole.log(JSON.stringify(meta));\n');
+    try {
+      const a = await Bun.build({
+        entrypoints: [join(root, "a.ts")],
+        outdir: join(root, "out-a"),
+        target: "bun",
+      });
+      const b = await Bun.build({
+        entrypoints: [join(root, "b.ts")],
+        outdir: join(root, "out-b"),
+        target: "bun",
+        plugins: [
+          {
+            name: "virt",
+            setup(build) {
+              build.onResolve({ filter: /^virt$/ }, () => ({ path: "virt", namespace: "v" }));
+              build.onLoad({ filter: /.*/, namespace: "v" }, () => ({
+                exports: {
+                  meta: { schema: "v1" },
+                  unsafe: { allowed: false },
+                  capacity: { ticker_window_bytes: 4096 },
+                },
+                loader: "object",
+              }));
+            },
+          },
+        ],
+      });
+      expect(a.success && b.success).toBe(true);
+      const A = await Bun.file(join(root, "out-a/a.js")).text();
+      const B = await Bun.file(join(root, "out-b/b.js")).text();
+      for (const js of [A, B]) {
+        expect(js).toContain("v1");
+        expect(js).not.toContain("allowed");
+        expect(js).not.toContain("ticker_window_bytes");
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("external keeps a virtual import, via config and via onResolve", async () => {
+    const root = project();
+    writeFileSync(join(root, "entry.ts"), 'import "virt-ext";\nconsole.log("x");\n');
+    try {
+      const viaConfig = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, "out-config"),
+        external: ["virt-ext"],
+      });
+      expect(viaConfig.success).toBe(true);
+      expect(await Bun.file(join(root, "out-config/entry.js")).text()).toContain("virt-ext");
+
+      const viaResolve = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, "out-resolve"),
+        plugins: [
+          {
+            name: "ext",
+            setup(build) {
+              build.onResolve({ filter: /^virt-ext$/ }, () => ({
+                path: "virt-ext",
+                external: true,
+              }));
+            },
+          },
+        ],
+      });
+      expect(viaResolve.success).toBe(true);
+      expect(await Bun.file(join(root, "out-resolve/entry.js")).text()).toContain("virt-ext");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   test("onStart is awaited before building", async () => {
     const root = project();
     const marks: string[] = [];
