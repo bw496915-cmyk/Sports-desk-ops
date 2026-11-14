@@ -243,7 +243,7 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(html).toContain("↻ Refresh");
     expect(html).toContain("c-ares: 1.2ms");
     expect(html).toContain("📝 Surveillance Brief");
-    expect(html).toContain("Bun.markdown.html()");
+    expect(html).toContain("native markdown");
     expect(html).toContain("⧉ Copy MD");
     expect(html).toContain("# Live Desk Status");
   });
