@@ -302,6 +302,39 @@ else
   fail audit-prod "dev excluded=$dev_excluded, prod kept=$prod_kept"
 fi
 
+# ---- P18: --omit is selective per dependency type and repeatable ------------
+audit_exit() { # audit_exit <dir> <flags...>
+  local dir="$1"; shift
+  ( cd "$dir" && bun audit "$@" >/dev/null 2>&1 ); echo $?
+}
+mkproj "$ROOT/p18a" '{"name":"p18a","version":"1.0.0","optionalDependencies":{"lodash":"4.17.20"}}'
+run bash -c "cd '$ROOT/p18a' && bun install"
+opt_plain="$(audit_exit "$ROOT/p18a")"
+opt_omit="$(audit_exit "$ROOT/p18a" --omit=optional)"
+mkproj "$ROOT/p18b" '{"name":"p18b","version":"1.0.0","peerDependencies":{"lodash":"4.17.20"}}'
+run bash -c "cd '$ROOT/p18b' && bun install"
+peer_plain="$(audit_exit "$ROOT/p18b")"
+peer_omit="$(audit_exit "$ROOT/p18b" --omit=peer)"
+# dev + optional: omitting optional must still catch the dev copy, and both omits
+# together must clear it.
+# Distinct packages per group: the same spec in both groups collapses to one
+# instance, and --omit=optional then removes the dev copy too (measured).
+mkproj "$ROOT/p18c" '{"name":"p18c","version":"1.0.0","devDependencies":{"lodash":"4.17.20"},"optionalDependencies":{"ws":"5.2.1"}}'
+run bash -c "cd '$ROOT/p18c' && bun install"
+both_plain="$(audit_exit "$ROOT/p18c")"
+omit_opt_only="$(audit_exit "$ROOT/p18c" --omit=optional)"
+omit_both="$(audit_exit "$ROOT/p18c" --omit=optional --omit=dev)"
+prod_equiv="$(audit_exit "$ROOT/p18c" --prod)"
+dev_equiv="$(audit_exit "$ROOT/p18c" --omit=dev)"
+if [ "$opt_plain" = 1 ] && [ "$opt_omit" = 0 ] \
+   && [ "$peer_plain" = 1 ] && [ "$peer_omit" = 0 ] \
+   && [ "$both_plain" = 1 ] && [ "$omit_opt_only" = 1 ] && [ "$omit_both" = 0 ] \
+   && [ "$prod_equiv" = "$dev_equiv" ]; then
+  pass audit-omit "optional/peer each excluded; dev still caught; both omits clear; --prod == --omit=dev"
+else
+  fail audit-omit "opt $opt_plain/$opt_omit peer $peer_plain/$peer_omit dev+opt $both_plain/$omit_opt_only/$omit_both prod==dev? $prod_equiv/$dev_equiv"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip migrate-speed "needs a ~20k-entry yarn.lock; manual: time bun pm migrate"
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
