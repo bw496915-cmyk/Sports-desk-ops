@@ -360,7 +360,9 @@
     "build:ws": "bun run scripts/build_dashboard.ts",
     "pack:check": "bun run scripts/check_workspace_packs.ts",
     "naming:fitness": "bun scripts/naming_fitness.ts",
-    "venue:table": "bun scripts/venue_registry_table.ts"
+    "venue:table": "bun scripts/venue_registry_table.ts",
+    "audit:deps": "bun audit",
+    "audit:deps:json": "bun audit --json"
   },
   "keywords": [
     "sportsdesk",
