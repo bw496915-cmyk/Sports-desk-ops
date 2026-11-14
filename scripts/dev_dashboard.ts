@@ -7,7 +7,9 @@
  * HTML/JS/CSS asset serving (`src/dashboard/index.html`), and workspace HMR file watchers.
  *
  * Pass `--api-only` (or `startDashboardServer({ apiOnly: true })`) via `bun run dev:api` to run
- * the API & WebSocket router without HTML bundling or UI file watchers.
+ * the API & WebSocket router without HTML bundling or UI file watchers. Set
+ * `SPORTSDESK_DATA_DIR` to read `data/live-wagers.json`, `data/live-bets.json` and the
+ * gitignored enriched book from another checkout (a worktree has none of them).
  */
 
 import {
@@ -216,6 +218,9 @@ export function startDashboardServer(
   options: DashboardServerOptions = {},
 ): DashboardServerHandle {
   const cwd = process.cwd();
+  // Captures and the gitignored enriched book live outside a worktree's tracked files.
+  // Point SPORTSDESK_DATA_DIR at another checkout to read them in place.
+  const dataDir = Bun.env.SPORTSDESK_DATA_DIR?.trim() || cwd;
   const port =
     options.port !== undefined ? options.port : Number(Bun.env.PORT) || 4022;
   const hostname = options.hostname ?? "127.0.0.1";
@@ -245,7 +250,7 @@ export function startDashboardServer(
   });
   const { buildLiveWagersPayload, clearCache: clearWagersCache } =
     createDevLiveWagersLoader({
-      cwd,
+      cwd: dataDir,
       loadSharpDeps: async () => {
         const [{ parseShortDesc: parseDesc }, { KEY_NUMBER_BUYER_PROFILES }] =
           await Promise.all([
@@ -263,7 +268,7 @@ export function startDashboardServer(
       },
     });
   const betTickerService = createBetTickerService({
-    cwd,
+    cwd: dataDir,
     parseShortDesc,
     getSharpCustomerIds: async () => {
       const { KEY_NUMBER_BUYER_PROFILES } =
@@ -431,7 +436,7 @@ export function startDashboardServer(
                 ),
               ),
               jsonReader.readCachedJson<Array<Record<string, unknown>>>(
-                resolve(cwd, "enriched_customers_full.json"),
+                resolve(dataDir, "enriched_customers_full.json"),
               ),
             ]);
           const backtestJson = backtestCached?.value ?? {
