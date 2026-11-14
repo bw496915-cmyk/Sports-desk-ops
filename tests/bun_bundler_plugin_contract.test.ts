@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { Loader } from "bun";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,7 +33,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     // The page's onLoad callback type shows only { path, defer }; installed
     // bun-types also pass namespace and the default loader, measured here.
     const loads: Array<{ namespace: string; loader: string }> = [];
-    const loaders = [
+    // Typed against Bun's own Loader union: the published page omits "xml", but
+    // installed bun-types 1.4.4 include it and this repo imports XML fixtures with
+    // { type: "xml" }. If Bun ever drops the name, this line fails to compile.
+    const loaders: readonly Loader[] = [
       "js",
       "jsx",
       "ts",
@@ -85,8 +89,7 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
                                 : loader === "html"
                                   ? "<p>hi</p>"
                                   : "content";
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  return { contents, loader: loader as any };
+                  return { contents, loader };
                 });
               },
             },
