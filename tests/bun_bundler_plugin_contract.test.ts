@@ -104,6 +104,87 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     }
   }, 120_000);
 
+  test("onResolve args and external are wider than the page type", async () => {
+    // Page: args { path, importer }; return { path, namespace? } | void.
+    // Measured: args also carry kind, namespace and resolveDir; returning
+    // external: true keeps the import out of the bundle.
+    const root = project();
+    let argKeys: string[] = [];
+    writeFileSync(
+      join(root, "entry.ts"),
+      'import "virt-ext";\nimport { x } from "virt-rs";\nconsole.log(x);\n',
+    );
+    try {
+      const result = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, "out"),
+        plugins: [
+          {
+            name: "resolve-shape",
+            setup(build) {
+              build.onResolve({ filter: /^virt-ext$/ }, () => ({
+                path: "virt-ext",
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ...({ external: true } as any),
+              }));
+              build.onResolve({ filter: /^virt-rs$/ }, (args) => {
+                argKeys = Object.keys(args).sort();
+                return { path: "virt-rs", namespace: "v" };
+              });
+              build.onLoad({ filter: /.*/, namespace: "v" }, () => ({
+                contents: "export const x = 1;",
+                loader: "js",
+              }));
+            },
+          },
+        ],
+      });
+      expect(result.success).toBe(true);
+      for (const key of ["importer", "kind", "namespace", "path", "resolveDir"]) {
+        expect(argKeys).toContain(key);
+      }
+      const js = await Bun.file(join(root, "out/entry.js")).text();
+      expect(js).toContain('"virt-ext"');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("binary contents are accepted and onBeforeParse exists", async () => {
+    // Page: contents?: string and no onBeforeParse on PluginBuilder. Installed
+    // types allow buffers and declare onBeforeParse; measured both hold.
+    const root = project();
+    writeFileSync(join(root, "entry.ts"), 'import { x } from "virt-bin";\nconsole.log(x);\n');
+    let beforeParse = "absent";
+    try {
+      const result = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, "out"),
+        plugins: [
+          {
+            name: "binary",
+            setup(build) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              beforeParse = typeof (build as any).onBeforeParse;
+              build.onResolve({ filter: /^virt-bin$/ }, () => ({
+                path: "virt-bin",
+                namespace: "v",
+              }));
+              build.onLoad({ filter: /.*/, namespace: "v" }, () => ({
+                contents: new TextEncoder().encode("export const x = 3;"),
+                loader: "js",
+              }));
+            },
+          },
+        ],
+      });
+      expect(result.success).toBe(true);
+      expect(beforeParse).toBe("function");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   test("onStart is awaited before building", async () => {
     const root = project();
     const marks: string[] = [];
