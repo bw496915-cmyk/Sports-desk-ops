@@ -229,6 +229,18 @@ else
   fail frozen-lockfile-names-dep "exit $frozen_code; error did not name the added dependency"
 fi
 
+# ---- P14: --filter narrows the recursive set, and a bad filter fails loudly --
+set +e
+filter_ok="$(cd "$ROOT/p12" && bun publish --filter 'p12a' 2>&1)"; filter_ok_code=$?
+filter_bad="$(cd "$ROOT/p12" && bun publish --filter 'nomatch*' 2>&1)"; filter_bad_code=$?
+set -e
+if [ "$filter_ok_code" -eq 0 ] && printf '%s' "$filter_ok" | grep -q "skipped p12a: private" \
+   && [ "$filter_bad_code" -eq 1 ] && printf '%s' "$filter_bad" | grep -q "No workspace packages matched"; then
+  pass publish-filter "match: exit 0 + skipped by name; no-match: exit 1 + named error"
+else
+  fail publish-filter "filter match exit $filter_ok_code, no-match exit $filter_bad_code"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip migrate-speed "needs a ~20k-entry yarn.lock; manual: time bun pm migrate"
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
