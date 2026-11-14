@@ -10,10 +10,12 @@
  * `lib/dashboard_static.ts`, shared with the daemon's `/app` route. This script only adds the API
  * proxy and the TLS opt-in.
  */
+import { pickApiTarget } from "../lib/dashboard_preview_routing.ts";
 import { serveDashboardAsset } from "../lib/dashboard_static.ts";
 
 const PORT = Number(process.env.PORT ?? 4174);
 const API = process.env.DESK_API ?? "http://127.0.0.1:4020";
+const FEEDS_API = process.env.DASH_API_FEEDS ?? "";
 const ROOT = process.env.DASHBOARD_ROOT ?? "dist/dashboard";
 const TLS_KEY = process.env.DASH_PREVIEW_TLS_KEY;
 const TLS_CERT = process.env.DASH_PREVIEW_TLS_CERT;
@@ -35,7 +37,11 @@ const server = Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
     if (url.pathname.startsWith("/api/") || url.pathname === "/health") {
-      return fetch(API + url.pathname + url.search, {
+      const target = pickApiTarget(url.pathname, {
+        api: API,
+        feedsApi: FEEDS_API,
+      });
+      return fetch(target + url.pathname + url.search, {
         method: req.method,
         headers: req.headers,
         body:
@@ -48,5 +54,5 @@ const server = Bun.serve({
 });
 
 console.log(
-  `preview → ${server.url.href}  (api → ${API}, tls=${tls ? "on" : "off"}, root=${ROOT})`,
+  `preview → ${server.url.href}  (api → ${API}${FEEDS_API ? `, feeds → ${FEEDS_API}` : ""}, tls=${tls ? "on" : "off"}, root=${ROOT})`,
 );
