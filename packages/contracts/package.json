@@ -2,6 +2,16 @@
   "name": "@sportsdesk-ops/contracts",
   "version": "0.1.0",
   "description": "Shared SportsDesk contracts: wager tokens, slice metrics/registry, shadow pricing, feature flags, dashboard hydration.",
+  "keywords": [
+    "sportsdesk",
+    "contracts",
+    "wager",
+    "types",
+    "bun"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
