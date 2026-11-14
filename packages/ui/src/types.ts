@@ -7,6 +7,7 @@ import type {
   BetTickerTypeBucket,
   CustomersApiResponse,
   CustomersCohortsSummary,
+  Daemon4020State,
   Daemon4020Status,
   DashboardFeedProvenanceKind,
   DashboardSourceProvenance,
@@ -15,6 +16,7 @@ import type {
   R2PipelineApiResponse,
   R2SinkDetail,
   WagerTier,
+  WagersWireContractSummary,
 } from "@sportsdesk-ops/contracts";
 
 export type {
@@ -26,6 +28,7 @@ export type {
   BetTickerTypeBucket,
   CustomersApiResponse,
   CustomersCohortsSummary,
+  Daemon4020State,
   Daemon4020Status,
   DashboardFeedProvenanceKind,
   DashboardSourceProvenance,
@@ -33,11 +36,16 @@ export type {
   LiveWagersApiResponse,
   R2PipelineApiResponse,
   R2SinkDetail,
+  WagersWireContractSummary,
 };
 
 export interface DashboardData {
   readonly markdown: string;
   readonly html: string;
+  readonly renderDurationMs?: number;
+  readonly markdownBytes?: number;
+  readonly htmlBytes?: number;
+  readonly nonAsciiChars?: number;
   readonly updatedAt: string;
 }
 
@@ -50,9 +58,12 @@ export interface DnsData {
     readonly cacheHitsInflight: number;
     readonly cacheMisses: number;
     readonly defaultTtlSeconds: number;
+    readonly errors?: number;
+    readonly totalCount?: number;
   };
   readonly hosts?: readonly {
     readonly hostname: string;
+    readonly port?: number;
     readonly serviceName?: string;
   }[];
   readonly coreHosts?: readonly {
@@ -60,6 +71,34 @@ export interface DnsData {
     readonly port?: number;
     readonly serviceName?: string;
   }[];
+  readonly updatedAt?: string;
+  readonly generatedAt?: string;
+}
+
+export interface CustomerPortalReconciliation {
+  readonly creditLimitUsd: number;
+  readonly currentBalanceUsd: number;
+  readonly pendingWagerBalanceUsd: number;
+  readonly pendingWagerCount: number;
+  readonly availableBalanceUsd: number;
+  readonly creditEquationBalanced: boolean;
+  readonly carryOverUsd: number;
+  readonly previousBalanceUsd: number;
+  readonly carryOverParityMatched: boolean;
+  readonly carryOverWindow: string;
+  readonly postCarryOverWindow: string;
+  readonly postCarryOverNetUsd: number;
+  readonly net31dUsd: number;
+  readonly activeDays31d: number;
+  readonly winDays31d: number;
+  readonly lossDays31d: number;
+  readonly wagerLimitUsd: number;
+  readonly settleFigureUsd: number;
+  readonly confirmationDelaySec: number;
+  readonly wiseLineMovementWeight: number;
+  readonly inetTarget: string;
+  readonly assignedParlayName: string;
+  readonly postureFlags: readonly string[];
 }
 
 export interface ShowcaseCustomer {
@@ -99,6 +138,7 @@ export interface ShowcaseCustomer {
   readonly shadowCopyMultiplier: number;
   readonly action: string;
   readonly ipAddress: string;
+  readonly portalReconciliation?: CustomerPortalReconciliation | undefined;
 }
 
 export interface RankedPlayer30d {
@@ -159,35 +199,48 @@ export interface DashboardAlertRecord {
   readonly status: "queued" | "delivered" | "dead" | "acknowledged";
   readonly payload: {
     readonly customerId: string;
-    readonly sport?: string;
-    readonly event?: string;
-    readonly selection?: string;
-    readonly oddsAmerican?: string;
-    readonly amountUsd?: number;
-    readonly clvCents?: number;
-    readonly directive?: string;
+    readonly sport?: string | undefined;
+    readonly event?: string | undefined;
+    readonly selection?: string | undefined;
+    readonly oddsAmerican?: string | undefined;
+    readonly amountUsd?: number | undefined;
+    readonly clvCents?: number | undefined;
+    readonly directive?: string | undefined;
   };
   readonly createdAt: string;
   readonly updatedAt: string;
-  readonly attempts?: number;
-  readonly finalError?: string;
-  readonly retriedFrom?: string;
-  readonly acknowledgedBy?: string;
-  readonly acknowledgedNotes?: string;
-  readonly messageId?: number;
+  readonly attempts?: number | undefined;
+  readonly finalError?: string | undefined;
+  readonly retriedFrom?: string | undefined;
+  readonly acknowledgedBy?: string | undefined;
+  readonly acknowledgedNotes?: string | undefined;
+  readonly messageId?: number | undefined;
 }
 
 export interface HealthData {
-  readonly status: "ok" | "warning" | "degraded";
+  readonly status: "ok" | "warning" | "degraded" | "healthy" | "down";
+  readonly operationalStatus?: "ok" | "degraded" | "down" | undefined;
+  readonly dataStatus?: "ok" | "stale" | undefined;
+  readonly httpStatus?: number | undefined;
   readonly uptimeSeconds: number;
-  readonly alerts?: {
-    readonly status: "ok" | "warning" | "degraded";
-    readonly queued: number;
-    readonly delivered: number;
-    readonly dead: number;
-    readonly backlog: number;
-    readonly acknowledged?: number;
-  };
+  readonly alerts?:
+    | {
+        readonly status: "ok" | "warning" | "degraded";
+        readonly queued: number;
+        readonly delivered: number;
+        readonly dead: number;
+        readonly backlog: number;
+        readonly acknowledged?: number | undefined;
+      }
+    | undefined;
+  readonly degradedReasons?:
+    | readonly {
+        readonly message: string;
+        readonly kind: string;
+        readonly severity: string;
+        readonly action?: string | undefined;
+      }[]
+    | undefined;
 }
 
 export interface ShiftSummaryData {

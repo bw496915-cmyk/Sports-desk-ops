@@ -28,7 +28,8 @@ import {
   type WsLike,
 } from "./ws.ts";
 
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+type HttpMethod =
+  "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
 
 type SimpleMethodHandlers = {
   readonly [M in HttpMethod]?: (req: Request) => Response | Promise<Response>;
@@ -53,6 +54,32 @@ function defaultEncodeResponse(
       ...spec.headers,
     },
   });
+}
+
+/**
+ * Merge the wagers-tab policy stamp into a live-wagers payload.
+ *
+ * The stamp is read from `packages/ui/src/config/wagers.toml` at request time,
+ * so `curl -s :4021/api/wagers | jq -r .policy_version` is a stable probe that
+ * survives rebuilds (unlike a bundle content hash). A missing/invalid policy
+ * file must not take the feed down: the payload is returned unstamped.
+ */
+async function withWagersTabPolicy(
+  deps: DashboardApiDeps,
+  payload: object,
+): Promise<object> {
+  const readPolicy = deps.getWagersTabPolicy;
+  if (!readPolicy) return payload;
+  try {
+    const stamp = await readPolicy();
+    return stamp ? { ...payload, ...stamp } : payload;
+  } catch (err) {
+    console.warn(
+      "[api] wagers tab policy stamp unavailable:",
+      err instanceof Error ? err.message : err,
+    );
+    return payload;
+  }
 }
 
 /**
@@ -108,6 +135,52 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
       },
     },
 
+    "/mcp": {
+      GET: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : Response.json(
+              { error: "MCP endpoint not configured" },
+              { status: 404 },
+            ),
+      HEAD: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : new Response(null, { status: 404 }),
+      POST: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : Response.json(
+              { error: "MCP endpoint not configured" },
+              { status: 404 },
+            ),
+      PUT: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : Response.json(
+              { error: "MCP endpoint not configured" },
+              { status: 404 },
+            ),
+      PATCH: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : Response.json(
+              { error: "MCP endpoint not configured" },
+              { status: 404 },
+            ),
+      DELETE: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : Response.json(
+              { error: "MCP endpoint not configured" },
+              { status: 404 },
+            ),
+      OPTIONS: (req: Request) =>
+        deps.handleMcp
+          ? deps.handleMcp(req)
+          : new Response(null, { status: 204 }),
+    },
+
     "/api/auth/login": {
       POST: (req: Request) => deps.auth.login(req),
     },
@@ -134,6 +207,18 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
         const payload = {
           markdown: rendered.markdown,
           html: rendered.html,
+          ...(rendered.renderDurationMs !== undefined
+            ? { renderDurationMs: rendered.renderDurationMs }
+            : {}),
+          ...(rendered.markdownBytes !== undefined
+            ? { markdownBytes: rendered.markdownBytes }
+            : {}),
+          ...(rendered.htmlBytes !== undefined
+            ? { htmlBytes: rendered.htmlBytes }
+            : {}),
+          ...(rendered.nonAsciiChars !== undefined
+            ? { nonAsciiChars: rendered.nonAsciiChars }
+            : {}),
           updatedAt: new Date().toISOString(),
         };
         return encodeResponse(req, {
@@ -318,14 +403,18 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
       GET: async (req: Request): Promise<Response> => {
         const denied = await enforceAuth(req);
         if (denied) return denied;
-        return Response.json(await deps.getLiveWagersPayload());
+        return Response.json(
+          await withWagersTabPolicy(deps, await deps.getLiveWagersPayload()),
+        );
       },
     },
     "/api/live-wagers": {
       GET: async (req: Request): Promise<Response> => {
         const denied = await enforceAuth(req);
         if (denied) return denied;
-        return Response.json(await deps.getLiveWagersPayload());
+        return Response.json(
+          await withWagersTabPolicy(deps, await deps.getLiveWagersPayload()),
+        );
       },
     },
 

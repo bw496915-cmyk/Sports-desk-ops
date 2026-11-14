@@ -5,6 +5,7 @@ import {
   type WsLike,
 } from "@sportsdesk-ops/api";
 import { parseDashboardWsSignal } from "@sportsdesk-ops/contracts";
+import { WAGERS_TABLE } from "../packages/ui/src/config/wagers.ts";
 import { startDashboardServer } from "../scripts/dev_dashboard.ts";
 
 function buildMockDeps(
@@ -498,6 +499,46 @@ describe("@sportsdesk-ops/api in-memory router (zero port bind)", () => {
     });
   });
 
+  test("stamps the wagers-tab policy version on the live-wagers payload (rebuild-independent probe)", async () => {
+    const api = createDashboardApi(
+      buildMockDeps({
+        getWagersTabPolicy: async () => ({
+          policy_version: "wagers-policy/v1",
+          policy_schema: "sportsdesk-wagers-tab/v1",
+        }),
+      }),
+    );
+    const call = (path: string) =>
+      api.fetch(new Request(`http://dashboard.local${path}`));
+
+    for (const path of ["/api/wagers", "/api/live-wagers"]) {
+      const body = (await (await call(path)).json()) as {
+        readonly policy_version?: string;
+        readonly policy_schema?: string;
+        readonly wagers?: unknown;
+      };
+      expect(body.policy_version).toBe("wagers-policy/v1");
+      expect(body.policy_schema).toBe("sportsdesk-wagers-tab/v1");
+      expect(Array.isArray(body.wagers)).toBe(true);
+    }
+  });
+
+  test("keeps the feed serving when the policy stamp read fails", async () => {
+    const api = createDashboardApi(
+      buildMockDeps({
+        getWagersTabPolicy: async () => {
+          throw new Error("policy file unreadable");
+        },
+      }),
+    );
+    const res = await api.fetch(
+      new Request("http://dashboard.local/api/wagers"),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { readonly policy_version?: string };
+    expect(body.policy_version).toBeUndefined();
+  });
+
   test("startDashboardServer({ apiOnly: true }) exposes /health & /api/* without serving UI HTML", async () => {
     const handle = startDashboardServer({
       port: 0,
@@ -513,6 +554,12 @@ describe("@sportsdesk-ops/api in-memory router (zero port bind)", () => {
       expect(taxRes.status).toBe(200);
       const rootRes = await fetch(new URL("/", handle.url));
       expect(rootRes.status).toBe(404);
+
+      // The host wires the real loader, so the committed TOML is the source.
+      const wagersBody = (await (
+        await fetch(new URL("/api/wagers", handle.url))
+      ).json()) as { readonly policy_version?: string };
+      expect(wagersBody.policy_version).toBe(WAGERS_TABLE.policy_tag);
     } finally {
       handle.stop(true);
     }

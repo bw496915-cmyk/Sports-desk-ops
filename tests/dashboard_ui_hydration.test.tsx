@@ -13,6 +13,7 @@ import {
   formatProvenanceBadge,
   hydrateDashboardFeeds,
   LiveWagersTabPanel,
+  normalizeLiveWagersResponse,
   SAMPLE_PROFILE_DATA,
 } from "@sportsdesk-ops/ui";
 
@@ -139,6 +140,46 @@ function buildHydrationApi(options: {
 }
 
 describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero port bind)", () => {
+  test("normalizeLiveWagersResponse carries wire_contract, and drops a malformed block", () => {
+    const base = {
+      wagers: [],
+      provenance: {
+        kind: "capture",
+        label: "Local Capture",
+        sourcePath: "data/live-wagers.json",
+        observedAt: "2026-11-14T00:00:00Z",
+      },
+    };
+    const withContract = normalizeLiveWagersResponse({
+      ...base,
+      wire_contract: {
+        ok: true,
+        registry: "schema/wagers_field_contract.json",
+        capture: "getBetTicker-2026-10-31",
+        capture_sha256: "955c",
+        enum_source: "observed",
+        fields_checked: ["WagerType", "VIP"],
+        rows: 237,
+        skipped_rows: 63,
+        violations: [],
+      },
+    });
+    expect(withContract?.wireContract?.rows).toBe(237);
+    expect(withContract?.wireContract?.skipped_rows).toBe(63);
+    expect(withContract?.wireContract?.enum_source).toBe("observed");
+    expect(withContract?.wireContract?.ok).toBe(true);
+
+    // `ok` must be a boolean; anything else is dropped rather than guessed.
+    const malformed = normalizeLiveWagersResponse({
+      ...base,
+      wire_contract: { ok: "yes", rows: 1 },
+    });
+    expect(malformed?.wireContract).toBeNull();
+
+    // Absent block stays null (a host that does not check the contract).
+    expect(normalizeLiveWagersResponse(base)?.wireContract).toBeNull();
+  });
+
   test("hydrates /api/wagers, /api/customers, and /api/config/tiers end-to-end through createDashboardApi.fetch", async () => {
     const api = buildHydrationApi({ wagerProvenanceKind: "capture" });
     const bundle = await hydrateDashboardFeeds((path) =>
@@ -261,8 +302,49 @@ describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero po
         error: fixtureBundle.customers.error,
       });
       expect(cards.every((c) => c.value === "Unavailable")).toBe(true);
+      expect(cards.every((c) => c.status === "unavailable")).toBe(true);
+      expect(cards.every((c) => c.count === null && c.sharePct === null)).toBe(
+        true,
+      );
       expect(cards[0]?.sub).toContain("HTTP 503");
     }
+
+    const readyCards = deriveCustomerCohortKpiCards({
+      status: "ready",
+      report: {
+        cohorts: {
+          backtestCount: 49,
+          keyNumberSharpsCount: 5,
+          hookSyndicateCount: 5,
+          fixtureCount: 6,
+          fullBookSpecCount: 220,
+          uniqueSurveillanceCount: 500,
+        },
+        backtestTop: [],
+        fixtures: [],
+        provenance: {
+          kind: "capture",
+          label: "Local Capture",
+          sourcePath: "data/live.json",
+          observedAt: "2026-11-14T00:00:00Z",
+        },
+      },
+    });
+    expect(readyCards[0]).toMatchObject({
+      id: "backtest",
+      status: "ready",
+      tone: "sky",
+      count: 49,
+      sharePct: 9.8,
+      filterTier: "ALL",
+    });
+    expect(readyCards[1]).toMatchObject({
+      id: "key-number-sharps",
+      tone: "red",
+      count: 5,
+      sharePct: 1,
+      filterTier: "ELITE",
+    });
 
     const fallbackBadge = formatProvenanceBadge({
       kind: "fallback",

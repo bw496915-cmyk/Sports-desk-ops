@@ -33,6 +33,7 @@ export const LINT_EXT = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 export const ROOT_BLAST_FILES = new Set([
   "package.json",
   "tsconfig.json",
+  "tsconfig.workspaces.json",
   "bun.lock",
   "bunfig.toml",
 ]);
@@ -265,11 +266,22 @@ export function inferTestsForFiles(
       candidates.push("tests/dashboard_config_validation.test.ts");
     }
 
+    if (
+      f === "schema/wagers_field_contract.json" ||
+      f === "scripts/validate_wagers_field_contract.ts"
+    ) {
+      candidates.push(
+        "tests/wagers_field_contract.test.ts",
+        "tests/wagers_field_roundtrip.test.ts",
+      );
+    }
+
     if (f.startsWith("packages/backend/")) {
       candidates.push(
         "tests/dashboard_backend_workspace.test.ts",
         "tests/dashboard_api_inmemory.test.ts",
         "tests/dashboard_ui_hydration.test.tsx",
+        "tests/wagers_field_roundtrip.test.ts",
       );
     } else if (f.startsWith("packages/api/")) {
       candidates.push(

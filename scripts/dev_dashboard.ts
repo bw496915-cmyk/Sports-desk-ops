@@ -55,8 +55,15 @@ import {
 } from "../lib/http_auth.ts";
 import { encodedResponse } from "../lib/http_compression.ts";
 import { parseShortDesc } from "../lib/live_wagers.ts";
+import { isSentinelTickerWriter } from "@sportsdesk-ops/backend";
+import { inspectWagersWireContract } from "../lib/wagers_wire_contract.ts";
+import { loadWagersTabPolicyStamp } from "../lib/wagers_tab_policy.ts";
 import { SUBSPORT_TAXONOMY_CATALOG } from "../lib/market_taxonomy_catalog.ts";
 import { runShadowPricingDashboard } from "../lib/shadow_pricing_engine.ts";
+import {
+  createSportsdeskMcpHttpHandler,
+  resolveMcpAllowedOrigins,
+} from "../lib/sportsdesk_mcp_server.ts";
 import { executeTerminalQuery } from "../lib/terminal_emulator.ts";
 import {
   PROXY_CONDUITS_30D,
@@ -73,6 +80,7 @@ export interface DashboardServerOptions {
   readonly shadowDbPath?: string | undefined;
   readonly forceShadowFixture?: boolean | undefined;
   readonly apiOnly?: boolean | undefined;
+  readonly mcpStateless?: boolean | undefined;
 }
 
 export interface DashboardServerHandle {
@@ -228,6 +236,13 @@ export function startDashboardServer(
   const clients = new Set<ServerWebSocket<undefined>>();
   const watchers: FSWatcher[] = [];
   let serverRef: Server<undefined> | null = null;
+  const isDevelopment = Bun.env.NODE_ENV !== "production";
+  const mcpHandler = createSportsdeskMcpHttpHandler({
+    stateless:
+      options.mcpStateless ??
+      /^(1|true)$/i.test(Bun.env.SPORTSDESK_MCP_STATELESS ?? ""),
+    allowedOrigins: resolveMcpAllowedOrigins(isDevelopment),
+  });
 
   const alertDispatcher = new AlertDispatcher({
     sweepIntervalMs: 5000,
@@ -246,6 +261,14 @@ export function startDashboardServer(
   const { buildLiveWagersPayload, clearCache: clearWagersCache } =
     createDevLiveWagersLoader({
       cwd,
+      // Vendor wire contract (schema/wagers_field_contract.json) checked against
+      // the raw rows before projection; surfaces as payload.wire_contract.
+      // Sentinel-noise rows (writer ALERT/BLOCKED) are not wagers; skip and count
+      // them so the exclusion is visible in payload.wire_contract.skipped_rows.
+      inspectRawRows: (rows) =>
+        inspectWagersWireContract(rows, undefined, {
+          skipRow: (row) => isSentinelTickerWriter(row.TicketWriter),
+        }),
       loadSharpDeps: async () => {
         const [{ parseShortDesc: parseDesc }, { KEY_NUMBER_BUYER_PROFILES }] =
           await Promise.all([
@@ -524,6 +547,8 @@ export function startDashboardServer(
         },
       },
       getLiveWagersPayload: () => buildLiveWagersPayload(),
+      // Stable ops probe: /api/wagers -> .policy_version (from wagers.toml at request time).
+      getWagersTabPolicy: () => loadWagersTabPolicyStamp(),
       getBetTickerPayload: (filters) => betTickerService.getPayload(filters),
       getR2PipelinePayload: (opts) => r2PipelineService.probeAll(opts),
       getDaemonStatusPayload: () => r2PipelineService.probeDaemon(),
@@ -550,6 +575,7 @@ export function startDashboardServer(
         }
         return cachedDceMatrix;
       },
+      handleMcp: (req: Request) => mcpHandler.handleRequest(req),
     },
     { clients },
   );
@@ -984,6 +1010,9 @@ export function startDashboardServer(
     port: server.port ?? port,
     stop(closeActiveConnections = true) {
       alertDispatcher.stop();
+      mcpHandler.closeAll().catch(() => {
+        // signal-honesty: intentional-teardown-cleanup
+      });
       for (const w of watchers) {
         w.close();
       }
@@ -1006,8 +1035,14 @@ if (import.meta.main) {
   }
 
   const apiOnly = Bun.argv.includes("--api-only");
+  const mcpStateless =
+    Bun.argv.includes("--stateless") || Bun.argv.includes("--mcp-stateless");
   prefetchSportsDeskEndpoints();
-  const handle = startDashboardServer({ watchFiles: true, apiOnly });
+  const handle = startDashboardServer({
+    watchFiles: true,
+    apiOnly,
+    ...(mcpStateless ? { mcpStateless: true } : {}),
+  });
 
   console.log(
     `\n⚡ SportsDesk ${apiOnly ? "API-Only" : "Enhanced Dashboard"} Server running!`,

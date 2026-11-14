@@ -167,6 +167,10 @@
       "documented": true,
       "link": "https://bun.com/docs/runtime/networking/tcp#start-a-server-bun-listen"
     },
+    "indexOfLine": {
+      "documented": false,
+      "link": null
+    },
     "main": {
       "documented": true,
       "link": "https://bun.com/docs/runtime/utils#bun-main"

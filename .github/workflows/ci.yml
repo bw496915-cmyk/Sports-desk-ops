@@ -115,6 +115,13 @@ jobs:
           if [ "$rc" -ne 0 ]; then echo "::error::bun fmt failed (exit $rc)"; exit "$rc"; fi
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      # Baseline green on 2026-11-14: 0 vulnerabilities (180 packages) after
+      # `bun audit fix` bumped @hono/node-server to 2.1.6 and overrides carried
+      # got to 11.8.5 and ws to 5.2.5 (both were pinned by @ganchrowsci/gs-sdk's
+      # transitive diffusion/got ranges). Blocking from here on.
+      - name: Dependency audit
+        timeout-minutes: 2
+        run: bun run audit:deps
       - name: Type check
         timeout-minutes: 3
         run: bun run typecheck

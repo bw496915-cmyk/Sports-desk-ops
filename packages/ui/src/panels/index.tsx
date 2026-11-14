@@ -17,6 +17,10 @@ export {
   type CustomersTabPanelProps,
 } from "./CustomersTabPanel.tsx";
 export {
+  WireContractChip,
+  type WireContractChipProps,
+} from "./WireContractChip.tsx";
+export {
   LiveWagersTabPanel,
   type LiveWagersTabPanelProps,
 } from "./LiveWagersTabPanel.tsx";

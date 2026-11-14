@@ -377,6 +377,17 @@ export const BUN_SHAPES: readonly BunShape[] = [
   },
   // data formats & parsing
   {
+    name: "indexOfLine",
+    kind: "value",
+    subsystem: "data",
+    heading: "Bun.indexOfLine",
+    evidence: [
+      "test:tests/bun_index_of_line.test.ts",
+      "test:tests/jsonl_stream_replay.test.ts",
+      "test:tests/f402_bet_ticker_jsonl.test.ts",
+    ],
+  },
+  {
     name: "Cookie",
     kind: "value",
     subsystem: "data",

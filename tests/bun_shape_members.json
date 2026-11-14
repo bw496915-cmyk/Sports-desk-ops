@@ -33,6 +33,7 @@
     "markdown": ["ansi", "html", "react", "render"],
     "stringWidth": [],
     "wrapAnsi": [],
+    "indexOfLine": [],
     "Cookie": ["from", "parse"],
     "CookieMap": [],
     "Glob": [],

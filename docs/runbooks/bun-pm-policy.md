@@ -317,7 +317,7 @@ Root manifest: `"private": true` and `"workspaces": ["packages/*"]` ([workspaces
 ```sh
 ./bin/dx workspaces                                     # List root + packages/*, waves & isolated links
 ./bin/dx workspaces graph --mermaid                     # Emit Mermaid flowchart of workspace:* waves
-./bin/dx workspaces audit [--strict-root]               # Run 7 monorepo gates (exit 1 on any failure)
+./bin/dx workspaces audit [--strict-root]               # Run the monorepo gates (exit 1 on any failure)
 ./bin/dx workspaces run --topological test              # Execute waves dependency-first (--parallel per wave)
 ./bin/dx workspaces run --filter '@sportsdesk-ops/*' check
 ./bin/dx workspaces add ba-example zod                  # Runs unfrozen bun-deps in packages/ba-example + lock check
