@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { findTemporal } from "../scripts/validate_dashboard_config.ts";
 
 /**
  * The `Bun.TOML` behaviours the config adapters depend on.
@@ -82,7 +83,14 @@ describe("Bun.TOML contract", () => {
     for (const file of files) {
       const text = await Bun.file(resolve(process.cwd(), file)).text();
       try {
-        Bun.TOML.parse(text);
+        const parsed = Bun.TOML.parse(text);
+        // Unquoted dates parse cleanly but become Temporal values, which crash
+        // browser bundles and fail the config validators. Keep every committed
+        // TOML Temporal-free.
+        const temporal = findTemporal(parsed);
+        if (temporal.length > 0) {
+          failures.push(`${file}: ${temporal.join(", ")}`);
+        }
       } catch (error) {
         failures.push(
           `${file}: ${error instanceof Error ? error.message : String(error)}`,
