@@ -13,6 +13,7 @@
  * First read: the last `windowBytes` (default 2 MB) of the file, aligned to a line boundary — that
  * is the "current live window" for a baseline snapshot. Later reads: only new appends.
  */
+import { SLAB_SERVER } from "./slab_config.ts";
 
 import {
   mkdir,
@@ -33,7 +34,12 @@ import { numericWagerNumber } from "./f402_bet_ticker_delta.ts";
 import { parseF402TickerRow, type F402TickerRow } from "./f402_ingest.ts";
 
 /** Default initial tail window; the live window is far smaller, this is a safe bound. */
-export const F402_BET_TICKER_JSONL_WINDOW_BYTES = 2_000_000;
+/**
+ * Byte window per getBetTicker read, from `config/slab.toml`
+ * (`capacity.ticker_window_bytes`) through the validated adapter.
+ */
+export const F402_BET_TICKER_JSONL_WINDOW_BYTES =
+  SLAB_SERVER.capacity.ticker_window_bytes;
 
 export interface F402TickerJsonlState {
   /** Byte offset of the next unread byte. */

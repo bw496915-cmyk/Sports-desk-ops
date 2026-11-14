@@ -16,6 +16,7 @@ export * from "./shadow_pricing/index.tsx";
 
 // 3. Build-Time Tree-Shaken TOML Config Contracts
 export * from "./config/dashboard.ts";
+export * from "./config/slab.ts";
 export * from "./config/wagers.ts";
 
 // 4. Hydration, Provenance Badges, Route Sanitizers, ANSI & Runtime Flags
