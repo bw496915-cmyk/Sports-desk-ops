@@ -518,6 +518,165 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     }
   }, 60_000);
 
+  test("namespaces: onLoad without one cannot load a namespaced module", async () => {
+    const root = project();
+    writeFileSync(join(root, "entry.ts"), 'import { x } from "virt";\nconsole.log(x);\n');
+    try {
+      let error: unknown;
+      try {
+        await Bun.build({
+          entrypoints: [join(root, "entry.ts")],
+          outdir: join(root, "out"),
+          plugins: [
+            {
+              name: "default-load-only",
+              setup(build) {
+                build.onResolve({ filter: /^virt$/ }, () => ({ path: "main", namespace: "v" }));
+                // No namespace: only file-namespace modules are loaded by this.
+                build.onLoad({ filter: /.*/ }, () => undefined);
+              },
+            },
+          ],
+        });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(Error);
+      const details = [...((error as AggregateError).errors ?? [])]
+        .map((e) => (e as Error).message)
+        .join("; ");
+      expect(details).toContain("Expected onLoad plugin for namespace v");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("namespaces: only $a-zA-Z0-9_- are valid characters", async () => {
+    const root = project();
+    try {
+      let error: unknown;
+      try {
+        await Bun.build({
+          entrypoints: [join(root, "entry.ts")],
+          outdir: join(root, "out"),
+          plugins: [
+            {
+              name: "bad-ns",
+              setup(build) {
+                build.onLoad({ filter: /.*/, namespace: "a:b" }, () => ({
+                  contents: "export const x = 1;",
+                  loader: "js",
+                }));
+              },
+            },
+          ],
+        });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(TypeError);
+      expect((error as Error).message).toContain("namespace can only contain");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("namespaces: a namespace-scoped onResolve never fires on 1.4.4", async () => {
+    // Isolated probe: the namespace constraint on onResolve builds successfully but
+    // the callback never ran for imports originating inside that namespace. An
+    // earlier observation that registering the scoped resolver BEFORE the namespace's
+    // onLoad fails the build did not reproduce in isolation (single build succeeds);
+    // it was cross-build state in one process, so it is deliberately not asserted.
+    // Unique namespace "q" keeps this test independent of the "v" tests in the same
+    // process for exactly that reason.
+    const root = project();
+    writeFileSync(
+      join(root, "entry.ts"),
+      'import { y } from "virt-main";\nconsole.log(y);\n',
+    );
+    const fired: string[] = [];
+    try {
+      const result = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, "out"),
+        plugins: [
+          {
+            name: "ns-resolve",
+            setup(build) {
+              build.onResolve({ filter: /^virt-main$/ }, () => ({
+                path: "main",
+                namespace: "q",
+              }));
+              build.onResolve({ filter: /^virt-child$/ }, () => ({
+                path: "child",
+                namespace: "q",
+              }));
+              build.onLoad({ filter: /.*/, namespace: "q" }, (args) => ({
+                contents:
+                  args.path === "main"
+                    ? 'import { z } from "virt-child";\nexport const y = 1;'
+                    : "export const z = 2;",
+                loader: "js",
+              }));
+              build.onResolve({ filter: /.*/, namespace: "q" }, (args) => {
+                fired.push(args.path);
+                return undefined;
+              });
+            },
+          },
+        ],
+      });
+      expect(result.success).toBe(true);
+      expect(fired).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("namespaces: onResolve reports file namespace and a bare importer for namespaced modules", async () => {
+    // Page/types say a module is namespace:path and OnResolveArgs.namespace is the
+    // importer's namespace. Measured: an import inside v:main is reported to a
+    // namespace-less onResolve as namespace "file" with importer "main" (no v:).
+    const root = project();
+    writeFileSync(
+      join(root, "entry.ts"),
+      'import { y } from "virt-main";\nconsole.log(y);\n',
+    );
+    const calls: Array<{ path: string; namespace: string; importer: string }> = [];
+    try {
+      const result = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, "out"),
+        plugins: [
+          {
+            name: "args-probe",
+            setup(build) {
+              build.onResolve({ filter: /.*/ }, (args) => {
+                calls.push({ path: args.path, namespace: args.namespace, importer: args.importer });
+                if (args.path === "virt-main") return { path: "main", namespace: "v" };
+                if (args.path === "virt-child") return { path: "child", namespace: "v" };
+                return undefined;
+              });
+              build.onLoad({ filter: /.*/, namespace: "v" }, (args) => ({
+                contents:
+                  args.path === "main"
+                    ? 'import { z } from "virt-child";\nexport const y = 1;'
+                    : "export const z = 2;",
+                loader: "js",
+              }));
+            },
+          },
+        ],
+      });
+      expect(result.success).toBe(true);
+      const child = calls.find((c) => c.path === "virt-child");
+      expect(child?.namespace).toBe("file");
+      expect(child?.importer).toBe("main");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   test("onStart is awaited before building", async () => {
     const root = project();
     const marks: string[] = [];
