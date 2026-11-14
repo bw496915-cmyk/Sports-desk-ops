@@ -32,14 +32,14 @@ tarball but not in the repository. Node consumers need Node 18 or newer.
 
 ## Exports
 
-| Path | Purpose |
-| --- | --- |
-| `.` | aggregate surface (`CONTRACTS_PACKAGE` and the re-exported modules) |
-| `./wager-tokens` | wager token vocabulary and parsing |
-| `./slice-metrics` | slice metric definitions |
-| `./slice-registry` | slice registry contracts |
-| `./slice-data-table` | data-table contracts |
-| `./slice-diff-view` | diff-view contracts |
-| `./shadow-pricing` | shadow pricing contracts |
-| `./features` | feature flags and build targets |
-| `./dashboard-hydration` | dashboard hydration types |
+| Path                    | Purpose                                                             |
+| ----------------------- | ------------------------------------------------------------------- |
+| `.`                     | aggregate surface (`CONTRACTS_PACKAGE` and the re-exported modules) |
+| `./wager-tokens`        | wager token vocabulary and parsing                                  |
+| `./slice-metrics`       | slice metric definitions                                            |
+| `./slice-registry`      | slice registry contracts                                            |
+| `./slice-data-table`    | data-table contracts                                                |
+| `./slice-diff-view`     | diff-view contracts                                                 |
+| `./shadow-pricing`      | shadow pricing contracts                                            |
+| `./features`            | feature flags and build targets                                     |
+| `./dashboard-hydration` | dashboard hydration types                                           |

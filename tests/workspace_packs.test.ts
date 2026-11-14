@@ -50,7 +50,12 @@ describe("publish opt-in", () => {
 
 describe("pack allowlist", () => {
   test("auto-included files always pass", () => {
-    for (const file of ["package.json", "README.md", "LICENSE", "CHANGELOG.md"]) {
+    for (const file of [
+      "package.json",
+      "README.md",
+      "LICENSE",
+      "CHANGELOG.md",
+    ]) {
       expect(isPackedFileAllowed(file, ["src"])).toBe(true);
     }
   });
@@ -79,7 +84,9 @@ describe("pack allowlist", () => {
     expect(
       isPackedFileAllowed("src/nested/b.ts", ["src", "!src/nested/**"]),
     ).toBe(false);
-    expect(isPackedFileAllowed("src/a.ts", ["src", "!src/nested/**"])).toBe(true);
+    expect(isPackedFileAllowed("src/a.ts", ["src", "!src/nested/**"])).toBe(
+      true,
+    );
   });
 });
 

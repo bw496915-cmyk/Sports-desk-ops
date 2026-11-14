@@ -87,7 +87,11 @@ describe("BunFile.lastModified", () => {
       const file = Bun.file(path);
       await Bun.write(file, "x");
       // A precise utimes value removes mtime/read races from the assertion.
-      utimesSync(path, new Date(1_600_000_000_000), new Date(1_600_000_000_000));
+      utimesSync(
+        path,
+        new Date(1_600_000_000_000),
+        new Date(1_600_000_000_000),
+      );
       // The reference says only "a UNIX timestamp"; measured it is milliseconds,
       // truncated to an integer (stat's mtimeMs is fractional).
       expect(file.lastModified).toBe(1_600_000_000_000);
@@ -105,9 +109,9 @@ describe("BunFile.lastModified", () => {
       // conventional "unknown" value — would treat it as a real timestamp.
       const SENTINEL = 4_503_599_627_370_495;
       expect(Bun.file(join(dir, "missing.txt")).lastModified).toBe(SENTINEL);
-      expect((new Blob(["x"]) as Blob & { lastModified: number }).lastModified).toBe(
-        SENTINEL,
-      );
+      expect(
+        (new Blob(["x"]) as Blob & { lastModified: number }).lastModified,
+      ).toBe(SENTINEL);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -188,10 +192,20 @@ describe("Bun.image", () => {
 
       const image = file.image();
       // Lazy handles report -1/-1 until the image is decoded.
-      expect({ width: image.width, height: image.height }).toEqual({ width: -1, height: -1 });
+      expect({ width: image.width, height: image.height }).toEqual({
+        width: -1,
+        height: -1,
+      });
 
-      expect(await image.metadata()).toEqual({ width: 1, height: 1, format: "png" });
-      expect({ width: image.width, height: image.height }).toEqual({ width: 1, height: 1 });
+      expect(await image.metadata()).toEqual({
+        width: 1,
+        height: 1,
+        format: "png",
+      });
+      expect({ width: image.width, height: image.height }).toEqual({
+        width: 1,
+        height: 1,
+      });
 
       const out = join(dir, "thumb.webp");
       await image.resize(4).webp().write(out);

@@ -21,7 +21,10 @@ const outdir = new URL("dist/", pkgDir);
 const entries: string[] = [];
 const expected: string[] = [];
 for (const target of Object.values(pkg.exports)) {
-  const source = typeof target === "string" ? target : (target.bun ?? target.types ?? target.default);
+  const source =
+    typeof target === "string"
+      ? target
+      : (target.bun ?? target.types ?? target.default);
   const dist = typeof target === "string" ? undefined : target.default;
   if (!source) {
     console.error("build: an exports entry has no source target");
@@ -62,4 +65,6 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-console.log(`build: dist/ has ${result.outputs.length} file(s) for ${entries.length} exports`);
+console.log(
+  `build: dist/ has ${result.outputs.length} file(s) for ${entries.length} exports`,
+);

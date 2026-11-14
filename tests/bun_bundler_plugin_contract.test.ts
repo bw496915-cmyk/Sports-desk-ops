@@ -70,7 +70,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
                   namespace: "v",
                 }));
                 build.onLoad({ filter: /.*/, namespace: "v" }, (args) => {
-                  loads.push({ namespace: args.namespace, loader: args.loader });
+                  loads.push({
+                    namespace: args.namespace,
+                    loader: args.loader,
+                  });
                   const contents =
                     loader === "js" || loader === "ts"
                       ? "export const x = 1;"
@@ -81,21 +84,24 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
                           : loader === "toml"
                             ? "a = 1\n"
                             : loader === "yaml"
-                            ? "a: 1\n"
-                            : loader === "xml"
-                              ? "<r/>"
-                              : loader === "css"
-                                ? ".a{color:red}"
-                                : loader === "html"
-                                  ? "<p>hi</p>"
-                                  : "content";
+                              ? "a: 1\n"
+                              : loader === "xml"
+                                ? "<r/>"
+                                : loader === "css"
+                                  ? ".a{color:red}"
+                                  : loader === "html"
+                                    ? "<p>hi</p>"
+                                    : "content";
                   return { contents, loader };
                 });
               },
             },
           ],
         });
-        expect({ loader, success: result.success }).toEqual({ loader, success: true });
+        expect({ loader, success: result.success }).toEqual({
+          loader,
+          success: true,
+        });
       }
       expect(loads.length).toBe(loaders.length);
       for (const args of loads) {
@@ -143,7 +149,13 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
         ],
       });
       expect(result.success).toBe(true);
-      for (const key of ["importer", "kind", "namespace", "path", "resolveDir"]) {
+      for (const key of [
+        "importer",
+        "kind",
+        "namespace",
+        "path",
+        "resolveDir",
+      ]) {
         expect(argKeys).toContain(key);
       }
       const js = await Bun.file(join(root, "out/entry.js")).text();
@@ -157,7 +169,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     // Page: contents?: string and no onBeforeParse on PluginBuilder. Installed
     // types allow buffers and declare onBeforeParse; measured both hold.
     const root = project();
-    writeFileSync(join(root, "entry.ts"), 'import { x } from "virt-bin";\nconsole.log(x);\n');
+    writeFileSync(
+      join(root, "entry.ts"),
+      'import { x } from "virt-bin";\nconsole.log(x);\n',
+    );
     let beforeParse = "absent";
     try {
       const result = await Bun.build({
@@ -191,7 +206,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
   test("lifecycle order is start > resolve > load > end", async () => {
     const root = project();
     const order: string[] = [];
-    writeFileSync(join(root, "entry.ts"), 'import { x } from "virt";\nconsole.log(x);\n');
+    writeFileSync(
+      join(root, "entry.ts"),
+      'import { x } from "virt";\nconsole.log(x);\n',
+    );
     try {
       const result = await Bun.build({
         entrypoints: [join(root, "entry.ts")],
@@ -243,7 +261,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
               name: "before-parse",
               setup(build) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (build as any).onBeforeParse({ filter: /.*/ }, { napiModule: {}, symbol: "x" });
+                (build as any).onBeforeParse(
+                  { filter: /.*/ },
+                  { napiModule: {}, symbol: "x" },
+                );
               },
             },
           ],
@@ -281,7 +302,11 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     try {
       // object loader: exports defines the module, contents ignored
       const objectBuild = await build(
-        loadWith({ contents: "export const x = 1;", exports: { y: 2 }, loader: "object" }),
+        loadWith({
+          contents: "export const x = 1;",
+          exports: { y: 2 },
+          loader: "object",
+        }),
       );
       expect(objectBuild.success).toBe(true);
       const objectJs = await Bun.file(objectBuild.outputs[0]!.path).text();
@@ -290,7 +315,11 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
 
       // js loader: contents wins, exports ignored
       const jsBuild = await build(
-        loadWith({ contents: "export const x = 1;", exports: { y: 2 }, loader: "js" }),
+        loadWith({
+          contents: "export const x = 1;",
+          exports: { y: 2 },
+          loader: "js",
+        }),
       );
       expect(jsBuild.success).toBe(true);
       const jsOut = await Bun.file(jsBuild.outputs[0]!.path).text();
@@ -320,8 +349,14 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
       join(root, "slab.toml"),
       '[meta]\nschema = "v1"\n\n[unsafe]\nallowed = false\n\n[capacity]\nticker_window_bytes = 4096\n',
     );
-    writeFileSync(join(root, "a.ts"), 'import { meta } from "./slab.toml";\nconsole.log(JSON.stringify(meta));\n');
-    writeFileSync(join(root, "b.ts"), 'import { meta } from "virt";\nconsole.log(JSON.stringify(meta));\n');
+    writeFileSync(
+      join(root, "a.ts"),
+      'import { meta } from "./slab.toml";\nconsole.log(JSON.stringify(meta));\n',
+    );
+    writeFileSync(
+      join(root, "b.ts"),
+      'import { meta } from "virt";\nconsole.log(JSON.stringify(meta));\n',
+    );
     try {
       const a = await Bun.build({
         entrypoints: [join(root, "a.ts")],
@@ -336,7 +371,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
           {
             name: "virt",
             setup(build) {
-              build.onResolve({ filter: /^virt$/ }, () => ({ path: "virt", namespace: "v" }));
+              build.onResolve({ filter: /^virt$/ }, () => ({
+                path: "virt",
+                namespace: "v",
+              }));
               build.onLoad({ filter: /.*/, namespace: "v" }, () => ({
                 exports: {
                   meta: { schema: "v1" },
@@ -364,7 +402,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
 
   test("external keeps a virtual import, via config and via onResolve", async () => {
     const root = project();
-    writeFileSync(join(root, "entry.ts"), 'import "virt-ext";\nconsole.log("x");\n');
+    writeFileSync(
+      join(root, "entry.ts"),
+      'import "virt-ext";\nconsole.log("x");\n',
+    );
     try {
       const viaConfig = await Bun.build({
         entrypoints: [join(root, "entry.ts")],
@@ -372,7 +413,9 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
         external: ["virt-ext"],
       });
       expect(viaConfig.success).toBe(true);
-      expect(await Bun.file(join(root, "out-config/entry.js")).text()).toContain("virt-ext");
+      expect(
+        await Bun.file(join(root, "out-config/entry.js")).text(),
+      ).toContain("virt-ext");
 
       const viaResolve = await Bun.build({
         entrypoints: [join(root, "entry.ts")],
@@ -390,7 +433,9 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
         ],
       });
       expect(viaResolve.success).toBe(true);
-      expect(await Bun.file(join(root, "out-resolve/entry.js")).text()).toContain("virt-ext");
+      expect(
+        await Bun.file(join(root, "out-resolve/entry.js")).text(),
+      ).toContain("virt-ext");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -498,7 +543,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
         }));
       },
     });
-    const buildWith = async (label: string, plugins: ReturnType<typeof plugin>[]) => {
+    const buildWith = async (
+      label: string,
+      plugins: ReturnType<typeof plugin>[],
+    ) => {
       const result = await Bun.build({
         entrypoints: [join(root, "entry.ts")],
         outdir: join(root, `out-${label}`),
@@ -510,9 +558,15 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
       return match?.[1];
     };
     try {
-      expect(await buildWith("a-then-b", [plugin("a", 100), plugin("b", 200)])).toBe("100");
-      expect(await buildWith("b-then-a", [plugin("b", 200), plugin("a", 100)])).toBe("200");
-      expect(await buildWith("dupes", [plugin("same", 1), plugin("same", 2)])).toBe("1");
+      expect(
+        await buildWith("a-then-b", [plugin("a", 100), plugin("b", 200)]),
+      ).toBe("100");
+      expect(
+        await buildWith("b-then-a", [plugin("b", 200), plugin("a", 100)]),
+      ).toBe("200");
+      expect(
+        await buildWith("dupes", [plugin("same", 1), plugin("same", 2)]),
+      ).toBe("1");
       expect(await buildWith("empty", [])).toBe("42");
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -521,7 +575,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
 
   test("namespaces: onLoad without one cannot load a namespaced module", async () => {
     const root = project();
-    writeFileSync(join(root, "entry.ts"), 'import { x } from "virt";\nconsole.log(x);\n');
+    writeFileSync(
+      join(root, "entry.ts"),
+      'import { x } from "virt";\nconsole.log(x);\n',
+    );
     try {
       let error: unknown;
       try {
@@ -532,7 +589,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
             {
               name: "default-load-only",
               setup(build) {
-                build.onResolve({ filter: /^virt$/ }, () => ({ path: "main", namespace: "v" }));
+                build.onResolve({ filter: /^virt$/ }, () => ({
+                  path: "main",
+                  namespace: "v",
+                }));
                 // No namespace: only file-namespace modules are loaded by this.
                 build.onLoad({ filter: /.*/ }, () => undefined);
               },
@@ -643,7 +703,8 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
       join(root, "entry.ts"),
       'import { y } from "virt-main";\nconsole.log(y);\n',
     );
-    const calls: Array<{ path: string; namespace: string; importer: string }> = [];
+    const calls: Array<{ path: string; namespace: string; importer: string }> =
+      [];
     try {
       const result = await Bun.build({
         entrypoints: [join(root, "entry.ts")],
@@ -653,9 +714,15 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
             name: "args-probe",
             setup(build) {
               build.onResolve({ filter: /.*/ }, (args) => {
-                calls.push({ path: args.path, namespace: args.namespace, importer: args.importer });
-                if (args.path === "virt-main") return { path: "main", namespace: "v" };
-                if (args.path === "virt-child") return { path: "child", namespace: "v" };
+                calls.push({
+                  path: args.path,
+                  namespace: args.namespace,
+                  importer: args.importer,
+                });
+                if (args.path === "virt-main")
+                  return { path: "main", namespace: "v" };
+                if (args.path === "virt-child")
+                  return { path: "child", namespace: "v" };
                 return undefined;
               });
               build.onLoad({ filter: /.*/, namespace: "v" }, (args) => ({
@@ -680,7 +747,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
 
   test("namespaces: explicit namespace:'file' matches the docs' redirect pattern", async () => {
     const root = project();
-    writeFileSync(join(root, "entry.ts"), 'import { img } from "images/logo.png";\nconsole.log(img);\n');
+    writeFileSync(
+      join(root, "entry.ts"),
+      'import { img } from "images/logo.png";\nconsole.log(img);\n',
+    );
     const seen: string[] = [];
     try {
       const result = await Bun.build({
@@ -691,10 +761,13 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
           {
             name: "file-ns-redirect",
             setup(build) {
-              build.onResolve({ filter: /^images\//, namespace: "file" }, (args) => {
-                seen.push(args.path);
-                return { path: "virtual-image", namespace: "assets" };
-              });
+              build.onResolve(
+                { filter: /^images\//, namespace: "file" },
+                (args) => {
+                  seen.push(args.path);
+                  return { path: "virtual-image", namespace: "assets" };
+                },
+              );
               build.onLoad({ filter: /.*/, namespace: "assets" }, () => ({
                 contents: "export const img = 'x';",
                 loader: "js",
@@ -900,7 +973,10 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
             name: "exports-shape",
             setup(build) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              build.onLoad({ filter: /entry\.ts$/ }, () => ({ exports: { x: 1 } }) as any);
+              build.onLoad(
+                { filter: /entry\.ts$/ },
+                () => ({ exports: { x: 1 } }) as any,
+              );
             },
           },
         ],

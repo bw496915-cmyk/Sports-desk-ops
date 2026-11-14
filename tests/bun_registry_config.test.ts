@@ -53,7 +53,10 @@ async function install(scenario: Scenario): Promise<Observed> {
     for (const [name, body] of Object.entries(scenario.files ?? {})) {
       writeFileSync(join(dir, name), body);
     }
-    const env: Record<string, string | undefined> = { ...process.env, ...scenario.env };
+    const env: Record<string, string | undefined> = {
+      ...process.env,
+      ...scenario.env,
+    };
     delete env.PROBE_TOKEN;
     delete env.GLOBAL_TOKEN;
     // `bun test` itself runs with NODE_ENV=test; without clearing it, every child
@@ -102,7 +105,8 @@ describe("global registry override", () => {
 
   test("username:password in the url becomes Basic auth", async () => {
     const result = await install({
-      bunfig: (port) => `[install]\nregistry = "http://u1:p1@127.0.0.1:${port}/"\n`,
+      bunfig: (port) =>
+        `[install]\nregistry = "http://u1:p1@127.0.0.1:${port}/"\n`,
       dep: "probe-thing",
     });
     expect(result.auth).toBe(`Basic ${btoa("u1:p1")}`);
@@ -142,7 +146,11 @@ describe("env-file loading for bunfig", () => {
   };
 
   test("production order: .env.production.local wins", async () => {
-    const result = await install({ bunfig: globalObject, dep: "probe-thing", files: allFiles });
+    const result = await install({
+      bunfig: globalObject,
+      dep: "probe-thing",
+      files: allFiles,
+    });
     expect(result.auth).toBe("Bearer from-.env.production.local");
   }, 60_000);
 

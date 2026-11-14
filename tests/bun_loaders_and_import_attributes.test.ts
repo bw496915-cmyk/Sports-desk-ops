@@ -33,7 +33,10 @@ describe("Bun Native Loaders & Import Attributes", () => {
   describe("Explicit type attributes override the extension", () => {
     it("parses TOML from a .txt file at runtime", () => {
       expect(typeof tomlFromTxt).toBe("object");
-      const parsed = tomlFromTxt as unknown as { answer: number; label: string };
+      const parsed = tomlFromTxt as unknown as {
+        answer: number;
+        label: string;
+      };
       expect(parsed.answer).toBe(42);
       expect(parsed.label).toContain("TOML");
     });
@@ -65,8 +68,13 @@ describe("Bun Native Loaders & Import Attributes", () => {
       type IsAny<T> = 0 extends 1 & T ? true : false;
       const tomlIsString: Assignable<typeof tomlFromTxt, string> = true;
       const tomlIsNotAny: IsAny<typeof tomlFromTxt> = false;
-      const jsonIsObject: Assignable<typeof textFromJson, { answer: number }> = true;
-      expect([tomlIsString, tomlIsNotAny, jsonIsObject]).toEqual([true, false, true]);
+      const jsonIsObject: Assignable<typeof textFromJson, { answer: number }> =
+        true;
+      expect([tomlIsString, tomlIsNotAny, jsonIsObject]).toEqual([
+        true,
+        false,
+        true,
+      ]);
     });
   });
 

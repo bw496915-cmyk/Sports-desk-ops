@@ -50,7 +50,9 @@ if (json) {
   if (failed.length === 0) {
     console.log(`verify_ci_gates: ok — ${results.length} rule(s) passed`);
   } else {
-    console.error(`verify_ci_gates: ${failed.length}/${results.length} rule(s) failed`);
+    console.error(
+      `verify_ci_gates: ${failed.length}/${results.length} rule(s) failed`,
+    );
   }
 }
 

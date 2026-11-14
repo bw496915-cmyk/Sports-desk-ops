@@ -15,7 +15,13 @@
  * The rule identifiers are the contract `verify_ci_gates.ts` reports; keep them stable.
  */
 
-import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
 import { join } from "node:path";
 
 export type RuleResult = {
@@ -35,11 +41,25 @@ const FOREIGN_LOCKFILES = [
 const CREDENTIAL_FILES = ["bunfig.toml", ".npmrc"] as const;
 
 /** Prefixes that define commands; docs and fixtures are not scanned for `bun i -g`. */
-const COMMAND_PREFIXES = ["scripts/", "bin/", ".github/", "cli/", "services/"] as const;
+const COMMAND_PREFIXES = [
+  "scripts/",
+  "bin/",
+  ".github/",
+  "cli/",
+  "services/",
+] as const;
 
 const COMMAND_FILES = ["package.json"] as const;
 
-const SCANNED_EXTENSIONS = [".ts", ".tsx", ".js", ".sh", ".json", ".yml", ".yaml"] as const;
+const SCANNED_EXTENSIONS = [
+  ".ts",
+  ".tsx",
+  ".js",
+  ".sh",
+  ".json",
+  ".yml",
+  ".yaml",
+] as const;
 
 function readText(path: string): string | null {
   try {
@@ -132,11 +152,16 @@ export function checkLockfiles(root: string): RuleResult[] {
     });
   }
 
-  const foreign = FOREIGN_LOCKFILES.filter((name) => existsSync(join(root, name)));
+  const foreign = FOREIGN_LOCKFILES.filter((name) =>
+    existsSync(join(root, name)),
+  );
   results.push({
     id: "lockfile/no-foreign",
     ok: foreign.length === 0,
-    detail: foreign.length === 0 ? "no bun.lockb/package-lock.json/yarn.lock/pnpm-lock.yaml" : foreign.join(", "),
+    detail:
+      foreign.length === 0
+        ? "no bun.lockb/package-lock.json/yarn.lock/pnpm-lock.yaml"
+        : foreign.join(", "),
   });
 
   const nested: string[] = [];
@@ -157,7 +182,8 @@ export function checkLockfiles(root: string): RuleResult[] {
   results.push({
     id: "lockfile/no-nested",
     ok: nested.length === 0,
-    detail: nested.length === 0 ? "no nested workspace lockfiles" : nested.join(", "),
+    detail:
+      nested.length === 0 ? "no nested workspace lockfiles" : nested.join(", "),
   });
 
   const bunfig = readText(join(root, "bunfig.toml"));
@@ -170,7 +196,10 @@ export function checkLockfiles(root: string): RuleResult[] {
       results.push({
         id: "lockfile/no-yarn-print",
         ok: print === undefined,
-        detail: print === undefined ? "no [install.lockfile].print" : `[install.lockfile].print=${String(print)}`,
+        detail:
+          print === undefined
+            ? "no [install.lockfile].print"
+            : `[install.lockfile].print=${String(print)}`,
       });
     } catch (error) {
       results.push({
@@ -187,7 +216,9 @@ export function checkLockfiles(root: string): RuleResult[] {
 /** No URL userinfo, no literal `_auth`/`_authToken`, no `:username=`/`:_password=`. */
 export function checkCredentials(root: string): RuleResult[] {
   const results: RuleResult[] = [];
-  const files = CREDENTIAL_FILES.map((name) => join(root, name)).filter((path) => isRegularFile(path));
+  const files = CREDENTIAL_FILES.map((name) => join(root, name)).filter(
+    (path) => isRegularFile(path),
+  );
 
   const urlHits: string[] = [];
   const literalAuth: string[] = [];
@@ -199,9 +230,11 @@ export function checkCredentials(root: string): RuleResult[] {
     const label = path.slice(root.length + 1);
     text.split("\n").forEach((line, index) => {
       const location = `${label}:${index + 1}`;
-      if (/https?:\/\/[^\s"'/@]+:[^\s"'/@]+@/.test(line)) urlHits.push(location);
+      if (/https?:\/\/[^\s"'/@]+:[^\s"'/@]+@/.test(line))
+        urlHits.push(location);
       const auth = /(?:^|[\s;])(?:_auth|_authToken)=(\S+)/.exec(line);
-      if (auth?.[1] !== undefined && !auth[1].startsWith("$")) literalAuth.push(location);
+      if (auth?.[1] !== undefined && !auth[1].startsWith("$"))
+        literalAuth.push(location);
       if (/:username=|:_password=/.test(line)) literalAuth.push(location);
     });
   }
@@ -209,25 +242,33 @@ export function checkCredentials(root: string): RuleResult[] {
   results.push({
     id: "credentials/no-url-userinfo",
     ok: urlHits.length === 0,
-    detail: urlHits.length === 0 ? "no user:pass@ registry URLs" : urlHits.join(", "),
+    detail:
+      urlHits.length === 0 ? "no user:pass@ registry URLs" : urlHits.join(", "),
   });
 
   results.push({
     id: "credentials/no-literal-auth",
     ok: literalAuth.length === 0,
-    detail: literalAuth.length === 0 ? "no literal _auth/_authToken/:username= entries" : literalAuth.join(", "),
+    detail:
+      literalAuth.length === 0
+        ? "no literal _auth/_authToken/:username= entries"
+        : literalAuth.join(", "),
   });
 
   results.push({
     id: "credentials/no-repo-npmrc",
     ok: !existsSync(npmrc),
-    detail: existsSync(npmrc) ? "repo .npmrc exists; registry config belongs in ~/.npmrc" : "no repo .npmrc",
+    detail: existsSync(npmrc)
+      ? "repo .npmrc exists; registry config belongs in ~/.npmrc"
+      : "no repo .npmrc",
   });
 
   // A 112-char pre-Base64 Azure PAT must never sit behind NPM_PASSWORD.
   const patHits: string[] = [];
   for (const file of [...envFiles(root), ".npmrc"]) {
-    const text = readText(file === ".npmrc" ? join(root, file) : join(root, file));
+    const text = readText(
+      file === ".npmrc" ? join(root, file) : join(root, file),
+    );
     if (text === null) continue;
     const value = keyedLines(text).get("NPM_PASSWORD");
     if (value === undefined) continue;
@@ -238,7 +279,10 @@ export function checkCredentials(root: string): RuleResult[] {
   results.push({
     id: "credentials/no-double-base64-pat",
     ok: patHits.length === 0,
-    detail: patHits.length === 0 ? "no 112-char NPM_PASSWORD PAT (ERR_NPM_DOUBLE_BASE64_PAT)" : patHits.join(", "),
+    detail:
+      patHits.length === 0
+        ? "no 112-char NPM_PASSWORD PAT (ERR_NPM_DOUBLE_BASE64_PAT)"
+        : patHits.join(", "),
   });
 
   return results;
@@ -260,7 +304,10 @@ export function checkEnvIsolation(root: string): RuleResult[] {
     const hasR2 = keys.has("CLOUDFLARE_R2_API_TOKEN");
     const hasPages = keys.has("CLOUDFLARE_API_TOKEN");
     if (hasR2 && hasPages) bleed.push(name);
-    const isAutoLoaded = name === ".env" || name === ".env.local" || name.startsWith(".env.production");
+    const isAutoLoaded =
+      name === ".env" ||
+      name === ".env.local" ||
+      name.startsWith(".env.production");
     if (isAutoLoaded && (hasR2 || hasPages)) autoLoaded.push(name);
   }
 
@@ -274,8 +321,12 @@ export function checkEnvIsolation(root: string): RuleResult[] {
             ? "no regular env files (FIFO/symlink skipped)"
             : `checked ${files.length} regular env file(s); no Cloudflare token in .env/.env.local/.env.production*`
           : [
-              bleed.length === 0 ? "" : `both tokens in ${bleed.join(", ")} (ERR_CF_TOKEN_BLEED_10000)`,
-              autoLoaded.length === 0 ? "" : `Cloudflare token in auto-loaded ${autoLoaded.join(", ")}`,
+              bleed.length === 0
+                ? ""
+                : `both tokens in ${bleed.join(", ")} (ERR_CF_TOKEN_BLEED_10000)`,
+              autoLoaded.length === 0
+                ? ""
+                : `Cloudflare token in auto-loaded ${autoLoaded.join(", ")}`,
             ]
               .filter((part) => part !== "")
               .join("; "),
@@ -298,7 +349,9 @@ export function checkGitattributes(root: string): RuleResult[] {
   }
 
   const lines = text.split("\n").map((line) => line.trim());
-  const bunLock = lines.findIndex((line) => line.split(/\s+/)[0] === "bun.lock");
+  const bunLock = lines.findIndex(
+    (line) => line.split(/\s+/)[0] === "bun.lock",
+  );
   const lockb = lines.findIndex((line) => line.split(/\s+/)[0] === "*.lockb");
   const problems: string[] = [];
 
@@ -311,7 +364,8 @@ export function checkGitattributes(root: string): RuleResult[] {
   if (bunLock !== -1) {
     const rule = lines[bunLock] ?? "";
     for (const attr of ["text", "eol=lf", "linguist-generated=true"]) {
-      if (!rule.split(/\s+/).includes(attr)) problems.push(`bun.lock rule lacks ${attr}`);
+      if (!rule.split(/\s+/).includes(attr))
+        problems.push(`bun.lock rule lacks ${attr}`);
     }
   }
 
@@ -330,7 +384,10 @@ export function checkGitattributes(root: string): RuleResult[] {
     {
       id: "gitattributes/order",
       ok: problems.length === 0,
-      detail: problems.length === 0 ? "bun.lock (text) before *.lockb (binary, diff=lockb)" : problems.join("; "),
+      detail:
+        problems.length === 0
+          ? "bun.lock (text) before *.lockb (binary, diff=lockb)"
+          : problems.join("; "),
     },
   ];
 }
@@ -360,7 +417,10 @@ export function checkTrackedDatabases(root: string): RuleResult[] {
     {
       id: "artifacts/no-tracked-databases",
       ok: tracked.length === 0,
-      detail: tracked.length === 0 ? "no tracked *.sqlite/*.sqlite3/*.db" : tracked.join(", "),
+      detail:
+        tracked.length === 0
+          ? "no tracked *.sqlite/*.sqlite3/*.db"
+          : tracked.join(", "),
     },
   ];
 }
@@ -390,7 +450,11 @@ export function checkGlobalInstalls(root: string): RuleResult[] {
     const isCommandFile = (COMMAND_FILES as readonly string[]).includes(path);
     const extension = path.slice(path.lastIndexOf("."));
     if (!inPrefix && !isCommandFile) continue;
-    if (!inPrefix && !(SCANNED_EXTENSIONS as readonly string[]).includes(extension)) continue;
+    if (
+      !inPrefix &&
+      !(SCANNED_EXTENSIONS as readonly string[]).includes(extension)
+    )
+      continue;
     const full = join(root, path);
     try {
       if (statSync(full).size > 512_000) continue;
@@ -400,7 +464,8 @@ export function checkGlobalInstalls(root: string): RuleResult[] {
     const text = readText(full);
     if (text === null) continue;
     text.split("\n").forEach((line, index) => {
-      if (/\bbun\s+(?:i|install)\s+-g\b/.test(line)) hits.push(`${path}:${index + 1}`);
+      if (/\bbun\s+(?:i|install)\s+-g\b/.test(line))
+        hits.push(`${path}:${index + 1}`);
     });
   }
 
@@ -408,7 +473,10 @@ export function checkGlobalInstalls(root: string): RuleResult[] {
     {
       id: "pm/no-global-install",
       ok: hits.length === 0,
-      detail: hits.length === 0 ? "no `bun i -g` in command surfaces" : hits.join(", "),
+      detail:
+        hits.length === 0
+          ? "no `bun i -g` in command surfaces"
+          : hits.join(", "),
     },
   ];
 }

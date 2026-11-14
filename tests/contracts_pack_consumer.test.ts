@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -42,7 +48,10 @@ describe("packed tarball consumers", () => {
         path.join(consumer, "package.json"),
         JSON.stringify({ name: "consumer", version: "1.0.0", type: "module" }),
       );
-      const add = run(["bun", "add", `file:${path.join(packDir, tgz!)}`], consumer);
+      const add = run(
+        ["bun", "add", `file:${path.join(packDir, tgz!)}`],
+        consumer,
+      );
       expect(add.exitCode).toBe(0);
 
       const bunCheck = run(

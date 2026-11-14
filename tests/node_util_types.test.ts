@@ -36,7 +36,11 @@ describe("util.types.isModuleNamespaceObject", () => {
     expect(types.isModuleNamespaceObject(42)).toBe(false);
     // `(await import(...)).default` is the VALUE, not a namespace.
     const mod = await import("node:util");
-    expect(types.isModuleNamespaceObject((mod as { default?: unknown }).default ?? null)).toBe(false);
+    expect(
+      types.isModuleNamespaceObject(
+        (mod as { default?: unknown }).default ?? null,
+      ),
+    ).toBe(false);
   });
 
   test("a forged Symbol.toStringTag does not pass the check", () => {

@@ -398,7 +398,7 @@ bun publish --cwd packages/contracts           # real publish
 Measured behaviour worth knowing before a release (2026-11-14):
 
 - `bun publish --dry-run` checks config, access and file selection but **not the token**: with a fake `_authToken` in `NPM_CONFIG_USERCONFIG` it prints `+ @sportsdesk-ops/contracts@0.1.0 (dry-run)` and exits 0. Without any token it fails with `missing authentication`. So the dry-run is a config gate; only a real publish tests the credential.
-- The name is unpublished (`bun info @sportsdesk-ops/contracts` → "does not exist"), and scope ownership cannot be checked unauthenticated: `registry.npmjs.org/-/org/sportsdesk-ops` returns 404 for a missing org *and* for an org your token cannot see. After `bunx npm login`, run `npm org ls sportsdesk-ops` (or create it on npmjs.com).
+- The name is unpublished (`bun info @sportsdesk-ops/contracts` → "does not exist"), and scope ownership cannot be checked unauthenticated: `registry.npmjs.org/-/org/sportsdesk-ops` returns 404 for a missing org _and_ for an org your token cannot see. After `bunx npm login`, run `npm org ls sportsdesk-ops` (or create it on npmjs.com).
 - Bun 1.4.4 has no `--provenance` / OIDC support in `bun publish` (checked via `--help`). Publishing with npm provenance would require `npm publish --provenance` in the workflow instead; that trades Bun's publish path for the attestation.
 - The workflow adds two guards: a tag/version match on `contracts-v*` (a tag that names the wrong version fails) and a dry-run before the real publish.
 

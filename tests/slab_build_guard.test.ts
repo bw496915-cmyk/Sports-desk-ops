@@ -12,7 +12,8 @@ import { slabConfigGuard } from "../scripts/build_plugins/slab_config_guard.ts";
  * and the pass-through, including tree-shaking of an unimported top-level key.
  */
 
-const ENTRY = 'import { meta } from "./packages/ui/src/config/slab.frontend.toml";\nconsole.log(JSON.stringify(meta));';
+const ENTRY =
+  'import { meta } from "./packages/ui/src/config/slab.frontend.toml";\nconsole.log(JSON.stringify(meta));';
 
 function project(configToml: string) {
   const root = mkdtempSync(join(tmpdir(), "slab-guard-"));
@@ -56,7 +57,9 @@ describe("slab config build guard", () => {
       // A throwing onLoad rejects Bun.build with an AggregateError whose own
       // message is "Bundle failed"; the plugin's reason is in .errors. Measured
       // 2026-11-14 in Bun 1.4.4.
-      const error = (await build(root).catch((e: unknown) => e)) as AggregateError;
+      const error = (await build(root).catch(
+        (e: unknown) => e,
+      )) as AggregateError;
       expect(error).toBeInstanceOf(AggregateError);
       const details = [...(error.errors ?? [])]
         .map((e) => (e as Error).message)

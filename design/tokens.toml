@@ -10,10 +10,10 @@ author = "bw496915-cmyk"
 updated_at = "2026-11-14T20:15:00Z" # quoted ISO-8601 — avoids Temporal.* in browser bundles
 
 [gates]
-min_body_contrast_ratio_milli = 4500       # 4.50:1 WCAG AA body copy on all surfaces
-min_aaa_slate_contrast_milli = 7000        # 7.00:1 WCAG AAA (#94a3b8 on #0b1120)
-min_ui_component_contrast_milli = 3000     # 3.00:1 WCAG 1.4.11 focus rings, active borders, badges
-min_cross_state_delta_e00_milli = 7000     # 7.00 CIEDE2000 across card -> hover -> selected
+min_body_contrast_ratio_milli = 4500 # 4.50:1 WCAG AA body copy on all surfaces
+min_aaa_slate_contrast_milli = 7000 # 7.00:1 WCAG AAA (#94a3b8 on #0b1120)
+min_ui_component_contrast_milli = 3000 # 3.00:1 WCAG 1.4.11 focus rings, active borders, badges
+min_cross_state_delta_e00_milli = 7000 # 7.00 CIEDE2000 across card -> hover -> selected
 min_fresh_vs_stale_delta_e00_milli = 40000 # 40.00 CIEDE2000 between SLA_FRESH and SLA_STALE
 
 # ------------------------------------------------------------------------------
@@ -436,20 +436,20 @@ operational_role = "Terminal Risk Containment & Manager Write-Gate"
 # Bits capped at 30 (0x40000000) so signed 32-bit JS SMI shifts never go negative.
 # ------------------------------------------------------------------------------
 [bitmasks.bet_legs]
-IS_LIVE_LEG = 0              # (1 << 0) >>> 0 = 0x00000001
-IS_ALT_SPREAD_PLUS_5000 = 1  # (1 << 1) >>> 0 = 0x00000002
-IS_SPLIT_MARKET_EXEMPT = 2   # (1 << 2) >>> 0 = 0x00000004 (ANOM-01 ML vs Total)
-IS_SIGNAL_DONOR_EXEMPT = 3   # (1 << 3) >>> 0 = 0x00000008
-IS_PARTNER_118_SKIN = 4      # (1 << 4) >>> 0 = 0x00000010 (G<id> / M.G<id>)
-IS_SAME_GAME_CORRELATED = 5  # (1 << 5) >>> 0 = 0x00000020
+IS_LIVE_LEG = 0 # (1 << 0) >>> 0 = 0x00000001
+IS_ALT_SPREAD_PLUS_5000 = 1 # (1 << 1) >>> 0 = 0x00000002
+IS_SPLIT_MARKET_EXEMPT = 2 # (1 << 2) >>> 0 = 0x00000004 (ANOM-01 ML vs Total)
+IS_SIGNAL_DONOR_EXEMPT = 3 # (1 << 3) >>> 0 = 0x00000008
+IS_PARTNER_118_SKIN = 4 # (1 << 4) >>> 0 = 0x00000010 (G<id> / M.G<id>)
+IS_SAME_GAME_CORRELATED = 5 # (1 << 5) >>> 0 = 0x00000020
 
 [bitmasks.ui_state]
-MODAL_OPEN_BIT = 0               # 0x00000001 — cleared on Escape; restores trigger focus
-INSPECTOR_DRAWER_BIT = 1         # 0x00000002 — detail drawer open
-FILTER_LOCK_BIT = 2              # 0x00000004 — channel filter pinned
-ARIA_LIVE_COALESCE_BIT = 3       # 0x00000008 — <= 2 Hz polite throttle latch
-FOCUS_RING_VISIBLE_BIT = 4       # 0x00000010 — keyboard modality active
-STALE_SNAPSHOT_POISON_BIT = 30   # 0x40000000 — halts A11y green-pass & write promotion
+MODAL_OPEN_BIT = 0 # 0x00000001 — cleared on Escape; restores trigger focus
+INSPECTOR_DRAWER_BIT = 1 # 0x00000002 — detail drawer open
+FILTER_LOCK_BIT = 2 # 0x00000004 — channel filter pinned
+ARIA_LIVE_COALESCE_BIT = 3 # 0x00000008 — <= 2 Hz polite throttle latch
+FOCUS_RING_VISIBLE_BIT = 4 # 0x00000010 — keyboard modality active
+STALE_SNAPSHOT_POISON_BIT = 30 # 0x40000000 — halts A11y green-pass & write promotion
 
 # ------------------------------------------------------------------------------
 # Axis 4: 10-Key Bijective Operator Keymap & Roving Tab Slots (Modes 1..10)
@@ -545,13 +545,13 @@ label = "Reconciliation & Ledger"
 "sd-surface-bg" = "#070b14"
 "sd-surface-cli" = "#04070e"
 "sd-surface-card" = "#0b1120"
-"sd-surface-panel" = "#0b1120"    # alias for wager_tiers.toml compatibility
+"sd-surface-panel" = "#0b1120" # alias for wager_tiers.toml compatibility
 "sd-surface-elevated" = "#121c31"
 "sd-surface-hover" = "#19263d"
 "sd-surface-raised" = "#202f4a"
 "sd-surface-selected" = "#0f3a5d"
 "sd-surface-border" = "#243247"
-"sd-border-default" = "#243247"   # alias for wager_tiers.toml compatibility
+"sd-border-default" = "#243247" # alias for wager_tiers.toml compatibility
 "sd-border-strong" = "#7085a1"
 "sd-focus-ring" = "#38bdf8"
 "sd-focus-ring-offset" = "#070b14"
@@ -567,7 +567,7 @@ label = "Reconciliation & Ledger"
 "sd-warn" = "#f59e0b"
 "sd-ok" = "#4ade80"
 "sd-info" = "#a5b4fc"
-"sd-theme-emerald" = "#22d39a"    # legacy L20 alias
+"sd-theme-emerald" = "#22d39a" # legacy L20 alias
 
 # --- Signal-Honesty Provenance Badges (#73 / #74; borders >= 3.0:1) --------
 "sd-provenance-live-fg" = "#34d399"
