@@ -9,6 +9,12 @@
  *  - JSONC (json with comments, tsconfig.json)
  *  - Text (with { type: "text" })
  *  - SQLite (with { type: "sqlite" } returning Database instance)
+ *
+ * Also pins the two documented edges of import attributes:
+ *  - an explicit attribute overrides the file extension at runtime
+ *  - on TypeScript < 7.1 the STATIC type still comes from the extension, so a
+ *    type-mismatched import compiles; the assertions in "static typing follows the
+ *    extension" are the ratchet that flips when the repo moves to TS 7.1+
  */
 
 import { describe, expect, it, onTestFinished } from "bun:test";
@@ -20,8 +26,42 @@ import { resolve } from "node:path";
 import bunfigStatic from "../bunfig.toml" with { type: "toml" };
 import betFlagsStatic from "../config/bet-flags.yml" with { type: "yaml" };
 import xmlRssStatic from "./fixtures/bun-xml-golden-ast/rss-channel-title-fragment.xml" with { type: "xml" };
+import tomlFromTxt from "./fixtures/attribute-override/config.toml.txt" with { type: "toml" };
+import textFromJson from "./fixtures/attribute-override/data.json" with { type: "text" };
 
 describe("Bun Native Loaders & Import Attributes", () => {
+  describe("Explicit type attributes override the extension", () => {
+    it("parses TOML from a .txt file at runtime", () => {
+      expect(typeof tomlFromTxt).toBe("object");
+      const parsed = tomlFromTxt as unknown as { answer: number; label: string };
+      expect(parsed.answer).toBe(42);
+      expect(parsed.label).toContain("TOML");
+    });
+
+    it("loads a .json file as text at runtime", () => {
+      // The static type here is the parsed object (extension .json), so the string
+      // operations need the runtime truth cast in — this test is the reason the
+      // typing assertion below exists.
+      const runtimeText = textFromJson as unknown as string;
+      expect(typeof runtimeText).toBe("string");
+      expect(runtimeText).toContain('"answer": 42');
+    });
+
+    it("static typing follows the extension, not the attribute (TS 5.9.3)", () => {
+      // Bun docs: TypeScript 7.1+ types these imports from the type attribute;
+      // older versions type them from the extension alone. The repo pins TS
+      // 5.9.3, so both directions are mismatched right now: the runtime object
+      // from config.toml.txt is typed string, and the runtime string from
+      // data.json is typed as the parsed object. The assignments below are the
+      // ratchet: they compile only while that mismatch holds, so a TypeScript
+      // upgrade to 7.1+ fails typecheck here and the casts above can be dropped.
+      type Assignable<From, To> = From extends To ? true : false;
+      const tomlIsString: Assignable<typeof tomlFromTxt, string> = true;
+      const jsonIsObject: Assignable<typeof textFromJson, { answer: number }> = true;
+      expect([tomlIsString, jsonIsObject]).toEqual([true, true]);
+    });
+  });
+
   describe("TOML Loader", () => {
     it("statically imports TOML configuration as parsed JavaScript object", () => {
       expect(bunfigStatic).toBeDefined();
