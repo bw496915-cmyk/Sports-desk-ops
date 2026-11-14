@@ -337,7 +337,7 @@ describe("Direct TypeScript spine MCP tools (unit & edge cases)", () => {
       }),
     );
 
-    expect(full.channels).toHaveLength(7);
+    expect(full.channels).toHaveLength(11);
     expect(full.writerResolution?.writerLaneId).toBe("gslive");
     expect(full.writerResolution?.provenanceLabel).toBe("GSLIVE");
     expect(full.writerResolution?.venueId).toBe("gslive_partner118");
@@ -802,11 +802,11 @@ describe("Direct TypeScript spine MCP tools (unit & edge cases)", () => {
       } | null;
     };
 
-    // Empty query returns full 7-entry ingestion palette and null per-query resolutions
+    // Empty query returns full 11-entry ingestion palette and null per-query resolutions
     const empty = extractStructured<ProvenancePayload>(
       runGetChannelProvenanceTool({}),
     );
-    expect(empty.channels).toHaveLength(7);
+    expect(empty.channels).toHaveLength(11);
     expect(empty.matchedChannel).toBeNull();
     expect(empty.routingChannel).toBeNull();
     expect(empty.bridgeResolution).toBeNull();

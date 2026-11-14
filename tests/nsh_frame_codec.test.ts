@@ -97,13 +97,13 @@ describe("provenance palette", () => {
   });
 
   test("packs the real token hexes as 24-bit ColorHexInt and keeps CSS precomputed", () => {
-    expect(PROVENANCE_COLORS.GSLIVE).toBe(asColor(0x28a745));
-    expect(PROVENANCE_COLORS.ALERT).toBe(asColor(0xef4444));
-    expect(PROVENANCE_COLORS.Internet).toBe(asColor(0x1d84b5));
-    expect(PROVENANCE_CSS.GSLIVE).toBe("#28a745");
-    expect(PROVENANCE_CSS.ALERT).toBe("#ef4444");
+    expect(PROVENANCE_COLORS.GSLIVE).toBe(asColor(0x4ade80));
+    expect(PROVENANCE_COLORS.ALERT).toBe(asColor(0xff7878));
+    expect(PROVENANCE_COLORS.Internet).toBe(asColor(0x29b6f6));
+    expect(PROVENANCE_CSS.GSLIVE).toBe("#4ade80");
+    expect(PROVENANCE_CSS.ALERT).toBe("#ff7878");
     expect(provenanceCodeForColor(PROVENANCE_COLORS.GSLIVE)).toBe("GSLIVE");
-    expect(provenanceCssForColor(PROVENANCE_COLORS.GSLIVE)).toBe("#28a745");
+    expect(provenanceCssForColor(PROVENANCE_COLORS.GSLIVE)).toBe("#4ade80");
   });
 
   test("unknown colors still produce a valid hex without a palette cache", () => {
