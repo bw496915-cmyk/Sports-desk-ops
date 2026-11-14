@@ -254,15 +254,8 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     operation: "getPerformancePlayer",
     method: "POST",
     readOnly: true,
-    note: "customer-admin performance tab (manager/module/customer-admin/performance.html)",
-    params: [
-      "agentID",
-      "agentOwner",
-      "customerID",
-      "token",
-      "operation",
-      "RRO",
-    ],
+    note: "customer-admin performance tab (2026-11-13 body: acc, period=0, operation, RRO=1, agentID, agentOwner)",
+    params: ["acc", "period", "operation", "RRO", "agentID", "agentOwner"],
     defaultPrefix: "/cloud/api/Manager",
   },
   {
@@ -623,7 +616,10 @@ export const CLIENT_JS_CONFIRMED_READ_ONLY_OPS = new Set<string>([
 ]);
 
 /** Player-info tab calls use form field `acc` (padded customer id), not `customerID`. */
-export const PROBE_ACC_IS_CUSTOMER_OPS = new Set<string>(["getTeaserProfile"]);
+export const PROBE_ACC_IS_CUSTOMER_OPS = new Set<string>([
+  "getTeaserProfile",
+  "getPerformancePlayer",
+]);
 
 /**
  * A read whose contract is confirmed by client JS or a prior capture. An unconfirmed read
@@ -1330,8 +1326,12 @@ function resolveParamMap(
     } else if (name === "sportSubType") {
       out[name] = options.sportSubType ?? ".";
     } else if (name === "period") {
-      // `Util.typePeriod.GAME` in util.js (bundle sha256 fba79858…).
-      out[name] = options.period ?? "Game";
+      // `Util.typePeriod.GAME` in util.js (bundle sha256 fba79858…) for line reads; the
+      // player-performance read uses period=0 in the observed 2026-11-13 body.
+      out[name] =
+        op.operation === "getPerformancePlayer"
+          ? (options.period ?? "0")
+          : (options.period ?? "Game");
     } else if (name === "hourFilter") {
       out[name] = options.hourFilter ?? "0";
     } else if (name === "wagerType") {
