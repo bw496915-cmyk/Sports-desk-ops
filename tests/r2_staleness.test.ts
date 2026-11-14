@@ -18,6 +18,7 @@ import {
   evaluateProbe,
   formatAge,
   formatReport,
+  formatStepSummary,
   parseLastModified,
   publicUrlFor,
   R2_PUBLIC_BASE,
@@ -225,6 +226,49 @@ describe("formatAge boundaries", () => {
     expect(formatAge(-1)).toBe("?");
     expect(formatAge(Number.NaN)).toBe("?");
     expect(formatAge(Number.POSITIVE_INFINITY)).toBe("?");
+  });
+});
+
+describe("formatStepSummary", () => {
+  const otherTarget: StalenessTarget = {
+    key: "bridge/other.json",
+    slaMs: 60 * 60 * 1000,
+    label: "other",
+  };
+  const probes: StalenessProbe[] = [
+    {
+      // 1d 15h old against a 1h SLA: the shape seen in the 2026-11-14 run.
+      target: SAMPLE_TARGET,
+      status: 200,
+      lastModifiedMs: NOW - 39 * 60 * 60 * 1000,
+    },
+    { target: otherTarget, status: 200, lastModifiedMs: NOW - 60_000 },
+  ];
+  const report = buildReport(probes, NOW);
+
+  test("renders the degraded table with age, SLA and reason", () => {
+    const summary = formatStepSummary(report);
+    expect(summary).toContain("## R2 freshness — 1 of 2 key(s) degraded");
+    expect(summary).toContain(
+      "| `f402-bet-ticker/latest.json` | stale | 1d15h | 1h |",
+    );
+    expect(summary).toContain("| `bridge/other.json` | fresh | 1m | 1h |");
+    // No delivery outcome was supplied: the Telegram line is absent.
+    expect(summary).not.toContain("**Telegram:**");
+    expect(summary.endsWith("\n")).toBe(true);
+  });
+
+  test("names the Telegram delivery outcome and escapes table cells", () => {
+    const failed = formatStepSummary(report, {
+      state: "failed",
+      detail: "telegram HTTP 502 Bad Gateway | retry later",
+    });
+    expect(failed).toContain("**Telegram:** failed");
+    expect(failed).toContain("telegram HTTP 502 Bad Gateway \\| retry later");
+
+    const sent = formatStepSummary(report, { state: "sent" });
+    expect(sent).toContain("**Telegram:** sent");
+    expect(sent).not.toContain("**Telegram:** sent —");
   });
 });
 

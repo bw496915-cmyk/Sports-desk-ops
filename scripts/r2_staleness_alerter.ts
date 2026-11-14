@@ -24,15 +24,20 @@
  * `--probe-only` emits one JSONL line per probe and exits 0; no SLA evaluation.
  */
 
+import { appendFile } from "node:fs/promises";
+
 import {
   ALERTER_EXIT,
   BRIDGE_STALENESS_TARGETS,
   buildReport,
   formatReport,
+  formatStepSummary,
   parseLastModified,
   publicUrlFor,
   type AlerterExit,
+  type AlertDelivery,
   type StalenessProbe,
+  type StalenessReport,
   type StalenessTarget,
 } from "../lib/r2_staleness.ts";
 
@@ -144,6 +149,23 @@ function logRunLine(payload: Record<string, unknown>): void {
   process.stdout.write(`${JSON.stringify(payload)}\n`);
 }
 
+/** Append the run-page summary when GitHub provides a summary file. */
+async function appendStepSummary(
+  report: StalenessReport,
+  delivery?: AlertDelivery,
+): Promise<void> {
+  const target = Bun.env.GITHUB_STEP_SUMMARY;
+  if (!target) return;
+  try {
+    await appendFile(target, formatStepSummary(report, delivery));
+  } catch (error) {
+    logRunLine({
+      kind: "alerter-error",
+      detail: `step summary write failed: ${error instanceof Error ? error.message : String(error)}`,
+    });
+  }
+}
+
 async function main(): Promise<AlerterExit> {
   const options = parseArgs(Bun.argv.slice(2));
   const nowMs = Date.now();
@@ -185,22 +207,29 @@ async function main(): Promise<AlerterExit> {
 
   if (options.dryRun) {
     process.stdout.write(`--- dry-run message ---\n${message}\n--- end ---\n`);
+    await appendStepSummary(report, {
+      state: "not-attempted",
+      detail: "dry-run",
+    });
     return ALERTER_EXIT.degraded;
   }
 
   const botToken = Bun.env.TELEGRAM_BOT_TOKEN ?? "";
   const chatId = Bun.env.TELEGRAM_CHAT_ID ?? "";
   if (botToken === "" || chatId === "") {
-    logRunLine({
-      kind: "alerter-error",
-      detail:
-        "missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID; cannot send alert",
-    });
+    const detail =
+      "missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID; cannot send alert";
+    logRunLine({ kind: "alerter-error", detail });
+    await appendStepSummary(report, { state: "not-attempted", detail });
     return ALERTER_EXIT.alerterError;
   }
 
   const send = await sendTelegram(botToken, chatId, message);
   logRunLine({ kind: "telegram", ...send });
+  await appendStepSummary(
+    report,
+    send.ok ? { state: "sent" } : { state: "failed", detail: send.detail },
+  );
   if (!send.ok) return ALERTER_EXIT.alerterError;
   return ALERTER_EXIT.degraded;
 }

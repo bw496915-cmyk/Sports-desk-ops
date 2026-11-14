@@ -250,6 +250,54 @@ export function formatReport(report: StalenessReport): string {
   return sections.join("\n");
 }
 
+/** Delivery outcome for the alert channel, rendered into the run summary. */
+export interface AlertDelivery {
+  readonly state: "sent" | "failed" | "not-attempted";
+  readonly detail?: string;
+}
+
+/** Table cells must not break the Markdown table. */
+function markdownCell(value: string): string {
+  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
+/**
+ * GitHub Actions run summary (plain Markdown, not Telegram HTML).
+ *
+ * The scheduled `check-r2-freshness` job fails on a degraded report, and that
+ * failure is a workflow email plus a red run page. The summary makes the run
+ * page self-explanatory: which keys are degraded, their age against the SLA, and
+ * whether the Telegram alert was delivered.
+ */
+export function formatStepSummary(
+  report: StalenessReport,
+  delivery?: AlertDelivery,
+): string {
+  const observed = new Date(report.observedAtMs).toISOString();
+  const lines = [
+    `## R2 freshness — ${report.degradedCount} of ${report.verdicts.length} key(s) degraded`,
+    "",
+    `Observed ${observed}.`,
+    "",
+    "| Key | State | Age | SLA | Reason |",
+    "| --- | --- | --- | --- | --- |",
+  ];
+  for (const verdict of report.verdicts) {
+    const age = verdict.ageMs === null ? "—" : formatAge(verdict.ageMs);
+    lines.push(
+      `| \`${markdownCell(verdict.target.key)}\` | ${verdict.state} | ${age} | ${formatAge(verdict.target.slaMs)} | ${markdownCell(verdict.reason)} |`,
+    );
+  }
+  if (delivery) {
+    const suffix =
+      delivery.detail === undefined
+        ? ""
+        : ` — ${markdownCell(delivery.detail)}`;
+    lines.push("", `**Telegram:** ${delivery.state}${suffix}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 /** Exit codes for the runner. 0 = all fresh, 2 = degraded, 1 = alerter itself failed. */
 export const ALERTER_EXIT = {
   allFresh: 0,
