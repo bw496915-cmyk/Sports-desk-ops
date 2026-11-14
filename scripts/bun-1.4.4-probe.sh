@@ -335,6 +335,35 @@ else
   fail audit-omit "opt $opt_plain/$opt_omit peer $peer_plain/$peer_omit dev+opt $both_plain/$omit_opt_only/$omit_both prod==dev? $prod_equiv/$dev_equiv"
 fi
 
+# ---- P19: --ignore works by GHSA and numeric id, and fails closed on typos --
+mkproj "$ROOT/p19" '{"name":"p19","version":"1.0.0","dependencies":{"lodash":"4.17.20"}}'
+run bash -c "cd '$ROOT/p19' && bun install"
+advisory_meta="$(cd "$ROOT/p19" && bun audit --json 2>/dev/null | bun -e 'const j = await Bun.stdin.json(); const rows = Object.values(j).flat(); console.log(rows.length, rows.map(r => r.url.split("/").pop()).join(","), rows.map(r => r.id).join(","));')"
+read -r adv_count ghsa_list id_list <<<"$advisory_meta"
+first_ghsa="$(printf '%s' "$ghsa_list" | cut -d, -f1)"
+first_id="$(printf '%s' "$id_list" | cut -d, -f1)"
+ignore_args=""
+for g in ${ghsa_list//,/ }; do ignore_args="$ignore_args --ignore $g"; done
+set +e
+plain_out="$(cd "$ROOT/p19" && bun audit 2>&1)"; plain_code=$?
+ghsa_out="$(cd "$ROOT/p19" && bun audit --ignore "$first_ghsa" 2>&1)"; ghsa_code=$?
+id_out="$(cd "$ROOT/p19" && bun audit --ignore "$first_id" 2>&1)"; id_code=$?
+all_out="$(cd "$ROOT/p19" && bun audit $ignore_args 2>&1)"; all_code=$?
+cve_out="$(cd "$ROOT/p19" && bun audit --ignore CVE-2021-23337 2>&1)"; cve_code=$?
+typo_out="$(cd "$ROOT/p19" && bun audit --ignore GHSA-0000-0000-0000 2>&1)"; typo_code=$?
+set -e
+expected_next=$((adv_count - 1))
+ghsa_ok=$(printf '%s' "$ghsa_out" | grep -q "$expected_next vulnerabilities" && echo yes || echo no)
+id_ok=$(printf '%s' "$id_out" | grep -q "$expected_next vulnerabilities" && echo yes || echo no)
+all_ok=$([ "$all_code" -eq 0 ] && printf '%s' "$all_out" | grep -q "ignored" && echo yes || echo no)
+cve_ok=$(printf '%s' "$cve_out" | grep -q "$adv_count vulnerabilities" && echo yes || echo no)
+typo_ok=$(printf '%s' "$typo_out" | grep -q "$adv_count vulnerabilities" && echo yes || echo no)
+if [ "$plain_code" -eq 1 ] && [ "$ghsa_ok" = yes ] && [ "$id_ok" = yes ] && [ "$all_ok" = yes ] && [ "$cve_ok" = yes ] && [ "$typo_ok" = yes ]; then
+  pass audit-ignore "GHSA and numeric each drop one; all ignored -> exit 0 (reported); CVE and typo'd GHSA match nothing"
+else
+  fail audit-ignore "ghsa=$ghsa_ok id=$id_ok all=$all_ok cve=$cve_ok typo=$typo_ok"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip migrate-speed "needs a ~20k-entry yarn.lock; manual: time bun pm migrate"
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
