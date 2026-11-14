@@ -62,6 +62,10 @@ export interface DashboardApiDeps {
     readonly stamp: string;
     readonly markdown: string;
     readonly html: string;
+    readonly renderDurationMs?: number;
+    readonly markdownBytes?: number;
+    readonly htmlBytes?: number;
+    readonly nonAsciiChars?: number;
   } | null>;
   readonly dns: {
     readonly getTelemetryPayload: () => Record<string, unknown>;
@@ -88,6 +92,13 @@ export interface DashboardApiDeps {
     readonly getConduits: () => Promise<readonly unknown[]>;
   };
   readonly getLiveWagersPayload: () => Promise<object>;
+  /**
+   * Panel-policy stamp merged into `/api/wagers` and `/api/live-wagers`.
+   * Optional so hermetic API tests need no policy file; when absent the feed
+   * response is unchanged. The host wires `loadWagersTabPolicyStamp()`.
+   */
+  readonly getWagersTabPolicy?:
+    (() => Promise<WagersTabPolicyStamp | null>) | undefined;
   readonly getTiersConfig: () => Promise<unknown>;
   readonly alerts: {
     readonly sweepOnce: () => Promise<unknown>;
@@ -130,4 +141,15 @@ export interface DashboardApiDeps {
         agentId: string,
       ) => Promise<AgentDetailApiResponse> | AgentDetailApiResponse)
     | undefined;
+}
+
+/**
+ * Stable, build-independent identity of the wagers-tab policy the server carries.
+ * Read from `packages/ui/src/config/wagers.toml` at request time.
+ */
+export interface WagersTabPolicyStamp {
+  /** `[table].policy_tag`, e.g. `wagers-policy/v1`. */
+  readonly policy_version: string;
+  /** `[meta].schema`, e.g. `sportsdesk-wagers-tab/v1`. */
+  readonly policy_schema: string;
 }

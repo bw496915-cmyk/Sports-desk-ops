@@ -36,8 +36,8 @@ Canonical commit links for the pinned runtime (`Bun 1.4.4`, `38afee6c84fcf48c0ed
 
 Do not hardcode member counts; run `./bin/dx bun --types` (or `./bin/dx bun --json`) to diff `bun-types@1.4.4` against the active binary. The two pinned drift IDs asserted in [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts) are:
 
-- **`dns-resolve`**: `bun-types` and [`/reference/globals/bun/dns`](https://bun.com/reference/globals/bun/dns) declare only `lookup`, `prefetch`, and `getCacheStats`, while the 1.4.4 binary also exposes the 15 `node:dns/promises` resolver methods (`resolve`, `resolve4`, `resolve6`, `resolveSrv`, `resolveTxt`, `resolveSoa`, `resolveNaptr`, `resolveMx`, `resolveCaa`, `resolveNs`, `resolvePtr`, `resolveCname`, `resolveAny`, `getServers`, `setServers`, `reverse`, `lookupService`).
-- **`websocket-global`**: [`/reference/globals/bun/WebSocket`](https://bun.com/reference/globals/bun/WebSocket) and [`/reference/globals/bun/Worker`](https://bun.com/reference/globals/bun/Worker) are filed under the `bun` module page, but `Bun.WebSocket` and `Bun.Worker` are `undefined` at runtime — the constructors live on `globalThis`.
+- **`dns-resolve`**: `bun-types` and [`/reference/bun/dns`](https://bun.com/reference/bun/dns) declare only `lookup`, `prefetch`, and `getCacheStats`, while the 1.4.4 binary also exposes the 15 `node:dns/promises` resolver methods (`resolve`, `resolve4`, `resolve6`, `resolveSrv`, `resolveTxt`, `resolveSoa`, `resolveNaptr`, `resolveMx`, `resolveCaa`, `resolveNs`, `resolvePtr`, `resolveCname`, `resolveAny`, `getServers`, `setServers`, `reverse`, `lookupService`).
+- **`websocket-global`**: [`/reference/bun/WebSocket`](https://bun.com/reference/bun/WebSocket) and [`/reference/bun/Worker`](https://bun.com/reference/bun/Worker) are filed under the `bun` module page, but `Bun.WebSocket` and `Bun.Worker` are `undefined` at runtime — the constructors live on `globalThis`.
 
 ## Upstream doc commit pins
 
@@ -70,7 +70,7 @@ The repo uses `Bun.JSONL.parse()` / `Bun.JSONL.parseChunk()` by default on JSONL
 
 ## `Bun.$` — available, but argv-only for credentials (2026-11-04 audit)
 
-[`Bun.$`](https://bun.com/reference/globals/bun/$) is pinned in [`bin/bun_surface.ts`](../bin/bun_surface.ts) and [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts), but [`lib/f402_credentials_policy.ts`](../lib/f402_credentials_policy.ts) enforces **argv-only (`Bun.spawn([argv…])`) for anything that touches a credential**:
+[`Bun.$`](https://bun.com/reference/bun/$) is pinned in [`bin/bun_surface.ts`](../bin/bun_surface.ts) and [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts), but [`lib/f402_credentials_policy.ts`](../lib/f402_credentials_policy.ts) enforces **argv-only (`Bun.spawn([argv…])`) for anything that touches a credential**:
 
 | Scenario                                                              | Use                                                   | Why                                                                                             |
 | :-------------------------------------------------------------------- | :---------------------------------------------------- | :---------------------------------------------------------------------------------------------- |
@@ -80,7 +80,7 @@ The repo uses `Bun.JSONL.parse()` / `Bun.JSONL.parseChunk()` by default on JSONL
 
 ## When to use `Bun.allocUnsafe` (and when NOT to) — 2026-11-04 audit
 
-[`Bun.allocUnsafe(size)`](https://bun.com/reference/globals/bun/allocUnsafe) returns an unzeroed `Uint8Array`. Every call site must guarantee that only written bytes are exposed to callers (pinned in [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts)):
+[`Bun.allocUnsafe(size)`](https://bun.com/reference/bun/allocUnsafe) returns an unzeroed `Uint8Array`. Every call site must guarantee that only written bytes are exposed to callers (pinned in [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts)):
 
 | File:line                            | Fill pattern                                    | Why it is safe                                                                                  |
 | :----------------------------------- | :---------------------------------------------- | :---------------------------------------------------------------------------------------------- |

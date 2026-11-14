@@ -1,6 +1,9 @@
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { parseDashboardWsSignal } from "@sportsdesk-ops/contracts";
+import {
+  parseDashboardWsSignal,
+  resolveDaemon4020State,
+} from "@sportsdesk-ops/contracts";
 import "./desk.css";
 import { ShadowPricingPanel } from "./ShadowPricingPanel.tsx";
 import { styles } from "./dashboard_styles.ts";
@@ -36,28 +39,32 @@ import {
   TERMINAL_INITIAL_COMMANDS,
   TERMINAL_WELCOME_HELP_STDOUT,
 } from "./showcase_data.ts";
-import type {
-  AlertFilter,
-  AlertToastState,
-  BetTickerApiResponse,
-  BuildMatrixRow,
-  CustomersApiResponse,
-  CustomerSortKey,
-  DashboardAlertRecord,
-  DashboardData,
-  DashboardSourceProvenance,
-  DashboardTabId,
-  DnsData,
-  HealthData,
-  LiveWager,
-  R2PipelineApiResponse,
-  RankingsFilter,
-  ShiftSummaryData,
-  ShowcaseCustomer,
-  TerminalCategory,
-  TerminalHistoryEntry,
-  TierStyleConfig,
-  WagerSortField,
+import { DASHBOARD_DEFAULT_TAB } from "./config/dashboard.ts";
+import { WAGERS_DEFAULTS } from "./config/wagers.ts";
+import {
+  type AlertFilter,
+  type AlertToastState,
+  type BetTickerApiResponse,
+  type BuildMatrixRow,
+  type CustomersApiResponse,
+  type CustomerSortKey,
+  type DashboardAlertRecord,
+  type DashboardData,
+  type DashboardSourceProvenance,
+  type DashboardTabId,
+  type DnsData,
+  type HealthData,
+  type LiveWager,
+  type R2PipelineApiResponse,
+  type RankingsFilter,
+  resolveDashboardTabId,
+  type ShiftSummaryData,
+  type ShowcaseCustomer,
+  type TerminalCategory,
+  type TerminalHistoryEntry,
+  type TierStyleConfig,
+  type WagerSortField,
+  type WagersWireContractSummary,
 } from "./types.ts";
 
 export * from "./types.ts";
@@ -87,22 +94,16 @@ function apiPostHeaders(): HeadersInit {
 }
 
 function resolveInitialTab(): DashboardTabId {
-  if (typeof window === "undefined") return "customers";
-  const raw = new URLSearchParams(window.location.search).get("tab");
-  if (
-    raw === "shadow" ||
-    raw === "surveillance" ||
-    raw === "customers" ||
-    raw === "terminal" ||
-    raw === "rankings" ||
-    raw === "wagers" ||
-    raw === "bet-ticker" ||
-    raw === "r2" ||
-    raw === "alerts"
-  ) {
-    return raw;
+  if (typeof window === "undefined") return DASHBOARD_DEFAULT_TAB;
+  const params = new URLSearchParams(window.location.search);
+  const queryTab = params.get("tab");
+  if (queryTab) {
+    return resolveDashboardTabId(queryTab, DASHBOARD_DEFAULT_TAB);
   }
-  return "customers";
+  if (window.location.hash) {
+    return resolveDashboardTabId(window.location.hash, DASHBOARD_DEFAULT_TAB);
+  }
+  return DASHBOARD_DEFAULT_TAB;
 }
 
 function resolveInitialUrlParam(name: string): string {
@@ -122,6 +123,7 @@ export function App(): React.ReactElement {
     readonly BuildMatrixRow[] | null
   >(null);
   const [buildMatrixLoading, setBuildMatrixLoading] = useState<boolean>(false);
+  const [buildMatrixError, setBuildMatrixError] = useState<string | null>(null);
   const [rankingsFilter, setRankingsFilter] = useState<RankingsFilter>("ALL");
   const [rankingsSearch, setRankingsSearch] = useState<string>(() =>
     resolveInitialUrlParam("agent"),
@@ -138,9 +140,13 @@ export function App(): React.ReactElement {
   const [selectedWager, setSelectedWager] = useState<LiveWager | null>(
     SAMPLE_LIVE_WAGERS[0] ?? null,
   );
-  const [wagerSortField, setWagerSortField] =
-    useState<WagerSortField>("timestamp");
-  const [wagerSortDir, setWagerSortDir] = useState<"asc" | "desc">("desc");
+  // Default sort comes from packages/ui/src/config/wagers.toml ([table] table).
+  const [wagerSortField, setWagerSortField] = useState<WagerSortField>(
+    WAGERS_DEFAULTS.sort_field,
+  );
+  const [wagerSortDir, setWagerSortDir] = useState<"asc" | "desc">(
+    WAGERS_DEFAULTS.sort_dir,
+  );
   const [clockTime, setClockTime] = useState<string>("");
   const [terminalCategory, setTerminalCategory] =
     useState<TerminalCategory>("ALL");
@@ -149,6 +155,8 @@ export function App(): React.ReactElement {
   );
   const [data, setData] = useState<DashboardData | null>(null);
   const [dnsData, setDnsData] = useState<DnsData | null>(null);
+  const [dnsRefreshing, setDnsRefreshing] = useState(false);
+  const [dnsError, setDnsError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"interactive" | "raw">(
     "interactive",
   );
@@ -184,6 +192,8 @@ export function App(): React.ReactElement {
   const [wagersProvenance, setWagersProvenance] =
     useState<DashboardSourceProvenance>(SHOWCASE_WAGERS_PROVENANCE);
   const [wagersError, setWagersError] = useState<string | null>(null);
+  const [wireContract, setWireContract] =
+    useState<WagersWireContractSummary | null>(null);
   const [betTickerData, setBetTickerData] =
     useState<BetTickerApiResponse | null>(null);
   const [betTickerLoading, setBetTickerLoading] = useState<boolean>(false);
@@ -233,6 +243,7 @@ export function App(): React.ReactElement {
       }
       setLiveWagers(normalized.wagers);
       setWagersProvenance(normalized.provenance);
+      setWireContract(normalized.wireContract);
       setWagersError(null);
       if (normalized.wagers.length > 0) {
         setSelectedWager((prev) =>
@@ -323,6 +334,32 @@ export function App(): React.ReactElement {
     }
   };
 
+  const fetchBuildMatrix = () => {
+    setBuildMatrixLoading(true);
+    setBuildMatrixError(null);
+    fetch("/api/build-matrix")
+      .then(async (r) => {
+        if (!r.ok) {
+          throw new Error(`GET /api/build-matrix returned HTTP ${r.status}`);
+        }
+        return (await r.json()) as {
+          targets?: readonly BuildMatrixRow[];
+        };
+      })
+      .then((json) => {
+        if (json?.targets) {
+          debugDashboardTrace("loaded DCE build matrix", json);
+          setBuildMatrixRows(json.targets);
+        }
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("Build matrix probe unavailable:", err);
+        setBuildMatrixError(msg);
+      })
+      .finally(() => setBuildMatrixLoading(false));
+  };
+
   useEffect(() => {
     void fetchTiersConfig();
     void fetchLiveWagers();
@@ -330,6 +367,12 @@ export function App(): React.ReactElement {
     void fetchBetTicker();
     void fetchR2Pipeline();
   }, []);
+
+  useEffect(() => {
+    if (showBuildMatrix && !buildMatrixRows && !buildMatrixLoading) {
+      fetchBuildMatrix();
+    }
+  }, [showBuildMatrix]);
 
   // UI enhancement states: banner dismissal & collapsible KPI cards
   const [bannerDismissed, setBannerDismissed] = useState(
@@ -360,7 +403,13 @@ export function App(): React.ReactElement {
 
   const fetchHealth = () => {
     fetch("/health")
-      .then((res) => (res.ok ? res.json() : null))
+      .then(async (res) => {
+        const contentType = res.headers.get("content-type") ?? "";
+        if (contentType !== "" && !contentType.toLowerCase().includes("json")) {
+          return null;
+        }
+        return (await res.json().catch(() => null)) as HealthData | null;
+      })
       .then((health) => {
         if (health) {
           setHealthData(health);
@@ -777,22 +826,36 @@ export function App(): React.ReactElement {
     }
   };
 
+  const fetchDnsTelemetry = async () => {
+    setDnsRefreshing(true);
+    setDnsError(null);
+    try {
+      const dnsRes = await fetch("/api/dns/telemetry").then(async (res) => {
+        if (!res.ok) return fetch("/api/dns");
+        return res;
+      });
+      if (dnsRes.ok) {
+        const json = (await dnsRes.json()) as DnsData;
+        setDnsData(json);
+      } else {
+        setDnsError(`HTTP ${dnsRes.status}`);
+      }
+    } catch (err) {
+      setDnsError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDnsRefreshing(false);
+    }
+  };
+
   const fetchDashboard = async () => {
     try {
-      const [dashRes, dnsRes] = await Promise.all([
+      const [dashRes] = await Promise.all([
         fetch("/api/dashboard"),
-        fetch("/api/dns/telemetry").then(async (res) => {
-          if (!res.ok) return fetch("/api/dns");
-          return res;
-        }),
+        fetchDnsTelemetry(),
       ]);
       if (dashRes.ok) {
         const json = (await dashRes.json()) as DashboardData;
         setData(json);
-      }
-      if (dnsRes.ok) {
-        const json = (await dnsRes.json()) as DnsData;
-        setDnsData(json);
       }
     } catch (err) {
       console.error("Failed to load dashboard data:", err);
@@ -930,6 +993,70 @@ export function App(): React.ReactElement {
     setActiveTab("customers");
   };
 
+  const daemon4020 = r2PipelineData?.daemon4020;
+  const daemonState = resolveDaemon4020State(daemon4020);
+  const daemonLatency = daemon4020?.latencyMs ?? 1;
+  const daemonPill =
+    daemonState === "online"
+      ? {
+          color: "#4ade80",
+          label: `● API :4020 (${daemonLatency}ms)`,
+          title: `SportsDesk Daemon :4020 online (${daemonLatency}ms)`,
+        }
+      : daemonState === "degraded"
+        ? {
+            color: "#fbbf24",
+            label: `◐ API :4020 ${daemon4020?.operationalStatus === "down" ? "Auth Down" : "Degraded"} (${daemonLatency}ms)`,
+            title: `SportsDesk Daemon :4020 reachable (HTTP ${daemon4020?.status ?? 503}, ${daemonLatency}ms)${daemon4020?.reason ? ` — ${daemon4020.reason}` : ""}`,
+          }
+        : daemonState === "offline"
+          ? {
+              color: "#fbbf24",
+              label: "○ API :4020 Offline",
+              title: `SportsDesk Daemon :4020 offline (${daemon4020?.reason ?? "unreachable"})`,
+            }
+          : {
+              color: "#94a3b8",
+              label: "◌ API :4020 Probing...",
+              title: "SportsDesk Daemon :4020 probing...",
+            };
+
+  const alertsStatus = healthData?.alerts?.status;
+  const opStatus = healthData?.operationalStatus;
+  const isHealthError =
+    alertsStatus === "degraded" ||
+    opStatus === "down" ||
+    healthData?.status === "down";
+  const isHealthWarn =
+    !isHealthError &&
+    (alertsStatus === "warning" ||
+      opStatus === "degraded" ||
+      healthData?.status === "degraded");
+  const degradedReasonSummary = healthData?.degradedReasons
+    ?.map((r) => r.message)
+    .slice(0, 3)
+    .join("; ");
+  const systemHealthUi = isHealthError
+    ? {
+        border: "#ef4444",
+        bg: "rgba(239, 68, 68, 0.15)",
+        color: "#f87171",
+        label: alertsStatus === "degraded" ? "🚨 DEGRADED" : "🚨 AUTH DOWN",
+      }
+    : isHealthWarn
+      ? {
+          border: "#f59e0b",
+          bg: "rgba(245, 158, 11, 0.15)",
+          color: "#fbbf24",
+          label: alertsStatus === "warning" ? "⚠️ WARNING" : "⚠️ DEGRADED",
+        }
+      : {
+          border: "#22c55e",
+          bg: "rgba(34, 197, 94, 0.15)",
+          color: "#4ade80",
+          label: "● System OK",
+        };
+
   return (
     <div style={styles.container}>
       {/* Global Header */}
@@ -952,24 +1079,12 @@ export function App(): React.ReactElement {
               <span>·</span>
               <span
                 style={{
-                  color: r2PipelineData?.daemon4020.online
-                    ? "#4ade80"
-                    : r2PipelineData
-                      ? "#fbbf24"
-                      : "#94a3b8",
+                  color: daemonPill.color,
                   fontWeight: 600,
                 }}
-                title={
-                  r2PipelineData?.daemon4020.online
-                    ? `SportsDesk Daemon :4020 online (${r2PipelineData.daemon4020.latencyMs ?? 1}ms)`
-                    : `SportsDesk Daemon :4020 offline (${r2PipelineData?.daemon4020.reason ?? "probing..."})`
-                }
+                title={daemonPill.title}
               >
-                {r2PipelineData?.daemon4020.online
-                  ? `● API :4020 (${r2PipelineData.daemon4020.latencyMs ?? 1}ms)`
-                  : r2PipelineData
-                    ? "○ API :4020 Offline"
-                    : "◌ API :4020 Probing..."}
+                {daemonPill.label}
               </span>
               <span>·</span>
               <button
@@ -1073,35 +1188,17 @@ export function App(): React.ReactElement {
               fontSize: "11px",
               fontWeight: 600,
               cursor: "pointer",
-              border: `1px solid ${
-                healthData?.alerts?.status === "degraded"
-                  ? "#ef4444"
-                  : healthData?.alerts?.status === "warning"
-                    ? "#f59e0b"
-                    : "#22c55e"
-              }`,
-              background:
-                healthData?.alerts?.status === "degraded"
-                  ? "rgba(239, 68, 68, 0.15)"
-                  : healthData?.alerts?.status === "warning"
-                    ? "rgba(245, 158, 11, 0.15)"
-                    : "rgba(34, 197, 94, 0.15)",
-              color:
-                healthData?.alerts?.status === "degraded"
-                  ? "#f87171"
-                  : healthData?.alerts?.status === "warning"
-                    ? "#fbbf24"
-                    : "#4ade80",
+              border: `1px solid ${systemHealthUi.border}`,
+              background: systemHealthUi.bg,
+              color: systemHealthUi.color,
             }}
-            title="Surveillance Alert Health (O(1) in-memory probe) · Click to view Shift Handoff Summary"
+            title={
+              degradedReasonSummary
+                ? `Health probe: ${degradedReasonSummary} · Click to view Shift Handoff Summary`
+                : "Surveillance Alert Health (O(1) in-memory probe) · Click to view Shift Handoff Summary"
+            }
           >
-            <span>
-              {healthData?.alerts?.status === "degraded"
-                ? "🚨 DEGRADED"
-                : healthData?.alerts?.status === "warning"
-                  ? "⚠️ WARNING"
-                  : "● System OK"}
-            </span>
+            <span>{systemHealthUi.label}</span>
             {healthData?.alerts && (
               <span style={{ color: "#94a3b8", fontSize: "10px" }}>
                 (DLQ: {healthData.alerts.dead} · Backlog:{" "}
@@ -1137,25 +1234,7 @@ export function App(): React.ReactElement {
               const next = !showBuildMatrix;
               setShowBuildMatrix(next);
               if (next && !buildMatrixRows && !buildMatrixLoading) {
-                setBuildMatrixLoading(true);
-                fetch("/api/build-matrix")
-                  .then((r) =>
-                    r.ok
-                      ? (r.json() as Promise<{
-                          targets?: readonly BuildMatrixRow[];
-                        }>)
-                      : null,
-                  )
-                  .then((json) => {
-                    if (json?.targets) {
-                      debugDashboardTrace("loaded DCE build matrix", json);
-                      setBuildMatrixRows(json.targets);
-                    }
-                  })
-                  .catch((err) => {
-                    console.warn("Build matrix probe unavailable:", err);
-                  })
-                  .finally(() => setBuildMatrixLoading(false));
+                fetchBuildMatrix();
               }
             }}
             title="Inspect compile-time bun:bundle dead-code elimination & tokens.toml CSS Houdini registry"
@@ -1315,8 +1394,184 @@ export function App(): React.ReactElement {
           dceMarker={runtimeFlags.dceMarker}
           loading={buildMatrixLoading}
           rows={buildMatrixRows}
+          target={runtimeFlags.target}
+          enabledFeatures={runtimeFlags.enabledFeatures}
+          error={buildMatrixError}
+          onRefresh={fetchBuildMatrix}
         />
       ) : null}
+
+      {/* Cross-Desk Operations Command Ribbon */}
+      <section
+        aria-label="Operations Command Ribbon"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "8px 14px",
+          padding: "8px 20px",
+          backgroundColor: "#0b1120",
+          borderBottom: "1px solid #1e293b",
+          fontSize: "11px",
+          color: "#cbd5e1",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "8px 12px",
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 700,
+              color: "#38bdf8",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+            }}
+          >
+            🧭 Desk Quick-Jump:
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setWagerSportFilter("ALL");
+              setWagerSearch("");
+              setActiveTab("wagers");
+            }}
+            style={{
+              padding: "3px 9px",
+              borderRadius: "999px",
+              border: "1px solid rgba(56, 189, 248, 0.35)",
+              backgroundColor: "rgba(56, 189, 248, 0.1)",
+              color: "#7dd3fc",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="Open Live Wagers tape"
+          >
+            ⚡ Active Risk: $
+            {liveWagers.reduce((s, w) => s + w.riskUsd, 0).toLocaleString()} (
+            {liveWagers.length} tickets)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setWagerSportFilter("NCAAB");
+              setWagerSearch("");
+              setActiveTab("wagers");
+            }}
+            style={{
+              padding: "3px 9px",
+              borderRadius: "999px",
+              border: "1px solid rgba(245, 158, 11, 0.35)",
+              backgroundColor: "rgba(245, 158, 11, 0.12)",
+              color: "#fbbf24",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="Filter Live Wagers to College Basketball (NCAAB 1H & Game)"
+          >
+            🏀 NCAAB Slice (
+            {liveWagers.filter((w) => w.sport.toUpperCase() === "NCAAB").length}
+            )
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setWagerSportFilter("ALL");
+              setWagerSearch("live");
+              setActiveTab("wagers");
+            }}
+            style={{
+              padding: "3px 9px",
+              borderRadius: "999px",
+              border: "1px solid rgba(192, 132, 252, 0.35)",
+              backgroundColor: "rgba(192, 132, 252, 0.12)",
+              color: "#d8b4fe",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="Filter Live Wagers to GSLive / In-Play tickets"
+          >
+            🔴 GSLive / In-Play (
+            {
+              liveWagers.filter(
+                (w) =>
+                  w.alertTier === "LATENCY" ||
+                  /live|in-play/i.test(w.selection) ||
+                  /ezl/i.test(w.ticketWriter ?? ""),
+              ).length
+            }
+            )
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              handleSelectCustomerById("BRT106");
+            }}
+            style={{
+              padding: "3px 9px",
+              borderRadius: "999px",
+              border: "1px solid rgba(34, 197, 94, 0.38)",
+              backgroundColor: "rgba(34, 197, 94, 0.12)",
+              color: "#4ade80",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="Inspect BRT106 (BGMASTER / BILLY666) 3-endpoint portal & figureDate reconciliation"
+          >
+            🧾 Figure-Date Audit: BRT106 (+$76,950 · 0¢ Delta)
+          </button>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "8px 12px",
+            color: "#94a3b8",
+          }}
+        >
+          <span>
+            Bridge 3a Watermark:{" "}
+            <code style={{ color: "#e2e8f0" }}>
+              {betTickerData?.bridge3aR2.watermark ?? "pending"}
+            </code>
+          </span>
+          <span>·</span>
+          <span>
+            Top Conduit:{" "}
+            <button
+              type="button"
+              onClick={() =>
+                setSelectedAgentId(
+                  PROXY_CONDUITS_30D[0]?.agentId ?? "FAKEMONEY",
+                )
+              }
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                color: "#38bdf8",
+                fontWeight: 600,
+                fontSize: "11px",
+                cursor: "pointer",
+              }}
+            >
+              {PROXY_CONDUITS_30D[0]?.agentId ?? "FAKEMONEY"} (
+              {PROXY_CONDUITS_30D[0]?.concPct ?? 100}%) ↗
+            </button>
+          </span>
+        </div>
+      </section>
 
       {/* Main View Area */}
       <main style={styles.main}>
@@ -1366,10 +1621,28 @@ export function App(): React.ReactElement {
               void runTerminalCommand(`profile ${customerId}`);
             }}
             onSelectAgent={(agentId) => setSelectedAgentId(agentId)}
+            onViewCustomerWagers={(customerId) => {
+              setWagerSportFilter("ALL");
+              setWagerAlertFilter("ALL");
+              setWagerTypeFilter("ALL");
+              setWagerSearch(customerId);
+              const match = liveWagers.find(
+                (w) => w.customerId.toUpperCase() === customerId.toUpperCase(),
+              );
+              if (match) {
+                setSelectedWager(match);
+              }
+              setActiveTab("wagers");
+            }}
           />
         ) : activeTab === "surveillance" ? (
           <SurveillanceTabPanel
             dnsData={dnsData}
+            dnsRefreshing={dnsRefreshing}
+            dnsError={dnsError}
+            onRefreshDns={() => {
+              void fetchDnsTelemetry();
+            }}
             benchLoading={benchLoading}
             benchResult={benchResult}
             onRunBenchmark={() => {
@@ -1504,6 +1777,7 @@ export function App(): React.ReactElement {
             wagers={liveWagers}
             provenance={wagersProvenance}
             wagersError={wagersError}
+            wireContract={wireContract}
             onRefreshWagers={() => {
               void fetchLiveWagers();
             }}
@@ -1542,8 +1816,8 @@ export function App(): React.ReactElement {
         <span>Updated: {data?.updatedAt ?? "—"}</span>
         <span>
           Native Bun HTML Bundler + Bun.serve Routes + bun:bundle (
-          {runtimeFlags.target}) + tokens.toml v1.1.0 · autoExecute: false
-          invariant active
+          {runtimeFlags.target}) + tokens.toml v1.2.0 · dashboard.toml v2.0.0 ·
+          autoExecute: false invariant active
         </span>
       </footer>
 

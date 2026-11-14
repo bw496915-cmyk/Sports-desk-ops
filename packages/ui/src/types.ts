@@ -7,6 +7,7 @@ import type {
   BetTickerTypeBucket,
   CustomersApiResponse,
   CustomersCohortsSummary,
+  Daemon4020State,
   Daemon4020Status,
   DashboardFeedProvenanceKind,
   DashboardSourceProvenance,
@@ -15,6 +16,7 @@ import type {
   R2PipelineApiResponse,
   R2SinkDetail,
   WagerTier,
+  WagersWireContractSummary,
 } from "@sportsdesk-ops/contracts";
 
 export type {
@@ -26,6 +28,7 @@ export type {
   BetTickerTypeBucket,
   CustomersApiResponse,
   CustomersCohortsSummary,
+  Daemon4020State,
   Daemon4020Status,
   DashboardFeedProvenanceKind,
   DashboardSourceProvenance,
@@ -33,11 +36,16 @@ export type {
   LiveWagersApiResponse,
   R2PipelineApiResponse,
   R2SinkDetail,
+  WagersWireContractSummary,
 };
 
 export interface DashboardData {
   readonly markdown: string;
   readonly html: string;
+  readonly renderDurationMs?: number;
+  readonly markdownBytes?: number;
+  readonly htmlBytes?: number;
+  readonly nonAsciiChars?: number;
   readonly updatedAt: string;
 }
 
@@ -50,9 +58,12 @@ export interface DnsData {
     readonly cacheHitsInflight: number;
     readonly cacheMisses: number;
     readonly defaultTtlSeconds: number;
+    readonly errors?: number;
+    readonly totalCount?: number;
   };
   readonly hosts?: readonly {
     readonly hostname: string;
+    readonly port?: number;
     readonly serviceName?: string;
   }[];
   readonly coreHosts?: readonly {
@@ -60,6 +71,34 @@ export interface DnsData {
     readonly port?: number;
     readonly serviceName?: string;
   }[];
+  readonly updatedAt?: string;
+  readonly generatedAt?: string;
+}
+
+export interface CustomerPortalReconciliation {
+  readonly creditLimitUsd: number;
+  readonly currentBalanceUsd: number;
+  readonly pendingWagerBalanceUsd: number;
+  readonly pendingWagerCount: number;
+  readonly availableBalanceUsd: number;
+  readonly creditEquationBalanced: boolean;
+  readonly carryOverUsd: number;
+  readonly previousBalanceUsd: number;
+  readonly carryOverParityMatched: boolean;
+  readonly carryOverWindow: string;
+  readonly postCarryOverWindow: string;
+  readonly postCarryOverNetUsd: number;
+  readonly net31dUsd: number;
+  readonly activeDays31d: number;
+  readonly winDays31d: number;
+  readonly lossDays31d: number;
+  readonly wagerLimitUsd: number;
+  readonly settleFigureUsd: number;
+  readonly confirmationDelaySec: number;
+  readonly wiseLineMovementWeight: number;
+  readonly inetTarget: string;
+  readonly assignedParlayName: string;
+  readonly postureFlags: readonly string[];
 }
 
 export interface ShowcaseCustomer {
@@ -99,6 +138,7 @@ export interface ShowcaseCustomer {
   readonly shadowCopyMultiplier: number;
   readonly action: string;
   readonly ipAddress: string;
+  readonly portalReconciliation?: CustomerPortalReconciliation | undefined;
 }
 
 export interface RankedPlayer30d {
@@ -153,53 +193,66 @@ export interface LiveWager {
 }
 
 export interface DashboardAlertRecord {
-  deliveryId: string;
-  wagerId: string;
-  tier: WagerTier;
-  status: "queued" | "delivered" | "dead" | "acknowledged";
-  payload: {
-    customerId: string;
-    sport?: string;
-    event?: string;
-    selection?: string;
-    oddsAmerican?: string;
-    amountUsd?: number;
-    clvCents?: number;
-    directive?: string;
+  readonly deliveryId: string;
+  readonly wagerId: string;
+  readonly tier: WagerTier;
+  readonly status: "queued" | "delivered" | "dead" | "acknowledged";
+  readonly payload: {
+    readonly customerId: string;
+    readonly sport?: string | undefined;
+    readonly event?: string | undefined;
+    readonly selection?: string | undefined;
+    readonly oddsAmerican?: string | undefined;
+    readonly amountUsd?: number | undefined;
+    readonly clvCents?: number | undefined;
+    readonly directive?: string | undefined;
   };
-  createdAt: string;
-  updatedAt: string;
-  attempts?: number;
-  finalError?: string;
-  retriedFrom?: string;
-  acknowledgedBy?: string;
-  acknowledgedNotes?: string;
-  messageId?: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly attempts?: number | undefined;
+  readonly finalError?: string | undefined;
+  readonly retriedFrom?: string | undefined;
+  readonly acknowledgedBy?: string | undefined;
+  readonly acknowledgedNotes?: string | undefined;
+  readonly messageId?: number | undefined;
 }
 
 export interface HealthData {
-  status: "ok" | "warning" | "degraded";
-  uptimeSeconds: number;
-  alerts?: {
-    status: "ok" | "warning" | "degraded";
-    queued: number;
-    delivered: number;
-    dead: number;
-    backlog: number;
-    acknowledged?: number;
-  };
+  readonly status: "ok" | "warning" | "degraded" | "healthy" | "down";
+  readonly operationalStatus?: "ok" | "degraded" | "down" | undefined;
+  readonly dataStatus?: "ok" | "stale" | undefined;
+  readonly httpStatus?: number | undefined;
+  readonly uptimeSeconds: number;
+  readonly alerts?:
+    | {
+        readonly status: "ok" | "warning" | "degraded";
+        readonly queued: number;
+        readonly delivered: number;
+        readonly dead: number;
+        readonly backlog: number;
+        readonly acknowledged?: number | undefined;
+      }
+    | undefined;
+  readonly degradedReasons?:
+    | readonly {
+        readonly message: string;
+        readonly kind: string;
+        readonly severity: string;
+        readonly action?: string | undefined;
+      }[]
+    | undefined;
 }
 
 export interface ShiftSummaryData {
-  date: string;
-  operatorId: string;
-  totalAlerts: number;
-  deliveredAlerts: number;
-  failedAttempts: number;
-  deadLetterAlerts: number;
-  acknowledgedAlerts: number;
-  terminalCommandsCount: number;
-  loginEventsCount: number;
+  readonly date: string;
+  readonly operatorId: string;
+  readonly totalAlerts: number;
+  readonly deliveredAlerts: number;
+  readonly failedAttempts: number;
+  readonly deadLetterAlerts: number;
+  readonly acknowledgedAlerts: number;
+  readonly terminalCommandsCount: number;
+  readonly loginEventsCount: number;
 }
 
 export interface BuildMatrixRow {
@@ -212,24 +265,188 @@ export interface BuildMatrixRow {
   readonly hasProdSentinel: boolean;
 }
 
-export type DashboardTabId =
-  | "surveillance"
-  | "customers"
-  | "terminal"
-  | "rankings"
-  | "wagers"
-  | "bet-ticker"
-  | "r2"
-  | "alerts"
-  | "shadow";
+/**
+ * Canonical ordered registry of top-level SportsDesk Dashboard tab identifiers.
+ * Single source of truth for URL `?tab=` routing, `dashboard.toml` `panels.default_tab`,
+ * keyboard shortcuts, and legacy route aliases.
+ */
+export const DASHBOARD_TAB_IDS = [
+  "customers",
+  "shadow",
+  "surveillance",
+  "terminal",
+  "rankings",
+  "wagers",
+  "bet-ticker",
+  "r2",
+  "alerts",
+] as const;
 
-export type RankingsFilter = "ALL" | "CONDUITS" | "TIER3" | "WHALES";
-export type TerminalCategory = "ALL" | "SHARPS" | "DOWNLINES" | "RISK" | "NET";
-export type AlertFilter =
-  "ALL" | "DEAD" | "QUEUED" | "DELIVERED" | "ACKNOWLEDGED";
-export type CustomerSortKey = "id" | "score" | "gini" | "var95Usd" | "holdPct";
-export type WagerSortField =
-  "timestamp" | "riskUsd" | "toWinUsd" | "clvCents" | "alertTier";
+export type DashboardTabId = (typeof DASHBOARD_TAB_IDS)[number];
+
+export interface DashboardTabSpec {
+  readonly id: DashboardTabId;
+  readonly label: string;
+  readonly icon: string;
+  readonly shortcut: string;
+  readonly description: string;
+  readonly aliases: readonly string[];
+}
+
+export const DASHBOARD_TAB_SPECS: Readonly<
+  Record<DashboardTabId, DashboardTabSpec>
+> = {
+  customers: {
+    id: "customers",
+    label: "Profiles",
+    icon: "👥",
+    shortcut: "Ctrl+1",
+    description: "Sharp originator profiling, sizing Gini & Bayesian skill",
+    aliases: ["profiles", "bettors", "customer"],
+  },
+  surveillance: {
+    id: "surveillance",
+    label: "Telemetry",
+    icon: "📊",
+    shortcut: "Ctrl+2",
+    description: "Bun.dns cache telemetry, dispatch thresholds & risk brief",
+    aliases: ["telemetry", "dns", "overview"],
+  },
+  terminal: {
+    id: "terminal",
+    label: "Terminal (PTY)",
+    icon: "💻",
+    shortcut: "Ctrl+3",
+    description: "Native Bun.Terminal interactive operator PTY engine",
+    aliases: ["pty", "cli", "console"],
+  },
+  rankings: {
+    id: "rankings",
+    label: "Downlines",
+    icon: "🏆",
+    shortcut: "Ctrl+4",
+    description: "30-day sub-agent handle rankings & proxy conduit trees",
+    aliases: ["downlines", "agents", "conduits"],
+  },
+  wagers: {
+    id: "wagers",
+    label: "Live Wagers",
+    icon: "⚡",
+    shortcut: "Ctrl+5",
+    description: "Real-time incoming wager tape, CLV ramp & slice leaders",
+    aliases: ["live-wagers", "tape"],
+  },
+  "bet-ticker": {
+    id: "bet-ticker",
+    label: "Bet Ticker",
+    icon: "🎟️",
+    shortcut: "Ctrl+6",
+    description: "Portal bet-ticker wire stream & R2 capture snapshots",
+    aliases: ["ticker", "bet_ticker"],
+  },
+  shadow: {
+    id: "shadow",
+    label: "Shadow Pricing",
+    icon: "⚖️",
+    shortcut: "Ctrl+7",
+    description: "Counterfactual shadow pricing & slice hold-floor cube",
+    aliases: ["shadow-pricing", "slices", "hold-floors"],
+  },
+  r2: {
+    id: "r2",
+    label: "R2 Pipeline",
+    icon: "☁️",
+    shortcut: "Ctrl+8",
+    description: "Multi-sink Cloudflare R2 artifact freshness & Last-Modified",
+    aliases: ["r2-pipeline", "pipeline", "storage"],
+  },
+  alerts: {
+    id: "alerts",
+    label: "DLQ & Alerts",
+    icon: "🚨",
+    shortcut: "Ctrl+9",
+    description: "Operator alert delivery queue, dead-letter retry & acks",
+    aliases: ["dlq", "notifications"],
+  },
+};
+
+const DASHBOARD_TAB_ID_SET: ReadonlySet<string> = new Set(DASHBOARD_TAB_IDS);
+
+const LEGACY_TAB_ALIAS_MAP: Readonly<Record<string, DashboardTabId>> =
+  Object.freeze(
+    Object.fromEntries(
+      DASHBOARD_TAB_IDS.flatMap((id) =>
+        DASHBOARD_TAB_SPECS[id].aliases.map((alias) => [alias, id] as const),
+      ),
+    ),
+  );
+
+export function isDashboardTabId(value: unknown): value is DashboardTabId {
+  return typeof value === "string" && DASHBOARD_TAB_ID_SET.has(value);
+}
+
+/**
+ * Resolves a raw `?tab=`, hash slug, or legacy alias to a canonical `DashboardTabId`,
+ * falling back to `fallback` (`"customers"` by default) when empty or unknown.
+ */
+export function resolveDashboardTabId(
+  raw: unknown,
+  fallback: DashboardTabId = "customers",
+): DashboardTabId {
+  if (typeof raw !== "string") return fallback;
+  const cleaned = raw
+    .trim()
+    .replace(/^[#/]+/, "")
+    .toLowerCase();
+  if (!cleaned) return fallback;
+  if (isDashboardTabId(cleaned)) return cleaned;
+  return LEGACY_TAB_ALIAS_MAP[cleaned] ?? fallback;
+}
+
+export const RANKINGS_FILTERS = ["ALL", "CONDUITS", "TIER3", "WHALES"] as const;
+export type RankingsFilter = (typeof RANKINGS_FILTERS)[number];
+
+export const TERMINAL_CATEGORIES = [
+  "ALL",
+  "SHARPS",
+  "DOWNLINES",
+  "RISK",
+  "NET",
+] as const;
+export type TerminalCategory = (typeof TERMINAL_CATEGORIES)[number];
+
+export const ALERT_FILTERS = [
+  "ALL",
+  "DEAD",
+  "QUEUED",
+  "DELIVERED",
+  "ACKNOWLEDGED",
+] as const;
+export type AlertFilter = (typeof ALERT_FILTERS)[number];
+
+export const CUSTOMER_SORT_KEYS = [
+  "id",
+  "score",
+  "gini",
+  "var95Usd",
+  "holdPct",
+] as const;
+export type CustomerSortKey = (typeof CUSTOMER_SORT_KEYS)[number];
+
+export const WAGER_SORT_FIELDS = [
+  "timestamp",
+  "riskUsd",
+  "toWinUsd",
+  "clvCents",
+  "alertTier",
+] as const;
+export type WagerSortField = (typeof WAGER_SORT_FIELDS)[number];
+
+const WAGER_SORT_FIELD_SET: ReadonlySet<string> = new Set(WAGER_SORT_FIELDS);
+
+export function isWagerSortField(value: unknown): value is WagerSortField {
+  return typeof value === "string" && WAGER_SORT_FIELD_SET.has(value);
+}
 
 export interface AlertToastState {
   readonly message: string;
@@ -244,7 +461,10 @@ export interface TerminalHistoryEntry {
   readonly timestamp: number;
 }
 
-export type TierStyleConfig = Record<
-  string,
-  { fg: string; bg: string; border: string }
->;
+export interface TierSwatchStyle {
+  readonly fg: string;
+  readonly bg: string;
+  readonly border: string;
+}
+
+export type TierStyleConfig = Readonly<Record<string, TierSwatchStyle>>;

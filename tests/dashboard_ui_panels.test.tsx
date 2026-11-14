@@ -5,11 +5,13 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { App } from "../packages/ui/src/App.tsx";
 import { renderAnsiReact } from "../packages/ui/src/ansi.tsx";
+import * as uiBarrel from "../packages/ui/src/index.ts";
 import {
   AlertsTabPanel,
   BetTickerTabPanel,
   BuildMatrixDrawer,
   CustomersTabPanel,
+  HOUDINI_TOKENS,
   LiveWagersTabPanel,
   R2PipelineTabPanel,
   RankingsTabPanel,
@@ -32,30 +34,56 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(html).toContain(`Profiles (${SAMPLE_PROFILE_DATA.length})`);
     expect(html).toContain(`Downlines (${PROXY_CONDUITS_30D.length})`);
     expect(html).toContain(`Live Wagers (${SAMPLE_LIVE_WAGERS.length})`);
+    expect(html).toContain("Desk Quick-Jump:");
+    expect(html).toContain("NCAAB Slice");
+    expect(html).toContain("GSLive / In-Play");
+    expect(html).toContain("Figure-Date Audit: BRT106");
     expect(html).toContain("GP301");
   });
 
-  test("BuildMatrixDrawer renders sentinel, token swatches, and target table", () => {
+  test("BuildMatrixDrawer renders sentinel, all 18 Houdini tokens, DCE flags, delta vs dev, and active target", () => {
     const html = renderToStaticMarkup(
       React.createElement(BuildMatrixDrawer, {
-        dceMarker: "[DCE_UNBUNDLED_HMR]",
+        dceMarker: "[DCE_PROD_TARGET_ACTIVE]",
         loading: false,
+        target: "prod",
+        enabledFeatures: ["PROD", "ANALYTICS"],
+        error: null,
+        onRefresh: () => {},
         rows: [
           {
             target: "prod",
-            features: ["PROD"],
+            features: ["PROD", "ANALYTICS"],
             totalJsBytes: 40960,
             totalCssBytes: 8192,
             hasDebugSentinel: false,
             hasExperimentalSentinel: false,
             hasProdSentinel: true,
           },
+          {
+            target: "dev",
+            features: ["DEBUG", "TEST", "ANALYTICS", "EXPERIMENTAL"],
+            totalJsBytes: 81920,
+            totalCssBytes: 8192,
+            hasDebugSentinel: true,
+            hasExperimentalSentinel: true,
+            hasProdSentinel: false,
+          },
         ],
       }),
     );
-    expect(html).toContain("[DCE_UNBUNDLED_HMR]");
+    expect(html).toContain("[DCE_PROD_TARGET_ACTIVE]");
+    expect(html).toContain("Active Target: prod");
+    expect(html).toContain(`All Tokens (${HOUDINI_TOKENS.length})`);
     expect(html).toContain("Obsidian: --sd-surface-bg");
+    expect(html).toContain("Elevated: --sd-surface-elevated");
+    expect(html).toContain("CLI: --sd-surface-cli");
+    expect(html).toContain("Pending R01: --sd-route-pending");
+    expect(html).toContain("#070b14");
     expect(html).toContain("40.0 KB");
+    expect(html).toContain("-40.0 KB (-50.0%)");
+    expect(html).toContain("ACTIVE");
+    expect(html).toContain("ANALYTICS");
     expect(html).toContain("✅ Kept");
     expect(html).toContain("✂️ Pruned (DCE)");
   });
@@ -87,12 +115,79 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
       }),
     );
     expect(html).toContain(`Profiled Bettors (${SAMPLE_PROFILE_DATA.length})`);
+    expect(html).toContain("Avg Sharp:");
+    expect(html).toContain("Alerts");
+    expect(html).toContain("Σ VaR:");
+    expect(html).toContain(`#1 / ${SAMPLE_PROFILE_DATA.length}`);
+    expect(html).toContain("← Prev");
+    expect(html).toContain("Next →");
+    expect(html).toContain("VaR / Max Cap:");
     expect(html).toContain("Pending…");
     expect(html).not.toContain("49 Accounts");
     expect(html).not.toContain("4,914 IDs");
     expect(html).toContain("Decomposed Sharpness Radars");
     expect(html).toContain("Golden Punter Syndicate Seat 1");
     expect(html).toContain("Datacenter check clean");
+
+    const emptyHtml = renderToStaticMarkup(
+      React.createElement(CustomersTabPanel, {
+        bannerDismissed: true,
+        onDismissBanner: noop,
+        kpisCollapsed: true,
+        onToggleKpis: noop,
+        searchQuery: "NONEXISTENT",
+        onSearchQueryChange: noop,
+        filterTier: "ALL",
+        onFilterTierChange: noop,
+        sortedCustomers: [],
+        customerSort: { key: "score", dir: -1 },
+        onCustomerSort: noop,
+        selectedCustomer: null,
+        onSelectCustomer: noop,
+        copiedCliId: null,
+        onCopyCli: noop,
+        customerForensicResult: null,
+        onClearForensicResult: noop,
+        onRunReverseLookup: noop,
+        onOpenTerminalProfile: noop,
+      }),
+    );
+    expect(emptyHtml).toContain("No profiled bettors match current filters.");
+    expect(emptyHtml).toContain("Reset filters");
+
+    const brt106 = SAMPLE_PROFILE_DATA.find((c) => c.id === "BRT106")!;
+    expect(brt106).toBeDefined();
+    const brtHtml = renderToStaticMarkup(
+      React.createElement(CustomersTabPanel, {
+        bannerDismissed: false,
+        onDismissBanner: noop,
+        kpisCollapsed: false,
+        onToggleKpis: noop,
+        searchQuery: "",
+        onSearchQueryChange: noop,
+        filterTier: "ALL",
+        onFilterTierChange: noop,
+        sortedCustomers: SAMPLE_PROFILE_DATA,
+        customerSort: { key: "score", dir: -1 },
+        onCustomerSort: noop,
+        selectedCustomer: brt106,
+        onSelectCustomer: noop,
+        copiedCliId: null,
+        onCopyCli: noop,
+        customerForensicResult: null,
+        onClearForensicResult: noop,
+        onRunReverseLookup: noop,
+        onOpenTerminalProfile: noop,
+        onViewCustomerWagers: noop,
+      }),
+    );
+    expect(brtHtml).toContain(
+      "Cross-Endpoint Portal &amp; Figure-Date Reconciliation",
+    );
+    expect(brtHtml).toContain("CREDIT &amp; CARRYOVER BALANCED (0¢ DELTA)");
+    expect(brtHtml).toContain("LINE_MOVER_WEIGHT_ACTIVE");
+    expect(brtHtml).toContain("BETTING_ALERTS_DISABLED");
+    expect(brtHtml).toContain("⚡ Wager Tape");
   });
 
   test("SurveillanceTabPanel renders DNS telemetry, benchmark controls, and markdown/html view", () => {
@@ -107,8 +202,19 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
             cacheHitsInflight: 3,
             cacheMisses: 2,
             defaultTtlSeconds: 30,
+            errors: 0,
+            totalCount: 125,
           },
+          coreHosts: [
+            {
+              hostname: "fantasy402.com",
+              port: 443,
+              serviceName: "Fantasy402 Manager Portal",
+            },
+          ],
+          generatedAt: "2026-11-13T12:34:56Z",
         },
+        onRefreshDns: noop,
         benchLoading: false,
         benchResult: "c-ares: 1.2ms",
         onRunBenchmark: noop,
@@ -125,9 +231,88 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
         },
       }),
     );
+    expect(html).toContain("WARM");
+    expect(html).toContain("4/256");
+    expect(html).toContain("1.6%");
     expect(html).toContain("98.5%");
+    expect(html).toContain("Lookups:");
+    expect(html).toContain("125");
+    expect(html).toContain("2% coalesced");
+    expect(html).toContain("12:34:56 UTC");
+    expect(html).toContain("Prefetched Hosts (1)");
+    expect(html).toContain("↻ Refresh");
     expect(html).toContain("c-ares: 1.2ms");
+    expect(html).toContain("📝 Surveillance Brief");
+    expect(html).toContain("Bun.markdown.html()");
+    expect(html).toContain("⧉ Copy MD");
     expect(html).toContain("# Live Desk Status");
+  });
+
+  test("SurveillanceTabPanel renders interactive markdown brief telemetry, outline toggle, and sd-markdown-doc wrapper", () => {
+    const noop = () => {};
+    const html = renderToStaticMarkup(
+      React.createElement(SurveillanceTabPanel, {
+        dnsData: null,
+        benchLoading: false,
+        benchResult: null,
+        onRunBenchmark: noop,
+        reverseIp: "1.1.1.1",
+        onReverseIpChange: noop,
+        reverseResult: null,
+        onRunReverseLookup: noop,
+        viewMode: "interactive",
+        onViewModeChange: noop,
+        data: {
+          markdown:
+            "# 📊 SportsDesk\n\n> Live Risk Telemetry · Desk Hotline\n\n## 🎯 Top Sharps\n\n| A | B |\n| - | - |\n| 1 | 2 |",
+          html: '<h1 id="sportsdesk">📊 SportsDesk</h1><blockquote><p>Live Risk Telemetry · Desk Hotline</p></blockquote><h2 id="top-sharps">🎯 Top Sharps</h2><table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>',
+          renderDurationMs: 0.42,
+          updatedAt: "2026-11-12T08:15:30Z",
+        },
+      }),
+    );
+    expect(html).toContain("sd-markdown-doc");
+    expect(html).toContain("#ids");
+    expect(html).toContain("Outline (1)");
+    expect(html).toContain("3 glyphs");
+    expect(html).toContain("0.42 ms");
+    expect(html).toContain("08:15:30 UTC");
+    expect(html).toContain("Tables:");
+  });
+
+  test("SurveillanceTabPanel renders DNS error badge and refresh warning when degraded", () => {
+    const noop = () => {};
+    const html = renderToStaticMarkup(
+      React.createElement(SurveillanceTabPanel, {
+        dnsData: {
+          telemetry: {
+            size: 6,
+            hitRatePercent: 40,
+            cacheHitsCompleted: 4,
+            cacheHitsInflight: 0,
+            cacheMisses: 6,
+            defaultTtlSeconds: 30,
+            errors: 2,
+          },
+        },
+        dnsRefreshing: true,
+        dnsError: "HTTP 503",
+        onRefreshDns: noop,
+        benchLoading: false,
+        benchResult: null,
+        onRunBenchmark: noop,
+        reverseIp: "1.1.1.1",
+        onReverseIpChange: noop,
+        reverseResult: null,
+        onRunReverseLookup: noop,
+        viewMode: "interactive",
+        onViewModeChange: noop,
+        data: null,
+      }),
+    );
+    expect(html).toContain("2 ERR");
+    expect(html).toContain("Refreshing...");
+    expect(html).toContain("DNS refresh warning: HTTP 503");
   });
 
   test("TerminalTabPanel renders PTY window, quick chips, and ANSI history", () => {
@@ -239,31 +424,99 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
   test("LiveWagersTabPanel renders incoming wagers table and selected ticket inspector", () => {
     const noop = () => {};
     const wager = SAMPLE_LIVE_WAGERS[0]!;
+    const baseProps = {
+      wagerSearch: "",
+      onWagerSearchChange: noop,
+      wagerSportFilter: "ALL",
+      onWagerSportFilterChange: noop,
+      wagerAlertFilter: "ALL",
+      onWagerAlertFilterChange: noop,
+      wagerTypeFilter: "ALL",
+      onWagerTypeFilterChange: noop,
+      wagerSortField: "timestamp" as const,
+      wagerSortDir: "desc" as const,
+      onWagerSort: noop,
+      selectedWager: wager,
+      onSelectWager: noop,
+      copiedTicketId: null,
+      onCopyText: noop,
+      tiersConfig: null,
+      onSelectCustomerById: noop,
+      onInspectPty: noop,
+    };
     const html = renderToStaticMarkup(
-      React.createElement(LiveWagersTabPanel, {
-        wagerSearch: "",
-        onWagerSearchChange: noop,
-        wagerSportFilter: "ALL",
-        onWagerSportFilterChange: noop,
-        wagerAlertFilter: "ALL",
-        onWagerAlertFilterChange: noop,
-        wagerTypeFilter: "ALL",
-        onWagerTypeFilterChange: noop,
-        wagerSortField: "timestamp",
-        wagerSortDir: "desc",
-        onWagerSort: noop,
-        selectedWager: wager,
-        onSelectWager: noop,
-        copiedTicketId: null,
-        onCopyText: noop,
-        tiersConfig: null,
-        onSelectCustomerById: noop,
-        onInspectPty: noop,
-      }),
+      React.createElement(LiveWagersTabPanel, baseProps),
     );
     expect(html).toContain("Live Incoming Wagers");
     expect(html).toContain("Ticket Inspector: #W-109281");
     expect(html).toContain("Kansas City Chiefs @ Buffalo Bills");
+    // wagers.toml is inlined into the bundle: its policy tag renders and the
+    // stake emphasis floor (dashboard.toml) tags overweight samples.
+    expect(html).toContain("wagers-policy/v1");
+    expect(html).toContain("HIGH RISK");
+    expect(html).not.toContain("wagers-dead-table-sentinel");
+
+    // Wire-contract chip: clean run vs. violations, rendered from the same props.
+    const clean = renderToStaticMarkup(
+      React.createElement(LiveWagersTabPanel, {
+        ...baseProps,
+        wireContract: {
+          ok: true,
+          registry: "schema/wagers_field_contract.json",
+          capture: "getBetTicker-2026-10-31",
+          capture_sha256: "955c3d0a",
+          enum_source: "observed",
+          fields_checked: ["WagerType", "ShortDesc", "VolumeAmount", "VIP"],
+          rows: 237,
+          skipped_rows: 63,
+          violations: [],
+        },
+      }),
+    );
+    expect(clean).toContain("✓ wire: 237 rows");
+    expect(clean).toContain("63 sentinel row(s) skipped");
+
+    const dirty = renderToStaticMarkup(
+      React.createElement(LiveWagersTabPanel, {
+        ...baseProps,
+        wireContract: {
+          ok: false,
+          registry: "schema/wagers_field_contract.json",
+          capture: "getBetTicker-2026-10-31",
+          capture_sha256: "955c3d0a",
+          enum_source: "observed",
+          fields_checked: ["VIP"],
+          rows: 237,
+          skipped_rows: 0,
+          violations: [
+            { field: "VIP", kind: "nullable", count: 4, examples: ["null"] },
+          ],
+        },
+      }),
+    );
+    expect(dirty).toContain("⚠ wire: 1 issue(s)");
+    expect(dirty).toContain("VIP: nullable ×4");
+
+    // A stale clean contract must not read as clean when the feed failed.
+    const errored = renderToStaticMarkup(
+      React.createElement(LiveWagersTabPanel, {
+        ...baseProps,
+        wagersError: "GET /api/wagers failed: boom",
+        wireContract: {
+          ok: true,
+          registry: "schema/wagers_field_contract.json",
+          capture: "getBetTicker-2026-10-31",
+          capture_sha256: "955c3d0a",
+          enum_source: "observed",
+          fields_checked: ["VIP"],
+          rows: 237,
+          skipped_rows: 0,
+          violations: [],
+        },
+      }),
+    );
+    expect(errored).toContain("⚠ wire: unavailable");
+    expect(errored).not.toContain("✓ wire: 237 rows");
   });
 
   test("ShiftHandoffModal renders operator handoff summary and DLQ status note", () => {
@@ -479,6 +732,38 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(r2Html).toContain("gslive tally");
     expect(r2Html).toContain("bun run tally:bridge3c");
     expect(r2Html).toContain("2026-11-09");
+
+    const degradedR2Html = renderToStaticMarkup(
+      React.createElement(R2PipelineTabPanel, {
+        data: {
+          schemaVersion: 1,
+          bucketPublicBase: "https://pub.example.r2.dev",
+          observedAt: "2026-11-12T18:00:00Z",
+          overallStatus: "stale",
+          freshCount: 0,
+          totalCount: 1,
+          staleKeys: ["gslive-tally/latest.json"],
+          dataStaleKeys: ["gslive-tally/latest.json"],
+          sinks: [],
+          daemon4020: {
+            online: true,
+            state: "degraded",
+            operationalStatus: "down",
+            url: "http://127.0.0.1:4020/health",
+            status: 503,
+            latencyMs: 9,
+            checkedAt: "2026-11-12T18:00:00Z",
+            reason: "HTTP 503 — F402 session expired",
+          },
+        },
+        loading: false,
+        error: null,
+        onRefresh: noop,
+      }),
+    );
+    expect(degradedR2Html).toContain("Reachable — Auth Down (9ms)");
+    expect(degradedR2Html).toContain("F402 session expired");
+    expect(degradedR2Html).not.toContain("Offline");
   });
 
   test("UI panels, ANSI renderer, and dashboard.md replace dead desk.bookdeskops.com/agent/ URLs with local links", () => {
@@ -557,5 +842,15 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(ansiHtml).toContain('href="/agent/FAKEMONEY"');
     expect(ansiHtml).not.toContain("https://desk.bookdeskops.com/agent/");
     expect(dashboardMd).not.toContain("https://desk.bookdeskops.com/agent/");
+  });
+
+  test("@sportsdesk-ops/ui public index.ts barrel exposes TOML contracts, route helpers, panels, and tab specs", () => {
+    expect(uiBarrel.App).toBe(App);
+    expect(typeof uiBarrel.ThresholdsPanel).toBe("function");
+    expect(typeof uiBarrel.getLocalAgentHref).toBe("function");
+    expect(typeof uiBarrel.resolveDashboardTabId).toBe("function");
+    expect(uiBarrel.DASHBOARD_META.schema).toBe("sportsdesk-dashboard/v2");
+    expect(uiBarrel.WAGERS_META.schema).toBe("sportsdesk-wagers-tab/v1");
+    expect(uiBarrel.DASHBOARD_TAB_IDS).toContain("wagers");
   });
 });

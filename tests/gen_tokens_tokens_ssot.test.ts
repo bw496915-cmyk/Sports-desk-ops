@@ -14,11 +14,26 @@ describe("parseTokensToml", () => {
     ).text();
     const ssot = parseTokensToml(tomlText);
 
-    expect(ssot.meta.version).toBe("1.1.0");
+    expect(ssot.meta.version).toBe("1.2.0");
+    expect(ssot.meta.schema).toBe("sportsdesk-tokens/v1");
+    expect(ssot.meta.updated_at).toBe("2026-11-14T00:00:00Z");
     expect(ssot.surfaces).toHaveLength(2);
     expect(ssot.ingestion).toHaveLength(7);
     expect(ssot.routes).toHaveLength(4);
-    expect(ssot.ui).toHaveLength(5);
+    expect(ssot.ui.length).toBeGreaterThanOrEqual(9);
+    expect(ssot.ui.map((u) => u.token_name)).toEqual(
+      expect.arrayContaining([
+        "--sd-surface-card",
+        "--sd-surface-elevated",
+        "--sd-surface-hover",
+        "--sd-surface-raised",
+        "--sd-surface-border",
+        "--sd-border-strong",
+        "--sd-text-primary",
+        "--sd-text-secondary",
+        "--sd-text-muted",
+      ]),
+    );
 
     const blocked = ssot.ingestion.find((c) => c.layer_id === "L19.N0518");
     expect(blocked?.sla_kind).toBe("sentinel_drop");

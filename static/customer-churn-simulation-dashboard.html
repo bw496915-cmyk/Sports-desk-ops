@@ -36,20 +36,40 @@
         inherits: true;
         initial-value: #0d1527;
       }
+      @property --sd-surface-elevated {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #111c33;
+      }
       @property --sd-surface-hover {
         syntax: "<color>";
         inherits: true;
         initial-value: #131f38;
+      }
+      @property --sd-surface-raised {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #1a2436;
       }
       @property --sd-surface-border {
         syntax: "<color>";
         inherits: true;
         initial-value: #1e293b;
       }
+      @property --sd-border-strong {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #334155;
+      }
       @property --sd-text-primary {
         syntax: "<color>";
         inherits: true;
         initial-value: #f1f5f9;
+      }
+      @property --sd-text-secondary {
+        syntax: "<color>";
+        inherits: true;
+        initial-value: #cbd5e1;
       }
       @property --sd-text-muted {
         syntax: "<color>";
@@ -116,13 +136,17 @@
        2. Canonical :root Variables and Backward-Compatible Aliases
        ========================================================================== */
       :root {
-        /* Generated from tokens.toml (v1.1.0) */
+        /* Generated from tokens.toml (v1.2.0) */
         --sd-surface-bg: #070b14;
         --sd-surface-cli: #04070e;
         --sd-surface-card: #0d1527;
+        --sd-surface-elevated: #111c33;
         --sd-surface-hover: #131f38;
+        --sd-surface-raised: #1a2436;
         --sd-surface-border: #1e293b;
+        --sd-border-strong: #334155;
         --sd-text-primary: #f1f5f9;
+        --sd-text-secondary: #cbd5e1;
         --sd-text-muted: #94a3b8;
         --sd-tier-retail: #1d84b5;
         --sd-tier-blocked: #64748b;

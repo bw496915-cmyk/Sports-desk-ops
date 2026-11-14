@@ -4,13 +4,27 @@ import {
   formatProvenanceBadge,
   SHOWCASE_WAGERS_PROVENANCE,
 } from "../hydration.ts";
+import { DASHBOARD_THRESHOLDS } from "../config/dashboard.ts";
+import {
+  clvEdgeTone,
+  WAGER_ALERT_TIERS,
+  WAGER_BET_TYPE_FILTERS,
+  WAGER_PERIOD_FILTERS,
+  WAGER_SPORT_FILTERS,
+  WAGER_TIER_RANK,
+  WAGERS_META,
+  WAGERS_TABLE,
+  WAGERS_THRESHOLDS,
+} from "../config/wagers.ts";
 import { getLocalAgentHref } from "../links.ts";
 import { SAMPLE_LIVE_WAGERS } from "../showcase_data.ts";
+import { WireContractChip } from "./WireContractChip.tsx";
 import type {
   DashboardSourceProvenance,
   LiveWager,
   TierStyleConfig,
   WagerSortField,
+  WagersWireContractSummary,
 } from "../types.ts";
 
 export interface LiveWagersTabPanelProps {
@@ -34,49 +48,26 @@ export interface LiveWagersTabPanelProps {
   readonly copiedTicketId: string | null;
   readonly onCopyText: (ticketId: string, text: string) => void;
   readonly tiersConfig: TierStyleConfig | null;
+  /** Vendor wire-contract check from the feed; absent when the host doesn't check. */
+  readonly wireContract?: WagersWireContractSummary | null | undefined;
   readonly onSelectCustomerById: (customerId: string) => void;
   readonly onInspectPty: (customerId: string) => void;
   readonly onSelectAgent?: ((agentId: string) => void) | undefined;
 }
 
-const SPORT_PILLS = [
-  { id: "ALL", label: "All Sports" },
-  { id: "NFL", label: "🏈 NFL" },
-  { id: "CFB", label: "🎓 CFB" },
-  { id: "NBA", label: "🏀 NBA" },
-  { id: "NCAAB", label: "🏀 NCAAB" },
-  { id: "SOCCER", label: "⚽ Soccer" },
-];
-
-const PERIOD_SLICE_PILLS = [
-  { id: "", label: "All Periods" },
-  { id: "1H", label: "⏱️ 1st Half (1H)" },
-  { id: "2H", label: "⏱️ 2nd Half (2H)" },
-  { id: "In-Play", label: "📡 Live / GSLive" },
-];
-
+// Filter vocabulary and severity ranks are inlined from
+// `packages/ui/src/config/wagers.toml` by Bun's bundler (no runtime fetch).
+const SPORT_PILLS = WAGER_SPORT_FILTERS;
+const PERIOD_SLICE_PILLS = WAGER_PERIOD_FILTERS;
+const BET_TYPE_PILLS = WAGER_BET_TYPE_FILTERS;
 const ALERT_PILLS = [
   { id: "ALL", label: "All Alerts" },
-  { id: "CRITICAL", label: "🚨 Critical" },
-  { id: "STEAM", label: "⚡ Steam" },
-  { id: "LATENCY", label: "⚠️ Latency" },
-  { id: "RECREATIONAL", label: "✅ Recreational" },
+  ...WAGER_ALERT_TIERS.map((tier) => ({ id: tier.id, label: tier.label })),
 ];
+const TIER_ORDER = WAGER_TIER_RANK;
 
-const BET_TYPE_PILLS = [
-  { id: "ALL", label: "All Bet Types" },
-  { id: "Spread", label: "Spread" },
-  { id: "Total", label: "Total" },
-  { id: "Moneyline", label: "Moneyline" },
-  { id: "Parlay", label: "Parlay" },
-];
-
-const TIER_ORDER: Record<string, number> = {
-  CRITICAL: 4,
-  STEAM: 3,
-  LATENCY: 2,
-  RECREATIONAL: 1,
-};
+/** Stake emphasis is owned by `dashboard.toml`, not duplicated in wagers.toml. */
+const HIGH_RISK_WAGER_USD = DASHBOARD_THRESHOLDS.high_risk_wager_usd;
 
 export function LiveWagersTabPanel({
   wagers = SAMPLE_LIVE_WAGERS,
@@ -99,6 +90,7 @@ export function LiveWagersTabPanel({
   copiedTicketId,
   onCopyText,
   tiersConfig,
+  wireContract = null,
   onSelectCustomerById,
   onInspectPty,
   onSelectAgent,
@@ -190,6 +182,10 @@ export function LiveWagersTabPanel({
       return wagerSortDir === "asc" ? cmp : -cmp;
     });
 
+  // Hard render bound from wagers.toml: the feed may carry more rows than the
+  // desk wants mounted in one table pass.
+  const visibleWagers = filteredWagers.slice(0, WAGERS_TABLE.max_rows);
+
   // Aggregate per-customer CLV & dollar edge across the active slice
   const sliceCustomerMap = new Map<
     string,
@@ -221,9 +217,13 @@ export function LiveWagersTabPanel({
       });
     }
   }
+  // A stale contract must not read as clean when the feed itself failed: the
+  // error wins and the chip says unavailable, matching the provenance badge.
+  const wireError = wagersError ?? wireContract?.error ?? null;
+
   const topSliceBeaters = [...sliceCustomerMap.values()]
     .sort((a, b) => b.expectedEdgeUsd - a.expectedEdgeUsd)
-    .slice(0, 4);
+    .slice(0, WAGERS_THRESHOLDS.slice_leader_limit);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -425,10 +425,26 @@ export function LiveWagersTabPanel({
             >
               {provenanceBadge.badgeText}
             </span>
+            <span
+              title={`Filter vocabulary, CLV ramp and row bounds are inlined from packages/ui/src/config/wagers.toml (schema ${WAGERS_META.schema}, v${WAGERS_META.version}) at bundle time. No runtime fetch, no JSON parse.`}
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: "999px",
+                color: "#a5b4fc",
+                backgroundColor: "rgba(99, 102, 241, 0.14)",
+                border: "1px solid rgba(129, 140, 248, 0.4)",
+              }}
+            >
+              📄 {WAGERS_TABLE.policy_tag}
+            </span>
+            <WireContractChip summary={wireContract} error={wireError} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ fontSize: "11px", color: "#64748b" }}>
-              {provenanceBadge.detail} · autoExecute: false invariant active
+              {provenanceBadge.detail} · showing {visibleWagers.length}/
+              {filteredWagers.length} · autoExecute: false invariant active
             </span>
             {onRefreshWagers ? (
               <button
@@ -523,7 +539,7 @@ export function LiveWagersTabPanel({
               </tr>
             </thead>
             <tbody>
-              {filteredWagers.map((w) => (
+              {visibleWagers.map((w) => (
                 <tr
                   key={w.ticketId}
                   style={styles.wagerRow(
@@ -651,6 +667,27 @@ export function LiveWagersTabPanel({
                   <td style={styles.td}>
                     <div style={{ fontWeight: 600 }}>
                       ${w.riskUsd.toLocaleString()}
+                      {w.riskUsd >= HIGH_RISK_WAGER_USD ? (
+                        <span
+                          title={`Stake at/above the $${HIGH_RISK_WAGER_USD.toLocaleString()} emphasis floor from dashboard.toml`}
+                          style={{
+                            marginLeft: "6px",
+                            padding: "1px 6px",
+                            borderRadius: "999px",
+                            fontSize: "9px",
+                            fontWeight: 800,
+                            letterSpacing: "0.04em",
+                            color: "#fca5a5",
+                            backgroundColor: "rgba(239, 68, 68, 0.16)",
+                            border: "1px solid rgba(248, 113, 113, 0.45)",
+                            verticalAlign: "middle",
+                            whiteSpace: "nowrap",
+                            display: "inline-block",
+                          }}
+                        >
+                          HIGH RISK
+                        </span>
+                      ) : null}
                     </div>
                     <div style={styles.custSub}>
                       To Win: ${w.toWinUsd.toLocaleString()}
@@ -660,12 +697,7 @@ export function LiveWagersTabPanel({
                     <span
                       style={{
                         fontWeight: 700,
-                        color:
-                          w.clvCents > 0
-                            ? w.clvCents >= 10
-                              ? "#ef4444"
-                              : "#f59e0b"
-                            : "#4ade80",
+                        color: clvEdgeTone(w.clvCents),
                       }}
                     >
                       {w.clvCents > 0 ? `+${w.clvCents}¢` : `${w.clvCents}¢`}
@@ -854,12 +886,7 @@ export function LiveWagersTabPanel({
                 <span
                   style={{
                     fontWeight: 700,
-                    color:
-                      selectedWager.clvCents > 0
-                        ? selectedWager.clvCents >= 10
-                          ? "#ef4444"
-                          : "#f59e0b"
-                        : "#4ade80",
+                    color: clvEdgeTone(selectedWager.clvCents),
                   }}
                 >
                   {selectedWager.clvCents > 0

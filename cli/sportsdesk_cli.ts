@@ -29,7 +29,11 @@ import {
   verifyR2Connection,
   getR2ConfigInfo,
 } from "../services/sportsdesk_r2_sync.ts";
-import { renderAnsiMarkdown } from "../lib/canonical_osc8_links.ts";
+import {
+  describeAnsiTheme,
+  parseAnsiMarkdownCliOptions,
+  renderAnsiMarkdown,
+} from "../lib/canonical_osc8_links.ts";
 import {
   benchmarkResolverLatency,
   classifyIpAddress,
@@ -217,7 +221,7 @@ Usage: \`bun sportsdesk_cli.ts [command|option] [parameters...]\`
 * **bridge** coverage|value|match: cross-domain join between the customer book and Polymarket wallets
 * **stale** \`-i\` FILE [\`--window-min\` N] [\`--json\`]: Stale-line / post-move bet cohort
 * **shot** <URL> [\`--out\` PATH] [\`--f402-login\`] [\`--profile\` DIR] [\`--format\` png|jpeg|webp]: Bun.WebView screenshot (default \`scratch/shots/\`)
-* **dashboard** [\`--exec\`]: Render dashboard.md with Bun.markdown.ansi in milliseconds
+* **dashboard** [\`--exec\`] [\`--theme\` dark|light|mono|accessible] [\`--columns\` N] [\`--light\`] [\`--no-color\`] [\`--no-hyperlinks\`] [\`--kitty-graphics\`] [\`--linkify-symbols\`]: Render dashboard.md with Bun.markdown.ansi (AnsiTheme) in milliseconds
 * **dns** [\`--backend\` system|c-ares|libc] [\`--json\`]: Bun native DNS cache telemetry and prefetch inspection
 `;
   printAnsiMarkdown(helpMd);
@@ -1760,17 +1764,18 @@ export async function handleDashboardCli(args: string[] = []): Promise<void> {
     return;
   }
 
+  const themeOptions = parseAnsiMarkdownCliOptions(args);
   const start = performance.now();
   const content = await file.text();
-  const rendered = renderAnsiMarkdown(content, {
-    colors: !Bun.env.NO_COLOR && Bun.env.TERM !== "dumb",
-    hyperlinks: true,
-  });
+  const rendered = renderAnsiMarkdown(content, themeOptions);
   const elapsed = (performance.now() - start).toFixed(2);
+  const themeSummary = describeAnsiTheme(themeOptions);
 
   process.stdout.write(rendered);
   console.log(
-    `\n\x1b[2m⚡ Rendered dashboard.md in ${elapsed}ms via Bun.markdown.ansi\x1b[0m`,
+    themeOptions.colors === false
+      ? `\n⚡ Rendered dashboard.md in ${elapsed}ms via Bun.markdown.ansi (AnsiTheme: ${themeSummary})`
+      : `\n\x1b[2m⚡ Rendered dashboard.md in ${elapsed}ms via Bun.markdown.ansi (AnsiTheme: ${themeSummary})\x1b[0m`,
   );
 
   // If shell execution requested (--exec or -x)

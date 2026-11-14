@@ -4,7 +4,11 @@
  * Signal-Honesty provenance badges, and zero-DOM feed loader for `@sportsdesk-ops/ui`.
  */
 
-import type { WagerTier } from "@sportsdesk-ops/contracts";
+import type {
+  WagerTier,
+  WagersWireContractSummary,
+  WagersWireViolation,
+} from "@sportsdesk-ops/contracts";
 import type {
   CustomersApiResponse,
   CustomersCohortsSummary,
@@ -43,12 +47,34 @@ export interface NormalizedLiveWagersResult {
   readonly totalToWinUsd: number;
   readonly criticalSteamCount: number;
   readonly provenance: DashboardSourceProvenance;
+  /** Vendor wire-contract summary when the feed host checks it; null otherwise. */
+  readonly wireContract: WagersWireContractSummary | null;
 }
 
+export type CustomerCohortKpiId =
+  | "backtest"
+  | "key-number-sharps"
+  | "hook-syndicates"
+  | "fixtures"
+  | "enriched-book"
+  | "unique-surveillance";
+
+export type CustomerCohortKpiTone =
+  "sky" | "red" | "amber" | "slate" | "emerald" | "violet";
+
 export interface CustomerCohortKpiCard {
+  readonly id: CustomerCohortKpiId;
   readonly label: string;
   readonly value: string;
   readonly sub: string;
+  readonly status: "pending" | "ready" | "unavailable";
+  readonly tone: CustomerCohortKpiTone;
+  /** Exact raw count when ready; null when pending or unavailable (never faked as 0). */
+  readonly count: number | null;
+  /** Percentage share of uniqueSurveillanceCount when ready and denominator > 0; null otherwise. */
+  readonly sharePct: number | null;
+  /** Optional profile tier filter activated when clicking this card in CustomersTabPanel. */
+  readonly filterTier: "ALL" | "ELITE" | "SYNDICATE" | null;
 }
 
 const KNOWN_PROVENANCE_KINDS = new Set<DashboardFeedProvenanceKind>([
@@ -237,6 +263,53 @@ export function normalizeLiveWagersResponse(
       "capture",
       "API Wagers Feed",
     ),
+    wireContract: normalizeWireContract(rec.wire_contract),
+  };
+}
+
+/** Structural parse of `wire_contract`; a malformed block is dropped, not guessed. */
+function normalizeWireContract(raw: unknown): WagersWireContractSummary | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+    return null;
+  const rec = raw as Record<string, unknown>;
+  if (typeof rec.ok !== "boolean") return null;
+  const violations: WagersWireViolation[] = [];
+  if (Array.isArray(rec.violations)) {
+    for (const entry of rec.violations) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const v = entry as Record<string, unknown>;
+      if (
+        typeof v.field !== "string" ||
+        (v.kind !== "type" && v.kind !== "nullable") ||
+        typeof v.count !== "number"
+      ) {
+        continue;
+      }
+      violations.push({
+        field: v.field,
+        kind: v.kind,
+        count: v.count,
+        examples: Array.isArray(v.examples)
+          ? v.examples.filter((e): e is string => typeof e === "string")
+          : [],
+      });
+    }
+  }
+  return {
+    ok: rec.ok,
+    registry: typeof rec.registry === "string" ? rec.registry : "",
+    capture: typeof rec.capture === "string" ? rec.capture : "",
+    capture_sha256:
+      typeof rec.capture_sha256 === "string" ? rec.capture_sha256 : "",
+    enum_source:
+      typeof rec.enum_source === "string" ? rec.enum_source : "unknown",
+    fields_checked: Array.isArray(rec.fields_checked)
+      ? rec.fields_checked.filter((f): f is string => typeof f === "string")
+      : [],
+    rows: typeof rec.rows === "number" ? rec.rows : 0,
+    skipped_rows: typeof rec.skipped_rows === "number" ? rec.skipped_rows : 0,
+    violations,
+    ...(typeof rec.error === "string" ? { error: rec.error } : {}),
   };
 }
 
@@ -279,6 +352,57 @@ export function normalizeCustomersCohortResponse(
   };
 }
 
+interface CustomerCohortKpiSpec {
+  readonly id: CustomerCohortKpiId;
+  readonly label: string;
+  readonly tone: CustomerCohortKpiTone;
+  readonly filterTier: "ALL" | "ELITE" | "SYNDICATE" | null;
+}
+
+const CUSTOMER_COHORT_KPI_SPECS: readonly CustomerCohortKpiSpec[] = [
+  {
+    id: "backtest",
+    label: "Backtest Cohort",
+    tone: "sky",
+    filterTier: "ALL",
+  },
+  {
+    id: "key-number-sharps",
+    label: "Key Number Sharps",
+    tone: "red",
+    filterTier: "ELITE",
+  },
+  {
+    id: "hook-syndicates",
+    label: "Hook Syndicates",
+    tone: "amber",
+    filterTier: "SYNDICATE",
+  },
+  {
+    id: "fixtures",
+    label: "CI Synthetic Fixtures",
+    tone: "slate",
+    filterTier: null,
+  },
+  {
+    id: "enriched-book",
+    label: "Enriched Book Spec",
+    tone: "emerald",
+    filterTier: null,
+  },
+  {
+    id: "unique-surveillance",
+    label: "Unique Surveillance",
+    tone: "violet",
+    filterTier: "ALL",
+  },
+];
+
+function computeSharePct(count: number, total: number): number | null {
+  if (total <= 0) return null;
+  return Math.round((count / total) * 1000) / 10;
+}
+
 /** Derive the 6 customer cohort KPI cards dynamically (missing is never hardcoded as non-zero or zero). */
 export function deriveCustomerCohortKpiCards(options: {
   readonly report: CustomersApiResponse | null;
@@ -290,88 +414,89 @@ export function deriveCustomerCohortKpiCards(options: {
       options.error && options.error.trim().length > 0
         ? options.error
         : "GET /api/customers unreachable";
-    return [
-      { label: "Backtest Cohort", value: "Unavailable", sub: reason },
-      { label: "Key Number Sharps", value: "Unavailable", sub: reason },
-      { label: "Hook Syndicates", value: "Unavailable", sub: reason },
-      { label: "CI Synthetic Fixtures", value: "Unavailable", sub: reason },
-      { label: "Enriched Book Spec", value: "Unavailable", sub: reason },
-      { label: "Unique Surveillance", value: "Unavailable", sub: reason },
-    ];
+    return CUSTOMER_COHORT_KPI_SPECS.map((spec) => ({
+      id: spec.id,
+      label: spec.label,
+      value: "Unavailable",
+      sub: reason,
+      status: "unavailable",
+      tone: spec.tone,
+      count: null,
+      sharePct: null,
+      filterTier: spec.filterTier,
+    }));
   }
 
   if (options.status === "pending" || options.report === null) {
-    return [
-      {
-        label: "Backtest Cohort",
-        value: "Pending…",
-        sub: "Awaiting GET /api/customers",
-      },
-      {
-        label: "Key Number Sharps",
-        value: "Pending…",
-        sub: "Awaiting GET /api/customers",
-      },
-      {
-        label: "Hook Syndicates",
-        value: "Pending…",
-        sub: "Awaiting GET /api/customers",
-      },
-      {
-        label: "CI Synthetic Fixtures",
-        value: "Pending…",
-        sub: "Awaiting GET /api/customers",
-      },
-      {
-        label: "Enriched Book Spec",
-        value: "Pending…",
-        sub: "Awaiting GET /api/customers",
-      },
-      {
-        label: "Unique Surveillance",
-        value: "Pending…",
-        sub: "Awaiting GET /api/customers",
-      },
-    ];
+    return CUSTOMER_COHORT_KPI_SPECS.map((spec) => ({
+      id: spec.id,
+      label: spec.label,
+      value: "Pending…",
+      sub: "Awaiting GET /api/customers",
+      status: "pending",
+      tone: spec.tone,
+      count: null,
+      sharePct: null,
+      filterTier: spec.filterTier,
+    }));
   }
 
   const { cohorts, provenance } = options.report;
   const sourceSuffix = provenance.sourcePath
     ? `Source: ${provenance.sourcePath}`
     : provenance.label;
+  const totalUnique = cohorts.uniqueSurveillanceCount;
 
-  return [
-    {
-      label: "Backtest Cohort",
+  const readyRows: Record<
+    CustomerCohortKpiId,
+    { readonly count: number; readonly value: string; readonly sub: string }
+  > = {
+    backtest: {
+      count: cohorts.backtestCount,
       value: `${cohorts.backtestCount.toLocaleString()} Accounts`,
       sub: "4-Wk CFB/NBA Leaderboard (/api/customers)",
     },
-    {
-      label: "Key Number Sharps",
+    "key-number-sharps": {
+      count: cohorts.keyNumberSharpsCount,
       value: `${cohorts.keyNumberSharpsCount.toLocaleString()} Elite Accounts`,
       sub: "Football Key Numbers Watchlist",
     },
-    {
-      label: "Hook Syndicates",
+    "hook-syndicates": {
+      count: cohorts.hookSyndicateCount,
       value: `${cohorts.hookSyndicateCount.toLocaleString()} Downlines`,
       sub: "Half-Point Syndicate Clusters",
     },
-    {
-      label: "CI Synthetic Fixtures",
+    fixtures: {
+      count: cohorts.fixtureCount,
       value: `${cohorts.fixtureCount.toLocaleString()} Accounts`,
       sub: "Deterministic Fixture Corpus",
     },
-    {
-      label: "Enriched Book Spec",
+    "enriched-book": {
+      count: cohorts.fullBookSpecCount,
       value: `${cohorts.fullBookSpecCount.toLocaleString()} Accounts`,
       sub: sourceSuffix,
     },
-    {
-      label: "Unique Surveillance",
-      value: `${cohorts.uniqueSurveillanceCount.toLocaleString()} IDs`,
+    "unique-surveillance": {
+      count: totalUnique,
+      value: `${totalUnique.toLocaleString()} IDs`,
       sub: `Deduplicated Across Cohorts (${provenance.kind})`,
     },
-  ];
+  };
+
+  return CUSTOMER_COHORT_KPI_SPECS.map((spec) => {
+    const row = readyRows[spec.id];
+    return {
+      id: spec.id,
+      label: spec.label,
+      value: row.value,
+      sub: row.sub,
+      status: "ready",
+      tone: spec.tone,
+      count: row.count,
+      sharePct: computeSharePct(row.count, totalUnique),
+      filterTier: spec.filterTier,
+    };
+  });
 }
 
 export type HydratedSliceResult<T> =
