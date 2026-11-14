@@ -106,7 +106,9 @@ noOrphans = true
 [console]
 # How many levels `console.log` expands before printing `[Object ...]` (Bun's default is 2). 8 keeps
 # nested report objects (a secrets row with its mention counts and aliases is 7 deep) readable.
-# `bun --console-depth=N` overrides it. Plain `Bun.inspect` is not affected by this setting.
+# MEASURED 2026-11-14 on 1.4.4: `bun --console-depth=N` does NOT override it --
+# this bunfig value wins, and the flag only applies when no [console].depth is in
+# scope. Plain `Bun.inspect` is not affected by this setting either.
 depth = 8
 
 [test]
