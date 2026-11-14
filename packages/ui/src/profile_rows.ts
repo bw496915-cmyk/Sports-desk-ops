@@ -94,6 +94,10 @@ export function bookRowsToProfiles(
 
     const unknown: string[] = [];
     if (!sharpKnown) unknown.push("sharpness");
+    if (stakes.length === 0) {
+      // A mean of zero observations is undefined; a mean of one is just that stake.
+      unknown.push("meanStake");
+    }
     if (stakes.length < 2) {
       // Gini/VaR of one observation are convention, not measurement; sizing derives from
       // a spread that does not exist yet.

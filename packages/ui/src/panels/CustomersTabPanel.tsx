@@ -684,7 +684,11 @@ export function CustomersTabPanel({
                   </div>
                   <div>
                     Mean Stake:{" "}
-                    <b>${selectedCustomer.meanStake.toLocaleString()}</b>
+                    <b>
+                      {selectedCustomer.unknown?.includes("meanStake")
+                        ? "—"
+                        : `$${selectedCustomer.meanStake.toLocaleString()}`}
+                    </b>
                   </div>
                 </div>
                 <div style={styles.detailCard}>

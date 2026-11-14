@@ -60,6 +60,7 @@ describe("bookRowsToProfiles", () => {
   test("empty tickets mark sizing, Gini, VaR and specialization unknown", () => {
     const [empty] = bookRowsToProfiles([{ ...row, recent_tickets: [] }]);
     expect(empty?.meanStake).toBe(0);
+    expect(empty?.unknown).toContain("meanStake");
     expect(empty?.unknown).toContain("sizing");
     expect(empty?.unknown).toContain("gini");
     expect(empty?.unknown).toContain("var95");
@@ -91,6 +92,8 @@ describe("bookRowsToProfiles", () => {
     expect(single?.unknown).toContain("gini");
     expect(single?.unknown).toContain("var95");
     expect(single?.unknown).toContain("sizing");
+    expect(single?.unknown).not.toContain("meanStake");
+    expect(single?.meanStake).toBe(100);
   });
 
   test("a tie keeps the first-seen league", () => {
@@ -104,6 +107,21 @@ describe("bookRowsToProfiles", () => {
       },
     ]);
     expect(tie?.specialization).toBe("CFB SPREAD");
+  });
+
+  test("a real-shaped row with unread fields still projects", () => {
+    // The abstraction claim: extra fields the mapper does not know are ignored, not fatal.
+    const [extra] = bookRowsToProfiles([
+      {
+        ...row,
+        syndicate_probability: 0.42,
+        tier: "TIER_1_ELITE_ORIGINATOR",
+        notes: "operator",
+      },
+    ]);
+    expect(extra?.id).toBe("SYNTH_SYN_01");
+    // The mapper derives tier from score; a source tier is a next-PR field, not silently mixed in.
+    expect(extra?.tier).toBe("TIER_2_STEAM_SYNDICATE");
   });
 
   test("marks fields the book does not carry as none, not a guess", () => {
