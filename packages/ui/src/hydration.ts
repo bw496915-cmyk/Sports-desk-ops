@@ -392,7 +392,7 @@ export function deriveCustomerCohortKpiCards(options: {
     {
       label: "Unique Surveillance",
       value: `${cohorts.uniqueSurveillanceCount.toLocaleString()} IDs`,
-      sub: `Deduplicated Across Cohorts (${provenance.kind})`,
+      sub: `Deduplicated Across Cohorts (${provenance.kind === "capture" ? "local capture" : provenance.kind})`,
     },
   ];
 }
