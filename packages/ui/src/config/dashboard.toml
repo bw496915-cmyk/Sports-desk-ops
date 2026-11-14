@@ -14,8 +14,10 @@ steam = 0.05
 [leagues]
 names = ["NFL", "NBA", "CFB"]
 
-# Data feeds the React panels read. Paths are same-origin; `base` exists for the
-# case where the API runs on another port (bun run dev:api serves these on 4021).
+# Data feeds the React panels read. Paths are same-origin; `base` is an origin only
+# (no path — the schema rejects one) for a split host. For dev, no edit is needed:
+# `?apiBase=http://127.0.0.1:4021` overrides it at runtime, loopback hosts only
+# (bun run dev:api serves these routes on 4021).
 [api]
 base = ""
 tiers = "/api/config/tiers"

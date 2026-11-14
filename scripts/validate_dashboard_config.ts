@@ -96,8 +96,25 @@ export function checkSchema(v: unknown, file: string): Issue[] {
       out.push({ path: file, message: "api must be a table" });
     } else {
       const table = api as Record<string, unknown>;
-      if (table.base != null && typeof table.base !== "string") {
-        out.push({ path: file, message: "api.base must be a string" });
+      if (table.base != null) {
+        if (typeof table.base !== "string") {
+          out.push({ path: file, message: "api.base must be a string" });
+        } else if (table.base !== "") {
+          try {
+            const url = new URL(table.base);
+            if (url.pathname !== "/" || url.search !== "" || url.hash !== "") {
+              out.push({
+                path: file,
+                message: "api.base must be an origin (no path, query or hash)",
+              });
+            }
+          } catch {
+            out.push({
+              path: file,
+              message: "api.base must be empty or an absolute URL",
+            });
+          }
+        }
       }
       for (const key of ["tiers", "customers", "wagers", "dashboard"]) {
         const value = table[key];
@@ -117,10 +134,11 @@ export function checkSchema(v: unknown, file: string): Issue[] {
       out.push({ path: file, message: "freshness must be a table" });
     } else {
       const stale = (freshness as Record<string, unknown>).stale_after_minutes;
-      if (typeof stale !== "number" || stale <= 0) {
+      if (typeof stale !== "number" || stale <= 0 || stale > 1440) {
         out.push({
           path: file,
-          message: "freshness.stale_after_minutes must be a positive number",
+          message:
+            "freshness.stale_after_minutes must be a positive number up to 1440",
         });
       }
     }

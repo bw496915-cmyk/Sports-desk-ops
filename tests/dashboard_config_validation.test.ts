@@ -5,6 +5,10 @@ import {
   hasKeyDeep,
   temporalType,
 } from "../scripts/validate_dashboard_config.ts";
+import {
+  DASHBOARD_API,
+  dashboardApiUrl,
+} from "../packages/ui/src/config/dashboard.ts";
 
 describe("temporalType", () => {
   test("recognises a TOML datetime parsed to Temporal.Instant", () => {
@@ -97,6 +101,60 @@ describe("checkSchema", () => {
     );
   });
 
+  test("accepts an empty or absolute-origin base", () => {
+    const withBase = (base: string) =>
+      checkSchema(
+        {
+          api: {
+            base,
+            tiers: "/a",
+            customers: "/b",
+            wagers: "/c",
+            dashboard: "/d",
+          },
+        },
+        "d.toml",
+      );
+    expect(withBase("")).toEqual([]);
+    expect(withBase("http://127.0.0.1:4021")).toEqual([]);
+  });
+
+  test("rejects a base with a path or a non-URL", () => {
+    const withBase = (base: string) => checkSchema({ api: { base } }, "d.toml");
+    expect(withBase("/api").length).toBeGreaterThan(0);
+    expect(
+      withBase("http://x.test/api").some((i) => i.message.includes("origin")),
+    ).toBe(true);
+    expect(
+      withBase("not a url").some((i) => i.message.includes("absolute URL")),
+    ).toBe(true);
+  });
+
+  test("rejects a freshness budget beyond a day", () => {
+    expect(
+      checkSchema({ freshness: { stale_after_minutes: 1441 } }, "d.toml").some(
+        (i) => i.message.includes("1440"),
+      ),
+    ).toBe(true);
+  });
+
+  test("rejects an api endpoint that is not a path", () => {
+    const issues = checkSchema(
+      {
+        api: {
+          tiers: "api/config/tiers",
+          customers: "/x",
+          wagers: "/y",
+          dashboard: "/z",
+        },
+      },
+      "d.toml",
+    );
+    expect(issues.some((issue) => issue.message.includes("api.tiers"))).toBe(
+      true,
+    );
+  });
+
   test("rejects a non-positive freshness budget", () => {
     const issues = checkSchema(
       { freshness: { stale_after_minutes: 0 } },
@@ -131,5 +189,45 @@ describe("checkSchema", () => {
       "d.toml",
     );
     expect(issues.some((issue) => issue.message.includes("sharp"))).toBe(true);
+  });
+});
+
+describe("dashboardApiUrl", () => {
+  test("returns the path unchanged when the base is empty", () => {
+    expect(DASHBOARD_API.base).toBe("");
+    expect(dashboardApiUrl("/api/wagers", "")).toBe("/api/wagers");
+  });
+
+  test("joins a loopback origin without doubling the path", () => {
+    expect(dashboardApiUrl("/api/wagers", "http://127.0.0.1:4021")).toBe(
+      "http://127.0.0.1:4021/api/wagers",
+    );
+    expect(dashboardApiUrl("/api/wagers", "http://127.0.0.1:4021/api")).toBe(
+      "http://127.0.0.1:4021/api/wagers",
+    );
+  });
+
+  test("a loopback ?apiBase wins over the committed base", () => {
+    (globalThis as { location?: unknown }).location = {
+      search: "?apiBase=http://127.0.0.1:9999",
+    };
+    try {
+      expect(dashboardApiUrl("/api/wagers")).toBe(
+        "http://127.0.0.1:9999/api/wagers",
+      );
+    } finally {
+      delete (globalThis as { location?: unknown }).location;
+    }
+  });
+
+  test("a non-loopback ?apiBase is ignored", () => {
+    (globalThis as { location?: unknown }).location = {
+      search: "?apiBase=http://evil.test",
+    };
+    try {
+      expect(dashboardApiUrl("/api/wagers")).toBe("/api/wagers");
+    } finally {
+      delete (globalThis as { location?: unknown }).location;
+    }
   });
 });

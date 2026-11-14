@@ -40,7 +40,36 @@ export const DASHBOARD_LEAGUES: DashboardLeagues = leagues;
 export const DASHBOARD_API: DashboardApi = api;
 export const DASHBOARD_FRESHNESS: DashboardFreshness = freshness;
 
-/** Join the configured base with a path, tolerating a trailing slash on either. */
-export function dashboardApiUrl(path: string): string {
-  return `${DASHBOARD_API.base.replace(/\/+$/, "")}${path}`;
+/** Loopback hosts that may override `[api].base` at runtime for a dev API. */
+const DEV_OVERRIDE_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+/**
+ * `?apiBase=http://127.0.0.1:4021` wins over the committed base, so a dev session does not
+ * need a hand edit of the TOML. Only loopback origins are accepted; anything else is ignored
+ * rather than silently redirecting feed reads.
+ */
+function devApiBaseOverride(): string | null {
+  const page = (globalThis as { location?: { search?: string } }).location;
+  if (!page) return null;
+  const raw = new URLSearchParams(page.search ?? "").get("apiBase");
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return DEV_OVERRIDE_HOSTS.has(url.hostname) ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve a feed path against `[api].base` (origin only; `checkSchema` rejects a path there).
+ * The absolute `path` replaces any base path in `new URL()` rather than doubling it.
+ */
+export function dashboardApiUrl(
+  path: string,
+  base: string | null = null,
+): string {
+  const resolved = base ?? devApiBaseOverride() ?? DASHBOARD_API.base;
+  if (!resolved) return path;
+  return new URL(path, resolved).toString();
 }
