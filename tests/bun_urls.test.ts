@@ -245,6 +245,12 @@ describe("Bun reference symbol matching", () => {
     expect(resolveBunSymbolReferenceUrl("Bun.inspect.custom")).toBe(
       "https://bun.com/reference/bun/inspect",
     );
+    expect(resolveBunSymbolReferenceUrl("Bun.TOML")).toBe(
+      "https://bun.com/reference/bun/TOML",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.TOML.stringify")).toBe(
+      "https://bun.com/reference/bun/TOML/stringify",
+    );
     expect(resolveBunSymbolReferenceUrl("Bun.Terminal")).toBe(
       "https://bun.com/reference/bun/Terminal",
     );
