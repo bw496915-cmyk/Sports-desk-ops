@@ -88,7 +88,9 @@ export function skipPoisonJsonlLine(buffer: JsonlByteBuffer): JsonlByteBuffer {
   while (at < buffer.length && (buffer[at] === 0x0a || buffer[at] === 0x0d)) {
     at += 1;
   }
-  const nl = buffer.indexOf(0x0a, at);
+  // Bun.indexOfLine is the native readline-without-IO scan; it matches a 0x0a
+  // byte search across ill-formed UTF-8 and accepts a numeric or bigint offset.
+  const nl = Bun.indexOfLine(buffer, at);
   if (nl < 0) return buffer;
   return buffer.subarray(nl + 1);
 }

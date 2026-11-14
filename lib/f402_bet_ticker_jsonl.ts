@@ -222,7 +222,7 @@ export async function readF402TickerJsonl(
       const previous = new Uint8Array(1);
       await handle.read(previous, 0, 1, start - 1);
       if (previous[0] !== 0x0a) {
-        const firstNewline = view.indexOf(0x0a);
+        const firstNewline = Bun.indexOfLine(view);
         skip = firstNewline === -1 ? view.length : firstNewline + 1;
       }
     }

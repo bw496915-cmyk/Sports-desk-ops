@@ -1,4 +1,4 @@
-# Bun shape contracts — the 90 shapes this repository calls
+# Bun shape contracts — the 91 shapes this repository calls
 
 The single source of truth is layered, and nothing here restates upstream text: **declarations** come from `bun-types@1.4.4` (the surface the reference site renders), **behaviour** from probes against the local `Bun 1.4.4` binary (`tests/bun_baseline.json`), **property attributes** from the pinned Bun commit `38afee6c84`. When they disagree: declarations win on names and signatures, the Bun source wins on attributes, and the measured binary wins on behaviour.
 
@@ -240,6 +240,13 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - `Bun.deepEquals` compares structure, not identity — `data.compare`.
 - `new Bun.Cookie("a","b")` and `new Bun.CookieMap("a=b").get("a")` agree on the pair — `data.cookies`.
 - `Bun.semver.satisfies("1.2.3", "^1.0.0")` → true and `Bun.semver.order("1.0.0", "1.0.1")` → -1 — `data.semver`.
+
+#### Bun.indexOfLine
+
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/indexOfLine)
+- **Shape:** value: `function` · writable true · enumerable true
+- **Here:** `lib/f402_bet_ticker_jsonl.ts`, `lib/jsonl_stream_replay.ts`
+- **Evidence:** `test:tests/bun_index_of_line.test.ts`, `test:tests/jsonl_stream_replay.test.ts`, `test:tests/f402_bet_ticker_jsonl.test.ts`
 
 #### Bun.Cookie
 

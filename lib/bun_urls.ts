@@ -139,6 +139,7 @@ export const BUN_KNOWN_REFERENCE_SYMBOLS: Readonly<Record<string, string>> = {
   "Bun.file": "bun/file",
   "Bun.write": "bun/write",
   "Bun.spawn": "bun/spawn",
+  "Bun.indexOfLine": "bun/indexOfLine",
   "Bun.Transpiler": "bun/Transpiler",
   "Bun.dns": "bun/dns",
   "dns.lookup": "bun/dns/lookup",
