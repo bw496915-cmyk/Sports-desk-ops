@@ -41,11 +41,24 @@ const server = Bun.serve({
         api: API,
         feedsApi: FEEDS_API,
       });
-      return fetch(target + url.pathname + url.search, {
+      // Identity upstream: Bun's fetch decompresses the body, so forwarding a compressed
+      // upstream's content-encoding/content-length makes the browser gunzip plain bytes
+      // ("Load failed"). Ask for identity and drop the stale framing headers.
+      const headers = new Headers(req.headers);
+      headers.set("accept-encoding", "identity");
+      const upstream = await fetch(target + url.pathname + url.search, {
         method: req.method,
-        headers: req.headers,
+        headers,
         body:
           req.method === "GET" || req.method === "HEAD" ? undefined : req.body,
+      });
+      const outHeaders = new Headers(upstream.headers);
+      outHeaders.delete("content-encoding");
+      outHeaders.delete("content-length");
+      return new Response(upstream.body, {
+        status: upstream.status,
+        statusText: upstream.statusText,
+        headers: outHeaders,
       });
     }
     const served = await serveDashboardAsset(url.pathname, { root: ROOT });

@@ -452,6 +452,7 @@ export function startDashboardServer(
             backtestLeaderboard: backtestJson.customerLeaderboard ?? [],
             fixtures: fixtureJson,
             localBookRows: localBookCached?.value,
+            localBookSourcePath: "enriched_customers_full.json",
             keyNumberBuyerIds: KEY_NUMBER_BUYER_PROFILES.keys(),
             hookSyndicateIds: HALF_POINT_HOOK_SYNDICATE_PROFILES.keys(),
           });

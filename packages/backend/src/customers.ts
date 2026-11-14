@@ -112,6 +112,8 @@ export interface CustomersCohortInput {
   readonly keyNumberBuyerIds: Iterable<string>;
   readonly hookSyndicateIds: Iterable<string>;
   readonly localBookRows?: ReadonlyArray<Record<string, unknown>> | undefined;
+  /** Where the local book came from, for provenance classification. */
+  readonly localBookSourcePath?: string | undefined;
   readonly provenance?: DashboardSourceProvenance | undefined;
 }
 
@@ -120,6 +122,43 @@ export interface CustomersCohortPayload {
   readonly backtestTop: ReadonlyArray<Record<string, unknown>>;
   readonly fixtures: ReadonlyArray<Record<string, unknown>>;
   readonly provenance: DashboardSourceProvenance;
+}
+
+const SYNTHETIC_CUSTOMER_ID = /^SYNTH/i;
+
+/**
+ * Name the local book by what it is.
+ *
+ * Loading a book is not evidence that it is real: `enriched_customers_full.json` in this repo is a
+ * six-row synthetic fixture, and labelling it `kind: "capture"` made the Profiles tab assert
+ * capture provenance over `SYNTH_*` ids. A book is a fixture when its path is under `fixtures/`
+ * or any row id carries the synthetic prefix.
+ */
+export function classifyCustomerBook(
+  rows: ReadonlyArray<Record<string, unknown>>,
+  sourcePath: string,
+): DashboardSourceProvenance {
+  const normalized = sourcePath.replace(/\\/g, "/");
+  const synthetic =
+    normalized.includes("/fixtures/") ||
+    rows.some((row) =>
+      SYNTHETIC_CUSTOMER_ID.test(
+        String(row.customer_id ?? row.customerId ?? "").trim(),
+      ),
+    );
+  return synthetic
+    ? {
+        kind: "fixture",
+        label: "Synthetic Customer Book",
+        sourcePath,
+        observedAt: new Date().toISOString(),
+      }
+    : {
+        kind: "capture",
+        label: "Enriched Local Book + Backtest",
+        sourcePath,
+        observedAt: new Date().toISOString(),
+      };
 }
 
 /** Dynamically compute surveillance cohort counts with zero hardcoded numbers. */
@@ -166,12 +205,10 @@ export function computeCustomersCohortPayload(
   const provenance: DashboardSourceProvenance =
     input.provenance ??
     (hasLocalBook
-      ? {
-          kind: "capture",
-          label: "Enriched Local Book + Backtest",
-          sourcePath: "enriched_customers_full.json",
-          observedAt: nowIso,
-        }
+      ? classifyCustomerBook(
+          input.localBookRows!,
+          input.localBookSourcePath ?? "enriched_customers_full.json",
+        )
       : input.backtestLeaderboard.length > 0 || input.fixtures.length > 0
         ? {
             kind: "fixture",
