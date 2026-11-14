@@ -744,6 +744,20 @@ await check("bun is resolvable from the host runtime", () => {
   );
 });
 
+// Counterpart of the stage-1 check: the host runtime must agree that a module
+// namespace is a module namespace, and Node's prototype is null here where Bun
+// 1.4.4's is a null-prototype object (measured 2026-11-14).
+await check("module namespace predicate matches Node's documented shape", async () => {
+  const { types } = await import("node:util");
+  const ns = await import("node:util");
+  assert(types.isModuleNamespaceObject(ns) === true, "a real namespace object was rejected");
+  assert(types.isModuleNamespaceObject({}) === false, "a plain object was accepted");
+  assert(types.isModuleNamespaceObject([]) === false, "an array was accepted");
+  const forged = { [Symbol.toStringTag]: "Module" };
+  assert(types.isModuleNamespaceObject(forged) === false, "a forged Symbol.toStringTag was accepted");
+  assert(Object.getPrototypeOf(ns) === null, "Node's namespace prototype is not null");
+});
+
 console.log(
   failed === 0
     ? "\nverify-runtime: PASS — every tool executed in the host runtime (stage 2/2)."

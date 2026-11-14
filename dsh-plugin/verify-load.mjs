@@ -2980,6 +2980,25 @@ await checkAsync(
   },
 );
 
+// Runtime-shape contract for the two-stage verification: stage 1 runs under Bun,
+// stage 2 under the host's Node. The predicate must mean the same thing in both,
+// and the one place the runtimes differ is recorded rather than smoothed over.
+// Measured 2026-11-14: Bun 1.4.4 gives a module namespace a null-prototype
+// object as its prototype; Node 26 gives it null.
+await checkAsync("module namespace predicate matches the documented shape", async () => {
+  const { types } = await import("node:util");
+  const ns = await import("node:util");
+  assert(types.isModuleNamespaceObject(ns) === true, "a real namespace object was rejected");
+  assert(types.isModuleNamespaceObject({}) === false, "a plain object was accepted");
+  assert(types.isModuleNamespaceObject([]) === false, "an array was accepted");
+  const forged = { [Symbol.toStringTag]: "Module" };
+  assert(types.isModuleNamespaceObject(forged) === false, "a forged Symbol.toStringTag was accepted");
+  assert(Object.isSealed(ns) === true, "the namespace object is not sealed");
+  const proto = Object.getPrototypeOf(ns);
+  assert(proto !== null, "Bun's namespace prototype is null; re-measure the contract");
+  assert(Object.getPrototypeOf(proto) === null, "unexpected namespace prototype chain");
+});
+
 console.log(
   failed === 0
     ? "\nverify-load: PASS — 13 tools load and refuse invalid input (stage 1/2)."
