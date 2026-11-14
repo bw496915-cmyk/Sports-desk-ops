@@ -1,6 +1,9 @@
 /**
- * The performance tab read: a shape-sample fixture (not a capture) with the exact 31 rows
- * observed on 2026-11-13, so the parse and the money math are exercised without a session.
+ * The performance tab read.
+ *
+ * Fixture: the operator-supplied 2026-11-13 response (31 rows). It is the observed body, but not a
+ * probe capture — no headers or status travel with it — so the parse/money math is exercised and
+ * the live-capture half stays tracked separately.
  */
 import { describe, expect, it } from "bun:test";
 import { resolve } from "node:path";
@@ -12,7 +15,7 @@ import {
 
 const FIXTURE = resolve(
   import.meta.dir,
-  "fixtures/f402-get-performance-player.sample.json",
+  "fixtures/f402-get-performance-player.response.json",
 );
 
 describe("buildPerformancePlayerRequest", () => {
