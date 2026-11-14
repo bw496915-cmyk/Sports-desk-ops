@@ -42,5 +42,16 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      # tee would return its own status, so pipefail is required for a failing
+      # probe to fail the job.
       - name: Probe the documented Bun package-manager behaviour
-        run: bash scripts/bun-1.4.4-probe.sh
+        run: |
+          set -o pipefail
+          bash scripts/bun-1.4.4-probe.sh | tee bun-probe-report.txt
+      - name: Upload probe report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bun-probe-report
+          path: bun-probe-report.txt
+          if-no-files-found: warn
