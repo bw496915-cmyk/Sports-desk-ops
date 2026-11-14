@@ -11,7 +11,9 @@
  *
  * `Bun.TOML.parse` is native, and the stat cache means editing the file is
  * picked up on the next request — no restart and no rebuild (the UI still needs
- * its dev watcher to re-bundle).
+ * its dev watcher to re-bundle). Read the file as text: a file-backed Blob
+ * (`Bun.file(path)`) throws in `TOML.parse` on 1.4.4; quoted dates only, since an
+ * unquoted date parses to `Temporal.PlainDate`.
  */
 
 import { TOML } from "bun";
