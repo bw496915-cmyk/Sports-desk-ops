@@ -66,25 +66,38 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Is a packed file covered by the manifest's "files" allowlist? Auto-included
- * files always pass; a "*" entry is a glob; anything else matches exactly or as a
- * directory prefix. Derived from the manifest instead of assuming src/ and dist/,
- * so a package that ships other paths is not flagged for telling the truth.
+ * Is a packed file covered by the manifest's "files" allowlist? Semantics measured
+ * against `bun pm pack --dry-run` on 2026-11-14 and matched with Bun.Glob:
+ *   "src/**\/*.ts"  matches src/a.ts and src/nested/b.ts
+ *   "src/*.ts"      matches src/a.ts only (a single "*" does not cross "/")
+ *   "src"           a directory entry covers everything under it
+ *   "!src/nested/**" excludes matching files (negation)
+ * Auto-included files (manifest, readme, licence, changelog) always pass.
  */
 export function isPackedFileAllowed(
   file: string,
   filesAllowlist: readonly string[],
 ): boolean {
   if (AUTO_INCLUDED_FILE.test(file)) return true;
-  return filesAllowlist.some((entry) => {
-    const clean = entry.replace(/^\.\//, "").replace(/\/+$/, "");
-    if (clean.length === 0) return false;
-    if (clean.includes("*")) {
-      const pattern = clean.split("*").map(escapeRegExp).join(".*");
-      return new RegExp(`^${pattern}$`).test(file);
-    }
-    return file === clean || file.startsWith(`${clean}/`);
-  });
+
+  const includes: string[] = [];
+  const excludes: string[] = [];
+  for (const raw of filesAllowlist) {
+    const negated = raw.startsWith("!");
+    const entry = (negated ? raw.slice(1) : raw)
+      .replace(/^\.\//, "")
+      .replace(/\/+$/, "");
+    if (entry.length === 0) continue;
+    (negated ? excludes : includes).push(entry);
+  }
+
+  const matches = (entry: string): boolean => {
+    if (/[*?[\]{}]/.test(entry)) return new Bun.Glob(entry).match(file);
+    return file === entry || file.startsWith(`${entry}/`);
+  };
+
+  if (excludes.some(matches)) return false;
+  return includes.some(matches);
 }
 
 /**

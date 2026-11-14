@@ -381,6 +381,8 @@ bun publish --cwd packages/contracts           # real publish
 
 `.github/workflows/publish-contracts.yml` publishes on a `contracts-v*` tag (or manual dispatch) using `NPM_TOKEN`; it writes a temporary npmrc and points `NPM_CONFIG_USERCONFIG` at it, which Bun reads (the same mechanism `actions/setup-node` uses). Prerelease versions need `--tag` (Bun refuses `2.0.0-beta.1` without one).
 
+`files` entries follow Bun's glob semantics, measured 2026-11-14 against `bun pm pack --dry-run`: `*` does not cross `/`, `**` does (including zero directories, so `src/**/*.ts` matches `src/a.ts`), a directory entry such as `src` covers the whole tree, and `!pattern` excludes. `package.json`, `README*`, `LICENSE*` and `CHANGELOG*` always ship regardless of the list — even a negation cannot drop them. `scripts/check_workspace_packs.ts` matches the packed output with `Bun.Glob` under those rules, so a README no longer reads as a leak and a wildcard is not misread.
+
 Measured behaviour worth knowing before a release (2026-11-14):
 
 - `bun publish --dry-run` checks config, access and file selection but **not the token**: with a fake `_authToken` in `NPM_CONFIG_USERCONFIG` it prints `+ @sportsdesk-ops/contracts@0.1.0 (dry-run)` and exits 0. Without any token it fails with `missing authentication`. So the dry-run is a config gate; only a real publish tests the credential.

@@ -58,9 +58,28 @@ describe("pack allowlist", () => {
   test("entries match as an exact file or a directory prefix", () => {
     expect(isPackedFileAllowed("src/index.ts", ["src"])).toBe(true);
     expect(isPackedFileAllowed("dist/index.js", ["src", "dist"])).toBe(true);
-    expect(isPackedFileAllowed("src/index.ts", ["src/**"])).toBe(true);
+    expect(isPackedFileAllowed("src/nested/x.ts", ["src"])).toBe(true);
     expect(isPackedFileAllowed("docs/x.md", ["src"])).toBe(false);
     expect(isPackedFileAllowed("src/index.ts", [])).toBe(false);
+  });
+
+  test("glob entries follow the measured pack semantics", () => {
+    // "src/**/*.ts" also matches the top-level file (zero directories).
+    expect(isPackedFileAllowed("src/a.ts", ["src/**/*.ts"])).toBe(true);
+    expect(isPackedFileAllowed("src/nested/b.ts", ["src/**/*.ts"])).toBe(true);
+    expect(isPackedFileAllowed("src/c.md", ["src/**/*.ts"])).toBe(false);
+    // "src/*.ts" does not cross the slash.
+    expect(isPackedFileAllowed("src/a.ts", ["src/*.ts"])).toBe(true);
+    expect(isPackedFileAllowed("src/nested/b.ts", ["src/*.ts"])).toBe(false);
+    // "**/*.ts" matches a root-level file.
+    expect(isPackedFileAllowed("a.ts", ["**/*.ts"])).toBe(true);
+  });
+
+  test("negated entries exclude", () => {
+    expect(
+      isPackedFileAllowed("src/nested/b.ts", ["src", "!src/nested/**"]),
+    ).toBe(false);
+    expect(isPackedFileAllowed("src/a.ts", ["src", "!src/nested/**"])).toBe(true);
   });
 });
 
