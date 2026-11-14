@@ -55,10 +55,18 @@ describe("Bun Native Loaders & Import Attributes", () => {
       // data.json is typed as the parsed object. The assignments below are the
       // ratchet: they compile only while that mismatch holds, so a TypeScript
       // upgrade to 7.1+ fails typecheck here and the casts above can be dropped.
+      // Measured 2026-11-14 with @types/bun 1.4.4:
+      //   TS 5.9.3      toml-from-.txt -> string   text-from-.json -> { answer: number }
+      //   TS 7.0.2      identical (extension still wins)
+      //   TS 7.1.0-beta toml-from-.txt -> any      text-from-.json -> string
+      // so the switch lands at 7.1, and the toml side becomes "any" rather than
+      // the parsed object. The IsAny guard keeps that from passing silently.
       type Assignable<From, To> = From extends To ? true : false;
+      type IsAny<T> = 0 extends 1 & T ? true : false;
       const tomlIsString: Assignable<typeof tomlFromTxt, string> = true;
+      const tomlIsNotAny: IsAny<typeof tomlFromTxt> = false;
       const jsonIsObject: Assignable<typeof textFromJson, { answer: number }> = true;
-      expect([tomlIsString, jsonIsObject]).toEqual([true, true]);
+      expect([tomlIsString, tomlIsNotAny, jsonIsObject]).toEqual([true, false, true]);
     });
   });
 
