@@ -80,6 +80,51 @@ describe("checkSchema", () => {
     );
   });
 
+  test("rejects an api endpoint that is not a path", () => {
+    const issues = checkSchema(
+      {
+        api: {
+          tiers: "api/config/tiers",
+          customers: "/x",
+          wagers: "/y",
+          dashboard: "/z",
+        },
+      },
+      "d.toml",
+    );
+    expect(issues.some((issue) => issue.message.includes("api.tiers"))).toBe(
+      true,
+    );
+  });
+
+  test("rejects a non-positive freshness budget", () => {
+    const issues = checkSchema(
+      { freshness: { stale_after_minutes: 0 } },
+      "d.toml",
+    );
+    expect(
+      issues.some((issue) => issue.message.includes("stale_after_minutes")),
+    ).toBe(true);
+  });
+
+  test("accepts the extended document shape", () => {
+    expect(
+      checkSchema(
+        {
+          api: {
+            base: "",
+            tiers: "/api/config/tiers",
+            customers: "/api/customers",
+            wagers: "/api/wagers",
+            dashboard: "/api/dashboard",
+          },
+          freshness: { stale_after_minutes: 30 },
+        },
+        "d.toml",
+      ),
+    ).toEqual([]);
+  });
+
   test("rejects a non-number threshold", () => {
     const issues = checkSchema(
       { thresholds: { sharp: "70", steam: 0.05 }, leagues: { names: ["NFL"] } },

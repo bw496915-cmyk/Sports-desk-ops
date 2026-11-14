@@ -1,5 +1,6 @@
 import type React from "react";
 import {
+  DASHBOARD_FRESHNESS,
   DASHBOARD_LEAGUES,
   DASHBOARD_META,
   DASHBOARD_THRESHOLDS,
@@ -28,7 +29,8 @@ export function ThresholdsPanel(): React.ReactElement {
         Leagues: <b>{DASHBOARD_LEAGUES.names.join(", ")}</b>
       </span>
       <span style={styles.dnsLabel}>
-        config {DASHBOARD_META.generated_at.slice(0, 10)}
+        config {DASHBOARD_META.generated_at.slice(0, 10)} · stale &gt;
+        {DASHBOARD_FRESHNESS.stale_after_minutes}m
       </span>
     </div>
   );

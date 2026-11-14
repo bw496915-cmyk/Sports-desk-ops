@@ -14,6 +14,18 @@ steam = 0.05
 [leagues]
 names = ["NFL", "NBA", "CFB"]
 
+# Data feeds the React panels read. Paths are same-origin; `base` exists for the
+# case where the API runs on another port (bun run dev:api serves these on 4021).
+[api]
+base = ""
+tiers = "/api/config/tiers"
+customers = "/api/customers"
+wagers = "/api/wagers"
+dashboard = "/api/dashboard"
+
+[freshness]
+stale_after_minutes = 30
+
 # Sentinel: defined here, never imported by any component. If this key appears
 # in dist/dashboard/*.js, tree-shaking is broken and the whole document leaked.
 [churn]

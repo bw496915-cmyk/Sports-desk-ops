@@ -13,6 +13,7 @@ import type {
   LiveWager,
   TierStyleConfig,
 } from "./types.ts";
+import { DASHBOARD_API, dashboardApiUrl } from "./config/dashboard.ts";
 
 export const SHOWCASE_WAGERS_PROVENANCE: DashboardSourceProvenance = {
   kind: "showcase",
@@ -423,19 +424,19 @@ export async function hydrateDashboardFeeds(
   const [wagers, customers, tiers] = await Promise.all([
     fetchJsonSlice(
       fetchImpl,
-      "/api/wagers",
+      dashboardApiUrl(DASHBOARD_API.wagers),
       normalizeLiveWagersResponse,
       "LiveWagersApiResponse",
     ),
     fetchJsonSlice(
       fetchImpl,
-      "/api/customers",
+      dashboardApiUrl(DASHBOARD_API.customers),
       normalizeCustomersCohortResponse,
       "CustomersApiResponse",
     ),
     fetchJsonSlice<TierStyleConfig>(
       fetchImpl,
-      "/api/config/tiers",
+      dashboardApiUrl(DASHBOARD_API.tiers),
       (raw) => {
         if (typeof raw !== "object" || raw === null) return null;
         const rec = raw as { tiers?: unknown };

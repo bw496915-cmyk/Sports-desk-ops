@@ -9,6 +9,7 @@ import {
   normalizeLiveWagersResponse,
   SHOWCASE_WAGERS_PROVENANCE,
 } from "./hydration.ts";
+import { DASHBOARD_API, dashboardApiUrl } from "./config/dashboard.ts";
 import {
   AgentInspectorModal,
   AlertsTabPanel,
@@ -202,7 +203,7 @@ export function App(): React.ReactElement {
 
   const fetchTiersConfig = async () => {
     try {
-      const res = await fetch("/api/config/tiers");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.tiers));
       if (!res.ok) return;
       const cfg = (await res.json()) as { tiers?: TierStyleConfig } | null;
       if (cfg?.tiers) {
@@ -218,7 +219,7 @@ export function App(): React.ReactElement {
 
   const fetchLiveWagers = async () => {
     try {
-      const res = await fetch("/api/wagers");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.wagers));
       if (!res.ok) {
         setWagersError(
           `GET /api/wagers returned HTTP ${res.status} (${res.statusText || "error"})`,
@@ -251,7 +252,7 @@ export function App(): React.ReactElement {
 
   const fetchCustomersCohorts = async () => {
     try {
-      const res = await fetch("/api/customers");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.customers));
       if (!res.ok) {
         setCohortsStatus("unavailable");
         setCohortsError(
@@ -781,7 +782,7 @@ export function App(): React.ReactElement {
   const fetchDashboard = async () => {
     try {
       const [dashRes, dnsRes] = await Promise.all([
-        fetch("/api/dashboard"),
+        fetch(dashboardApiUrl(DASHBOARD_API.dashboard)),
         fetch("/api/dns/telemetry").then(async (res) => {
           if (!res.ok) return fetch("/api/dns");
           return res;

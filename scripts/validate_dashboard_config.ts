@@ -90,6 +90,42 @@ export function checkSchema(v: unknown, file: string): Issue[] {
       });
     }
   }
+  const api = doc.api;
+  if (api != null) {
+    if (typeof api !== "object") {
+      out.push({ path: file, message: "api must be a table" });
+    } else {
+      const table = api as Record<string, unknown>;
+      if (table.base != null && typeof table.base !== "string") {
+        out.push({ path: file, message: "api.base must be a string" });
+      }
+      for (const key of ["tiers", "customers", "wagers", "dashboard"]) {
+        const value = table[key];
+        if (typeof value !== "string" || !value.startsWith("/")) {
+          out.push({
+            path: file,
+            message: `api.${key} must be a path starting with "/"`,
+          });
+        }
+      }
+    }
+  }
+
+  const freshness = doc.freshness;
+  if (freshness != null) {
+    if (typeof freshness !== "object") {
+      out.push({ path: file, message: "freshness must be a table" });
+    } else {
+      const stale = (freshness as Record<string, unknown>).stale_after_minutes;
+      if (typeof stale !== "number" || stale <= 0) {
+        out.push({
+          path: file,
+          message: "freshness.stale_after_minutes must be a positive number",
+        });
+      }
+    }
+  }
+
   return out;
 }
 
