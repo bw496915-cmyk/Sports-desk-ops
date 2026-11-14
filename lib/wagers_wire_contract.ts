@@ -21,10 +21,12 @@ import type {
 } from "@sportsdesk-ops/contracts";
 import { stat } from "node:fs/promises";
 import { basename, dirname, resolve, sep } from "node:path";
+import { assertRelativePath, SLAB_SERVER } from "./slab_config.ts";
 
+const REPO_ROOT = resolve(import.meta.dir, "..");
 const DEFAULT_REGISTRY_PATH = resolve(
-  import.meta.dir,
-  "../schema/wagers_field_contract.json",
+  REPO_ROOT,
+  SLAB_SERVER.paths.wire_contract,
 );
 
 interface SkeletonScalar {
@@ -68,10 +70,21 @@ let cache: {
   readonly contract: LoadedContract | null;
 } | null = null;
 
-/** `WAGERS_WIRE_CONTRACT_PATH` overrides the checkout-relative registry path. */
+/**
+ * `WAGERS_WIRE_CONTRACT_PATH` overrides the checkout-relative registry path.
+ *
+ * The env value goes through `assertRelativePath`: the adapter is the chokepoint
+ * for user-supplied paths, so an absolute path cannot enter the filesystem read
+ * (or the payload's `registry` label) even though the label itself is only a
+ * basename.
+ */
 export function wagersWireContractPath(): string {
   const override = process.env.WAGERS_WIRE_CONTRACT_PATH?.trim();
-  return override && override.length > 0 ? override : DEFAULT_REGISTRY_PATH;
+  if (!override) return DEFAULT_REGISTRY_PATH;
+  return resolve(
+    REPO_ROOT,
+    assertRelativePath(override, "WAGERS_WIRE_CONTRACT_PATH"),
+  );
 }
 
 async function loadContract(
