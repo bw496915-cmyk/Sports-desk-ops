@@ -395,6 +395,88 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     }
   }, 60_000);
 
+  test("setup may be async and is awaited before the build", async () => {
+    const root = project();
+    const marks: string[] = [];
+    try {
+      const started = performance.now();
+      const result = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, "out"),
+        plugins: [
+          {
+            name: "async-setup",
+            async setup(build) {
+              marks.push("setup-start");
+              await Bun.sleep(40);
+              marks.push("setup-end");
+              build.onLoad({ filter: /entry\.ts$/ }, () => ({
+                contents: "export const x = 99;",
+                loader: "js",
+              }));
+            },
+          },
+        ],
+      });
+      expect(result.success).toBe(true);
+      expect(marks).toEqual(["setup-start", "setup-end"]);
+      expect(performance.now() - started).toBeGreaterThanOrEqual(30);
+      const js = await Bun.file(join(root, "out/entry.js")).text();
+      expect(js).toContain("x = 99");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("plugin target does not gate application under Bun.build on 1.4.4", async () => {
+    // bun-types say target controls which builds apply the plugin ("bun" |
+    // "browser" | "node", read by Bun.build); measured, it does not gate anything
+    // here: a browser-targeted plugin applied to a bun build and a bun-targeted
+    // plugin applied to a browser build. This test is a ratchet: if Bun starts
+    // honoring target, the skipped case will fail and the expectation gets fixed.
+    const root = project();
+    writeFileSync(join(root, "entry.ts"), "export const answer = 42;\n");
+    const plugin = (name: string, target: "bun" | "browser") => ({
+      name,
+      target,
+      setup(build: {
+        onLoad: (
+          opts: { filter: RegExp },
+          cb: () => { contents: string; loader: "js" },
+        ) => void;
+      }) {
+        build.onLoad({ filter: /entry\.ts$/ }, () => ({
+          contents: "export const answer = 43;",
+          loader: "js" as const,
+        }));
+      },
+    });
+    try {
+      for (const [buildTarget, pluginTarget] of [
+        ["bun", "browser"],
+        ["browser", "bun"],
+      ] as const) {
+        const result = await Bun.build({
+          entrypoints: [join(root, "entry.ts")],
+          outdir: join(root, `out-${buildTarget}-${pluginTarget}`),
+          target: buildTarget,
+          plugins: [plugin(`p-${pluginTarget}`, pluginTarget)],
+        });
+        expect({ buildTarget, pluginTarget, success: result.success }).toEqual({
+          buildTarget,
+          pluginTarget,
+          success: true,
+        });
+        const js = await Bun.file(
+          join(root, `out-${buildTarget}-${pluginTarget}/entry.js`),
+        ).text();
+        expect(js).toContain("answer = 43");
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   test("onStart is awaited before building", async () => {
     const root = project();
     const marks: string[] = [];
