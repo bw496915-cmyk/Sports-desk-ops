@@ -37,7 +37,6 @@
 import type {
   OriginDomainId,
   WriterChannelId,
-  WriterLaneId,
 } from "./domain_venue_registry.ts";
 import {
   OriginDomainWireId,

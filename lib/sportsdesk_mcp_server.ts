@@ -57,7 +57,6 @@ import {
   resolveWriterChannel,
   resolveWriterLaneId,
   type OriginDomainEntry,
-  type SentinelChannelEntry,
   type WriterLaneEntry,
 } from "./domain_venue_registry.ts";
 import {
@@ -265,17 +264,6 @@ function serializeWriterLaneEntry(entry: WriterLaneEntry) {
     provenanceLabel: entry.provenanceLabel,
     signalChannelCode: entry.signalChannelCode,
     brandColorHex: entry.brandColorHex,
-  };
-}
-
-function serializeSentinelChannelEntry(entry: SentinelChannelEntry) {
-  return {
-    sentinelId: entry.sentinelId,
-    provenanceLabel: entry.provenanceLabel,
-    signalChannelCode: entry.signalChannelCode,
-    laneId: entry.laneId,
-    brandColorHex: entry.brandColorHex,
-    isMoneyExcluded: entry.isMoneyExcluded,
   };
 }
 
