@@ -27,7 +27,9 @@ export function ThresholdsPanel(): React.ReactElement {
       <span>
         Leagues: <b>{DASHBOARD_LEAGUES.names.join(", ")}</b>
       </span>
-      <span style={styles.dnsLabel}>config {DASHBOARD_META.generated_at}</span>
+      <span style={styles.dnsLabel}>
+        config {DASHBOARD_META.generated_at.slice(0, 10)}
+      </span>
     </div>
   );
 }
