@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -73,6 +73,41 @@ describe("Bun.file", () => {
       }
       expect(bodyError).toBeInstanceOf(Error);
       expect((bodyError as NodeJS.ErrnoException).code).toBe("ENOENT");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("BunFile.lastModified", () => {
+  test("is integer milliseconds and follows utimes", async () => {
+    const dir = temp();
+    try {
+      const path = join(dir, "stamp.txt");
+      const file = Bun.file(path);
+      await Bun.write(file, "x");
+      // A precise utimes value removes mtime/read races from the assertion.
+      utimesSync(path, new Date(1_600_000_000_000), new Date(1_600_000_000_000));
+      // The reference says only "a UNIX timestamp"; measured it is milliseconds,
+      // truncated to an integer (stat's mtimeMs is fractional).
+      expect(file.lastModified).toBe(1_600_000_000_000);
+      expect(Number.isInteger(file.lastModified)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("non-file values use the 2^52-1 sentinel, not 0 (undocumented)", async () => {
+    const dir = temp();
+    try {
+      // Measured 2026-11-14: missing files and in-memory blobs both report
+      // 4_503_599_627_370_495 (2^52-1). A caller comparing against 0 — the
+      // conventional "unknown" value — would treat it as a real timestamp.
+      const SENTINEL = 4_503_599_627_370_495;
+      expect(Bun.file(join(dir, "missing.txt")).lastModified).toBe(SENTINEL);
+      expect((new Blob(["x"]) as Blob & { lastModified: number }).lastModified).toBe(
+        SENTINEL,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
