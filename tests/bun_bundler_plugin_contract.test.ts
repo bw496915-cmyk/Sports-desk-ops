@@ -28,6 +28,82 @@ function project() {
 }
 
 describe("Bun bundler plugin lifecycle (1.4.4)", () => {
+  test("onLoad args carry namespace/loader; the Loader union is accepted", async () => {
+    // The page's onLoad callback type shows only { path, defer }; installed
+    // bun-types also pass namespace and the default loader, measured here.
+    const loads: Array<{ namespace: string; loader: string }> = [];
+    const loaders = [
+      "js",
+      "jsx",
+      "ts",
+      "tsx",
+      "json",
+      "jsonc",
+      "toml",
+      "yaml",
+      "xml",
+      "file",
+      "text",
+      "css",
+      "html",
+    ];
+    const root = project();
+    writeFileSync(
+      join(root, "entry.ts"),
+      'import * as ns from "virt";\nconsole.log(Object.keys(ns).length);\n',
+    );
+    try {
+      for (const loader of loaders) {
+        const result = await Bun.build({
+          entrypoints: [join(root, "entry.ts")],
+          outdir: join(root, `out-${loader}`),
+          plugins: [
+            {
+              name: `loader-${loader}`,
+              setup(build) {
+                build.onResolve({ filter: /^virt$/ }, () => ({
+                  path: "virt",
+                  namespace: "v",
+                }));
+                build.onLoad({ filter: /.*/, namespace: "v" }, (args) => {
+                  loads.push({ namespace: args.namespace, loader: args.loader });
+                  const contents =
+                    loader === "js" || loader === "ts"
+                      ? "export const x = 1;"
+                      : loader === "json"
+                        ? '{"a":1}'
+                        : loader === "jsonc"
+                          ? '{/*c*/"a":1,}'
+                          : loader === "toml"
+                            ? "a = 1\n"
+                            : loader === "yaml"
+                            ? "a: 1\n"
+                            : loader === "xml"
+                              ? "<r/>"
+                              : loader === "css"
+                                ? ".a{color:red}"
+                                : loader === "html"
+                                  ? "<p>hi</p>"
+                                  : "content";
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  return { contents, loader: loader as any };
+                });
+              },
+            },
+          ],
+        });
+        expect({ loader, success: result.success }).toEqual({ loader, success: true });
+      }
+      expect(loads.length).toBe(loaders.length);
+      for (const args of loads) {
+        expect(args.namespace).toBe("v");
+        expect(typeof args.loader).toBe("string");
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+
   test("onStart is awaited before building", async () => {
     const root = project();
     const marks: string[] = [];
