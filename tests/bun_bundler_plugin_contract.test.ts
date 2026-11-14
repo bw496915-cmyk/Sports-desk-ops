@@ -185,6 +185,78 @@ describe("Bun bundler plugin lifecycle (1.4.4)", () => {
     }
   }, 60_000);
 
+  test("lifecycle order is start > resolve > load > end", async () => {
+    const root = project();
+    const order: string[] = [];
+    writeFileSync(join(root, "entry.ts"), 'import { x } from "virt";\nconsole.log(x);\n');
+    try {
+      const result = await Bun.build({
+        entrypoints: [join(root, "entry.ts")],
+        outdir: join(root, "out"),
+        plugins: [
+          {
+            name: "order",
+            setup(build) {
+              build.onStart(() => {
+                order.push("start");
+              });
+              build.onResolve({ filter: /^virt$/ }, () => {
+                order.push("resolve");
+                return { path: "virt", namespace: "v" };
+              });
+              build.onLoad({ filter: /.*/, namespace: "v" }, () => {
+                order.push("load");
+                return { contents: "export const x = 1;", loader: "js" };
+              });
+              build.onEnd(() => {
+                order.push("end");
+              });
+            },
+          },
+        ],
+      });
+      expect(result.success).toBe(true);
+      expect(order).toEqual(["start", "resolve", "load", "end"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  test("onBeforeParse is native-only: a JS object is refused with a TypeError", async () => {
+    // The docs describe onBeforeParse as zero-copy native addons in the parser
+    // thread; installed types take { napiModule, symbol, external? }, not a
+    // callback. Measured: registration throws a TypeError naming the requirement.
+    const root = project();
+    try {
+      // Registration throws synchronously from setup, so a `.catch()` on the
+      // promise would never see it; the try/catch must wrap the call itself.
+      let error: Error | undefined;
+      try {
+        await Bun.build({
+          entrypoints: [join(root, "entry.ts")],
+          outdir: join(root, "out"),
+          plugins: [
+            {
+              name: "before-parse",
+              setup(build) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (build as any).onBeforeParse({ filter: /.*/ }, { napiModule: {}, symbol: "x" });
+              },
+            },
+          ],
+        });
+      } catch (e) {
+        error = e as Error;
+      }
+      expect(error).toBeInstanceOf(TypeError);
+      const message = error?.message ?? "";
+      expect(message).toContain("Napi module");
+      expect(message).toContain("BUN_PLUGIN_NAME");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   test("onStart is awaited before building", async () => {
     const root = project();
     const marks: string[] = [];
