@@ -241,6 +241,24 @@ else
   fail publish-filter "filter match exit $filter_ok_code, no-match exit $filter_bad_code"
 fi
 
+# ---- P15: minimumReleaseAge accepts units and enforces the window -----------
+mkproj "$ROOT/p15a" '{"name":"p15a","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+printf '[install]\nminimumReleaseAge = "3d"\nminimumReleaseAgeExcludes = ["lodash@4.17.21"]\n' > "$ROOT/p15a/bunfig.toml"
+if run bash -c "cd '$ROOT/p15a' && bun install"; then
+  mkproj "$ROOT/p15b" '{"name":"p15b","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+  printf '[install]\nminimumReleaseAge = "87600h"\nminimumReleaseAgeExcludes = []\n' > "$ROOT/p15b/bunfig.toml"
+  set +e
+  aged_out="$(cd "$ROOT/p15b" && bun install 2>&1)"; aged_code=$?
+  set -e
+  if [ "$aged_code" -ne 0 ] && printf '%s' "$aged_out" | grep -q "minimum-release-age"; then
+    pass minimum-release-age "\"3d\" + per-version exclude installs; a 10-year window blocks and names the reason"
+  else
+    fail minimum-release-age "10-year window did not block (exit $aged_code)"
+  fi
+else
+  fail minimum-release-age "\"3d\" units rejected by bun install"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip migrate-speed "needs a ~20k-entry yarn.lock; manual: time bun pm migrate"
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
