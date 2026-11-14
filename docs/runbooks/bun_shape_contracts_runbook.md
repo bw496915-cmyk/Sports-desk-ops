@@ -1,4 +1,4 @@
-# Bun shape contracts — the 91 shapes this repository calls
+# Bun shape contracts — the 92 shapes this repository calls
 
 The single source of truth is layered, and nothing here restates upstream text: **declarations** come from `bun-types@1.4.4` (the surface the reference site renders), **behaviour** from probes against the local `Bun 1.4.4` binary (`tests/bun_baseline.json`), **property attributes** from the pinned Bun commit `38afee6c84`. When they disagree: declarations win on names and signatures, the Bun source wins on attributes, and the measured binary wins on behaviour.
 
@@ -126,6 +126,13 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `scripts/gdocs_template_instantiate.ts`, `scripts/dx_workspaces.ts`
 - **Evidence:** `probe:proc.spawn`
+
+#### Bun.build
+
+- **Source:** declared in `bun-types@1.4.4` · no reference page (see [docs](https://bun.com/docs/bundler))
+- **Shape:** value: `function` · writable true · enumerable true
+- **Here:** `packages/contracts/scripts/build.ts`
+- **Evidence:** `test:tests/bun_bundler_plugin_contract.test.ts`
 
 #### Bun.stdin
 
@@ -283,7 +290,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/JSONC)
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (1):** `parse`
-- **Here:** `lib/pm_policy.ts`
+- **Here:** `lib/pm_policy.ts`, `scripts/bun_native_rules.ts`
 - **Evidence:** `probe:data.json`
 
 #### Bun.JSONL

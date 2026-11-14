@@ -25,6 +25,7 @@
     "sleepSync": [],
     "spawn": [],
     "spawnSync": [],
+    "build": [],
     "which": [],
     "write": [],
     "color": [],

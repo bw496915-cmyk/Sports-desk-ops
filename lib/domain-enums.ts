@@ -149,6 +149,7 @@ export const SENTINEL_CHANNEL_BY_WIRE_ID: Readonly<
 export const WRITER_LANE_WIRE_ID_BY_SIGNAL_CHANNEL: Readonly<
   Record<SignalChannelCode, WriterLaneWireId>
 > = Object.freeze({
+  NON_SPORTS: WriterLaneWireId.UNKNOWN,
   Internet: WriterLaneWireId.INTERNET,
   BLOCKED: WriterLaneWireId.BLOCKED,
   GATEWAY: WriterLaneWireId.GATEWAY,
@@ -156,6 +157,9 @@ export const WRITER_LANE_WIRE_ID_BY_SIGNAL_CHANNEL: Readonly<
   GSBUILDER: WriterLaneWireId.GSBUILDER,
   GSLIVE: WriterLaneWireId.GSLIVE,
   CSLEVEL2: WriterLaneWireId.CSLEVEL2,
+  LIVEBETTINGCWS: WriterLaneWireId.GSLIVE,
+  PHONE: WriterLaneWireId.INTERNET,
+  HOUSE: WriterLaneWireId.INTERNET,
 });
 
 /** Maps a canonical origin domain onto its wire id. */
