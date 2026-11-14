@@ -115,14 +115,12 @@ jobs:
           if [ "$rc" -ne 0 ]; then echo "::error::bun fmt failed (exit $rc)"; exit "$rc"; fi
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      # Advisory until the baseline is green. Measured 2026-11-14:
-      # 6 vulnerabilities (2 high, 4 moderate) — ws@5.2.1 and got@11.8.0 via
-      # @ganchrowsci/gs-sdk, @hono/node-server@2.1.5 via @modelcontextprotocol/sdk.
-      # Drop continue-on-error once `bun audit` exits 0 on main; then this step
-      # is the gate the release notes' `bun audit fix` path is for.
-      - name: Dependency audit (advisory)
+      # Baseline green on 2026-11-14: 0 vulnerabilities (180 packages) after
+      # `bun audit fix` bumped @hono/node-server to 2.1.6 and overrides carried
+      # got to 11.8.5 and ws to 5.2.5 (both were pinned by @ganchrowsci/gs-sdk's
+      # transitive diffusion/got ranges). Blocking from here on.
+      - name: Dependency audit
         timeout-minutes: 2
-        continue-on-error: true
         run: bun run audit:deps
       - name: Type check
         timeout-minutes: 3
