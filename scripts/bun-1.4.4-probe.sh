@@ -364,6 +364,78 @@ else
   fail audit-ignore "ghsa=$ghsa_ok id=$id_ok all=$all_ok cve=$cve_ok typo=$typo_ok"
 fi
 
+# ---- P20: --json is unfiltered; --ignore only moves the exit code -----------
+mkproj "$ROOT/p20" '{"name":"p20","version":"1.0.0","dependencies":{"lodash":"4.17.20"}}'
+run bash -c "cd '$ROOT/p20' && bun install"
+ghsas="$(cd "$ROOT/p20" && bun audit --json 2>/dev/null | bun -e 'const j = await Bun.stdin.json(); console.log(Object.values(j).flat().map(r => r.url.split("/").pop()).join(" "))')"
+ignore_all=""
+for g in $ghsas; do ignore_all="$ignore_all --ignore $g"; done
+set +e
+raw_all="$(cd "$ROOT/p20" && bun audit --json $ignore_all 2>/dev/null)"; raw_code=$?
+set -e
+raw_entries="$(printf '%s' "$raw_all" | bun -e 'const j = await Bun.stdin.json(); console.log(Object.values(j).flat().length)')"
+if [ "$raw_code" -eq 0 ] && [ "$raw_entries" = 4 ]; then
+  pass audit-json-unfiltered "all advisories ignored (exit 0) yet --json still lists $raw_entries"
+else
+  fail audit-json-unfiltered "exit $raw_code, entries $raw_entries (expected 0 and 4)"
+fi
+
+# ---- P21: audit fix --dry-run --json plans without writing -------------------
+mkproj "$ROOT/p21" '{"name":"p21","version":"1.0.0","dependencies":{"lodash":"4.17.20"}}'
+run bash -c "cd '$ROOT/p21' && bun install"
+hash_before="$(cd "$ROOT/p21" && shasum package.json bun.lock | shasum)"
+set +e
+plan="$(cd "$ROOT/p21" && bun audit fix --dry-run --json 2>/dev/null)"; plan_code=$?
+set -e
+hash_after="$(cd "$ROOT/p21" && shasum package.json bun.lock | shasum)"
+plan_ok="$(printf '%s' "$plan" | bun -e '
+  const j = await Bun.stdin.json();
+  const keys = ["dryRun", "fixed", "remaining", "fixes", "blocked", "unfixable", "unmatched", "unaudited", "vulnerableAfterInstall"];
+  const missing = keys.filter((k) => !(k in j));
+  const rewrite = (j.fixes ?? []).some((f) => (f.packageJson ?? []).some((p) => p.key === "lodash"));
+  console.log(missing.length === 0 && j.dryRun === true && rewrite ? "ok" : `missing=${missing} dryRun=${j.dryRun} rewrite=${rewrite}`);
+')"
+if [ "$plan_code" -eq 0 ] && [ "$plan_ok" = ok ] && [ "$hash_before" = "$hash_after" ]; then
+  pass audit-fix-dry-run "plan object complete, dry-run wrote nothing"
+else
+  fail audit-fix-dry-run "code=$plan_code plan=$plan_ok filesChanged=$([ "$hash_before" != "$hash_after" ] && echo yes || echo no)"
+fi
+
+# ---- P22: audit fix rewrites an exact pin, and audit-clean is not "good" -----
+mkproj "$ROOT/p22" '{"name":"p22","version":"1.0.0","dependencies":{"lodash":"4.17.20"}}'
+run bash -c "cd '$ROOT/p22' && bun install"
+run bash -c "cd '$ROOT/p22' && bun audit fix"
+pin_after="$(cd "$ROOT/p22" && bun -e 'const p = await Bun.file("package.json").json(); console.log(p.dependencies.lodash)')"
+set +e
+post_audit="$(cd "$ROOT/p22" && bun audit 2>&1)"; post_code=$?
+set -e
+if [ "$pin_after" != "4.17.20" ] && [ "$post_code" -eq 0 ]; then
+  # Observed 2026-11-14: the rewrite targets lodash 4.18.0. That is consistent
+  # with "lowest non-vulnerable" (4.17.21 still carries 2 advisories) but 4.18.0
+  # is npm-deprecated ("bad release"); audit-clean is not a quality signal.
+  pass audit-fix-rewrites-pin "exact pin 4.17.20 -> $pin_after, audit exit 0 (deprecated target; see note)"
+else
+  fail audit-fix-rewrites-pin "pin=$pin_after audit exit=$post_code"
+fi
+
+# ---- P23: audit fix refuses flags that would prevent writing the lockfile ---
+mkproj "$ROOT/p23" '{"name":"p23","version":"1.0.0","dependencies":{"lodash":"4.17.20"}}'
+run bash -c "cd '$ROOT/p23' && bun install"
+rejects=0
+for flag in --prod --frozen-lockfile --no-save; do
+  set +e
+  rejected_out="$(cd "$ROOT/p23" && bun audit fix "$flag" 2>&1)"; rejected_code=$?
+  set -e
+  if [ "$rejected_code" -ne 0 ] && printf '%s' "$rejected_out" | grep -q "bun.lock"; then
+    rejects=$((rejects+1))
+  fi
+done
+if [ "$rejects" -eq 3 ]; then
+  pass audit-fix-rejects-flags "all three lockfile-blocking flags refused with a bun.lock reason"
+else
+  fail audit-fix-rejects-flags "only $rejects/3 flags refused"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip migrate-speed "needs a ~20k-entry yarn.lock; manual: time bun pm migrate"
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
