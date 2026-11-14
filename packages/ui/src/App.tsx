@@ -39,7 +39,11 @@ import {
   TERMINAL_INITIAL_COMMANDS,
   TERMINAL_WELCOME_HELP_STDOUT,
 } from "./showcase_data.ts";
-import { DASHBOARD_DEFAULT_TAB } from "./config/dashboard.ts";
+import {
+  DASHBOARD_API,
+  DASHBOARD_DEFAULT_TAB,
+  dashboardApiUrl,
+} from "./config/dashboard.ts";
 import { WAGERS_DEFAULTS } from "./config/wagers.ts";
 import {
   type AlertFilter,
@@ -211,7 +215,7 @@ export function App(): React.ReactElement {
 
   const fetchTiersConfig = async () => {
     try {
-      const res = await fetch("/api/config/tiers");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.tiers));
       if (!res.ok) return;
       const cfg = (await res.json()) as { tiers?: TierStyleConfig } | null;
       if (cfg?.tiers) {
@@ -227,7 +231,7 @@ export function App(): React.ReactElement {
 
   const fetchLiveWagers = async () => {
     try {
-      const res = await fetch("/api/wagers");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.wagers));
       if (!res.ok) {
         setWagersError(
           `GET /api/wagers returned HTTP ${res.status} (${res.statusText || "error"})`,
@@ -261,7 +265,7 @@ export function App(): React.ReactElement {
 
   const fetchCustomersCohorts = async () => {
     try {
-      const res = await fetch("/api/customers");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.customers));
       if (!res.ok) {
         setCohortsStatus("unavailable");
         setCohortsError(
@@ -291,7 +295,7 @@ export function App(): React.ReactElement {
   const fetchBetTicker = async () => {
     setBetTickerLoading(true);
     try {
-      const res = await fetch("/api/bet-ticker");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.bet_ticker));
       if (!res.ok) {
         setBetTickerError(
           `GET /api/bet-ticker returned HTTP ${res.status} (${res.statusText || "error"})`,

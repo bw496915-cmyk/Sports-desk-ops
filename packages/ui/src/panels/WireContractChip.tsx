@@ -26,7 +26,11 @@ export function WireContractChip({
     ? "⚠ wire: unavailable"
     : ok && summary
       ? `✓ wire: ${summary.rows} rows`
-      : `⚠ wire: ${summary?.violations.length ?? 0} issue(s)`;
+      : summary && summary.violations.length > 0
+        ? `⚠ wire: ${summary.violations.length} issue(s)`
+        : // ok:false with no parseable violations is an invalid summary, not a
+          // clean one: never render "0 issue(s)".
+          "⚠ wire: invalid summary";
 
   const title = error
     ? `Wire contract unavailable: ${error}`

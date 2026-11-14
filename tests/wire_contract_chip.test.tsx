@@ -60,6 +60,12 @@ describe("WireContractChip", () => {
     expect(html).not.toContain("No type or nullability violations.");
   });
 
+  test("ok:false with no parseable violations never reads as clean", () => {
+    const html = render({ ...clean, ok: false, violations: [] });
+    expect(html).toContain("⚠ wire: invalid summary");
+    expect(html).not.toContain("0 issue(s)");
+  });
+
   test("an error wins over a stale clean summary and suppresses its detail", () => {
     const html = render(clean, "GET /api/wagers failed: boom");
     expect(html).toContain("⚠ wire: unavailable");
