@@ -5,17 +5,20 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { App } from "../packages/ui/src/App.tsx";
 import { renderAnsiReact } from "../packages/ui/src/ansi.tsx";
+import * as uiBarrel from "../packages/ui/src/index.ts";
 import {
   AlertsTabPanel,
   BetTickerTabPanel,
   BuildMatrixDrawer,
   CustomersTabPanel,
+  HOUDINI_TOKENS,
   LiveWagersTabPanel,
   R2PipelineTabPanel,
   RankingsTabPanel,
   ShiftHandoffModal,
   SurveillanceTabPanel,
   TerminalTabPanel,
+  ThresholdsPanel,
 } from "../packages/ui/src/panels/index.tsx";
 import {
   PROXY_CONDUITS_30D,
@@ -557,5 +560,24 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(ansiHtml).toContain('href="/agent/FAKEMONEY"');
     expect(ansiHtml).not.toContain("https://desk.bookdeskops.com/agent/");
     expect(dashboardMd).not.toContain("https://desk.bookdeskops.com/agent/");
+  });
+
+  test("ThresholdsPanel & public index.ts barrel expose TOML contracts, Houdini tokens, route helpers, and tab specs", () => {
+    const thresholdsHtml = renderToStaticMarkup(
+      React.createElement(ThresholdsPanel),
+    );
+    expect(thresholdsHtml).toContain("Dispatch thresholds:");
+    expect(thresholdsHtml).toContain("Sharp:");
+
+    expect(
+      HOUDINI_TOKENS.some(([token]) => token === "--sd-surface-elevated"),
+    ).toBe(true);
+    expect(uiBarrel.App).toBe(App);
+    expect(uiBarrel.ThresholdsPanel).toBe(ThresholdsPanel);
+    expect(typeof uiBarrel.getLocalAgentHref).toBe("function");
+    expect(typeof uiBarrel.resolveDashboardTabId).toBe("function");
+    expect(uiBarrel.DASHBOARD_META.schema).toBe("sportsdesk-dashboard/v2");
+    expect(uiBarrel.WAGERS_META.schema).toBe("sportsdesk-wagers-tab/v1");
+    expect(uiBarrel.DASHBOARD_TAB_IDS).toContain("wagers");
   });
 });

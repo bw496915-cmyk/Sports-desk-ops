@@ -248,6 +248,23 @@ export function inferTestsForFiles(
       candidates.push("tests/nsh_desk_contract.test.ts");
     }
 
+    if (f === "config/wager_tiers.toml") {
+      candidates.push(
+        "tests/wager_tiers_toml.test.ts",
+        "tests/slice_metrics.test.ts",
+      );
+    } else if (f === "design/tokens.toml") {
+      candidates.push(
+        "tests/verify_tokens.test.ts",
+        "tests/gen_tokens_tokens_ssot.test.ts",
+      );
+    } else if (
+      f.startsWith("packages/ui/src/config/") ||
+      f === "scripts/validate_dashboard_config.ts"
+    ) {
+      candidates.push("tests/dashboard_config_validation.test.ts");
+    }
+
     if (f.startsWith("packages/backend/")) {
       candidates.push(
         "tests/dashboard_backend_workspace.test.ts",
@@ -505,11 +522,56 @@ async function main(): Promise<number> {
       (f) => f.startsWith("design/") || f.startsWith("lib/gen_tokens/"),
     )
   ) {
-    tokensGateResult = await runTask("gen:tokens:gate", [
-      "bun",
-      "run",
-      "scripts/gen_tokens_gate.ts",
+    const { GEN_TOKEN_EMISSION_PATHS } =
+      await import("../lib/gen_tokens/emission_targets.ts");
+    const dirtyOutputs = gitQuery([
+      "status",
+      "--porcelain",
+      "--",
+      ...GEN_TOKEN_EMISSION_PATHS,
     ]);
+    if (dirtyOutputs.ok && dirtyOutputs.lines.length === 0) {
+      tokensGateResult = await runTask("gen:tokens:gate", [
+        "bun",
+        "run",
+        "scripts/gen_tokens_gate.ts",
+      ]);
+    } else {
+      const hashOutputs = async (): Promise<Map<string, string>> => {
+        const out = new Map<string, string>();
+        for (const rel of GEN_TOKEN_EMISSION_PATHS) {
+          const bytes = await Bun.file(path.join(ROOT, rel)).bytes();
+          const hasher = new Bun.CryptoHasher("sha256");
+          hasher.update(bytes);
+          out.set(rel, hasher.digest("hex"));
+        }
+        return out;
+      };
+      const t0 = performance.now();
+      const beforeHashes = await hashOutputs();
+      const genRun = await runTask("gen:tokens (idempotence)", [
+        "bun",
+        "run",
+        "gen:tokens",
+      ]);
+      if (!genRun.ok) {
+        tokensGateResult = genRun;
+      } else {
+        const afterHashes = await hashOutputs();
+        const drifted = [...beforeHashes.entries()]
+          .filter(([rel, hash]) => afterHashes.get(rel) !== hash)
+          .map(([rel]) => rel);
+        tokensGateResult = {
+          name: "gen:tokens (working-tree zero-drift)",
+          ok: drifted.length === 0,
+          ms: Math.round(performance.now() - t0),
+          output:
+            drifted.length === 0
+              ? ""
+              : `Uncommitted token outputs drifted on re-generation: ${drifted.join(", ")}`,
+        };
+      }
+    }
     if (!tokensGateResult.ok) {
       console.error(
         `✗ ${tokensGateResult.name} (${tokensGateResult.ms}ms)\n${tokensGateResult.output}`,

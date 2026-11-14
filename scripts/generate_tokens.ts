@@ -199,9 +199,13 @@ function generateStandaloneDashboardTokensCss(): string {
   --bg: var(--sd-surface-bg);
   --bg-cli: var(--sd-surface-cli);
   --card: var(--sd-surface-card);
+  --card-elevated: var(--sd-surface-elevated);
   --card-hover: var(--sd-surface-hover);
+  --card-raised: var(--sd-surface-raised);
   --border: var(--sd-surface-border);
+  --border-strong: var(--sd-border-strong);
   --text: var(--sd-text-primary);
+  --text-secondary: var(--sd-text-secondary);
   --muted: var(--sd-text-muted);
   --accent: var(--sd-tier-rec-bias);
   --emerald: var(--sd-theme-emerald);

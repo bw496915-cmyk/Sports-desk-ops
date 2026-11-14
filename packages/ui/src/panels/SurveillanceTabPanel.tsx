@@ -1,6 +1,8 @@
 import type React from "react";
+import { DASHBOARD_PANELS } from "../config/dashboard.ts";
 import { styles } from "../dashboard_styles.ts";
 import type { DashboardData, DnsData } from "../types.ts";
+import { ThresholdsPanel } from "./ThresholdsPanel.tsx";
 
 export interface SurveillanceTabPanelProps {
   readonly dnsData: DnsData | null;
@@ -38,7 +40,10 @@ export function SurveillanceTabPanel({
         <div style={styles.dnsBar}>
           <span style={styles.dnsLabel}>🌐 Bun.dns Cache Telemetry:</span>
           <span>
-            Size: <b>{dnsData.telemetry.size}/256</b>
+            Size:{" "}
+            <b>
+              {dnsData.telemetry.size}/{DASHBOARD_PANELS.dns_cache_capacity}
+            </b>
           </span>
           <span>
             Hit Rate: <b>{dnsData.telemetry.hitRatePercent}%</b>
@@ -107,6 +112,8 @@ export function SurveillanceTabPanel({
           </button>
         </div>
       </div>
+
+      <ThresholdsPanel />
 
       {data ? (
         viewMode === "interactive" ? (

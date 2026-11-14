@@ -3,6 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { parseDashboardWsSignal } from "@sportsdesk-ops/contracts";
 import "./desk.css";
 import { ShadowPricingPanel } from "./ShadowPricingPanel.tsx";
+import {
+  DASHBOARD_API,
+  DASHBOARD_DEFAULT_TAB,
+  dashboardApiUrl,
+} from "./config/dashboard.ts";
+import { WAGERS_DEFAULTS } from "./config/wagers.ts";
 import { styles } from "./dashboard_styles.ts";
 import {
   normalizeCustomersCohortResponse,
@@ -36,28 +42,29 @@ import {
   TERMINAL_INITIAL_COMMANDS,
   TERMINAL_WELCOME_HELP_STDOUT,
 } from "./showcase_data.ts";
-import type {
-  AlertFilter,
-  AlertToastState,
-  BetTickerApiResponse,
-  BuildMatrixRow,
-  CustomersApiResponse,
-  CustomerSortKey,
-  DashboardAlertRecord,
-  DashboardData,
-  DashboardSourceProvenance,
-  DashboardTabId,
-  DnsData,
-  HealthData,
-  LiveWager,
-  R2PipelineApiResponse,
-  RankingsFilter,
-  ShiftSummaryData,
-  ShowcaseCustomer,
-  TerminalCategory,
-  TerminalHistoryEntry,
-  TierStyleConfig,
-  WagerSortField,
+import {
+  type AlertFilter,
+  type AlertToastState,
+  type BetTickerApiResponse,
+  type BuildMatrixRow,
+  type CustomersApiResponse,
+  type CustomerSortKey,
+  type DashboardAlertRecord,
+  type DashboardData,
+  type DashboardSourceProvenance,
+  type DashboardTabId,
+  type DnsData,
+  type HealthData,
+  type LiveWager,
+  type R2PipelineApiResponse,
+  type RankingsFilter,
+  resolveDashboardTabId,
+  type ShiftSummaryData,
+  type ShowcaseCustomer,
+  type TerminalCategory,
+  type TerminalHistoryEntry,
+  type TierStyleConfig,
+  type WagerSortField,
 } from "./types.ts";
 
 export * from "./types.ts";
@@ -87,22 +94,16 @@ function apiPostHeaders(): HeadersInit {
 }
 
 function resolveInitialTab(): DashboardTabId {
-  if (typeof window === "undefined") return "customers";
-  const raw = new URLSearchParams(window.location.search).get("tab");
-  if (
-    raw === "shadow" ||
-    raw === "surveillance" ||
-    raw === "customers" ||
-    raw === "terminal" ||
-    raw === "rankings" ||
-    raw === "wagers" ||
-    raw === "bet-ticker" ||
-    raw === "r2" ||
-    raw === "alerts"
-  ) {
-    return raw;
+  if (typeof window === "undefined") return DASHBOARD_DEFAULT_TAB;
+  const params = new URLSearchParams(window.location.search);
+  const fromParam = params.get("tab");
+  if (fromParam) {
+    return resolveDashboardTabId(fromParam, DASHBOARD_DEFAULT_TAB);
   }
-  return "customers";
+  if (window.location.hash) {
+    return resolveDashboardTabId(window.location.hash, DASHBOARD_DEFAULT_TAB);
+  }
+  return DASHBOARD_DEFAULT_TAB;
 }
 
 function resolveInitialUrlParam(name: string): string {
@@ -138,9 +139,12 @@ export function App(): React.ReactElement {
   const [selectedWager, setSelectedWager] = useState<LiveWager | null>(
     SAMPLE_LIVE_WAGERS[0] ?? null,
   );
-  const [wagerSortField, setWagerSortField] =
-    useState<WagerSortField>("timestamp");
-  const [wagerSortDir, setWagerSortDir] = useState<"asc" | "desc">("desc");
+  const [wagerSortField, setWagerSortField] = useState<WagerSortField>(
+    WAGERS_DEFAULTS.sort_field,
+  );
+  const [wagerSortDir, setWagerSortDir] = useState<"asc" | "desc">(
+    WAGERS_DEFAULTS.sort_dir,
+  );
   const [clockTime, setClockTime] = useState<string>("");
   const [terminalCategory, setTerminalCategory] =
     useState<TerminalCategory>("ALL");
@@ -201,7 +205,7 @@ export function App(): React.ReactElement {
 
   const fetchTiersConfig = async () => {
     try {
-      const res = await fetch("/api/config/tiers");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.tiers));
       if (!res.ok) return;
       const cfg = (await res.json()) as { tiers?: TierStyleConfig } | null;
       if (cfg?.tiers) {
@@ -217,7 +221,7 @@ export function App(): React.ReactElement {
 
   const fetchLiveWagers = async () => {
     try {
-      const res = await fetch("/api/wagers");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.wagers));
       if (!res.ok) {
         setWagersError(
           `GET /api/wagers returned HTTP ${res.status} (${res.statusText || "error"})`,
@@ -250,7 +254,7 @@ export function App(): React.ReactElement {
 
   const fetchCustomersCohorts = async () => {
     try {
-      const res = await fetch("/api/customers");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.customers));
       if (!res.ok) {
         setCohortsStatus("unavailable");
         setCohortsError(
@@ -280,7 +284,7 @@ export function App(): React.ReactElement {
   const fetchBetTicker = async () => {
     setBetTickerLoading(true);
     try {
-      const res = await fetch("/api/bet-ticker");
+      const res = await fetch(dashboardApiUrl(DASHBOARD_API.bet_ticker));
       if (!res.ok) {
         setBetTickerError(
           `GET /api/bet-ticker returned HTTP ${res.status} (${res.statusText || "error"})`,
@@ -303,7 +307,11 @@ export function App(): React.ReactElement {
     setR2PipelineLoading(true);
     try {
       const res = await fetch(
-        force ? "/api/r2/pipeline?refresh=1" : "/api/r2/pipeline",
+        dashboardApiUrl(
+          force
+            ? `${DASHBOARD_API.r2_pipeline}?refresh=1`
+            : DASHBOARD_API.r2_pipeline,
+        ),
       );
       if (!res.ok) {
         setR2PipelineError(

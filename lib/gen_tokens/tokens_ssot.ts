@@ -12,8 +12,10 @@ export type RouteThresholdKind = (typeof ROUTE_THRESHOLD_KINDS)[number];
 const UI_ROLES: readonly UiRole[] = ["surface", "border", "text"];
 
 export type TokensMeta = {
+  schema?: string;
   version: string;
   author?: string;
+  updated_at?: string;
 };
 
 export type SurfaceToml = {
@@ -122,10 +124,17 @@ function parseMeta(raw: unknown): TokensMeta {
     throw new Error("[tokens_ssot] meta must be a table");
   }
   const version = reqString(raw, "version", "meta");
-  if (typeof raw.author === "string") {
-    return { version, author: raw.author };
+  const out: TokensMeta = { version };
+  if (typeof raw.schema === "string" && raw.schema.length > 0) {
+    out.schema = raw.schema;
   }
-  return { version };
+  if (typeof raw.author === "string" && raw.author.length > 0) {
+    out.author = raw.author;
+  }
+  if (typeof raw.updated_at === "string" && raw.updated_at.length > 0) {
+    out.updated_at = raw.updated_at;
+  }
+  return out;
 }
 
 function parseSurface(key: string, raw: unknown): SurfaceToml {
