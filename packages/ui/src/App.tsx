@@ -11,6 +11,7 @@ import {
 } from "./hydration.ts";
 import { DASHBOARD_API, dashboardApiUrl } from "./config/dashboard.ts";
 import { resolveInitialTab, tabHref } from "./tab_routes.ts";
+import { bookRowsToProfiles } from "./profile_rows.ts";
 import {
   AgentInspectorModal,
   AlertsTabPanel,
@@ -115,6 +116,7 @@ export function App(): React.ReactElement {
     else url.searchParams.set("tab", activeTab);
     window.history.replaceState(null, "", url);
   }, [activeTab]);
+
   const [buildMatrixRows, setBuildMatrixRows] = useState<
     readonly BuildMatrixRow[] | null
   >(null);
@@ -161,18 +163,26 @@ export function App(): React.ReactElement {
   );
   const [filterTier, setFilterTier] = useState<string>("ALL");
   const [copiedCliId, setCopiedCliId] = useState<string | null>(null);
+  const [profileRows, setProfileRows] =
+    useState<readonly ShowcaseCustomer[]>(SAMPLE_PROFILE_DATA);
   const [selectedCustomer, setSelectedCustomer] =
     useState<ShowcaseCustomer | null>(() => {
       const q = resolveInitialUrlParam("search").toUpperCase();
       if (q) {
-        const match = SAMPLE_PROFILE_DATA.find((c) => c.id.toUpperCase() === q);
+        const match = profileRows.find((c) => c.id.toUpperCase() === q);
         if (match) return match;
       }
-      return SAMPLE_PROFILE_DATA[0] ?? null;
+      return profileRows[0] ?? null;
     });
   const [customerForensicResult, setCustomerForensicResult] = useState<
     string | null
   >(null);
+  // Keep the detail panel on a row that exists after the book replaces the sample rows.
+  useEffect(() => {
+    if (profileRows.length === 0) return;
+    if (profileRows.some((row) => row.id === selectedCustomer?.id)) return;
+    setSelectedCustomer(profileRows[0] ?? null);
+  }, [profileRows, selectedCustomer?.id]);
 
   // Runtime Declarative Wager Tiers + Live API Hydration state
   const [tiersConfig, setTiersConfig] = useState<TierStyleConfig | null>(null);
@@ -264,6 +274,8 @@ export function App(): React.ReactElement {
         return;
       }
       setCohortsReport(normalized);
+      const mappedRows = bookRowsToProfiles(normalized.fixtures ?? []);
+      if (mappedRows.length > 0) setProfileRows(mappedRows);
       setCohortsStatus("ready");
       setCohortsError(null);
     } catch (err) {
@@ -698,7 +710,7 @@ export function App(): React.ReactElement {
     } catch {
       // Local client fallback
       const upper = trimmed.toUpperCase();
-      const cust = SAMPLE_PROFILE_DATA.find((c) => c.id === upper);
+      const cust = profileRows.find((c) => c.id === upper);
       let stdout = "";
       if (cust) {
         stdout =
@@ -876,7 +888,7 @@ export function App(): React.ReactElement {
     };
   }, []);
 
-  const filteredCustomers = SAMPLE_PROFILE_DATA.filter((cust) => {
+  const filteredCustomers = profileRows.filter((cust) => {
     const matchesSearch =
       cust.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       cust.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -919,7 +931,7 @@ export function App(): React.ReactElement {
 
   const handleSelectCustomerById = (customerId: string) => {
     const upper = customerId.trim().toUpperCase();
-    const found = SAMPLE_PROFILE_DATA.find((c) => c.id.toUpperCase() === upper);
+    const found = profileRows.find((c) => c.id.toUpperCase() === upper);
     if (found) {
       setSelectedCustomer(found);
     }
@@ -1171,7 +1183,7 @@ export function App(): React.ReactElement {
             onClick={() => setActiveTab("customers")}
             title="Inspect individual sharp originators, sizing models, and risk (Ctrl+1)"
           >
-            👥 Profiles ({SAMPLE_PROFILE_DATA.length})
+            👥 Profiles ({profileRows.length})
             <span style={styles.keyShortcutBadge}>Ctrl+1</span>
           </button>
           <button
@@ -1461,7 +1473,7 @@ export function App(): React.ReactElement {
         ) : activeTab === "shadow" ? (
           <ShadowPricingPanel
             onInspectAccount={(accountId) => {
-              const found = SAMPLE_PROFILE_DATA.find(
+              const found = profileRows.find(
                 (c) => c.id.toUpperCase() === accountId.toUpperCase(),
               );
               if (found) {
