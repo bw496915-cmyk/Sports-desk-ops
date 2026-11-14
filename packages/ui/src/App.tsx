@@ -10,6 +10,7 @@ import {
   SHOWCASE_WAGERS_PROVENANCE,
 } from "./hydration.ts";
 import { DASHBOARD_API, dashboardApiUrl } from "./config/dashboard.ts";
+import { resolveInitialTab, tabHref } from "./tab_routes.ts";
 import {
   AgentInspectorModal,
   AlertsTabPanel,
@@ -88,25 +89,6 @@ function apiPostHeaders(): HeadersInit {
   return headers;
 }
 
-function resolveInitialTab(): DashboardTabId {
-  if (typeof window === "undefined") return "customers";
-  const raw = new URLSearchParams(window.location.search).get("tab");
-  if (
-    raw === "shadow" ||
-    raw === "surveillance" ||
-    raw === "customers" ||
-    raw === "terminal" ||
-    raw === "rankings" ||
-    raw === "wagers" ||
-    raw === "bet-ticker" ||
-    raw === "r2" ||
-    raw === "alerts"
-  ) {
-    return raw;
-  }
-  return "customers";
-}
-
 function resolveInitialUrlParam(name: string): string {
   if (typeof window === "undefined") return "";
   return new URLSearchParams(window.location.search).get(name)?.trim() ?? "";
@@ -114,12 +96,25 @@ function resolveInitialUrlParam(name: string): string {
 
 export function App(): React.ReactElement {
   const runtimeFlags = getDashboardRuntimeFlags();
-  const [activeTab, setActiveTab] = useState<DashboardTabId>(resolveInitialTab);
+  const [activeTab, setActiveTab] = useState<DashboardTabId>(() =>
+    typeof window === "undefined"
+      ? "customers"
+      : resolveInitialTab(window.location.search, window.location.pathname),
+  );
   const [showBuildMatrix, setShowBuildMatrix] = useState<boolean>(() =>
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("matrix") === "1"
       : false,
   );
+
+  // Keep the URL honest so every tab is linkable and reloads back to itself.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (activeTab === "customers") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", activeTab);
+    window.history.replaceState(null, "", url);
+  }, [activeTab]);
   const [buildMatrixRows, setBuildMatrixRows] = useState<
     readonly BuildMatrixRow[] | null
   >(null);
@@ -1001,7 +996,7 @@ export function App(): React.ReactElement {
               </button>
               <span>·</span>
               <a
-                href="/live-bets"
+                href={tabHref("wagers")}
                 target="_blank"
                 rel="noreferrer"
                 style={{
