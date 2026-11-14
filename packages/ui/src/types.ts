@@ -7,6 +7,7 @@ import type {
   BetTickerTypeBucket,
   CustomersApiResponse,
   CustomersCohortsSummary,
+  Daemon4020State,
   Daemon4020Status,
   DashboardFeedProvenanceKind,
   DashboardSourceProvenance,
@@ -26,6 +27,7 @@ export type {
   BetTickerTypeBucket,
   CustomersApiResponse,
   CustomersCohortsSummary,
+  Daemon4020State,
   Daemon4020Status,
   DashboardFeedProvenanceKind,
   DashboardSourceProvenance,
@@ -38,6 +40,10 @@ export type {
 export interface DashboardData {
   readonly markdown: string;
   readonly html: string;
+  readonly renderDurationMs?: number;
+  readonly markdownBytes?: number;
+  readonly htmlBytes?: number;
+  readonly nonAsciiChars?: number;
   readonly updatedAt: string;
 }
 
@@ -50,9 +56,12 @@ export interface DnsData {
     readonly cacheHitsInflight: number;
     readonly cacheMisses: number;
     readonly defaultTtlSeconds: number;
+    readonly errors?: number;
+    readonly totalCount?: number;
   };
   readonly hosts?: readonly {
     readonly hostname: string;
+    readonly port?: number;
     readonly serviceName?: string;
   }[];
   readonly coreHosts?: readonly {
@@ -60,6 +69,8 @@ export interface DnsData {
     readonly port?: number;
     readonly serviceName?: string;
   }[];
+  readonly updatedAt?: string;
+  readonly generatedAt?: string;
 }
 
 export interface ShowcaseCustomer {
@@ -180,7 +191,10 @@ export interface DashboardAlertRecord {
 }
 
 export interface HealthData {
-  status: "ok" | "warning" | "degraded";
+  status: "ok" | "warning" | "degraded" | "healthy" | "down";
+  operationalStatus?: "ok" | "degraded" | "down" | undefined;
+  dataStatus?: "ok" | "stale" | undefined;
+  httpStatus?: number | undefined;
   uptimeSeconds: number;
   alerts?: {
     status: "ok" | "warning" | "degraded";
@@ -190,6 +204,12 @@ export interface HealthData {
     backlog: number;
     acknowledged?: number;
   };
+  degradedReasons?: readonly {
+    readonly message: string;
+    readonly kind: string;
+    readonly severity: string;
+    readonly action?: string | undefined;
+  }[];
 }
 
 export interface ShiftSummaryData {

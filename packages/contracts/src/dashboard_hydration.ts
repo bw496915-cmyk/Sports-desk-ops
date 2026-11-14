@@ -338,13 +338,36 @@ export interface BetTickerApiResponse {
   readonly captureHealth: BetTickerCaptureHealthSummary;
 }
 
+export type Daemon4020State = "online" | "degraded" | "offline";
+
 export interface Daemon4020Status {
+  /** True when :4020 answered /health (2xx or SportsDesk 503 auth-down). */
   readonly online: boolean;
+  /** Granular reachability + /health state (`online` | `degraded` | `offline`). */
+  readonly state?: Daemon4020State | undefined;
+  readonly operationalStatus?: "ok" | "degraded" | "down" | undefined;
   readonly url: string;
   readonly status: number | null;
   readonly latencyMs: number | null;
   readonly checkedAt: string;
   readonly reason?: string | undefined;
+}
+
+/** Resolve unified daemon reachability state from structured status fields or legacy flags. */
+export function resolveDaemon4020State(
+  daemon: Daemon4020Status | null | undefined,
+): Daemon4020State | "probing" {
+  if (!daemon) return "probing";
+  if (daemon.state) return daemon.state;
+  if (!daemon.online) return "offline";
+  if (
+    daemon.status === 503 ||
+    daemon.operationalStatus === "down" ||
+    daemon.operationalStatus === "degraded"
+  ) {
+    return "degraded";
+  }
+  return "online";
 }
 
 export interface R2SinkRollupMetric {

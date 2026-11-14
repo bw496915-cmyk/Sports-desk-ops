@@ -34,8 +34,11 @@ const server = Bun.serve({
     console.error("preview error:", err);
     return new Response("server error", { status: 500 });
   },
-  async fetch(req) {
+  async fetch(req, srv) {
     const url = new URL(req.url);
+    if (url.pathname === "/ws" && srv.upgrade(req)) {
+      return undefined;
+    }
     if (url.pathname.startsWith("/api/") || url.pathname === "/health") {
       const target = pickApiTarget(url.pathname, {
         api: API,
@@ -63,6 +66,29 @@ const server = Bun.serve({
     }
     const served = await serveDashboardAsset(url.pathname, { root: ROOT });
     return served ?? new Response("not found", { status: 404 });
+  },
+  websocket: {
+    open(ws) {
+      ws.send(JSON.stringify({ type: "ack", topics: ["preview"] }));
+    },
+    message(ws, message) {
+      try {
+        const parsed =
+          typeof message === "string"
+            ? (JSON.parse(message) as { action?: unknown; topics?: unknown })
+            : null;
+        if (parsed?.action === "subscribe") {
+          ws.send(
+            JSON.stringify({
+              type: "ack",
+              topics: Array.isArray(parsed.topics) ? parsed.topics : [],
+            }),
+          );
+        }
+      } catch {
+        // Ignore malformed preview client frames.
+      }
+    },
   },
 });
 

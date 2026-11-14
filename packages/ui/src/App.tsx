@@ -1,6 +1,9 @@
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { parseDashboardWsSignal } from "@sportsdesk-ops/contracts";
+import {
+  parseDashboardWsSignal,
+  resolveDaemon4020State,
+} from "@sportsdesk-ops/contracts";
 import "./desk.css";
 import { ShadowPricingPanel } from "./ShadowPricingPanel.tsx";
 import { styles } from "./dashboard_styles.ts";
@@ -121,6 +124,7 @@ export function App(): React.ReactElement {
     readonly BuildMatrixRow[] | null
   >(null);
   const [buildMatrixLoading, setBuildMatrixLoading] = useState<boolean>(false);
+  const [buildMatrixError, setBuildMatrixError] = useState<string | null>(null);
   const [rankingsFilter, setRankingsFilter] = useState<RankingsFilter>("ALL");
   const [rankingsSearch, setRankingsSearch] = useState<string>(() =>
     resolveInitialUrlParam("agent"),
@@ -148,6 +152,8 @@ export function App(): React.ReactElement {
   );
   const [data, setData] = useState<DashboardData | null>(null);
   const [dnsData, setDnsData] = useState<DnsData | null>(null);
+  const [dnsRefreshing, setDnsRefreshing] = useState(false);
+  const [dnsError, setDnsError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"interactive" | "raw">(
     "interactive",
   );
@@ -334,6 +340,32 @@ export function App(): React.ReactElement {
     }
   };
 
+  const fetchBuildMatrix = () => {
+    setBuildMatrixLoading(true);
+    setBuildMatrixError(null);
+    fetch("/api/build-matrix")
+      .then(async (r) => {
+        if (!r.ok) {
+          throw new Error(`GET /api/build-matrix returned HTTP ${r.status}`);
+        }
+        return (await r.json()) as {
+          targets?: readonly BuildMatrixRow[];
+        };
+      })
+      .then((json) => {
+        if (json?.targets) {
+          debugDashboardTrace("loaded DCE build matrix", json);
+          setBuildMatrixRows(json.targets);
+        }
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("Build matrix probe unavailable:", err);
+        setBuildMatrixError(msg);
+      })
+      .finally(() => setBuildMatrixLoading(false));
+  };
+
   useEffect(() => {
     void fetchTiersConfig();
     void fetchLiveWagers();
@@ -341,6 +373,12 @@ export function App(): React.ReactElement {
     void fetchBetTicker();
     void fetchR2Pipeline();
   }, []);
+
+  useEffect(() => {
+    if (showBuildMatrix && !buildMatrixRows && !buildMatrixLoading) {
+      fetchBuildMatrix();
+    }
+  }, [showBuildMatrix]);
 
   // UI enhancement states: banner dismissal & collapsible KPI cards
   const [bannerDismissed, setBannerDismissed] = useState(
@@ -371,7 +409,13 @@ export function App(): React.ReactElement {
 
   const fetchHealth = () => {
     fetch("/health")
-      .then((res) => (res.ok ? res.json() : null))
+      .then(async (res) => {
+        const contentType = res.headers.get("content-type") ?? "";
+        if (contentType !== "" && !contentType.toLowerCase().includes("json")) {
+          return null;
+        }
+        return (await res.json().catch(() => null)) as HealthData | null;
+      })
       .then((health) => {
         if (health) {
           setHealthData(health);
@@ -788,22 +832,36 @@ export function App(): React.ReactElement {
     }
   };
 
+  const fetchDnsTelemetry = async () => {
+    setDnsRefreshing(true);
+    setDnsError(null);
+    try {
+      const dnsRes = await fetch("/api/dns/telemetry").then(async (res) => {
+        if (!res.ok) return fetch("/api/dns");
+        return res;
+      });
+      if (dnsRes.ok) {
+        const json = (await dnsRes.json()) as DnsData;
+        setDnsData(json);
+      } else {
+        setDnsError(`HTTP ${dnsRes.status}`);
+      }
+    } catch (err) {
+      setDnsError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDnsRefreshing(false);
+    }
+  };
+
   const fetchDashboard = async () => {
     try {
-      const [dashRes, dnsRes] = await Promise.all([
+      const [dashRes] = await Promise.all([
         fetch(dashboardApiUrl(DASHBOARD_API.dashboard)),
-        fetch("/api/dns/telemetry").then(async (res) => {
-          if (!res.ok) return fetch("/api/dns");
-          return res;
-        }),
+        fetchDnsTelemetry(),
       ]);
       if (dashRes.ok) {
         const json = (await dashRes.json()) as DashboardData;
         setData(json);
-      }
-      if (dnsRes.ok) {
-        const json = (await dnsRes.json()) as DnsData;
-        setDnsData(json);
       }
     } catch (err) {
       console.error("Failed to load dashboard data:", err);
@@ -950,6 +1008,70 @@ export function App(): React.ReactElement {
     setActiveTab("customers");
   };
 
+  const daemon4020 = r2PipelineData?.daemon4020;
+  const daemonState = resolveDaemon4020State(daemon4020);
+  const daemonLatency = daemon4020?.latencyMs ?? 1;
+  const daemonPill =
+    daemonState === "online"
+      ? {
+          color: "#4ade80",
+          label: `● API :4020 (${daemonLatency}ms)`,
+          title: `SportsDesk Daemon :4020 online (${daemonLatency}ms)`,
+        }
+      : daemonState === "degraded"
+        ? {
+            color: "#fbbf24",
+            label: `◐ API :4020 ${daemon4020?.operationalStatus === "down" ? "Auth Down" : "Degraded"} (${daemonLatency}ms)`,
+            title: `SportsDesk Daemon :4020 reachable (HTTP ${daemon4020?.status ?? 503}, ${daemonLatency}ms)${daemon4020?.reason ? ` — ${daemon4020.reason}` : ""}`,
+          }
+        : daemonState === "offline"
+          ? {
+              color: "#fbbf24",
+              label: "○ API :4020 Offline",
+              title: `SportsDesk Daemon :4020 offline (${daemon4020?.reason ?? "unreachable"})`,
+            }
+          : {
+              color: "#94a3b8",
+              label: "◌ API :4020 Probing...",
+              title: "SportsDesk Daemon :4020 probing...",
+            };
+
+  const alertsStatus = healthData?.alerts?.status;
+  const opStatus = healthData?.operationalStatus;
+  const isHealthError =
+    alertsStatus === "degraded" ||
+    opStatus === "down" ||
+    healthData?.status === "down";
+  const isHealthWarn =
+    !isHealthError &&
+    (alertsStatus === "warning" ||
+      opStatus === "degraded" ||
+      healthData?.status === "degraded");
+  const degradedReasonSummary = healthData?.degradedReasons
+    ?.map((r) => r.message)
+    .slice(0, 3)
+    .join("; ");
+  const systemHealthUi = isHealthError
+    ? {
+        border: "#ef4444",
+        bg: "rgba(239, 68, 68, 0.15)",
+        color: "#f87171",
+        label: alertsStatus === "degraded" ? "🚨 DEGRADED" : "🚨 AUTH DOWN",
+      }
+    : isHealthWarn
+      ? {
+          border: "#f59e0b",
+          bg: "rgba(245, 158, 11, 0.15)",
+          color: "#fbbf24",
+          label: alertsStatus === "warning" ? "⚠️ WARNING" : "⚠️ DEGRADED",
+        }
+      : {
+          border: "#22c55e",
+          bg: "rgba(34, 197, 94, 0.15)",
+          color: "#4ade80",
+          label: "● System OK",
+        };
+
   return (
     <div style={styles.container}>
       {/* Global Header */}
@@ -972,24 +1094,12 @@ export function App(): React.ReactElement {
               <span>·</span>
               <span
                 style={{
-                  color: r2PipelineData?.daemon4020.online
-                    ? "#4ade80"
-                    : r2PipelineData
-                      ? "#fbbf24"
-                      : "#94a3b8",
+                  color: daemonPill.color,
                   fontWeight: 600,
                 }}
-                title={
-                  r2PipelineData?.daemon4020.online
-                    ? `SportsDesk Daemon :4020 online (${r2PipelineData.daemon4020.latencyMs ?? 1}ms)`
-                    : `SportsDesk Daemon :4020 offline (${r2PipelineData?.daemon4020.reason ?? "probing..."})`
-                }
+                title={daemonPill.title}
               >
-                {r2PipelineData?.daemon4020.online
-                  ? `● API :4020 (${r2PipelineData.daemon4020.latencyMs ?? 1}ms)`
-                  : r2PipelineData
-                    ? "○ API :4020 Offline"
-                    : "◌ API :4020 Probing..."}
+                {daemonPill.label}
               </span>
               <span>·</span>
               <button
@@ -1093,35 +1203,17 @@ export function App(): React.ReactElement {
               fontSize: "11px",
               fontWeight: 600,
               cursor: "pointer",
-              border: `1px solid ${
-                healthData?.alerts?.status === "degraded"
-                  ? "#ef4444"
-                  : healthData?.alerts?.status === "warning"
-                    ? "#f59e0b"
-                    : "#22c55e"
-              }`,
-              background:
-                healthData?.alerts?.status === "degraded"
-                  ? "rgba(239, 68, 68, 0.15)"
-                  : healthData?.alerts?.status === "warning"
-                    ? "rgba(245, 158, 11, 0.15)"
-                    : "rgba(34, 197, 94, 0.15)",
-              color:
-                healthData?.alerts?.status === "degraded"
-                  ? "#f87171"
-                  : healthData?.alerts?.status === "warning"
-                    ? "#fbbf24"
-                    : "#4ade80",
+              border: `1px solid ${systemHealthUi.border}`,
+              background: systemHealthUi.bg,
+              color: systemHealthUi.color,
             }}
-            title="Surveillance Alert Health (O(1) in-memory probe) · Click to view Shift Handoff Summary"
+            title={
+              degradedReasonSummary
+                ? `Health probe: ${degradedReasonSummary} · Click to view Shift Handoff Summary`
+                : "Surveillance Alert Health (O(1) in-memory probe) · Click to view Shift Handoff Summary"
+            }
           >
-            <span>
-              {healthData?.alerts?.status === "degraded"
-                ? "🚨 DEGRADED"
-                : healthData?.alerts?.status === "warning"
-                  ? "⚠️ WARNING"
-                  : "● System OK"}
-            </span>
+            <span>{systemHealthUi.label}</span>
             {healthData?.alerts && (
               <span style={{ color: "#94a3b8", fontSize: "10px" }}>
                 (DLQ: {healthData.alerts.dead} · Backlog:{" "}
@@ -1157,25 +1249,7 @@ export function App(): React.ReactElement {
               const next = !showBuildMatrix;
               setShowBuildMatrix(next);
               if (next && !buildMatrixRows && !buildMatrixLoading) {
-                setBuildMatrixLoading(true);
-                fetch("/api/build-matrix")
-                  .then((r) =>
-                    r.ok
-                      ? (r.json() as Promise<{
-                          targets?: readonly BuildMatrixRow[];
-                        }>)
-                      : null,
-                  )
-                  .then((json) => {
-                    if (json?.targets) {
-                      debugDashboardTrace("loaded DCE build matrix", json);
-                      setBuildMatrixRows(json.targets);
-                    }
-                  })
-                  .catch((err) => {
-                    console.warn("Build matrix probe unavailable:", err);
-                  })
-                  .finally(() => setBuildMatrixLoading(false));
+                fetchBuildMatrix();
               }
             }}
             title="Inspect compile-time bun:bundle dead-code elimination & tokens.toml CSS Houdini registry"
@@ -1335,6 +1409,10 @@ export function App(): React.ReactElement {
           dceMarker={runtimeFlags.dceMarker}
           loading={buildMatrixLoading}
           rows={buildMatrixRows}
+          target={runtimeFlags.target}
+          enabledFeatures={runtimeFlags.enabledFeatures}
+          error={buildMatrixError}
+          onRefresh={fetchBuildMatrix}
         />
       ) : null}
 
@@ -1390,9 +1468,14 @@ export function App(): React.ReactElement {
           />
         ) : activeTab === "surveillance" ? (
           <>
-            <ThresholdsPanel />
+            <ThresholdsPanel dataUpdatedAt={data?.updatedAt} />
             <SurveillanceTabPanel
               dnsData={dnsData}
+              dnsRefreshing={dnsRefreshing}
+              dnsError={dnsError}
+              onRefreshDns={() => {
+                void fetchDnsTelemetry();
+              }}
               benchLoading={benchLoading}
               benchResult={benchResult}
               onRunBenchmark={() => {
