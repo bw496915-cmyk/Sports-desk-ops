@@ -55,6 +55,43 @@ describe("Bun.TOML contract", () => {
     expect(twice).toEqual(once);
   });
 
+  test("strict mode rejects unquoted strings, missing newlines and redefined keys", () => {
+    // Release note: Bun.TOML (and bunfig.toml) are strict. These three shapes
+    // are SyntaxErrors, not lenient repairs.
+    expect(() => Bun.TOML.parse("a = hello")).toThrow(/Strings must be quoted/);
+    expect(() => Bun.TOML.parse("a = 1 b = 2")).toThrow(/Expected a newline/);
+    expect(() => Bun.TOML.parse("a = 1\na = 2")).toThrow(/Cannot redefine key/);
+    // The well-formed pair, one key per line, parses.
+    expect(Bun.TOML.parse("a = 1\nb = 2")).toEqual({ a: 1, b: 2 });
+  });
+
+  test("every tracked TOML file parses under strict mode", async () => {
+    const listed = Bun.spawnSync(["git", "ls-files", "*.toml"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(listed.exitCode).toBe(0);
+    const files = listed.stdout
+      .toString()
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((file) => file !== "" && !file.startsWith("node_modules/"));
+    expect(files.length).toBeGreaterThan(0);
+
+    const failures: string[] = [];
+    for (const file of files) {
+      const text = await Bun.file(resolve(process.cwd(), file)).text();
+      try {
+        Bun.TOML.parse(text);
+      } catch (error) {
+        failures.push(
+          `${file}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
   test("Temporal is defined by default and compares by value", () => {
     // Bun >= 1.4.0: `Temporal` and `Date.prototype.toTemporalInstant` exist, and
     // deepEqual/toEqual compare Temporal objects by value rather than by class.
