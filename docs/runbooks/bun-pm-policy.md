@@ -361,7 +361,9 @@ If a private scope is ever needed, configure it **outside** the repo:
 
 Workspace packages are **private by default**, and `scripts/check_workspace_packs.ts` enforces it: a package without `"private": true` must opt in explicitly with `publishConfig { access: "public", registry: "https://…" }`. Loopback or plain-http registries never qualify (measured 2026-11-14).
 
-`@sportsdesk-ops/contracts` is the pilot: `private` removed, `publishConfig.access: "public"` against npmjs, `repository.directory` set, exports still pointing at TypeScript source in `src/` (consumers need Bun or a TS-aware resolver).
+`@sportsdesk-ops/contracts` is the pilot: `private` removed, `publishConfig.access: "public"` against npmjs, `repository.directory` set. Exports are conditional — `types`/`bun` resolve the TypeScript source, `default` resolves `dist/<name>.js` — and `prepack` runs `scripts/build.ts`, so a packed tarball always carries the dist. `dist/` is gitignored; it is built during `bun pm pack`/`bun publish`, not committed.
+
+Verified 2026-11-14 by installing the packed tarball into a throwaway project: Bun imports the source condition (59 exports, 5 features) and Node imports the dist (59 exports, 5 features). Node cannot load the TypeScript source at all (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`), so the dist leg is what makes the package usable outside Bun. `tests/contracts_pack_consumer.test.ts` keeps that true.
 
 Before the first publish:
 
