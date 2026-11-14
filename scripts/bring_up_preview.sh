@@ -27,9 +27,14 @@ fi
 
 trap 'echo "stopping preview" >&2; exit 0' INT TERM
 while true; do
+  if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "port $PORT is already in use; refusing to restart (stop the other process or pick PORT=…)" >&2
+    exit 1
+  fi
   status=0
   DASH_API_FEEDS="$FEEDS" PORT="$PORT" \
     bun run "$REPO_ROOT/scripts/dashboard_preview.ts" || status=$?
-  echo "preview exited (status $status); restarting in 1s" >&2
-  sleep 1
+  # A killed child can leave the listener briefly; do not spin on EADDRINUSE.
+  sleep 2
+  echo "preview exited (status $status); restarting in 2s" >&2
 done
