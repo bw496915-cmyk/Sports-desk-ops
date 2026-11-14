@@ -42,7 +42,15 @@ const SPORT_PILLS = [
   { id: "NFL", label: "🏈 NFL" },
   { id: "CFB", label: "🎓 CFB" },
   { id: "NBA", label: "🏀 NBA" },
+  { id: "NCAAB", label: "🏀 NCAAB" },
   { id: "SOCCER", label: "⚽ Soccer" },
+];
+
+const PERIOD_SLICE_PILLS = [
+  { id: "", label: "All Periods" },
+  { id: "1H", label: "⏱️ 1st Half (1H)" },
+  { id: "2H", label: "⏱️ 2nd Half (2H)" },
+  { id: "In-Play", label: "📡 Live / GSLive" },
 ];
 
 const ALERT_PILLS = [
@@ -130,6 +138,89 @@ export function LiveWagersTabPanel({
     }
   }
   const betTypePills = [...BET_TYPE_PILLS, ...extraTypePills];
+
+  const filteredWagers = activeWagers
+    .filter((w) => {
+      const q = wagerSearch.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        w.ticketId.toLowerCase().includes(q) ||
+        w.customerId.toLowerCase().includes(q) ||
+        w.agentId.toLowerCase().includes(q) ||
+        w.sport.toLowerCase().includes(q) ||
+        w.betType.toLowerCase().includes(q) ||
+        w.event.toLowerCase().includes(q) ||
+        w.selection.toLowerCase().includes(q) ||
+        w.alertBadge.toLowerCase().includes(q) ||
+        ((q === "live" || q === "gslive" || q === "in-play") &&
+          (/in-play|live|halftime/i.test(w.selection) ||
+            /in-play|live|halftime/i.test(w.alertBadge) ||
+            w.alertTier === "LATENCY"));
+      if (!matchesSearch) return false;
+      if (
+        wagerSportFilter !== "ALL" &&
+        w.sport.toUpperCase() !== wagerSportFilter.toUpperCase()
+      )
+        return false;
+      if (wagerAlertFilter !== "ALL" && w.alertTier !== wagerAlertFilter)
+        return false;
+      if (
+        wagerTypeFilter !== "ALL" &&
+        w.betType.toUpperCase() !== wagerTypeFilter.toUpperCase()
+      )
+        return false;
+      return true;
+    })
+    .sort((a, b) => {
+      let cmp = 0;
+      if (wagerSortField === "timestamp") {
+        cmp = a.timestamp.localeCompare(b.timestamp);
+      } else if (wagerSortField === "riskUsd") {
+        cmp = a.riskUsd - b.riskUsd;
+      } else if (wagerSortField === "toWinUsd") {
+        cmp = a.toWinUsd - b.toWinUsd;
+      } else if (wagerSortField === "clvCents") {
+        cmp = a.clvCents - b.clvCents;
+      } else if (wagerSortField === "alertTier") {
+        cmp = (TIER_ORDER[a.alertTier] ?? 0) - (TIER_ORDER[b.alertTier] ?? 0);
+      }
+      return wagerSortDir === "asc" ? cmp : -cmp;
+    });
+
+  // Aggregate per-customer CLV & dollar edge across the active slice
+  const sliceCustomerMap = new Map<
+    string,
+    {
+      customerId: string;
+      agentId: string;
+      wagers: number;
+      riskUsd: number;
+      clvSum: number;
+      expectedEdgeUsd: number;
+    }
+  >();
+  for (const w of filteredWagers) {
+    const existing = sliceCustomerMap.get(w.customerId);
+    const edgeUsd = w.riskUsd * (w.clvCents / 100);
+    if (existing) {
+      existing.wagers += 1;
+      existing.riskUsd += w.riskUsd;
+      existing.clvSum += w.clvCents;
+      existing.expectedEdgeUsd += edgeUsd;
+    } else {
+      sliceCustomerMap.set(w.customerId, {
+        customerId: w.customerId,
+        agentId: w.agentId,
+        wagers: 1,
+        riskUsd: w.riskUsd,
+        clvSum: w.clvCents,
+        expectedEdgeUsd: edgeUsd,
+      });
+    }
+  }
+  const topSliceBeaters = [...sliceCustomerMap.values()]
+    .sort((a, b) => b.expectedEdgeUsd - a.expectedEdgeUsd)
+    .slice(0, 4);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -247,7 +338,68 @@ export function LiveWagersTabPanel({
             </button>
           ))}
         </div>
+
+        <div style={styles.tierFilterGroup}>
+          {PERIOD_SLICE_PILLS.map((pill) => (
+            <button
+              key={pill.label}
+              type="button"
+              style={styles.filterPill(
+                wagerSearch.trim().toUpperCase() === pill.id.toUpperCase(),
+              )}
+              onClick={() => onWagerSearchChange(pill.id)}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Slice Edge Leaderboard: Who is beating the desk in the active filter slice */}
+      {topSliceBeaters.length > 0 && (
+        <div
+          style={{
+            padding: "10px 14px",
+            borderRadius: "8px",
+            backgroundColor: "rgba(15, 23, 42, 0.75)",
+            border: "1px solid rgba(56, 189, 248, 0.25)",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+          }}
+        >
+          <div style={{ fontSize: "12px", fontWeight: 700, color: "#e2e8f0" }}>
+            🎯 Active Slice Edge Leaderboard (Who&apos;s Beating the Line):
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {topSliceBeaters.map((c, idx) => {
+              const avgClv = c.wagers > 0 ? c.clvSum / c.wagers : 0;
+              return (
+                <button
+                  key={c.customerId}
+                  type="button"
+                  style={{
+                    ...styles.actionBtn,
+                    padding: "4px 10px",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => onSelectCustomerById(c.customerId)}
+                  title={`Inspect ${c.customerId} (${c.agentId}) — ${c.wagers} wager(s), $${c.riskUsd.toLocaleString()} risk`}
+                >
+                  #{idx + 1} <b>{c.customerId}</b> ({c.agentId}) ·{" "}
+                  {avgClv > 0
+                    ? `+${avgClv.toFixed(1)}¢`
+                    : `${avgClv.toFixed(1)}¢`}{" "}
+                  CLV · ${c.riskUsd.toLocaleString()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Live Wagers Table Card */}
       <div style={styles.tableCard}>
@@ -368,248 +520,202 @@ export function LiveWagersTabPanel({
               </tr>
             </thead>
             <tbody>
-              {activeWagers
-                .filter((w) => {
-                  const q = wagerSearch.toLowerCase();
-                  const matchesSearch =
-                    !q ||
-                    w.ticketId.toLowerCase().includes(q) ||
-                    w.customerId.toLowerCase().includes(q) ||
-                    w.agentId.toLowerCase().includes(q) ||
-                    w.event.toLowerCase().includes(q) ||
-                    w.selection.toLowerCase().includes(q);
-                  if (!matchesSearch) return false;
-                  if (
-                    wagerSportFilter !== "ALL" &&
-                    w.sport.toUpperCase() !== wagerSportFilter.toUpperCase()
-                  )
-                    return false;
-                  if (
-                    wagerAlertFilter !== "ALL" &&
-                    w.alertTier !== wagerAlertFilter
-                  )
-                    return false;
-                  if (
-                    wagerTypeFilter !== "ALL" &&
-                    w.betType.toUpperCase() !== wagerTypeFilter.toUpperCase()
-                  )
-                    return false;
-                  return true;
-                })
-                .sort((a, b) => {
-                  let cmp = 0;
-                  if (wagerSortField === "timestamp") {
-                    cmp = a.timestamp.localeCompare(b.timestamp);
-                  } else if (wagerSortField === "riskUsd") {
-                    cmp = a.riskUsd - b.riskUsd;
-                  } else if (wagerSortField === "toWinUsd") {
-                    cmp = a.toWinUsd - b.toWinUsd;
-                  } else if (wagerSortField === "clvCents") {
-                    cmp = a.clvCents - b.clvCents;
-                  } else if (wagerSortField === "alertTier") {
-                    cmp =
-                      (TIER_ORDER[a.alertTier] ?? 0) -
-                      (TIER_ORDER[b.alertTier] ?? 0);
-                  }
-                  return wagerSortDir === "asc" ? cmp : -cmp;
-                })
-                .map((w) => (
-                  <tr
-                    key={w.ticketId}
-                    style={styles.wagerRow(
-                      selectedWager?.ticketId === w.ticketId,
-                    )}
-                    onClick={() => onSelectWager(w)}
-                  >
-                    <td style={styles.td}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontFamily:
-                              "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                            fontWeight: 700,
-                            color: "#38bdf8",
-                          }}
-                        >
-                          #{w.ticketId}
-                        </span>
-                        <button
-                          type="button"
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: "11px",
-                            color: "#94a3b8",
-                            padding: "0 2px",
-                          }}
-                          title="Copy Ticket ID"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onCopyText(w.ticketId, w.ticketId);
-                          }}
-                        >
-                          {copiedTicketId === w.ticketId ? "✓" : "📋"}
-                        </button>
-                      </div>
-                      <div style={styles.custSub}>{w.timestamp}</div>
-                    </td>
-                    <td style={styles.td}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                        }}
-                      >
-                        <span
-                          style={{
-                            ...styles.custLink,
-                            cursor: "pointer",
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectCustomerById(w.customerId);
-                          }}
-                          title="Inspect full profile in Customer Showcase"
-                        >
-                          {w.customerId}
-                        </span>
-                        <a
-                          href={`https://fantasy402.com/manager.html?customer=${w.customerId}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            color: "#94a3b8",
-                            textDecoration: "none",
-                            fontSize: "11px",
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Open in Fantasy402 Manager Portal"
-                        >
-                          ↗
-                        </a>
-                      </div>
-                    </td>
-                    <td style={styles.td}>
-                      <div>
-                        <a
-                          href={`https://desk.bookdeskops.com/agent/${w.agentId}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            color: "#38bdf8",
-                            textDecoration: "none",
-                            fontWeight: 600,
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Open Agent Desk Profile"
-                        >
-                          {w.agentId} ↗
-                        </a>
-                      </div>
-                      <div style={styles.custSub}>Master: {w.masterAgent}</div>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={{ fontWeight: 600 }}>{w.sport}</div>
-                      <div style={styles.custSub}>{w.betType}</div>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={{ fontWeight: 600 }}>{w.event}</div>
-                      <div style={{ color: "#f59e0b", fontWeight: 700 }}>
-                        {w.selection} {w.lineDisplay} ({w.oddsAmerican})
-                      </div>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={{ fontWeight: 600 }}>
-                        ${w.riskUsd.toLocaleString()}
-                      </div>
-                      <div style={styles.custSub}>
-                        To Win: ${w.toWinUsd.toLocaleString()}
-                      </div>
-                    </td>
-                    <td style={styles.td}>
+              {filteredWagers.map((w) => (
+                <tr
+                  key={w.ticketId}
+                  style={styles.wagerRow(
+                    selectedWager?.ticketId === w.ticketId,
+                  )}
+                  onClick={() => onSelectWager(w)}
+                >
+                  <td style={styles.td}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
                       <span
                         style={{
+                          fontFamily:
+                            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
                           fontWeight: 700,
-                          color:
-                            w.clvCents > 0
-                              ? w.clvCents >= 10
-                                ? "#ef4444"
-                                : "#f59e0b"
-                              : "#4ade80",
+                          color: "#38bdf8",
                         }}
                       >
-                        {w.clvCents > 0 ? `+${w.clvCents}¢` : `${w.clvCents}¢`}
+                        #{w.ticketId}
                       </span>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={styles.wagerBadge(w.alertTier, tiersConfig)}>
-                        {w.alertBadge}
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      <div
+                      <button
+                        type="button"
                         style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
                           fontSize: "11px",
-                          color:
-                            w.alertTier === "CRITICAL" ||
-                            w.alertTier === "STEAM"
-                              ? "#f87171"
-                              : "#4ade80",
+                          color: "#94a3b8",
+                          padding: "0 2px",
+                        }}
+                        title="Copy Ticket ID"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCopyText(w.ticketId, w.ticketId);
+                        }}
+                      >
+                        {copiedTicketId === w.ticketId ? "✓" : "📋"}
+                      </button>
+                    </div>
+                    <div style={styles.custSub}>{w.timestamp}</div>
+                  </td>
+                  <td style={styles.td}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          ...styles.custLink,
+                          cursor: "pointer",
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectCustomerById(w.customerId);
+                        }}
+                        title="Inspect full profile in Customer Showcase"
+                      >
+                        {w.customerId}
+                      </span>
+                      <a
+                        href={`https://fantasy402.com/manager.html?customer=${w.customerId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          color: "#94a3b8",
+                          textDecoration: "none",
+                          fontSize: "11px",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Open in Fantasy402 Manager Portal"
+                      >
+                        ↗
+                      </a>
+                    </div>
+                  </td>
+                  <td style={styles.td}>
+                    <div>
+                      <a
+                        href={`https://desk.bookdeskops.com/agent/${w.agentId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          color: "#38bdf8",
+                          textDecoration: "none",
                           fontWeight: 600,
                         }}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Open Agent Desk Profile"
                       >
-                        {w.operatorDirective}
-                      </div>
-                      <div style={styles.custSub}>
-                        Cap: ${w.maxRecommendedStake.toLocaleString()}
-                      </div>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={{ display: "flex", gap: "6px" }}>
-                        <button
-                          type="button"
-                          style={{
-                            ...styles.actionBtn,
-                            padding: "4px 8px",
-                            fontSize: "11px",
-                            cursor: "pointer",
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onInspectPty(w.customerId);
-                          }}
-                          title="Inspect Customer in PTY Terminal"
-                        >
-                          💻 PTY
-                        </button>
-                        <a
-                          href={`https://fantasy402.com/manager.html?customer=${w.customerId}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            ...styles.actionBtn,
-                            padding: "4px 8px",
-                            fontSize: "11px",
-                            textDecoration: "none",
-                            color: "#0f172a",
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Open Customer in Portal"
-                        >
-                          Portal ↗
-                        </a>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        {w.agentId} ↗
+                      </a>
+                    </div>
+                    <div style={styles.custSub}>Master: {w.masterAgent}</div>
+                  </td>
+                  <td style={styles.td}>
+                    <div style={{ fontWeight: 600 }}>{w.sport}</div>
+                    <div style={styles.custSub}>{w.betType}</div>
+                  </td>
+                  <td style={styles.td}>
+                    <div style={{ fontWeight: 600 }}>{w.event}</div>
+                    <div style={{ color: "#f59e0b", fontWeight: 700 }}>
+                      {w.selection} {w.lineDisplay} ({w.oddsAmerican})
+                    </div>
+                  </td>
+                  <td style={styles.td}>
+                    <div style={{ fontWeight: 600 }}>
+                      ${w.riskUsd.toLocaleString()}
+                    </div>
+                    <div style={styles.custSub}>
+                      To Win: ${w.toWinUsd.toLocaleString()}
+                    </div>
+                  </td>
+                  <td style={styles.td}>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        color:
+                          w.clvCents > 0
+                            ? w.clvCents >= 10
+                              ? "#ef4444"
+                              : "#f59e0b"
+                            : "#4ade80",
+                      }}
+                    >
+                      {w.clvCents > 0 ? `+${w.clvCents}¢` : `${w.clvCents}¢`}
+                    </span>
+                  </td>
+                  <td style={styles.td}>
+                    <span style={styles.wagerBadge(w.alertTier, tiersConfig)}>
+                      {w.alertBadge}
+                    </span>
+                  </td>
+                  <td style={styles.td}>
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color:
+                          w.alertTier === "CRITICAL" || w.alertTier === "STEAM"
+                            ? "#f87171"
+                            : "#4ade80",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {w.operatorDirective}
+                    </div>
+                    <div style={styles.custSub}>
+                      Cap: ${w.maxRecommendedStake.toLocaleString()}
+                    </div>
+                  </td>
+                  <td style={styles.td}>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.actionBtn,
+                          padding: "4px 8px",
+                          fontSize: "11px",
+                          cursor: "pointer",
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onInspectPty(w.customerId);
+                        }}
+                        title="Inspect Customer in PTY Terminal"
+                      >
+                        💻 PTY
+                      </button>
+                      <a
+                        href={`https://fantasy402.com/manager.html?customer=${w.customerId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          ...styles.actionBtn,
+                          padding: "4px 8px",
+                          fontSize: "11px",
+                          textDecoration: "none",
+                          color: "#0f172a",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Open Customer in Portal"
+                      >
+                        Portal ↗
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -760,6 +866,29 @@ export function LiveWagersTabPanel({
                 <span style={{ color: "#94a3b8" }}>Sub-Agent / Master:</span>
                 <span style={{ fontWeight: 600, color: "#f8fafc" }}>
                   {selectedWager.agentId} / {selectedWager.masterAgent}
+                </span>
+              </div>
+            </div>
+
+            <div style={styles.radarCard}>
+              <div style={styles.cardHeader}>PRE/POST-BET LINE WINDOW</div>
+              <div style={styles.radarRow}>
+                <span style={{ color: "#94a3b8" }}>Entry Line / Price:</span>
+                <span style={{ fontWeight: 700, color: "#f8fafc" }}>
+                  {selectedWager.lineDisplay} ({selectedWager.oddsAmerican})
+                </span>
+              </div>
+              <div style={styles.radarRow}>
+                <span style={{ color: "#94a3b8" }}>Post-Bet Trajectory:</span>
+                <span
+                  style={{
+                    fontWeight: 700,
+                    color: selectedWager.clvCents > 0 ? "#f87171" : "#4ade80",
+                  }}
+                >
+                  {selectedWager.clvCents > 0
+                    ? `Beat Move (+${selectedWager.clvCents}¢ CLV)`
+                    : `Behind Move (${selectedWager.clvCents}¢ CLV)`}
                 </span>
               </div>
             </div>
