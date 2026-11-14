@@ -65,6 +65,11 @@ correctness = "warn"
 # Re-probe when bumping Bun: a dialect change is invisible to config hashing.
 
 [lint.rules]
+# Off by default upstream: `with {}` is a leftover shell or a placeholder for a
+# missing `type`. Bun 1.4.4 has no native `bun lint` command (it resolves to the
+# package script and `--no-script` does not bypass it), and oxlint does not ship
+# this rule, so CI enforces the same intent in tests/module_attributes.test.ts.
+"unicorn/require-module-attributes" = "error" # https://bun.com/docs/lint/rules/unicorn/require-module-attributes
 "eqeqeq" = ["error", "smart"] # same policy as .oxlintrc.json; "smart" keeps the `x == null` guards
 "@typescript-eslint/no-explicit-any" = "error"
 "@typescript-eslint/no-require-imports" = "error"
