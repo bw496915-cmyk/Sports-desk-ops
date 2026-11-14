@@ -123,6 +123,8 @@ export interface CustomersCohortPayload {
   readonly cohorts: CustomersCohortsSummary;
   readonly backtestTop: ReadonlyArray<Record<string, unknown>>;
   readonly fixtures: ReadonlyArray<Record<string, unknown>>;
+  /** The local enriched book rows (the real data when one is present). */
+  readonly book: ReadonlyArray<Record<string, unknown>>;
   readonly provenance: DashboardSourceProvenance;
 }
 
@@ -240,6 +242,7 @@ export function computeCustomersCohortPayload(
       uniqueSurveillanceCount: uniqueSurveillanceIds.size,
     },
     backtestTop: input.backtestLeaderboard.slice(0, 20),
+    book: input.localBookRows ?? [],
     fixtures: input.fixtures,
     provenance,
   };

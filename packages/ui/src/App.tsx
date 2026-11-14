@@ -274,7 +274,10 @@ export function App(): React.ReactElement {
         return;
       }
       setCohortsReport(normalized);
-      const mappedRows = bookRowsToProfiles(normalized.fixtures ?? []);
+      const bookRows = normalized.book ?? [];
+      const mappedRows = bookRowsToProfiles(
+        bookRows.length > 0 ? bookRows : (normalized.fixtures ?? []),
+      );
       if (mappedRows.length > 0) setProfileRows(mappedRows);
       setCohortsStatus("ready");
       setCohortsError(null);

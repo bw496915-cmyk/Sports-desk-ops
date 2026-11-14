@@ -42,6 +42,20 @@ describe("classifyCustomerBook", () => {
   });
 });
 
+describe("computeCustomersCohortPayload book passthrough", () => {
+  test("returns the local book rows so the UI can map them", () => {
+    const payload = computeCustomersCohortPayload({
+      backtestLeaderboard: [],
+      fixtures: [{ customer_id: "SYNTH_X" }],
+      keyNumberBuyerIds: [],
+      hookSyndicateIds: [],
+      localBookRows: [{ customer_id: "ML284" }, { customer_id: "HT5009" }],
+    });
+    expect(payload.book.map((r) => r.customer_id)).toEqual(["ML284", "HT5009"]);
+    expect(payload.provenance.kind).toBe("capture");
+  });
+});
+
 describe("computeCustomersCohortPayload provenance", () => {
   test("does not claim capture for a synthetic local book", () => {
     const payload = computeCustomersCohortPayload({

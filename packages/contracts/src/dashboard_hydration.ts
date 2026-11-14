@@ -78,6 +78,8 @@ export interface CustomersApiResponse {
   readonly cohorts: CustomersCohortsSummary;
   readonly backtestTop: ReadonlyArray<Record<string, unknown>>;
   readonly fixtures: ReadonlyArray<Record<string, unknown>>;
+  /** Local enriched book rows; empty when only the CI fixture corpus is available. */
+  readonly book?: ReadonlyArray<Record<string, unknown>> | undefined;
   readonly provenance: DashboardSourceProvenance;
 }
 

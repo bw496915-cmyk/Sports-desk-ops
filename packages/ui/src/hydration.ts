@@ -291,6 +291,9 @@ export function normalizeCustomersCohortResponse(
     fixtures: Array.isArray(rec.fixtures)
       ? (rec.fixtures as ReadonlyArray<Record<string, unknown>>)
       : [],
+    book: Array.isArray(rec.book)
+      ? (rec.book as ReadonlyArray<Record<string, unknown>>)
+      : [],
     provenance: normalizeProvenance(
       rec.provenance,
       "fixture",
