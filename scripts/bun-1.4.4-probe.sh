@@ -372,10 +372,11 @@ fi
 # ---- P21: audit fix --dry-run --json plans without writing -------------------
 mkproj "$ROOT/p21" '{"name":"p21","version":"1.0.0","dependencies":{"lodash":"4.17.20"}}'
 run bash -c "cd '$ROOT/p21' && bun install"
-hash_before="$(cd "$ROOT/p21" && shasum package.json bun.lock | shasum)"
+hash_cmd="shasum"; command -v sha256sum >/dev/null 2>&1 && hash_cmd="sha256sum"
+hash_before="$(cd "$ROOT/p21" && $hash_cmd package.json bun.lock | $hash_cmd)"
 set +e
 plan="$(cd "$ROOT/p21" && bun audit fix --dry-run --json 2>/dev/null)"; plan_code=$?
-hash_after="$(cd "$ROOT/p21" && shasum package.json bun.lock | shasum)"
+hash_after="$(cd "$ROOT/p21" && $hash_cmd package.json bun.lock | $hash_cmd)"
 plan_ok="$(printf '%s' "$plan" | bun -e '
   const j = await Bun.stdin.json();
   const keys = ["dryRun", "fixed", "remaining", "fixes", "blocked", "unfixable", "unmatched", "unaudited", "vulnerableAfterInstall"];
