@@ -55,6 +55,48 @@ describe("Bun.TOML contract", () => {
     expect(twice).toEqual(once);
   });
 
+  test("Temporal is defined by default and compares by value", () => {
+    // Bun >= 1.4.0: `Temporal` and `Date.prototype.toTemporalInstant` exist, and
+    // deepEqual/toEqual compare Temporal objects by value rather than by class.
+    expect(typeof Temporal).toBe("object");
+    expect(typeof Temporal.PlainDate).toBe("function");
+    expect(typeof Date.prototype.toTemporalInstant).toBe("function");
+
+    expect(
+      Bun.deepEquals(
+        Temporal.PlainDate.from("2020-01-01"),
+        Temporal.PlainDate.from("1999-12-31"),
+      ),
+    ).toBe(false);
+    expect(
+      Bun.deepEquals(
+        Temporal.PlainDate.from("2020-01-01"),
+        Temporal.PlainDate.from("2020-01-01"),
+      ),
+    ).toBe(true);
+    // toEqual follows the same value semantics; before 1.4.0 any two instances
+    // of one class compared equal, which would have hidden this difference.
+    expect(Temporal.PlainDate.from("2020-01-01")).not.toEqual(
+      Temporal.PlainDate.from("1999-12-31"),
+    );
+
+    // The dates a TOML document yields are distinguishable the same way.
+    const first = Bun.TOML.parse("d = 2020-01-01") as { d: unknown };
+    const second = Bun.TOML.parse("d = 1999-12-31") as { d: unknown };
+    expect(Bun.deepEquals(first.d, second.d)).toBe(false);
+    expect(first.d).not.toEqual(second.d);
+  });
+
+  test("BUN_JSC_useTemporal=0 removes the global", () => {
+    const run = Bun.spawnSync(["bun", "-e", "console.log(typeof Temporal)"], {
+      env: { ...process.env, BUN_JSC_useTemporal: "0" },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.toString().trim()).toBe("undefined");
+  });
+
   test("stringify refuses values TOML cannot represent", () => {
     expect(() => Bun.TOML.stringify({ x: null })).toThrow(
       /cannot represent null/,
