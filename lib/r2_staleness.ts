@@ -261,18 +261,20 @@ function markdownCell(value: string): string {
   return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
 }
 
+/** Escaped delivery line; separate so the table can be written before the POST. */
+export function formatDeliveryLine(delivery: AlertDelivery): string {
+  const suffix =
+    delivery.detail === undefined ? "" : ` — ${markdownCell(delivery.detail)}`;
+  return `**Telegram:** ${delivery.state}${suffix}\n`;
+}
+
 /**
- * GitHub Actions run summary (plain Markdown, not Telegram HTML).
+ * The run-page table (plain Markdown, not Telegram HTML).
  *
- * The scheduled `check-r2-freshness` job fails on a degraded report, and that
- * failure is a workflow email plus a red run page. The summary makes the run
- * page self-explanatory: which keys are degraded, their age against the SLA, and
- * whether the Telegram alert was delivered.
+ * Written before any Telegram attempt, so a hung or failed POST cannot erase the
+ * evidence that the probe ran and what it found.
  */
-export function formatStepSummary(
-  report: StalenessReport,
-  delivery?: AlertDelivery,
-): string {
+export function formatStepSummaryTable(report: StalenessReport): string {
   const observed = new Date(report.observedAtMs).toISOString();
   const lines = [
     `## R2 freshness — ${report.degradedCount} of ${report.verdicts.length} key(s) degraded`,
@@ -288,14 +290,18 @@ export function formatStepSummary(
       `| \`${markdownCell(verdict.target.key)}\` | ${verdict.state} | ${age} | ${formatAge(verdict.target.slaMs)} | ${markdownCell(verdict.reason)} |`,
     );
   }
-  if (delivery) {
-    const suffix =
-      delivery.detail === undefined
-        ? ""
-        : ` — ${markdownCell(delivery.detail)}`;
-    lines.push("", `**Telegram:** ${delivery.state}${suffix}`);
-  }
   return `${lines.join("\n")}\n`;
+}
+
+/** Table plus delivery outcome, as one block. */
+export function formatStepSummary(
+  report: StalenessReport,
+  delivery?: AlertDelivery,
+): string {
+  const table = formatStepSummaryTable(report);
+  return delivery === undefined
+    ? table
+    : `${table}\n${formatDeliveryLine(delivery)}`;
 }
 
 /** Exit codes for the runner. 0 = all fresh, 2 = degraded, 1 = alerter itself failed. */

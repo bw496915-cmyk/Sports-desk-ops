@@ -17,8 +17,10 @@ import {
   buildReport,
   evaluateProbe,
   formatAge,
+  formatDeliveryLine,
   formatReport,
   formatStepSummary,
+  formatStepSummaryTable,
   parseLastModified,
   publicUrlFor,
   R2_PUBLIC_BASE,
@@ -256,6 +258,21 @@ describe("formatStepSummary", () => {
     // No delivery outcome was supplied: the Telegram line is absent.
     expect(summary).not.toContain("**Telegram:**");
     expect(summary.endsWith("\n")).toBe(true);
+  });
+
+  test("the table and the delivery line can be written separately", () => {
+    // The runner writes the table before the POST, so a failed delivery cannot
+    // erase the probe evidence; the outcome is appended as its own block.
+    const table = formatStepSummaryTable(report);
+    expect(table).toContain("## R2 freshness — 1 of 2 key(s) degraded");
+    expect(table).not.toContain("**Telegram:**");
+    expect(table.endsWith("\n")).toBe(true);
+
+    const line = formatDeliveryLine({
+      state: "failed",
+      detail: "telegram HTTP 502",
+    });
+    expect(line).toBe("**Telegram:** failed — telegram HTTP 502\n");
   });
 
   test("names the Telegram delivery outcome and escapes table cells", () => {
