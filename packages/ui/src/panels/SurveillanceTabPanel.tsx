@@ -525,9 +525,9 @@ export function SurveillanceTabPanel({
                   "rgba(56, 189, 248, 0.14)",
                   "rgba(56, 189, 248, 0.4)",
                 )}
-                title="Rendered server-side via Bun.markdown.html() (GFM tables, strikethrough, tasklists, autolinks, heading IDs, tagFilter)"
+                title="Rendered server-side by the native Markdown renderer (GFM tables, strikethrough, tasklists, autolinks, heading IDs, tagFilter)"
               >
-                Bun.markdown.html()
+                native markdown
               </span>
               {briefSummary.hasHeadingIds && (
                 <span
@@ -564,7 +564,7 @@ export function SurveillanceTabPanel({
             <span>
               Lines: <b>{briefSummary.lineCount}</b>
             </span>
-            <span title="UTF-8 byte payload before and after Bun.markdown.html()">
+            <span title="UTF-8 byte payload before and after the native render">
               Payload:{" "}
               <b>{(briefSummary.markdownBytes / 1024).toFixed(1)} KB</b> →{" "}
               <b>{(briefSummary.htmlBytes / 1024).toFixed(1)} KB</b>
@@ -573,7 +573,7 @@ export function SurveillanceTabPanel({
               Non-ASCII: <b>{briefSummary.nonAsciiChars} glyphs</b>
             </span>
             {data.renderDurationMs !== undefined && (
-              <span title="Measured Bun.markdown.html() parse + render duration">
+              <span title="Measured native Markdown parse and render duration">
                 Render:{" "}
                 <b style={{ color: "#34d399" }}>
                   {data.renderDurationMs.toFixed(2)} ms
