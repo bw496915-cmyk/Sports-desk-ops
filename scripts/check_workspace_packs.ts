@@ -55,6 +55,39 @@ interface RawWorkspaceManifest {
 }
 
 /**
+ * npm and Bun always include these regardless of "files": the manifest itself,
+ * readme, license and changelog (with optional extensions such as README.md).
+ */
+const AUTO_INCLUDED_FILE =
+  /^(?:package\.json|readme(?:\.[a-z0-9]+)?|license(?:\.[a-z0-9]+)?|changelog(?:\.[a-z0-9]+)?)$/i;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Is a packed file covered by the manifest's "files" allowlist? Auto-included
+ * files always pass; a "*" entry is a glob; anything else matches exactly or as a
+ * directory prefix. Derived from the manifest instead of assuming src/ and dist/,
+ * so a package that ships other paths is not flagged for telling the truth.
+ */
+export function isPackedFileAllowed(
+  file: string,
+  filesAllowlist: readonly string[],
+): boolean {
+  if (AUTO_INCLUDED_FILE.test(file)) return true;
+  return filesAllowlist.some((entry) => {
+    const clean = entry.replace(/^\.\//, "").replace(/\/+$/, "");
+    if (clean.length === 0) return false;
+    if (clean.includes("*")) {
+      const pattern = clean.split("*").map(escapeRegExp).join(".*");
+      return new RegExp(`^${pattern}$`).test(file);
+    }
+    return file === clean || file.startsWith(`${clean}/`);
+  });
+}
+
+/**
  * Workspace packages are private by default. Publication is an explicit opt-in:
  * no "private": true plus publishConfig access "public" to an https registry.
  * A loopback or plain-http registry never qualifies. Measured 2026-11-14.
@@ -197,11 +230,7 @@ export async function checkWorkspacePacks(
         if (FORBIDDEN_PACK_RE.test(file)) {
           issues.push(`${relDir}: forbidden file matched pack output: ${file}`);
         }
-        const allowed =
-          file === "package.json" ||
-          file.startsWith("src/") ||
-          file.startsWith("dist/");
-        if (!allowed) {
+        if (!isPackedFileAllowed(file, filesAllowlist)) {
           issues.push(`${relDir}: unexpected file outside allowlist: ${file}`);
         }
       }

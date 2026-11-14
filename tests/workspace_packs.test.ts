@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import path from "node:path";
 import {
   checkWorkspacePacks,
+  isPackedFileAllowed,
   isPublishableManifest,
   parseBunPackDryRunFiles,
   WORKSPACE_PACK_DIRS,
@@ -44,6 +45,22 @@ describe("publish opt-in", () => {
         },
       }),
     ).toBe(false);
+  });
+});
+
+describe("pack allowlist", () => {
+  test("auto-included files always pass", () => {
+    for (const file of ["package.json", "README.md", "LICENSE", "CHANGELOG.md"]) {
+      expect(isPackedFileAllowed(file, ["src"])).toBe(true);
+    }
+  });
+
+  test("entries match as an exact file or a directory prefix", () => {
+    expect(isPackedFileAllowed("src/index.ts", ["src"])).toBe(true);
+    expect(isPackedFileAllowed("dist/index.js", ["src", "dist"])).toBe(true);
+    expect(isPackedFileAllowed("src/index.ts", ["src/**"])).toBe(true);
+    expect(isPackedFileAllowed("docs/x.md", ["src"])).toBe(false);
+    expect(isPackedFileAllowed("src/index.ts", [])).toBe(false);
   });
 });
 
