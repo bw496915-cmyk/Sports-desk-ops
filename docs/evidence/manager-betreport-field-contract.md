@@ -91,6 +91,11 @@ to the feed:
 curl -s http://127.0.0.1:4023/api/wagers | jq '.wire_contract'
 ```
 
+A registry must cite exactly one capture for all of its fields; a mixed set is rejected rather than
+partially checked (the checker would otherwise silently verify only the first field's capture). Cited
+capture paths resolve relative to the registry's grandparent, and the reported `registry` is a
+basename or `schema/<file>` — never an absolute host path.
+
 It reports `ok`, `rows` (checked), `skipped_rows`, `fields_checked`, the capture id/sha it resolved, and one violation bucket
 per `(field, kind)` where kind is `type` or `nullable`. Enum differences are deliberately **not**
 violations: `enum_source` is `observed` (see `scripts/capture/schema.ts:191`), so an unobserved code

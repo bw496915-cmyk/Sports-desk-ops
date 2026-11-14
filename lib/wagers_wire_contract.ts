@@ -20,7 +20,7 @@ import type {
   WagersWireViolation,
 } from "@sportsdesk-ops/contracts";
 import { stat } from "node:fs/promises";
-import { resolve } from "node:path";
+import { basename, dirname, resolve, sep } from "node:path";
 
 const DEFAULT_REGISTRY_PATH = resolve(
   import.meta.dir,
@@ -82,12 +82,29 @@ async function loadContract(
 
   const registry = (await Bun.file(registryPath).json()) as RegistryDoc;
   const fields = Object.entries(registry.fields ?? {});
-  const captureId =
-    typeof fields[0]?.[1]?.capture === "string" ? fields[0][1].capture : "";
+
+  // One capture per registry: a mixed set would silently check only the first
+  // field's capture, so reject it instead of guessing.
+  const captureIds = [
+    ...new Set(
+      fields
+        .map(([, entry]) => entry?.capture)
+        .filter((id): id is string => typeof id === "string" && id !== ""),
+    ),
+  ];
+  if (captureIds.length !== 1) {
+    throw new Error(
+      `registry must cite exactly one capture for all fields; found ${captureIds.length}` +
+        (captureIds.length > 0 ? ` (${captureIds.join(", ")})` : ""),
+    );
+  }
+  const captureId = captureIds[0]!;
   const captureDef = registry.captureSets?.[captureId];
   if (!captureDef || typeof captureDef.path !== "string") return null;
 
-  const capturePath = resolve(registryPath, "..", "..", captureDef.path);
+  // The registry lives at `<root>/schema/<file>.json`; cited capture paths are
+  // root-relative. dirname twice, rather than treating the file as a directory.
+  const capturePath = resolve(dirname(dirname(registryPath)), captureDef.path);
   const captureStat = await stat(capturePath).catch(() => null);
   if (captureStat === null) return null;
 
@@ -172,13 +189,17 @@ function render(value: unknown): string {
 }
 
 /**
- * One summary per (row array, registry) pair. The loader hands back the same
- * row array until the source file changes, so a 5-second poll reuses the scan
- * instead of re-walking every row. Predicate runs are never memoized.
+ * One summary per (row array, contract).
+ *
+ * The loader hands back a frozen row array until the source file changes, and
+ * `loadContract` returns a new contract object whenever the registry or the cited
+ * capture changes (its own stat cache). Keying on both means a `bun --hot` config
+ * reload cannot serve a scan computed against the previous contract, and the
+ * frozen rows mean an in-place edit cannot outlive its scan.
  */
 const scanCache = new WeakMap<
   readonly Record<string, unknown>[],
-  Map<string, WagersWireContractSummary>
+  WeakMap<LoadedContract, WagersWireContractSummary>
 >();
 
 /** Check raw rows against the registry's wired fields; never throws. */
@@ -189,53 +210,68 @@ export async function inspectWagersWireContract(
     readonly skipRow?: ((row: Record<string, unknown>) => boolean) | undefined;
   } = {},
 ): Promise<WagersWireContractSummary> {
-  if (options.skipRow) return scanRows(rows, registryPath, options);
-  const perRows =
-    scanCache.get(rows) ?? new Map<string, WagersWireContractSummary>();
-  const cached = perRows.get(registryPath);
-  if (cached) return cached;
-  const summary = await scanRows(rows, registryPath, options);
-  perRows.set(registryPath, summary);
-  scanCache.set(rows, perRows);
-  return summary;
-}
-
-async function scanRows(
-  rows: readonly Record<string, unknown>[],
-  registryPath: string,
-  options: {
-    readonly skipRow?: ((row: Record<string, unknown>) => boolean) | undefined;
-  },
-): Promise<WagersWireContractSummary> {
-  const base = {
-    registry: registryPath.replace(/^.*\/schema\//, "schema/"),
-    capture: "",
-    capture_sha256: "",
-    enum_source: "unknown",
-    fields_checked: [] as string[],
-    // When the contract cannot be read, still report how many rows were offered.
-    rows: rows.length,
-    skipped_rows: 0,
-    violations: [] as WagersWireViolation[],
-  };
   let contract: LoadedContract | null;
   try {
     contract = await loadContract(registryPath);
   } catch (err) {
-    return {
-      ...base,
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
+    return unavailableSummary(rows, registryPath, err);
   }
   if (contract === null) {
-    return {
-      ...base,
-      ok: false,
-      error: "wire contract registry or capture unavailable",
-    };
+    return unavailableSummary(
+      rows,
+      registryPath,
+      "wire contract registry or capture unavailable",
+    );
   }
 
+  // Predicate runs are never memoized: the predicate is part of the call.
+  if (options.skipRow) return scanRows(rows, contract, options);
+
+  const perRows =
+    scanCache.get(rows) ??
+    new WeakMap<LoadedContract, WagersWireContractSummary>();
+  const cached = perRows.get(contract);
+  if (cached) return cached;
+  const summary = await scanRows(rows, contract, {});
+  perRows.set(contract, summary);
+  scanCache.set(rows, perRows);
+  return summary;
+}
+
+/** Never echo an absolute path into the payload/tooltip. */
+function registryLabel(registryPath: string): string {
+  return registryPath.includes(`${sep}schema${sep}`)
+    ? `schema/${basename(registryPath)}`
+    : basename(registryPath);
+}
+
+function unavailableSummary(
+  rows: readonly Record<string, unknown>[],
+  registryPath: string,
+  error: unknown,
+): WagersWireContractSummary {
+  return {
+    ok: false,
+    registry: registryLabel(registryPath),
+    capture: "",
+    capture_sha256: "",
+    enum_source: "unknown",
+    fields_checked: [],
+    // When the contract cannot be read, still report how many rows were offered.
+    rows: rows.length,
+    skipped_rows: 0,
+    violations: [],
+    error: error instanceof Error ? error.message : String(error),
+  };
+}
+
+async function scanRows(
+  rows: readonly Record<string, unknown>[],
+  contract: LoadedContract,
+  options: {
+    readonly skipRow?: ((row: Record<string, unknown>) => boolean) | undefined;
+  },
+): Promise<WagersWireContractSummary> {
   const checked = options.skipRow
     ? rows.filter((row) => !options.skipRow!(row))
     : rows;
@@ -286,7 +322,7 @@ async function scanRows(
 
   return {
     ok: violations.length === 0,
-    registry: base.registry,
+    registry: registryLabel(contract.registryPath),
     capture: contract.captureId,
     capture_sha256: contract.captureSha,
     enum_source: contract.enumSource,
