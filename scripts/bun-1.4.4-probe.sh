@@ -281,6 +281,27 @@ else
   fail audit-level "moderate filtered=$moderate_filtered, high kept=$high_kept"
 fi
 
+# ---- P17: --prod scopes the audit to what actually ships --------------------
+mkproj "$ROOT/p17a" '{"name":"p17a","version":"1.0.0","devDependencies":{"lodash":"4.17.20"}}'
+run bash -c "cd '$ROOT/p17a' && bun install"
+set +e
+dev_plain="$(cd "$ROOT/p17a" && bun audit 2>&1)"; dev_plain_code=$?
+dev_prod="$(cd "$ROOT/p17a" && bun audit --prod 2>&1)"; dev_prod_code=$?
+set -e
+mkproj "$ROOT/p17b" '{"name":"p17b","version":"1.0.0","dependencies":{"lodash":"4.17.20"}}'
+run bash -c "cd '$ROOT/p17b' && bun install"
+set +e
+prod_plain="$(cd "$ROOT/p17b" && bun audit 2>&1)"; prod_plain_code=$?
+prod_prod="$(cd "$ROOT/p17b" && bun audit --prod 2>&1)"; prod_prod_code=$?
+set -e
+dev_excluded=$([ "$dev_plain_code" -eq 1 ] && [ "$dev_prod_code" -eq 0 ] && printf '%s' "$dev_prod" | grep -q "checked 0 packages" && echo yes || echo no)
+prod_kept=$([ "$prod_plain_code" -eq 1 ] && [ "$prod_prod_code" -eq 1 ] && echo yes || echo no)
+if [ "$dev_excluded" = yes ] && [ "$prod_kept" = yes ]; then
+  pass audit-prod "dev-only vulnerable: plain exit 1, --prod exit 0 (0 checked); prod vulnerable: both exit 1"
+else
+  fail audit-prod "dev excluded=$dev_excluded, prod kept=$prod_kept"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip migrate-speed "needs a ~20k-entry yarn.lock; manual: time bun pm migrate"
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
