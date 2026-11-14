@@ -17,6 +17,7 @@ import { Readable } from "node:stream";
 import {
   buildCompositeMatchKey,
   enrichWagerRecord,
+  parseFigureDateWagersPayload,
   inferTotalPicks,
   parseBuyPointsFromDesc,
   FigureDateEnrichmentInspection,
@@ -139,26 +140,7 @@ async function loadFigureIndex(
         ? await fileWithJson.json()
         : JSON.parse(await file.text());
 
-    if (Array.isArray(parsed)) {
-      records = parsed as FigureDateWager[];
-    } else if (
-      parsed &&
-      typeof parsed === "object" &&
-      "LIST" in parsed &&
-      parsed.LIST &&
-      typeof parsed.LIST === "object" &&
-      "INFO" in parsed.LIST &&
-      Array.isArray((parsed.LIST as Record<string, unknown>).INFO)
-    ) {
-      records = (parsed.LIST as { INFO: FigureDateWager[] }).INFO;
-    } else if (
-      parsed &&
-      typeof parsed === "object" &&
-      "rows" in parsed &&
-      Array.isArray((parsed as Record<string, unknown>).rows)
-    ) {
-      records = (parsed as { rows: FigureDateWager[] }).rows;
-    }
+    records = parseFigureDateWagersPayload(parsed);
   } catch {
     // If not single JSON, parse line-by-line JSONL from file text
     const content = await file.text();

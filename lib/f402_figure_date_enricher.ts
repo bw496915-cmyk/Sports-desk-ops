@@ -21,6 +21,26 @@ import {
 import { sportCategoryFor } from "./sport_taxonomy.ts";
 import type { BunInspectOptions } from "./cli_inspect.ts";
 
+/** The three envelopes the portal and the probe emit for this read. */
+export function parseFigureDateWagersPayload(raw: unknown): FigureDateWager[] {
+  if (Array.isArray(raw)) return raw as FigureDateWager[];
+  if (raw && typeof raw === "object") {
+    const list = (raw as { LIST?: unknown }).LIST;
+    if (
+      list &&
+      typeof list === "object" &&
+      Array.isArray((list as { INFO?: unknown }).INFO)
+    ) {
+      return (list as { INFO: FigureDateWager[] }).INFO;
+    }
+    const rows = (raw as { rows?: unknown }).rows;
+    if (Array.isArray(rows)) return rows as FigureDateWager[];
+  }
+  throw new Error(
+    "unrecognised getWagersByFigureDate payload: expected LIST.INFO, rows[], or an array",
+  );
+}
+
 /** The read that returns settled wagers for one customer and one figure date. */
 export const FIGURE_DATE_WAGERS_PATH =
   "/cloud/api/Report/getWagersByFigureDate" as const;
