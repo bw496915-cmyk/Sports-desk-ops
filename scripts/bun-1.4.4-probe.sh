@@ -13,6 +13,7 @@
 #   scripts/bun-1.4.4-probe.sh --verbose  show command output
 # ============================================================================
 set -u
+set +e
 
 STRICT=0
 VERBOSE=0
@@ -127,13 +128,11 @@ mkdir -p "$ROOT/p6/node_modules/zzz-extra"
 printf '%s' '{"name":"zzz-extra","version":"1.0.0"}' > "$ROOT/p6/node_modules/zzz-extra/package.json"
 set +e
 prune_out="$(cd "$ROOT/p6" && bun prune --check 2>&1)"; prune_code=$?
-set -e
 if [ "$prune_code" -eq 1 ] && printf '%s' "$prune_out" | grep -q "zzz-extra"; then
   run bash -c "cd '$ROOT/p6' && bun prune"
   if [ ! -d "$ROOT/p6/node_modules/zzz-extra" ]; then
     set +e
     (cd "$ROOT/p6" && bun prune --check >/dev/null 2>&1); post_code=$?
-    set -e
     if [ "$post_code" -eq 0 ]; then
       pass prune-check "check exit 1 naming zzz-extra; prune removed it; re-check exit 0"
     else
@@ -164,7 +163,6 @@ fi
 mkproj "$ROOT/p8" '{"name":"p8","version":"1.0.0","dependencies":{}}'
 set +e
 unknown_out="$(cd "$ROOT/p8" && bun install --frozen-lockfil 2>&1)"; unknown_code=$?
-set -e
 if [ "$unknown_code" -ne 0 ] && printf '%s' "$unknown_out" | grep -q "no --frozen-lockfil flag"; then
   pass unknown-flag-rejected "typo'd flag exits $unknown_code and is named"
 else
@@ -187,7 +185,6 @@ mkproj "$ROOT/p10" '{"name":"p10","version":"1.0.0","dependencies":{}}'
 printf 'PROBE=1\n' > "$ROOT/p10/ci.env"
 set +e
 envfile_out="$(cd "$ROOT/p10" && bun install --env-file ci.env 2>&1)"; envfile_code=$?
-set -e
 if [ "$envfile_code" -eq 0 ] && ! printf '%s' "$envfile_out" | grep -qiE "not found|missing package|ci\.env@"; then
   pass env-file-install "--env-file accepted as an env file, install exit 0"
 else
@@ -209,7 +206,6 @@ printf '%s' '{"name":"p12root","version":"1.0.0","private":true,"workspaces":["p
 printf '%s' '{"name":"p12a","version":"1.0.0","private":true}' > "$ROOT/p12/packages/a/package.json"
 set +e
 recursive_out="$(cd "$ROOT/p12" && bun publish --recursive 2>&1)"; recursive_code=$?
-set -e
 if [ "$recursive_code" -eq 0 ] && printf '%s' "$recursive_out" | grep -q "skipped p12a: private"; then
   pass publish-recursive "all-private workspace: exit 0, both packages skipped by name"
 else
@@ -222,7 +218,6 @@ run bash -c "cd '$ROOT/p13' && bun install"
 mkproj "$ROOT/p13" '{"name":"p13","version":"1.0.0","dependencies":{"lodash":"4.17.21","is-odd":"3.0.1"}}'
 set +e
 frozen_out="$(cd "$ROOT/p13" && bun install --frozen-lockfile 2>&1)"; frozen_code=$?
-set -e
 if [ "$frozen_code" -ne 0 ] && printf '%s' "$frozen_out" | grep -q "is-odd was added"; then
   pass frozen-lockfile-names-dep "error names 'is-odd was added'"
 else
@@ -233,7 +228,6 @@ fi
 set +e
 filter_ok="$(cd "$ROOT/p12" && bun publish --filter 'p12a' 2>&1)"; filter_ok_code=$?
 filter_bad="$(cd "$ROOT/p12" && bun publish --filter 'nomatch*' 2>&1)"; filter_bad_code=$?
-set -e
 if [ "$filter_ok_code" -eq 0 ] && printf '%s' "$filter_ok" | grep -q "skipped p12a: private" \
    && [ "$filter_bad_code" -eq 1 ] && printf '%s' "$filter_bad" | grep -q "No workspace packages matched"; then
   pass publish-filter "match: exit 0 + skipped by name; no-match: exit 1 + named error"
@@ -249,7 +243,6 @@ if run bash -c "cd '$ROOT/p15a' && bun install"; then
   printf '[install]\nminimumReleaseAge = "87600h"\nminimumReleaseAgeExcludes = []\n' > "$ROOT/p15b/bunfig.toml"
   set +e
   aged_out="$(cd "$ROOT/p15b" && bun install 2>&1)"; aged_code=$?
-  set -e
   if [ "$aged_code" -ne 0 ] && printf '%s' "$aged_out" | grep -q "minimum-release-age"; then
     pass minimum-release-age "\"3d\" + per-version exclude installs; a 10-year window blocks and names the reason"
   else
@@ -266,13 +259,11 @@ run bash -c "cd '$ROOT/p16a' && bun install"
 set +e
 moderate_plain="$(cd "$ROOT/p16a" && bun audit 2>&1)"; moderate_plain_code=$?
 moderate_high="$(cd "$ROOT/p16a" && bun audit --audit-level=high 2>&1)"; moderate_high_code=$?
-set -e
 mkproj "$ROOT/p16b" '{"name":"p16b","version":"1.0.0","dependencies":{"lodash":"4.17.20"},"overrides":{"lodash":"4.17.20"}}'
 run bash -c "cd '$ROOT/p16b' && bun install"
 set +e
 high_plain="$(cd "$ROOT/p16b" && bun audit 2>&1)"; high_plain_code=$?
 high_high="$(cd "$ROOT/p16b" && bun audit --audit-level=high 2>&1)"; high_high_code=$?
-set -e
 moderate_filtered=$([ "$moderate_plain_code" -eq 1 ] && [ "$moderate_high_code" -eq 0 ] && echo yes || echo no)
 high_kept=$([ "$high_plain_code" -eq 1 ] && [ "$high_high_code" -eq 1 ] && printf '%s' "$high_high" | grep -q "high" && echo yes || echo no)
 if [ "$moderate_filtered" = yes ] && [ "$high_kept" = yes ]; then
@@ -287,13 +278,11 @@ run bash -c "cd '$ROOT/p17a' && bun install"
 set +e
 dev_plain="$(cd "$ROOT/p17a" && bun audit 2>&1)"; dev_plain_code=$?
 dev_prod="$(cd "$ROOT/p17a" && bun audit --prod 2>&1)"; dev_prod_code=$?
-set -e
 mkproj "$ROOT/p17b" '{"name":"p17b","version":"1.0.0","dependencies":{"lodash":"4.17.20"}}'
 run bash -c "cd '$ROOT/p17b' && bun install"
 set +e
 prod_plain="$(cd "$ROOT/p17b" && bun audit 2>&1)"; prod_plain_code=$?
 prod_prod="$(cd "$ROOT/p17b" && bun audit --prod 2>&1)"; prod_prod_code=$?
-set -e
 dev_excluded=$([ "$dev_plain_code" -eq 1 ] && [ "$dev_prod_code" -eq 0 ] && printf '%s' "$dev_prod" | grep -q "checked 0 packages" && echo yes || echo no)
 prod_kept=$([ "$prod_plain_code" -eq 1 ] && [ "$prod_prod_code" -eq 1 ] && echo yes || echo no)
 if [ "$dev_excluded" = yes ] && [ "$prod_kept" = yes ]; then
@@ -351,7 +340,6 @@ id_out="$(cd "$ROOT/p19" && bun audit --ignore "$first_id" 2>&1)"; id_code=$?
 all_out="$(cd "$ROOT/p19" && bun audit $ignore_args 2>&1)"; all_code=$?
 cve_out="$(cd "$ROOT/p19" && bun audit --ignore CVE-2021-23337 2>&1)"; cve_code=$?
 typo_out="$(cd "$ROOT/p19" && bun audit --ignore GHSA-0000-0000-0000 2>&1)"; typo_code=$?
-set -e
 expected_next=$((adv_count - 1))
 ghsa_ok=$(printf '%s' "$ghsa_out" | grep -q "$expected_next vulnerabilities" && echo yes || echo no)
 id_ok=$(printf '%s' "$id_out" | grep -q "$expected_next vulnerabilities" && echo yes || echo no)
@@ -372,7 +360,6 @@ ignore_all=""
 for g in $ghsas; do ignore_all="$ignore_all --ignore $g"; done
 set +e
 raw_all="$(cd "$ROOT/p20" && bun audit --json $ignore_all 2>/dev/null)"; raw_code=$?
-set -e
 raw_entries="$(printf '%s' "$raw_all" | bun -e 'const j = await Bun.stdin.json(); console.log(Object.values(j).flat().length)')"
 if [ "$raw_code" -eq 0 ] && [ "$raw_entries" = 4 ]; then
   pass audit-json-unfiltered "all advisories ignored (exit 0) yet --json still lists $raw_entries"
@@ -386,7 +373,6 @@ run bash -c "cd '$ROOT/p21' && bun install"
 hash_before="$(cd "$ROOT/p21" && shasum package.json bun.lock | shasum)"
 set +e
 plan="$(cd "$ROOT/p21" && bun audit fix --dry-run --json 2>/dev/null)"; plan_code=$?
-set -e
 hash_after="$(cd "$ROOT/p21" && shasum package.json bun.lock | shasum)"
 plan_ok="$(printf '%s' "$plan" | bun -e '
   const j = await Bun.stdin.json();
@@ -408,7 +394,6 @@ run bash -c "cd '$ROOT/p22' && bun audit fix"
 pin_after="$(cd "$ROOT/p22" && bun -e 'const p = await Bun.file("package.json").json(); console.log(p.dependencies.lodash)')"
 set +e
 post_audit="$(cd "$ROOT/p22" && bun audit 2>&1)"; post_code=$?
-set -e
 if [ "$pin_after" != "4.17.20" ] && [ "$post_code" -eq 0 ]; then
   # Observed 2026-11-14: the rewrite targets lodash 4.18.0. That is consistent
   # with "lowest non-vulnerable" (4.17.21 still carries 2 advisories) but 4.18.0
@@ -425,7 +410,6 @@ rejects=0
 for flag in --prod --frozen-lockfile --no-save; do
   set +e
   rejected_out="$(cd "$ROOT/p23" && bun audit fix "$flag" 2>&1)"; rejected_code=$?
-  set -e
   if [ "$rejected_code" -ne 0 ] && printf '%s' "$rejected_out" | grep -q "bun.lock"; then
     rejects=$((rejects+1))
   fi
@@ -434,6 +418,43 @@ if [ "$rejects" -eq 3 ]; then
   pass audit-fix-rejects-flags "all three lockfile-blocking flags refused with a bun.lock reason"
 else
   fail audit-fix-rejects-flags "only $rejects/3 flags refused"
+fi
+
+# ---- P24: audit fix --latest rewrites OWN ranges, keeping their style -------
+mkproj "$ROOT/p24" '{"name":"p24","version":"1.0.0","dependencies":{"qs":"~6.5.0"}}'
+run bash -c "cd '$ROOT/p24' && bun install"
+set +e
+plain_out="$(cd "$ROOT/p24" && bun audit 2>&1)"; plain_code=$?
+run bash -c "cd '$ROOT/p24' && bun audit fix"
+range_plain="$(cd "$ROOT/p24" && bun -e 'const p = await Bun.file("package.json").json(); console.log(p.dependencies.qs)')"
+set +e
+latest_plan="$(cd "$ROOT/p24" && bun audit fix --latest --dry-run --json 2>/dev/null)"; plan_code=$?
+rewrite_to="$(printf '%s' "$latest_plan" | bun -e 'const j = await Bun.stdin.json(); const f = (j.fixes ?? [])[0]; console.log(f?.packageJson?.[0]?.to ?? "")')"
+run bash -c "cd '$ROOT/p24' && bun audit fix --latest"
+range_latest="$(cd "$ROOT/p24" && bun -e 'const p = await Bun.file("package.json").json(); console.log(p.dependencies.qs)')"
+set +e
+post_code=$(cd "$ROOT/p24" && bun audit >/dev/null 2>&1; echo $?)
+if [ "$plain_code" -eq 1 ] && [ "$range_plain" = "~6.5.0" ] \
+   && [ "${rewrite_to:0:1}" = "~" ] && [ "$range_latest" = "$rewrite_to" ] && [ "$post_code" -eq 0 ]; then
+  pass audit-fix-latest "own range blocked plain fix ($range_plain); --latest rewrote to $range_latest (style kept)"
+else
+  fail audit-fix-latest "plain=$range_plain plan=$rewrite_to latest=$range_latest post=$post_code"
+fi
+
+# ---- P25: a failing registry is never a clean audit -------------------------
+mkproj "$ROOT/p25" '{"name":"p25","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+run bash -c "cd '$ROOT/p25' && bun install"
+printf 'registry=http://127.0.0.1:9/\n' > "$ROOT/p25/.npmrc"
+set +e
+dead_out="$(cd "$ROOT/p25" && bun audit 2>/tmp/p25.err)"; dead_code=$?
+dead_fix="$(cd "$ROOT/p25" && bun audit fix 2>&1)"; dead_fix_code=$?
+dead_err="$(cat /tmp/p25.err)"
+never_clean=$(printf '%s' "$dead_out" | grep -q "No vulnerabilities" && echo no || echo yes)
+named_reason=$(printf '%s' "$dead_err" | grep -qiE "ConnectionRefused|advisories/bulk|error:" && echo yes || echo no)
+if [ "$dead_code" -eq 1 ] && [ "$dead_fix_code" -eq 1 ] && [ "$never_clean" = yes ] && [ "$named_reason" = yes ]; then
+  pass audit-registry-failure "dead registry: audit and fix both exit 1, error names the request, no clean report"
+else
+  fail audit-registry-failure "audit=$dead_code fix=$dead_fix_code neverClean=$never_clean named=$named_reason"
 fi
 
 # ---- Deliberately not automated ---------------------------------------------
