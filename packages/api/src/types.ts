@@ -110,6 +110,8 @@ export interface DashboardApiDeps {
   readonly forceShadowFixture?: boolean | undefined;
   readonly shadowDbPath?: string | undefined;
   readonly getBuildMatrix: () => Promise<readonly unknown[]>;
+  readonly handleMcp?:
+    ((req: Request) => Response | Promise<Response>) | undefined;
   readonly getBetTickerPayload?:
     | ((filters?: {
         readonly writer?: string | undefined;

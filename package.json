@@ -173,6 +173,7 @@
     "session:login": "bun run scripts/session_login.ts",
     "session:status": "bun run scripts/session_login.ts --status",
     "mcp:dx": "bun run scripts/mcp_dx_server.ts",
+    "mcp:serve": "bun --no-orphans run cli/sportsdesk_mcp_cli.ts",
     "cli": "bun run cli/sportsdesk_cli.ts",
     "replay": "bun run cli/sportsdesk_replay_cli.ts",
     "ingestion:enrich-xml-golden": "bun run scripts/enrich_ingestion_jsonl_xml_golden.ts",
@@ -357,7 +358,9 @@
     "dev:api": "bun run scripts/dev_dashboard.ts --api-only",
     "test:ws": "PRETEST_SKIP=1 bun test --parallel tests/workspace_packs.test.ts tests/dx_workspaces.test.ts tests/verify_fast_scope.test.ts tests/dashboard_backend_workspace.test.ts tests/dashboard_api_inmemory.test.ts tests/dashboard_ui_panels.test.tsx tests/dashboard_build_and_markdown.test.ts tests/enhanced_dashboard_builder.test.ts tests/slice_metrics.test.ts tests/wager_tiers_toml.test.ts",
     "build:ws": "bun run scripts/build_dashboard.ts",
-    "pack:check": "bun run scripts/check_workspace_packs.ts"
+    "pack:check": "bun run scripts/check_workspace_packs.ts",
+    "naming:fitness": "bun scripts/naming_fitness.ts",
+    "venue:table": "bun scripts/venue_registry_table.ts"
   },
   "keywords": [
     "sportsdesk",

@@ -518,7 +518,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/globals/bun/gunzipSync)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `lib/eod_archive.ts`, `lib/schema_binary.ts`
+- **Here:** `lib/eod_archive.ts`, `lib/ppm_socket_feed.ts`
 - **Evidence:** `probe:crypto.compress`
 
 #### Bun.gzipSync
