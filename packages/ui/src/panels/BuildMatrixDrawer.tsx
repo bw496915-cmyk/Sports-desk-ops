@@ -7,17 +7,29 @@ export interface BuildMatrixDrawerProps {
   readonly rows: readonly BuildMatrixRow[] | null;
 }
 
-const TOKEN_SWATCHES: readonly [string, string][] = [
+export const HOUDINI_TOKENS: readonly [string, string][] = [
   ["--sd-surface-bg", "Obsidian"],
+  ["--sd-surface-cli", "CLI"],
   ["--sd-surface-card", "Card"],
+  ["--sd-surface-elevated", "Elevated"],
+  ["--sd-surface-hover", "Hover"],
+  ["--sd-surface-raised", "Raised"],
+  ["--sd-surface-border", "Border"],
+  ["--sd-border-strong", "Border Strong"],
+  ["--sd-text-primary", "Primary"],
+  ["--sd-text-secondary", "Secondary"],
+  ["--sd-text-muted", "Muted"],
   ["--sd-tier-alert", "Alert L21"],
   ["--sd-tier-steam", "Steam L22"],
   ["--sd-tier-whale", "Whale L23"],
   ["--sd-tier-rec-bias", "Rec L24"],
   ["--sd-theme-emerald", "Gateway L20"],
+  ["--sd-theme-amber", "Amber"],
+  ["--sd-theme-violet", "Violet"],
+  ["--sd-route-pending", "Pending R01"],
   ["--sd-route-sharp", "Sharp R02"],
-  ["--sd-route-devig", "Devig R04"],
   ["--sd-route-manager", "Manager R03"],
+  ["--sd-route-devig", "Devig R04"],
 ];
 
 export function BuildMatrixDrawer({
@@ -66,7 +78,7 @@ export function BuildMatrixDrawer({
           </span>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-          {TOKEN_SWATCHES.map(([token, label]) => (
+          {HOUDINI_TOKENS.map(([token, label]) => (
             <span key={token} className="sd-pill sd-mono">
               <span
                 className="sd-token-swatch"

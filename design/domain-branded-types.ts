@@ -936,10 +936,22 @@ export const UI_TOKENS: readonly UiTokenDefinition[] = [
     description: "Cards, panels, table bodies",
   },
   {
+    tokenName: "--sd-surface-elevated",
+    hex: "#111c33",
+    role: "surface",
+    description: "Elevated drawers, modals, and floating popovers",
+  },
+  {
     tokenName: "--sd-surface-hover",
     hex: "#131f38",
     role: "surface",
     description: "Hovered cards and table rows",
+  },
+  {
+    tokenName: "--sd-surface-raised",
+    hex: "#1a2436",
+    role: "surface",
+    description: "Raised headers, toolbar strips, and inspector sub-cards",
   },
   {
     tokenName: "--sd-surface-border",
@@ -948,10 +960,22 @@ export const UI_TOKENS: readonly UiTokenDefinition[] = [
     description: "Hairlines and dividers",
   },
   {
+    tokenName: "--sd-border-strong",
+    hex: "#334155",
+    role: "border",
+    description: "Emphasized panel borders, active rings, and keycaps",
+  },
+  {
     tokenName: "--sd-text-primary",
     hex: "#f1f5f9",
     role: "text",
     description: "Body copy and headings",
+  },
+  {
+    tokenName: "--sd-text-secondary",
+    hex: "#cbd5e1",
+    role: "text",
+    description: "Subheadings, metric values, and active controls",
   },
   {
     tokenName: "--sd-text-muted",

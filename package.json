@@ -355,8 +355,9 @@
     "typecheck:ws": "bun check --no-script -p packages/contracts/tsconfig.json && bun check --no-script -p packages/ui/tsconfig.json && bun check --no-script -p packages/backend/tsconfig.json && bun check --no-script -p packages/api/tsconfig.json",
     "dev:ui": "bun run scripts/dev_dashboard.ts",
     "dev:api": "bun run scripts/dev_dashboard.ts --api-only",
-    "test:ws": "PRETEST_SKIP=1 bun test --parallel tests/workspace_packs.test.ts tests/dx_workspaces.test.ts tests/verify_fast_scope.test.ts tests/dashboard_backend_workspace.test.ts tests/dashboard_api_inmemory.test.ts tests/dashboard_ui_panels.test.tsx tests/dashboard_build_and_markdown.test.ts tests/enhanced_dashboard_builder.test.ts tests/slice_metrics.test.ts tests/wager_tiers_toml.test.ts",
+    "test:ws": "PRETEST_SKIP=1 bun test --parallel tests/workspace_packs.test.ts tests/dx_workspaces.test.ts tests/verify_fast_scope.test.ts tests/dashboard_backend_workspace.test.ts tests/dashboard_api_inmemory.test.ts tests/dashboard_ui_panels.test.tsx tests/dashboard_build_and_markdown.test.ts tests/enhanced_dashboard_builder.test.ts tests/slice_metrics.test.ts tests/wager_tiers_toml.test.ts tests/dashboard_config_validation.test.ts",
     "build:ws": "bun run scripts/build_dashboard.ts",
+    "validate:dashboard": "bun scripts/validate_dashboard_config.ts",
     "pack:check": "bun run scripts/check_workspace_packs.ts"
   },
   "keywords": [

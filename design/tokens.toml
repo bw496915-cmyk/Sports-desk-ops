@@ -4,8 +4,10 @@
 # ==============================================================================
 
 [meta]
-version = "1.1.0"
+schema = "sportsdesk-tokens/v1"
+version = "1.2.0"
 author = "bw496915-cmyk"
+updated_at = "2026-11-14T00:00:00Z" # quoted ISO-8601 — avoids Temporal.* in browser bundles
 
 # ------------------------------------------------------------------------------
 # Surfaces & Base Design Canvas
@@ -31,7 +33,7 @@ protocol = "ANSI 24-bit TrueColor (\\x1b[38;2;R;G;Bm)"
 color_depth = "24-bit TrueColor RGB"
 
 # ------------------------------------------------------------------------------
-# Dashboard UI Chrome (cards, borders, text)
+# Dashboard UI Chrome (cards, elevated drawers, borders, text)
 # role: surface | border | text. Text tokens must reach WCAG 4.5:1 on every surface.
 # ------------------------------------------------------------------------------
 [ui.surface_card]
@@ -40,11 +42,23 @@ hex = "#0d1527"
 role = "surface"
 description = "Cards, panels, table bodies"
 
+[ui.surface_elevated]
+token_name = "--sd-surface-elevated"
+hex = "#111c33"
+role = "surface"
+description = "Elevated drawers, modals, and floating popovers"
+
 [ui.surface_hover]
 token_name = "--sd-surface-hover"
 hex = "#131f38"
 role = "surface"
 description = "Hovered cards and table rows"
+
+[ui.surface_raised]
+token_name = "--sd-surface-raised"
+hex = "#1a2436"
+role = "surface"
+description = "Raised headers, toolbar strips, and inspector sub-cards"
 
 [ui.surface_border]
 token_name = "--sd-surface-border"
@@ -52,11 +66,23 @@ hex = "#1e293b"
 role = "border"
 description = "Hairlines and dividers"
 
+[ui.border_strong]
+token_name = "--sd-border-strong"
+hex = "#334155"
+role = "border"
+description = "Emphasized panel borders, active rings, and keycaps"
+
 [ui.text_primary]
 token_name = "--sd-text-primary"
 hex = "#f1f5f9"
 role = "text"
 description = "Body copy and headings"
+
+[ui.text_secondary]
+token_name = "--sd-text-secondary"
+hex = "#cbd5e1"
+role = "text"
+description = "Subheadings, metric values, and active controls"
 
 [ui.text_muted]
 token_name = "--sd-text-muted"
@@ -219,7 +245,11 @@ operational_role = "Terminal Risk Containment & Manager Write-Gate"
 [tokens]
 
 # --- Surfaces & structure --------------------------------------------------
+"sd-surface-bg" = "#070b14"
+"sd-surface-cli" = "#04070e"
 "sd-surface-panel" = "#0d1527"
+"sd-surface-elevated" = "#111c33"
+"sd-surface-hover" = "#131f38"
 "sd-surface-raised" = "#1a2436"
 "sd-border-default" = "#1e293b"
 "sd-border-strong" = "#334155"
@@ -235,6 +265,23 @@ operational_role = "Terminal Risk Containment & Manager Write-Gate"
 "sd-warn" = "#f59e0b"
 "sd-ok" = "#22c55e"
 "sd-info" = "#818cf8"
+
+# --- Signal-Honesty Provenance Badges (#73 / #74) --------------------------
+"sd-provenance-live-fg" = "#34d399"
+"sd-provenance-live-bg" = "#0f2e28"
+"sd-provenance-live-border" = "#10b981"
+
+"sd-provenance-capture-fg" = "#38bdf8"
+"sd-provenance-capture-bg" = "#10283d"
+"sd-provenance-capture-border" = "#0284c7"
+
+"sd-provenance-stale-fg" = "#fbbf24"
+"sd-provenance-stale-bg" = "#332713"
+"sd-provenance-stale-border" = "#f59e0b"
+
+"sd-provenance-fixture-fg" = "#c084fc"
+"sd-provenance-fixture-bg" = "#281d3d"
+"sd-provenance-fixture-border" = "#a855f7"
 
 # --- Tier colors (bound to tier keys in wager_tiers.toml) ------------------
 "sd-tier-originator-fg" = "#f87171"

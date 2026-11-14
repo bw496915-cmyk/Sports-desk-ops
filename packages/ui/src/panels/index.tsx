@@ -10,6 +10,7 @@ export {
 export {
   BuildMatrixDrawer,
   type BuildMatrixDrawerProps,
+  HOUDINI_TOKENS,
 } from "./BuildMatrixDrawer.tsx";
 export {
   CustomersTabPanel,
@@ -39,3 +40,7 @@ export {
   TerminalTabPanel,
   type TerminalTabPanelProps,
 } from "./TerminalTabPanel.tsx";
+export {
+  ThresholdsPanel,
+  type ThresholdsPanelProps,
+} from "./ThresholdsPanel.tsx";

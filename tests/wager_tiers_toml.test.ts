@@ -26,9 +26,21 @@ describe("Declarative Wager Tiers TOML Config (Bun.TOML v3)", () => {
     const config = await loadTomlConfig(DEFAULT_WAGER_TIERS_CONFIG_PATH);
 
     // Verify Surface with resolved @token:*
+    expect(config.surface.bg).toBe("#070b14");
     expect(config.surface.panel).toBe("#0d1527");
+    expect(config.surface.elevated).toBe("#111c33");
+    expect(config.surface.raised).toBe("#1a2436");
     expect(config.surface.text).toBe("#f1f5f9"); // Drift fixed from #f8fafc
+    expect(config.surface.textSecondary).toBe("#cbd5e1");
     expect(config.surface.border).toBe("#1e293b");
+    expect(config.surface.borderStrong).toBe("#334155");
+    expect(config.surface.provenance?.liveFg).toBe("#34d399");
+    expect(config.surface.provenance?.staleFg).toBe("#fbbf24");
+
+    // Verify Dashboard defaults & Signal-Honesty invariant
+    expect(config.dashboard?.autoExecute).toBe(false);
+    expect(config.dashboard?.refreshIntervalSeconds).toBe(15);
+    expect(config.dashboard?.staleFeedWarnMinutes).toBe(30);
 
     // Verify Canonical Tiers
     expect(config.tiers.ORIGINATOR_HIGH_RISK).toBeDefined();

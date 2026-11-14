@@ -1,6 +1,6 @@
 /**
  * @file src/dashboard/tokens.generated.css
- * @description Generated from design/tokens.toml (v1.1.0) via `bun run gen:tokens`.
+ * @description Generated from design/tokens.toml (v1.2.0) via `bun run gen:tokens`.
  * DO NOT EDIT BY HAND — enforced by `bun run gen:tokens:gate`.
  */
 
@@ -26,10 +26,22 @@
   initial-value: #0d1527;
 }
 
+@property --sd-surface-elevated {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #111c33;
+}
+
 @property --sd-surface-hover {
   syntax: "<color>";
   inherits: true;
   initial-value: #131f38;
+}
+
+@property --sd-surface-raised {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1a2436;
 }
 
 @property --sd-surface-border {
@@ -38,10 +50,22 @@
   initial-value: #1e293b;
 }
 
+@property --sd-border-strong {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #334155;
+}
+
 @property --sd-text-primary {
   syntax: "<color>";
   inherits: true;
   initial-value: #f1f5f9;
+}
+
+@property --sd-text-secondary {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #cbd5e1;
 }
 
 @property --sd-text-muted {
@@ -121,13 +145,17 @@
    ========================================================================== */
 :root {
   color-scheme: dark;
-  /* Generated from tokens.toml (v1.1.0) */
+  /* Generated from tokens.toml (v1.2.0) */
   --sd-surface-bg: #070b14;
   --sd-surface-cli: #04070e;
   --sd-surface-card: #0d1527;
+  --sd-surface-elevated: #111c33;
   --sd-surface-hover: #131f38;
+  --sd-surface-raised: #1a2436;
   --sd-surface-border: #1e293b;
+  --sd-border-strong: #334155;
   --sd-text-primary: #f1f5f9;
+  --sd-text-secondary: #cbd5e1;
   --sd-text-muted: #94a3b8;
   --sd-tier-retail: #1d84b5;
   --sd-tier-blocked: #64748b;
@@ -145,9 +173,13 @@
   --bg: var(--sd-surface-bg);
   --bg-cli: var(--sd-surface-cli);
   --card: var(--sd-surface-card);
+  --card-elevated: var(--sd-surface-elevated);
   --card-hover: var(--sd-surface-hover);
+  --card-raised: var(--sd-surface-raised);
   --border: var(--sd-surface-border);
+  --border-strong: var(--sd-border-strong);
   --text: var(--sd-text-primary);
+  --text-secondary: var(--sd-text-secondary);
   --muted: var(--sd-text-muted);
   --accent: var(--sd-tier-rec-bias);
   --emerald: var(--sd-theme-emerald);

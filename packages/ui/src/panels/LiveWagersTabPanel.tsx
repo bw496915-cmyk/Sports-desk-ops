@@ -1,4 +1,14 @@
 import type React from "react";
+import { DASHBOARD_THRESHOLDS } from "../config/dashboard.ts";
+import {
+  clvEdgeTone,
+  formatClvCents,
+  WAGER_ALERT_TIERS,
+  WAGER_BET_TYPE_FILTERS,
+  WAGER_SPORT_FILTERS,
+  WAGER_TIER_RANK,
+  WAGERS_TABLE,
+} from "../config/wagers.ts";
 import { styles } from "../dashboard_styles.ts";
 import {
   formatProvenanceBadge,
@@ -39,36 +49,18 @@ export interface LiveWagersTabPanelProps {
   readonly onSelectAgent?: ((agentId: string) => void) | undefined;
 }
 
-const SPORT_PILLS = [
-  { id: "ALL", label: "All Sports" },
-  { id: "NFL", label: "🏈 NFL" },
-  { id: "CFB", label: "🎓 CFB" },
-  { id: "NBA", label: "🏀 NBA" },
-  { id: "SOCCER", label: "⚽ Soccer" },
-];
+const SPORT_PILLS = WAGER_SPORT_FILTERS;
 
 const ALERT_PILLS = [
   { id: "ALL", label: "All Alerts" },
-  { id: "CRITICAL", label: "🚨 Critical" },
-  { id: "STEAM", label: "⚡ Steam" },
-  { id: "LATENCY", label: "⚠️ Latency" },
-  { id: "RECREATIONAL", label: "✅ Recreational" },
+  ...WAGER_ALERT_TIERS.map((tier) => ({ id: tier.id, label: tier.label })),
 ];
 
-const BET_TYPE_PILLS = [
-  { id: "ALL", label: "All Bet Types" },
-  { id: "Spread", label: "Spread" },
-  { id: "Total", label: "Total" },
-  { id: "Moneyline", label: "Moneyline" },
-  { id: "Parlay", label: "Parlay" },
-];
+const BET_TYPE_PILLS = WAGER_BET_TYPE_FILTERS;
 
-const TIER_ORDER: Record<string, number> = {
-  CRITICAL: 4,
-  STEAM: 3,
-  LATENCY: 2,
-  RECREATIONAL: 1,
-};
+const TIER_ORDER = WAGER_TIER_RANK;
+
+const HIGH_RISK_WAGER_USD = DASHBOARD_THRESHOLDS.high_risk_wager_usd;
 
 export function LiveWagersTabPanel({
   wagers = SAMPLE_LIVE_WAGERS,
@@ -416,9 +408,11 @@ export function LiveWagersTabPanel({
                   }
                   return wagerSortDir === "asc" ? cmp : -cmp;
                 })
+                .slice(0, WAGERS_TABLE.max_rows)
                 .map((w) => (
                   <tr
                     key={w.ticketId}
+                    data-wagers-policy={WAGERS_TABLE.policy_tag}
                     style={styles.wagerRow(
                       selectedWager?.ticketId === w.ticketId,
                     )}
@@ -542,7 +536,15 @@ export function LiveWagersTabPanel({
                       </div>
                     </td>
                     <td style={styles.td}>
-                      <div style={{ fontWeight: 600 }}>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          color:
+                            w.riskUsd >= HIGH_RISK_WAGER_USD
+                              ? "#fbbf24"
+                              : "#f8fafc",
+                        }}
+                      >
                         ${w.riskUsd.toLocaleString()}
                       </div>
                       <div style={styles.custSub}>
@@ -553,15 +555,10 @@ export function LiveWagersTabPanel({
                       <span
                         style={{
                           fontWeight: 700,
-                          color:
-                            w.clvCents > 0
-                              ? w.clvCents >= 10
-                                ? "#ef4444"
-                                : "#f59e0b"
-                              : "#4ade80",
+                          color: clvEdgeTone(w.clvCents),
                         }}
                       >
-                        {w.clvCents > 0 ? `+${w.clvCents}¢` : `${w.clvCents}¢`}
+                        {formatClvCents(w.clvCents)}
                       </span>
                     </td>
                     <td style={styles.td}>
