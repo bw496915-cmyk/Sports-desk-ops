@@ -909,6 +909,15 @@ export function App(): React.ReactElement {
     return true;
   });
 
+  const unknownSyndicateCount = useMemo(
+    () =>
+      profileRows.filter(
+        (cust) =>
+          cust.unknown?.includes("syndicate") && cust.syndicateRisk !== "HIGH",
+      ).length,
+    [profileRows],
+  );
+
   const [customerSort, setCustomerSort] = useState<{
     key: CustomerSortKey;
     dir: 1 | -1;
@@ -1331,6 +1340,7 @@ export function App(): React.ReactElement {
       <main style={styles.main}>
         {activeTab === "customers" ? (
           <CustomersTabPanel
+            unknownSyndicateCount={unknownSyndicateCount}
             bannerDismissed={bannerDismissed}
             onDismissBanner={() => {
               setBannerDismissed(true);

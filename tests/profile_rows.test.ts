@@ -88,7 +88,9 @@ describe("bookRowsToProfiles", () => {
       },
     ]);
     expect(single?.specialization).toBe("NBA TOTAL");
-    expect(single?.gini).toBe(0);
+    expect(single?.unknown).toContain("gini");
+    expect(single?.unknown).toContain("var95");
+    expect(single?.unknown).toContain("sizing");
   });
 
   test("a tie keeps the first-seen league", () => {

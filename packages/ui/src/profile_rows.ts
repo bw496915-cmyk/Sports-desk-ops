@@ -94,7 +94,11 @@ export function bookRowsToProfiles(
 
     const unknown: string[] = [];
     if (!sharpKnown) unknown.push("sharpness");
-    if (stakes.length === 0) unknown.push("sizing", "gini", "var95");
+    if (stakes.length < 2) {
+      // Gini/VaR of one observation are convention, not measurement; sizing derives from
+      // a spread that does not exist yet.
+      unknown.push("sizing", "gini", "var95");
+    }
     if (!league && !market) unknown.push("specialization");
     // The book carries no syndicate or correlation signal at all.
     unknown.push("syndicate", "correlation");

@@ -39,6 +39,8 @@ export interface CustomersTabPanelProps {
   readonly onRunReverseLookup: (ipAddress: string) => void;
   readonly onOpenTerminalProfile: (customerId: string) => void;
   readonly onSelectAgent?: ((agentId: string) => void) | undefined;
+  /** Rows the Syndicates filter hides because the book carries no syndicate signal. */
+  readonly unknownSyndicateCount?: number | undefined;
 }
 
 export function CustomersTabPanel({
@@ -65,6 +67,7 @@ export function CustomersTabPanel({
   onRunReverseLookup,
   onOpenTerminalProfile,
   onSelectAgent,
+  unknownSyndicateCount = 0,
 }: CustomersTabPanelProps): React.ReactElement {
   const effectiveStatus: "pending" | "ready" | "unavailable" =
     cohortsStatus ?? (cohortsReport !== null ? "ready" : "pending");
@@ -277,6 +280,11 @@ export function CustomersTabPanel({
             <span style={{ fontSize: "11px", color: "#64748b" }}>
               Click header to sort · Pinned Directive
             </span>
+            {filterTier === "SYNDICATE" && unknownSyndicateCount > 0 && (
+              <span style={{ fontSize: "11px", color: "#fbbf24" }}>
+                {unknownSyndicateCount} excluded: syndicate signal unknown
+              </span>
+            )}
           </div>
           <div className="profiles-wrap">
             <table style={styles.table}>
