@@ -131,6 +131,12 @@ jobs:
       - name: Bun docs & shape manifest baselines
         timeout-minutes: 3
         run: bun run bun:docs-mcp surfaces --check tests/bun_docs_surface_baseline.json && bun scripts/bun_shape_contracts.ts --check && bun test tests/bun_shapes_manifest.test.ts tests/bun_shapes_coverage.test.ts tests/language_coverage.test.ts
+      # Two cheap gates that ran only on main and turned it red after green PRs
+      # (2026-11-14: the innerHTML sink scan in #188 and the bundled VPS tree in
+      # #189). Both take seconds, so PRs can check them too.
+      - name: Main-gate smoke (innerHTML sinks + VPS tree)
+        timeout-minutes: 2
+        run: bun bin/check-innerhtml.ts && bun test tests/dashboard_credentials.test.ts
       - name: Bun test changed files
         run: bun run test:changed
       - name: Changed dsh-plugin bundles (verify-load)
