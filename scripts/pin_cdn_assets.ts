@@ -49,6 +49,17 @@ import type { CdnAssetPin, CdnManifest } from "../lib/f402_cdn_pin.ts";
 
 const CONCURRENCY = 8;
 
+/**
+ * Third-party origins that rotate their payload on their own cadence without changing the URL or
+ * the document's vendor version (#267). A byte change there is not actionable as a failure: the
+ * bytes are the vendor's, and re-pinning holds only until the next rotation — observed on
+ * 2026-11-15 as 2b5ff1cb… -> b2267597… -> 534cc8a4… at an unchanged 331,754 B.
+ *
+ * Deliberately narrow: same origin **and** unchanged byte length, reported as a warning so the
+ * change stays visible. Any other origin, or any length change, remains a hard failure.
+ */
+const ROTATING_VENDOR_ORIGINS = new Set(["https://maps.googleapis.com"]);
+
 const { positionals, values } = parseArgs({
   allowPositionals: true,
   strict: false,
@@ -297,6 +308,7 @@ async function check(): Promise<void> {
   const html = await fetchDocumentHtml();
   const coverage = checkDocumentCoverage(html, manifest);
   const details: string[] = [];
+  const warnings: string[] = [];
   let driftCount = 0;
   let infrastructureCount = 0;
 
@@ -339,6 +351,21 @@ async function check(): Promise<void> {
     if (outcome.kind === "ok") {
       const liveSha256 = await sha256Hex(outcome.bytes);
       if (liveSha256 !== pin.sha256) {
+        let origin = "";
+        try {
+          origin = new URL(url).origin;
+        } catch {
+          origin = "";
+        }
+        if (
+          ROTATING_VENDOR_ORIGINS.has(origin) &&
+          outcome.bytes.length === pin.bytes
+        ) {
+          warnings.push(
+            `rotating_vendor_drift ${url}: live ${liveSha256.slice(0, 16)}… (${outcome.bytes.length}B, unchanged length) — tolerated for ${origin} (#267)`,
+          );
+          continue;
+        }
         driftCount += 1;
         details.push(
           `byte_drift ${url}: live ${liveSha256} (${outcome.bytes.length}B) != pinned ${pin.sha256} (${pin.bytes}B)`,
@@ -415,6 +442,8 @@ async function check(): Promise<void> {
       );
     }
   }
+
+  for (const warning of warnings) console.error(`  WARN ${warning}`);
 
   if (details.length > 0) {
     console.error(
