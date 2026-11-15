@@ -28,10 +28,6 @@
     "desk-provenance": "bin/desk-provenance.ts"
   },
   "trustedDependencies": [],
-  "publishConfig": {
-    "access": "restricted",
-    "registry": "http://127.0.0.1:50851/"
-  },
   "description": "SportsDesk & Fantasy402 Downline Risk Surveillance, Bettor Churn Simulation, and Cloudflare R2 Sync Suite",
   "workspaces": [
     "packages/*"

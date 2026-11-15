@@ -23,6 +23,10 @@
       "documented": true,
       "link": "https://bun.com/docs/runtime/streams#bun-arraybuffersink"
     },
+    "build": {
+      "documented": true,
+      "link": "https://bun.com/docs/bundler"
+    },
     "color": {
       "documented": true,
       "link": "https://bun.com/docs/runtime/color#format-colors-as-css"

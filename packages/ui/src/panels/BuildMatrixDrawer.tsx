@@ -24,7 +24,7 @@ interface HoudiniTokenSpec {
 }
 
 /**
- * Canonical CSS Houdini @property registry generated from `design/tokens.toml` (v1.2.0).
+ * Canonical CSS Houdini @property registry generated from `design/tokens.toml` (v1.3.0).
  */
 export const HOUDINI_TOKENS: readonly HoudiniTokenSpec[] = [
   {
@@ -44,44 +44,65 @@ export const HOUDINI_TOKENS: readonly HoudiniTokenSpec[] = [
   {
     token: "--sd-surface-card",
     label: "Card",
-    hex: "#0d1527",
+    hex: "#0b1120",
     axis: "surfaces",
     detail: "UI surface · Cards, panels, table headers",
   },
   {
     token: "--sd-surface-elevated",
     label: "Elevated",
-    hex: "#111c33",
+    hex: "#121c31",
     axis: "surfaces",
     detail: "UI surface · Elevated drawers, modals & popovers",
   },
   {
     token: "--sd-surface-hover",
     label: "Hover",
-    hex: "#131f38",
+    hex: "#19263d",
     axis: "surfaces",
     detail: "UI surface · Hovered rows & cards",
   },
   {
     token: "--sd-surface-raised",
     label: "Raised",
-    hex: "#1a2436",
+    hex: "#202f4a",
     axis: "surfaces",
     detail: "UI surface · Raised headers & toolbar strips",
   },
   {
+    token: "--sd-surface-selected",
+    label: "Selected",
+    hex: "#0f3a5d",
+    axis: "surfaces",
+    detail: "UI surface · Active BitSet32 roving tab & selected row",
+  },
+  {
     token: "--sd-surface-border",
     label: "Border",
-    hex: "#1e293b",
+    hex: "#243247",
     axis: "surfaces",
     detail: "UI border · Hairlines & dividers",
   },
   {
     token: "--sd-border-strong",
     label: "Strong Border",
-    hex: "#334155",
+    hex: "#7085a1",
     axis: "surfaces",
-    detail: "UI border · Emphasized borders & active rings",
+    detail: "UI border · Emphasized panel borders & keycaps",
+  },
+  {
+    token: "--sd-focus-ring",
+    label: "Focus Ring",
+    hex: "#38bdf8",
+    axis: "surfaces",
+    detail: "UI focus · Keyboard roving tabindex ring",
+  },
+  {
+    token: "--sd-focus-ring-offset",
+    label: "Focus Offset",
+    hex: "#070b14",
+    axis: "surfaces",
+    detail: "UI focus · 2px inner separation ring",
   },
   {
     token: "--sd-text-primary",
@@ -105,30 +126,37 @@ export const HOUDINI_TOKENS: readonly HoudiniTokenSpec[] = [
     detail: "UI text · Secondary labels & headers",
   },
   {
+    token: "--sd-tier-drop",
+    label: "Drop L17",
+    hex: "#94a3b8",
+    axis: "ingestion",
+    detail: "L17.N0000 · NON_SPORTS · Stage 1 drop",
+  },
+  {
     token: "--sd-tier-retail",
     label: "Retail L18",
-    hex: "#1d84b5",
+    hex: "#29b6f6",
     axis: "ingestion",
     detail: "L18.N0204 · Internet · SLA ≤1500ms",
   },
   {
     token: "--sd-tier-blocked",
     label: "Blocked L19",
-    hex: "#64748b",
+    hex: "#8fa3bf",
     axis: "ingestion",
     detail: "L19.N0518 · BLOCKED · sentinel_drop",
   },
   {
-    token: "--sd-theme-emerald",
+    token: "--sd-tier-gateway",
     label: "Gateway L20",
-    hex: "#10b981",
+    hex: "#22d39a",
     axis: "ingestion",
     detail: "L20.N1105 · GATEWAY · SLA ≤1000ms",
   },
   {
     token: "--sd-tier-alert",
     label: "Alert L21",
-    hex: "#ef4444",
+    hex: "#ff7878",
     axis: "ingestion",
     detail: "L21.N0884 · ALERT · SLA ≤250ms",
   },
@@ -142,42 +170,63 @@ export const HOUDINI_TOKENS: readonly HoudiniTokenSpec[] = [
   {
     token: "--sd-tier-whale",
     label: "Whale L23",
-    hex: "#28a745",
+    hex: "#4ade80",
     axis: "ingestion",
     detail: "L23.N0412 · GSLIVE · SLA ≤500ms",
   },
   {
     token: "--sd-tier-rec-bias",
     label: "Rec L24",
-    hex: "#38bdf8",
+    hex: "#7dd3fc",
     axis: "ingestion",
     detail: "L24.N2019 · CSLEVEL2 · SLA ≤2000ms",
   },
   {
+    token: "--sd-tier-live-cws",
+    label: "Live CWS L24B",
+    hex: "#67e8f9",
+    axis: "ingestion",
+    detail: "L24B.N2110 · LIVEBETTINGCWS · SLA ≤750ms",
+  },
+  {
+    token: "--sd-tier-phone",
+    label: "Phone L24C",
+    hex: "#a5b4fc",
+    axis: "ingestion",
+    detail: "L24C.N2204 · PHONE · SLA ≤1500ms",
+  },
+  {
+    token: "--sd-tier-house",
+    label: "House L24D",
+    hex: "#e2e8f0",
+    axis: "ingestion",
+    detail: "L24D.N2308 · HOUSE · SLA ≤1500ms",
+  },
+  {
     token: "--sd-route-pending",
     label: "Pending R01",
-    hex: "#d97706",
+    hex: "#fb923c",
     axis: "routes",
     detail: "L27.N0912 · LIQUIDITY_HALT · ≥$1,000 depth",
   },
   {
     token: "--sd-route-sharp",
     label: "Sharp R02",
-    hex: "#a855f7",
+    hex: "#c892ff",
     axis: "routes",
-    detail: "L26.N3104 · SHRINKAGE_SHARP · τ*≥0.68, N≥8",
+    detail: "L26.N3104 · SHRINKAGE_SHARP · τ*≥6800 bps, N≥8",
   },
   {
     token: "--sd-route-manager",
     label: "Manager R03",
-    hex: "#f43f5e",
+    hex: "#ff758f",
     axis: "routes",
     detail: "L28.N2501 · TERMINAL_ENFORCE · tox≥80",
   },
   {
     token: "--sd-route-devig",
     label: "Devig R04",
-    hex: "#06b6d4",
+    hex: "#22d3ee",
     axis: "routes",
     detail: "L25.N1882 · STEAM_CONVERGENCE · ≤5000ms lag",
   },
@@ -403,9 +452,18 @@ export function BuildMatrixDrawer({
             {(
               [
                 ["all", `All Tokens (${HOUDINI_TOKENS.length})`],
-                ["surfaces", "Surfaces & Chrome (7)"],
-                ["ingestion", "Ingestion L18–L24 (7)"],
-                ["routes", "Risk Routes R01–R04 (4)"],
+                [
+                  "surfaces",
+                  `Surfaces & Chrome (${HOUDINI_TOKENS.filter((t) => t.axis === "surfaces").length})`,
+                ],
+                [
+                  "ingestion",
+                  `Ingestion L17–L24D (${HOUDINI_TOKENS.filter((t) => t.axis === "ingestion").length})`,
+                ],
+                [
+                  "routes",
+                  `Risk Routes R01–R04 (${HOUDINI_TOKENS.filter((t) => t.axis === "routes").length})`,
+                ],
               ] as const
             ).map(([id, label]) => (
               <button

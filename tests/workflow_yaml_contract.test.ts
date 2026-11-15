@@ -44,4 +44,20 @@ describe("GitHub Actions YAML under YAML 1.2", () => {
       expect(workflow["jobs"]).not.toBeNull();
     }
   });
+
+  test("the pull-request job runs the two main-only gates", async () => {
+    // 2026-11-14: #188 (innerHTML sink) and #189 (bundled VPS tree) merged green
+    // in verify-changed, then failed on main, because those gates only ran there.
+    const doc = Bun.YAML.parse(
+      await Bun.file(resolve(process.cwd(), ".github/workflows/ci.yml")).text(),
+    ) as {
+      jobs?: Record<string, { steps?: Array<{ run?: string }> }>;
+    };
+    const job = doc.jobs?.["verify-changed"];
+    expect(job).toBeDefined();
+
+    const runs = (job?.steps ?? []).map((step) => step.run ?? "").join("\n");
+    expect(runs).toContain("bin/check-innerhtml.ts");
+    expect(runs).toContain("tests/dashboard_credentials.test.ts");
+  });
 });

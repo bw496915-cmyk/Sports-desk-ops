@@ -154,6 +154,7 @@ const MCP_ALLOW_HEADERS =
 const MCP_EXPOSE_HEADERS = "Mcp-Session-Id, Mcp-Protocol-Version";
 
 const PROVENANCE_CHANNEL_ENUM_VALUES = [
+  "NON_SPORTS",
   "Internet",
   "BLOCKED",
   "GATEWAY",
@@ -161,6 +162,9 @@ const PROVENANCE_CHANNEL_ENUM_VALUES = [
   "GSBUILDER",
   "GSLIVE",
   "CSLEVEL2",
+  "LIVEBETTINGCWS",
+  "PHONE",
+  "HOUSE",
 ] as const satisfies readonly SignalChannelCode[];
 
 const TRANSPORT_BRIDGE_ENUM_VALUES = [
@@ -334,7 +338,7 @@ export const GET_CHANNEL_PROVENANCE_INPUT = {
     .enum(EXTENDED_CHANNEL_ENUM_VALUES)
     .optional()
     .describe(
-      "Canonical 7-entry ingestion provenance channel code or 16-entry ExtendedSignalChannelCode to inspect",
+      "Canonical 11-entry ingestion provenance channel code or 16-entry ExtendedSignalChannelCode to inspect",
     ),
   writer: z
     .string()

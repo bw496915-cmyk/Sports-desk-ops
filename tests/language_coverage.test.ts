@@ -45,6 +45,7 @@ const COVERAGE: Readonly<Record<string, string>> = {
   example: "template",
   npmrc: "config",
   gitignore: "config",
+  gitattributes: "git attributes (bun.lock text/binary order)",
   "git-blame-ignore-revs": "config",
   "bun-version": "runtime pin",
   gitkeep: "placeholder",

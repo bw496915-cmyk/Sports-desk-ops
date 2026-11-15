@@ -47,8 +47,8 @@ export const tierEntrySchema = z.object({
 });
 
 export const DEFAULT_SURFACE = {
-  panel: "#0d1527",
-  border: "#1e293b",
+  panel: "#0b1120",
+  border: "#243247",
   text: "#f1f5f9",
   muted: "#94a3b8",
   accent: "#38bdf8",

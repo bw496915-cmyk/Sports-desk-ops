@@ -298,6 +298,13 @@ export const BUN_SHAPES: readonly BunShape[] = [
     evidence: ["probe:proc.spawn"],
   },
   {
+    name: "build",
+    kind: "value",
+    subsystem: "process",
+    heading: "Bun.build",
+    evidence: ["test:tests/bun_bundler_plugin_contract.test.ts"],
+  },
+  {
     name: "stdin",
     kind: "value",
     subsystem: "process",

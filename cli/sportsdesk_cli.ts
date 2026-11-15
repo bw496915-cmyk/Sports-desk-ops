@@ -447,21 +447,21 @@ export function printNeuronRegistry(): void {
     "========================================================================================================================",
   );
   console.log(
-    "QWEN3.5-4B (LAYERS 18-28) NEURON REGISTRY & DECOUPLED THREE-AXIS ARCHITECTURE",
+    "QWEN3.5-4B (LAYERS 17-28) NEURON REGISTRY & DECOUPLED THREE-AXIS ARCHITECTURE",
   );
   console.log(
     "========================================================================================================================",
   );
 
-  // Table 1: Ingestion Signal Channels (Layers 18-24)
+  // Table 1: Ingestion Signal Channels (Layers 17-24D)
   console.log(
-    "\n--- AXIS 1: INGESTION SIGNAL CHANNELS (LAYERS 18-24) • TRANSPORT SLA (ms / POLICY) ---",
+    "\n--- AXIS 1: INGESTION SIGNAL CHANNELS (LAYERS 17-24D) • TRANSPORT SLA (ms / POLICY) ---",
   );
   console.log(
-    " # | Layer ID    | CSS Token          | Hex Code | ANSI Preview  | Channel Code | SLA Policy & Target | Status     | Twin / Volume Rule",
+    " # | Layer ID    | CSS Token          | Hex Code | ANSI Preview  | Channel Code   | SLA Policy & Target | Status     | Twin / Volume Rule",
   );
   console.log(
-    "---+-------------+--------------------+----------+---------------+--------------+---------------------+------------+------------------------------------------",
+    "---+-------------+--------------------+----------+---------------+----------------+---------------------+------------+------------------------------------------",
   );
   INGESTION_CHANNELS.forEach((n, idx) => {
     const num = String(idx + 1).padStart(2);
@@ -477,7 +477,7 @@ export function printNeuronRegistry(): void {
         `${n.tokenName.padEnd(18)} | ` +
         `${n.hex.padEnd(8)} | ` +
         `${preview.padEnd(17)} | ` +
-        `${n.channelCode.padEnd(12)} | ` +
+        `${n.channelCode.padEnd(14)} | ` +
         `${slaStr.padEnd(21)} | ` +
         `${n.channelStatus.padEnd(10)} | ` +
         `${n.volumeRule}`,
@@ -495,7 +495,7 @@ export function printNeuronRegistry(): void {
     "---+-------------+--------------------+----------+---------------+-----------------------------+---------------------+----------------------+-----------------------------+-----------------------",
   );
   ROUTE_CIRCUITS.forEach((n, idx) => {
-    const num = String(idx + 8).padStart(2);
+    const num = String(INGESTION_CHANNELS.length + idx + 1).padStart(2);
     const ansi = Bun.color(n.hex, "ansi-16m") ?? "";
     const preview = `${ansi}████████${reset}`;
 
@@ -503,7 +503,7 @@ export function printNeuronRegistry(): void {
     if (n.threshold.kind === "consensus_lag") {
       threshStr = `Lag <= ${n.threshold.maxLagMs.toLocaleString()} ms`;
     } else if (n.threshold.kind === "bayes_shrinkage") {
-      threshStr = `tau* = ${n.threshold.tauStar}, N >= ${n.threshold.minTickets}`;
+      threshStr = `tau* = ${n.threshold.tauStarBasisPoints} bps, N >= ${n.threshold.minTickets}`;
     } else if (n.threshold.kind === "liquidity_depth") {
       threshStr = `Depth < $${(n.threshold.minDepthCents / 100).toLocaleString()}`;
     } else if (n.threshold.kind === "composite_risk_gate") {
