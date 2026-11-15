@@ -29,11 +29,7 @@ async function makeRepo(): Promise<string> {
   await mkdir(join(dir, "lib"), { recursive: true });
   await mkdir(join(dir, "tests", "code_mode"), { recursive: true });
   await write(dir, "data/profile-snapshot.json", "{}\n");
-  await write(
-    dir,
-    "lib/profile_query_codemode.ts",
-    "export const schema = 1;\n",
-  );
+  await write(dir, "lib/profile_query_schema.ts", "export const schema = 1;\n");
   await write(dir, "tests/code_mode/oracle.ts", "export const frozen = 1;\n");
   git(dir, ["init", "-q"]);
   git(dir, ["add", "-A"]);
@@ -97,7 +93,7 @@ describe("oracle freeze gate", () => {
     await withRepo(async (dir) => {
       await write(
         dir,
-        "lib/profile_query_codemode.ts",
+        "lib/profile_query_schema.ts",
         "export const schema = 2;\n",
       );
       expect(runGate(dir).code).toBe(1);

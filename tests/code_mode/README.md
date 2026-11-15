@@ -13,6 +13,12 @@ implementation. It throws at import when the profile count or sentinel ids drift
 document is versioned: the parser rejects an unknown `schemaVersion`, an untrimmed id, duplicate
 ids and non-finite values.
 
+The tracked argument contract is [lib/profile_query_schema.ts](../../lib/profile_query_schema.ts)
+(the repository's `schema.ts`): the tool, the Code Mode registration and the tests import it, and
+the freeze gate watches it (plus the snapshot). The oracle deliberately duplicates its constants.
+On a push-to-main checkout, where `origin/main` equals `HEAD`, the gate falls back to
+`GITHUB_EVENT_BEFORE` or `HEAD^` so the pushed commit is still compared with its parent.
+
 To re-freeze deliberately after a contract change:
 
 1. `bun run scripts/generate_profile_snapshot.ts` (rebuilds the snapshot from the operator book;
@@ -65,9 +71,12 @@ report is written to `reports/mutation/mutation.html` (force-added; `reports/` i
 `lib/quickjs_code_mode.ts` runs cells in a QuickJS WASM realm whose only host capability is a
 `tools` bridge. Cells may `await` (host promises are settled by pumping the guest job queue, with a
 host deadline for promises that never settle). Every cell gets a fresh runtime with a wall-clock
-timeout (5 s), a tool-call budget (100, per cell), a 64 MiB heap cap and a 1 MiB stack cap; the
-probe asserts `Bun`, `process`, `require` and `module` are not reachable, that cells cannot see
-each other's globals, and that guest mutation of a tool result cannot reach the host snapshot.
+timeout (5 s), a tool-call budget (100, per cell), a 64 MiB heap cap and a 1 MiB stack cap.
+Arguments are packed to a bounded JSON string **in the guest** (1,000,000 characters) and only the
+bounded text is parsed on the host, so a huge, cyclic or deeply nested guest object cannot exhaust
+host memory through `ctx.dump`. The probe asserts `Bun`, `process`, `require` and `module` are not
+reachable, that cells cannot see each other's globals, and that guest mutation of a tool result
+cannot reach the host snapshot.
 Stack overflow, heap exhaustion, runaway tool loops and awaited rejections are all pinned to guest
 failures rather than host crashes. The broad MCP toolset still runs through the pre-existing
 `CodeModeRunner` (`new AsyncFunction`, host realm) — a known limitation of the older runner, not of

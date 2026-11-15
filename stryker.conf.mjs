@@ -22,6 +22,7 @@ export default {
     "tests/code_mode/profile_query.synthetic.test.ts",
     "tests/code_mode/profile_query.differential.test.ts",
     "tests/code_mode/quickjs_marshal.test.ts",
+    "tests/code_mode/oracle.arguments.test.ts",
   ],
   coverageAnalysis: "perTest",
   thresholds: { high: 80, low: 60, break: 60 },

@@ -24,10 +24,14 @@ const FIELDS: readonly ProfileField[] = ["clv", "vol", "sharp"];
 const isSentinel = (profile: ProfileRecord): boolean =>
   profile.id.startsWith("SYNTH_");
 
-const valueArbitrary = fc.oneof(
-  fc.constantFrom(0, -1, 1, 2.5, -2.5),
-  fc.double({ min: -1000, max: 1000, noNaN: true, noDefaultInfinity: true }),
-);
+// JSON cannot round-trip -0; normalize it so the round-trip property tests the data model, not
+// an IEEE-754 edge that the serialized format cannot represent.
+const valueArbitrary = fc
+  .oneof(
+    fc.constantFrom(0, -1, 1, 2.5, -2.5),
+    fc.double({ min: -1000, max: 1000, noNaN: true, noDefaultInfinity: true }),
+  )
+  .map((value) => (Object.is(value, -0) ? 0 : value));
 
 const profileArbitrary: fc.Arbitrary<ProfileRecord> = fc
   .record({
@@ -233,5 +237,18 @@ describe("parser round-trip", () => {
       ),
       { numRuns: NUM_RUNS },
     );
+  });
+});
+
+describe("row flag immutability", () => {
+  test("row flags are frozen copies and cannot mutate the input snapshot", () => {
+    const flags = ["a"];
+    const snapshot = [{ id: "A", vol: 1, clv: 2, sharp: 3, flags }];
+    const result = querySnapshot(snapshot, { field: "vol" });
+    expect(Object.isFrozen(result.rows[0]?.flags)).toBe(true);
+    expect(() =>
+      Reflect.apply(Array.prototype.push, result.rows[0]?.flags, ["b"]),
+    ).toThrow();
+    expect(flags).toEqual(["a"]);
   });
 });

@@ -184,3 +184,41 @@ describe("option normalization and error shapes", () => {
     await expect(runGuestCell("throw 42")).rejects.toThrow(/42/);
   });
 });
+
+describe("argument marshalling budgets", () => {
+  test("a huge guest array is rejected before it reaches the host", async () => {
+    await expect(
+      runGuestCell(
+        'const a = new Array(2000000).fill(0); return tools.query_profiles({ field: "clv", limit: 1, junk: a })',
+        { timeoutMs: 3000 },
+      ),
+    ).rejects.toThrow(/ARGUMENT_TOO_LARGE/);
+  });
+
+  test("a cyclic argument fails cleanly instead of hanging", async () => {
+    await expect(
+      runGuestCell("const a = {}; a.self = a; return tools.query_profiles(a)", {
+        timeoutMs: 3000,
+      }),
+    ).rejects.toThrow(/circular|guest cell failed/);
+  });
+
+  test("a deeply nested argument no longer aborts the QuickJS runtime", async () => {
+    const result = await runGuestCell(
+      'let o = {}; let c = o; for (let i = 0; i < 20000; i += 1) { c.n = {}; c = c.n; } return tools.query_profiles({ field: "clv", limit: 1, junk: o })',
+      { timeoutMs: 3000 },
+    );
+    expect(result).toMatchObject({ field: "clv" });
+    expect((result as { rows: unknown[] }).rows).toHaveLength(1);
+  });
+
+  test("non-JSON values are dropped by the packing boundary", async () => {
+    const result = await runGuestCell(
+      'return tools.query_profiles({ field: "clv", limit: 1, junk: () => 1 })',
+    );
+    expect((result as { rows: unknown[] }).rows).toHaveLength(1);
+    await expect(
+      runGuestCell("return tools.query_profiles(() => 1)"),
+    ).rejects.toThrow(/ARGUMENT_UNSUPPORTED|guest cell failed/);
+  });
+});

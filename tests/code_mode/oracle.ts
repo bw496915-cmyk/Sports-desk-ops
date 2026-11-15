@@ -81,6 +81,10 @@ const FIELDS: Readonly<
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** Own data property only, read once: inherited keys and getter re-reads are not arguments. */
+const ownValue = (source: Record<string, unknown>, key: string): unknown =>
+  Object.hasOwn(source, key) ? source[key] : undefined;
+
 const isField = (value: unknown): value is ProfileField =>
   typeof value === "string" && Object.hasOwn(FIELDS, value);
 
@@ -191,11 +195,13 @@ const compareRows = (left: OracleRow, right: OracleRow): number => {
 export function oracleQuery(args: unknown): OracleOutcome {
   if (!isRecord(args))
     return { ok: false, reason: "arguments must be an object" };
-  if (!isField(args.field)) return { ok: false, reason: "unknown field" };
-  const field = args.field;
-  const limit = resolveLimit(args.limit);
+  const fieldValue = ownValue(args, "field");
+  if (!isField(fieldValue)) return { ok: false, reason: "unknown field" };
+  const field = fieldValue;
+  const limitValue = ownValue(args, "limit");
+  const limit = resolveLimit(limitValue);
   if (!limit.ok) return { ok: false, reason: limit.reason };
-  const includeSentinels = args.includeSentinels === true;
+  const includeSentinels = ownValue(args, "includeSentinels") === true;
   const resolve = FIELDS[field];
 
   const rows: OracleRow[] = [];
@@ -211,7 +217,7 @@ export function oracleQuery(args: unknown): OracleOutcome {
   }
   rows.sort(compareRows);
 
-  const requested = typeof args.limit === "number" ? args.limit : DEFAULT_LIMIT;
+  const requested = typeof limitValue === "number" ? limitValue : DEFAULT_LIMIT;
   return {
     ok: true,
     result: {
@@ -263,7 +269,8 @@ export function assertQueryInvariants(
   args: unknown,
 ): asserts result is OracleQueryResult {
   if (!isRecord(result)) throw new Error("result is not an object");
-  if (result.field !== (isRecord(args) ? args.field : undefined)) {
+  const requestedField = isRecord(args) ? ownValue(args, "field") : undefined;
+  if (result.field !== requestedField) {
     throw new Error(
       `result.field ${String(result.field)} does not echo the requested field`,
     );
@@ -273,7 +280,7 @@ export function assertQueryInvariants(
   if (!Array.isArray(result.rows))
     throw new Error("result.rows is not an array");
 
-  const requested = isRecord(args) ? args.limit : undefined;
+  const requested = isRecord(args) ? ownValue(args, "limit") : undefined;
   if (requested === undefined) {
     if (result.truncated)
       throw new Error("truncated is true without a requested limit");
@@ -286,7 +293,8 @@ export function assertQueryInvariants(
   }
   if (result.rows.length > MAX_LIMIT) throw new Error("rows exceed MAX_LIMIT");
 
-  const includeSentinels = isRecord(args) && args.includeSentinels === true;
+  const includeSentinels =
+    isRecord(args) && ownValue(args, "includeSentinels") === true;
   let previous: number | null = null;
   for (const [index, row] of result.rows.entries()) {
     if (!isRecord(row)) throw new Error(`row #${index} is not an object`);
@@ -319,7 +327,15 @@ export function assertQueryInvariants(
 
 /** Exact comparison with the reference query; a mismatch names the first differing field. */
 export function assertMatchesOracle(actual: unknown, args: unknown): void {
-  const expected = oracleQuery(args);
+  // Normalize once so the oracle and the invariant checker see the same read of every argument.
+  const normalized = isRecord(args)
+    ? {
+        field: ownValue(args, "field"),
+        limit: ownValue(args, "limit"),
+        includeSentinels: ownValue(args, "includeSentinels"),
+      }
+    : args;
+  const expected = oracleQuery(normalized);
   if (!expected.ok) {
     if (!isToolErrorLike(actual)) {
       throw new Error(
@@ -330,7 +346,7 @@ export function assertMatchesOracle(actual: unknown, args: unknown): void {
   }
   if (isToolErrorLike(actual))
     throw new Error("valid request returned a ToolError");
-  assertQueryInvariants(actual, args);
+  assertQueryInvariants(actual, normalized);
   if (actual.truncated !== expected.result.truncated) {
     throw new Error(
       `truncated: expected ${expected.result.truncated}, got ${actual.truncated}`,

@@ -15,10 +15,13 @@
 
 import { readFileSync } from "node:fs";
 
-export const MAX_LIMIT = 500;
-export const DEFAULT_LIMIT = MAX_LIMIT;
+import {
+  DEFAULT_LIMIT,
+  MAX_LIMIT,
+  type ProfileField,
+} from "./profile_query_schema.ts";
 
-export type ProfileField = "clv" | "vol" | "sharp";
+export { DEFAULT_LIMIT, MAX_LIMIT, type ProfileField };
 
 export interface ProfileRecord {
   readonly id: string;
@@ -200,7 +203,7 @@ export function querySnapshot(
       Object.freeze({
         id: profile.id,
         value: sortValue(profile, field),
-        flags: profile.flags,
+        flags: Object.freeze([...profile.flags]),
         sentinel,
       }),
     );

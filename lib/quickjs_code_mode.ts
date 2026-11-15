@@ -26,6 +26,8 @@ const DEFAULT_MAX_TOOL_CALLS = 100;
 const DEFAULT_MEMORY_LIMIT_BYTES = 64 * 1024 * 1024;
 const MIN_MEMORY_LIMIT_BYTES = 1024 * 1024;
 const DEFAULT_MAX_STACK_BYTES = 1024 * 1024;
+/** Guest arguments are packed in the guest with this character budget before the host parses them. */
+const MAX_ARGUMENT_CHARS = 1_000_000;
 
 let quickJsModule: Promise<QuickJSWASMModule> | undefined;
 
@@ -81,13 +83,35 @@ export function toGuest(ctx: QuickJSContext, value: unknown): GuestValue {
 
 type HostTool = (args: unknown) => unknown;
 
-function installTools(ctx: QuickJSContext, maxToolCalls: number): void {
+function installTools(
+  ctx: QuickJSContext,
+  maxToolCalls: number,
+): readonly QuickJSHandle[] {
   const tools: Readonly<Record<string, HostTool>> = {
     query_profiles: (args) => queryProfiles(args),
     get_profile: (args) => getProfile(args),
     get_profile_summary: (args) => getSummary(args),
   };
   let calls = 0;
+
+  // Pack arguments in the guest, not the host: JSON.stringify runs under the guest's heap limit and
+  // a character budget, so a huge or deep object cannot exhaust host memory through ctx.dump. The
+  // host only parses the bounded text. (The guest probe itself still reads the realm directly.)
+  const pack = ctx.unwrapResult(
+    ctx.evalCode(
+      `(function(value) {
+        const text = JSON.stringify(value);
+        if (typeof text !== "string") {
+          throw new Error("ERR_CODE_MODE_ARGUMENT_UNSUPPORTED: arguments must be JSON-serialisable data");
+        }
+        if (text.length > ${MAX_ARGUMENT_CHARS}) {
+          throw new Error("ERR_CODE_MODE_ARGUMENT_TOO_LARGE: argument exceeds the ${MAX_ARGUMENT_CHARS}-character budget");
+        }
+        return text;
+      })`,
+      "argument-pack.js",
+    ),
+  );
 
   const toolsObject = ctx.newObject();
   for (const [name, hostTool] of Object.entries(tools)) {
@@ -99,7 +123,26 @@ function installTools(ctx: QuickJSContext, maxToolCalls: number): void {
         );
       }
       const [first] = argHandles;
-      const args = first === undefined ? undefined : ctx.dump(first);
+      let args: unknown;
+      if (first === undefined) {
+        args = undefined;
+      } else {
+        const packed = ctx.callFunction(pack, ctx.undefined, first);
+        if (packed.error) {
+          const message = describeGuestError(ctx, packed.error);
+          packed.error.dispose();
+          throw new Error(`ERR_CODE_MODE_ARGUMENT_UNSUPPORTED: ${message}`);
+        }
+        const text = ctx.getString(packed.value);
+        packed.value.dispose();
+        try {
+          args = JSON.parse(text);
+        } catch {
+          throw new Error(
+            "ERR_CODE_MODE_ARGUMENT_UNSUPPORTED: argument is not valid JSON data",
+          );
+        }
+      }
       const output = hostTool(args);
       return toGuest(ctx, output).handle;
     });
@@ -108,6 +151,7 @@ function installTools(ctx: QuickJSContext, maxToolCalls: number): void {
   }
   ctx.setProp(ctx.global, "tools", toolsObject);
   toolsObject.dispose();
+  return [pack];
 }
 
 /** QuickJS error objects dump as `{}`; read name/message handles before disposing. */
@@ -166,8 +210,9 @@ export async function runGuestCell(
     shouldInterruptAfterDeadline(Date.now() + timeoutMs),
   );
   const ctx = runtime.newContext();
+  let cleanup: readonly QuickJSHandle[] = [];
   try {
-    installTools(ctx, Math.floor(maxToolCalls));
+    cleanup = installTools(ctx, Math.floor(maxToolCalls));
     const result = ctx.evalCode(
       `(async function(){\n${source}\n})()`,
       "cell.js",
@@ -232,6 +277,7 @@ export async function runGuestCell(
     }
     return value;
   } finally {
+    for (const handle of cleanup) handle.dispose();
     ctx.dispose();
     runtime.dispose();
   }

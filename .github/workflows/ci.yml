@@ -187,6 +187,8 @@ jobs:
       - name: Code Mode gates (freeze, property tests, mutation, guest probe)
         env:
           GITHUB_BASE_REF: ${{ github.base_ref }}
+          # On a push, origin/main == HEAD in the checkout; the gate falls back to this SHA (or HEAD^).
+          GITHUB_EVENT_BEFORE: ${{ github.event_name == 'push' && github.event.before || '' }}
         run: bun run ci:code-mode
       - name: Upload mutation report
         if: always()

@@ -7,9 +7,13 @@
  * schema changes without `tests/code_mode/oracle.ts` changing, the suite would silently follow the
  * new contract instead of failing — so this gate fails first.
  *
- * Contract inputs (this repo's equivalent of `schema.ts`):
- *   - data/profile-snapshot.json      the 31-profile data contract
- *   - lib/profile_query_codemode.ts   the Code Mode argument schema (Zod)
+ * Contract inputs:
+ *   - data/profile-snapshot.json    the 31-profile data contract
+ *   - lib/profile_query_schema.ts   the Code Mode argument schema (Zod)
+ *
+ * Base selection: ORACLE_BASE_REF, then the push event's GITHUB_EVENT_BEFORE, then the PR base,
+ * then origin/main, then HEAD^. A base that resolves to HEAD (a push-to-main checkout) falls
+ * back to HEAD^ so the pushed commit is still compared with its parent.
  *
  *   bun run check:oracle-frozen
  *   ORACLE_BASE_REF=origin/main bun run check:oracle-frozen
@@ -21,7 +25,7 @@ import { existsSync } from "node:fs";
 const ORACLE = "tests/code_mode/oracle.ts";
 const CONTRACT_INPUTS = [
   "data/profile-snapshot.json",
-  "lib/profile_query_codemode.ts",
+  "lib/profile_query_schema.ts",
 ] as const;
 
 const git = (args: readonly string[]): { ok: boolean; stdout: string } => {
@@ -29,15 +33,39 @@ const git = (args: readonly string[]): { ok: boolean; stdout: string } => {
   return { ok: result.status === 0, stdout: result.stdout.trim() };
 };
 
-const baseRef =
-  process.env.ORACLE_BASE_REF ??
-  (process.env.GITHUB_BASE_REF
-    ? `origin/${process.env.GITHUB_BASE_REF}`
-    : "origin/main");
+const ZERO_SHA = /^0+$/;
+const explicitBase = (process.env.ORACLE_BASE_REF ?? "").trim();
+const eventBefore = (process.env.GITHUB_EVENT_BEFORE ?? "").trim();
+const pullBase = (process.env.GITHUB_BASE_REF ?? "").trim();
 
-const baseExists =
-  baseRef !== "" && git(["rev-parse", "--verify", "--quiet", baseRef]).ok;
-const committed = baseExists ? [`${baseRef}...HEAD`] : ["HEAD"];
+const resolve = (ref: string): string => {
+  const result = git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
+  return result.ok ? result.stdout : "";
+};
+const head = resolve("HEAD");
+
+const candidates = [
+  explicitBase,
+  eventBefore !== "" && !ZERO_SHA.test(eventBefore) ? eventBefore : "",
+  pullBase !== "" ? `origin/${pullBase}` : "",
+  "origin/main",
+].filter((candidate) => candidate !== "");
+
+let baseRef = "";
+for (const candidate of candidates) {
+  const sha = resolve(candidate);
+  if (sha === "") continue;
+  if (sha === head) {
+    // A push-to-main checkout has origin/main == HEAD; compare the pushed commit to its parent.
+    if (resolve("HEAD^") !== "") baseRef = "HEAD^";
+    continue;
+  }
+  baseRef = candidate;
+  break;
+}
+if (baseRef === "" && resolve("HEAD^") !== "") baseRef = "HEAD^";
+
+const committed = baseRef !== "" ? [`${baseRef}...HEAD`] : ["HEAD"];
 const diff = git(["diff", "--name-only", ...committed]);
 if (!diff.ok) {
   console.error(
@@ -85,7 +113,7 @@ if (contractChanges.length > 0 && !oracleChanged) {
   process.exit(1);
 }
 
-const comparison = baseExists ? `${baseRef}...HEAD` : "HEAD (working tree)";
+const comparison = baseRef !== "" ? `${baseRef}...HEAD` : "HEAD (working tree)";
 console.log(
   `check:oracle-frozen: ok — ${contractChanges.length} contract change(s) against ${comparison}, oracle ${oracleChanged ? "updated" : "unchanged"}`,
 );
