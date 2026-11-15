@@ -13,6 +13,7 @@ import {
   formatProvenanceBadge,
   hydrateDashboardFeeds,
   LiveWagersTabPanel,
+  normalizeHydratedWagerRow,
   SAMPLE_PROFILE_DATA,
 } from "@sportsdesk-ops/ui";
 
@@ -137,6 +138,18 @@ function buildHydrationApi(options: {
     getBuildMatrix: async () => [],
   });
 }
+
+describe("normalizeHydratedWagerRow CLV", () => {
+  test("keeps unknown CLV as null", () => {
+    expect(normalizeHydratedWagerRow({ ticketId: "1" }, 0).clvCents).toBeNull();
+  });
+
+  test("keeps a real CLV value", () => {
+    expect(
+      normalizeHydratedWagerRow({ ticketId: "1", clvCents: 8 }, 0).clvCents,
+    ).toBe(8);
+  });
+});
 
 describe("formatProvenanceBadge staleness", () => {
   const now = Date.parse("2026-11-14T12:00:00Z");
@@ -295,8 +308,49 @@ describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero po
         error: fixtureBundle.customers.error,
       });
       expect(cards.every((c) => c.value === "Unavailable")).toBe(true);
+      expect(cards.every((c) => c.status === "unavailable")).toBe(true);
+      expect(cards.every((c) => c.count === null && c.sharePct === null)).toBe(
+        true,
+      );
       expect(cards[0]?.sub).toContain("HTTP 503");
     }
+
+    const readyCards = deriveCustomerCohortKpiCards({
+      status: "ready",
+      report: {
+        cohorts: {
+          backtestCount: 49,
+          keyNumberSharpsCount: 5,
+          hookSyndicateCount: 5,
+          fixtureCount: 6,
+          fullBookSpecCount: 220,
+          uniqueSurveillanceCount: 500,
+        },
+        backtestTop: [],
+        fixtures: [],
+        provenance: {
+          kind: "capture",
+          label: "Local Capture",
+          sourcePath: "data/live.json",
+          observedAt: "2026-11-14T00:00:00Z",
+        },
+      },
+    });
+    expect(readyCards[0]).toMatchObject({
+      id: "backtest",
+      status: "ready",
+      tone: "sky",
+      count: 49,
+      sharePct: 9.8,
+      filterTier: "ALL",
+    });
+    expect(readyCards[1]).toMatchObject({
+      id: "key-number-sharps",
+      tone: "red",
+      count: 5,
+      sharePct: 1,
+      filterTier: "ELITE",
+    });
 
     const fallbackBadge = formatProvenanceBadge({
       kind: "fallback",

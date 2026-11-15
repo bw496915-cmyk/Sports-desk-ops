@@ -47,7 +47,8 @@ export interface HydratedWagerRow {
   readonly oddsAmerican: string;
   readonly riskUsd: number;
   readonly toWinUsd: number;
-  readonly clvCents: number;
+  /** Real CLV in cents, or null when the source carries no closing-line comparison. */
+  readonly clvCents: number | null;
   readonly alertTier: WagerTier;
   readonly alertBadge: string;
   readonly operatorDirective: string;

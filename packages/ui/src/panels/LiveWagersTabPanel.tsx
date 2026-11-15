@@ -411,7 +411,17 @@ export function LiveWagersTabPanel({
                   } else if (wagerSortField === "toWinUsd") {
                     cmp = a.toWinUsd - b.toWinUsd;
                   } else if (wagerSortField === "clvCents") {
-                    cmp = a.clvCents - b.clvCents;
+                    // Unknown CLV sorts last in both directions rather than pretending to be 0.
+                    if (a.clvCents === null || b.clvCents === null) {
+                      return a.clvCents === null
+                        ? b.clvCents === null
+                          ? 0
+                          : 1
+                        : -1;
+                    }
+                    return wagerSortDir === "asc"
+                      ? a.clvCents - b.clvCents
+                      : b.clvCents - a.clvCents;
                   } else if (wagerSortField === "alertTier") {
                     cmp =
                       (TIER_ORDER[a.alertTier] ?? 0) -
@@ -557,14 +567,20 @@ export function LiveWagersTabPanel({
                         style={{
                           fontWeight: 700,
                           color:
-                            w.clvCents > 0
-                              ? w.clvCents >= 10
-                                ? "#ef4444"
-                                : "#f59e0b"
-                              : "#4ade80",
+                            w.clvCents === null
+                              ? "#94a3b8"
+                              : w.clvCents > 0
+                                ? w.clvCents >= 10
+                                  ? "#ef4444"
+                                  : "#f59e0b"
+                                : "#4ade80",
                         }}
                       >
-                        {w.clvCents > 0 ? `+${w.clvCents}¢` : `${w.clvCents}¢`}
+                        {w.clvCents === null
+                          ? "—"
+                          : w.clvCents > 0
+                            ? `+${w.clvCents}¢`
+                            : `${w.clvCents}¢`}
                       </span>
                     </td>
                     <td style={styles.td}>
@@ -752,16 +768,20 @@ export function LiveWagersTabPanel({
                   style={{
                     fontWeight: 700,
                     color:
-                      selectedWager.clvCents > 0
-                        ? selectedWager.clvCents >= 10
-                          ? "#ef4444"
-                          : "#f59e0b"
-                        : "#4ade80",
+                      selectedWager.clvCents === null
+                        ? "#94a3b8"
+                        : selectedWager.clvCents > 0
+                          ? selectedWager.clvCents >= 10
+                            ? "#ef4444"
+                            : "#f59e0b"
+                          : "#4ade80",
                   }}
                 >
-                  {selectedWager.clvCents > 0
-                    ? `+${selectedWager.clvCents}¢`
-                    : `${selectedWager.clvCents}¢`}
+                  {selectedWager.clvCents === null
+                    ? "— (no closing line)"
+                    : selectedWager.clvCents > 0
+                      ? `+${selectedWager.clvCents}¢`
+                      : `${selectedWager.clvCents}¢`}
                 </span>
               </div>
             </div>

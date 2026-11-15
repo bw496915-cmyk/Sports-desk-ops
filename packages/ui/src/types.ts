@@ -156,7 +156,8 @@ export interface LiveWager {
   readonly riskUsd: number;
   readonly volumeUsd?: number | undefined;
   readonly toWinUsd: number;
-  readonly clvCents: number;
+  /** Real CLV in cents, or null when the source carries no closing-line comparison. */
+  readonly clvCents: number | null;
   readonly vip?: boolean | undefined;
   readonly alertTier: WagerTier;
   readonly alertBadge: string;
