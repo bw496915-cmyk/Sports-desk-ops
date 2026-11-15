@@ -13,6 +13,18 @@ implementation. It throws at import when the profile count or sentinel ids drift
 document is versioned: the parser rejects an unknown `schemaVersion`, an untrimmed id, duplicate
 ids and non-finite values.
 
+The committed snapshot is **synthetic** (27 pseudonymous `P###` profiles plus 4 `SYNTH_*`): no
+customer login, agent id or P/L is in the repository. For a deployment that needs real profiles,
+project the gitignored operator book locally and point the tool at it:
+
+```sh
+bun run scripts/generate_profile_snapshot.ts --from-book --out data/profile-snapshot.real.json
+PROFILE_SNAPSHOT_PATH=data/profile-snapshot.real.json <entrypoint>
+```
+
+The tool loads the snapshot lazily, so importing it never fails on a host without one; using it
+without `PROFILE_SNAPSHOT_PATH` reports the missing path.
+
 The tracked argument contract is [lib/profile_query_schema.ts](../../lib/profile_query_schema.ts)
 (the repository's `schema.ts`): the tool, the Code Mode registration and the tests import it, and
 the freeze gate watches it (plus the snapshot). The oracle deliberately duplicates its constants.
@@ -21,9 +33,8 @@ On a push-to-main checkout, where `origin/main` equals `HEAD`, the gate falls ba
 
 To re-freeze deliberately after a contract change:
 
-1. `bun run scripts/generate_profile_snapshot.ts` (rebuilds the snapshot from the operator book;
-   `data/customer-profiles.json` is gitignored and absent in CI). `bun run
-check:profile-snapshot` fails when the committed artifact no longer matches the book.
+1. `bun run scripts/generate_profile_snapshot.ts` (writes the deterministic synthetic fixture).
+   `bun run check:profile-snapshot` fails when the committed fixture is stale.
 2. Update `EXPECTED_PROFILE_COUNT` / `EXPECTED_SENTINEL_IDS` in `oracle.ts` if they moved.
 3. Run `bun run check:oracle-frozen` — a snapshot or argument-schema change without an oracle
    change fails the gate.
@@ -61,9 +72,13 @@ Property runs default to 100 cases; override with `FAST_CHECK_NUM_RUNS` and pin 
 with `FAST_CHECK_SEED`.
 
 Mutation covers both `lib/profile_query_tools.ts` and the QuickJS bridge `lib/quickjs_code_mode.ts`
-(host-to-guest marshalling, option normalization, budgets and deadlines). It runs in place because
-the sandbox cannot resolve Stryker's TypeScript preprocessor under this repo's isolated linker;
-the gate script restores the executable bits and symlinks that in-place restore strips. The HTML
+(host-to-guest marshalling, option normalization, budgets and deadlines). It runs under **Bun**
+(`bunx stryker run`): Stryker's documented Node runtime cannot load the Bun runner in this repo
+because the security override `ws: 5.2.5` breaks the runner's ESM named import; Bun's CJS interop
+handles it. If the override is ever scoped for the runner, Node 22 can be used instead. It is in
+place because the sandbox cannot resolve Stryker's TypeScript preprocessor under this repo's
+isolated linker; the gate script restores the executable bits and symlinks that in-place restore
+strips. The HTML
 report is written to `reports/mutation/mutation.html` (force-added; `reports/` is gitignored).
 
 ## Sandbox boundary

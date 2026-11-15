@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import { runGuestCell } from "../../lib/quickjs_code_mode.ts";
-import { assertMatchesOracle, oracleSummary } from "./oracle.ts";
+import {
+  assertMatchesOracle,
+  firstRegularProfile,
+  oracleSummary,
+} from "./oracle.ts";
 import { BANNED_GUEST_GLOBALS, probeGuestGlobals } from "./guest_probe.ts";
+
+const SAMPLE = firstRegularProfile();
 
 describe("QuickJS guest boundary", () => {
   test("guest globalThis does not expose host capabilities", async () => {
@@ -33,9 +39,9 @@ describe("QuickJS guest boundary", () => {
 
   test("a guest cell sees the same frozen profile as the host", async () => {
     const guest = await runGuestCell(
-      'return tools.get_profile({ id: "BGD101" })',
+      "return tools.get_profile({ id: " + JSON.stringify(SAMPLE.id) + " })",
     );
-    expect(guest).toMatchObject({ id: "BGD101", vol: 1 });
+    expect(guest).toMatchObject({ id: SAMPLE.id, vol: SAMPLE.vol });
     expect((guest as { flags?: unknown }).flags).toBeArray();
   });
 
@@ -56,7 +62,9 @@ describe("sandbox resource and isolation guarantees", () => {
   test("the tool-call budget stops a runaway cell", async () => {
     await expect(
       runGuestCell(
-        'for (let i = 0; i < 10; i += 1) tools.get_profile({ id: "BGD101" }); return "ok";',
+        "for (let i = 0; i < 10; i += 1) tools.get_profile({ id: " +
+          JSON.stringify(SAMPLE.id) +
+          ' }); return "ok";',
         { maxToolCalls: 3 },
       ),
     ).rejects.toThrow(/ERR_CODE_MODE_MAX_CALLS/);
@@ -70,19 +78,23 @@ describe("sandbox resource and isolation guarantees", () => {
 
   test("guest mutation of a tool result cannot reach the host snapshot", async () => {
     const before = await runGuestCell(
-      'const p = tools.get_profile({ id: "BGD101" }); p.flags.push("hacked"); p.vol = -1; return p.flags.length;',
+      "const p = tools.get_profile({ id: " +
+        JSON.stringify(SAMPLE.id) +
+        ' }); p.flags.push("hacked"); p.vol = -1; return p.flags.length;',
     );
-    expect(before).toBe(2);
+    expect(before).toBe(SAMPLE.flags.length + 1);
     const after = await runGuestCell(
-      'return tools.get_profile({ id: "BGD101" })',
+      "return tools.get_profile({ id: " + JSON.stringify(SAMPLE.id) + " })",
     );
-    expect(after).toMatchObject({ id: "BGD101", vol: 1 });
+    expect(after).toMatchObject({ id: SAMPLE.id, vol: SAMPLE.vol });
     expect((after as { flags: string[] }).flags).not.toContain("hacked");
   });
 
   test("the Function constructor stays inside the guest realm", async () => {
     const kind = await runGuestCell(
-      'const p = tools.get_profile({ id: "BGD101" }); return p.constructor.constructor("return typeof process")();',
+      "const p = tools.get_profile({ id: " +
+        JSON.stringify(SAMPLE.id) +
+        ' }); return p.constructor.constructor("return typeof process")();',
     );
     expect(kind).toBe("undefined");
   });
@@ -135,7 +147,9 @@ describe("async cells and resource ceilings", () => {
 
   test("the tool-call budget is per cell, not process-wide", async () => {
     const cell =
-      'for (let i = 0; i < 3; i += 1) tools.get_profile({ id: "BGD101" }); return "ok";';
+      "for (let i = 0; i < 3; i += 1) tools.get_profile({ id: " +
+      JSON.stringify(SAMPLE.id) +
+      ' }); return "ok";';
     expect(await runGuestCell(cell, { maxToolCalls: 3 })).toBe("ok");
     expect(await runGuestCell(cell, { maxToolCalls: 3 })).toBe("ok");
   });
@@ -157,9 +171,13 @@ describe("option normalization and error shapes", () => {
 
   test("the tool budget is exact and floors fractional values", async () => {
     const twoCalls =
-      'for (let i = 0; i < 2; i += 1) tools.get_profile({ id: "BGD101" }); return "ok";';
+      "for (let i = 0; i < 2; i += 1) tools.get_profile({ id: " +
+      JSON.stringify(SAMPLE.id) +
+      ' }); return "ok";';
     const threeCalls =
-      'for (let i = 0; i < 3; i += 1) tools.get_profile({ id: "BGD101" }); return "ok";';
+      "for (let i = 0; i < 3; i += 1) tools.get_profile({ id: " +
+      JSON.stringify(SAMPLE.id) +
+      ' }); return "ok";';
     expect(await runGuestCell(twoCalls, { maxToolCalls: 2 })).toBe("ok");
     await expect(runGuestCell(threeCalls, { maxToolCalls: 2 })).rejects.toThrow(
       /MAX_CALLS/,

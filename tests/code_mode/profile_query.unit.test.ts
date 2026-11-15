@@ -14,11 +14,14 @@ import {
   EXPECTED_PROFILE_COUNT,
   EXPECTED_SENTINEL_IDS,
   MAX_LIMIT as ORACLE_MAX_LIMIT,
+  firstRegularProfile,
   assertMatchesOracle,
   oracleGetProfile,
   oracleSummary,
   snapshotProfiles,
 } from "./oracle.ts";
+
+const SAMPLE_ID = firstRegularProfile().id;
 
 const execute = async (args: unknown): Promise<unknown> => {
   try {
@@ -195,9 +198,9 @@ describe("field validation", () => {
 
 describe("get_profile and get_profile_summary", () => {
   test("get_profile returns the frozen record and rejects unknown ids", async () => {
-    const profile = await getProfileTool.execute({ id: " BGD101 " });
-    expect(profile.id).toBe("BGD101");
-    expect(oracleGetProfile("BGD101")).toMatchObject(profile);
+    const profile = await getProfileTool.execute({ id: " " + SAMPLE_ID + " " });
+    expect(profile.id).toBe(SAMPLE_ID);
+    expect(oracleGetProfile(SAMPLE_ID)).toMatchObject(profile);
     await expect(getProfileTool.execute({ id: "NOPE" })).rejects.toThrow(
       /unknown id/,
     );
@@ -207,10 +210,10 @@ describe("get_profile and get_profile_summary", () => {
   });
 
   test("returned records are frozen and cannot corrupt the snapshot", async () => {
-    const first = await getProfileTool.execute({ id: "BGD101" });
+    const first = await getProfileTool.execute({ id: SAMPLE_ID });
     expect(Object.isFrozen(first)).toBe(true);
     expect(Object.isFrozen(first.flags)).toBe(true);
-    const second = await getProfileTool.execute({ id: "BGD101" });
+    const second = await getProfileTool.execute({ id: SAMPLE_ID });
     expect(second).toEqual(first);
   });
 
@@ -247,7 +250,7 @@ describe("error surface", () => {
     for (const args of [
       [],
       42,
-      "BGD101",
+      SAMPLE_ID,
       null,
       {},
       { id: 5 },
@@ -277,15 +280,15 @@ describe("flag and sentinel semantics", () => {
   };
 
   test("row flags equal the snapshot's flags, not a filtered or empty copy", async () => {
-    const expected = oracleProfile("BGD101").flags;
+    const expected = oracleProfile(SAMPLE_ID).flags;
     expect(expected.length).toBeGreaterThan(0);
-    const profile = await getProfileTool.execute({ id: "BGD101" });
+    const profile = await getProfileTool.execute({ id: SAMPLE_ID });
     expect([...profile.flags]).toEqual([...expected]);
     const result = await queryProfilesTool.execute({
       field: "clv",
       includeSentinels: true,
     });
-    const row = result.rows.find((entry) => entry.id === "BGD101");
+    const row = result.rows.find((entry) => entry.id === SAMPLE_ID);
     expect(row?.flags).toEqual([...expected]);
   });
 
@@ -338,14 +341,14 @@ describe("get_profile argument hardening", () => {
     const args = {
       get id() {
         reads += 1;
-        return reads === 1 ? "BGD101" : 42;
+        return reads === 1 ? SAMPLE_ID : 42;
       },
     };
     const profile = await getProfileTool.execute(args);
     expect(reads).toBe(1);
-    expect(profile.id).toBe("BGD101");
+    expect(profile.id).toBe(SAMPLE_ID);
 
-    const inherited = Object.create({ id: "BGD101" }) as Record<
+    const inherited = Object.create({ id: SAMPLE_ID }) as Record<
       string,
       unknown
     >;

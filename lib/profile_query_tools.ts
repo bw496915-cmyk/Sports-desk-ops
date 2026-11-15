@@ -14,6 +14,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import {
   DEFAULT_LIMIT,
@@ -130,14 +131,33 @@ export function parseProfileSnapshot(raw: unknown): readonly ProfileRecord[] {
 
 const SNAPSHOT_SCHEMA_VERSION = 1;
 
-const SNAPSHOT: readonly ProfileRecord[] = parseProfileSnapshot(
-  JSON.parse(
-    readFileSync(
-      new URL("../data/profile-snapshot.json", import.meta.url),
-      "utf8",
-    ),
-  ),
-);
+const SNAPSHOT_ENV = (process.env.PROFILE_SNAPSHOT_PATH ?? "").trim();
+const SNAPSHOT_PATH: string | URL =
+  SNAPSHOT_ENV !== ""
+    ? resolve(SNAPSHOT_ENV)
+    : new URL("../data/profile-snapshot.json", import.meta.url);
+
+let cachedSnapshot: readonly ProfileRecord[] | undefined;
+
+/**
+ * Loaded on first use: importing the module never fails on a deployment that has no snapshot, and
+ * a local operator can point PROFILE_SNAPSHOT_PATH at a real projection of the book.
+ */
+function snapshot(): readonly ProfileRecord[] {
+  if (cachedSnapshot !== undefined) return cachedSnapshot;
+  let text: string;
+  try {
+    text = readFileSync(SNAPSHOT_PATH, "utf8");
+  } catch {
+    throw new Error(
+      "profile snapshot: cannot read " +
+        String(SNAPSHOT_PATH) +
+        " — set PROFILE_SNAPSHOT_PATH to a production snapshot",
+    );
+  }
+  cachedSnapshot = parseProfileSnapshot(JSON.parse(text));
+  return cachedSnapshot;
+}
 
 const FIELD_NAMES: ReadonlySet<string> = new Set(["clv", "vol", "sharp"]);
 const SENTINEL_PREFIX = "SYNTH_";
@@ -223,7 +243,7 @@ export function querySnapshot(
 
 /** Sync core shared by the MCP tool wrapper and the QuickJS bridge. */
 export function queryProfiles(args: unknown): ProfileQueryResult {
-  return querySnapshot(SNAPSHOT, args);
+  return querySnapshot(snapshot(), args);
 }
 
 export function getProfile(args: unknown): ProfileRecord {
@@ -235,7 +255,7 @@ export function getProfile(args: unknown): ProfileRecord {
     throw new ToolError("get_profile: id required");
   }
   const id = rawId.trim();
-  const found = SNAPSHOT.find((profile) => profile.id === id);
+  const found = snapshot().find((profile) => profile.id === id);
   if (found === undefined) {
     throw new ToolError(`get_profile: unknown id ${id}`);
   }
@@ -249,7 +269,7 @@ export function getSummary(args: unknown): ProfileSummary {
   }
   let deltaVol = 0;
   let deltaNet = 0;
-  for (const profile of SNAPSHOT) {
+  for (const profile of snapshot()) {
     if (isProfileSentinel(profile)) continue;
     deltaVol += profile.vol;
     deltaNet += profile.clv;

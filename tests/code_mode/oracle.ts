@@ -24,10 +24,10 @@ export const DEFAULT_LIMIT = MAX_LIMIT;
 /** Re-freeze deliberately when the snapshot changes; the suite must not follow the data. */
 export const EXPECTED_PROFILE_COUNT = 31;
 export const EXPECTED_SENTINEL_IDS: readonly string[] = Object.freeze([
-  "SYNTH_REC_03",
-  "SYNTH_REC_04",
-  "SYNTH_SNIPER_02",
-  "SYNTH_SYN_01",
+  "SYNTH_01",
+  "SYNTH_02",
+  "SYNTH_03",
+  "SYNTH_04",
 ]);
 
 export type ProfileField = "clv" | "vol" | "sharp";
@@ -160,6 +160,15 @@ if (
 
 export function snapshotProfiles(): readonly OracleProfile[] {
   return SNAPSHOT;
+}
+
+/** The first non-sentinel profile, for tests that need a concrete id without hardcoding one. */
+export function firstRegularProfile(): OracleProfile {
+  const profile = SNAPSHOT.find((entry) => !entry.id.startsWith("SYNTH_"));
+  if (profile === undefined) {
+    throw new Error("oracle snapshot has no regular profile");
+  }
+  return profile;
 }
 
 export function isSentinelProfile(id: string): boolean {

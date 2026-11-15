@@ -255,7 +255,7 @@
     "audit:archives": "bun run scripts/audit_archives.ts",
     "audit:ops": "bun run scripts/audit_release.ts && bun run scripts/audit_archives.ts",
     "test:docs": "bun test tests/api_reference.test.ts tests/docs_evidence.test.ts",
-    "test:code-mode": "bun test tests/code_mode",
+    "test:code-mode": "bun test tests/code_mode/*.test.ts",
     "mutation:code-mode": "stryker run; rc=$?; bun run scripts/ci/restore_after_stryker.ts; exit $rc",
     "probe:code-mode": "bun run tests/code_mode/guest_probe.ts",
     "check:oracle-frozen": "bun run scripts/ci/check_oracle_frozen.ts",
@@ -401,7 +401,6 @@
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
     "pele": "1.9.0",
-    "quickjs-emscripten": "0.32.0",
     "semver": "7.8.6",
     "sportsdesk-ops": "workspace:packages/sportsdesk-ops",
     "typescript": "5.9.3"
@@ -424,6 +423,7 @@
     "cytoscape": "3.30.2",
     "cytoscape-elk": "2.3.0",
     "elkjs": "0.12.1",
+    "quickjs-emscripten": "0.32.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "zod": "4.6.7"

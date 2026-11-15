@@ -108,3 +108,6 @@ pages.env
 
 # Stryker mutation scratch (restored files + backups).
 .stryker-tmp/
+
+# Local real projection of the operator book (never commit: customer data).
+data/profile-snapshot.real.json

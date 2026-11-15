@@ -14,8 +14,8 @@ fi
 echo "== [1/5] oracle freeze gate =="
 bun run check:oracle-frozen
 
-echo "== [2/5] bun test tests/code_mode =="
-bun test tests/code_mode
+echo "== [2/5] bun test tests/code_mode/*.test.ts =="
+bun test tests/code_mode/*.test.ts
 
 echo "== [3/5] stryker run (thresholds: high 80 / low 60 / break 60) =="
 stryker_rc=0
