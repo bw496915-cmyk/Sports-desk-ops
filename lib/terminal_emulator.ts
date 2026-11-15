@@ -39,10 +39,7 @@ import {
 } from "./canonical_osc8_links.ts";
 import { formatHalfPointLine } from "../design/domain-branded-types.ts";
 import { padDisplay } from "./cli_inspect.ts";
-import {
-  harvestLiveCustomerProfiles,
-  synthesizeLiveCustomerProfile,
-} from "./live_profile_harvester.ts";
+import { harvestLiveCustomerProfiles } from "./live_profile_harvester.ts";
 import { TIER, SURFACE, composite, type WagerTier } from "./wager_tokens.ts";
 
 const FG = (c: string) =>
@@ -1686,7 +1683,7 @@ async function executeTerminalQueryInner(
     }
     rows.push(
       "└────────────┴────────────┴────────────┴───────┴────────────┴──────────────┴─────────┴────────────────────────────────────────┘",
-      `\x1b[90mTip: Type 'p <ID>' (e.g. 'p VIPM126', 'p WC8036', 'p GL205', 'p BS161') to inspect any live or DOD6 spine profile.\x1b[0m`,
+      `\x1b[90mTip: Type 'p <ID>' to inspect a profile, or 'harvest --all' to widen the scan.\x1b[0m`,
     );
     return {
       command: trimmed,
@@ -1703,8 +1700,7 @@ async function executeTerminalQueryInner(
     const idArg = cmdArgs.find((a) => !a.startsWith("-")) || "GP301";
     const upperId = idArg.toUpperCase();
 
-    let cust: TerminalCustomerRecord | undefined =
-      KNOWN_CUSTOMER_MAP.get(upperId);
+    const cust = KNOWN_CUSTOMER_MAP.get(upperId);
     if (!cust) {
       // Check behavioral profiles
       const keyProf =
@@ -1732,19 +1728,13 @@ async function executeTerminalQueryInner(
         };
       }
 
-      // Dynamic synthesis from 24h live wagers + 14,534-customer DOD6 v5.4 binary spine
-      const synthesized = await synthesizeLiveCustomerProfile(upperId);
-      if (synthesized) {
-        cust = synthesized;
-      } else {
-        return {
-          command: trimmed,
-          stdout: `\x1b[33mCustomer '${idArg}' not found in local active profile matrix.\x1b[0m\n\x1b[90mTry: profile GP301, profile BRT5229, profile VIPM126, or type 'harvest' / 'find <query>'\x1b[0m`,
-          exitCode: 1,
-          durationMs: Date.now() - startedAt,
-          timestamp: startedAt,
-        };
-      }
+      return {
+        command: trimmed,
+        stdout: `\x1b[33mCustomer '${idArg}' not found in local active profile matrix.\x1b[0m\n\x1b[90mTry: profile GP301, profile BRT5229, or type 'harvest' / 'find <query>'\x1b[0m`,
+        exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
     }
 
     // Flag: --json

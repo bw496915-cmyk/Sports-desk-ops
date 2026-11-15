@@ -1210,8 +1210,11 @@ export async function runLivePositionsPulse(options?: {
       resolve(REPO_ROOT, "reports/harvested-live-profiles.json"),
       `${JSON.stringify(harvested, null, 2)}\n`,
     );
-  } catch {
-    // Non-fatal: keep cron resilient if optional spine files are busy
+  } catch (error) {
+    // Non-fatal for the pulse, but never silent: the run log must say the artifact was skipped.
+    console.error(
+      `[positions] harvest skipped: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   const journalPath = options?.journalPath ?? DEFAULT_JOURNAL_PATH;

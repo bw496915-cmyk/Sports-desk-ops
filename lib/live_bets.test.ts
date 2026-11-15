@@ -603,6 +603,44 @@ describe("Pass 2 parlay deduplication, canonical brands & desk risk bridge", () 
     expect(gapEval.degradedPending[0]?.hasCoercionError).toBe(true);
   });
 
+  test("flags a partially captured parlay instead of reading it as complete", () => {
+    const partial: PendingRow[] = [
+      {
+        TicketNumber: "88001",
+        WagerNumber: "1",
+        customerID: "CUST_PARTIAL",
+        WagerStatus: "P",
+        WagerType: "P",
+        AmountWagered: 25000,
+        ToWinAmount: 150000,
+        FinalMoney: 600,
+        totalPicks: 3,
+        Team1ID: "Lakers",
+        Team2ID: "Celtics",
+        ChosenTeamID: "Lakers",
+        Team1RotNum: 5501,
+        Team2RotNum: 5502,
+        AdjSpread: -3.5,
+      },
+    ];
+
+    const [ticket] = dedupeParentPendingTickets(partial);
+    expect(ticket).toBeDefined();
+    expect(ticket?.totalPicks).toBe(3);
+    expect(ticket?.observedLegs).toBe(1);
+    expect(ticket?.missingPicks).toBe(2);
+    expect(ticket?.hasCoercionError).toBe(true);
+
+    const bridged = bridgePendingRowsToDesk(partial, {
+      maxStakeCents: parseAsCents(50000),
+    });
+    const evaluation = evaluateDeskRisk(bridged.desk);
+    expect(evaluation.degradedPending).toHaveLength(1);
+    expect(evaluation.degradedPending[0]?.hasCoercionError).toBe(true);
+    // Under the limit, so it is degraded rather than reported at max — but never silent.
+    expect(evaluation.pendingAtMax).toHaveLength(0);
+  });
+
   test("evaluates parent-level parlay exposure once with structured legs and Arsenal alert", () => {
     const parlay2AtMax: PendingRow[] = [
       {

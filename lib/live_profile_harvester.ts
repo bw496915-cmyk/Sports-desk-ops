@@ -42,12 +42,22 @@ export interface HarvestedSampleWager {
   readonly sport: string;
   readonly market: string;
   readonly line: string;
-  readonly clvBps: number;
+  /** Measured closing-line value in bps; null when no closing-line comparison exists. */
+  readonly clvBps: number | null;
   readonly stakeUsd: number;
   readonly netUsd: number;
-  readonly time: string;
+  /** Source timestamp, or null when the input carried none. */
+  readonly time: string | null;
 }
 
+/**
+ * A profile derived from the 24h live window and the DOD6 spine.
+ *
+ * `score`, `tier`, `var95Usd`, `cvar95Usd`, `recommendedLimitUsd`, `inPlayDelaySec`,
+ * `lineShadeCents`, `shadowCopyMultiplier`, `syndicateProb` and the archetype strings are
+ * heuristic model outputs, not measurements; they are only as honest as the inputs above
+ * (a null `dodClvBps` means unmeasured, never zero).
+ */
 export interface HarvestedLiveProfile {
   readonly id: string;
   readonly canonicalId: string;
@@ -83,7 +93,6 @@ export interface HarvestedLiveProfile {
   readonly lineShadeCents: number;
   readonly shadowCopyMultiplier: number;
   readonly action: "ALERT_OPERATOR" | "MONITOR" | "ALLOW";
-  readonly ipAddress: string;
   readonly openRisk24hUsd: number;
   readonly openTickets24h: number;
   readonly pointBuyingTickets: number;
@@ -122,6 +131,8 @@ interface RawAccumulator {
   openToWin24hCents: number;
   openTickets24h: number;
   liveWagerStakesUsd: number[];
+  /** Epoch ms of each counted wager; empty when the source carried no timestamp. */
+  wagerTimesMs: number[];
   pointBuyingTickets: number;
   teaserTickets: number;
   alertMirrorTriggers: number;
@@ -161,7 +172,7 @@ async function getDodReader(
 }
 
 function computeGini(stakes: readonly number[]): number {
-  if (stakes.length <= 1) return 0.08;
+  if (stakes.length <= 1) return 0;
   const sorted = [...stakes].sort((a, b) => a - b);
   const n = sorted.length;
   let sum = 0;
@@ -171,7 +182,7 @@ function computeGini(stakes: readonly number[]): number {
     sum += val;
     weightedSum += (i + 1) * val;
   }
-  if (sum <= 0) return 0.08;
+  if (sum <= 0) return 0;
   const g = (2 * weightedSum) / (n * sum) - (n + 1) / n;
   return Number(Math.max(0.01, Math.min(0.95, g)).toFixed(3));
 }
@@ -214,6 +225,23 @@ function resolveMasterAgent(
   return curr;
 }
 
+/** Largest number of wagers that fall inside any `windowMs` span. */
+function maxWagersInWindow(
+  timesMs: readonly number[],
+  windowMs: number,
+): number {
+  if (timesMs.length < 2) return timesMs.length;
+  const sorted = [...timesMs].sort((a, b) => a - b);
+  let best = 0;
+  let start = 0;
+  for (let end = 0; end < sorted.length; end++) {
+    while (sorted[end]! - sorted[start]! > windowMs) start++;
+    const count = end - start + 1;
+    if (count > best) best = count;
+  }
+  return best;
+}
+
 function buildProfileFromAccumulator(
   acc: RawAccumulator,
   agentRiskMap: ReadonlyMap<string, number>,
@@ -222,6 +250,7 @@ function buildProfileFromAccumulator(
   hasDodMatch: boolean,
 ): HarvestedLiveProfile {
   const flags: LiveAnomalyFlag[] = [];
+  const burstCount = maxWagersInWindow(acc.wagerTimesMs, 10 * 60_000);
   const liveTickerSumUsd = acc.liveWagerStakesUsd.reduce((s, x) => s + x, 0);
   const openRiskUsd = Math.max(
     Math.round(acc.openRisk24hCents / 100),
@@ -241,7 +270,8 @@ function buildProfileFromAccumulator(
   if (acc.pointBuyingTickets > 0 || acc.teaserTickets > 0) {
     flags.push("KEY_NUMBER_HOOK_BUYER");
   }
-  if (acc.liveWagerStakesUsd.length >= 3 || acc.alertMirrorTriggers > 0) {
+  // 3+ wagers inside one 10-minute window; a 24h ticket count is not a burst.
+  if (burstCount >= 3 || acc.alertMirrorTriggers > 0) {
     flags.push("VELOCITY_BURST_SNIPER");
   }
 
@@ -410,7 +440,7 @@ function buildProfileFromAccumulator(
             : `${topSport} Spread & Total Syndicate Action`;
 
   const timingArchetype =
-    acc.liveWagerStakesUsd.length >= 5
+    burstCount >= 5
       ? "HIGH_FREQUENCY_STEAM_BURST"
       : acc.gsliveTickets > 0
         ? "IN_PLAY_LATENCY_SNIPER"
@@ -515,7 +545,6 @@ function buildProfileFromAccumulator(
           ? 1.0
           : 0.5,
     action,
-    ipAddress: "104.18.24.101",
     openRisk24hUsd: openRiskUsd,
     openTickets24h: Math.max(acc.openTickets24h, acc.liveWagerStakesUsd.length),
     pointBuyingTickets: acc.pointBuyingTickets,
@@ -563,6 +592,7 @@ export async function harvestLiveCustomerProfiles(
         openToWin24hCents: 0,
         openTickets24h: 0,
         liveWagerStakesUsd: [],
+        wagerTimesMs: [],
         pointBuyingTickets: 0,
         teaserTickets: 0,
         alertMirrorTriggers: 0,
@@ -629,12 +659,12 @@ export async function harvestLiveCustomerProfiles(
             clvBps:
               row.dodAvgClvPoints !== null && row.dodAvgClvPoints !== undefined
                 ? Math.round(row.dodAvgClvPoints * 100)
-                : 35,
+                : null,
             stakeUsd: Math.round(
               row.riskCents / 100 / Math.max(1, row.wagersCount),
             ),
             netUsd: 0,
-            time: "2026-11-14",
+            time: null,
           });
         }
         acc.dodSettledStakedCents = row.dodSettledStakedCents ?? null;
@@ -671,7 +701,9 @@ export async function harvestLiveCustomerProfiles(
         }
         if (writer === "blocked") continue;
 
+        const whenMs = Date.parse(String(r.InsertDateTime ?? ""));
         acc.liveWagerStakesUsd.push(stakeUsd);
+        if (Number.isFinite(whenMs)) acc.wagerTimesMs.push(whenMs);
         if (writer.includes("gslive")) acc.gsliveTickets++;
         if (/buying/i.test(desc)) acc.pointBuyingTickets++;
         if (wt === "T" || /^T\./i.test(desc)) acc.teaserTickets++;
@@ -700,10 +732,12 @@ export async function harvestLiveCustomerProfiles(
                       ? "TEASER"
                       : "SPREAD",
             line: desc.replace(/\s+/g, " ").slice(0, 48),
-            clvBps: /buying/i.test(desc) ? 65 : 25,
+            clvBps: null,
             stakeUsd,
             netUsd: 0,
-            time: String(r.InsertDateTime ?? "2026-11-14").slice(0, 16),
+            time: Number.isFinite(whenMs)
+              ? new Date(whenMs).toISOString().slice(0, 16).replace("T", " ")
+              : null,
           });
         }
       }
@@ -754,10 +788,7 @@ export async function harvestLiveCustomerProfiles(
         if (!cid) continue;
         const ag = String(row.agentId ?? row.agent ?? "").trim();
         const acc = getOrCreate(cid, ag);
-        if (acc.openRisk24hCents === 0 && row.totalRiskUsd) {
-          acc.openRisk24hCents = Math.round(row.totalRiskUsd * 100);
-          acc.openTickets24h = row.tickets ?? 5;
-        }
+        // The 4-week backtest is not a 24h exposure window; only its measured CLV is usable.
         if (acc.dodAvgClvPoints === null && typeof row.avgClvBps === "number") {
           acc.dodAvgClvPoints = row.avgClvBps / 100;
         }
@@ -860,83 +891,4 @@ export async function harvestLiveCustomerProfiles(
     patternCounts,
     profiles: filtered.slice(0, limit),
   };
-}
-
-/**
- * Synthesizes a single customer profile on the fly from live wagers, 24h open positions,
- * or any of the 14,534 accounts in the DOD6 v5.4 binary spine (`lookupInto`).
- */
-export async function synthesizeLiveCustomerProfile(
-  customerId: string,
-  options: { repoRoot?: string } = {},
-): Promise<HarvestedLiveProfile | null> {
-  const norm = customerId.trim().toUpperCase();
-  if (!norm) return null;
-  const canonical = normalizeCanonicalCustomer(norm);
-
-  const harvested = await harvestLiveCustomerProfiles({
-    repoRoot: options.repoRoot,
-  });
-  const direct = harvested.profiles.find(
-    (p) => p.id === norm || p.canonicalId === canonical,
-  );
-  if (direct) return direct;
-
-  // Fallback: direct lookup in the 14,534-customer DOD6 v5.4 binary spine
-  const repoRoot = options.repoRoot ?? resolve(import.meta.dir, "..");
-  const dodbinPath = resolve(
-    repoRoot,
-    "data/sportsdesk_unified_baseline_v54.dodbin",
-  );
-  const dodReader = await getDodReader(dodbinPath);
-  if (!dodReader) return null;
-
-  const dodTarget: Dod6LifetimeLookupTarget = {
-    clvBps: null,
-    sharpScore: null,
-    lifetimeNetUsd: null,
-    clvLegs: 0,
-    avgClvPoints: null,
-    sharpCandidateGatePassed: false,
-    source: "dodbin_columnar",
-    handleKind: "row-index-fallback",
-    handleValue: null,
-  };
-
-  const found =
-    dodReader.lookupInto(canonical, dodTarget) ||
-    dodReader.lookupInto(norm, dodTarget);
-  if (!found) return null;
-
-  const syntheticAcc: RawAccumulator = {
-    id: norm,
-    canonicalId: canonical,
-    agentId: "DOD6_SPINE",
-    openRisk24hCents: 0,
-    openToWin24hCents: 0,
-    openTickets24h: Math.max(1, dodTarget.clvLegs),
-    liveWagerStakesUsd: [1000],
-    pointBuyingTickets: 0,
-    teaserTickets: 0,
-    alertMirrorTriggers: 0,
-    gsliveTickets: 0,
-    sports: new Map([["Football", 1]]),
-    wagerTypes: new Map([["S", 1]]),
-    sampleWagers: [],
-    latestSelection: "",
-    dodSettledStakedCents: null,
-    dodSettledNetCents:
-      dodTarget.lifetimeNetUsd !== null
-        ? Math.round(dodTarget.lifetimeNetUsd * 100)
-        : null,
-    dodAvgClvPoints: dodTarget.avgClvPoints,
-  };
-
-  return buildProfileFromAccumulator(
-    syntheticAcc,
-    new Map(),
-    null,
-    dodTarget,
-    true,
-  );
 }

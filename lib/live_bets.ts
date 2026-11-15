@@ -963,6 +963,8 @@ export interface DeduplicatedParentTicket {
   readonly customerKey: CustomerKey;
   readonly totalPicks: number;
   readonly observedLegs: number;
+  /** Legs the ticket declares but the capture did not carry; never assumed resolved. */
+  readonly missingPicks: number;
   readonly status: string;
   readonly wagerType: string;
   readonly stakeCents: Cents;
@@ -978,7 +980,9 @@ export interface DeduplicatedParentTicket {
  * Zero-Map / zero-Set sorted-run parlay deduplicator keyed by
  * `(TicketNumber, WagerNumber, totalPicks)`. Checks `unresolvedGapCents === 0n`
  * across all leg rows in each contiguous run and preserves structured `DeskPositionLeg`
- * rotation + `LineHundredths` effective-line math.
+ * rotation + `LineHundredths` effective-line math. A run carrying fewer leg rows than
+ * `totalPicks` reports `missingPicks > 0` and is flagged, so a partial capture degrades
+ * the desk-risk evaluation instead of reading as a complete ticket.
  */
 export function dedupeParentPendingTickets(
   rows: readonly PendingRow[],
@@ -1147,6 +1151,7 @@ export function dedupeParentPendingTickets(
       ? maxStakeBig - minStakeBig
       : 0n;
     const representativeStake = stakeInitialized ? minStakeBig : 0n;
+    const missingPicks = Math.max(0, totalPicks - observedLegs);
 
     if (!priceResolved && !oddsCoercionError) {
       if (!stakeCoercionError && !toWinCoercionError && stakeInitialized) {
@@ -1188,6 +1193,7 @@ export function dedupeParentPendingTickets(
       oddsCoercionError ||
       legLineCoercionError ||
       unresolvedGapCents !== 0n ||
+      missingPicks > 0 ||
       observedLegs > totalPicks;
 
     result[groupIdx++] = {
@@ -1197,6 +1203,7 @@ export function dedupeParentPendingTickets(
       customerKey: customerKeyOf(firstRow.customerID ?? firstRow.CustomerID),
       totalPicks,
       observedLegs,
+      missingPicks,
       status,
       wagerType: text(firstRow.WagerType),
       stakeCents,
