@@ -9,9 +9,12 @@ every successful-but-empty feed:
 
 ```ts
 switch (provenance.kind) {
-  case "pending":     return `Waiting for GET ${endpoint}…`;
-  case "unavailable": return `Unavailable — ${endpoint}: ${provenance.label}`;
-  default:            return `${provenance.label} returned no wagers (${endpoint}).`;
+  case "pending":
+    return `Waiting for GET ${endpoint}…`;
+  case "unavailable":
+    return `Unavailable — ${endpoint}: ${provenance.label}`;
+  default:
+    return `${provenance.label} returned no wagers (${endpoint}).`;
 }
 ```
 
