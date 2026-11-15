@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { runGuestCell } from "../../lib/quickjs_code_mode.ts";
-import { assertMatchesOracle } from "./oracle.ts";
+import { assertMatchesOracle, oracleSummary } from "./oracle.ts";
 import { BANNED_GUEST_GLOBALS, probeGuestGlobals } from "./guest_probe.ts";
 
 describe("QuickJS guest boundary", () => {
@@ -109,10 +109,14 @@ describe("async cells and resource ceilings", () => {
     ).rejects.toThrow(/nope/);
   });
 
-  test("a promise that never settles is bounded by the host deadline", async () => {
+  test("a never-settling promise waits for the host deadline, not longer", async () => {
+    const started = performance.now();
     await expect(
       runGuestCell("await new Promise(() => {});", { timeoutMs: 50 }),
     ).rejects.toThrow(/exceeded 50ms/);
+    const elapsed = performance.now() - started;
+    expect(elapsed).toBeGreaterThanOrEqual(250);
+    expect(elapsed).toBeLessThan(3_000);
   });
 
   test("infinite recursion is a guest stack overflow, not a host crash", async () => {
@@ -141,5 +145,42 @@ describe("async cells and resource ceilings", () => {
       'try { tools.query_profiles({ field: "nope" }); } catch (e) { return e.message; }',
     );
     expect(message).toContain("field required");
+  });
+});
+
+describe("option normalization and error shapes", () => {
+  test("invalid option values fall back to the defaults", async () => {
+    expect(await runGuestCell("return 1", { timeoutMs: 0 })).toBe(1);
+    expect(await runGuestCell("return 1", { maxToolCalls: 0 })).toBe(1);
+    expect(await runGuestCell("return 1", { memoryLimitBytes: 1 })).toBe(1);
+  });
+
+  test("the tool budget is exact and floors fractional values", async () => {
+    const twoCalls =
+      'for (let i = 0; i < 2; i += 1) tools.get_profile({ id: "BGD101" }); return "ok";';
+    const threeCalls =
+      'for (let i = 0; i < 3; i += 1) tools.get_profile({ id: "BGD101" }); return "ok";';
+    expect(await runGuestCell(twoCalls, { maxToolCalls: 2 })).toBe("ok");
+    await expect(runGuestCell(threeCalls, { maxToolCalls: 2 })).rejects.toThrow(
+      /MAX_CALLS/,
+    );
+    expect(await runGuestCell(twoCalls, { maxToolCalls: 2.9 })).toBe("ok");
+    await expect(
+      runGuestCell(threeCalls, { maxToolCalls: 2.9 }),
+    ).rejects.toThrow(/MAX_CALLS/);
+  });
+
+  test("a zero-argument tool call marshals undefined", async () => {
+    expect(await runGuestCell("return tools.get_profile_summary()")).toEqual(
+      oracleSummary(),
+    );
+  });
+
+  test("a syntax error is a guest failure", async () => {
+    await expect(runGuestCell("return )")).rejects.toThrow(/guest cell failed/);
+  });
+
+  test("a non-Error throw is still described", async () => {
+    await expect(runGuestCell("throw 42")).rejects.toThrow(/42/);
   });
 });

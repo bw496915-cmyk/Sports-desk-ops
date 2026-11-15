@@ -13,7 +13,10 @@ const profile = (
   ...overrides,
 });
 
-const snapshot = (profiles: unknown): unknown => ({ profiles });
+const snapshot = (profiles: unknown): unknown => ({
+  schemaVersion: 1,
+  profiles,
+});
 
 const failure = (raw: unknown): string => {
   try {
@@ -31,10 +34,29 @@ describe("snapshot loader rejection paths", () => {
     }
   });
 
+  test("rejects an unknown or missing schema version", () => {
+    expect(failure({ profiles: [] })).toContain("unsupported schemaVersion");
+    expect(failure({ schemaVersion: 2, profiles: [] })).toContain(
+      "unsupported schemaVersion",
+    );
+    expect(failure({ schemaVersion: "1", profiles: [] })).toContain(
+      "unsupported schemaVersion",
+    );
+  });
+
   test("rejects profiles without a usable id", () => {
     expect(failure(snapshot([null]))).toContain("profile #0 has no id");
     expect(failure(snapshot([{ id: 7 }]))).toContain("profile #0 has no id");
     expect(failure(snapshot([{ id: "" }]))).toContain("profile #0 has no id");
+  });
+
+  test("rejects ids with surrounding whitespace", () => {
+    expect(failure(snapshot([profile({ id: " P1 " })]))).toContain(
+      "profile #0 id has surrounding whitespace",
+    );
+    expect(failure(snapshot([profile({ id: "P1\n" })]))).toContain(
+      "surrounding whitespace",
+    );
   });
 
   test("rejects duplicate ids", () => {

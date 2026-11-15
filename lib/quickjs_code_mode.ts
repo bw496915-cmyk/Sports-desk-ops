@@ -40,8 +40,11 @@ interface GuestValue {
   readonly owned: boolean;
 }
 
-/** Marshal a host value into the guest realm as native QuickJS values (no JSON hop). */
-function toGuest(ctx: QuickJSContext, value: unknown): GuestValue {
+/**
+ * Marshal a host value into the guest realm as native QuickJS values (no JSON hop).
+ * Exported so the boundary can be tested type-by-type without a tools round trip.
+ */
+export function toGuest(ctx: QuickJSContext, value: unknown): GuestValue {
   if (value === null) return { handle: ctx.null, owned: false };
   if (value === undefined) return { handle: ctx.undefined, owned: false };
   switch (typeof value) {

@@ -9,7 +9,9 @@ Code Mode tools).
 [tests/code_mode/oracle.ts](oracle.ts) is the specification. It is derived from the committed
 31-profile snapshot ([data/profile-snapshot.json](../../data/profile-snapshot.json)) and the
 schema constants (`MAX_LIMIT = 500`, fields `clv` | `vol` | `sharp`), **not** from the
-implementation. It throws at import when the profile count or sentinel ids drift.
+implementation. It throws at import when the profile count or sentinel ids drift. The snapshot
+document is versioned: the parser rejects an unknown `schemaVersion`, an untrimmed id, duplicate
+ids and non-finite values.
 
 To re-freeze deliberately after a contract change:
 
@@ -52,10 +54,11 @@ bun run check:profile-snapshot
 Property runs default to 100 cases; override with `FAST_CHECK_NUM_RUNS` and pin a failing run
 with `FAST_CHECK_SEED`.
 
-Mutation runs in place (the sandbox cannot resolve Stryker's TypeScript preprocessor under this
-repo's isolated linker), and the gate script restores the executable bits and symlinks that
-in-place restore strips. The HTML report is written to `reports/mutation/mutation.html`
-(force-added; `reports/` is gitignored).
+Mutation covers both `lib/profile_query_tools.ts` and the QuickJS bridge `lib/quickjs_code_mode.ts`
+(host-to-guest marshalling, option normalization, budgets and deadlines). It runs in place because
+the sandbox cannot resolve Stryker's TypeScript preprocessor under this repo's isolated linker;
+the gate script restores the executable bits and symlinks that in-place restore strips. The HTML
+report is written to `reports/mutation/mutation.html` (force-added; `reports/` is gitignored).
 
 ## Sandbox boundary
 

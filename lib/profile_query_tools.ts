@@ -83,6 +83,10 @@ const stringFlags = (value: unknown, where: string): readonly string[] => {
   return Object.freeze(flags);
 };
 
+/** Only own data properties are read: inherited keys and prototype traps are ignored. */
+const ownValue = (source: Record<string, unknown>, key: string): unknown =>
+  Object.hasOwn(source, key) ? source[key] : undefined;
+
 /**
  * Parse and freeze a snapshot document. Exported so the loader's rejection paths are testable
  * without shipping a malformed committed snapshot.
@@ -91,10 +95,20 @@ export function parseProfileSnapshot(raw: unknown): readonly ProfileRecord[] {
   if (!isRecord(raw) || !Array.isArray(raw.profiles)) {
     throw new Error("profile snapshot: missing profiles array");
   }
+  if (raw.schemaVersion !== SNAPSHOT_SCHEMA_VERSION) {
+    throw new Error(
+      `profile snapshot: unsupported schemaVersion ${String(raw.schemaVersion)}`,
+    );
+  }
   const seen = new Set<string>();
   const profiles = raw.profiles.map((entry, index) => {
     if (!isRecord(entry) || typeof entry.id !== "string" || entry.id === "") {
       throw new Error(`profile snapshot: profile #${index} has no id`);
+    }
+    if (entry.id !== entry.id.trim()) {
+      throw new Error(
+        `profile snapshot: profile #${index} id has surrounding whitespace`,
+      );
     }
     if (seen.has(entry.id)) {
       throw new Error(`profile snapshot: duplicate id ${entry.id}`);
@@ -110,6 +124,8 @@ export function parseProfileSnapshot(raw: unknown): readonly ProfileRecord[] {
   });
   return Object.freeze(profiles);
 }
+
+const SNAPSHOT_SCHEMA_VERSION = 1;
 
 const SNAPSHOT: readonly ProfileRecord[] = parseProfileSnapshot(
   JSON.parse(
@@ -163,12 +179,17 @@ export function querySnapshot(
   snapshot: readonly ProfileRecord[],
   args: unknown,
 ): ProfileQueryResult {
-  if (!isRecord(args) || !isProfileField(args.field)) {
+  if (!isRecord(args)) {
     throw new ToolError("query_profiles: field required (clv|vol|sharp)");
   }
-  const field = args.field;
-  const requested = parseLimit(args.limit);
-  const includeSentinels = args.includeSentinels === true;
+  // Read each argument exactly once: a getter cannot return a valid field for the check and a
+  // different value for the query, and an inherited property is not an argument.
+  const field = ownValue(args, "field");
+  if (!isProfileField(field)) {
+    throw new ToolError("query_profiles: field required (clv|vol|sharp)");
+  }
+  const requested = parseLimit(ownValue(args, "limit"));
+  const includeSentinels = ownValue(args, "includeSentinels") === true;
   const effective = Math.min(requested, MAX_LIMIT);
 
   const ranked: ProfileQueryRow[] = [];
@@ -203,10 +224,14 @@ export function queryProfiles(args: unknown): ProfileQueryResult {
 }
 
 export function getProfile(args: unknown): ProfileRecord {
-  if (!isRecord(args) || typeof args.id !== "string" || args.id.trim() === "") {
+  if (!isRecord(args)) {
     throw new ToolError("get_profile: id required");
   }
-  const id = args.id.trim();
+  const rawId = ownValue(args, "id");
+  if (typeof rawId !== "string" || rawId.trim() === "") {
+    throw new ToolError("get_profile: id required");
+  }
+  const id = rawId.trim();
   const found = SNAPSHOT.find((profile) => profile.id === id);
   if (found === undefined) {
     throw new ToolError(`get_profile: unknown id ${id}`);

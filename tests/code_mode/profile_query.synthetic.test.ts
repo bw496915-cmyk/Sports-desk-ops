@@ -4,6 +4,7 @@ import fc from "fast-check";
 import {
   MAX_LIMIT,
   ToolError,
+  parseProfileSnapshot,
   querySnapshot,
   type ProfileField,
   type ProfileRecord,
@@ -143,5 +144,94 @@ describe("querySnapshot over generated snapshots", () => {
         ToolError,
       );
     }
+  });
+});
+
+describe("argument-object hardening", () => {
+  const many = [
+    { id: "A", vol: 1, clv: 2, sharp: 3, flags: [] },
+    { id: "B", vol: 2, clv: 3, sharp: 4, flags: [] },
+    { id: "SYNTH_C", vol: 3, clv: 4, sharp: 5, flags: [] },
+  ] as const;
+
+  test("each argument is read exactly once", () => {
+    let fieldReads = 0;
+    let limitReads = 0;
+    let includeReads = 0;
+    const args = {
+      get field() {
+        fieldReads += 1;
+        return fieldReads === 1 ? "clv" : "bogus";
+      },
+      get limit() {
+        limitReads += 1;
+        return 2;
+      },
+      get includeSentinels() {
+        includeReads += 1;
+        return true;
+      },
+    };
+    const result = querySnapshot(many, args);
+    expect(fieldReads).toBe(1);
+    expect(limitReads).toBe(1);
+    expect(includeReads).toBe(1);
+    expect(result.field).toBe("clv");
+    expect(result.rows.every((row) => Number.isFinite(row.value))).toBe(true);
+  });
+
+  test("inherited properties are not arguments", () => {
+    const inherited = Object.create({
+      field: "clv",
+      limit: 1,
+      includeSentinels: true,
+    }) as Record<string, unknown>;
+    expect(() => querySnapshot(many, inherited)).toThrow(ToolError);
+
+    const args = Object.assign(
+      Object.create({ limit: 1, includeSentinels: true }),
+      {
+        field: "vol",
+      },
+    );
+    const result = querySnapshot(many, args);
+    // Inherited limit/includeSentinels are ignored: default limit, sentinels excluded.
+    expect(result.rows.map((row) => row.id)).toEqual(["B", "A"]);
+  });
+
+  test("a null-prototype object with own properties is a valid argument bag", () => {
+    const args = Object.assign(Object.create(null), { field: "clv", limit: 2 });
+    expect(querySnapshot(many, args).rows).toHaveLength(2);
+  });
+});
+
+describe("parser round-trip", () => {
+  test("JSON serialize -> parse preserves query results for generated snapshots", () => {
+    fc.assert(
+      fc.property(
+        snapshotArbitrary,
+        fc.constantFrom(...FIELDS),
+        fc.integer({ min: 1, max: MAX_LIMIT }),
+        fc.boolean(),
+        (snapshot, field, limit, includeSentinels) => {
+          const document = {
+            schemaVersion: 1,
+            profiles: snapshot.map((profile) => ({
+              ...profile,
+              flags: [...profile.flags],
+            })),
+          };
+          const reparsed = parseProfileSnapshot(
+            JSON.parse(JSON.stringify(document)),
+          );
+          expect(
+            querySnapshot(reparsed, { field, limit, includeSentinels }),
+          ).toEqual(
+            querySnapshot(snapshot, { field, limit, includeSentinels }),
+          );
+        },
+      ),
+      { numRuns: NUM_RUNS },
+    );
   });
 });

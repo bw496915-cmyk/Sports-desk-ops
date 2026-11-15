@@ -320,6 +320,7 @@ describe("flag and sentinel semantics", () => {
 describe("sentinel semantics are state, not value", () => {
   test("a real profile carrying sentinel values is not a sentinel row", () => {
     const parsed = parseProfileSnapshot({
+      schemaVersion: 1,
       profiles: [
         { id: "REAL1", vol: 1, clv: -2_147_483_648, sharp: -1, flags: [] },
       ],
@@ -328,5 +329,28 @@ describe("sentinel semantics are state, not value", () => {
     expect(profile).toBeDefined();
     if (profile === undefined) return;
     expect(isProfileSentinel(profile)).toBe(false);
+  });
+});
+
+describe("get_profile argument hardening", () => {
+  test("reads id once and ignores an inherited id", async () => {
+    let reads = 0;
+    const args = {
+      get id() {
+        reads += 1;
+        return reads === 1 ? "BGD101" : 42;
+      },
+    };
+    const profile = await getProfileTool.execute(args);
+    expect(reads).toBe(1);
+    expect(profile.id).toBe("BGD101");
+
+    const inherited = Object.create({ id: "BGD101" }) as Record<
+      string,
+      unknown
+    >;
+    await expect(getProfileTool.execute(inherited)).rejects.toThrow(
+      /id required/,
+    );
   });
 });
