@@ -30,6 +30,7 @@ export type ProbeParam =
   | "customerID"
   | "week"
   | "date"
+  | "start"
   | "type"
   | "layout"
   | "RRO"
@@ -73,7 +74,11 @@ export type ProbeParam =
   | "periodNumber"
   | "periods"
   | "rotOrder"
-  | "placeLateFlag";
+  | "placeLateFlag"
+  | "reportType"
+  | "startDate"
+  | "endDate"
+  | "lineType";
 
 export type ProbeWireContentType =
   "application/x-www-form-urlencoded; charset=UTF-8" | "application/json";
@@ -151,37 +156,21 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     defaultPrefix: "/cloud/api/Manager",
   },
   {
+    // Verified in `manager/module/customer-admin/transaction-player` (`lib/f402_transaction_list.ts`).
     operation: "getTransactionList",
     method: "POST",
     readOnly: true,
-    note: "customer-admin transactions tab (manager/module/customer-admin/transactions.html); days + type filter codes",
-    params: [
-      "agentID",
-      "agentOwner",
-      "customerID",
-      "days",
-      "type",
-      "token",
-      "operation",
-      "RRO",
-    ],
+    note: "customer-admin transaction-player module: acc+start+operation+RRO+agentID+agentOwner (type filter is client-side)",
+    params: ["acc", "start", "operation", "RRO", "agentID", "agentOwner"],
     defaultPrefix: "/cloud/api/Manager",
   },
   {
+    // Verified in `manager/module/customer-admin/transaction-player` (`getDeletedTransactionHistory`).
     operation: "getDeletedTransactionHistory",
     method: "POST",
     readOnly: true,
-    note: "customer-admin Deleted/Changed filter; wire uses days=all&type=0 (UI label DELETED); returns LIST[] ledger rows",
-    params: [
-      "agentID",
-      "agentOwner",
-      "customerID",
-      "days",
-      "type",
-      "token",
-      "operation",
-      "RRO",
-    ],
+    note: "customer-admin Deleted/Changed filter (transaction-player): acc+start+operation+RRO+agentID+agentOwner; returns LIST[] ledger rows",
+    params: ["acc", "start", "operation", "RRO", "agentID", "agentOwner"],
     defaultPrefix: "/cloud/api/Manager",
   },
   {
@@ -250,13 +239,6 @@ export const PROBE_OPS: readonly ProbeOp[] = [
     operation: "getPerformancePlayer",
     method: "POST",
     readOnly: true,
-    // Observed Chrome wire (2026-11-13):
-    // POST /cloud/api/Manager/getPerformancePlayer
-    // acc=BRT106&period=0&operation=getPerformancePlayer&RRO=1&agentID=BILLY666&agentOwner=BILLY666
-    // Response: 31-day [{ Date: "MM/DD/YYYY DayName", Won, Lost }, ...] series (cents).
-    // Drilling into an active day fires POST /cloud/api/Report/getWagersByFigureDate
-    // with figureDate="YYYY-MM-DD" derived from row.Date.
-    // No token or customerID key on wire; uses acc + period=0.
     note: "customer-admin performance tab (app/manager/module/customer-admin/performance.js?bust=1.0.287): acc+period+operation+RRO",
     params: ["acc", "period", "operation", "RRO", "agentID", "agentOwner"],
     defaultPrefix: "/cloud/api/Manager",
@@ -279,6 +261,24 @@ export const PROBE_OPS: readonly ProbeOp[] = [
       "agentOwner",
       "customerID",
       "token",
+      "operation",
+      "RRO",
+    ],
+    defaultPrefix: "/cloud/api/Manager",
+  },
+  {
+    operation: "getReportPlayerAnalysis",
+    method: "POST",
+    readOnly: true,
+    note: 'manager Analysis module (manager.js:93668): CLV & bot-flag player analysis {LIST[]}; customerID="" queries all customers',
+    params: [
+      "agentID",
+      "agentOwner",
+      "customerID",
+      "reportType",
+      "startDate",
+      "endDate",
+      "lineType",
       "operation",
       "RRO",
     ],
@@ -608,6 +608,8 @@ export const CLIENT_JS_CONFIRMED_READ_ONLY_OPS = new Set<string>([
 export const PROBE_ACC_IS_CUSTOMER_OPS = new Set<string>([
   "getTeaserProfile",
   "getPerformancePlayer",
+  "getTransactionList",
+  "getDeletedTransactionHistory",
 ]);
 
 /**
@@ -1160,6 +1162,7 @@ export interface ProbeBodyOptions {
   readonly type?: string;
   readonly layout?: string;
   readonly days?: string;
+  readonly start?: string;
   readonly description?: string;
   readonly additional?: string;
   readonly sportType?: string;
@@ -1177,6 +1180,10 @@ export interface ProbeBodyOptions {
   readonly periods?: string;
   readonly rotOrder?: string;
   readonly placeLateFlag?: string;
+  readonly reportType?: string;
+  readonly startDate?: string;
+  readonly endDate?: string;
+  readonly lineType?: string;
 }
 
 function resolveParamMap(
@@ -1207,6 +1214,8 @@ function resolveParamMap(
     } else if (name === "customerID") {
       if (op.operation === "getSportsVigSetup") {
         out[name] = "*";
+      } else if (op.operation === "getReportPlayerAnalysis") {
+        out[name] = customerId !== undefined ? customerId : "";
       } else {
         const raw =
           customerId !== undefined && customerId !== ""
@@ -1219,6 +1228,8 @@ function resolveParamMap(
       }
     } else if (name === "date") {
       out[name] = "__DATE__";
+    } else if (name === "start") {
+      out[name] = options.start ?? "";
     } else if (name === "week") {
       out[name] = "__WEEK__";
     } else if (name === "ticketNumber") {
@@ -1331,6 +1342,14 @@ function resolveParamMap(
       // `Util.isPlaceLateBetAgent()` is false for the plain customer front end; jQuery serializes
       // the boolean as "false".
       out[name] = options.placeLateFlag ?? "false";
+    } else if (name === "reportType") {
+      out[name] = options.reportType ?? "1";
+    } else if (name === "startDate") {
+      out[name] = options.startDate ?? "2026-10-31";
+    } else if (name === "endDate") {
+      out[name] = options.endDate ?? "2026-11-14";
+    } else if (name === "lineType") {
+      out[name] = options.lineType ?? "1";
     } else {
       // Compile-time exhaustiveness: adding a ProbeParam variant without a case
       // fails the build here instead of silently dropping the field from every body.

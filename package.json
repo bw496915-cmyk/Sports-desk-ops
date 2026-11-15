@@ -364,7 +364,8 @@
     "audit:deps": "bun audit",
     "audit:deps:json": "bun audit --json",
     "validate:field-contract": "bun scripts/validate_wagers_field_contract.ts",
-    "profiles:harvest": "bun run scripts/harvest_live_profiles.ts"
+    "profiles:harvest": "bun run scripts/harvest_live_profiles.ts",
+    "analyze:suspected-bots": "bun run scripts/analyze_suspected_bots.ts"
   },
   "keywords": [
     "sportsdesk",
