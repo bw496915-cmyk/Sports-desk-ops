@@ -90,7 +90,8 @@ async function main(): Promise<void> {
     codeMode: {
       hostRealm: {
         path: "lib/code_mode_host.ts",
-        mechanism: "Bun.Transpiler + AsyncFunction in host realm (MCP spine only)",
+        mechanism:
+          "Bun.Transpiler + AsyncFunction in host realm (MCP spine only)",
         trimNote:
           "Pulls full Bun runtime; --trim keeps APIs the import graph proves unused",
         binaryFit: "trim / jit compile for MCP spine; not a WASM guest",
@@ -99,9 +100,11 @@ async function main(): Promise<void> {
         path: "lib/quickjs_code_mode.ts",
         mechanism: "quickjs-emscripten WASM; tools bridge only",
         trimNote: "No bun:ffi; suitable for remove native-code binaries",
-        binaryFit: "Production profile cells; wired via lib/code_mode_profile.ts",
+        binaryFit:
+          "Production profile cells; wired via lib/code_mode_profile.ts",
       },
       profileTools: "lib/profile_query_tools.ts",
+      profileHostRegistrar: "lib/profile_code_mode_host.ts",
       guestProbe: "bun run probe:code-mode",
     },
     shapesUsedByCodeMode: shapesForNames(CODE_MODE_COMPILE_SURFACES),

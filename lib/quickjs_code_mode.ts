@@ -2,7 +2,7 @@
  * @file lib/quickjs_code_mode.ts
  * @description QuickJS guest realm for the profile Code Mode tools.
  *
- * The broad sportsdesk runner (`lib/code_mode.ts`) executes cells with `new AsyncFunction` in the
+ * The desk MCP host (`lib/code_mode_host.ts`) executes cells with `new AsyncFunction` in the
  * host realm, so a cell can reach `Bun`, `process` and `require`. This module is the isolated path
  * used for the profile tools: cells run inside a QuickJS context (WASM) whose only capability is a
  * synchronous `tools` bridge. Host values cross the boundary as native handles, never as JSON text.

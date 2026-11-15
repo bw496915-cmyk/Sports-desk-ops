@@ -5,7 +5,7 @@
  *
  * Usage:
  *   bun run code-mode -e "const blotter = await tools.get_active_bet_blotter({ limit: 10 }); return blotter.length;"
- *   bun run code-mode --realm guest -e "return (await tools.query_profiles({ field: 'clv', limit: 3 })).rows.length"
+ *   bun run code-mode:profile -e "return (await tools.query_profiles({ field: 'clv', limit: 3 })).rows.length"
  *   bun run code-mode script.ts [--json]
  *   bun run code-mode --types
  *   bun run code-mode --list-tools
@@ -13,7 +13,7 @@
 
 import { parseArgs } from "node:util";
 import { createSportsdeskCodeModeRunner } from "../lib/code_mode.ts";
-import { createProfileQueryHostRunner } from "../lib/profile_query_codemode.ts";
+import { createProfileQueryHostRunner } from "../lib/profile_code_mode_host.ts";
 import {
   executeProfileCodeMode,
   type ProfileCodeModeRealm,
@@ -38,18 +38,26 @@ if (values.help) {
   console.log(`sportsdesk code-mode — Programmatic Tool Orchestration Engine
 
 Usage:
-  bun run code-mode -e "<code>" [options]
+  bun run code-mode -e "<code>" [options]        # desk MCP spine (--realm host default)
+  bun run code-mode:profile -e "<code>"          # profile cells (--realm guest default)
   bun run code-mode <script.ts> [options]
   bun run code-mode --types
   bun run code-mode --list-tools
+
+Realm defaults (intentional split):
+  code-mode         → host  = full desk tool spine (operator CLI; not hardened)
+  code-mode:profile → guest = production profile QuickJS cells
+
+  code-mode:profile still accepts --realm profile-host (gated env) or --realm host (desk spine);
+  defaults are not exclusions — they pick the usual path for each script.
 
 Options:
   -e, --eval <code>      Execute inline JavaScript/TypeScript snippet
   -f, --file <path>      Path to script file to execute
       --realm <host|guest|profile-host>
-                         guest = QuickJS profile cell (default for profile scripts)
-                         profile-host = dev-only host runner with profile tools only
-                         host (default) = desk MCP spine (no profile tools)
+                         host (default on code-mode) = desk MCP spine
+                         guest (default on code-mode:profile / library) = QuickJS profile bridge
+                         profile-host = dev/parity profile on insecure host; SPORTSDESK_PROFILE_CODE_MODE_HOST=1
   -t, --types            Output ambient TypeScript (.d.ts) declarations for LLM prompt injection
   -l, --list-tools       List all registered tools and signatures
   -j, --json             Output structured JSON execution result with full telemetry
@@ -73,12 +81,20 @@ if (
 type CliRealm = ProfileCodeModeRealm | "profile-host" | "host";
 const realm = realmRaw as CliRealm;
 
-const runner =
-  realm === "guest"
-    ? null
-  : realm === "profile-host"
-    ? createProfileQueryHostRunner()
-  : createSportsdeskCodeModeRunner();
+let runner = null as ReturnType<typeof createSportsdeskCodeModeRunner> | null;
+if (realm === "guest") {
+  runner = null;
+} else if (realm === "profile-host") {
+  try {
+    runner = createProfileQueryHostRunner();
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error(message);
+    process.exit(1);
+  }
+} else {
+  runner = createSportsdeskCodeModeRunner();
+}
 
 if (values.types) {
   if (!runner) {
@@ -92,7 +108,11 @@ if (values.types) {
 if (values["list-tools"]) {
   if (realm === "guest") {
     console.log("Registered Code Mode Tools (guest profile bridge):\n");
-    for (const name of ["query_profiles", "get_profile", "get_profile_summary"]) {
+    for (const name of [
+      "query_profiles",
+      "get_profile",
+      "get_profile_summary",
+    ]) {
       console.log(`  • tools.${name}`);
     }
     process.exit(0);

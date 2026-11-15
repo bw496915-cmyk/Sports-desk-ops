@@ -85,11 +85,12 @@ report is written to `reports/mutation/mutation.html` (force-added; `reports/` i
 
 Two Code Mode runtimes coexist:
 
-| Path | Realm | Compile / trim |
-| ---- | ----- | -------------- |
-| `lib/code_mode_host.ts` | Host desk spine (`Bun.Transpiler`, `AsyncFunction`) | Full Bun; see [Smaller executables](https://bun.com/docs/compiler/size). `--trim` drops unused APIs; **not** guest-safe. No profile tools. |
-| `lib/code_mode_profile.ts` | Guest (default) or dev-only profile host | Call `executeProfileCodeMode(code, "guest")` / CLI `--realm guest`. |
-| `lib/quickjs_code_mode.ts` | QuickJS WASM guest | No `bun:ffi`; fits **`remove: ["native-code"]`** AOT profiles. FFI QuickJS (`@tanstack/ai-isolate-quickjs-bun`) is a separate, faster lane that **requires** `allow: ["native-code"]`. |
+| Path                            | Realm                                                 | Compile / trim                                                                                                                                                                         |
+| ------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/code_mode_host.ts`         | Host desk spine (`Bun.Transpiler`, `AsyncFunction`)   | Full Bun; see [Smaller executables](https://bun.com/docs/compiler/size). `--trim` drops unused APIs; **not** guest-safe. No profile tools.                                             |
+| `lib/profile_code_mode_host.ts` | Profile tools on insecure host                        | Env `SPORTSDESK_PROFILE_CODE_MODE_HOST=1`; not mixed into desk host.                                                                                                                   |
+| `lib/code_mode_profile.ts`      | Profile API (`PROFILE_CODE_MODE_DEFAULT_REALM=guest`) | `executeProfileCodeMode(code)` / `bun run code-mode:profile`.                                                                                                                          |
+| `lib/quickjs_code_mode.ts`      | QuickJS WASM guest                                    | No `bun:ffi`; fits **`remove: ["native-code"]`** AOT profiles. FFI QuickJS (`@tanstack/ai-isolate-quickjs-bun`) is a separate, faster lane that **requires** `allow: ["native-code"]`. |
 
 Reference URLs use the canonical form (`https://bun.com/reference/bun/<Symbol>` — not
 `/reference/globals/bun/...`, which 404s). Local catalog: `lib/bun_shapes.ts`; docs MCP:
@@ -118,5 +119,58 @@ reachable, that cells cannot see each other's globals, and that guest mutation o
 cannot reach the host snapshot.
 Stack overflow, heap exhaustion, runaway tool loops and awaited rejections are all pinned to guest
 failures rather than host crashes. The broad MCP toolset runs through `createSportsdeskCodeModeHostRunner()` (`lib/code_mode_host.ts`).
-Profile snapshot tools are **not** on that runner; they use the guest bridge only (or
-`createProfileQueryHostRunner()` for local parity).
+Profile snapshot tools are **not** on that runner. Production uses the guest bridge (`code-mode:profile`
+or `executeProfileCodeMode`). The **factory** `createProfileQueryHostRunner()` is env-gated
+(`SPORTSDESK_PROFILE_CODE_MODE_HOST=1`); `registerProfileCodeModeHostTools()` is ungated so tests can
+wire a bare runner via `tests/helpers/attachProfileHostTools.ts` (importable only from `*.test.ts`);
+CI AST allowlist blocks new import sites (`bun run check:profile-code-mode-host-allowlist`, self-tested in
+`scripts/ci/`).
+
+**Control ordering:** the **env gate on `createProfileQueryHostRunner()` is primary**. The import allowlist is
+**secondary** — legibility and accident prevention, not a security boundary. Computed `import(specifier)` cannot
+be ruled out statically; re-exporting the factory from an allowed file is permitted and remains env-gated at
+call time. The **ungated registrar** is why the allowlist also constrains who may import `attachProfileHostTools`.
+
+**Interim seal vs. end state:** the AST allowlist (`check:profile-code-mode-host-seal`) is the cheap guard
+**now** — not the destination. Capability-token sealing (only the gated factory holds the token; the
+registrar requires it) is the intended end state. Expect to retire the allowlist when that refactor lands;
+having a seal does not mean the host path is “done.”
+
+**CI allowlist vs. package `exports`:** the allowlist governs _internal_ repo imports; a future `exports` map
+governs _external_ consumers. Neither replaces the other — do not drop one when the other lands.
+
+| Bypass option              | Outcome                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| Env-gate the registrar     | Superseded by import allowlist (below) — tests use `attachProfileHostTools` instead. |
+| Type-seal `CodeModeRunner` | Declined — desk/MCP legitimately constructs runners everywhere.                      |
+| AST import allowlist (now) | Enforced in CI; registrar helper is the sole widen point for tests.                  |
+
+### CLI vs library defaults
+
+| Entry                          | Default realm | Why                                                                |
+| ------------------------------ | ------------- | ------------------------------------------------------------------ |
+| `bun run code-mode`            | `host`        | Operator orchestration over the desk MCP spine (superset tooling). |
+| `bun run code-mode:profile`    | `guest`       | Hardened profile cells (matches production).                       |
+| `executeProfileCodeMode(code)` | `guest`       | Same as production path; realm arg optional.                       |
+
+`code-mode:profile` may pass `--realm profile-host` (gated) or `--realm host` (desk spine); defaults pick
+the usual path, not a hard exclusion.
+
+Deprecated aliases (remove after **2026-06-01**, target **v0.2.0**): `createSportsdeskCodeModeRunner`,
+`registerProfileQueryCodeModeTools`. Prefer `createSportsdeskCodeModeHostRunner` and
+`registerProfileCodeModeHostTools`. Tracked: https://github.com/bw496915-cmyk/Sports-desk-ops/issues/227
+
+the allowlist failure is the backstop, the issue is the reminder.
+
+### CI
+
+| Job              | Trigger                              | Blocks merge?                                                                                                  |
+| ---------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `verify-changed` | Every PR                             | **Yes** (branch protection) — `bun run check:profile-code-mode-host-seal`                                      |
+| `code-mode`      | PR, `main` push, `workflow_dispatch` | No (team norm / latency; reversible) — `ci:code-mode` reuses the same seal script, then mutation + guest probe |
+
+`attachProfileHostTools` may only be imported from `*.test.ts`; a non-`*.test.ts` helper under `tests/helpers/` must widen the allowlist deliberately.
+
+When a public package `exports` map lands, stable entrypoints should be guest/profile API only
+(`code_mode_profile`, `quickjs_code_mode`); desk and profile-host factories stay deep imports. That map
+complements the internal import allowlist — it does not replace it.
