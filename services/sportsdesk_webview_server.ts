@@ -3870,11 +3870,8 @@ if (import.meta.main)
  */
 async function withWeblog<T extends Record<string, unknown>>(
   value: T,
-): Promise<T & { weblog: unknown; bridge: unknown; deskRisk: unknown }> {
-  const [mod, deskParser] = await Promise.all([
-    import("../lib/f402_weblog_latest.ts"),
-    import("../lib/desk-parser.ts"),
-  ]);
+): Promise<T & { weblog: unknown; bridge: unknown }> {
+  const mod = await import("../lib/f402_weblog_latest.ts");
   const [latest, bridge] = await Promise.all([
     mod.loadWeblogLatest(),
     readBridgeRollupState(),
@@ -3883,7 +3880,6 @@ async function withWeblog<T extends Record<string, unknown>>(
     ...value,
     weblog: latest.status === "ok" ? latest.rollup : latest,
     bridge,
-    deskRisk: deskParser.getLatestDeskRiskTelemetry(),
   };
 }
 

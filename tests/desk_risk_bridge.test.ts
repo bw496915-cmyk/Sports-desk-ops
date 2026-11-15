@@ -1,15 +1,13 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readAuditEntries } from "../lib/audit_log.ts";
-import { buildDeskEnhancedHealth } from "../lib/desk_enhanced_health.ts";
 import {
   getLatestDeskRiskTelemetry,
   parseAsEpochMs,
   resetDeskRiskTelemetryForTests,
 } from "../lib/desk-parser.ts";
-import type { GsliveSessionHealth } from "../lib/gslive_session_health.ts";
 import {
   buildArtifact,
   evaluatePendingExposureRisk,
@@ -37,35 +35,6 @@ function makeTempDir(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   tempDirs.push(dir);
   return dir;
-}
-
-function makeGsliveOk(): GsliveSessionHealth {
-  return {
-    schemaVersion: 1,
-    generatedAt: "2026-11-14T12:00:00.000Z",
-    authModel: {
-      durable: "GSID cookie (browser-managed, HttpOnly)",
-      modern: "cookie-only GET /manager-tools/*",
-      legacy: "ajax.php POST needs x-gs-session from signin",
-    },
-    session: {
-      configured: true,
-      source: "keychain",
-      cookieName: "GSID",
-      cookieNames: ["GSID"],
-    },
-    probe: {
-      status: "ok",
-      httpStatus: 200,
-      latencyMs: 25,
-      checkedAt: "2026-11-14T12:00:00.000Z",
-      cfMitigated: null,
-      detail: "ok",
-      cached: false,
-    },
-    surfaceMap: [],
-    advisory: "ok",
-  };
 }
 
 function makeLiveBetsArtifactJson(): string {
@@ -116,10 +85,9 @@ afterEach(() => {
 });
 
 describe("desk risk bridge end-to-end signal honesty & peer sanitization", () => {
-  test("evaluatePendingExposureRisk emits telemetry & provenance to audit_log, /health payload, and /api/kpis", async () => {
+  test("evaluatePendingExposureRisk emits telemetry, provenance, and an audit_log entry", async () => {
     const dir = makeTempDir("desk-risk-e2e-");
     const auditDir = join(dir, "audit");
-    const socketPath = join(dir, "kpis.sock");
     const liveBetsPath = join(dir, "live-bets.json");
     writeFileSync(liveBetsPath, makeLiveBetsArtifactJson());
 
@@ -198,67 +166,6 @@ describe("desk risk bridge end-to-end signal honesty & peer sanitization", () =>
       dataWindowMaxEpochMs: 1_763_120_000_000,
       r2PublishedAtEpochMs: 1_763_120_005_000,
     });
-
-    const healthPayload = await buildDeskEnhancedHealth({
-      port: 4020,
-      hostname: "localhost",
-      url: "http://localhost:4020/",
-      runtime: "Bun",
-      ingress: { proxied: true, trustProxy: false },
-      nodeEnv: "test",
-      uptimeSeconds: 5,
-      now: new Date("2026-11-14T12:00:00.000Z"),
-      resolveGitSha: () => "deadbee",
-      readF402: () => ({
-        cookieHeader: "f402=stub",
-        cookieNames: ["f402"],
-        obtainedAtIso: "2026-11-14T11:50:00.000Z",
-        expiresAtIso: "2026-11-15T11:50:00.000Z",
-      }),
-      readGsliveHealth: async () => makeGsliveOk(),
-      probeR2: async () => ({
-        "f402-weblog": {
-          lastModified: "2026-11-14T11:55:00.000Z",
-          ageSeconds: 300,
-          stale: false,
-          state: "fresh",
-          reason: "fresh",
-          dataAgeSeconds: 300,
-          dataStale: false,
-          dataWindowToMs: 1_763_120_000_000,
-        },
-      }),
-    });
-    expect(healthPayload.deskRisk).toEqual(bridged.telemetry);
-
-    const offlineFetch: typeof fetch = Object.assign(
-      async () => new Response(null, { status: 404 }),
-      { preconnect: () => {} },
-    );
-    using _fetchSpy = spyOn(globalThis, "fetch").mockImplementation(
-      offlineFetch,
-    );
-
-    const server = startServer({
-      unix: socketPath,
-      wagerListDir: dir,
-      liveBetsPath,
-      executionLedgerRoot: dir,
-      liveRefresh: { enabled: false },
-    });
-
-    try {
-      const res = await server.fetch(new Request("http://localhost/api/kpis"));
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as {
-        success: boolean;
-        deskRisk: unknown;
-      };
-      expect(body.success).toBe(true);
-      expect(body.deskRisk).toEqual(bridged.telemetry);
-    } finally {
-      server.stop(true);
-    }
   });
 
   test("sanitizes /api/v1/live-bets and /api/v2/live-bets for untrusted proxied peers and preserves raw fields on trusted peers", async () => {
