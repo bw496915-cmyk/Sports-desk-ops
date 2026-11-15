@@ -53,7 +53,9 @@ describe("restrictGradedRowsToSummaryBook", () => {
     // A blank CustomerID cannot be attributed to the book, so it is out of population like any
     // other outsider. Keeping it would silently reopen the mismatch this closes.
     const r = restrictGradedRowsToSummaryBook(graded, summary);
-    expect(r.rows.some((x) => String(x.CustomerID ?? "").trim() === "")).toBe(false);
+    expect(r.rows.some((x) => String(x.CustomerID ?? "").trim() === "")).toBe(
+      false,
+    );
   });
 
   test("an empty summary book empties the corpus rather than passing it through", () => {

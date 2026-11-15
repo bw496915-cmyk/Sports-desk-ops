@@ -1675,8 +1675,7 @@ export function buildCcc88412DecisionInstrument(
       availability: "PRESENT_FULL",
       recordCount: gradedWagerRows.length,
       sourceDigestSha256: sha256Hex(JSON.stringify(priors)),
-      whatWasMeasuredAndWhen:
-        `Computed from straight graded wagers in the summary-book population (${gradedWagerRows.length.toLocaleString("en-US")} of ${input.gradedWagerRows.length.toLocaleString("en-US")} deduped graded wagers in /tmp/graded-oct-window.json + /tmp/graded-today.json; #234 excludes the rest) and 112,941 CLV-tracked wagers across 6,228 accounts in scratch/f402-player-analysis-all.json.`,
+      whatWasMeasuredAndWhen: `Computed from straight graded wagers in the summary-book population (${gradedWagerRows.length.toLocaleString("en-US")} of ${input.gradedWagerRows.length.toLocaleString("en-US")} deduped graded wagers in /tmp/graded-oct-window.json + /tmp/graded-today.json; #234 excludes the rest) and 112,941 CLV-tracked wagers across 6,228 accounts in scratch/f402-player-analysis-all.json.`,
       limitationsAndTreatment:
         "Provides exact empirical Bayes shrinkage priors (p1_0=16.09%, p2_0=14.83%, P(AUB)_0=28.53%) and straight-bet book hold by segment (Football:Game +7.63%, Football:1H +6.02%, Football:2H -4.10%).",
     },
