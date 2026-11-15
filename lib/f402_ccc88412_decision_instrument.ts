@@ -853,7 +853,24 @@ export function computeWilson95(k: number, n: number): ConfidenceInterval {
 }
 
 /**
- * Normal-approximation 95% interval for sample mean of continuous values.
+ * Two-sided 95% Student-t critical values by degrees of freedom (df 1..30).
+ * `2.262` is the value for df 9 only; applying it at df 1..8 yields an interval narrower than the
+ * nominal 95%.
+ */
+const T_CRIT_95_BY_DF = [
+  12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228, 2.201,
+  2.179, 2.16, 2.145, 2.131, 2.12, 2.11, 2.101, 2.093, 2.086, 2.08, 2.074,
+  2.069, 2.064, 2.06, 2.056, 2.052, 2.048, 2.045, 2.042,
+] as const;
+
+function tCritical95(df: number): number {
+  if (df < 1) return T_CRIT_95_BY_DF[0];
+  return T_CRIT_95_BY_DF[df - 1] ?? 1.96;
+}
+
+/**
+ * Student-t 95% interval for the sample mean of continuous values, converging to the normal
+ * critical value as n grows.
  */
 export function computeMeanInterval95(values: number[]): ConfidenceInterval {
   const n = values.length;
@@ -862,6 +879,8 @@ export function computeMeanInterval95(values: number[]): ConfidenceInterval {
   }
   const mean = values.reduce((s, v) => s + v, 0) / n;
   if (n === 1) {
+    // One observation carries no variance information: this zero-width interval is a degenerate
+    // placeholder, not evidence of precision.
     return {
       low: roundTo(mean, 4),
       high: roundTo(mean, 4),
@@ -874,8 +893,7 @@ export function computeMeanInterval95(values: number[]): ConfidenceInterval {
   }
   const sd = Math.sqrt(ss / (n - 1));
   const se = sd / Math.sqrt(n);
-  // Use conservative t-multiplier for small n, converging to 1.96
-  const tCrit = n < 10 ? 2.262 : n < 20 ? 2.093 : n < 35 ? 2.042 : 1.96;
+  const tCrit = tCritical95(n - 1);
   return {
     low: roundTo(mean - tCrit * se, 4),
     high: roundTo(mean + tCrit * se, 4),
@@ -935,7 +953,9 @@ export function computeBinomialPowerOneSided(
 }
 
 /**
- * Exact one-sided binomial p-value P(X >= k | n, p0).
+ * One-sided binomial tail P(X >= k | n, p0), approximated by the normal distribution with a
+ * continuity correction — not the exact binomial sum. At n=5, k=1, p0=0.2853 it returns 0.8206
+ * against an exact 0.8135, and these approximations are what the BH q-values are computed from.
  */
 export function computeOneSidedBinomialPValue(
   k: number,
@@ -991,8 +1011,8 @@ export function buildPreRegistrationEnvelope(
   p2Prior = 0.1483,
   winPrior = 0.5238,
 ): PreRegistrationEnvelope {
-  const minNClv15 = computeMinimumSampleSizePower80(p2Prior, p2Prior + 0.15); // 47
-  const minNWin10 = computeMinimumSampleSizePower80(winPrior, winPrior + 0.1); // 151
+  const minNClv15 = computeMinimumSampleSizePower80(p2Prior, p2Prior + 0.15); // 42
+  const minNWin10 = computeMinimumSampleSizePower80(winPrior, winPrior + 0.1); // 152
   const minNWin15 = computeMinimumSampleSizePower80(winPrior, winPrior + 0.15); // 66
   void p1Prior;
 
