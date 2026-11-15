@@ -105,3 +105,6 @@ cloudflare.env
 **/.nsh/*
 !packages/nsh-desk/.nsh/tsconfig.json
 pages.env
+
+# Stryker mutation scratch (restored files + backups).
+.stryker-tmp/

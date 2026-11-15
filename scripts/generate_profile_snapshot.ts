@@ -36,16 +36,22 @@ const number = (value: unknown, field: string, id: string): number => {
 };
 
 const readable = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((flag): flag is string => typeof flag === "string") : [];
+  Array.isArray(value)
+    ? value.filter((flag): flag is string => typeof flag === "string")
+    : [];
 
-const document = (await Bun.file(SOURCE).json()) as { profiles?: SourceProfile[] };
+const document = (await Bun.file(SOURCE).json()) as {
+  profiles?: SourceProfile[];
+};
 if (!Array.isArray(document.profiles)) {
   throw new Error(`${SOURCE} has no profiles array`);
 }
 
 const profiles = document.profiles.map((profile) => {
-  const id = typeof profile.customerId === "string" ? profile.customerId.trim() : "";
-  if (id === "") throw new Error("profile without customerId in the source book");
+  const id =
+    typeof profile.customerId === "string" ? profile.customerId.trim() : "";
+  if (id === "")
+    throw new Error("profile without customerId in the source book");
   const book = profile.book ?? {};
   return {
     id,
@@ -62,7 +68,11 @@ await Bun.write(
     {
       schemaVersion: 1,
       generatedFrom: "data/customer-profiles.json",
-      fieldMap: { clv: "book.clvBps", vol: "book.lifetimeVolumeUsd", sharp: "book.sharpScore" },
+      fieldMap: {
+        clv: "book.clvBps",
+        vol: "book.lifetimeVolumeUsd",
+        sharp: "book.sharpScore",
+      },
       profiles,
     },
     null,
@@ -70,4 +80,6 @@ await Bun.write(
   )}\n`,
 );
 
-console.log(`profile-snapshot: wrote ${profiles.length} profile(s) to ${OUT.replace(REPO, ".")}`);
+console.log(
+  `profile-snapshot: wrote ${profiles.length} profile(s) to ${OUT.replace(REPO, ".")}`,
+);

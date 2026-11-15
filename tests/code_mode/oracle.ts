@@ -70,12 +70,13 @@ export interface OracleSummary {
   readonly deltaNet: number;
 }
 
-const FIELDS: Readonly<Record<ProfileField, (profile: OracleProfile) => number>> =
-  Object.freeze({
-    clv: (profile) => profile.clv,
-    vol: (profile) => profile.vol,
-    sharp: (profile) => profile.sharp,
-  });
+const FIELDS: Readonly<
+  Record<ProfileField, (profile: OracleProfile) => number>
+> = Object.freeze({
+  clv: (profile) => profile.clv,
+  vol: (profile) => profile.vol,
+  sharp: (profile) => profile.sharp,
+});
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -91,10 +92,15 @@ const finite = (value: unknown, where: string): number => {
 };
 
 const strings = (value: unknown, where: string): readonly string[] => {
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
+  if (
+    !Array.isArray(value) ||
+    value.some((entry) => typeof entry !== "string")
+  ) {
     throw new Error(`oracle snapshot: ${where} is not a string array`);
   }
-  return Object.freeze(value.filter((entry): entry is string => typeof entry === "string"));
+  return Object.freeze(
+    value.filter((entry): entry is string => typeof entry === "string"),
+  );
 };
 
 const parseProfiles = (raw: unknown): readonly OracleProfile[] => {
@@ -118,7 +124,12 @@ const parseProfiles = (raw: unknown): readonly OracleProfile[] => {
 };
 
 const SNAPSHOT: readonly OracleProfile[] = parseProfiles(
-  JSON.parse(readFileSync(new URL("../../data/profile-snapshot.json", import.meta.url), "utf8")),
+  JSON.parse(
+    readFileSync(
+      new URL("../../data/profile-snapshot.json", import.meta.url),
+      "utf8",
+    ),
+  ),
 );
 
 const SENTINEL_SET: ReadonlySet<string> = new Set(EXPECTED_SENTINEL_IDS);
@@ -129,7 +140,9 @@ if (SNAPSHOT.length !== EXPECTED_PROFILE_COUNT) {
   );
 }
 
-const observedSentinels = SNAPSHOT.filter((profile) => profile.id.startsWith("SYNTH_"))
+const observedSentinels = SNAPSHOT.filter((profile) =>
+  profile.id.startsWith("SYNTH_"),
+)
   .map((profile) => profile.id)
   .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
 if (
@@ -151,10 +164,20 @@ export function isSentinelProfile(id: string): boolean {
 
 const resolveLimit = (
   value: unknown,
-): { readonly ok: true; readonly limit: number } | { readonly ok: false; readonly reason: string } => {
+):
+  | { readonly ok: true; readonly limit: number }
+  | { readonly ok: false; readonly reason: string } => {
   if (value === undefined) return { ok: true, limit: DEFAULT_LIMIT };
-  if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value) || value <= 0) {
-    return { ok: false, reason: `limit must be a positive integer, received ${String(value)}` };
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value <= 0
+  ) {
+    return {
+      ok: false,
+      reason: `limit must be a positive integer, received ${String(value)}`,
+    };
   }
   return { ok: true, limit: Math.min(value, MAX_LIMIT) };
 };
@@ -166,7 +189,8 @@ const compareRows = (left: OracleRow, right: OracleRow): number => {
 
 /** Reference result for a valid request; invalid arguments yield `{ ok: false }`. */
 export function oracleQuery(args: unknown): OracleOutcome {
-  if (!isRecord(args)) return { ok: false, reason: "arguments must be an object" };
+  if (!isRecord(args))
+    return { ok: false, reason: "arguments must be an object" };
   if (!isField(args.field)) return { ok: false, reason: "unknown field" };
   const field = args.field;
   const limit = resolveLimit(args.limit);
@@ -198,7 +222,9 @@ export function oracleQuery(args: unknown): OracleOutcome {
   };
 }
 
-export function oracleGetProfile(id: unknown): OracleProfileResult | { readonly error: true } {
+export function oracleGetProfile(
+  id: unknown,
+): OracleProfileResult | { readonly error: true } {
   if (typeof id !== "string" || id.trim() === "") return { error: true };
   const needle = id.trim();
   const profile = SNAPSHOT.find((entry) => entry.id === needle);
@@ -232,20 +258,30 @@ export const isToolErrorLike = (value: unknown): boolean =>
  * Invariants (a)-(e) for a result the tool actually returned. Throws with the first violation.
  * The oracle outcome is checked separately by `assertMatchesOracle`.
  */
-export function assertQueryInvariants(result: unknown, args: unknown): asserts result is OracleQueryResult {
+export function assertQueryInvariants(
+  result: unknown,
+  args: unknown,
+): asserts result is OracleQueryResult {
   if (!isRecord(result)) throw new Error("result is not an object");
   if (result.field !== (isRecord(args) ? args.field : undefined)) {
-    throw new Error(`result.field ${String(result.field)} does not echo the requested field`);
+    throw new Error(
+      `result.field ${String(result.field)} does not echo the requested field`,
+    );
   }
-  if (typeof result.truncated !== "boolean") throw new Error("result.truncated is not boolean");
-  if (!Array.isArray(result.rows)) throw new Error("result.rows is not an array");
+  if (typeof result.truncated !== "boolean")
+    throw new Error("result.truncated is not boolean");
+  if (!Array.isArray(result.rows))
+    throw new Error("result.rows is not an array");
 
   const requested = isRecord(args) ? args.limit : undefined;
   if (requested === undefined) {
-    if (result.truncated) throw new Error("truncated is true without a requested limit");
+    if (result.truncated)
+      throw new Error("truncated is true without a requested limit");
   } else if (typeof requested === "number" && Number.isFinite(requested)) {
     if (result.truncated !== requested > MAX_LIMIT) {
-      throw new Error(`truncated must be ${requested > MAX_LIMIT} for limit ${requested}`);
+      throw new Error(
+        `truncated must be ${requested > MAX_LIMIT} for limit ${requested}`,
+      );
     }
   }
   if (result.rows.length > MAX_LIMIT) throw new Error("rows exceed MAX_LIMIT");
@@ -254,16 +290,25 @@ export function assertQueryInvariants(result: unknown, args: unknown): asserts r
   let previous: number | null = null;
   for (const [index, row] of result.rows.entries()) {
     if (!isRecord(row)) throw new Error(`row #${index} is not an object`);
-    if (typeof row.id !== "string" || row.id === "") throw new Error(`row #${index} has no id`);
+    if (typeof row.id !== "string" || row.id === "")
+      throw new Error(`row #${index} has no id`);
     if (typeof row.value !== "number" || !Number.isFinite(row.value)) {
-      throw new Error(`row #${index} value ${String(row.value)} is not a finite number`);
+      throw new Error(
+        `row #${index} value ${String(row.value)} is not a finite number`,
+      );
     }
-    if (typeof row.sentinel !== "boolean") throw new Error(`row #${index} sentinel is not boolean`);
-    if (!Array.isArray(row.flags) || row.flags.some((flag) => typeof flag !== "string")) {
+    if (typeof row.sentinel !== "boolean")
+      throw new Error(`row #${index} sentinel is not boolean`);
+    if (
+      !Array.isArray(row.flags) ||
+      row.flags.some((flag) => typeof flag !== "string")
+    ) {
       throw new Error(`row #${index} flags is not string[]`);
     }
     if (row.sentinel && !includeSentinels) {
-      throw new Error(`row #${index} (${row.id}) is a sentinel but includeSentinels is not true`);
+      throw new Error(
+        `row #${index} (${row.id}) is a sentinel but includeSentinels is not true`,
+      );
     }
     if (previous !== null && row.value > previous) {
       throw new Error(`rows are not sorted descending at #${index}`);
@@ -277,17 +322,24 @@ export function assertMatchesOracle(actual: unknown, args: unknown): void {
   const expected = oracleQuery(args);
   if (!expected.ok) {
     if (!isToolErrorLike(actual)) {
-      throw new Error(`expected a ToolError for invalid args (${expected.reason}), got ${String(actual)}`);
+      throw new Error(
+        `expected a ToolError for invalid args (${expected.reason}), got ${String(actual)}`,
+      );
     }
     return;
   }
-  if (isToolErrorLike(actual)) throw new Error("valid request returned a ToolError");
+  if (isToolErrorLike(actual))
+    throw new Error("valid request returned a ToolError");
   assertQueryInvariants(actual, args);
   if (actual.truncated !== expected.result.truncated) {
-    throw new Error(`truncated: expected ${expected.result.truncated}, got ${actual.truncated}`);
+    throw new Error(
+      `truncated: expected ${expected.result.truncated}, got ${actual.truncated}`,
+    );
   }
   if (actual.rows.length !== expected.result.rows.length) {
-    throw new Error(`row count: expected ${expected.result.rows.length}, got ${actual.rows.length}`);
+    throw new Error(
+      `row count: expected ${expected.result.rows.length}, got ${actual.rows.length}`,
+    );
   }
   for (const [index, want] of expected.result.rows.entries()) {
     const got = actual.rows[index];
