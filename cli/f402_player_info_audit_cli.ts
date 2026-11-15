@@ -209,7 +209,13 @@ if (await rankingsFile.exists()) {
     isRecord(parsed) && Array.isArray(parsed.allCustomerRows)
       ? parsed.allCustomerRows
       : [];
+  // `customerId` keeps its `_N` suffix: that suffix is what makes it unique (the login
+  // normalizer strips it, which would collapse `DUPLE_1` and `DUPLE_9` into `DUPLE`).
+  const targetCustomerId = summary.customerId.trim();
   const targetLogin = normalizeLogin(summary.login || summary.customerId);
+  // `customerId` is unique in the artifact; `playerLogin` is not (the current book has ten
+  // duplicated logins), so a login-only match is accepted only when it is unambiguous.
+  const loginMatches: DecisionInstrumentReportOverlay[] = [];
   let skipped = 0;
   for (const row of rows) {
     if (!isRecord(row)) {
@@ -221,25 +227,35 @@ if (await rankingsFile.exists()) {
       skipped++;
       continue;
     }
-    const playerLogin =
-      typeof row.playerLogin === "string"
-        ? normalizeLogin(row.playerLogin)
-        : "";
-    const customerId =
-      typeof row.customerId === "string" ? normalizeLogin(row.customerId) : "";
-    if (playerLogin === targetLogin || customerId === targetLogin) {
+    const rowCustomerId =
+      typeof row.customerId === "string" ? row.customerId.trim() : "";
+    if (rowCustomerId !== "" && rowCustomerId === targetCustomerId) {
       decisionOverlay = overlay;
       break;
     }
+    const rowLogin =
+      typeof row.playerLogin === "string"
+        ? normalizeLogin(row.playerLogin)
+        : "";
+    if (rowLogin !== "" && rowLogin === targetLogin) {
+      loginMatches.push(overlay);
+    }
+  }
+  if (decisionOverlay === null && loginMatches.length === 1) {
+    decisionOverlay = loginMatches[0] ?? null;
+  } else if (decisionOverlay === null && loginMatches.length > 1) {
+    console.error(
+      `note: login "${targetLogin}" matches ${loginMatches.length} customers in ${rankingsPath}; overlay omitted (customerId is the only unique key)`,
+    );
   }
   if (skipped > 0) {
     console.error(
       `note: skipped ${skipped} malformed row(s) in ${rankingsPath}`,
     );
   }
-  if (decisionOverlay === null && rows.length > 0) {
+  if (decisionOverlay === null && rows.length > 0 && loginMatches.length <= 1) {
     console.error(
-      `note: no ranking row matched login "${targetLogin}"; Section 4 overlay omitted`,
+      `note: no ranking row matched customer "${targetCustomerId}" (login "${targetLogin}"); Section 4 overlay omitted`,
     );
   }
 } else {
