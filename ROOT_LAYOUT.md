@@ -106,3 +106,21 @@ When executing `package.json` scripts (`bun run <script>`):
   - Supports JS, TS, and JSX/TSX without temporary files: `echo "const x: string = 'Hello'; console.log(x)" | bun run -`
   - Fully compatible with `--check`: `echo "const x: number = 'err';" | bun --check run -` performs compile-time static type analysis on `[stdin]` and halts on errors.
   - **Extension-independent parsing via redirection**: Running `bun file.js` enforces standard JavaScript parser rules (rejecting TS syntax like `as any` or `!`). Redirecting through `bun run - < file.js` defaults `[stdin]` to the universal TypeScript/TSX loader, running `.js` files containing TypeScript seamlessly.
+
+## Testing upstream Bun releases & PRs (`./bin/dx pr`)
+
+To test unmerged bugfixes, regressions, or candidate runtime patches from `oven-sh/bun`:
+
+- **Download and verify against repository gates**:
+  ```sh
+  ./bin/dx pr <pr-number|url|branch> --verify
+  ```
+  Downloads the CI release binary from GitHub Actions into `~/.bun/bin/bun-<pr>`, runs `bun check`, `check:spec-citations`, and `verify:fast` using the candidate binary.
+- **Immediate execution via `-x` / `--run`**:
+  ```sh
+  ./bin/dx pr 16420 -x run test tests/bun_cli_flags.test.ts
+  ```
+- **Managing installed candidate builds**:
+  - `./bin/dx pr --list`: Lists all installed `bun-*` PR binaries and symlinks in `~/.bun/bin`.
+  - `./bin/dx pr --clean <target|all>`: Removes installed PR artifacts to reclaim disk space.
+- **Targeted builds**: Supports `--asan` (Linux AddressSanitizer), `--profile` (profiling build), `--baseline` (x86-64 without AVX2), `--musl` (Alpine Linux), and `--lldb` / `--gdb` (direct debugger launch).
