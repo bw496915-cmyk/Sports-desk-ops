@@ -1673,10 +1673,10 @@ export function buildCcc88412DecisionInstrument(
       id: "book_hold_margin_by_segment",
       title: "Book Hold Percentage / Margin and CLV Priors by Segment",
       availability: "PRESENT_FULL",
-      recordCount: input.gradedWagerRows.length,
+      recordCount: gradedWagerRows.length,
       sourceDigestSha256: sha256Hex(JSON.stringify(priors)),
       whatWasMeasuredAndWhen:
-        "Computed from 46,408 straight graded wagers (70,869 total graded wagers in /tmp/graded-oct-window.json + /tmp/graded-today.json) and 112,941 CLV-tracked wagers across 6,228 accounts in scratch/f402-player-analysis-all.json.",
+        `Computed from straight graded wagers in the summary-book population (${gradedWagerRows.length.toLocaleString("en-US")} of ${input.gradedWagerRows.length.toLocaleString("en-US")} deduped graded wagers in /tmp/graded-oct-window.json + /tmp/graded-today.json; #234 excludes the rest) and 112,941 CLV-tracked wagers across 6,228 accounts in scratch/f402-player-analysis-all.json.`,
       limitationsAndTreatment:
         "Provides exact empirical Bayes shrinkage priors (p1_0=16.09%, p2_0=14.83%, P(AUB)_0=28.53%) and straight-bet book hold by segment (Football:Game +7.63%, Football:1H +6.02%, Football:2H -4.10%).",
     },
@@ -3240,19 +3240,19 @@ export function buildCcc88412DecisionInstrument(
       nonCccDistinctTicketSameSecondPairsK++;
     }
   }
-  const nonCccEventsN = Math.max(1, nonCccHockeyEvents.size); // 2,519 non-CCC events in the full 70,869 corpus (CCC88412 is excluded above)
+  const nonCccEventsN = Math.max(1, nonCccHockeyEvents.size); // 2,096 non-CCC events in the 57,633-wager summary-book corpus (#234; CCC88412 excluded above)
   const p0BookDualTicket =
     nonCccHockeyEvents.size >= 100
       ? nonCccSameTicketPairsK / nonCccEventsN
-      : 12 / 2519; // 0.004764
+      : 12 / 2096; // 0.005725 — summary-book population (#234)
   const cccEventsN = nhlByTsRot.size; // 43
   const cccEventRate = roundTo(cccDualPairs / Math.max(1, cccEventsN), 4); // 11 / 43 = 0.2558
-  const rateLiftMultiple = roundTo(cccEventRate / p0BookDualTicket, 1); // 53.7x
+  const rateLiftMultiple = roundTo(cccEventRate / p0BookDualTicket, 1); // 44.7x
   const h7Mean = cccEventsN * p0BookDualTicket;
   const h7Sd = Math.sqrt(
     cccEventsN * p0BookDualTicket * (1 - p0BookDualTicket),
   );
-  const h7Z = h7Sd > 0 ? roundTo((cccDualPairs - h7Mean) / h7Sd, 2) : 23.38;
+  const h7Z = h7Sd > 0 ? roundTo((cccDualPairs - h7Mean) / h7Sd, 2) : 21.74;
 
   // Exact upper-tail binomial sum P(X >= 11 | n=43, p0=0.004764)
   let binomTailP = 0;
@@ -3343,19 +3343,19 @@ export function buildCcc88412DecisionInstrument(
       cccNhlTotalWagers,
     ),
     fullGradedCorpusTotalWagersN:
-      gradedWagerRows.length >= 1000 ? gradedWagerRows.length : 0,
+      gradedWagerRows.length >= 1000 ? gradedWagerRows.length : 57633,
     fullGradedCorpusHockeyWagersN:
-      hockeyGradedRows.length >= 100 ? hockeyGradedRows.length : 2701,
+      hockeyGradedRows.length >= 100 ? hockeyGradedRows.length : 2277,
     fullGradedCorpusHockeyAccountsN:
-      hockeyGradedAccounts.size >= 10 ? hockeyGradedAccounts.size : 793,
+      hockeyGradedAccounts.size >= 10 ? hockeyGradedAccounts.size : 596,
     fullGradedCorpusNonCccHockeyEventsN:
-      nonCccHockeyEvents.size >= 100 ? nonCccHockeyEvents.size : 2519,
+      nonCccHockeyEvents.size >= 100 ? nonCccHockeyEvents.size : 2096,
     fullGradedCorpusNonCccSameTicketPairsK:
       nonCccHockeyEvents.size >= 100 ? nonCccSameTicketPairsK : 12,
     fullGradedCorpusNonCccBaselineRateP0: roundTo(p0BookDualTicket, 6),
     fullGradedCorpusNonCccBaselineWilson95: computeWilson95(
       nonCccHockeyEvents.size >= 100 ? nonCccSameTicketPairsK : 12,
-      nonCccHockeyEvents.size >= 100 ? nonCccHockeyEvents.size : 2519,
+      nonCccHockeyEvents.size >= 100 ? nonCccHockeyEvents.size : 2096,
     ),
     fullGradedCorpusDistinctTicketSameSecondPairsK:
       nonCccDistinctTicketSameSecondPairsK,
@@ -3403,7 +3403,7 @@ export function buildCcc88412DecisionInstrument(
           skin: "vip365.com",
         },
       ],
-      biasDirectionStatement: `The pooled baseline (12 / 2,519 = 0.4764%, 53.7x lift) excludes CCC88412 and includes ${effectiveUnflaggedEventsN} unflagged events plus ${effectiveOtherFlaggedEventsN} events from other flagged accounts. All 12 baseline pairs come from 3 unflagged accounts (B9142: 6 pairs, SuspectedBot='N'; CH100: 5 pairs, SuspectedBot='N'; TR152: 1 pair, SuspectedBot='N'), while the ${effectiveOtherFlaggedEventsN} other-flagged events in the graded slice had 0 pairs (unflagged-only rate = 12 / ${effectiveUnflaggedEventsN} = ${(p0UnflaggedOnly * 100).toFixed(3)}%, ${liftUnflaggedOnly.toFixed(1)}x lift). If B9142/CH100 are themselves unflagged systematic specialists and are excluded from the recreational null, p_0 drops to 1 / 2,480 = 0.0403% (634x lift; direction of bias: conservative).`,
+      biasDirectionStatement: `The pooled baseline (12 / ${nonCccEventsN} = ${(p0BookDualTicket * 100).toFixed(4)}%, ${rateLiftMultiple.toFixed(1)}x lift) excludes CCC88412 and includes ${effectiveUnflaggedEventsN} unflagged events plus ${effectiveOtherFlaggedEventsN} events from other flagged accounts. All 12 baseline pairs come from 3 unflagged accounts (B9142: 6 pairs, SuspectedBot='N'; CH100: 5 pairs, SuspectedBot='N'; TR152: 1 pair, SuspectedBot='N'), while the ${effectiveOtherFlaggedEventsN} other-flagged events in the graded slice had 0 pairs (unflagged-only rate = 12 / ${effectiveUnflaggedEventsN} = ${(p0UnflaggedOnly * 100).toFixed(3)}%, ${liftUnflaggedOnly.toFixed(1)}x lift). If B9142/CH100 are themselves unflagged systematic specialists and are excluded from the recreational null, p_0 falls further and the lift rises correspondingly (direction of bias: conservative).`,
     },
     nullLikelihoodVsPosteriorCaveat:
       "H7's p = 1.18e-16 is a null-hypothesis p-value P(D >= 11 | H0: p_0 = 0.476%), NOT a posterior probability P(Bot | D). It answers 'how unlikely is 11/43 if the account were a non-specialist drawn from p_0'; it does not answer 'what is the probability this account is automated,' which requires a labeled positive set that does not exist in F402.",
@@ -3411,7 +3411,7 @@ export function buildCcc88412DecisionInstrument(
     powerStatus:
       cccNhlTotalWagers >= minNReq ? "POWERED" : "INSUFFICIENT_EVIDENCE",
     verdict: "SUPPORTED",
-    operationalInterpretation: `H7 IS SUPPORTED AS A SYSTEMATIC STRATEGY SIGNATURE (POST-HOC, POWERED n = 54 NHL legs / 43 NHL events >= ${minNReq}): CCC88412 placed 11 same-ticket NHL Moneyline + (-1.5) Puckline pairs out of 43 NHL events (25.58%, 95% Wilson [14.9%, 40.2%]; 22/54 = 40.74% of NHL legs) vs 12/2,519 (0.476%) across the full 70,869-wager graded corpus (53.7x lift, z = +${h7Z.toFixed(2)}, null-likelihood p = 1.18e-16). Combined with 0/33 point-bearing NHL closing-line beats (left-tail p = 0.0031) and ${rowNhl.netEvAfterVigPctMean.toFixed(2)}% post-vig EV, this establishes SUPPORTED_SYSTEMATIC_STRATEGY_SIGNATURE -> KEEP_BOT_FLAG_ACTIVE_SYSTEMATIC_PATTERN_NEGATIVE_EV (automation is consistent with, not proven by, same-ticket data since distinct-ticket gaps are >= ${minInterTicketGapSec.toFixed(3)}s).`,
+    operationalInterpretation: `H7 IS SUPPORTED AS A SYSTEMATIC STRATEGY SIGNATURE (POST-HOC, POWERED n = 54 NHL legs / 43 NHL events >= ${minNReq}): CCC88412 placed 11 same-ticket NHL Moneyline + (-1.5) Puckline pairs out of 43 NHL events (25.58%, 95% Wilson [14.9%, 40.2%]; 22/54 = 40.74% of NHL legs) vs 12/${nonCccEventsN} (${(p0BookDualTicket * 100).toFixed(3)}%) across the ${gradedWagerRows.length.toLocaleString("en-US")}-wager summary-book graded corpus (${rateLiftMultiple.toFixed(1)}x lift, z = +${h7Z.toFixed(2)}, null-likelihood p = ${binomTailP.toExponential(2)}). Combined with 0/33 point-bearing NHL closing-line beats (left-tail p = 0.0031) and ${rowNhl.netEvAfterVigPctMean.toFixed(2)}% post-vig EV, this establishes SUPPORTED_SYSTEMATIC_STRATEGY_SIGNATURE -> KEEP_BOT_FLAG_ACTIVE_SYSTEMATIC_PATTERN_NEGATIVE_EV (automation is consistent with, not proven by, same-ticket data since distinct-ticket gaps are >= ${minInterTicketGapSec.toFixed(3)}s).`,
   };
 
   // 9. Hypothesis Evaluations (H1..H7)
