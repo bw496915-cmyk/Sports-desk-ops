@@ -156,6 +156,8 @@ governs _external_ consumers. Neither replaces the other — do not drop one whe
 `code-mode:profile` may pass `--realm profile-host` (gated) or `--realm host` (desk spine); defaults pick
 the usual path, not a hard exclusion.
 
+`qs` / `minimatch` overrides (audit gate): retire when MCP/Stryker bump — https://github.com/bw496915-cmyk/Sports-desk-ops/issues/228
+
 Deprecated aliases (remove after **2026-06-01**, target **v0.2.0**): `createSportsdeskCodeModeRunner`,
 `registerProfileQueryCodeModeTools`. Prefer `createSportsdeskCodeModeHostRunner` and
 `registerProfileCodeModeHostTools`. Tracked: https://github.com/bw496915-cmyk/Sports-desk-ops/issues/227
