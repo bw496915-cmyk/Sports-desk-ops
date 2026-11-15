@@ -81,6 +81,30 @@ isolated linker; the gate script restores the executable bits and symlinks that 
 strips. The HTML
 report is written to `reports/mutation/mutation.html` (force-added; `reports/` is gitignored).
 
+## Bun reference and binary posture
+
+Two Code Mode runtimes coexist:
+
+| Path | Realm | Compile / trim |
+| ---- | ----- | -------------- |
+| `lib/code_mode_host.ts` | Host desk spine (`Bun.Transpiler`, `AsyncFunction`) | Full Bun; see [Smaller executables](https://bun.com/docs/compiler/size). `--trim` drops unused APIs; **not** guest-safe. No profile tools. |
+| `lib/code_mode_profile.ts` | Guest (default) or dev-only profile host | Call `executeProfileCodeMode(code, "guest")` / CLI `--realm guest`. |
+| `lib/quickjs_code_mode.ts` | QuickJS WASM guest | No `bun:ffi`; fits **`remove: ["native-code"]`** AOT profiles. FFI QuickJS (`@tanstack/ai-isolate-quickjs-bun`) is a separate, faster lane that **requires** `allow: ["native-code"]`. |
+
+Reference URLs use the canonical form (`https://bun.com/reference/bun/<Symbol>` — not
+`/reference/globals/bun/...`, which 404s). Local catalog: `lib/bun_shapes.ts`; docs MCP:
+`bun run bun:docs-mcp search "compile standalone"`.
+
+Audit (runtime + docs grep + `--explain=trim` when supported):
+
+```sh
+bun run code-mode:binary-reference
+bun run code-mode:binary-reference --offline
+```
+
+Official trim feature name for FFI sandboxes: **`native-code`** (~0.7 MB) — see
+`bun check --aot --explain=trim` on Bun builds that support it ([compiler/size](https://bun.com/docs/compiler/size)).
+
 ## Sandbox boundary
 
 `lib/quickjs_code_mode.ts` runs cells in a QuickJS WASM realm whose only host capability is a
@@ -93,6 +117,6 @@ host memory through `ctx.dump`. The probe asserts `Bun`, `process`, `require` an
 reachable, that cells cannot see each other's globals, and that guest mutation of a tool result
 cannot reach the host snapshot.
 Stack overflow, heap exhaustion, runaway tool loops and awaited rejections are all pinned to guest
-failures rather than host crashes. The broad MCP toolset still runs through the pre-existing
-`CodeModeRunner` (`new AsyncFunction`, host realm) — a known limitation of the older runner, not of
-the profile path.
+failures rather than host crashes. The broad MCP toolset runs through `createSportsdeskCodeModeHostRunner()` (`lib/code_mode_host.ts`).
+Profile snapshot tools are **not** on that runner; they use the guest bridge only (or
+`createProfileQueryHostRunner()` for local parity).

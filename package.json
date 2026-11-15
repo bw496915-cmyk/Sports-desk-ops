@@ -43,6 +43,7 @@
   "main": "cli/sportsdesk_cli.ts",
   "type": "module",
   "scripts": {
+    "clean": "rm -rf dist && echo 'Done.'",
     "health": "bun run scripts/health_check.ts",
     "sportsdesk": "bun run cli/sportsdesk_cli.ts",
     "test": "bun test --parallel --timings=.bun-test-timings.json --update-timings",
@@ -258,6 +259,7 @@
     "test:code-mode": "bun test tests/code_mode/*.test.ts",
     "mutation:code-mode": "stryker run; rc=$?; bun run scripts/ci/restore_after_stryker.ts; exit $rc",
     "probe:code-mode": "bun run tests/code_mode/guest_probe.ts",
+    "code-mode:binary-reference": "bun scripts/code_mode_binary_reference.ts",
     "check:oracle-frozen": "bun run scripts/ci/check_oracle_frozen.ts",
     "check:profile-snapshot": "bun run scripts/generate_profile_snapshot.ts --check",
     "ci:code-mode": "bash scripts/ci/code_mode_gates.sh",

@@ -184,6 +184,8 @@ export interface GuestCellOptions {
   readonly memoryLimitBytes?: number;
 }
 
+export type RunGuestCellOptions = GuestCellOptions;
+
 const positiveOr = (value: number | undefined, fallback: number): number =>
   value !== undefined && Number.isFinite(value) && value > 0 ? value : fallback;
 
