@@ -8,7 +8,9 @@ import {
   createDevLiveWagersLoader,
   createR2PipelineService,
   isSentinelTickerWriter,
+  probeDaemon4020Status,
 } from "@sportsdesk-ops/backend";
+import { resolveDaemon4020State } from "@sportsdesk-ops/contracts";
 import { parseShortDesc } from "../lib/live_wagers.ts";
 
 const tempDirs: string[] = [];
@@ -434,5 +436,73 @@ describe("Bet-Ticker, R2 Pipeline & Agent Detail backend services", () => {
     const missing = await agentSvc.getAgentDetail("NONEXISTENT_AGENT_999");
     expect(missing.found).toBe(false);
     expect(missing.childAgents).toEqual([]);
+  });
+
+  test("probeDaemon4020Status treats HTTP 503 /health JSON as reachable degraded instead of offline", async () => {
+    const fixedNow = new Date("2026-11-14T03:45:00.000Z");
+
+    const status503 = await probeDaemon4020Status({
+      now: () => fixedNow,
+      fetchImpl: async () =>
+        Response.json(
+          {
+            status: "down",
+            operationalStatus: "down",
+            degradedReasons: [
+              {
+                message: "F402 session expired",
+                kind: "auth",
+                severity: "error",
+              },
+              {
+                message: "GSLive session expired (Cloudflare blocks auto-mint)",
+                kind: "auth",
+                severity: "error",
+              },
+            ],
+          },
+          { status: 503 },
+        ),
+    });
+    expect(status503.online).toBe(true);
+    expect(status503.state).toBe("degraded");
+    expect(status503.operationalStatus).toBe("down");
+    expect(status503.status).toBe(503);
+    expect(status503.latencyMs).toBeGreaterThanOrEqual(1);
+    expect(status503.reason).toContain("HTTP 503");
+    expect(status503.reason).toContain("F402 session expired");
+    expect(resolveDaemon4020State(status503)).toBe("degraded");
+
+    const status200Degraded = await probeDaemon4020Status({
+      now: () => fixedNow,
+      fetchImpl: async () =>
+        Response.json(
+          {
+            status: "degraded",
+            operationalStatus: "degraded",
+            degradedReasons: [
+              {
+                message: "R2 sink 'f402-bet-ticker' publish is stale",
+                kind: "publish",
+                severity: "warn",
+              },
+            ],
+          },
+          { status: 200 },
+        ),
+    });
+    expect(status200Degraded.online).toBe(true);
+    expect(status200Degraded.state).toBe("degraded");
+    expect(status200Degraded.operationalStatus).toBe("degraded");
+    expect(status200Degraded.reason).toContain("f402-bet-ticker");
+    expect(resolveDaemon4020State(status200Degraded)).toBe("degraded");
+
+    const status404 = await probeDaemon4020Status({
+      now: () => fixedNow,
+      fetchImpl: async () => new Response(null, { status: 404 }),
+    });
+    expect(status404.online).toBe(false);
+    expect(status404.state).toBe("offline");
+    expect(resolveDaemon4020State(status404)).toBe("offline");
   });
 });

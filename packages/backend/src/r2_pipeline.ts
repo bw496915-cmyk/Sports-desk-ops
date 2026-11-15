@@ -387,6 +387,50 @@ export function buildBridge3aSnapshotFromBody(
   };
 }
 
+interface Daemon4020HealthSummary {
+  readonly operationalStatus?: "ok" | "degraded" | "down";
+  readonly reasonSummary?: string;
+}
+
+async function readDaemon4020HealthSummary(
+  res: Response,
+): Promise<Daemon4020HealthSummary> {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType !== "" && !contentType.toLowerCase().includes("json")) {
+    return {};
+  }
+  try {
+    const body = (await res.json()) as {
+      operationalStatus?: unknown;
+      degradedReasons?: unknown;
+    } | null;
+    if (!body || typeof body !== "object") return {};
+    const op =
+      body.operationalStatus === "ok" ||
+      body.operationalStatus === "degraded" ||
+      body.operationalStatus === "down"
+        ? body.operationalStatus
+        : undefined;
+    const reasons = Array.isArray(body.degradedReasons)
+      ? body.degradedReasons
+          .map((item) =>
+            item && typeof item === "object" && "message" in item
+              ? String((item as { message: unknown }).message)
+              : "",
+          )
+          .filter((msg) => msg.length > 0)
+      : [];
+    const reasonSummary =
+      reasons.length > 0 ? reasons.slice(0, 2).join("; ") : undefined;
+    return {
+      ...(op !== undefined ? { operationalStatus: op } : {}),
+      ...(reasonSummary !== undefined ? { reasonSummary } : {}),
+    };
+  } catch {
+    return {};
+  }
+}
+
 export async function probeDaemon4020Status(
   options: {
     readonly origin?: string | undefined;
@@ -408,18 +452,58 @@ export async function probeDaemon4020Status(
   try {
     const res = await fetcher(url, { method: "GET" });
     const latencyMs = Math.max(1, Math.round(performance.now() - startedAt));
+    const health = await readDaemon4020HealthSummary(res);
+
+    if (res.ok) {
+      const degraded =
+        health.operationalStatus === "degraded" ||
+        health.operationalStatus === "down";
+      return {
+        online: true,
+        state: degraded ? "degraded" : "online",
+        ...(health.operationalStatus !== undefined
+          ? { operationalStatus: health.operationalStatus }
+          : {}),
+        url,
+        status: res.status,
+        latencyMs,
+        checkedAt,
+        reason: degraded ? health.reasonSummary : undefined,
+      };
+    }
+
+    // SportsDesk /health returns HTTP 503 when the daemon process is up & answering
+    // routes locally, but both upstream auth sessions (f402 + gslive) are down.
+    if (res.status === 503) {
+      const reason = health.reasonSummary
+        ? `HTTP 503 — ${health.reasonSummary}`
+        : "HTTP 503";
+      return {
+        online: true,
+        state: "degraded",
+        operationalStatus: health.operationalStatus ?? "down",
+        url,
+        status: res.status,
+        latencyMs,
+        checkedAt,
+        reason,
+      };
+    }
+
     return {
-      online: res.ok,
+      online: false,
+      state: "offline",
       url,
       status: res.status,
       latencyMs,
       checkedAt,
-      reason: res.ok ? undefined : `HTTP ${res.status}`,
+      reason: `HTTP ${res.status}`,
     };
   } catch (err) {
     // signal-honesty: intentional-daemon-offline-probe-report
     return {
       online: false,
+      state: "offline",
       url,
       status: null,
       latencyMs: null,

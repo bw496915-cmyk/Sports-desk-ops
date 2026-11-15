@@ -47,12 +47,56 @@ export interface HydratedWagerRow {
   readonly oddsAmerican: string;
   readonly riskUsd: number;
   readonly toWinUsd: number;
-  readonly clvCents: number;
+  /** Real CLV in cents, or null when no closing-line comparison exists. */
+  readonly clvCents: number | null;
   readonly alertTier: WagerTier;
   readonly alertBadge: string;
   readonly operatorDirective: string;
   readonly maxRecommendedStake: number;
   readonly autoExecute: false;
+}
+
+/** Validated `config/slab.toml` summary; read-only and path-free. */
+export interface SlabPolicySummary {
+  readonly schema: string;
+  readonly version: string;
+  readonly window_bytes: number;
+  readonly unsafe_allowed: boolean;
+  readonly sentinels: {
+    readonly null_clv: number;
+    readonly null_customer_handle32: number;
+    readonly null_bridge_channel_word32: number;
+  };
+}
+
+export interface WagersWireViolation {
+  readonly field: string;
+  readonly kind: "type" | "nullable";
+  readonly count: number;
+  /** Up to three rendered values, so the violation is actionable without the row. */
+  readonly examples: readonly string[];
+}
+
+/**
+ * Result of checking raw `getBetTicker` rows against the capture-owned wire
+ * shape (type + nullability only). `enum_source` travels with it: when the
+ * registry says `observed`, an enum difference is a sample boundary and is
+ * never counted as a violation.
+ */
+export interface WagersWireContractSummary {
+  readonly ok: boolean;
+  readonly registry: string;
+  readonly capture: string;
+  readonly capture_sha256: string;
+  readonly enum_source: string;
+  readonly fields_checked: readonly string[];
+  /** Rows actually checked (total minus sentinel-noise rows). */
+  readonly rows: number;
+  /** Rows the host excluded as sentinel noise; surfaced so the exclusion is visible. */
+  readonly skipped_rows: number;
+  readonly violations: readonly WagersWireViolation[];
+  /** Set when the registry/capture could not be read; `ok` is false then. */
+  readonly error?: string;
 }
 
 export interface LiveWagersApiResponse {
@@ -63,6 +107,17 @@ export interface LiveWagersApiResponse {
   readonly autoExecute: false;
   readonly timestamp: string;
   readonly provenance: DashboardSourceProvenance;
+  /**
+   * Wagers-tab policy identity read from `packages/ui/src/config/wagers.toml`
+   * at request time. Optional: a host without the UI package serves the feed
+   * unstamped. Probe with `jq -r .policy_version`.
+   */
+  readonly policy_version?: string;
+  readonly policy_schema?: string;
+  /** Raw-row conformance against `schema/wagers_field_contract.json`, when a host checks it. */
+  readonly wire_contract?: WagersWireContractSummary;
+  /** Slab policy when the host exposes it. */
+  readonly slab_policy?: SlabPolicySummary;
 }
 
 export interface CustomersCohortsSummary {
@@ -336,13 +391,36 @@ export interface BetTickerApiResponse {
   readonly captureHealth: BetTickerCaptureHealthSummary;
 }
 
+export type Daemon4020State = "online" | "degraded" | "offline";
+
 export interface Daemon4020Status {
+  /** True when :4020 answered /health (2xx or SportsDesk 503 auth-down). */
   readonly online: boolean;
+  /** Granular reachability + /health state (`online` | `degraded` | `offline`). */
+  readonly state?: Daemon4020State | undefined;
+  readonly operationalStatus?: "ok" | "degraded" | "down" | undefined;
   readonly url: string;
   readonly status: number | null;
   readonly latencyMs: number | null;
   readonly checkedAt: string;
   readonly reason?: string | undefined;
+}
+
+/** Resolve unified daemon reachability state from structured status fields or legacy flags. */
+export function resolveDaemon4020State(
+  daemon: Daemon4020Status | null | undefined,
+): Daemon4020State | "probing" {
+  if (!daemon) return "probing";
+  if (daemon.state) return daemon.state;
+  if (!daemon.online) return "offline";
+  if (
+    daemon.status === 503 ||
+    daemon.operationalStatus === "down" ||
+    daemon.operationalStatus === "degraded"
+  ) {
+    return "degraded";
+  }
+  return "online";
 }
 
 export interface R2SinkRollupMetric {

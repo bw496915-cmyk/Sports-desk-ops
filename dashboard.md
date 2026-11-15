@@ -12,6 +12,7 @@
 | [CCC88412](https://fantasy402.com/manager.html?customer=CCC88412) | **9.5 / 10.0**  | `ELITE_SHARP`  | `CRITICAL` | `key_number_buyer`         | **57.9%** [53.5%, 62.1%] | `+3.98` (p=0.0001) |  Half-Kelly   | 🚨 `ALERT_OPERATOR` |
 | [MJ107](https://fantasy402.com/manager.html?customer=MJ107)       | **9.3 / 10.0**  | `ELITE_SHARP`  | `CRITICAL` | `halftime_derivative`      | **57.3%** [52.9%, 61.7%] | `+3.76` (p=0.0002) |  Half-Kelly   | 🚨 `ALERT_OPERATOR` |
 | [BRT5235](https://fantasy402.com/manager.html?customer=BRT5235)   | **9.2 / 10.0**  | `ELITE_SHARP`  | `CRITICAL` | `hook_syndicate_cluster`   | **57.1%** [52.7%, 61.5%] | `+3.62` (p=0.0003) |  Half-Kelly   | 🚨 `ALERT_OPERATOR` |
+| [BRT106](https://fantasy402.com/manager.html?customer=BRT106)     | **9.1 / 10.0**  | `ELITE_SHARP`  | `CRITICAL` | `ncaab_1h_line_mover`      | **57.0%** [52.6%, 61.4%] | `+3.54` (p=0.0004) |  Half-Kelly   | 🚨 `ALERT_OPERATOR` |
 | [BRT5229](https://fantasy402.com/manager.html?customer=BRT5229)   | **8.9 / 10.0**  | `ELITE_SHARP`  | `CRITICAL` | `key_number_buyer`         | **56.8%** [52.4%, 61.2%] | `+3.45` (p=0.0006) |  Half-Kelly   | 🚨 `ALERT_OPERATOR` |
 | [BGD101](https://fantasy402.com/manager.html?customer=BGD101)     | **8.8 / 10.0**  |    `SHARP`     |   `HIGH`   | `steam_chaser`             | **56.4%** [52.0%, 60.8%] | `+3.31` (p=0.0010) |   Qtr-Kelly   | ⚠️ `ALERT_OPERATOR` |
 | [BAR301](https://fantasy402.com/manager.html?customer=BAR301)     | **8.5 / 10.0**  |    `SHARP`     |   `HIGH`   | `proxy_conduit_whale`      | **55.9%** [51.5%, 60.3%] | `+3.10` (p=0.0020) |   Qtr-Kelly   | ⚠️ `ALERT_OPERATOR` |
@@ -51,8 +52,18 @@
 | `#W-109286` | [BGD101](https://fantasy402.com/manager.html?customer=BGD101)     | [BIGDAD](/agent/BIGDAD)     |    **CFB**     | Under `52½` (-110)         | `+125 bps` |   `$2,000`    |  `$1,818`  | 👁️ MONITOR_ORIG   | 👁️ `MONITOR`        |
 | `#W-109287` | [RF2003](https://fantasy402.com/manager.html?customer=RF2003)     | [FATSSIDE](/agent/FATSSIDE) |    **NFL**     | SF 49ers ML (-165)         | `-15 bps`  |    `$350`     |   `$212`   | 🟢 RECREATIONAL   | ✅ `ACCEPT`         |
 | `#W-109288` | [SQUARE1](https://fantasy402.com/manager.html?customer=SQUARE1)   | [LAND225](/agent/LAND225)   |    **NBA**     | 4-Leg Parlay (+1250)       | `-320 bps` |    `$100`     |  `$1,250`  | 🟢 SQUARE_PARLAY  | ✅ `ACCEPT`         |
+| `#W-109293` | [BRT106](https://fantasy402.com/manager.html?customer=BRT106)     | [BGMASTER](/agent/BGMASTER) |   **NCAAB**    | Duke 1H `-3½` (-110)       | `+180 bps` | **`$5,500`**  |  `$5,000`  | 🚨 CRITICAL_KEY   | 🚨 `ALERT_OPERATOR` |
+| `#W-109294` | [BRT106](https://fantasy402.com/manager.html?customer=BRT106)     | [BGMASTER](/agent/BGMASTER) |   **NCAAB**    | Duke Live `-5½` (-110)     | `+210 bps` | **`$11,000`** | `$10,000`  | ⚠️ LIVE_LATENCY   | ⚠️ `ALERT_OPERATOR` |
 
 > **Security & Signal Honesty Invariant**: `autoExecute: false`. Every action directive produces a recommendation for human desk operator review and does not automatically mutate production wagering rules.
+
+---
+
+## 🧾 Cross-Endpoint Portal & Figure-Date Reconciliation (`getInfoPlayer` ↔ `getPerformancePlayer` ↔ `getWagersByFigureDate`)
+
+| Account                                                       | Agent / Master              | Credit Limit | Current Bal | Pending Risk | Available Bal | CarryOver (`Nov 1–9`) | Post-CarryOver (`Nov 10–12`) |  31d Net P&L   | Posture & Wire Flags                                                |
+| :------------------------------------------------------------ | :-------------------------- | :----------: | :---------: | :----------: | :-----------: | :-------------------: | :--------------------------: | :------------: | :------------------------------------------------------------------ |
+| [BRT106](https://fantasy402.com/manager.html?customer=BRT106) | [BGMASTER](/agent/BGMASTER) |  `$75,000`   |  `-$2,050`  |  `$25,600`   |   `$47,350`   |  `+$79,325` (`8d ✓`)  |      `-$2,375` (`2d ✓`)      | **`+$76,950`** | `LINE_MOVER_WEIGHT_ACTIVE` · `BETTING_ALERTS_DISABLED` · `0¢ Delta` |
 
 ---
 
@@ -81,23 +92,27 @@
 
 ---
 
----
-
 ## 👥 Customer Profiling & Behavioral Sharp Showcase
 
 ### Profiled Customer Cohorts & Corpora
 
-| Cohort / Registry                     |   Count   | Description & Evidence Source                                                                                 |
-| :------------------------------------ | :-------: | :------------------------------------------------------------------------------------------------------------ |
-| **Committed Backtest Cohort**         |  **49**   | 4-week CFB/NBA historical backtest with CLV, volume, hold, and parlay data (`docs/backtest-4wk-cfb-nba.json`) |
-| **Key Number Buyer Watchlist**        |   **5**   | Elite sharps targeting football key numbers 3, 7, 10, 14, 21 (`KEY_NUMBER_BUYER_PROFILES`)                    |
-| **Hook Syndicate Watchlist**          |   **5**   | Downline accounts exploiting half-point hooks (`HALF_POINT_HOOK_SYNDICATE_PROFILES`)                          |
-| **CI Synthetic Fixture Book**         |   **6**   | Edge case test cohort (`tests/fixtures/backtest/enriched_customers_full.json`)                                |
-| **Local Customer Book Specification** |  **220**  | Full operator book (`enriched_customers_full.json`, 1,100 sampled tickets across 29 agents)                   |
-| **Broad Surveillance Surface**        | **4,914** | Unique customer identifiers across all historical captures and weblogs                                        |
+| Cohort / Registry                     |    Count    | Description & Evidence Source                                                                                       |
+| :------------------------------------ | :---------: | :------------------------------------------------------------------------------------------------------------------ |
+| **DOD6 v5.4 Binary Columnar Spine**   | **14,534**  | 88-section SoA binary spine (`data/sportsdesk_unified_baseline_v54.dodbin`, 84.1 MB, 64-bit base-40 + radix lookup) |
+| **Provisioned Portal Accounts**       |  **9,435**  | Total provisioned customer accounts (`totalProvisionedCustomers` in `docs/backtest-4wk-cfb-nba.json`)               |
+| **Broad Surveillance Surface**        |  **4,914**  | Unique customer identifiers across all historical captures and weblogs                                              |
+| **Active 4-Week Sports Bettors**      |  **2,236**  | Active sports bettors in 4-week window (`totalActiveSportsBettors` in `docs/backtest-4wk-cfb-nba.json`)             |
+| **Local Customer Book Specification** |   **220**   | Full operator book (`enriched_customers_full.json`, 1,100 sampled tickets across 29 agents)                         |
+| **Committed Backtest Cohort**         |   **49**    | 4-week CFB/NBA historical backtest with CLV, volume, hold, and parlay data (`docs/backtest-4wk-cfb-nba.json`)       |
+| **Bridged Polymarket Wallets**        |   **22**    | Cross-domain customer-to-wallet attributions (`totalBridgedPolymarketWallets`, `./bin/dx bridge`)                   |
+| **UI Showcase & Known ID Registry**   | **15 / 27** | Fully typed UI showcase profiles (`SAMPLE_PROFILE_DATA`) & autocomplete IDs (`KNOWN_ID_LIST`)                       |
+| **CI Synthetic Fixture Book**         |    **6**    | Edge case test cohort (`tests/fixtures/backtest/enriched_customers_full.json`)                                      |
+| **Key Number Buyer Watchlist**        |    **5**    | Elite sharps targeting football key numbers 3, 7, 10, 14, 21 (`KEY_NUMBER_BUYER_PROFILES`)                          |
+| **Hook Syndicate Watchlist**          |    **5**    | Downline accounts exploiting half-point hooks (`HALF_POINT_HOOK_SYNDICATE_PROFILES`)                                |
 
 ### Multidimensional Profiling Architecture
 
+- **DOD6 v5.4 Binary Key Packer & Columnar Reader**: Zero-allocation 64-bit base-40 (`<=12` chars) / FNV-1a (`>12` chars) login key packing (`lib/dod6_v54_login_key.ts`) + 4-slot 16-bit radix probing (`lib/dod6_v54_lifetime_reader.ts`).
 - **Unified Sharpness Composite Index (0.0 - 10.0)**: Decomposed into CLV (3.0), Bayesian Skill (2.5), Sizing Discipline (1.5), Signature Specialization (2.0), and Timing Exploitation (1.0).
 - **Stake Sizing Inequality**: Exact Gini coefficient (0.0 = Flat Unit, 1.0 = Martingale Chaser).
 - **Correlated Parlay Forensics**: Automated detection of Favorite Spread + Over, Underdog + Under, and 1H/Game crosses.
@@ -108,7 +123,11 @@
 
 ## ⚙️ Automated Shell Directives
 
+> Executed by `./bin/dx dashboard --exec` (`handleDashboardCli` in `cli/sportsdesk_cli.ts`).
+> `Bun.markdown.ansi` [`AnsiTheme`](https://bun.com/reference/bun/markdown/AnsiTheme) flags: `--theme dark|light|mono|accessible`, `--columns <n>` (`0` disables wrapping), `--light` / `--dark`, `--colors` / `--no-color`, `--hyperlinks` / `--no-hyperlinks`, `--kitty-graphics`, `--linkify-symbols`.
+> Customer CLI helpers: `bun run customers index|list|find|search`, `bun run customers:profiles`, `bun run audit:customer-book`, `bun run normalize:customer-book`, `./bin/dx bridge coverage|value|match`.
+
 ```sh
-# Health probe trigger
+# Health probe trigger (executed when running `./bin/dx dashboard --exec`)
 echo "Desk health check: OK"
 ```

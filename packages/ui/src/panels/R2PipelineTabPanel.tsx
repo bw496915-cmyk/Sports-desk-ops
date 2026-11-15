@@ -1,3 +1,4 @@
+import { resolveDaemon4020State } from "@sportsdesk-ops/contracts";
 import type React from "react";
 import { useState } from "react";
 import { styles } from "../dashboard_styles.ts";
@@ -70,6 +71,20 @@ export function R2PipelineTabPanel({
   const [copiedCmdId, setCopiedCmdId] = useState<string | null>(null);
 
   const daemon = data?.daemon4020;
+  const daemonState = resolveDaemon4020State(daemon);
+  const daemonBannerColor =
+    daemonState === "online"
+      ? "#4ade80"
+      : daemonState === "degraded"
+        ? "#fbbf24"
+        : "#fbbf24";
+  const daemonBannerBorder = daemonState === "online" ? "#22c55e" : "#f59e0b";
+  const daemonBannerLabel =
+    daemonState === "online"
+      ? `● SportsDesk Daemon :4020 Online (${daemon?.latencyMs ?? 1}ms)`
+      : daemonState === "degraded"
+        ? `◐ SportsDesk Daemon :4020 Reachable — ${daemon?.operationalStatus === "down" ? "Auth Down" : "Degraded"} (${daemon?.latencyMs ?? 1}ms)`
+        : "○ SportsDesk Daemon :4020 Offline (Standalone :4022 fallback active)";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
@@ -175,7 +190,7 @@ export function R2PipelineTabPanel({
           padding: "10px 14px",
           borderRadius: "8px",
           backgroundColor: "rgba(15, 23, 42, 0.9)",
-          border: `1px solid ${daemon?.online ? "#22c55e" : "#f59e0b"}`,
+          border: `1px solid ${daemonBannerBorder}`,
           fontSize: "12px",
         }}
       >
@@ -190,14 +205,12 @@ export function R2PipelineTabPanel({
           <span
             style={{
               fontWeight: 700,
-              color: daemon?.online ? "#4ade80" : "#fbbf24",
+              color: daemonBannerColor,
             }}
           >
-            {daemon?.online
-              ? `● SportsDesk Daemon :4020 Online (${daemon.latencyMs ?? 1}ms)`
-              : "○ SportsDesk Daemon :4020 Offline (Standalone :4022 fallback active)"}
+            {daemonBannerLabel}
           </span>
-          {daemon?.reason && !daemon.online && (
+          {daemon?.reason && daemonState !== "online" && (
             <span style={{ color: "#94a3b8" }}>({daemon.reason})</span>
           )}
         </div>
