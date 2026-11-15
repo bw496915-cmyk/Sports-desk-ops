@@ -880,7 +880,7 @@ export async function runLivePositionsPulse(options?: {
     ...byCustomerMap.values(),
   ]
     .sort((a, b) => b.risk - a.risk)
-    .slice(0, 10)
+    .slice(0, 25)
     .map((c) => {
       const canonicalId = normalizeCanonicalCustomer(c.customerId);
       const dod = dodLifetimeMap.get(canonicalId);
@@ -1196,6 +1196,23 @@ export async function runLivePositionsPulse(options?: {
     DEFAULT_SUMMARY_JSON_PATH,
     `${JSON.stringify(finalSummary, null, 2)}\n`,
   );
+
+  // Automatically harvest and rank 24h flagged profiles into reports/harvested-live-profiles.json
+  try {
+    const { harvestLiveCustomerProfiles } =
+      await import("../lib/live_profile_harvester.ts");
+    const harvested = await harvestLiveCustomerProfiles({
+      repoRoot: REPO_ROOT,
+      onlyFlagged: true,
+      limit: 50,
+    });
+    await Bun.write(
+      resolve(REPO_ROOT, "reports/harvested-live-profiles.json"),
+      `${JSON.stringify(harvested, null, 2)}\n`,
+    );
+  } catch {
+    // Non-fatal: keep cron resilient if optional spine files are busy
+  }
 
   const journalPath = options?.journalPath ?? DEFAULT_JOURNAL_PATH;
   await mkdir(dirname(journalPath), { recursive: true });

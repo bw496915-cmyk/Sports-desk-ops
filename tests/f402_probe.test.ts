@@ -76,8 +76,8 @@ describe("f402 probe plan", () => {
     ]);
 
     const allReadOnly = selectProbeOps(false, "all");
-    // 25 read-only report/module ops + 8 unique manager-boot ops (getListAgenstByAgent is shared) = 33
-    expect(allReadOnly).toHaveLength(37);
+    // 30 read-only report/module ops + 8 unique manager-boot ops (getListAgenstByAgent is shared) = 38
+    expect(allReadOnly).toHaveLength(38);
   });
 
   test("builds URLs from the observed route prefix", () => {
@@ -302,6 +302,54 @@ describe("f402 probe plan", () => {
     );
     expect(probeUrl("https://fantasy402.com", perfPlayer)).toBe(
       "https://fantasy402.com/cloud/api/Manager/getPerformancePlayer",
+    );
+
+    const playerAnalysis = PROBE_OPS.find(
+      (op) => op.operation === "getReportPlayerAnalysis",
+    )!;
+    expect(
+      new URLSearchParams(
+        buildProbeBody(playerAnalysis, "BILLY666", "", {
+          reportType: "1",
+          startDate: "2026-10-31",
+          endDate: "2026-11-14",
+          lineType: "1",
+        }),
+      ).toString(),
+    ).toBe(
+      "agentID=BILLY666&agentOwner=BILLY666&customerID=&reportType=1&startDate=2026-10-31&endDate=2026-11-14&lineType=1&operation=getReportPlayerAnalysis&RRO=1",
+    );
+    expect(probeUrl("https://fantasy402.com", playerAnalysis)).toBe(
+      "https://fantasy402.com/cloud/api/Manager/getReportPlayerAnalysis",
+    );
+
+    const txList = PROBE_OPS.find(
+      (op) => op.operation === "getTransactionList",
+    )!;
+    expect(
+      new URLSearchParams(
+        buildProbeBody(txList, "BILLY666", "BRT106"),
+      ).toString(),
+    ).toBe(
+      "acc=BRT106&start=&operation=getTransactionList&RRO=1&agentID=BILLY666&agentOwner=BILLY666",
+    );
+    expect(
+      new URLSearchParams(
+        buildProbeBody(txList, "BILLY666", "BRT106", { start: "2026-11-07" }),
+      ).toString(),
+    ).toBe(
+      "acc=BRT106&start=2026-11-07&operation=getTransactionList&RRO=1&agentID=BILLY666&agentOwner=BILLY666",
+    );
+
+    const deletedTxHistory = PROBE_OPS.find(
+      (op) => op.operation === "getDeletedTransactionHistory",
+    )!;
+    expect(
+      new URLSearchParams(
+        buildProbeBody(deletedTxHistory, "BILLY666", "BRT106"),
+      ).toString(),
+    ).toBe(
+      "acc=BRT106&start=&operation=getDeletedTransactionHistory&RRO=1&agentID=BILLY666&agentOwner=BILLY666",
     );
 
     // PendingDelete sends sentinel ticketNumber=-1 by default

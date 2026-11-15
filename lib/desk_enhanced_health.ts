@@ -5,6 +5,10 @@
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
+import {
+  getLatestDeskRiskTelemetry,
+  type DeskRiskTelemetrySnapshot,
+} from "./desk-parser.ts";
 import { readF402Session, resolveF402SessionPath } from "./f402_session.ts";
 import {
   GSLIVE_MANUAL_DUAL_AUTH_ACTION,
@@ -106,6 +110,8 @@ export interface DeskEnhancedHealthInput {
   readonly hasF402MintCredentials?: () => Promise<boolean>;
   /** Override mint-failure streak (tests); defaults to {@link gsliveConsecutiveMintFailures}. */
   readonly gsliveMintFailureStreak?: () => number;
+  /** Latest desk-parser risk snapshot (defaults to in-process telemetry). */
+  readonly deskRisk?: DeskRiskTelemetrySnapshot | null | undefined;
 }
 
 export interface DeskEnhancedHealthPayload {
@@ -138,6 +144,7 @@ export interface DeskEnhancedHealthPayload {
       readonly gslive: GsliveAuthProbe;
     };
   };
+  readonly deskRisk?: DeskRiskTelemetrySnapshot | null;
   readonly degradedReasons: readonly DegradedReason[];
 }
 
@@ -698,6 +705,10 @@ export async function buildDeskEnhancedHealth(
     sources: {
       auth: { f402, gslive },
     },
+    deskRisk:
+      input.deskRisk === undefined
+        ? getLatestDeskRiskTelemetry()
+        : input.deskRisk,
     degradedReasons: finalReasons,
   };
 }
