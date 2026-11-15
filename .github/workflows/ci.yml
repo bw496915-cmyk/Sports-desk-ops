@@ -117,6 +117,12 @@ jobs:
           if [ "$rc" -ne 0 ]; then echo "::error::bun fmt failed (exit $rc)"; exit "$rc"; fi
       - name: Install dependencies
         run: bun install --frozen-lockfile --no-env-file
+      # SECURITY-ADJACENT SEAL (merge gate): profile insecure-host import allowlist — do not move to a
+      # non-required job or trim without replacing the merge gate. Runs early so a later step failure
+      # still leaves proof this job executed the seal on PRs touching lib/. Full suite: `code-mode` job.
+      - name: Profile code-mode host import allowlist
+        timeout-minutes: 2
+        run: bun run check:profile-code-mode-host-seal
       - name: Build workspace contracts dist
         run: bun run --filter '@sportsdesk-ops/contracts' build
       # Baseline green on 2026-11-14: 0 vulnerabilities (180 packages) after
@@ -144,11 +150,6 @@ jobs:
       - name: Main-gate smoke (innerHTML sinks + VPS tree)
         timeout-minutes: 2
         run: bun bin/check-innerhtml.ts && bun test tests/dashboard_credentials.test.ts
-      # SECURITY-ADJACENT SEAL (merge gate): profile insecure-host import allowlist — do not move to a
-      # non-required job or trim without replacing the merge gate. Full mutation/guest suite: `code-mode` job.
-      - name: Profile code-mode host import allowlist
-        timeout-minutes: 2
-        run: bun run check:profile-code-mode-host-seal
       - name: Bun test changed files
         run: bun run test:changed
       - name: Changed dsh-plugin bundles (verify-load)
