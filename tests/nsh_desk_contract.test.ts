@@ -607,7 +607,25 @@ describe("packages/nsh-desk model and capability contracts", () => {
 
     const repoRoot = path.join(import.meta.dir, "..");
     const maybeNsh = await tryResolveNshBinary(repoRoot);
-    if (maybeNsh !== null) {
+    // The sign flow needs a runtime at least as new as the manifest's
+    // minRuntime: a stale local nsh cannot build a pinned app. Gate on the
+    // probe and say why we skipped instead of failing every 0.4.0 host.
+    const localNshVersion =
+      maybeNsh === null
+        ? null
+        : (() => {
+            const probe = Bun.spawnSync([maybeNsh.bin, "--version"], {
+              stdout: "pipe",
+              stderr: "pipe",
+            });
+            return parseNshVersionOutput(
+              `${probe.stdout.toString()}${probe.stderr.toString()}`,
+            ).semver;
+          })();
+    const runtimeMeetsPin =
+      localNshVersion !== null &&
+      Bun.semver.satisfies(localNshVersion, `>=${PINNED_NSH_RELEASE.version}`);
+    if (maybeNsh !== null && runtimeMeetsPin) {
       const signReport = await runNshSignVerify(
         repoRoot,
         path.join(repoRoot, "packages", "nsh-desk"),
@@ -625,6 +643,10 @@ describe("packages/nsh-desk model and capability contracts", () => {
       );
       expect(signInspect).toContain("NSH Sign & Verify");
       expect(signInspect).toContain("ops.sportsdesk.desk");
+    } else if (maybeNsh !== null) {
+      console.warn(
+        `[nsh] sign/verify skipped: local nsh ${localNshVersion ?? "unknown"} < pinned ${PINNED_NSH_RELEASE.version}`,
+      );
     }
 
     expect(PINNED_NSH_RELEASE.version).toBe("0.5.0");
