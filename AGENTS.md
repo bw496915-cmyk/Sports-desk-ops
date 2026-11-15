@@ -243,7 +243,7 @@ code, in commit messages, and with the negation ignored**. The keywords are `clo
 `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, each followed by an issue
 reference (`#248`, `GH-248`, or the issue URL).
 
-So a sentence *explaining that you are not closing an issue* closes it. That happened twice on
+So a sentence _explaining that you are not closing an issue_ closes it. That happened twice on
 2026-11-15, both times writing `deliberately not Fixes #248` — the second time after the first had
 already been noticed. The second one is a documentation failure, not a parser surprise.
 
