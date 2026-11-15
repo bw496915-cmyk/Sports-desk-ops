@@ -40,7 +40,16 @@ const readable = (value: unknown): string[] =>
     ? value.filter((flag): flag is string => typeof flag === "string")
     : [];
 
-const document = (await Bun.file(SOURCE).json()) as {
+const checkOnly = Bun.argv.includes("--check");
+const sourceFile = Bun.file(SOURCE);
+if (!(await sourceFile.exists())) {
+  console.error(
+    `profile-snapshot: source ${SOURCE.replace(REPO, ".")} is absent (gitignored operator book)`,
+  );
+  process.exit(2);
+}
+
+const document = (await sourceFile.json()) as {
   profiles?: SourceProfile[];
 };
 if (!Array.isArray(document.profiles)) {
@@ -62,23 +71,42 @@ const profiles = document.profiles.map((profile) => {
   };
 });
 
-await Bun.write(
-  OUT,
-  `${JSON.stringify(
-    {
-      schemaVersion: 1,
-      generatedFrom: "data/customer-profiles.json",
-      fieldMap: {
-        clv: "book.clvBps",
-        vol: "book.lifetimeVolumeUsd",
-        sharp: "book.sharpScore",
-      },
-      profiles,
+const serialized = `${JSON.stringify(
+  {
+    schemaVersion: 1,
+    generatedFrom: "data/customer-profiles.json",
+    fieldMap: {
+      clv: "book.clvBps",
+      vol: "book.lifetimeVolumeUsd",
+      sharp: "book.sharpScore",
     },
-    null,
-    2,
-  )}\n`,
-);
+    profiles,
+  },
+  null,
+  2,
+)}\n`;
+
+if (checkOnly) {
+  const committed = Bun.file(OUT);
+  if (!(await committed.exists())) {
+    console.error(
+      `profile-snapshot: committed snapshot ${OUT.replace(REPO, ".")} is missing`,
+    );
+    process.exit(1);
+  }
+  if ((await committed.text()) !== serialized) {
+    console.error(
+      `profile-snapshot: ${OUT.replace(REPO, ".")} is stale — regenerate and re-freeze oracle.ts`,
+    );
+    process.exit(1);
+  }
+  console.log(
+    `profile-snapshot: ok — ${profiles.length} profile(s) match ${OUT.replace(REPO, ".")}`,
+  );
+  process.exit(0);
+}
+
+await Bun.write(OUT, serialized);
 
 console.log(
   `profile-snapshot: wrote ${profiles.length} profile(s) to ${OUT.replace(REPO, ".")}`,

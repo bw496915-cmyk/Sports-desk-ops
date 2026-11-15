@@ -7,6 +7,7 @@ import {
   getSummaryTool,
   isProfileSentinel,
   isToolError,
+  parseProfileSnapshot,
   queryProfilesTool,
 } from "../../lib/profile_query_tools.ts";
 import {
@@ -313,5 +314,19 @@ describe("flag and sentinel semantics", () => {
       .map((row) => row.id);
     expect(zeros.length).toBeGreaterThan(1);
     expect(zeros).toEqual([...zeros].sort());
+  });
+});
+
+describe("sentinel semantics are state, not value", () => {
+  test("a real profile carrying sentinel values is not a sentinel row", () => {
+    const parsed = parseProfileSnapshot({
+      profiles: [
+        { id: "REAL1", vol: 1, clv: -2_147_483_648, sharp: -1, flags: [] },
+      ],
+    });
+    const profile = parsed[0];
+    expect(profile).toBeDefined();
+    if (profile === undefined) return;
+    expect(isProfileSentinel(profile)).toBe(false);
   });
 });

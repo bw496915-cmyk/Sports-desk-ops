@@ -259,6 +259,7 @@
     "mutation:code-mode": "stryker run; rc=$?; bun run scripts/ci/restore_after_stryker.ts; exit $rc",
     "probe:code-mode": "bun run tests/code_mode/guest_probe.ts",
     "check:oracle-frozen": "bun run scripts/ci/check_oracle_frozen.ts",
+    "check:profile-snapshot": "bun run scripts/generate_profile_snapshot.ts --check",
     "ci:code-mode": "bash scripts/ci/code_mode_gates.sh",
     "capture:evidence": "bun run scripts/evidence_capture.ts --mode mock",
     "capture:f402": "bun run scripts/capture/f402_probe.ts",

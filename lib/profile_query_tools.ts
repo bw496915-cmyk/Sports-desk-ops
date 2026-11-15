@@ -70,12 +70,17 @@ const finite = (value: unknown, where: string): number => {
 };
 
 const stringFlags = (value: unknown, where: string): readonly string[] => {
-  if (!Array.isArray(value) || value.some((flag) => typeof flag !== "string")) {
+  if (!Array.isArray(value)) {
     throw new Error(`profile snapshot: ${where} is not a string array`);
   }
-  return Object.freeze(
-    value.filter((flag): flag is string => typeof flag === "string"),
-  );
+  const flags: string[] = [];
+  for (const flag of value) {
+    if (typeof flag !== "string") {
+      throw new Error(`profile snapshot: ${where} is not a string array`);
+    }
+    flags.push(flag);
+  }
+  return Object.freeze(flags);
 };
 
 /**

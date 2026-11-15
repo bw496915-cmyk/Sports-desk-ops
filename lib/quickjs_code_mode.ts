@@ -22,6 +22,9 @@ import {
 } from "./profile_query_tools.ts";
 
 const DEFAULT_TIMEOUT_MS = 5_000;
+const DEFAULT_MAX_TOOL_CALLS = 100;
+const DEFAULT_MEMORY_LIMIT_BYTES = 64 * 1024 * 1024;
+const MIN_MEMORY_LIMIT_BYTES = 1024 * 1024;
 
 let quickJsModule: Promise<QuickJSWASMModule> | undefined;
 
@@ -74,16 +77,23 @@ function toGuest(ctx: QuickJSContext, value: unknown): GuestValue {
 
 type HostTool = (args: unknown) => unknown;
 
-function installTools(ctx: QuickJSContext): void {
+function installTools(ctx: QuickJSContext, maxToolCalls: number): void {
   const tools: Readonly<Record<string, HostTool>> = {
     query_profiles: (args) => queryProfiles(args),
     get_profile: (args) => getProfile(args),
     get_profile_summary: (args) => getSummary(args),
   };
+  let calls = 0;
 
   const toolsObject = ctx.newObject();
   for (const [name, hostTool] of Object.entries(tools)) {
     const fn = ctx.newFunction(name, (...argHandles) => {
+      calls += 1;
+      if (calls > maxToolCalls) {
+        throw new Error(
+          `ERR_CODE_MODE_MAX_CALLS: cell exceeded the ${maxToolCalls} tool-call budget`,
+        );
+      }
       const [first] = argHandles;
       const args = first === undefined ? undefined : ctx.dump(first);
       const output = hostTool(args);
@@ -115,8 +125,16 @@ function describeGuestError(
 }
 
 export interface GuestCellOptions {
+  /** Wall-clock budget for the cell; the guest is interrupted when it expires. */
   readonly timeoutMs?: number;
+  /** Maximum guest -> host tool calls in one cell (default 100). */
+  readonly maxToolCalls?: number;
+  /** QuickJS heap ceiling in bytes (default 64 MiB, minimum 1 MiB). */
+  readonly memoryLimitBytes?: number;
 }
+
+const positiveOr = (value: number | undefined, fallback: number): number =>
+  value !== undefined && Number.isFinite(value) && value > 0 ? value : fallback;
 
 /**
  * Execute a cell in a fresh QuickJS realm and return its value as a host value.
@@ -126,24 +144,39 @@ export async function runGuestCell(
   source: string,
   options: GuestCellOptions = {},
 ): Promise<unknown> {
+  const timeoutMs = positiveOr(options.timeoutMs, DEFAULT_TIMEOUT_MS);
+  const maxToolCalls = positiveOr(options.maxToolCalls, DEFAULT_MAX_TOOL_CALLS);
+  const memoryLimitBytes = Math.max(
+    MIN_MEMORY_LIMIT_BYTES,
+    positiveOr(options.memoryLimitBytes, DEFAULT_MEMORY_LIMIT_BYTES),
+  );
+
   const QuickJS = await loadQuickJS();
   const runtime = QuickJS.newRuntime();
+  runtime.setMemoryLimit(memoryLimitBytes);
   runtime.setInterruptHandler(
-    shouldInterruptAfterDeadline(
-      Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-    ),
+    shouldInterruptAfterDeadline(Date.now() + timeoutMs),
   );
   const ctx = runtime.newContext();
   try {
-    installTools(ctx);
+    installTools(ctx, Math.floor(maxToolCalls));
     const result = ctx.evalCode(`(function(){\n${source}\n})()`, "cell.js");
     if (result.error) {
       const message = describeGuestError(ctx, result.error);
       result.error.dispose();
       throw new Error(`quickjs_code_mode: guest cell failed: ${message}`);
     }
-    const value = ctx.dump(result.value);
-    result.value.dispose();
+    let value: unknown;
+    try {
+      value = ctx.dump(result.value);
+    } finally {
+      result.value.dispose();
+    }
+    if (typeof value === "function" || typeof value === "symbol") {
+      throw new Error(
+        "quickjs_code_mode: guest cell returned a value that cannot cross the boundary",
+      );
+    }
     return value;
   } finally {
     ctx.dispose();
