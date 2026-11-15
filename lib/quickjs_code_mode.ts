@@ -25,6 +25,7 @@ const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_MAX_TOOL_CALLS = 100;
 const DEFAULT_MEMORY_LIMIT_BYTES = 64 * 1024 * 1024;
 const MIN_MEMORY_LIMIT_BYTES = 1024 * 1024;
+const DEFAULT_MAX_STACK_BYTES = 1024 * 1024;
 
 let quickJsModule: Promise<QuickJSWASMModule> | undefined;
 
@@ -124,6 +125,9 @@ function describeGuestError(
   return `${name ?? "Error"}: ${message ?? ""}`.trim();
 }
 
+type SettledGuestPromise =
+  { readonly value: QuickJSHandle } | { readonly error: QuickJSHandle };
+
 export interface GuestCellOptions {
   /** Wall-clock budget for the cell; the guest is interrupted when it expires. */
   readonly timeoutMs?: number;
@@ -154,23 +158,69 @@ export async function runGuestCell(
   const QuickJS = await loadQuickJS();
   const runtime = QuickJS.newRuntime();
   runtime.setMemoryLimit(memoryLimitBytes);
+  runtime.setMaxStackSize(DEFAULT_MAX_STACK_BYTES);
   runtime.setInterruptHandler(
     shouldInterruptAfterDeadline(Date.now() + timeoutMs),
   );
   const ctx = runtime.newContext();
   try {
     installTools(ctx, Math.floor(maxToolCalls));
-    const result = ctx.evalCode(`(function(){\n${source}\n})()`, "cell.js");
+    const result = ctx.evalCode(
+      `(async function(){\n${source}\n})()`,
+      "cell.js",
+    );
     if (result.error) {
       const message = describeGuestError(ctx, result.error);
       result.error.dispose();
       throw new Error(`quickjs_code_mode: guest cell failed: ${message}`);
     }
-    let value: unknown;
+
+    // A cell may await. resolvePromise installs guest then-callbacks, but the guest job queue must
+    // be pumped for them to run; a promise that never settles is bounded by a host deadline (the
+    // interpreter is idle then, so the interrupt handler cannot fire).
+    const outcomes: SettledGuestPromise[] = [];
+    const settling = ctx.resolvePromise(result.value);
+    settling.then(
+      (outcome) => {
+        outcomes.push(outcome);
+      },
+      () => {
+        // A late rejection after the runtime is disposed is expected on the deadline path.
+      },
+    );
+    const deadline = Date.now() + timeoutMs + 250;
     try {
-      value = ctx.dump(result.value);
+      while (outcomes.length === 0) {
+        const jobs = runtime.executePendingJobs();
+        if ("error" in jobs && jobs.error !== undefined) {
+          const message = describeGuestError(ctx, jobs.error);
+          jobs.error.dispose();
+          throw new Error(`quickjs_code_mode: guest cell failed: ${message}`);
+        }
+        await Bun.sleep(1);
+        if (outcomes.length === 0 && Date.now() > deadline) {
+          throw new Error(
+            `quickjs_code_mode: guest cell exceeded ${timeoutMs}ms`,
+          );
+        }
+      }
     } finally {
       result.value.dispose();
+    }
+    const settled = outcomes[0];
+    if (settled === undefined) {
+      throw new Error("quickjs_code_mode: guest cell promise did not settle");
+    }
+    if ("error" in settled) {
+      const message = describeGuestError(ctx, settled.error);
+      settled.error.dispose();
+      throw new Error(`quickjs_code_mode: guest cell failed: ${message}`);
+    }
+    let value: unknown;
+    try {
+      value = ctx.dump(settled.value);
+    } finally {
+      settled.value.dispose();
     }
     if (typeof value === "function" || typeof value === "symbol") {
       throw new Error(

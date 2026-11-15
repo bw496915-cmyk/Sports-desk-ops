@@ -93,3 +93,53 @@ describe("sandbox resource and isolation guarantees", () => {
     );
   });
 });
+
+describe("async cells and resource ceilings", () => {
+  test("awaits promises and tool calls", async () => {
+    expect(await runGuestCell("return await Promise.resolve(41) + 1")).toBe(42);
+    const id = await runGuestCell(
+      'const r = await tools.query_profiles({ field: "sharp", limit: 1 }); return r.rows[0].id;',
+    );
+    expect(typeof id).toBe("string");
+  });
+
+  test("an awaited rejection surfaces as a guest failure", async () => {
+    await expect(
+      runGuestCell('await Promise.reject(new Error("nope"))'),
+    ).rejects.toThrow(/nope/);
+  });
+
+  test("a promise that never settles is bounded by the host deadline", async () => {
+    await expect(
+      runGuestCell("await new Promise(() => {});", { timeoutMs: 50 }),
+    ).rejects.toThrow(/exceeded 50ms/);
+  });
+
+  test("infinite recursion is a guest stack overflow, not a host crash", async () => {
+    await expect(
+      runGuestCell("const f = () => f(); return f();"),
+    ).rejects.toThrow(/guest cell failed/);
+  });
+
+  test("the heap cap stops runaway allocation", async () => {
+    await expect(
+      runGuestCell('let s = "x"; while (true) s += s;', {
+        memoryLimitBytes: 1024 * 1024,
+      }),
+    ).rejects.toThrow(/guest cell failed|out of memory/);
+  });
+
+  test("the tool-call budget is per cell, not process-wide", async () => {
+    const cell =
+      'for (let i = 0; i < 3; i += 1) tools.get_profile({ id: "BGD101" }); return "ok";';
+    expect(await runGuestCell(cell, { maxToolCalls: 3 })).toBe("ok");
+    expect(await runGuestCell(cell, { maxToolCalls: 3 })).toBe("ok");
+  });
+
+  test("a guest can catch a host tool error and read its message", async () => {
+    const message = await runGuestCell(
+      'try { tools.query_profiles({ field: "nope" }); } catch (e) { return e.message; }',
+    );
+    expect(message).toContain("field required");
+  });
+});

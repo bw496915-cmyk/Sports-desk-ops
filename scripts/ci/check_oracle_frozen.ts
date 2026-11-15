@@ -16,6 +16,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 
 const ORACLE = "tests/code_mode/oracle.ts";
 const CONTRACT_INPUTS = [
@@ -58,6 +59,17 @@ const changed = new Set(
     .flatMap((output) => (output === "" ? [] : output.split("\n")))
     .filter((path) => path !== ""),
 );
+
+// git diff cannot see an untracked contract input; say so instead of silently skipping it.
+const untrackedInputs = CONTRACT_INPUTS.filter(
+  (path) => existsSync(path) && !git(["ls-files", "--error-unmatch", path]).ok,
+);
+if (untrackedInputs.length > 0) {
+  console.warn(
+    "check:oracle-frozen: warning — untracked contract input(s); changes are invisible to this gate:",
+  );
+  for (const path of untrackedInputs) console.warn(`  untracked: ${path}`);
+}
 const contractChanges = CONTRACT_INPUTS.filter((path) => changed.has(path));
 const oracleChanged = changed.has(ORACLE);
 

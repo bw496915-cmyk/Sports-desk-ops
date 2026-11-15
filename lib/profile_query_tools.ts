@@ -121,18 +121,14 @@ const SNAPSHOT: readonly ProfileRecord[] = parseProfileSnapshot(
 );
 
 const FIELD_NAMES: ReadonlySet<string> = new Set(["clv", "vol", "sharp"]);
-const SENTINEL_IDS: ReadonlySet<string> = new Set(
-  SNAPSHOT.filter((profile) => profile.id.startsWith("SYNTH_")).map(
-    (profile) => profile.id,
-  ),
-);
+const SENTINEL_PREFIX = "SYNTH_";
 
 const isProfileField = (value: unknown): value is ProfileField =>
   typeof value === "string" && FIELD_NAMES.has(value);
 
-/** Sentinel state is a property of the profile, never inferred from its sort value. */
+/** Sentinel state is a property of the profile id, never inferred from its sort value. */
 export function isProfileSentinel(profile: ProfileRecord): boolean {
-  return SENTINEL_IDS.has(profile.id);
+  return profile.id.startsWith(SENTINEL_PREFIX);
 }
 
 function sortValue(profile: ProfileRecord, field: ProfileField): number {
@@ -159,8 +155,14 @@ function parseLimit(value: unknown): number {
   return value;
 }
 
-/** Sync core shared by the MCP tool wrapper and the QuickJS bridge. */
-export function queryProfiles(args: unknown): ProfileQueryResult {
+/**
+ * Pure query core. Exported so properties can run over generated snapshots, not only the frozen
+ * 31-row one; `queryProfiles` is this function bound to the committed snapshot.
+ */
+export function querySnapshot(
+  snapshot: readonly ProfileRecord[],
+  args: unknown,
+): ProfileQueryResult {
   if (!isRecord(args) || !isProfileField(args.field)) {
     throw new ToolError("query_profiles: field required (clv|vol|sharp)");
   }
@@ -170,7 +172,7 @@ export function queryProfiles(args: unknown): ProfileQueryResult {
   const effective = Math.min(requested, MAX_LIMIT);
 
   const ranked: ProfileQueryRow[] = [];
-  for (const profile of SNAPSHOT) {
+  for (const profile of snapshot) {
     const sentinel = isProfileSentinel(profile);
     if (sentinel && !includeSentinels) continue;
     ranked.push(
@@ -193,6 +195,11 @@ export function queryProfiles(args: unknown): ProfileQueryResult {
     rows: Object.freeze(ranked.slice(0, effective)),
     truncated: requested > MAX_LIMIT,
   });
+}
+
+/** Sync core shared by the MCP tool wrapper and the QuickJS bridge. */
+export function queryProfiles(args: unknown): ProfileQueryResult {
+  return querySnapshot(SNAPSHOT, args);
 }
 
 export function getProfile(args: unknown): ProfileRecord {

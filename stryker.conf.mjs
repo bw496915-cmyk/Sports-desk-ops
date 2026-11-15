@@ -19,6 +19,8 @@ export default {
     "tests/code_mode/profile_query.property.test.ts",
     "tests/code_mode/quickjs_guest.test.ts",
     "tests/code_mode/profile_query.parser.test.ts",
+    "tests/code_mode/profile_query.synthetic.test.ts",
+    "tests/code_mode/profile_query.differential.test.ts",
   ],
   coverageAnalysis: "perTest",
   thresholds: { high: 80, low: 60, break: 60 },

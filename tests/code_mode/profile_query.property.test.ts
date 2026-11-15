@@ -13,6 +13,11 @@ const NUM_RUNS = (() => {
   return Number.isInteger(raw) && raw > 0 ? raw : 100;
 })();
 
+const seed = Number(process.env.FAST_CHECK_SEED);
+if (process.env.FAST_CHECK_SEED !== undefined && Number.isInteger(seed)) {
+  fc.configureGlobal({ seed });
+}
+
 const fieldArbitrary = fc.oneof(
   fc.constantFrom("clv", "vol", "sharp"),
   fc.string(),

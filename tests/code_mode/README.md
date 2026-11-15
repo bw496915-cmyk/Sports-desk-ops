@@ -32,6 +32,13 @@ metamorphic properties that hold independently of the oracle:
 - sentinel state is the profile id (`SYNTH_*`), not the sort value — a real profile carrying the
   old sentinel numbers is not a sentinel row.
 
+The pure core `querySnapshot(snapshot, args)` is tested over **generated snapshots** (0–40 rows,
+duplicate values, ties, negatives, synthetic ids), against a separately written reference model —
+so ordering, filtering, limits and freezing are exercised beyond the frozen 31 rows. A second
+suite runs the same requests through **SQLite** (`ORDER BY value DESC, id ASC LIMIT ?`) and requires
+both engines to agree row-for-row. The freeze gate itself is tested by spawning it against a
+throwaway git repository: clean, schema-only, and paired-change cases.
+
 ## Gates
 
 ```sh
@@ -42,7 +49,8 @@ bun run probe:code-mode       # QuickJS guest probe as a standalone gate
 bun run check:profile-snapshot
 ```
 
-Property runs default to 100 cases; override with `FAST_CHECK_NUM_RUNS`.
+Property runs default to 100 cases; override with `FAST_CHECK_NUM_RUNS` and pin a failing run
+with `FAST_CHECK_SEED`.
 
 Mutation runs in place (the sandbox cannot resolve Stryker's TypeScript preprocessor under this
 repo's isolated linker), and the gate script restores the executable bits and symlinks that
@@ -52,9 +60,12 @@ in-place restore strips. The HTML report is written to `reports/mutation/mutatio
 ## Sandbox boundary
 
 `lib/quickjs_code_mode.ts` runs cells in a QuickJS WASM realm whose only host capability is a
-synchronous `tools` bridge. Every cell gets a fresh runtime with a wall-clock timeout (5 s), a
-tool-call budget (100), and a 64 MiB heap cap; the probe asserts `Bun`, `process`, `require` and
-`module` are not reachable, that cells cannot see each other's globals, and that guest mutation of
-a tool result cannot reach the host snapshot. The broad MCP toolset still runs through the
-pre-existing `CodeModeRunner` (`new AsyncFunction`, host realm) — that is a known limitation of
-the older runner, not of the profile path.
+`tools` bridge. Cells may `await` (host promises are settled by pumping the guest job queue, with a
+host deadline for promises that never settle). Every cell gets a fresh runtime with a wall-clock
+timeout (5 s), a tool-call budget (100, per cell), a 64 MiB heap cap and a 1 MiB stack cap; the
+probe asserts `Bun`, `process`, `require` and `module` are not reachable, that cells cannot see
+each other's globals, and that guest mutation of a tool result cannot reach the host snapshot.
+Stack overflow, heap exhaustion, runaway tool loops and awaited rejections are all pinned to guest
+failures rather than host crashes. The broad MCP toolset still runs through the pre-existing
+`CodeModeRunner` (`new AsyncFunction`, host realm) — a known limitation of the older runner, not of
+the profile path.
