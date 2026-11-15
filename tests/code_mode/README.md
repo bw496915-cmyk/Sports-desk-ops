@@ -166,7 +166,7 @@ the allowlist failure is the backstop, the issue is the reminder.
 
 | Job              | Trigger                              | Blocks merge?                                                                                                  |
 | ---------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `verify-changed` | Every PR                             | **Yes** (branch protection) — `check:profile-code-mode-host-seal` immediately after `bun install`            |
+| `verify-changed` | Every PR                             | **Yes** (branch protection) — `check:profile-code-mode-host-seal` immediately after `bun install`              |
 | `code-mode`      | PR, `main` push, `workflow_dispatch` | No (team norm / latency; reversible) — `ci:code-mode` reuses the same seal script, then mutation + guest probe |
 
 `attachProfileHostTools` may only be imported from `*.test.ts`; a non-`*.test.ts` helper under `tests/helpers/` must widen the allowlist deliberately.
