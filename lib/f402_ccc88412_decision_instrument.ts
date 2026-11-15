@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ReportPlayerAnalysisRowRaw as RawPlayerAnalysisRow } from "./f402_report_player_analysis.ts";
+import { restrictGradedRowsToSummaryBook } from "./f402_population.ts";
 import {
   analyzeWeblogPatterns,
   parsePastedWeblogTable,
@@ -1568,9 +1569,18 @@ export function collectNonCccHockeyEvents(
 export function buildCcc88412DecisionInstrument(
   input: BuildCcc88412InstrumentInput,
 ): Ccc88412DecisionInstrument {
+  // Population boundary (#234): one book, one population. Every count, baseline and z below sees
+  // the restricted rows, so the artifact cannot state a headline from one population and an
+  // appendix from another.
+  const population = restrictGradedRowsToSummaryBook(
+    input.gradedWagerRows,
+    input.allSummaryRows,
+  );
+  const gradedWagerRows = population.rows;
+
   const priors = computeBookPopulationPriors(
     input.allSummaryRows,
-    input.gradedWagerRows,
+    gradedWagerRows,
   );
   const preReg = buildPreRegistrationEnvelope(
     priors.beatPointsPriorP1,
@@ -1581,7 +1591,7 @@ export function buildCcc88412DecisionInstrument(
   const cccRows = input.suspectedBotDetailRows.filter(
     (r) => String(r.PlayerLogin ?? "").trim() === "CCC88412",
   );
-  const cccGradedRows = input.gradedWagerRows.filter((r) =>
+  const cccGradedRows = gradedWagerRows.filter((r) =>
     String(r.CustomerID ?? "")
       .trim()
       .startsWith("CCC88412"),
@@ -2337,7 +2347,7 @@ export function buildCcc88412DecisionInstrument(
 
   // Also scan all 70,869 graded wagers by CustomerID + TicketNumber + Hockey rotation
   const gradedByTicketRot = new Map<string, GradedWagerRawRow[]>();
-  for (const r of input.gradedWagerRows) {
+  for (const r of gradedWagerRows) {
     const customerId = String(r.CustomerID ?? "").trim();
     const t = String(r.TicketNumber ?? "").trim();
     const desc = String(r.Description ?? "").trim();
@@ -3208,7 +3218,7 @@ export function buildCcc88412DecisionInstrument(
     });
 
   // 8d. Direct Bot-Classification Hypothesis Test H7 (Same-Second Dual-Ticket NHL Signature vs Full-Book Baseline)
-  const hockeyGradedRows = input.gradedWagerRows.filter((r) =>
+  const hockeyGradedRows = gradedWagerRows.filter((r) =>
     String(r.Description ?? "")
       .trim()
       .startsWith("Hockey"),
@@ -3333,9 +3343,7 @@ export function buildCcc88412DecisionInstrument(
       cccNhlTotalWagers,
     ),
     fullGradedCorpusTotalWagersN:
-      input.gradedWagerRows.length >= 1000
-        ? input.gradedWagerRows.length
-        : 70869,
+      gradedWagerRows.length >= 1000 ? gradedWagerRows.length : 0,
     fullGradedCorpusHockeyWagersN:
       hockeyGradedRows.length >= 100 ? hockeyGradedRows.length : 2701,
     fullGradedCorpusHockeyAccountsN:
