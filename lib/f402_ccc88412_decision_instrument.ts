@@ -1600,8 +1600,7 @@ export function buildCcc88412DecisionInstrument(
       sourceDigestSha256: sha256Hex(input.cccRawWebLogText20261101),
       whatWasMeasuredAndWhen:
         "Parsed all 103 Mode C WebLog events for CCC88412 on 2026-11-01 (12:25:16 AM to 08:29:03 PM EST) and checked scratch/weblog/rollup-2026-11-01..04.json.",
-      limitationsAndTreatment:
-        "Mode C customer-level WebLog is captured for 2026-11-01 (103 events, containing 1 BOT BLOCK LINE ST event at 10:48:20 AM and its 10:48:35 AM retry). Because n=1 < n_min=47, population rate inference is gated as INSUFFICIENT_EVIDENCE while the single event is deterministically classified.",
+      limitationsAndTreatment: `Mode C customer-level WebLog is captured for 2026-11-01 (103 events, containing 1 BOT BLOCK LINE ST event at 10:48:20 AM and its 10:48:35 AM retry). Because n=1 < n_min=${preReg.minimumSampleSizeClv15PctLift}, population rate inference is gated as INSUFFICIENT_EVIDENCE while the single event is deterministically classified.`,
     },
     {
       id: "book_hold_margin_by_segment",
@@ -1906,8 +1905,7 @@ export function buildCcc88412DecisionInstrument(
   const segmentTable: SegmentStatisticalRow[] = prelimRows.map((r, idx) => {
     const winQ = winQs[idx] ?? 1;
     const clvQ = clvQs[idx] ?? 1;
-    let rec =
-      "INSUFFICIENT_EVIDENCE (n < 47 power gate; do not recommend limit change)";
+    let rec = `INSUFFICIENT_EVIDENCE (n < ${minNReq} power gate; do not recommend limit change)`;
     if (r.powerStatus === "POWERED") {
       if (r.netEvAfterVigPctMean > 0 && clvQ < 0.05) {
         rec = "POWERED_EDGE_DETECTED -> LIMIT";
@@ -2507,8 +2505,7 @@ export function buildCcc88412DecisionInstrument(
       ticketCount: ip.wagerCount,
       botBlockCount: ip.botBlockCount,
     })),
-    interpretation:
-      "At 10:48:20 AM EST on 2026-11-01 (IP 107.115.171.78), CCC88412 triggered self-collision lock key bot_619115908_0_S__0 on #240 Lions. Exactly 15 seconds later (10:48:35 AM), Ticket 1073245580 was accepted at -3.0 -115 (deltaPoints = 0, deltaPrice = 0). This proves TTL_EXPIRY (the 15s lock cooldown expired while the line remained at -3 -115), NOT PRICE_CHASE. Because n = 1 < 47, population rate estimation is gated as INSUFFICIENT_EVIDENCE.",
+    interpretation: `At 10:48:20 AM EST on 2026-11-01 (IP 107.115.171.78), CCC88412 triggered self-collision lock key bot_619115908_0_S__0 on #240 Lions. Exactly 15 seconds later (10:48:35 AM), Ticket 1073245580 was accepted at -3.0 -115 (deltaPoints = 0, deltaPrice = 0). This proves TTL_EXPIRY (the 15s lock cooldown expired while the line remained at -3 -115), NOT PRICE_CHASE. Because n = 1 < ${minNReq}, population rate estimation is gated as INSUFFICIENT_EVIDENCE.`,
   };
 
   // 7. Key-Number Half-Point Buying Audit (H6)
@@ -3867,8 +3864,7 @@ export function buildCcc88412DecisionInstrument(
     systematicSignaturePostHocSupportedCount: 1,
     postHocContingencyLeadStatement:
       "The one SUPPORTED hypothesis (H7: SYSTEMATIC_STRATEGY_SIGNATURE) is post-hoc; the report classifies it as such in the integrity audit (POST_HOC_PREREGISTERED_RETROSPECTIVE_SPLIT). The KEEP_BOT_FLAG_ACTIVE_SYSTEMATIC_PATTERN_NEGATIVE_EV verdict rests on that hypothesis. A genuinely pre-registered confirmation requires the W3 firewall specified in §0.1 / §3.",
-    honestExecutiveSummary:
-      "Zero pre-registered consequence/edge/linkage hypotheses (H1-H6) were confirmed: two powered tests came back null/falsified (H2 coordination crossed the >=50% absent falsifier threshold at 75.8% while Branch A permutation p=0.0958 was non-significant; H4 NHL union CLV was 13.0% vs 28.53% book prior with -4.62% post-vig EV), one structural IP test had zero overlap (H3), and three tests were underpowered (H1 halftime n=37 < 47, H5 BOT BLOCK n=1 < 47, H6 half-point buys n=4 < 47). The one SUPPORTED hypothesis (H7: SYSTEMATIC_STRATEGY_SIGNATURE) is post-hoc: CCC88412 pairs NHL ML + (-1.5) Puckline on the same ticket in 11/43 events (25.58% vs 0.476% book baseline, 53.7x lift, null-likelihood p = 1.18e-16), beats closing points on 0/33 point-bearing NHL legs (left-tail p = 0.0031), and runs at -4.62% NHL / -4.76% overall post-vig EV. Because same-ticket multi-leg bets share a timestamp by construction and distinct-ticket gaps are >= 13.563s, automation is marked 'consistent with, not proven by' same-ticket data, and the headline verdict is KEEP_BOT_FLAG_ACTIVE_SYSTEMATIC_PATTERN_NEGATIVE_EV with explicit MONITOR alerting triggers.",
+    honestExecutiveSummary: `Zero pre-registered consequence/edge/linkage hypotheses (H1-H6) were confirmed: two powered tests came back null/falsified (H2 coordination crossed the >=50% absent falsifier threshold at 75.8% while Branch A permutation p=0.0958 was non-significant; H4 NHL union CLV was 13.0% vs 28.53% book prior with -4.62% post-vig EV), one structural IP test had zero overlap (H3), and three tests were underpowered (H1 halftime n=37 < ${minNReq}, H5 BOT BLOCK n=1 < ${minNReq}, H6 half-point buys n=4 < ${minNReq}). The one SUPPORTED hypothesis (H7: SYSTEMATIC_STRATEGY_SIGNATURE) is post-hoc: CCC88412 pairs NHL ML + (-1.5) Puckline on the same ticket in 11/43 events (25.58% vs 0.476% book baseline, 53.7x lift, null-likelihood p = 1.18e-16), beats closing points on 0/33 point-bearing NHL legs (left-tail p = 0.0031), and runs at -4.62% NHL / -4.76% overall post-vig EV. Because same-ticket multi-leg bets share a timestamp by construction and distinct-ticket gaps are >= 13.563s, automation is marked 'consistent with, not proven by' same-ticket data, and the headline verdict is KEEP_BOT_FLAG_ACTIVE_SYSTEMATIC_PATTERN_NEGATIVE_EV with explicit MONITOR alerting triggers.`,
   };
 
   const monitorOperationalTriggers: MonitorOperationalTrigger[] = [
@@ -4136,7 +4132,7 @@ export function renderCcc88412DecisionInstrumentMarkdown(
   );
   lines.push("");
   lines.push(
-    "| Segment | Cat | $n$ | Power ($n \\ge 47$) | W-L-P | Net USD (ROI%) | Book Hold% | Win% Raw [95% Wilson] | Win% Shrunk ($q_{\\text{BH}}$) | $p_1$ Pts Raw / Shrunk | $p_2$ Prc Raw / Shrunk | Union $P(A\\cup B)$ Raw [95% CI] / Shrunk ($q_{\\text{BH}}$) | CLV Move Edge% [95% CI] | Net EV% After Vig [95% CI] |",
+    `| Segment | Cat | $n$ | Power ($n \\ge ${inst.preRegistration.minimumSampleSizeClv15PctLift}$) | W-L-P | Net USD (ROI%) | Book Hold% | Win% Raw [95% Wilson] | Win% Shrunk ($q_{\\text{BH}}$) | $p_1$ Pts Raw / Shrunk | $p_2$ Prc Raw / Shrunk | Union $P(A\\cup B)$ Raw [95% CI] / Shrunk ($q_{\\text{BH}}$) | CLV Move Edge% [95% CI] | Net EV% After Vig [95% CI] |`,
   );
   lines.push(
     "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
