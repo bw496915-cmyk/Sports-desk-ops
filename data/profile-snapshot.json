@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "data/customer-profiles.json",
+  "fieldMap": {
+    "clv": "book.clvBps",
+    "vol": "book.lifetimeVolumeUsd",
+    "sharp": "book.sharpScore"
+  },
+  "profiles": [
+    {
+      "id": "SYNTH_SYN_01",
+      "vol": 500000,
+      "clv": 40,
+      "sharp": 81.5,
+      "flags": [
+        "agent SYNTH_AGENT_01 is not in the tree"
+      ]
+    },
+    {
+      "id": "SYNTH_SNIPER_02",
+      "vol": 250000,
+      "clv": 120,
+      "sharp": 88,
+      "flags": [
+        "agent SYNTH_AGENT_02 is not in the tree"
+      ]
+    },
+    {
+      "id": "SYNTH_REC_03",
+      "vol": 0,
+      "clv": 10,
+      "sharp": 33.2,
+      "flags": [
+        "agent SYNTH_AGENT_03 is not in the tree",
+        "no ticket sample"
+      ]
+    },
+    {
+      "id": "SYNTH_REC_04",
+      "vol": 10000,
+      "clv": -20,
+      "sharp": 22,
+      "flags": [
+        "agent SYNTH_AGENT_04 is not in the tree",
+        "no ticket sample"
+      ]
+    },
+    {
+      "id": "PEY101",
+      "vol": 20000,
+      "clv": 90,
+      "sharp": 79.4,
+      "flags": [
+        "agent SYNTH_AGENT_05 is not in the tree",
+        "recent sample runs opposite to the lifetime net"
+      ]
+    },
+    {
+      "id": "BGD101",
+      "vol": 1,
+      "clv": 999,
+      "sharp": 99.9,
+      "flags": [
+        "agent SYNTH_DUPLICATE_AGENT is not in the tree"
+      ]
+    },
+    {
+      "id": "ABC700_0",
+      "vol": 0,
+      "clv": -86,
+      "sharp": 7.5,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "DAN136_0",
+      "vol": 0,
+      "clv": 903,
+      "sharp": -8.2,
+      "flags": [
+        "agent DAN318 is not in the tree",
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "CCC88412",
+      "vol": 0,
+      "clv": -228,
+      "sharp": -1.5,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "GL205",
+      "vol": 0,
+      "clv": 0,
+      "sharp": 5,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "MM1007_1",
+      "vol": 0,
+      "clv": -643,
+      "sharp": -7.3,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "QQ151_0",
+      "vol": 0,
+      "clv": 1126,
+      "sharp": -21,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "PU225",
+      "vol": 0,
+      "clv": 0,
+      "sharp": 5,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "BB7884",
+      "vol": 0,
+      "clv": 371,
+      "sharp": -6.3,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "WC8036",
+      "vol": 0,
+      "clv": -931,
+      "sharp": -6.9,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "BRT106",
+      "vol": 0,
+      "clv": 0,
+      "sharp": 0,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "B9224",
+      "vol": 0,
+      "clv": 239,
+      "sharp": -9.2,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "DAN222",
+      "vol": 0,
+      "clv": 73,
+      "sharp": -4.8,
+      "flags": [
+        "agent DAN318 is not in the tree",
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "ESP101",
+      "vol": 0,
+      "clv": -3578,
+      "sharp": 4.5,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "DDE10",
+      "vol": 0,
+      "clv": 482,
+      "sharp": -10.4,
+      "flags": [
+        "agent DDELP9 is not in the tree",
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "JJ866_0",
+      "vol": 0,
+      "clv": 745,
+      "sharp": -10.2,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "XB115",
+      "vol": 0,
+      "clv": 4167,
+      "sharp": -29.8,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "J4818.",
+      "vol": 0,
+      "clv": 38,
+      "sharp": -7.4,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "ADJ100",
+      "vol": 0,
+      "clv": 4122,
+      "sharp": -29.7,
+      "flags": [
+        "agent ADRIANJOSH is not in the tree",
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "BA107_0",
+      "vol": 0,
+      "clv": 0,
+      "sharp": 75.7,
+      "flags": [
+        "agent BARSK1 is not in the tree",
+        "no ticket sample",
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "G442",
+      "vol": 0,
+      "clv": 0,
+      "sharp": 0,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "QQ150.",
+      "vol": 0,
+      "clv": 0,
+      "sharp": -37.6,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "2696",
+      "vol": 0,
+      "clv": 98,
+      "sharp": -14.3,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "J54964",
+      "vol": 0,
+      "clv": 408,
+      "sharp": -6.4,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "BZ103",
+      "vol": 0,
+      "clv": 329,
+      "sharp": -29.6,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    },
+    {
+      "id": "B160",
+      "vol": 0,
+      "clv": 1437,
+      "sharp": 15,
+      "flags": [
+        "SOURCE:harvested-live-profiles (model-derived; lifetime volume not measured)"
+      ]
+    }
+  ]
+}
