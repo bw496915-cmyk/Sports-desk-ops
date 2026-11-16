@@ -34,6 +34,8 @@ export interface UsersRosterIndex {
   readonly byAgent: ReadonlyMap<string, ProjectedRosterAgent>;
   /** Normalized customerID and login → agent id. */
   readonly playerToAgent: ReadonlyMap<string, string>;
+  /** Number of roster players assigned to each agent. */
+  readonly playerCountByAgent: ReadonlyMap<string, number>;
 }
 
 const SENSITIVE_KEYS = [
@@ -157,8 +159,14 @@ export async function loadProjectedUsersRoster(
     byAgent.set(normalizeRosterId(agent.agentId), agent);
   }
   const playerToAgent = new Map<string, string>();
+  const playerCountByAgent = new Map<string, number>();
   for (const player of roster.players) {
     if (player.agent === null) continue;
+    const agentKey = normalizeRosterId(player.agent);
+    playerCountByAgent.set(
+      agentKey,
+      (playerCountByAgent.get(agentKey) ?? 0) + 1,
+    );
     for (const key of matchKeys(player.customerId)) {
       playerToAgent.set(key, player.agent);
     }
@@ -174,5 +182,6 @@ export async function loadProjectedUsersRoster(
     players: roster.players.length,
     byAgent,
     playerToAgent,
+    playerCountByAgent,
   };
 }

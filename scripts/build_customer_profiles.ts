@@ -308,6 +308,59 @@ const agentFeed = {
         },
 };
 
+const rootWeeklyAgent =
+  typeof weeklyDoc?.agentId === "string" && weeklyDoc.agentId.trim() !== ""
+    ? normalizeRosterId(weeklyDoc.agentId)
+    : null;
+const weeklyFigure =
+  weeklyDoc?.weekly !== null &&
+  typeof weeklyDoc?.weekly === "object" &&
+  typeof (weeklyDoc.weekly as { kind?: unknown }).kind === "string"
+    ? (weeklyDoc.weekly as {
+        kind: string;
+        activePlayers?: number;
+        thisWeek?: number | null;
+        today?: number | null;
+      })
+    : null;
+const feedProfiles = enrichedProfiles.map((profile) => {
+  const rosterAgent = roster?.playerToAgent.get(
+    normalizeRosterId(profile.customerId),
+  );
+  const info =
+    rosterAgent === undefined
+      ? undefined
+      : roster?.byAgent.get(normalizeRosterId(rosterAgent));
+  const count =
+    rosterAgent === undefined
+      ? undefined
+      : roster?.playerCountByAgent.get(normalizeRosterId(rosterAgent));
+  const inRoot =
+    rootWeeklyAgent !== null &&
+    (normalizeRosterId(profile.agentId) === rootWeeklyAgent ||
+      profile.placement.chain.some(
+        (agent) => normalizeRosterId(agent) === rootWeeklyAgent,
+      ));
+  return {
+    ...profile,
+    ...(info === undefined
+      ? {}
+      : {
+          roster: {
+            agentId: info.agentId,
+            level: info.level,
+            type: info.type,
+            seqNumber: info.seqNumber,
+            playerCount: count ?? 0,
+            agentMatchesProfile:
+              normalizeRosterId(info.agentId) ===
+              normalizeRosterId(profile.agentId),
+          },
+        }),
+    ...(inRoot && weeklyFigure !== null ? { weeklyFigure } : {}),
+  };
+});
+
 const outPath = resolve(values.out ?? "");
 await Bun.write(
   outPath,
@@ -349,7 +402,7 @@ await Bun.write(
         meta: downline?.meta ?? null,
         note: "sportsdesk_downline_data.json is a point-in-time fixture, not a live feed",
       },
-      profiles: enrichedProfiles,
+      profiles: feedProfiles,
     },
     null,
     2,
@@ -357,7 +410,7 @@ await Bun.write(
 );
 
 if (values.json) {
-  console.log(JSON.stringify({ summary, profiles: enrichedProfiles }, null, 2));
+  console.log(JSON.stringify({ summary, profiles: feedProfiles }, null, 2));
 } else {
   // The book's `*_usd` fields are dollars (a $20,000 ticket is `risk_usd: 20000`), not cents.
   const usd = (dollars: number) =>

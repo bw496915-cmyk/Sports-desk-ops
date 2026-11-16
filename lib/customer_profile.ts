@@ -403,6 +403,22 @@ export interface CustomerProfile {
   readonly treeExposure?: AgentExposure;
   /** Tree collision for this agent login, when the tree reports one. */
   readonly treeCollision?: TreeCollision;
+  /** Real roster assignment for this customer, when the projected roster carries it. */
+  readonly roster?: {
+    readonly agentId: string;
+    readonly level: number | null;
+    readonly type: string | null;
+    readonly seqNumber: number | null;
+    readonly playerCount: number;
+    readonly agentMatchesProfile: boolean;
+  };
+  /** Root weekly figure, attached to profiles inside that agent's tree subtree. */
+  readonly weeklyFigure?: {
+    readonly kind: string;
+    readonly activePlayers?: number;
+    readonly thisWeek?: number | null;
+    readonly today?: number | null;
+  };
   /** Data-quality notes that change how a number should be read. */
   readonly flags: readonly string[];
 }
