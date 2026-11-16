@@ -27,6 +27,10 @@ import {
 } from "../lib/customer_source_rows.ts";
 import { positionIdentity } from "../lib/position_identity.ts";
 import { ticketWriterDisposition } from "../lib/live_writer_policy.ts";
+import {
+  loadProjectedUsersRoster,
+  normalizeRosterId,
+} from "../lib/users_roster.ts";
 import { fetchLiveFeedObject } from "../lib/live_feed_source.ts";
 import {
   loadAgentDownline,
@@ -48,6 +52,10 @@ const { values } = parseArgs({
     downline: {
       type: "string",
       default: join(REPO, "sportsdesk_downline_data.json"),
+    },
+    "agent-feed": {
+      type: "string",
+      default: join(REPO, "Scratch", "agent-feed"),
     },
     out: {
       type: "string",
@@ -243,6 +251,63 @@ const enrichedProfiles = labelledProfiles.map((profile) => {
   };
 });
 
+const agentFeedDir = resolve(values["agent-feed"] ?? "");
+const roster = await loadProjectedUsersRoster(
+  join(agentFeedDir, "roster.projected.json"),
+).catch(() => null);
+const weeklyDoc = (await Bun.file(join(agentFeedDir, "weekly.json"))
+  .json()
+  .catch(() => null)) as { weekly?: unknown; agentId?: unknown } | null;
+const wagersDoc = (await Bun.file(join(agentFeedDir, "wagers.json"))
+  .json()
+  .catch(() => null)) as {
+  customerID?: unknown;
+  figureDate?: unknown;
+  raw?: unknown;
+} | null;
+const matchedProfiles =
+  roster === null
+    ? 0
+    : enrichedProfiles.filter((profile) => {
+        const agent = roster.playerToAgent.get(
+          normalizeRosterId(profile.customerId),
+        );
+        return (
+          agent !== undefined &&
+          normalizeRosterId(agent) === normalizeRosterId(profile.agentId)
+        );
+      }).length;
+const wagerRows = Array.isArray(wagersDoc?.raw)
+  ? wagersDoc.raw.length
+  : typeof wagersDoc?.raw === "object" && wagersDoc?.raw !== null
+    ? Object.keys(wagersDoc.raw as object).length
+    : null;
+const agentFeed = {
+  status:
+    roster === null && weeklyDoc === null && wagersDoc === null
+      ? "missing"
+      : "present",
+  dir: agentFeedDir.replace(REPO, "."),
+  roster:
+    roster === null
+      ? null
+      : {
+          agents: roster.agents,
+          players: roster.players,
+          matchedProfiles,
+        },
+  weekly: weeklyDoc?.weekly ?? null,
+  weeklyAgentId: weeklyDoc?.agentId ?? null,
+  wagers:
+    wagersDoc === null
+      ? null
+      : {
+          customerID: wagersDoc.customerID ?? null,
+          figureDate: wagersDoc.figureDate ?? null,
+          rows: wagerRows,
+        },
+};
+
 const outPath = resolve(values.out ?? "");
 await Bun.write(
   outPath,
@@ -275,6 +340,7 @@ await Bun.write(
             ? {}
             : { collision: treeCollisions.get(agent) }),
         })),
+      agentFeed,
       downline: {
         status: downline === null ? "missing" : "ok",
         source: downlinePath.replace(REPO, "."),
