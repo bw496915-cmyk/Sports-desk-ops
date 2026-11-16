@@ -66,7 +66,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.pathToFileURL
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · no reference page (see [docs](https://bun.com/guides/util/path-to-file-url))
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `src/lib/source_location_url.ts`
 - **Evidence:** `test:tests/bun_url_native_utils.test.ts`
