@@ -135,12 +135,25 @@ export interface AgentExposure {
   readonly positions: number;
   readonly openRiskUsd: number;
   readonly openToWinUsd: number;
-  /** Largest single-customer risk inside the subtree. */
+  /** The agent's own customers only (not its descendants). */
+  readonly ownCustomers: number;
+  readonly ownPositions: number;
+  readonly ownRiskUsd: number;
+  readonly ownToWinUsd: number;
+  /** Everyone below the agent; totals = own + downline. */
+  readonly downlineCustomers: number;
+  readonly downlinePositions: number;
+  readonly downlineRiskUsd: number;
+  readonly downlineToWinUsd: number;
   readonly topCustomerRiskUsd: number;
-  /** That customer's share of the subtree's open risk, 0–100 (one decimal). */
   readonly topCustomerSharePct: number;
   readonly maxTicketRiskUsd: number;
   readonly avgTicketRiskUsd: number;
+  /** Largest sport bucket in the subtree; null when positions carry no sport. */
+  readonly topSport: string | null;
+  readonly topSportRiskUsd: number;
+  readonly topSportSharePct: number;
+  readonly sportCount: number;
 }
 
 export interface TreeCollision {
@@ -170,22 +183,27 @@ export function treeCollisionIndex(
 }
 
 interface ExposureAccumulator {
-  customers: number;
-  positions: number;
-  riskUsd: number;
-  toWinUsd: number;
+  ownCustomers: number;
+  ownPositions: number;
+  ownRiskUsd: number;
+  ownToWinUsd: number;
+  downlineCustomers: number;
+  downlinePositions: number;
+  downlineRiskUsd: number;
+  downlineToWinUsd: number;
   maxTicketRiskUsd: number;
   riskByCustomer: Map<string, number>;
+  riskBySport: Map<string, number>;
 }
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 const round1 = (value: number): number => Math.round(value * 10) / 10;
 
 /**
- * Open-position exposure per agent subtree, from the tree's parent links. A customer counts once
- * toward its own agent and every ancestor, so an agent's entry is the whole downline below it;
- * agents outside the tree still get their own direct exposure. Concentration is measured per
- * subtree (top customer share, largest ticket), never inferred.
+ * Open-position exposure per agent subtree, split into the agent's own customers and its downline.
+ * A customer counts once toward its own agent (own) and every ancestor (downline), so totals are
+ * own + downline and ancestors intentionally overlap. Concentration and sport mix are measured
+ * per subtree, never inferred.
  */
 export function treeSubtreeExposure(
   nodes: Readonly<Record<string, { readonly p?: string | null | undefined }>>,
@@ -195,6 +213,7 @@ export function treeSubtreeExposure(
     readonly positions: readonly {
       readonly risk_usd?: number | undefined;
       readonly to_win_usd?: number | undefined;
+      readonly sport?: string | undefined;
     }[];
   }>,
 ): ReadonlyMap<string, AgentExposure> {
@@ -205,6 +224,19 @@ export function treeSubtreeExposure(
     if (key !== "" && up !== "") parent.set(key, up);
   }
   const accumulated = new Map<string, ExposureAccumulator>();
+  const empty = (): ExposureAccumulator => ({
+    ownCustomers: 0,
+    ownPositions: 0,
+    ownRiskUsd: 0,
+    ownToWinUsd: 0,
+    downlineCustomers: 0,
+    downlinePositions: 0,
+    downlineRiskUsd: 0,
+    downlineToWinUsd: 0,
+    maxTicketRiskUsd: 0,
+    riskByCustomer: new Map<string, number>(),
+    riskBySport: new Map<string, number>(),
+  });
   for (const profile of profiles) {
     const agent = profile.agentId.trim().toUpperCase();
     if (agent === "") continue;
@@ -223,20 +255,21 @@ export function treeSubtreeExposure(
     );
     const seen = new Set<string>();
     let current = agent;
+    let isOwn = true;
     while (current !== "" && !seen.has(current)) {
       seen.add(current);
-      const acc = accumulated.get(current) ?? {
-        customers: 0,
-        positions: 0,
-        riskUsd: 0,
-        toWinUsd: 0,
-        maxTicketRiskUsd: 0,
-        riskByCustomer: new Map<string, number>(),
-      };
-      acc.customers += 1;
-      acc.positions += profile.positions.length;
-      acc.riskUsd += riskUsd;
-      acc.toWinUsd += toWinUsd;
+      const acc = accumulated.get(current) ?? empty();
+      if (isOwn) {
+        acc.ownCustomers += 1;
+        acc.ownPositions += profile.positions.length;
+        acc.ownRiskUsd += riskUsd;
+        acc.ownToWinUsd += toWinUsd;
+      } else {
+        acc.downlineCustomers += 1;
+        acc.downlinePositions += profile.positions.length;
+        acc.downlineRiskUsd += riskUsd;
+        acc.downlineToWinUsd += toWinUsd;
+      }
       acc.maxTicketRiskUsd = Math.max(acc.maxTicketRiskUsd, maxTicket);
       if (customer !== "") {
         acc.riskByCustomer.set(
@@ -244,24 +277,53 @@ export function treeSubtreeExposure(
           (acc.riskByCustomer.get(customer) ?? 0) + riskUsd,
         );
       }
+      for (const position of profile.positions) {
+        const sport = position.sport?.trim();
+        if (sport !== undefined && sport !== "") {
+          acc.riskBySport.set(
+            sport,
+            (acc.riskBySport.get(sport) ?? 0) + (position.risk_usd ?? 0),
+          );
+        }
+      }
       accumulated.set(current, acc);
       current = parent.get(current) ?? "";
+      isOwn = false;
     }
   }
   const exposure = new Map<string, AgentExposure>();
   for (const [agent, acc] of accumulated) {
+    const customers = acc.ownCustomers + acc.downlineCustomers;
+    const positions = acc.ownPositions + acc.downlinePositions;
+    const riskUsd = acc.ownRiskUsd + acc.downlineRiskUsd;
+    const toWinUsd = acc.ownToWinUsd + acc.downlineToWinUsd;
     const topCustomerRiskUsd = Math.max(0, ...acc.riskByCustomer.values());
+    const [topSport, topSportRiskUsd] = [...acc.riskBySport.entries()].sort(
+      (a, b) => b[1] - a[1],
+    )[0] ?? [null, 0];
     exposure.set(agent, {
-      customers: acc.customers,
-      positions: acc.positions,
-      openRiskUsd: round2(acc.riskUsd),
-      openToWinUsd: round2(acc.toWinUsd),
+      customers,
+      positions,
+      openRiskUsd: round2(riskUsd),
+      openToWinUsd: round2(toWinUsd),
+      ownCustomers: acc.ownCustomers,
+      ownPositions: acc.ownPositions,
+      ownRiskUsd: round2(acc.ownRiskUsd),
+      ownToWinUsd: round2(acc.ownToWinUsd),
+      downlineCustomers: acc.downlineCustomers,
+      downlinePositions: acc.downlinePositions,
+      downlineRiskUsd: round2(acc.downlineRiskUsd),
+      downlineToWinUsd: round2(acc.downlineToWinUsd),
       topCustomerRiskUsd: round2(topCustomerRiskUsd),
       topCustomerSharePct:
-        acc.riskUsd > 0 ? round1((topCustomerRiskUsd / acc.riskUsd) * 100) : 0,
+        riskUsd > 0 ? round1((topCustomerRiskUsd / riskUsd) * 100) : 0,
       maxTicketRiskUsd: round2(acc.maxTicketRiskUsd),
-      avgTicketRiskUsd:
-        acc.positions > 0 ? round2(acc.riskUsd / acc.positions) : 0,
+      avgTicketRiskUsd: positions > 0 ? round2(riskUsd / positions) : 0,
+      topSport,
+      topSportRiskUsd: round2(topSportRiskUsd),
+      topSportSharePct:
+        riskUsd > 0 ? round1((topSportRiskUsd / riskUsd) * 100) : 0,
+      sportCount: acc.riskBySport.size,
     });
   }
   return exposure;
