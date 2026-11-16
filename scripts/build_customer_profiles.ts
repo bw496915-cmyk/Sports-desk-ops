@@ -349,7 +349,7 @@ const feedProfiles = enrichedProfiles.map((profile) => {
             level: info.level,
             type: info.type,
             seqNumber: info.seqNumber,
-            playerCount: count ?? 0,
+            ...(count === undefined ? {} : { playerCount: count }),
             agentMatchesProfile:
               normalizeRosterId(info.agentId) ===
               normalizeRosterId(profile.agentId),
@@ -358,6 +358,15 @@ const feedProfiles = enrichedProfiles.map((profile) => {
     ...(inWeeklyScope && weeklyFigure !== null ? { weeklyFigure } : {}),
   };
 });
+
+const profileCoverage = {
+  total: feedProfiles.length,
+  withRoster: feedProfiles.filter((profile) => profile.roster !== undefined)
+    .length,
+  withWeekly: feedProfiles.filter(
+    (profile) => profile.weeklyFigure !== undefined,
+  ).length,
+};
 
 const outPath = resolve(values.out ?? "");
 await Bun.write(
@@ -391,7 +400,7 @@ await Bun.write(
             ? {}
             : { collision: treeCollisions.get(agent) }),
         })),
-      agentFeed,
+      agentFeed: { ...agentFeed, profileCoverage },
       downline: {
         status: downline === null ? "missing" : "ok",
         source: downlinePath.replace(REPO, "."),

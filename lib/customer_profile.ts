@@ -409,7 +409,7 @@ export interface CustomerProfile {
     readonly level: number | null;
     readonly type: string | null;
     readonly seqNumber: number | null;
-    readonly playerCount: number;
+    readonly playerCount?: number;
     readonly agentMatchesProfile: boolean;
   };
   /** Root weekly figure, attached to profiles inside that agent's tree subtree. */
