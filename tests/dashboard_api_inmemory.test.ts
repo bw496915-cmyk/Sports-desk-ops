@@ -303,7 +303,7 @@ describe("@sportsdesk-ops/api in-memory router (zero port bind)", () => {
     expect((await call("/api/taxonomy-catalog")).status).toBe(200);
 
     const shadowGet = await call(
-      "/api/shadow-pricing?source=fixture&ladder3=-145&mode=floor&routerAudit=enforced_lockout",
+      "/api/shadow-pricing?source=fixture&ladder3=-145&mode=floor&routerAudit=enforced_lockout&regime=live_in_play",
     );
     expect(shadowGet.status).toBe(200);
     const shadowGetJson = (await shadowGet.json()) as {
@@ -312,12 +312,29 @@ describe("@sportsdesk-ops/api in-memory router (zero port bind)", () => {
         ladderKey3: number;
         repriceMode: string;
         routerAuditMode: string;
+        regime?: string;
       };
     };
     expect(shadowGetJson.provenance).toBe("fixture");
     expect(shadowGetJson.parameters.ladderKey3).toBe(-145);
     expect(shadowGetJson.parameters.repriceMode).toBe("floor");
     expect(shadowGetJson.parameters.routerAuditMode).toBe("enforced_lockout");
+    expect(shadowGetJson.parameters.regime).toBe("live_in_play");
+
+    const shadowPostRegime = await call("/api/shadow-pricing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sport: "Football",
+        regime: "pregame",
+      }),
+    });
+    expect(shadowPostRegime.status).toBe(200);
+    const shadowPostRegimeJson = (await shadowPostRegime.json()) as {
+      parameters: { sport?: string; regime?: string };
+    };
+    expect(shadowPostRegimeJson.parameters.sport).toBe("Football");
+    expect(shadowPostRegimeJson.parameters.regime).toBe("pregame");
 
     const shadowBadPost = await call("/api/shadow-pricing", {
       method: "POST",

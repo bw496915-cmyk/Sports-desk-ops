@@ -256,7 +256,7 @@ describe("each dashboard panel names its endpoint when the source fails", () => 
         onSelectCustomer: noop,
         copiedCliId: null,
         onCopyCli: noop,
-        customerForensicResult: null,
+        customerReverseForensics: null,
         onClearForensicResult: noop,
         onRunReverseLookup: noop,
         onOpenTerminalProfile: noop,

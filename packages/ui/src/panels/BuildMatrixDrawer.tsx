@@ -13,6 +13,10 @@
 import { DESCRIPTIONS, FEATURES } from "@sportsdesk-ops/contracts";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  formatMatrixEvidenceTable,
+  formatMatrixRowEvidence,
+} from "../build_matrix_evidence.ts";
 import { copyText, type CopyFailure } from "../clipboard.ts";
 import {
   buildRegistryRootCss,
@@ -80,10 +84,18 @@ const SENTINEL_PROBES = [
   readonly label: string;
 }[];
 
+/**
+ * Flag → description, keyed by plain string so a probe payload carrying an
+ * unregistered flag is detectable without a cast.
+ */
+const FEATURE_DESCRIPTIONS: ReadonlyMap<string, string> = new Map(
+  FEATURES.map((feature) => [feature, DESCRIPTIONS[feature]] as const),
+);
+
 type CopyFeedback =
   | {
       readonly ok: true;
-      readonly kind: "token" | "alias" | "registry";
+      readonly kind: "token" | "alias" | "registry" | "row" | "matrix";
       readonly id: string;
       readonly label: string;
     }
@@ -404,6 +416,45 @@ export function BuildMatrixDrawer({
     });
   };
 
+  const copyMatrixRow = (row: BuildMatrixRow) => {
+    void copyText(formatMatrixRowEvidence(row, devBaselineBytes)).then(
+      (result) => {
+        if (result.ok) {
+          showCopyFeedback({
+            ok: true,
+            kind: "row",
+            id: row.target,
+            label: `${row.target} matrix row`,
+          });
+        } else {
+          showCopyFeedback({ ok: false, reason: result.reason });
+        }
+      },
+    );
+  };
+
+  const copyMatrixTable = () => {
+    if (rows === null || rows.length === 0) return;
+    void copyText(
+      formatMatrixEvidenceTable(rows, devBaselineBytes, {
+        target,
+        generatedAt,
+        compiledMs,
+      }),
+    ).then((result) => {
+      if (result.ok) {
+        showCopyFeedback({
+          ok: true,
+          kind: "matrix",
+          id: "matrix",
+          label: `DCE matrix (${rows.length} targets)`,
+        });
+      } else {
+        showCopyFeedback({ ok: false, reason: result.reason });
+      }
+    });
+  };
+
   return (
     <section
       aria-labelledby="build-matrix-heading"
@@ -521,6 +572,31 @@ export function BuildMatrixDrawer({
                 {loading ? "⏳ Compiling..." : "↻ Re-compile Matrix"}
               </button>
             )}
+            {rows !== null && rows.length > 0 && (
+              <button
+                type="button"
+                className="sd-pill sd-mono"
+                data-matrix-copy-table="true"
+                onClick={copyMatrixTable}
+                title="Copy the whole DCE matrix — probe metadata, byte totals, deltas and retained branches — as a Markdown table"
+                style={{ cursor: "pointer", color: SAVED_COLOR }}
+              >
+                ⧉ Copy matrix
+              </button>
+            )}
+            <a
+              href="#build-matrix-table"
+              data-matrix-jump="table"
+              className="sd-mono"
+              title="Jump past the token registry to the DCE matrix table"
+              style={{
+                fontSize: "10px",
+                color: MUTED_TEXT,
+                textDecoration: "none",
+              }}
+            >
+              ⤓ Skip to matrix
+            </a>
           </div>
         </div>
 
@@ -879,7 +955,11 @@ export function BuildMatrixDrawer({
                   : `sentinels ${parityChecks}/${parityChecks} match the flags each target enables`}
               </span>
             </div>
-            <table style={{ margin: 0 }}>
+            <table
+              id="build-matrix-table"
+              data-matrix-table="true"
+              style={{ margin: 0 }}
+            >
               <caption style={VISUALLY_HIDDEN}>
                 DCE matrix: per-target JS and CSS bytes, retained bun:bundle
                 branches, and the JS delta against the dev baseline.
@@ -973,8 +1053,72 @@ export function BuildMatrixDrawer({
                             ⚠ {rowParity.mismatches.length} sentinel mismatch
                           </span>
                         )}
+                        <button
+                          type="button"
+                          data-matrix-copy-row={r.target}
+                          aria-label={`Copy the evidence line for ${r.target}`}
+                          title="Copy this row as a plain-text evidence line — exact bytes, delta vs dev, and retained branches"
+                          onClick={() => copyMatrixRow(r)}
+                          style={{
+                            marginLeft: "6px",
+                            background: "none",
+                            border: "none",
+                            padding: "0 2px",
+                            color: MUTED_TEXT,
+                            cursor: "pointer",
+                            fontSize: "11px",
+                          }}
+                        >
+                          ⧉
+                        </button>
                       </th>
-                      <td className="sd-mono">{r.features.join(", ")}</td>
+                      <td className="sd-mono">
+                        {r.features.length === 0 ? (
+                          <span style={{ color: MUTED_TEXT }}>none</span>
+                        ) : (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              flexWrap: "wrap",
+                              gap: "4px",
+                            }}
+                          >
+                            {r.features.map((feature) => {
+                              const description =
+                                FEATURE_DESCRIPTIONS.get(feature) ?? null;
+                              const probe = SENTINEL_PROBES.find(
+                                (entry) => entry.feature === feature,
+                              );
+                              return (
+                                <span
+                                  key={feature}
+                                  className="sd-pill sd-mono"
+                                  data-matrix-flag={feature}
+                                  data-matrix-flag-unknown={
+                                    description === null ? "true" : undefined
+                                  }
+                                  title={
+                                    description === null
+                                      ? "Not a registered bun:bundle feature — check the probe payload."
+                                      : `${description}${probe === undefined ? " · compile-time only; no retained-branch probe." : ` · gates the ${probe.label} probe.`}`
+                                  }
+                                  style={{
+                                    fontSize: "10px",
+                                    padding: "1px 6px",
+                                    ...(description === null
+                                      ? { color: DANGER_COLOR }
+                                      : {}),
+                                  }}
+                                >
+                                  {description === null
+                                    ? `⚠ ${feature}`
+                                    : feature}
+                                </span>
+                              );
+                            })}
+                          </span>
+                        )}
+                      </td>
                       <td className="sd-mono" style={{ textAlign: "right" }}>
                         <span>{formatKb(r.totalJsBytes)}</span>
                         <span

@@ -2,6 +2,10 @@ export {
   AgentInspectorModal,
   type AgentInspectorModalProps,
 } from "./AgentInspectorModal.tsx";
+export {
+  AlertAuditDetail,
+  type AlertAuditDetailProps,
+} from "./AlertAuditDetail.tsx";
 export { AlertsTabPanel, type AlertsTabPanelProps } from "./AlertsTabPanel.tsx";
 export {
   BetTickerTabPanel,

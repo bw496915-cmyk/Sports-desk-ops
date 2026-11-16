@@ -438,6 +438,23 @@ export interface R2SinkRollupMetric {
   readonly value: string;
 }
 
+export type R2SinkBlockerClass =
+  | "f402_auth_expired"
+  | "gslive_auth_expired"
+  | "sanitization_guard"
+  | "upstream_capture_stale"
+  | "missing_artifact"
+  | "network_or_http"
+  | "sla_lag";
+
+export interface R2SinkDiagnostic {
+  readonly blockerClass: R2SinkBlockerClass;
+  readonly headline: string;
+  readonly detail: string;
+  readonly failedJobIds: readonly string[];
+  readonly suggestedCommand: string;
+}
+
 export interface R2SinkDetail {
   readonly id: string;
   readonly key: string;
@@ -457,6 +474,8 @@ export interface R2SinkDetail {
   readonly sha256: string | null;
   readonly reason: string | null;
   readonly remediationCommand: string;
+  readonly bridgeJobIds?: readonly string[] | undefined;
+  readonly diagnostic?: R2SinkDiagnostic | undefined;
   readonly metrics: readonly R2SinkRollupMetric[];
 }
 

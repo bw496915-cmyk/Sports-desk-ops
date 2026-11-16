@@ -75,8 +75,8 @@ describe("runRuntimePreflightAudit", () => {
     expect(() => assertCloudflareTokenIsolation()).toThrow(
       "ERR_CF_TOKEN_BLEED_10000",
     );
-    expect(() =>
-      runRuntimePreflightAudit({ dnsTelemetry: zeroDns }),
-    ).toThrow("ERR_CF_TOKEN_BLEED_10000");
+    expect(() => runRuntimePreflightAudit({ dnsTelemetry: zeroDns })).toThrow(
+      "ERR_CF_TOKEN_BLEED_10000",
+    );
   });
 });

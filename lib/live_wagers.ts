@@ -18,7 +18,7 @@
  *    are sentinels rather than wagers, so neither may be summed into stake.
  */
 
-import { wagerChannelOf, type WagerChannel } from "@sportsdesk-ops/contracts";
+import type { WagerChannel } from "@sportsdesk-ops/contracts";
 import { SPORT_CATEGORIES } from "./sport_taxonomy.ts";
 
 /** Parse a bet-ticker XML feed with Bun's native parser (compact shape). */
@@ -140,9 +140,20 @@ function number(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-/** `GSLIVE   ` → `gslive`; anything unknown → `other` (shared with the dashboard). */
+const WRITERS: Readonly<Record<string, WagerChannel>> = {
+  gslive: "gslive",
+  gsbuilder: "gsbuilder",
+  internet: "internet",
+  alert: "alert",
+  blocked: "blocked",
+};
+
+/** `GSLIVE   ` → `gslive`; anything unknown → `other` (must match `@sportsdesk-ops/contracts` without runtime `packages/` import on VPS). */
 export function writerOf(ticketWriter: unknown): WagerChannel {
-  return wagerChannelOf(ticketWriter);
+  const normalized = text(ticketWriter).toLowerCase();
+  return Object.hasOwn(WRITERS, normalized)
+    ? (WRITERS[normalized] ?? "other")
+    : "other";
 }
 
 /**

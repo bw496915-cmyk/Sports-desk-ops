@@ -8,6 +8,8 @@ import {
   PENDING_COHORTS_PROVENANCE,
 } from "../hydration.ts";
 import { getLocalAgentHref } from "../links.ts";
+import type { ReverseDnsForensicsView } from "../../../../lib/reverse_dns_forensics.ts";
+import { ReverseDnsForensicsCard } from "./ReverseDnsForensicsCard.tsx";
 import { SharpnessDecomposition } from "../viz/SharpnessDecomposition.tsx";
 import type {
   CustomersApiResponse,
@@ -37,7 +39,8 @@ export interface CustomersTabPanelProps {
   readonly onSelectCustomer: (cust: ShowcaseCustomer) => void;
   readonly copiedCliId: string | null;
   readonly onCopyCli: (customerId: string) => void;
-  readonly customerForensicResult: string | null;
+  readonly customerReverseForensics?:
+    ReverseDnsForensicsView | null | undefined;
   readonly onClearForensicResult: () => void;
   readonly onRunReverseLookup: (ipAddress: string) => void;
   readonly onOpenTerminalProfile: (customerId: string) => void;
@@ -155,7 +158,7 @@ export function CustomersTabPanel({
   onSelectCustomer,
   copiedCliId,
   onCopyCli,
-  customerForensicResult,
+  customerReverseForensics = null,
   onClearForensicResult,
   onRunReverseLookup,
   onOpenTerminalProfile,
@@ -1519,11 +1522,11 @@ export function CustomersTabPanel({
                         🔍 Run Reverse DNS
                       </button>
                     </div>
-                    {customerForensicResult && (
-                      <div style={styles.forensicResult}>
-                        {customerForensicResult}
-                      </div>
-                    )}
+                    {customerReverseForensics ? (
+                      <ReverseDnsForensicsCard
+                        view={customerReverseForensics}
+                      />
+                    ) : null}
                   </div>
                 </div>
               ) : (

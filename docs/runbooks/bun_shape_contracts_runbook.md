@@ -61,7 +61,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/fileURLToPath)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `lib/local_path.ts`, `scripts/capture/f402_hierarchy_probe.ts`
+- **Here:** `lib/schema_cli_errors.ts`, `lib/local_path.ts`
 - **Evidence:** `probe:proc.paths`
 
 #### Bun.gc
@@ -394,7 +394,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/S3Client)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Members (9):** `delete`, `exists`, `file`, `list`, `presign`, `size`, `stat`, `unlink`, `write`
-- **Here:** `bin/bun_surface.ts`, `lib/r2_s3_client.ts`
+- **Here:** `scripts/verify-gslive-tickets.ts`, `bin/bun_surface.ts`
 - **Evidence:** `surface:S3Client`
 
 #### Bun.s3
@@ -402,7 +402,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · no reference page (see [docs](https://bun.com/docs/runtime/s3#bun-s3client-bun-s3))
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (9):** `delete`, `exists`, `file`, `list`, `presign`, `size`, `stat`, `unlink`, `write`
-- **Here:** `bin/bun_surface.ts`
+- **Here:** `scripts/verify-gslive-tickets.ts`, `src/telemetry/runtime-preflight.ts`
 - **Evidence:** `surface:s3`, `test:tests/bun_s3client_contract.test.ts`
 
 #### Bun.S3File (type)
@@ -476,7 +476,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/secrets)
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (3):** `delete`, `get`, `set`
-- **Here:** `scripts/secrets_r2.ts`, `lib/secrets.ts`
+- **Here:** `scripts/secrets_r2.ts`, `scripts/verify-gslive-tickets.ts`
 - **Evidence:** `surface:secrets.get`, `test:tests/bun_capabilities.test.ts`
 
 ## Crypto, hashing and compression
@@ -639,7 +639,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/dns)
 - **Shape:** value: `object` · writable false · enumerable true
 - **Members (21):** snapshot in tests/bun_shape_members.json
-- **Here:** `lib/preflight.ts`, `bin/bun_surface.ts`
+- **Here:** `lib/preflight.ts`, `scripts/verify-gslive-tickets.ts`
 - **Evidence:** `surface:dns.lookup`
 
 #### Bun.fetch
@@ -707,7 +707,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/env)
 - **Shape:** value: `object` · writable false · enumerable true
-- **Here:** `services/sportsdesk_webview_server.ts`, `scripts/probe/parse-tree-only.ts`
+- **Here:** `scripts/verify-gslive-tickets.ts`, `services/sportsdesk_webview_server.ts`
 - **Evidence:** `probe:proc.shell`
 
 #### Bun.revision

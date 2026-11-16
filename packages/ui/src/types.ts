@@ -481,6 +481,12 @@ export interface TerminalHistoryEntry {
   readonly exitCode: number;
   readonly durationMs: number;
   readonly timestamp: number;
+  /**
+   * True for the seeded welcome buffer, which never executed. A real run can
+   * legitimately report `durationMs: 0` (sub-millisecond command), so run
+   * statistics must not infer "did not execute" from the duration.
+   */
+  readonly synthetic?: boolean;
 }
 
 export interface TierSwatchStyle {

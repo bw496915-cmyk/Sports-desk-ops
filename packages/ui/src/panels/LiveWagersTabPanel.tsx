@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PARTNER_118_CHANNELS,
   WAGER_CHANNEL_LABELS,
@@ -13,6 +13,9 @@ import {
   gameKeyOf,
 } from "../gslive_game_log.ts";
 import { GsliveGameLogSection } from "./GsliveGameLogSection.tsx";
+import { findAlertForWager } from "../ticket_inspector.ts";
+import { formatWagerSelection } from "../wager_display.ts";
+import { TicketInspectorPanel } from "./TicketInspectorPanel.tsx";
 import {
   formatProvenanceBadge,
   PENDING_WAGERS_PROVENANCE,
@@ -35,6 +38,7 @@ import {
 import { getLocalAgentHref } from "../links.ts";
 import { WireContractChip } from "./WireContractChip.tsx";
 import type {
+  DashboardAlertRecord,
   DashboardSourceProvenance,
   LiveWager,
   TierStyleConfig,
@@ -79,7 +83,9 @@ export interface LiveWagersTabPanelProps {
   readonly slabPolicy?: SlabPolicySummary | null | undefined;
   readonly onSelectCustomerById: (customerId: string) => void;
   readonly onInspectPty: (customerId: string) => void;
+  readonly onRunPtyCommand?: ((command: string) => void) | undefined;
   readonly onSelectAgent?: ((agentId: string) => void) | undefined;
+  readonly alertRecords?: readonly DashboardAlertRecord[] | undefined;
 }
 
 // Filter vocabulary and severity ranks are inlined from
@@ -215,7 +221,9 @@ export function LiveWagersTabPanel({
   slabPolicy = null,
   onSelectCustomerById,
   onInspectPty,
+  onRunPtyCommand,
   onSelectAgent,
+  alertRecords = [],
 }: LiveWagersTabPanelProps): React.ReactElement {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
@@ -225,6 +233,26 @@ export function LiveWagersTabPanel({
   const [pendingNew, setPendingNew] = useState(0);
   const seenTicketIdsRef = useRef<Set<string>>(new Set());
   const isGsliveScope = wagerChannelFilter.toUpperCase() === "GSLIVE";
+
+  const inspectorRelatedWagers = useMemo(() => {
+    if (selectedWager === null) {
+      return [];
+    }
+    return wagers
+      .filter(
+        (w) =>
+          w.customerId === selectedWager.customerId &&
+          w.ticketId !== selectedWager.ticketId,
+      )
+      .slice(0, 8);
+  }, [wagers, selectedWager]);
+
+  const inspectorMatchedAlert = useMemo(() => {
+    if (selectedWager === null) {
+      return null;
+    }
+    return findAlertForWager(alertRecords, selectedWager);
+  }, [alertRecords, selectedWager]);
 
   // A game selection belongs to the GSLIVE scope; leaving it must not silently keep
   // filtering another channel's table.
@@ -1144,7 +1172,7 @@ export function LiveWagersTabPanel({
                   <td style={styles.td}>
                     <div style={{ fontWeight: 600 }}>{w.event}</div>
                     <div style={{ color: "#f59e0b", fontWeight: 700 }}>
-                      {w.selection} {w.lineDisplay} ({w.oddsAmerican})
+                      {formatWagerSelection(w)}
                     </div>
                   </td>
                   <td style={styles.td}>
@@ -1270,241 +1298,20 @@ export function LiveWagersTabPanel({
         </div>
       </div>
 
-      {/* Interactive Selected Wager Inspector */}
-      {selectedWager && (
-        <div style={styles.wagerInspectorCard}>
-          <div style={styles.inspectorHeader}>
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  marginBottom: "4px",
-                }}
-              >
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: "18px",
-                    color: "#f8fafc",
-                  }}
-                >
-                  Ticket Inspector: #{selectedWager.ticketId}
-                </h3>
-                <span
-                  style={styles.wagerBadge(
-                    selectedWager.alertTier,
-                    tiersConfig,
-                  )}
-                >
-                  {selectedWager.alertBadge}
-                </span>
-              </div>
-              <div style={styles.inspectorSub}>
-                Placed {selectedWager.timestamp} · Sport: {selectedWager.sport}{" "}
-                · Market: {selectedWager.betType} · Line:{" "}
-                {selectedWager.lineDisplay} ({selectedWager.oddsAmerican})
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                type="button"
-                style={styles.actionBtn}
-                onClick={() => onInspectPty(selectedWager.customerId)}
-                title="Inspect Customer in Terminal PTY"
-              >
-                💻 PTY Profile
-              </button>
-              <button
-                type="button"
-                style={styles.actionBtn}
-                onClick={() => onSelectCustomerById(selectedWager.customerId)}
-                title="Inspect in Customer Showcase"
-              >
-                👤 Customer Card
-              </button>
-              <button
-                type="button"
-                style={styles.actionBtn}
-                onClick={() =>
-                  onCopyText(
-                    selectedWager.ticketId,
-                    JSON.stringify(selectedWager, null, 2),
-                  )
-                }
-                title="Copy Full Ticket Payload"
-              >
-                {copiedTicketId === selectedWager.ticketId
-                  ? "✓ Payload Copied"
-                  : "📋 Copy Payload"}
-              </button>
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "12px",
-              marginBottom: "16px",
-            }}
-          >
-            <div style={styles.radarCard}>
-              <div style={styles.cardHeader}>EVENT & SELECTION</div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#f8fafc",
-                  marginBottom: "4px",
-                }}
-              >
-                {selectedWager.event}
-              </div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "#f59e0b",
-                  fontWeight: 600,
-                }}
-              >
-                Pick: {selectedWager.selection} {selectedWager.lineDisplay} (
-                {selectedWager.oddsAmerican})
-              </div>
-            </div>
-
-            <div style={styles.radarCard}>
-              <div style={styles.cardHeader}>FINANCIAL EXPOSURE & EDGE</div>
-              <div style={styles.radarRow}>
-                <span style={{ color: "#94a3b8" }}>Risk / To Win:</span>
-                <span style={{ fontWeight: 700, color: "#f8fafc" }}>
-                  ${selectedWager.riskUsd.toLocaleString()} / $
-                  {selectedWager.toWinUsd.toLocaleString()}
-                </span>
-              </div>
-              <div style={styles.radarRow}>
-                <span style={{ color: "#94a3b8" }}>CLV Edge Delta:</span>
-                <span
-                  style={{
-                    fontWeight: 700,
-                    color: clvEdgeTone(selectedWager.clvCents),
-                  }}
-                >
-                  {selectedWager.clvCents === null
-                    ? "— (no closing line)"
-                    : selectedWager.clvCents > 0
-                      ? `+${selectedWager.clvCents}¢`
-                      : `${selectedWager.clvCents}¢`}
-                </span>
-              </div>
-            </div>
-
-            <div style={styles.radarCard}>
-              <div style={styles.cardHeader}>AGENT & SYNDICATE ROUTING</div>
-              <div style={styles.radarRow}>
-                <span style={{ color: "#94a3b8" }}>Customer Login:</span>
-                <span style={{ fontWeight: 700, color: "#38bdf8" }}>
-                  {selectedWager.customerId}
-                </span>
-              </div>
-              <div style={styles.radarRow}>
-                <span style={{ color: "#94a3b8" }}>Sub-Agent / Master:</span>
-                <span style={{ fontWeight: 600, color: "#f8fafc" }}>
-                  {selectedWager.agentId} / {selectedWager.masterAgent}
-                </span>
-              </div>
-            </div>
-
-            <div style={styles.radarCard}>
-              <div style={styles.cardHeader}>PRE/POST-BET LINE WINDOW</div>
-              <div style={styles.radarRow}>
-                <span style={{ color: "#94a3b8" }}>Entry Line / Price:</span>
-                <span style={{ fontWeight: 700, color: "#f8fafc" }}>
-                  {selectedWager.lineDisplay} ({selectedWager.oddsAmerican})
-                </span>
-              </div>
-              <div style={styles.radarRow}>
-                <span style={{ color: "#94a3b8" }}>Post-Bet Trajectory:</span>
-                <span
-                  style={{
-                    fontWeight: 700,
-                    color: clvEdgeTone(selectedWager.clvCents),
-                  }}
-                >
-                  {selectedWager.clvCents === null
-                    ? "No closing-line comparison"
-                    : selectedWager.clvCents > 0
-                      ? `Beat Move (+${selectedWager.clvCents}¢ CLV)`
-                      : `Behind Move (${selectedWager.clvCents}¢ CLV)`}
-                </span>
-              </div>
-            </div>
-
-            <div style={styles.radarCard}>
-              <div style={styles.cardHeader}>
-                DESK DIRECTIVE (autoExecute: false)
-              </div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color:
-                    selectedWager.alertTier === "CRITICAL" ||
-                    selectedWager.alertTier === "STEAM"
-                      ? "#f87171"
-                      : "#4ade80",
-                  marginBottom: "4px",
-                }}
-              >
-                {selectedWager.operatorDirective}
-              </div>
-              <div style={{ fontSize: "11px", color: "#94a3b8" }}>
-                Max Recommended Stake: $
-                {selectedWager.maxRecommendedStake.toLocaleString()}
-              </div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              padding: "10px 14px",
-              borderRadius: "6px",
-              backgroundColor:
-                selectedWager.alertTier === "CRITICAL"
-                  ? "rgba(239, 68, 68, 0.12)"
-                  : selectedWager.alertTier === "STEAM"
-                    ? "rgba(251, 146, 60, 0.12)"
-                    : "rgba(34, 197, 94, 0.12)",
-              border: `1px solid ${
-                selectedWager.alertTier === "CRITICAL"
-                  ? "rgba(239, 68, 68, 0.3)"
-                  : selectedWager.alertTier === "STEAM"
-                    ? "rgba(251, 146, 60, 0.3)"
-                    : "rgba(34, 197, 94, 0.3)"
-              }`,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div style={{ fontSize: "12px", color: "#f1f5f9" }}>
-              <b>Action Directive:</b> {selectedWager.operatorDirective} ·
-              Safety Invariant: <code>autoExecute: false</code> (Requires
-              operator manual override in Fantasy402 Manager)
-            </div>
-            <span
-              style={{
-                fontSize: "11px",
-                color: "#94a3b8",
-                fontWeight: 600,
-              }}
-            >
-              Cap: ${selectedWager.maxRecommendedStake.toLocaleString()}
-            </span>
-          </div>
-        </div>
-      )}
+      {selectedWager ? (
+        <TicketInspectorPanel
+          wager={selectedWager}
+          relatedWagers={inspectorRelatedWagers}
+          matchedAlert={inspectorMatchedAlert}
+          copiedTicketId={copiedTicketId}
+          onCopyText={onCopyText}
+          onSelectCustomerById={onSelectCustomerById}
+          onSelectWager={onSelectWager}
+          onInspectPty={onInspectPty}
+          onRunPtyCommand={onRunPtyCommand}
+          tiersConfig={tiersConfig}
+        />
+      ) : null}
     </div>
   );
 }

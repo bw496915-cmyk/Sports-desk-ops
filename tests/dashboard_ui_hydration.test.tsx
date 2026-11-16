@@ -302,7 +302,7 @@ describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero po
         onSelectCustomer: noop,
         copiedCliId: null,
         onCopyCli: noop,
-        customerForensicResult: null,
+        customerReverseForensics: null,
         onClearForensicResult: noop,
         onRunReverseLookup: noop,
         onOpenTerminalProfile: noop,

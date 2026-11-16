@@ -11,6 +11,7 @@ import type {
   MarketFilter,
   PeriodFilter,
   R2PipelineApiResponse,
+  RegimeFilter,
   RouterAuditMode,
   ShadowRepriceMode,
   SportFilter,
@@ -52,6 +53,7 @@ export interface ShadowPricingQueryParams {
   readonly subSport?: SubSportFilter | undefined;
   readonly period?: PeriodFilter | undefined;
   readonly market?: MarketFilter | undefined;
+  readonly regime?: RegimeFilter | undefined;
   readonly routerAuditMode?: RouterAuditMode | undefined;
 }
 

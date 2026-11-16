@@ -37,6 +37,54 @@ function formatUsdCents(cents: number): string {
   });
 }
 
+function formatBytes(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes)) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+interface BlockerGroup {
+  readonly key: string;
+  readonly headline: string;
+  readonly detail: string;
+  readonly suggestedCommand: string;
+  readonly sinkIds: string[];
+  readonly urgentAuth: boolean;
+}
+
+function collectBlockerGroups(
+  sinks: readonly R2SinkDetail[],
+): readonly BlockerGroup[] {
+  const groups: BlockerGroup[] = [];
+  const indexByKey: Record<string, number> = Object.create(null);
+
+  for (const sink of sinks) {
+    const diag = sink.diagnostic;
+    if (!diag) continue;
+    const key = `${diag.blockerClass}::${diag.suggestedCommand}`;
+    const existingIdx = indexByKey[key];
+    if (existingIdx !== undefined) {
+      groups[existingIdx]!.sinkIds.push(sink.id);
+      continue;
+    }
+    const urgentAuth =
+      diag.blockerClass === "f402_auth_expired" ||
+      diag.blockerClass === "gslive_auth_expired" ||
+      diag.blockerClass === "sanitization_guard";
+    indexByKey[key] = groups.length;
+    groups.push({
+      key,
+      headline: diag.headline,
+      detail: diag.detail,
+      suggestedCommand: diag.suggestedCommand,
+      sinkIds: [sink.id],
+      urgentAuth,
+    });
+  }
+  return groups;
+}
+
 const SECTION_CARD_STYLE: React.CSSProperties = {
   borderRadius: "8px",
   padding: "14px 16px",
@@ -106,6 +154,8 @@ export function R2PipelineTabPanel({
   const ticketVerify = automations?.ticketVerification ?? null;
 
   const daemon = data?.daemon4020;
+  const blockerGroups = collectBlockerGroups(data?.sinks ?? []);
+  const failedBridgeJobs = (automations?.bridgeJobs ?? []).filter((j) => !j.ok);
   const daemonState = resolveDaemon4020State(daemon);
   const daemonBannerColor =
     daemonState === "online"
@@ -175,6 +225,22 @@ export function R2PipelineTabPanel({
               >
                 {data.freshCount}/{data.totalCount} Sinks Within SLA (
                 {data.overallStatus.toUpperCase()})
+              </span>
+            )}
+            {data && data.dataStaleKeys.length > 0 && (
+              <span
+                style={{
+                  padding: "2px 8px",
+                  borderRadius: "999px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "#f87171",
+                  backgroundColor: "rgba(239, 68, 68, 0.14)",
+                  border: "1px solid #ef4444",
+                }}
+              >
+                ⚠️ {data.dataStaleKeys.length}/{data.totalCount} Data Windows
+                &gt;24h
               </span>
             )}
           </div>
@@ -295,6 +361,99 @@ export function R2PipelineTabPanel({
         </div>
       </div>
 
+      {blockerGroups.length > 0 && (
+        <div
+          style={{
+            ...SECTION_CARD_STYLE,
+            borderColor: "#f59e0b",
+            backgroundColor: "rgba(69, 26, 3, 0.28)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "8px",
+            }}
+          >
+            <span
+              style={{ fontWeight: 700, fontSize: "13px", color: "#fbbf24" }}
+            >
+              🛠️ Pipeline Root-Cause &amp; Auth Remediation Triage (
+              {blockerGroups.length} active{" "}
+              {blockerGroups.length === 1 ? "blocker" : "blockers"})
+            </span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
+            {blockerGroups.map((group) => (
+              <div
+                key={group.key}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                  padding: "8px 10px",
+                  borderRadius: "6px",
+                  backgroundColor: "rgba(15, 23, 42, 0.78)",
+                  border: `1px solid ${group.urgentAuth ? "#ef4444" : "#f59e0b"}`,
+                  fontSize: "11px",
+                }}
+              >
+                <div style={{ flex: "1 1 340px", minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      color: group.urgentAuth ? "#fca5a5" : "#fde68a",
+                    }}
+                  >
+                    {group.headline} · Sinks: {group.sinkIds.join(", ")}
+                  </div>
+                  <div
+                    style={{
+                      color: "#cbd5e1",
+                      marginTop: "3px",
+                      fontFamily: "monospace",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {group.detail}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.actionBtn,
+                    padding: "4px 8px",
+                    fontSize: "11px",
+                    fontFamily: "monospace",
+                    maxWidth: "100%",
+                  }}
+                  onClick={() => {
+                    void copyText(group.suggestedCommand);
+                    setCopiedCmdId(`blocker:${group.key}`);
+                    setTimeout(() => setCopiedCmdId(null), 1800);
+                  }}
+                >
+                  {copiedCmdId === `blocker:${group.key}`
+                    ? "✓ Copied Fix CLI"
+                    : `📋 ${group.suggestedCommand}`}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 4 R2 Bridge Sink Cards */}
       <div
         style={{
@@ -344,20 +503,45 @@ export function R2PipelineTabPanel({
                     {sink.description}
                   </div>
                 </div>
-                <span
+                <div
                   style={{
-                    padding: "3px 8px",
-                    borderRadius: "999px",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: badge.fg,
-                    backgroundColor: badge.bg,
-                    border: `1px solid ${badge.border}`,
-                    whiteSpace: "nowrap",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    flexWrap: "wrap",
                   }}
                 >
-                  {badge.label}
-                </span>
+                  {sink.dataStale && (
+                    <span
+                      style={{
+                        padding: "3px 7px",
+                        borderRadius: "999px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        color: "#fca5a5",
+                        backgroundColor: "rgba(239, 68, 68, 0.16)",
+                        border: "1px solid #ef4444",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      ⚠️ DATA &gt;24H
+                    </span>
+                  )}
+                  <span
+                    style={{
+                      padding: "3px 8px",
+                      borderRadius: "999px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: badge.fg,
+                      backgroundColor: badge.bg,
+                      border: `1px solid ${badge.border}`,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {badge.label}
+                  </span>
+                </div>
               </div>
 
               {/* Publish Age vs Data Window Age */}
@@ -407,6 +591,59 @@ export function R2PipelineTabPanel({
                   </div>
                 </div>
               </div>
+
+              {(sink.reason || sink.sha256 || sink.contentLength !== null) && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "6px",
+                    fontSize: "11px",
+                    color: "#94a3b8",
+                  }}
+                >
+                  <span>{sink.reason ?? ""}</span>
+                  <span style={{ fontFamily: "monospace" }}>
+                    {sink.contentLength !== null
+                      ? formatBytes(sink.contentLength)
+                      : ""}
+                    {sink.contentLength !== null && sink.sha256 ? " · " : ""}
+                    {sink.sha256 ? `sha256:${sink.sha256.slice(0, 12)}` : ""}
+                  </span>
+                </div>
+              )}
+
+              {sink.diagnostic && (
+                <div
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    backgroundColor: "rgba(127, 29, 29, 0.22)",
+                    border: "1px solid rgba(239, 68, 68, 0.65)",
+                    fontSize: "11px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: "#fca5a5" }}>
+                    {sink.diagnostic.headline}
+                    {sink.diagnostic.failedJobIds.length > 0
+                      ? ` (${sink.diagnostic.failedJobIds.join(", ")})`
+                      : ""}
+                  </div>
+                  <div
+                    style={{
+                      color: "#e2e8f0",
+                      fontFamily: "monospace",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {sink.diagnostic.detail}
+                  </div>
+                </div>
+              )}
 
               {/* Dereferenced Rollup Metrics */}
               {sink.metrics.length > 0 && (
@@ -752,6 +989,41 @@ export function R2PipelineTabPanel({
                 >
                   {job.ok ? "✓" : "✗"} {job.id} ({job.durationMs}ms)
                 </span>
+              ))}
+            </div>
+          )}
+
+          {failedBridgeJobs.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px",
+                padding: "8px 10px",
+                borderRadius: "6px",
+                backgroundColor: "rgba(127, 29, 29, 0.18)",
+                border: "1px solid rgba(239, 68, 68, 0.45)",
+                fontSize: "11px",
+              }}
+            >
+              <div style={{ fontWeight: 700, color: "#fca5a5" }}>
+                Failing Bridge Jobs ({failedBridgeJobs.length})
+              </div>
+              {failedBridgeJobs.map((job) => (
+                <div
+                  key={job.id}
+                  style={{
+                    fontFamily: "monospace",
+                    color: "#e2e8f0",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  <span style={{ color: "#f87171", fontWeight: 700 }}>
+                    ✗ {job.id}
+                  </span>{" "}
+                  <span style={{ color: "#94a3b8" }}>({job.label})</span>:{" "}
+                  {job.error ?? `exited with failure (${job.durationMs}ms)`}
+                </div>
               ))}
             </div>
           )}

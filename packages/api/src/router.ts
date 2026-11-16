@@ -12,6 +12,7 @@ import {
   type DashboardWsTopic,
   type MarketFilter,
   type PeriodFilter,
+  type RegimeFilter,
   type RouterAuditMode,
   type ShadowRepriceMode,
   type SportFilter,
@@ -495,6 +496,7 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
           const subSportParam = url.searchParams.get("subSport");
           const periodParam = url.searchParams.get("period");
           const marketParam = url.searchParams.get("market");
+          const regimeParam = url.searchParams.get("regime");
           const payload = await deps.runShadowPricing({
             dbPath: deps.shadowDbPath,
             forceFixture,
@@ -513,6 +515,7 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
               SubSportFilter | undefined,
             period: (periodParam ?? undefined) as PeriodFilter | undefined,
             market: (marketParam ?? undefined) as MarketFilter | undefined,
+            regime: (regimeParam ?? undefined) as RegimeFilter | undefined,
             routerAuditMode: parseRouterAuditMode(
               url.searchParams.get("routerAudit"),
             ),
@@ -540,6 +543,7 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
             subSport?: SubSportFilter;
             period?: PeriodFilter;
             market?: MarketFilter;
+            regime?: RegimeFilter;
             routerAuditMode?: RouterAuditMode;
             source?: string;
           };
@@ -558,6 +562,7 @@ export function createDashboardApi<TWs extends WsLike = WsLike>(
             subSport: body.subSport,
             period: body.period,
             market: body.market,
+            regime: body.regime,
             routerAuditMode: parseRouterAuditMode(body.routerAuditMode),
           });
           return Response.json(payload);

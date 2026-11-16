@@ -24,6 +24,10 @@ import {
 } from "../packages/ui/src/panels/index.tsx";
 import { DASHBOARD_META } from "../packages/ui/src/config/dashboard.ts";
 import { TERMINAL_WELCOME_HELP_STDOUT } from "../packages/ui/src/terminal_catalog.ts";
+import type {
+  LiveWager,
+  TerminalHistoryEntry,
+} from "../packages/ui/src/types.ts";
 import {
   CANONICAL_TOKENS,
   TOKEN_ALIASES,
@@ -48,10 +52,18 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(html).toContain("Live Wagers (0)");
     expect(html).toContain("No live profile source yet");
     expect(html).toContain("Desk Quick-Jump:");
+    expect(html).toContain('data-desk-quickjump="active-risk"');
+    expect(html).toContain("NFL 1H Pregame");
+    expect(html).toContain("BookDeskOps tokens");
     expect(html).toContain("NCAAB Slice");
     expect(html).toContain("GSLIVE (0)");
     expect(html).toContain("GS Builder (0)");
     expect(html).toContain("Figure-Date Audit: BRT106");
+    expect(html).toContain('data-quickjump-feed-age="true"');
+    expect(html).toContain('data-quickjump-feed="true"');
+    expect(html).toContain("feed: Pending Hydration · pending");
+    expect(html).toContain('data-desk-quickjump="copy-link"');
+    expect(html).toContain("⧉ Copy link");
     expect(html).not.toContain("GP301");
     expect(html).not.toContain("+$76,950");
   });
@@ -110,6 +122,16 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
       `sentinels ${rows.length * 3}/${rows.length * 3} match the flags each target enables`,
     );
     expect(html).toContain("Copy registry");
+    expect(html).toContain('data-matrix-table="true"');
+    expect(html).toContain('id="build-matrix-table"');
+    expect(html).toContain('data-matrix-copy-table="true"');
+    expect(html).toContain("⧉ Copy matrix");
+    expect(html).toContain('data-matrix-jump="table"');
+    expect(html).toContain('data-matrix-copy-row="prod"');
+    expect(html).toContain('data-matrix-flag="PROD"');
+    expect(html).toContain('data-matrix-flag="ANALYTICS"');
+    expect(html).toContain("Production-only code paths.");
+    expect(html).not.toContain('data-matrix-flag-unknown="true"');
     expect(html).toContain(
       `${HOUDINI_TOKENS.length}/${HOUDINI_TOKENS.length} tokens`,
     );
@@ -125,6 +147,35 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     );
     expect(stateAlias?.target).toBe("--sd-tier-whale");
     expect(html).toContain("--sd-state-ok ← --sd-tier-whale");
+  });
+
+  test("BuildMatrixDrawer flags an unregistered bun:bundle flag instead of listing it as known", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(BuildMatrixDrawer, {
+        dceMarker: "[DCE_PROD_TARGET_ACTIVE]",
+        loading: false,
+        target: "prod",
+        enabledFeatures: ["PROD", "TURBO"],
+        error: null,
+        rows: [
+          {
+            target: "prod",
+            features: ["PROD", "TURBO"],
+            totalJsBytes: 40960,
+            totalCssBytes: 8192,
+            hasDebugSentinel: false,
+            hasExperimentalSentinel: false,
+            hasProdSentinel: true,
+          },
+        ],
+      }),
+    );
+    expect(html).toContain('data-matrix-flag="TURBO"');
+    expect(html).toContain('data-matrix-flag-unknown="true"');
+    expect(html).toContain("⚠ TURBO");
+    expect(html).toContain(
+      "Not a registered bun:bundle feature — check the probe payload.",
+    );
   });
 
   test("BuildMatrixDrawer marks an unbundled runtime as unpruned instead of claiming DCE", () => {
@@ -261,7 +312,18 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
         onSelectCustomer: noop,
         copiedCliId: null,
         onCopyCli: noop,
-        customerForensicResult: "Datacenter check clean",
+        customerReverseForensics: {
+          ipAddress: "146.190.10.20",
+          hostnames: ["cpe-146-190-10-20.tx.res.rr.com"],
+          primaryHostname: "cpe-146-190-10-20.tx.res.rr.com",
+          isDatacenterOrCloud: false,
+          isVpnOrProxySuspicious: false,
+          organization: "Spectrum Residential",
+          egressCategory: "RESIDENTIAL",
+          classificationLabel: "RESIDENTIAL",
+          riskEmphasis: "NORMAL",
+          deskNote: "Datacenter check clean",
+        },
         onClearForensicResult: noop,
         onRunReverseLookup: noop,
         onOpenTerminalProfile: noop,
@@ -301,7 +363,18 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
         onSelectCustomer: noop,
         copiedCliId: null,
         onCopyCli: noop,
-        customerForensicResult: null,
+        customerReverseForensics: {
+          ipAddress: "146.190.10.20",
+          hostnames: ["cpe-146-190-10-20.tx.res.rr.com"],
+          primaryHostname: "cpe-146-190-10-20.tx.res.rr.com",
+          isDatacenterOrCloud: false,
+          isVpnOrProxySuspicious: false,
+          organization: "Spectrum Residential",
+          egressCategory: "RESIDENTIAL",
+          classificationLabel: "RESIDENTIAL",
+          riskEmphasis: "NORMAL",
+          deskNote: "Datacenter check clean",
+        },
         onClearForensicResult: noop,
         onRunReverseLookup: noop,
         onOpenTerminalProfile: noop,
@@ -329,7 +402,18 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
         onSelectCustomer: noop,
         copiedCliId: null,
         onCopyCli: noop,
-        customerForensicResult: null,
+        customerReverseForensics: {
+          ipAddress: "146.190.10.20",
+          hostnames: ["cpe-146-190-10-20.tx.res.rr.com"],
+          primaryHostname: "cpe-146-190-10-20.tx.res.rr.com",
+          isDatacenterOrCloud: false,
+          isVpnOrProxySuspicious: false,
+          organization: "Spectrum Residential",
+          egressCategory: "RESIDENTIAL",
+          classificationLabel: "RESIDENTIAL",
+          riskEmphasis: "NORMAL",
+          deskNote: "Datacenter check clean",
+        },
         onClearForensicResult: noop,
         onRunReverseLookup: noop,
         onOpenTerminalProfile: noop,
@@ -377,7 +461,18 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
         onSelectCustomer: noop,
         copiedCliId: null,
         onCopyCli: noop,
-        customerForensicResult: null,
+        customerReverseForensics: {
+          ipAddress: "146.190.10.20",
+          hostnames: ["cpe-146-190-10-20.tx.res.rr.com"],
+          primaryHostname: "cpe-146-190-10-20.tx.res.rr.com",
+          isDatacenterOrCloud: false,
+          isVpnOrProxySuspicious: false,
+          organization: "Spectrum Residential",
+          egressCategory: "RESIDENTIAL",
+          classificationLabel: "RESIDENTIAL",
+          riskEmphasis: "NORMAL",
+          deskNote: "Datacenter check clean",
+        },
         onClearForensicResult: noop,
         onRunReverseLookup: noop,
         onOpenTerminalProfile: noop,
@@ -429,7 +524,18 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
         onRunBenchmark: noop,
         reverseIp: "1.1.1.1",
         onReverseIpChange: noop,
-        reverseResult: "Cloudflare",
+        reverseForensics: {
+          ipAddress: "1.1.1.1",
+          hostnames: ["one.one.one.one"],
+          primaryHostname: "one.one.one.one",
+          isDatacenterOrCloud: true,
+          isVpnOrProxySuspicious: false,
+          organization: "Cloudflare Edge",
+          egressCategory: "KNOWN_PUBLIC_DNS",
+          classificationLabel: "DATACENTER / VPN",
+          riskEmphasis: "HIGH_RISK",
+          deskNote: "Known public DNS resolver",
+        },
         onRunReverseLookup: noop,
         viewMode: "raw",
         onViewModeChange: noop,
@@ -451,6 +557,8 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(html).toContain("Prefetched Hosts (1)");
     expect(html).toContain("↻ Refresh");
     expect(html).toContain("c-ares: 1.2ms");
+    expect(html).toContain('data-reverse-dns-forensics="true"');
+    expect(html).toContain("Suspicious Proxy  : NO");
     expect(html).toContain("📝 Surveillance Brief");
     expect(html).toContain("native markdown");
     expect(html).toContain("⧉ Copy MD");
@@ -467,7 +575,7 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
         onRunBenchmark: noop,
         reverseIp: "1.1.1.1",
         onReverseIpChange: noop,
-        reverseResult: null,
+        reverseForensics: null,
         onRunReverseLookup: noop,
         viewMode: "interactive",
         onViewModeChange: noop,
@@ -512,7 +620,7 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
         onRunBenchmark: noop,
         reverseIp: "1.1.1.1",
         onReverseIpChange: noop,
-        reverseResult: null,
+        reverseForensics: null,
         onRunReverseLookup: noop,
         viewMode: "interactive",
         onViewModeChange: noop,
@@ -564,6 +672,84 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(html).toContain("⧉ cmd");
     expect(html).toContain("exit 0");
     expect(html).toContain("Clear Screen");
+    expect(html).toContain('data-terminal-filter="true"');
+    expect(html).toContain("⤓ Export");
+    expect(html).toContain("⏱ 1 run · p50 2ms");
+  });
+
+  test("TerminalTabPanel surfaces inline suggestions, run stats and failure counts", () => {
+    const noop = () => {};
+    const renderPanel = (
+      terminalCommand: string,
+      terminalHistory: readonly TerminalHistoryEntry[],
+    ) =>
+      renderToStaticMarkup(
+        React.createElement(TerminalTabPanel, {
+          terminalCategory: "ALL",
+          onTerminalCategoryChange: noop,
+          terminalHistory,
+          onClearHistory: noop,
+          copiedTerminalIdx: null,
+          onCopyOutput: noop,
+          copiedCommandIdx: null,
+          onCopyCommand: noop,
+          terminalLoading: false,
+          terminalBottomRef: { current: null },
+          terminalCommand,
+          onTerminalCommandChange: noop,
+          commandHistory: ["help"],
+          historyIndex: -1,
+          onHistoryIndexChange: noop,
+          onAutocomplete: noop,
+          onRunCommand: noop,
+        }),
+      );
+
+    const history: readonly TerminalHistoryEntry[] = [
+      {
+        command: "risk",
+        stdout: "\x1b[1mCRITICAL\x1b[0m hold 91%",
+        exitCode: 1,
+        durationMs: 12,
+        timestamp: 1700000000000,
+      },
+      {
+        command: "help",
+        stdout: TERMINAL_WELCOME_HELP_STDOUT,
+        exitCode: 0,
+        durationMs: 0,
+        timestamp: 1700000000000,
+        synthetic: true,
+      },
+    ];
+
+    const withSuggestions = renderPanel("pro", history);
+    expect(withSuggestions).toContain('data-terminal-palette="true"');
+    expect(withSuggestions).toContain("profile &lt;id&gt;");
+    expect(withSuggestions).toContain(
+      "Inspect multidimensional sharpness radar",
+    );
+    expect(withSuggestions).toContain("⏱ 1 run · p50 12ms · p95 12ms");
+    expect(withSuggestions).toContain("1 failed");
+
+    // Arguments suppress the palette so it cannot cover the output.
+    expect(renderPanel("p GP301", history)).not.toContain(
+      'data-terminal-palette="true"',
+    );
+
+    // A sub-millisecond run still counts as a run; it just has no latency sample.
+    const subMillisecond = renderPanel("", [
+      {
+        command: "help",
+        stdout: "ok",
+        exitCode: 0,
+        durationMs: 0,
+        timestamp: 1700000000000,
+      },
+    ]);
+    expect(subMillisecond).toContain("⏱ 1 run");
+    expect(subMillisecond).not.toContain("p50");
+    expect(subMillisecond).not.toContain("no runs yet");
   });
 
   test("RankingsTabPanel renders 30d rankings and agency proxy conduits", () => {
@@ -669,6 +855,14 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(html).toContain("Live Incoming Wagers");
     expect(html).toContain("Ticket Inspector: #W-109281");
     expect(html).toContain("Kansas City Chiefs @ Buffalo Bills");
+    expect(html).toContain("OPERATOR GUARDRAILS");
+    expect(html).toContain("SHADOW TAXONOMY MAP");
+    expect(html).toContain("ALERT QUEUE &amp; CROSS-DESK");
+    expect(html).toContain("LINE, PRICE &amp; TICKET HOLD");
+    expect(html).toContain("PTY TRACE");
+    expect(html).toContain("Shadow slice");
+    expect(html).toContain("Weblog trace");
+    expect(html).toContain("Operator brief");
     // wagers.toml is inlined into the bundle: its policy tag renders and the
     // stake emphasis floor (dashboard.toml) tags overweight samples.
     expect(html).toContain("wagers-policy/v1");
@@ -830,6 +1024,82 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     );
     expect(errored).toContain("⚠ wire: unavailable");
     expect(errored).not.toContain("✓ wire: 237 rows");
+  });
+
+  test("LiveWagersTabPanel prints a pick whose selection repeats the line only once", () => {
+    const noop = () => {};
+    // Ticket 769158444 as captured: ShortDesc hydration puts the whole pick in
+    // both selection and lineDisplay, which used to render the pick twice.
+    const ticket: LiveWager = {
+      ...FIXTURE_LIVE_WAGERS[0]!,
+      ticketId: "769158444",
+      timestamp: "10:27:24 PM ET",
+      customerId: "TTN29",
+      agentId: "APOLLO",
+      masterAgent: "APOLLO",
+      ticketWriter: "Internet",
+      writer: "internet",
+      sport: "",
+      subSport: null,
+      betType: "Spread",
+      event: "Event Matchup",
+      selection: "Steelers (Live) +27½ +100",
+      lineDisplay: "Steelers (Live) +27½ +100",
+      oddsAmerican: "-110",
+      riskUsd: 10000,
+      volumeUsd: 10000,
+      toWinUsd: 10000,
+      clvCents: null,
+      alertTier: "LATENCY",
+      alertBadge: "⚠️ LATENCY (In-Play)",
+      operatorDirective: "Delay 3s + Cap $1,000 (autoExecute: false)",
+      maxRecommendedStake: 1000,
+    };
+    const baseProps = {
+      wagers: [ticket],
+      wagerSearch: "",
+      onWagerSearchChange: noop,
+      wagerSportFilter: "ALL",
+      onWagerSportFilterChange: noop,
+      wagerAlertFilter: "ALL",
+      onWagerAlertFilterChange: noop,
+      wagerChannelFilter: "ALL",
+      onWagerChannelFilterChange: noop,
+      wagerTypeFilter: "ALL",
+      onWagerTypeFilterChange: noop,
+      wagerSortField: "timestamp" as const,
+      wagerSortDir: "desc" as const,
+      onWagerSort: noop,
+      selectedWager: null,
+      onSelectWager: noop,
+      copiedTicketId: null,
+      onCopyText: noop,
+      tiersConfig: null,
+      onSelectCustomerById: noop,
+      onInspectPty: noop,
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(LiveWagersTabPanel, baseProps),
+    );
+    const occurrences = (html.match(/Steelers \(Live\) \+27½ \+100/g) ?? [])
+      .length;
+    expect(occurrences).toBe(1);
+    expect(html).toContain("Steelers (Live) +27½ +100 (-110)");
+    expect(html).not.toContain(
+      "Steelers (Live) +27½ +100 Steelers (Live) +27½ +100",
+    );
+
+    // The inspector formats the same pick through the same path.
+    const withInspector = renderToStaticMarkup(
+      React.createElement(LiveWagersTabPanel, {
+        ...baseProps,
+        selectedWager: ticket,
+      }),
+    );
+    expect(withInspector).toContain("Pick: Steelers (Live) +27½ +100 (-110)");
+    expect(withInspector).not.toContain(
+      "Pick: Steelers (Live) +27½ +100 Steelers",
+    );
   });
 
   test("ShiftHandoffModal renders operator handoff summary and DLQ status note", () => {
@@ -1158,6 +1428,91 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
       "GSLive Ticket &amp; Canary Verify (30m)",
     );
     expect(automationsR2Html).toContain("Run Dry-Run Verify");
+
+    const triageR2Html = renderToStaticMarkup(
+      React.createElement(R2PipelineTabPanel, {
+        data: {
+          schemaVersion: 1,
+          bucketPublicBase: "https://pub.example.r2.dev",
+          observedAt: "2026-11-16T03:30:04Z",
+          overallStatus: "stale",
+          freshCount: 1,
+          totalCount: 4,
+          staleKeys: ["gslive-tally/latest.json"],
+          dataStaleKeys: ["wagers-by-state/latest.json"],
+          sinks: [
+            {
+              id: "wagers-by-state",
+              key: "wagers-by-state/latest.json",
+              label: "wagers-by-state",
+              description: "88-hour win/lose/push & grade-lag histogram",
+              publicUrl:
+                "https://pub.example.r2.dev/wagers-by-state/latest.json",
+              resolvedRollupKey: null,
+              resolvedRollupUrl: null,
+              slaSeconds: 3600,
+              state: "fresh",
+              stale: false,
+              lastModified: "2026-11-16T03:30:01Z",
+              ageSeconds: 3,
+              dataAgeSeconds: 593251,
+              dataStale: true,
+              contentLength: 2140,
+              sha256: "9cb61eecc60e40b4",
+              reason: "Within publish SLA",
+              remediationCommand: "bun run wagers:publish-snapshot",
+              diagnostic: {
+                blockerClass: "upstream_capture_stale",
+                headline:
+                  "Cached Snapshot Republished · GSLive Dual-Auth Expired",
+                detail:
+                  "wagers-by-state: GSLive expired. Manual dual-auth required.",
+                failedJobIds: ["wagers-by-state"],
+                suggestedCommand:
+                  "printf '%s' '<GSID>' | bun run secrets:gslive set",
+              },
+              metrics: [{ label: "Desk Date", value: "2026-11-09" }],
+            },
+          ],
+          daemon4020: {
+            online: true,
+            url: "http://127.0.0.1:4020/health",
+            status: 200,
+            latencyMs: 2,
+            checkedAt: "2026-11-16T03:30:04Z",
+          },
+          automations: {
+            observedAt: "2026-11-16T03:30:04Z",
+            bridgeRollupUpdatedAt: "2026-11-16T03:30:02Z",
+            bridgeJobs: [
+              {
+                id: "wagers-by-state",
+                label: "Wagers by State Publish",
+                ok: false,
+                durationMs: 0,
+                error: "GSLive expired. Manual dual-auth required.",
+              },
+            ],
+            schedules: [],
+            ticketVerification: null,
+          },
+        },
+        loading: false,
+        error: null,
+        onRefresh: noop,
+      }),
+    );
+    expect(triageR2Html).toContain("Data Windows &gt;24h");
+    expect(triageR2Html).toContain(
+      "Pipeline Root-Cause &amp; Auth Remediation Triage",
+    );
+    expect(triageR2Html).toContain("Cached Snapshot Republished");
+    expect(triageR2Html).toContain("DATA &gt;24H");
+    expect(triageR2Html).toContain("sha256:9cb61eecc60e");
+    expect(triageR2Html).toContain("Failing Bridge Jobs (1)");
+    expect(triageR2Html).toContain(
+      "GSLive expired. Manual dual-auth required.",
+    );
   });
 
   test("UI panels, ANSI renderer, and dashboard.md replace dead desk.bookdeskops.com/agent/ URLs with local links", () => {
@@ -1179,7 +1534,18 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
         onSelectCustomer: noop,
         copiedCliId: null,
         onCopyCli: noop,
-        customerForensicResult: null,
+        customerReverseForensics: {
+          ipAddress: "146.190.10.20",
+          hostnames: ["cpe-146-190-10-20.tx.res.rr.com"],
+          primaryHostname: "cpe-146-190-10-20.tx.res.rr.com",
+          isDatacenterOrCloud: false,
+          isVpnOrProxySuspicious: false,
+          organization: "Spectrum Residential",
+          egressCategory: "RESIDENTIAL",
+          classificationLabel: "RESIDENTIAL",
+          riskEmphasis: "NORMAL",
+          deskNote: "Datacenter check clean",
+        },
         onClearForensicResult: noop,
         onRunReverseLookup: noop,
         onOpenTerminalProfile: noop,

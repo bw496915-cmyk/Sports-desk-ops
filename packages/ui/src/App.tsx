@@ -53,6 +53,28 @@ import {
 } from "./config/dashboard.ts";
 import { TOKENS_TOML_VERSION } from "./tokens.registry.generated.ts";
 import { WAGERS_DEFAULTS } from "./config/wagers.ts";
+import {
+  applyShadowSliceToLocation,
+  buildBookdeskopsTokensDeskHref,
+  buildDashboardShadowSliceUrl,
+  formatShadowSliceRibbonLabel,
+  NFL_1H_PREGAME_SLICE,
+  shadowSliceHasTapeFocus,
+  sportFilterForSlice,
+  summarizeSliceWagers,
+  wagerSearchHintForSlice,
+} from "./desk_quick_jump.ts";
+import type { ReverseDnsClassification } from "../../../lib/bun_dns.ts";
+import {
+  buildReverseDnsForensicsView,
+  type ReverseDnsForensicsView,
+} from "../../../lib/reverse_dns_forensics.ts";
+import { useActiveShadowSlice } from "./use_active_shadow_slice.ts";
+import { feedFreshnessTitle, quickJumpFeedState } from "./quick_jump_feed.ts";
+import {
+  findWagerByTicketParam,
+  syncTicketInspectorToLocation,
+} from "./ticket_inspector.ts";
 import { DEMO_CUSTOMER_COUNT } from "./data/demo_customers.ts";
 import {
   type AlertFilter,
@@ -119,6 +141,14 @@ function resolveInitialTab(): DashboardTabId {
   const queryTab = params.get("tab");
   if (queryTab) {
     return resolveDashboardTabId(queryTab, DASHBOARD_DEFAULT_TAB);
+  }
+  const sport = params.get("sport")?.trim();
+  const subSport = params.get("subSport")?.trim();
+  if (
+    (sport && sport.length > 0 && sport.toUpperCase() !== "ALL") ||
+    (subSport && subSport.length > 0 && subSport.toUpperCase() !== "ALL")
+  ) {
+    return "shadow";
   }
   if (window.location.hash) {
     return resolveDashboardTabId(window.location.hash, DASHBOARD_DEFAULT_TAB);
@@ -200,7 +230,8 @@ export function App(): React.ReactElement {
   const [benchResult, setBenchResult] = useState<string | null>(null);
   const [benchLoading, setBenchLoading] = useState(false);
   const [reverseIp, setReverseIp] = useState("1.1.1.1");
-  const [reverseResult, setReverseResult] = useState<string | null>(null);
+  const [reverseForensics, setReverseForensics] =
+    useState<ReverseDnsForensicsView | null>(null);
 
   // Customer Showcase state
   const [searchQuery, setSearchQuery] = useState(() =>
@@ -210,9 +241,10 @@ export function App(): React.ReactElement {
   const [copiedCliId, setCopiedCliId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] =
     useState<ShowcaseCustomer | null>(null);
-  const [customerForensicResult, setCustomerForensicResult] = useState<
-    string | null
-  >(null);
+  const [customerReverseForensics, setCustomerReverseForensics] =
+    useState<ReverseDnsForensicsView | null>(null);
+  /** HMR/back-compat: older dashboard bundles referenced this name. */
+  const customerForensicResult = customerReverseForensics;
 
   // Runtime Declarative Wager Tiers + Live API Hydration state
   const [tiersConfig, setTiersConfig] = useState<TierStyleConfig | null>(null);
@@ -244,6 +276,65 @@ export function App(): React.ReactElement {
   // Every customer row the desk actually has: fixture-book rows first (richer), then the
   // full backtest cohort. A missing/unavailable payload leaves this empty, which is what
   // keeps the Profiles tab in its explicit "no source" state.
+  const activeShadowSlice = useActiveShadowSlice();
+  const shadowSliceTape = useMemo(
+    () => summarizeSliceWagers(liveWagers, activeShadowSlice),
+    [liveWagers, activeShadowSlice],
+  );
+  const tapeRiskUsd = shadowSliceHasTapeFocus(activeShadowSlice)
+    ? shadowSliceTape.riskUsd
+    : liveWagers.reduce((s, w) => s + w.riskUsd, 0);
+  const tapeTicketCount = shadowSliceHasTapeFocus(activeShadowSlice)
+    ? shadowSliceTape.count
+    : liveWagers.length;
+
+  // Quick-Jump ribbon freshness. The App re-renders on the per-second clock, so
+  // the age is recomputed without a second timer; `wagersUpdatedAt` is the last
+  // successful snapshot, never the render time.
+  const quickJumpFeed = quickJumpFeedState(wagersUpdatedAt, Date.now());
+  const quickJumpNcaabActive =
+    activeTab === "wagers" && wagerSportFilter.toUpperCase() === "NCAAB";
+  const quickJumpChannelFilter = wagerChannelFilter.toUpperCase();
+  const quickJumpAuditActive =
+    activeTab === "customers" &&
+    (selectedCustomer?.id ?? "").toUpperCase() === "BRT106";
+
+  const [quickLinkCopyState, setQuickLinkCopyState] = useState<
+    "idle" | "copied" | "failed"
+  >("idle");
+  const quickLinkCopyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (quickLinkCopyTimer.current !== null) {
+        clearTimeout(quickLinkCopyTimer.current);
+      }
+    },
+    [],
+  );
+  const handleCopyQuickLink = () => {
+    if (typeof window === "undefined") return;
+    void copyText(window.location.href).then((result) => {
+      setQuickLinkCopyState(result.ok ? "copied" : "failed");
+      if (quickLinkCopyTimer.current !== null) {
+        clearTimeout(quickLinkCopyTimer.current);
+      }
+      quickLinkCopyTimer.current = setTimeout(
+        () => setQuickLinkCopyState("idle"),
+        1_800,
+      );
+    });
+  };
+
+  const openWagersForShadowSlice = () => {
+    setWagerChannelFilter("ALL");
+    setWagerAlertFilter("ALL");
+    setWagerTypeFilter("ALL");
+    setWagerSportFilter(sportFilterForSlice(activeShadowSlice));
+    const searchHint = wagerSearchHintForSlice(activeShadowSlice);
+    setWagerSearch(searchHint);
+    setActiveTab("wagers");
+  };
+
   const profileCustomers = useMemo<readonly ShowcaseCustomer[]>(() => {
     if (cohortsReport === null) return [];
     return mergeProfileRows(
@@ -326,11 +417,28 @@ export function App(): React.ReactElement {
       seenWagerIdsRef.current = nextIds;
       setWagersUpdatedAt(Date.now());
       if (normalized.wagers.length > 0) {
-        setSelectedWager((prev) =>
-          prev && normalized.wagers.some((w) => w.ticketId === prev.ticketId)
-            ? prev
-            : (normalized.wagers[0] ?? null),
-        );
+        const ticketFromUrl =
+          typeof window !== "undefined"
+            ? (new URLSearchParams(window.location.search)
+                .get("ticket")
+                ?.trim() ?? "")
+            : "";
+        const urlPick =
+          ticketFromUrl !== ""
+            ? findWagerByTicketParam(normalized.wagers, ticketFromUrl)
+            : null;
+        setSelectedWager((prev) => {
+          if (urlPick !== null) {
+            return urlPick;
+          }
+          if (
+            prev &&
+            normalized.wagers.some((w) => w.ticketId === prev.ticketId)
+          ) {
+            return prev;
+          }
+          return normalized.wagers[0] ?? null;
+        });
       }
     } catch (err) {
       failLiveWagers(
@@ -681,6 +789,7 @@ export function App(): React.ReactElement {
       exitCode: 0,
       durationMs: 0,
       timestamp: Date.now(),
+      synthetic: true,
     },
   ]);
   const [terminalCommand, setTerminalCommand] = useState("");
@@ -690,6 +799,7 @@ export function App(): React.ReactElement {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [terminalLoading, setTerminalLoading] = useState(false);
   const terminalBottomRef = useRef<HTMLDivElement>(null);
+  const initialTerminalQueryRan = useRef(false);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -930,6 +1040,16 @@ export function App(): React.ReactElement {
     }
   };
 
+  useEffect(() => {
+    const cmd = resolveInitialUrlParam("terminal");
+    if (cmd === "" || initialTerminalQueryRan.current) {
+      return;
+    }
+    initialTerminalQueryRan.current = true;
+    setActiveTab("terminal");
+    void runTerminalCommand(cmd);
+  }, []);
+
   const runBenchmark = async () => {
     setBenchLoading(true);
     try {
@@ -957,19 +1077,19 @@ export function App(): React.ReactElement {
     try {
       const res = await fetch(`/api/dns/reverse?ip=${encodeURIComponent(ip)}`);
       if (res.ok) {
-        const json = await res.json();
-        const resultMsg = `🔍 ${json.organization} | Cloud/DC: ${json.isDatacenterOrCloud ? "🚨 YES" : "NO"} | Proxy/VPN: ${json.isVpnOrProxySuspicious ? "⚠️ YES" : "NO"} | Host: ${json.primaryHostname || "none"}`;
+        const json = (await res.json()) as ReverseDnsClassification;
+        const view = buildReverseDnsForensicsView(json);
         if (ipToLookup) {
-          setCustomerForensicResult(resultMsg);
+          setCustomerReverseForensics(view);
         } else {
-          setReverseResult(resultMsg);
+          setReverseForensics(view);
         }
       }
     } catch {
       if (ipToLookup) {
-        setCustomerForensicResult("Lookup failed");
+        setCustomerReverseForensics(null);
       } else {
-        setReverseResult("Lookup failed");
+        setReverseForensics(null);
       }
     }
   };
@@ -1614,43 +1734,126 @@ export function App(): React.ReactElement {
           </span>
           <button
             type="button"
-            onClick={() => {
-              setWagerSportFilter("ALL");
-              setWagerSearch("");
-              setActiveTab("wagers");
-            }}
+            data-desk-quickjump="active-risk"
+            onClick={openWagersForShadowSlice}
             style={{
               padding: "3px 9px",
               borderRadius: "999px",
-              border: "1px solid rgba(56, 189, 248, 0.35)",
-              backgroundColor: "rgba(56, 189, 248, 0.1)",
-              color: "#7dd3fc",
+              border: shadowSliceHasTapeFocus(activeShadowSlice)
+                ? "1px solid rgba(251, 191, 36, 0.45)"
+                : "1px solid rgba(56, 189, 248, 0.35)",
+              backgroundColor: shadowSliceHasTapeFocus(activeShadowSlice)
+                ? "rgba(251, 191, 36, 0.14)"
+                : "rgba(56, 189, 248, 0.1)",
+              color: shadowSliceHasTapeFocus(activeShadowSlice)
+                ? "#fde68a"
+                : "#7dd3fc",
               fontSize: "11px",
               fontWeight: 600,
               cursor: "pointer",
             }}
-            title="Open Live Wagers tape"
+            title={
+              shadowSliceHasTapeFocus(activeShadowSlice)
+                ? `Filter Live Wagers to URL shadow slice: ${buildDashboardShadowSliceUrl(activeShadowSlice, { matrix: showBuildMatrix })}`
+                : "Open full Live Wagers tape"
+            }
           >
-            ⚡ Active Risk: $
-            {liveWagers.reduce((s, w) => s + w.riskUsd, 0).toLocaleString()} (
-            {liveWagers.length} tickets)
+            ⚡{" "}
+            {shadowSliceHasTapeFocus(activeShadowSlice)
+              ? `Slice Risk (${formatShadowSliceRibbonLabel(activeShadowSlice)}):`
+              : "Active Risk:"}{" "}
+            ${tapeRiskUsd.toLocaleString()} ({tapeTicketCount} tickets
+            {shadowSliceTape.criticalOrSteam > 0
+              ? ` · ${shadowSliceTape.criticalOrSteam} crit/steam`
+              : ""}
+            )
+            <span
+              data-quickjump-feed-age="true"
+              style={{
+                marginLeft: "4px",
+                color: quickJumpFeed.stale ? "#fbbf24" : "#64748b",
+                fontWeight: 400,
+              }}
+              title={feedFreshnessTitle(quickJumpFeed, wagersProvenance.label)}
+            >
+              {" "}
+              · {quickJumpFeed.label}
+              {quickJumpFeed.stale ? " ⚠" : ""}
+            </span>
           </button>
           <button
             type="button"
+            data-desk-quickjump="nfl-1h-pregame"
+            onClick={() => {
+              applyShadowSliceToLocation(NFL_1H_PREGAME_SLICE, {
+                matrix: showBuildMatrix,
+              });
+              setActiveTab("shadow");
+            }}
+            style={{
+              padding: "3px 9px",
+              borderRadius: "999px",
+              border: "1px solid rgba(234, 179, 8, 0.4)",
+              backgroundColor: "rgba(234, 179, 8, 0.12)",
+              color: "#facc15",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="Shadow matrix: NFL · 1H · Pregame (matches ?matrix=1&sport=Football&subSport=NFL&period=1h&regime=pregame)"
+          >
+            🏈 NFL 1H Pregame
+          </button>
+          <a
+            href={buildBookdeskopsTokensDeskHref(
+              shadowSliceHasTapeFocus(activeShadowSlice)
+                ? activeShadowSlice
+                : undefined,
+            )}
+            target="_blank"
+            rel="noreferrer"
+            data-desk-quickjump="bookdeskops-tokens"
+            style={{
+              padding: "3px 9px",
+              borderRadius: "999px",
+              border: "1px solid rgba(148, 163, 184, 0.35)",
+              backgroundColor: "rgba(148, 163, 184, 0.1)",
+              color: "#e2e8f0",
+              fontSize: "11px",
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+            title="BookDeskOps serve-local tokens desk (DCE compile-time anchor)"
+          >
+            📎 BookDeskOps tokens
+          </a>
+          <button
+            type="button"
+            data-desk-quickjump="ncaab"
+            data-quickjump-active={quickJumpNcaabActive ? "true" : undefined}
+            aria-current={quickJumpNcaabActive ? "page" : undefined}
             onClick={() => {
               setWagerSportFilter("NCAAB");
               setWagerSearch("");
+              setWagerChannelFilter("ALL");
               setActiveTab("wagers");
             }}
             style={{
               padding: "3px 9px",
               borderRadius: "999px",
-              border: "1px solid rgba(245, 158, 11, 0.35)",
-              backgroundColor: "rgba(245, 158, 11, 0.12)",
+              border: quickJumpNcaabActive
+                ? "1px solid #fbbf24"
+                : "1px solid rgba(245, 158, 11, 0.35)",
+              backgroundColor: quickJumpNcaabActive
+                ? "rgba(245, 158, 11, 0.26)"
+                : "rgba(245, 158, 11, 0.12)",
               color: "#fbbf24",
               fontSize: "11px",
               fontWeight: 600,
               cursor: "pointer",
+              boxShadow: quickJumpNcaabActive
+                ? "0 0 0 1px rgba(251, 191, 36, 0.35)"
+                : undefined,
             }}
             title="Filter Live Wagers to College Basketball (NCAAB 1H & Game)"
           >
@@ -1678,10 +1881,15 @@ export function App(): React.ReactElement {
                 (w.writer ?? wagerChannelOf(w.ticketWriter)) ===
                 channel.id.toLowerCase(),
             ).length;
+            const channelActive =
+              activeTab === "wagers" && quickJumpChannelFilter === channel.id;
             return (
               <button
                 key={channel.id}
                 type="button"
+                data-desk-quickjump={channel.id.toLowerCase()}
+                data-quickjump-active={channelActive ? "true" : undefined}
+                aria-current={channelActive ? "page" : undefined}
                 onClick={() => {
                   setWagerSportFilter("ALL");
                   setWagerSearch("");
@@ -1691,12 +1899,19 @@ export function App(): React.ReactElement {
                 style={{
                   padding: "3px 9px",
                   borderRadius: "999px",
-                  border: "1px solid rgba(192, 132, 252, 0.35)",
-                  backgroundColor: "rgba(192, 132, 252, 0.12)",
+                  border: channelActive
+                    ? "1px solid #d8b4fe"
+                    : "1px solid rgba(192, 132, 252, 0.35)",
+                  backgroundColor: channelActive
+                    ? "rgba(192, 132, 252, 0.26)"
+                    : "rgba(192, 132, 252, 0.12)",
                   color: "#d8b4fe",
                   fontSize: "11px",
                   fontWeight: 600,
                   cursor: "pointer",
+                  boxShadow: channelActive
+                    ? "0 0 0 1px rgba(216, 180, 254, 0.35)"
+                    : undefined,
                 }}
                 title={channel.title}
               >
@@ -1706,18 +1921,28 @@ export function App(): React.ReactElement {
           })}
           <button
             type="button"
+            data-desk-quickjump="audit"
+            data-quickjump-active={quickJumpAuditActive ? "true" : undefined}
+            aria-current={quickJumpAuditActive ? "page" : undefined}
             onClick={() => {
               handleSelectCustomerById("BRT106");
             }}
             style={{
               padding: "3px 9px",
               borderRadius: "999px",
-              border: "1px solid rgba(34, 197, 94, 0.38)",
-              backgroundColor: "rgba(34, 197, 94, 0.12)",
+              border: quickJumpAuditActive
+                ? "1px solid #4ade80"
+                : "1px solid rgba(34, 197, 94, 0.38)",
+              backgroundColor: quickJumpAuditActive
+                ? "rgba(34, 197, 94, 0.26)"
+                : "rgba(34, 197, 94, 0.12)",
               color: "#4ade80",
               fontSize: "11px",
               fontWeight: 600,
               cursor: "pointer",
+              boxShadow: quickJumpAuditActive
+                ? "0 0 0 1px rgba(74, 222, 128, 0.35)"
+                : undefined,
             }}
             title="Inspect BRT106 (BGMASTER / BILLY666) 3-endpoint portal & figureDate reconciliation"
           >
@@ -1771,6 +1996,41 @@ export function App(): React.ReactElement {
               </code>
             )}
           </span>
+          <span>·</span>
+          <span
+            data-quickjump-feed="true"
+            style={
+              quickJumpFeed.stale
+                ? { color: "#fbbf24", fontWeight: 600 }
+                : undefined
+            }
+            title={feedFreshnessTitle(quickJumpFeed, wagersProvenance.label)}
+          >
+            feed: {wagersProvenance.label} · {quickJumpFeed.label}
+            {quickJumpFeed.stale ? " ⚠" : ""}
+          </span>
+          <button
+            type="button"
+            data-desk-quickjump="copy-link"
+            onClick={handleCopyQuickLink}
+            style={{
+              padding: "3px 9px",
+              borderRadius: "999px",
+              border: "1px solid rgba(148, 163, 184, 0.35)",
+              backgroundColor: "rgba(148, 163, 184, 0.12)",
+              color: "#cbd5e1",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="Copy this exact view — tab, filters and shadow slice — as a deep link"
+          >
+            {quickLinkCopyState === "copied"
+              ? "✓ Copied"
+              : quickLinkCopyState === "failed"
+                ? "⚠ Copy blocked"
+                : "⧉ Copy link"}
+          </button>
         </div>
       </section>
 
@@ -1812,8 +2072,8 @@ export function App(): React.ReactElement {
               setCopiedCliId(customerId);
               setTimeout(() => setCopiedCliId(null), 2000);
             }}
-            customerForensicResult={customerForensicResult}
-            onClearForensicResult={() => setCustomerForensicResult(null)}
+            customerReverseForensics={customerForensicResult}
+            onClearForensicResult={() => setCustomerReverseForensics(null)}
             onRunReverseLookup={(ipAddress) => {
               void runReverseLookup(ipAddress);
             }}
@@ -1855,7 +2115,7 @@ export function App(): React.ReactElement {
             }}
             reverseIp={reverseIp}
             onReverseIpChange={setReverseIp}
-            reverseResult={reverseResult}
+            reverseForensics={reverseForensics}
             onRunReverseLookup={() => {
               void runReverseLookup();
             }}
@@ -2018,7 +2278,11 @@ export function App(): React.ReactElement {
             wagerSortDir={wagerSortDir}
             onWagerSort={handleWagerSort}
             selectedWager={selectedWager}
-            onSelectWager={setSelectedWager}
+            onSelectWager={(wager) => {
+              setSelectedWager(wager);
+              syncTicketInspectorToLocation(wager.ticketId);
+            }}
+            alertRecords={alertRecords}
             copiedTicketId={copiedTicketId}
             onCopyText={(ticketId, text) => {
               void copyText(text);
@@ -2031,6 +2295,10 @@ export function App(): React.ReactElement {
             onInspectPty={(customerId) => {
               setActiveTab("terminal");
               void runTerminalCommand(`profile ${customerId} --radar`);
+            }}
+            onRunPtyCommand={(cmd) => {
+              setActiveTab("terminal");
+              void runTerminalCommand(cmd);
             }}
           />
         )}

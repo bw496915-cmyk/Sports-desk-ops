@@ -119,9 +119,13 @@ export function runRuntimePreflightAudit(options?: {
     (name) => Bun.env[name] ?? "",
   ).filter((value) => value !== "");
 
-  const globalS3 = typeof Bun.s3 === "object" && Bun.s3 !== null ? Bun.s3 : null;
+  const globalS3 =
+    typeof Bun.s3 === "object" && Bun.s3 !== null ? Bun.s3 : null;
   if (globalS3 !== null) {
-    assertNoSecretLeak(Bun.inspect(globalS3, { depth: Infinity }), activeSecrets);
+    assertNoSecretLeak(
+      Bun.inspect(globalS3, { depth: Infinity }),
+      activeSecrets,
+    );
     assertNoSecretLeak(
       nodeInspect(globalS3, { showHidden: true, depth: null }),
       activeSecrets,
@@ -161,11 +165,13 @@ export async function runPreflightOrExit(
   } catch (err) {
     const rawMsg = err instanceof Error ? err.message : String(err);
     let code: PreflightErrorCode = "ERR_INSP_SECRET_REDACTION_LEAK";
-    let safeDetail = "Secret or token pattern detected during startup preflight";
+    let safeDetail =
+      "Secret or token pattern detected during startup preflight";
 
     if (rawMsg.startsWith("ERR_CF_TOKEN_BLEED_10000")) {
       code = "ERR_CF_TOKEN_BLEED_10000";
-      safeDetail = "Conflicting CLOUDFLARE_API_TOKEN and R2/AWS credentials in env";
+      safeDetail =
+        "Conflicting CLOUDFLARE_API_TOKEN and R2/AWS credentials in env";
     } else if (rawMsg.startsWith("ERR_DNS_CACHE_THRASH_OR_ERR_SPIKE")) {
       code = "ERR_DNS_CACHE_THRASH_OR_ERR_SPIKE";
       safeDetail = rawMsg.slice(0, 95); // numeric counters only; never echoes secrets
