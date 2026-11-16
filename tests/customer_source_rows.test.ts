@@ -381,3 +381,31 @@ describe("ticket writer policy in the capture merge", () => {
     expect(al?.recent_tickets).toHaveLength(1);
   });
 });
+
+describe("live bet ticker enrichment", () => {
+  test("carries market, VIP, canonical rotation and leg count", () => {
+    const rows = customerRowsFromLiveCaptures(
+      {
+        LIST: [
+          {
+            CustomerID: "TK1",
+            TicketWriter: "Internet",
+            WagerType: "P",
+            VIP: "1   ",
+            AmountWagered: 10000,
+            ToWinAmount: 50000,
+            WagerNumber: 9,
+            ShortDesc:
+              "P.Hockey #286 Mammoth -335 - For Game Basketball #870 Tulsa -260 - For Game",
+          },
+        ],
+      },
+      {},
+    );
+    const position = rows[0]?.open_positions?.[0];
+    expect(position?.market).toBe("P");
+    expect(position?.vip).toBe(true);
+    expect(position?.rotation).toBe("ROT 286");
+    expect(position?.legs).toBe(2);
+  });
+});

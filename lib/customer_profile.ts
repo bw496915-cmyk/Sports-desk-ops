@@ -292,6 +292,12 @@ export interface PositionRow {
   readonly to_win_usd?: number;
   readonly placed_at?: string;
   readonly writer?: string;
+  /** Ticker VIP flag; absent when the capture did not carry one. */
+  readonly vip?: boolean;
+  /** Canonical rotation key ("ROT 286") from the ticker description. */
+  readonly rotation?: string;
+  /** Legs counted from the ticker description (1 for a straight wager). */
+  readonly legs?: number;
   /** Placeholder: live captures only produce open positions; settled rows are not wired yet. */
   readonly status?: string;
   readonly source?: string;

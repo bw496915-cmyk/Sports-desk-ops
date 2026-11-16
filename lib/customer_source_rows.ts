@@ -15,6 +15,7 @@ import type {
 } from "./customer_profile.ts";
 import { ticketWriterDisposition } from "./live_writer_policy.ts";
 import { positionIdentity } from "./position_identity.ts";
+import { extractRotationFromText } from "./rotation_normalizer.ts";
 import { usdFromWireCents } from "./wire_money.ts";
 
 type JsonRow = Record<string, unknown>;
@@ -161,13 +162,27 @@ function livePosition(row: JsonRow): PositionRow | null {
   const placedAt = text(row.InsertDateTime) ?? text(row.insertedAt);
   const selection = text(row.ShortDesc) ?? text(row.shortDesc);
   const sport = sportOfDescription(selection);
+  const market = text(row.WagerType) ?? text(row.wagerType);
+  const vip = (text(row.VIP) ?? text(row.vip)) === "1";
+  const rotation =
+    selection === null
+      ? null
+      : (extractRotationFromText(selection)?.canonicalRotationKey ?? null);
+  const legs =
+    selection === null
+      ? null
+      : Math.max(1, (selection.match(/#\d+/g) ?? []).length);
   return {
     ...(number === null ? {} : { wager_number: String(number) }),
     ...(sport === null ? {} : { sport }),
+    ...(market === null ? {} : { market }),
     ...(selection === null ? {} : { selection }),
     ...(risk === null ? {} : { risk_usd: usdFromWireCents(risk) }),
     ...(toWin === null ? {} : { to_win_usd: usdFromWireCents(toWin) }),
     ...(writer === null ? {} : { writer }),
+    ...(vip ? { vip } : {}),
+    ...(rotation === null ? {} : { rotation }),
+    ...(legs === null ? {} : { legs }),
     ...(placedAt === null ? {} : { placed_at: placedAt }),
     status: "open",
     source: "live-wagers",
@@ -298,6 +313,7 @@ function liveBetPosition(row: JsonRow): PositionRow {
   const market = text(row.wagerType) ?? text(row.subSport);
   const selection = text(row.description) ?? text(row.chosenTeam);
   const placedAt = text(row.acceptedAt);
+  const picks = finite(row.picks);
   return {
     ...(ticket === null ? {} : { ticket_number: ticket }),
     ...(number === null ? {} : { wager_number: number }),
@@ -306,6 +322,7 @@ function liveBetPosition(row: JsonRow): PositionRow {
     ...(selection === null ? {} : { selection }),
     ...(risk === null ? {} : { risk_usd: usdFromWireCents(risk) }),
     ...(toWin === null ? {} : { to_win_usd: usdFromWireCents(toWin) }),
+    ...(picks === null ? {} : { legs: Math.max(1, picks) }),
     ...(placedAt === null ? {} : { placed_at: placedAt }),
     status: "open",
     source: "live-bets",
