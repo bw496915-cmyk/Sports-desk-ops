@@ -28,6 +28,10 @@ import {
 import { positionIdentity } from "../lib/position_identity.ts";
 import { ticketWriterDisposition } from "../lib/live_writer_policy.ts";
 import { fetchLiveFeedObject } from "../lib/live_feed_source.ts";
+import {
+  loadAgentDownline,
+  treeDownlineCounts,
+} from "../lib/agent_downline.ts";
 import { LIVE_POSITIONS_R2_KEYS } from "../lib/live_positions_r2_publisher.ts";
 
 const REPO = join(import.meta.dir, "..");
@@ -39,6 +43,10 @@ const { values } = parseArgs({
       default: join(REPO, "enriched_customers_full.json"),
     },
     tree: { type: "string", default: join(REPO, "data", "agent-tree.json") },
+    downline: {
+      type: "string",
+      default: join(REPO, "sportsdesk_downline_data.json"),
+    },
     out: {
       type: "string",
       default: join(REPO, "data", "customer-profiles.json"),
@@ -203,6 +211,27 @@ const labelledProfiles = profiles.map((profile) =>
     : profile,
 );
 
+const downlinePath = resolve(values.downline ?? "");
+const downline = await loadAgentDownline(downlinePath);
+const agentIds = new Set(
+  labelledProfiles
+    .map((profile) => profile.agentId.trim().toUpperCase())
+    .filter((agent) => agent !== "" && agent !== "UNASSIGNED"),
+);
+const treeCounts = treeDownlineCounts(tree.nodes, agentIds);
+let downlineMatched = 0;
+const enrichedProfiles = labelledProfiles.map((profile) => {
+  const agent = profile.agentId.trim().toUpperCase();
+  const rollup = downline?.byAgent.get(agent);
+  const counts = treeCounts.get(agent);
+  if (rollup !== undefined) downlineMatched++;
+  return {
+    ...profile,
+    ...(rollup === undefined ? {} : { downline: rollup }),
+    ...(counts === undefined ? {} : { treeDownline: counts }),
+  };
+});
+
 const outPath = resolve(values.out ?? "");
 await Bun.write(
   outPath,
@@ -224,7 +253,15 @@ await Bun.write(
       summary,
       positionRefusals,
       writerExclusions,
-      profiles: labelledProfiles,
+      downline: {
+        status: downline === null ? "missing" : "ok",
+        source: downlinePath.replace(REPO, "."),
+        agents: downline?.agents ?? null,
+        matched: downlineMatched,
+        meta: downline?.meta ?? null,
+        note: "sportsdesk_downline_data.json is a point-in-time fixture, not a live feed",
+      },
+      profiles: enrichedProfiles,
     },
     null,
     2,
@@ -232,7 +269,7 @@ await Bun.write(
 );
 
 if (values.json) {
-  console.log(JSON.stringify({ summary, profiles: labelledProfiles }, null, 2));
+  console.log(JSON.stringify({ summary, profiles: enrichedProfiles }, null, 2));
 } else {
   // The book's `*_usd` fields are dollars (a $20,000 ticket is `risk_usd: 20000`), not cents.
   const usd = (dollars: number) =>

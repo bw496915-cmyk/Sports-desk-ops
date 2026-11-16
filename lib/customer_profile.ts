@@ -15,6 +15,10 @@
  *    as a *proxy* and says so. Period (`Game` vs halves) is a market property, not a timing one.
  */
 
+import type {
+  AgentDownlineRollup,
+  TreeDownlineCounts,
+} from "./agent_downline.ts";
 import { portalIso } from "./bet_flags.ts";
 import { competitionFamilyFromDirectory } from "./candidate_match_evaluation.ts";
 import type { BunInspectOptions } from "./cli_inspect.ts";
@@ -389,6 +393,10 @@ export interface CustomerProfile {
   /** Open positions, one row per ticket; empty when no live capture carried this customer. */
   readonly positions: readonly PositionRow[];
   readonly placement: Placement;
+  /** Downline rollup for the agent, when the snapshot carries that login. */
+  readonly downline?: AgentDownlineRollup;
+  /** Direct and descendant agent counts for the agent, from the tree. */
+  readonly treeDownline?: TreeDownlineCounts;
   /** Data-quality notes that change how a number should be read. */
   readonly flags: readonly string[];
 }
