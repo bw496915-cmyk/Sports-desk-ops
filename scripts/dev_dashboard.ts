@@ -652,6 +652,9 @@ export function startDashboardServer(
   const uiRoutes = {
     "/": indexHtml,
     "/dashboard": indexHtml,
+    // Bun's native directory route: zero-JS static dispatch with range/ETag
+    // handling and symlink clamping; files live under repo `static/`.
+    "/static/*": { dir: resolve(cwd, "static") },
     "/index.js": {
       GET: async (req: Request): Promise<Response> => {
         const bundle = await ensureLegacyBundle();

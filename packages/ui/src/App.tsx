@@ -2537,7 +2537,7 @@ export function App(): React.ReactElement {
           {runtimeFlags.target}) + tokens.toml v{TOKENS_TOML_VERSION} ·
           dashboard.toml v{DASHBOARD_META.version}
           {buildInfo
-            ? ` · build ${buildInfo.target}@${buildInfo.commit} · ${buildInfo.builtAt}`
+            ? ` · build ${buildInfo.target}@${buildInfo.commit} · ${buildInfo.builtAt} · bun ${buildInfo.bunVersion}+${buildInfo.bunRevision.slice(0, 9)} on ${buildInfo.builtOn}`
             : ""}{" "}
           · autoExecute: false invariant active
         </span>

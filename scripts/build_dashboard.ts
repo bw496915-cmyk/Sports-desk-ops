@@ -42,6 +42,9 @@ export interface DashboardBuildManifest {
   readonly minify: boolean;
   readonly elapsedMs: number;
   readonly entrypoint: string;
+  readonly bunVersion: string;
+  readonly bunRevision: string;
+  readonly builtOn: string;
   readonly artifacts: readonly DashboardArtifactSummary[];
 }
 
@@ -93,6 +96,11 @@ export async function buildEnhancedDashboard(
       __DASHBOARD_BUILD_TARGET__: JSON.stringify(target),
       __DASHBOARD_BUILD_TIME__: JSON.stringify(builtAt),
       __DASHBOARD_BUILD_COMMIT__: JSON.stringify(resolveGitCommit()),
+      __DASHBOARD_BUILD_BUN_VERSION__: JSON.stringify(Bun.version),
+      __DASHBOARD_BUILD_BUN_REVISION__: JSON.stringify(Bun.revision),
+      __DASHBOARD_BUILD_PLATFORM__: JSON.stringify(
+        `${process.platform}/${process.arch}`,
+      ),
     },
   });
 
@@ -148,6 +156,9 @@ export async function buildEnhancedDashboard(
     minify,
     elapsedMs,
     entrypoint: "src/dashboard/index.html",
+    bunVersion: Bun.version,
+    bunRevision: Bun.revision,
+    builtOn: `${process.platform}/${process.arch}`,
     artifacts,
   };
 

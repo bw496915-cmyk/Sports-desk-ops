@@ -79,10 +79,17 @@ describe("Enhanced Dashboard Builder & Shadow-Pricing Suite", () => {
           join(outdir, "build-manifest.json"),
         ).json();
         expect(manifestDisk.target).toBe("prod");
+        expect(manifestDisk.bunVersion).toBe(Bun.version);
+        expect(manifestDisk.bunRevision).toBe(Bun.revision);
+        expect(manifestDisk.builtOn).toBe(
+          `${process.platform}/${process.arch}`,
+        );
 
         // Build-time constants are inlined into the client bundle (Bun.build define).
         const jsBundled = await Bun.file(join(outdir, jsArt!.fileName)).text();
         expect(jsBundled).toContain(manifest.builtAt);
+        expect(jsBundled).toContain(Bun.version);
+        expect(jsBundled).toContain(Bun.revision);
       } finally {
         rmSync(outdir, { recursive: true, force: true });
       }
