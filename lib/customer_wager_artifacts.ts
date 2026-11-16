@@ -20,6 +20,7 @@
 
 import { resolve } from "node:path";
 import { summarizeCardCorpus, type CardCorpus } from "./wager_card.ts";
+import { ticketWriterDisposition } from "./live_writer_policy.ts";
 import { WIRE_MONEY_PER_USD, usdFromWireCents } from "./wire_money.ts";
 
 type JsonRow = Record<string, unknown>;
@@ -424,6 +425,9 @@ export function tickerWagerRows(value: unknown): readonly TickerWagerRow[] {
   for (const row of list) {
     const customerId = customerIdOf(row);
     if (customerId === null) continue;
+    // The review surface must use the same writer policy as the profile build:
+    // ALERT mirrors and blocked rows are not book positions.
+    if (ticketWriterDisposition(row.TicketWriter) !== "book") continue;
     rows.push({
       customerId,
       agent: text(row.AgentID) ?? text(row.AgentLogin) ?? "",
