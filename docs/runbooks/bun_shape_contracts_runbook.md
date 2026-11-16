@@ -89,14 +89,14 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/openInEditor)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `lib/schema_cli_errors.ts`
+- **Here:** `lib/schema_cli_errors.ts`, `src/lib/source_location_url.ts`
 - **Evidence:** `probe:proc.paths`
 
 #### Bun.resolveSync
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/resolveSync)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `lib/f402_agent_graph_layouts.ts`, `scripts/module_graph.ts`
+- **Here:** `packages/sportsdesk-ops/src/lib/bun_surface_dts_inventory.ts`, `lib/f402_agent_graph_layouts.ts`
 - **Evidence:** `probe:proc.paths`
 
 #### Bun.sleep
@@ -714,7 +714,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/revision)
 - **Shape:** value: `string` · writable false · enumerable true
-- **Here:** `lib/bun_runtime.ts`, `bin/bun_surface.ts`
+- **Here:** `lib/bun_runtime.ts`, `packages/sportsdesk-ops/src/bin/bun-surface.ts`
 - **Evidence:** `probe:proc.meta`
 
 #### Bun.version
