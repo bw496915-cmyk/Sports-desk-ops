@@ -26,9 +26,6 @@ describe("deriveAmbientDtsKindNumbers", () => {
         inventory.variables +
         inventory.namespaces,
     );
-    expect(inventory.namespaces).toBeGreaterThanOrEqual(
-      [...["XML", "JSON5", "JSONC", "JSONL", "TOML", "YAML", "markdown"]]
-        .length,
-    );
+    expect(inventory.namespaces).toBeGreaterThanOrEqual(7);
   });
 });

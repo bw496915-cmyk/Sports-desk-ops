@@ -92,9 +92,9 @@ describe("bun-surface DOD snapshot", () => {
     expect(samples.length).toBeGreaterThanOrEqual(3);
     for (const row of samples) {
       const relative = row.leafPath.replace(/^packages\/bun-types\//, "");
-      const line = readFileSync(resolve(typesRoot, relative), "utf8").split("\n")[
-        row.line - 1
-      ];
+      const line = readFileSync(resolve(typesRoot, relative), "utf8").split(
+        "\n",
+      )[row.line - 1];
       expect(line?.includes(row.symbol)).toBe(true);
     }
     const inspect = symbolLocations.filter((row) => row.symbol === "inspect");
@@ -159,12 +159,18 @@ describe("bun-surface CLI", () => {
     const child = Bun.spawn(
       [
         process.execPath,
-        resolve(import.meta.dir, "../packages/sportsdesk-ops/bin/bun-surface.ts"),
+        resolve(
+          import.meta.dir,
+          "../packages/sportsdesk-ops/bin/bun-surface.ts",
+        ),
         "--json",
       ],
       { stdout: "pipe", stderr: "pipe" },
     );
-    const [code, stdout] = await Promise.all([child.exited, child.stdout.text()]);
+    const [code, stdout] = await Promise.all([
+      child.exited,
+      child.stdout.text(),
+    ]);
     expect(code).toBe(0);
     const snap = JSON.parse(stdout) as {
       audited_bun_commit: string;
@@ -190,13 +196,19 @@ describe("bun-surface CLI", () => {
     const child = Bun.spawn(
       [
         process.execPath,
-        resolve(import.meta.dir, "../packages/sportsdesk-ops/bin/bun-surface.ts"),
+        resolve(
+          import.meta.dir,
+          "../packages/sportsdesk-ops/bin/bun-surface.ts",
+        ),
         "--json",
         "--no-symbols",
       ],
       { stdout: "pipe", stderr: "pipe" },
     );
-    const [code, stdout] = await Promise.all([child.exited, child.stdout.text()]);
+    const [code, stdout] = await Promise.all([
+      child.exited,
+      child.stdout.text(),
+    ]);
     expect(code).toBe(0);
     const snap = JSON.parse(stdout) as Record<string, unknown>;
     expect("symbols" in snap).toBe(false);

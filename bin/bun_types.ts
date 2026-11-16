@@ -378,8 +378,7 @@ export async function declarationDrift(
       error: built.error ?? "probe unavailable",
     };
   }
-  const { checker, anchor, bunType, bunSymbol, modType, modNamespaceSymbol } =
-    built.ctx;
+  const { checker, anchor, bunType, modType, modNamespaceSymbol } = built.ctx;
 
   const entityInventory = deriveAmbientDtsKindNumbers(built.ctx);
   const declared = checker
