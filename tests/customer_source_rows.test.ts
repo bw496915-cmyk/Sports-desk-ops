@@ -341,3 +341,43 @@ describe("null-ticket positions", () => {
     expect(rows[0]?.open_positions).toHaveLength(2);
   });
 });
+
+describe("ticket writer policy in the capture merge", () => {
+  test("alert and blocked ticker rows never become positions", () => {
+    const rows = customerRowsFromLiveCaptures(
+      {
+        LIST: [
+          {
+            CustomerID: "AL1",
+            TicketWriter: "ALERT     ",
+            AmountWagered: 10000,
+            ToWinAmount: 20000,
+            WagerNumber: 1,
+            ShortDesc: "S:Football #286",
+          },
+          {
+            CustomerID: "AL1",
+            TicketWriter: "blocked",
+            AmountWagered: 10000,
+            ToWinAmount: 20000,
+            WagerNumber: 2,
+            ShortDesc: "S:Football #287",
+          },
+          {
+            CustomerID: "AL1",
+            TicketWriter: "Internet   ",
+            AmountWagered: 10000,
+            ToWinAmount: 20000,
+            WagerNumber: 3,
+            ShortDesc: "S:Football #288",
+          },
+        ],
+      },
+      {},
+    );
+    const al = rows.find((row) => row.customer_id === "AL1");
+    expect(al?.open_positions).toHaveLength(1);
+    expect(al?.open_positions?.[0]?.writer).toBe("Internet");
+    expect(al?.recent_tickets).toHaveLength(1);
+  });
+});

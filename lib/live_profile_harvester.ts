@@ -23,6 +23,7 @@ import {
   type Dod6V54LifetimeReader,
 } from "./dod6_v54_lifetime_reader.ts";
 import { normalizeCanonicalCustomer } from "./dod6_spine_overlay.ts";
+import { ticketWriterDisposition } from "./live_writer_policy.ts";
 import { positionIdentity } from "./position_identity.ts";
 
 export type LiveAnomalyFlag =
@@ -753,11 +754,12 @@ export async function harvestLiveCustomerProfiles(
         const desc = String(r.ShortDesc ?? "").trim();
         const wt = String(r.WagerType ?? "S").trim();
 
-        if (writer === "alert") {
+        const writerDisposition = ticketWriterDisposition(writer);
+        if (writerDisposition === "alert") {
           acc.alertMirrorTriggers++;
           continue;
         }
-        if (writer === "blocked") continue;
+        if (writerDisposition === "blocked") continue;
 
         const whenMs = Date.parse(String(r.InsertDateTime ?? ""));
         acc.liveWagerStakesUsd.push(stakeUsd);

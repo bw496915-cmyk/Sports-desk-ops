@@ -13,6 +13,7 @@ import type {
   PositionRow,
   TicketRow,
 } from "./customer_profile.ts";
+import { ticketWriterDisposition } from "./live_writer_policy.ts";
 import { positionIdentity } from "./position_identity.ts";
 import { usdFromWireCents } from "./wire_money.ts";
 
@@ -147,7 +148,12 @@ function harvestedPosition(value: unknown): PositionRow | null {
 }
 
 /** One open position from a live-wagers capture row. `AmountWagered`/`ToWinAmount` are wire cents. */
-function livePosition(row: JsonRow): PositionRow {
+function livePosition(row: JsonRow): PositionRow | null {
+  if (
+    ticketWriterDisposition(row.TicketWriter ?? row.ticketWriter) !== "book"
+  ) {
+    return null;
+  }
   const risk = finite(row.AmountWagered) ?? finite(row.amountWagered);
   const toWin = finite(row.ToWinAmount) ?? finite(row.toWinAmount);
   const number = finite(row.WagerNumber) ?? finite(row.wagerNumber);
@@ -227,7 +233,12 @@ export function customerRowFromLiveWagers(
   if (id === "") return null;
   const mine: JsonRow[] = [];
   for (const row of rows) {
-    if (liveWagerCustomerId(row) === id) mine.push(row);
+    if (
+      liveWagerCustomerId(row) === id &&
+      ticketWriterDisposition(row.TicketWriter ?? row.ticketWriter) === "book"
+    ) {
+      mine.push(row);
+    }
   }
   if (mine.length === 0) return null;
 
@@ -237,7 +248,9 @@ export function customerRowFromLiveWagers(
     agent ??= text(row.AgentID) ?? text(row.agentId) ?? text(row.AgentLogin);
     if (tickets.length < 10) tickets.push(liveTicket(row));
   }
-  const positions = mine.map(livePosition);
+  const positions = mine
+    .map(livePosition)
+    .filter((position): position is PositionRow => position !== null);
 
   return {
     customer_id: id,

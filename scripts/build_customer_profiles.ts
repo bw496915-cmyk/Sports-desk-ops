@@ -23,8 +23,10 @@ import {
 import {
   customerRowFromHarvestedProfile,
   customerRowsFromLiveCaptures,
+  liveWagerRows,
 } from "../lib/customer_source_rows.ts";
 import { positionIdentity } from "../lib/position_identity.ts";
+import { ticketWriterDisposition } from "../lib/live_writer_policy.ts";
 
 const REPO = join(import.meta.dir, "..");
 const { values } = parseArgs({
@@ -87,6 +89,12 @@ const liveWagersDoc = await Bun.file(join(REPO, "data", "live-wagers.json"))
 const liveBetsDoc = await Bun.file(join(REPO, "data", "live-bets.json"))
   .json()
   .catch(() => null);
+const writerExclusions = { alert: 0, blocked: 0 };
+for (const row of liveWagerRows(liveWagersDoc)) {
+  const disposition = ticketWriterDisposition(row.TicketWriter);
+  if (disposition === "alert") writerExclusions.alert++;
+  else if (disposition === "blocked") writerExclusions.blocked++;
+}
 const liveRows = customerRowsFromLiveCaptures(liveWagersDoc, liveBetsDoc);
 const positionRefusals = { nullTicket: 0, nullWager: 0 };
 const rowById = new Map(
@@ -165,6 +173,7 @@ await Bun.write(
       liveProxy: "GSLIVE channel — unverified as a live-betting flag",
       summary,
       positionRefusals,
+      writerExclusions,
       profiles: labelledProfiles,
     },
     null,
