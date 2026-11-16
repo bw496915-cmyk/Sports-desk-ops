@@ -112,7 +112,11 @@ const fetched = Bun.spawnSync({
     "--out",
     hierarchyOut,
   ],
-  env: { ...process.env, F402_PLAYERS_MODE: "projected" },
+  env: {
+    ...process.env,
+    F402_PLAYERS_MODE: "projected",
+    F402_ALLOW_AGENT_COLLISIONS: "1",
+  },
   stdout: "pipe",
   stderr: "pipe",
 });

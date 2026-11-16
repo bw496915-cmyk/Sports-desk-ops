@@ -200,7 +200,11 @@ async function runPipeline(): Promise<void> {
             agentId,
           );
         }
-        throw e;
+        if (Bun.env.F402_ALLOW_AGENT_COLLISIONS?.trim() === "1") {
+          console.error(`quarantined agent login collision: ${String(e)}`);
+        } else {
+          throw e;
+        }
       }
       const mem = estimatePlayersShallowBytes(envelope.PLAYERS);
       if (mem !== null && mode === "full") {
