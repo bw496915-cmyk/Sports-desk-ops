@@ -27,6 +27,8 @@ import {
 } from "../lib/customer_source_rows.ts";
 import { positionIdentity } from "../lib/position_identity.ts";
 import { ticketWriterDisposition } from "../lib/live_writer_policy.ts";
+import { fetchLiveFeedObject } from "../lib/live_feed_source.ts";
+import { LIVE_POSITIONS_R2_KEYS } from "../lib/live_positions_r2_publisher.ts";
 
 const REPO = join(import.meta.dir, "..");
 const { values } = parseArgs({
@@ -42,6 +44,7 @@ const { values } = parseArgs({
       default: join(REPO, "data", "customer-profiles.json"),
     },
     json: { type: "boolean", default: false },
+    feed: { type: "string", default: "r2" },
   },
 });
 
@@ -83,12 +86,58 @@ if (await harvestedFile.exists()) {
 
 // Every customer that appears in either live capture, independent of the ranked harvest.
 // A wager must reach a profile even when the customer is not in the book or the flagged top-N.
-const liveWagersDoc = await Bun.file(join(REPO, "data", "live-wagers.json"))
-  .json()
-  .catch(() => null);
-const liveBetsDoc = await Bun.file(join(REPO, "data", "live-bets.json"))
-  .json()
-  .catch(() => null);
+const liveFeedProvenance: Record<string, unknown> = {};
+async function loadLiveArtifact(
+  label: "liveWagers" | "liveBets",
+  key: string,
+  localPath: string,
+): Promise<unknown> {
+  if (values.feed !== "local") {
+    try {
+      const object = await fetchLiveFeedObject(key);
+      liveFeedProvenance[label] = {
+        source: "r2",
+        key: object.key,
+        url: object.url,
+        observedAt: object.observedAtIso,
+        fetchedAt: object.fetchedAtIso,
+        bytes: object.bytes,
+      };
+      return object.doc;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const local = await Bun.file(localPath)
+        .json()
+        .catch(() => null);
+      liveFeedProvenance[label] = {
+        source: "local-fallback",
+        key,
+        localPath: localPath.replace(REPO, "."),
+        error: message,
+      };
+      return local;
+    }
+  }
+  const local = await Bun.file(localPath)
+    .json()
+    .catch(() => null);
+  liveFeedProvenance[label] = {
+    source: "local",
+    localPath: localPath.replace(REPO, "."),
+  };
+  return local;
+}
+
+const liveWagersDoc = await loadLiveArtifact(
+  "liveWagers",
+  LIVE_POSITIONS_R2_KEYS.liveWagers,
+  join(REPO, "data", "live-wagers.json"),
+);
+const liveBetsDoc = await loadLiveArtifact(
+  "liveBets",
+  LIVE_POSITIONS_R2_KEYS.liveBets,
+  join(REPO, "data", "live-bets.json"),
+);
 const writerExclusions = { alert: 0, blocked: 0 };
 for (const row of liveWagerRows(liveWagersDoc)) {
   const disposition = ticketWriterDisposition(row.TicketWriter);
@@ -163,6 +212,7 @@ await Bun.write(
       generatedAt: new Date().toISOString(),
       source: {
         book: bookPath.replace(REPO, "."),
+        liveFeed: liveFeedProvenance,
         tree: resolve(values.tree ?? "").replace(REPO, "."),
         ...(harvestedIds.size === 0
           ? {}
