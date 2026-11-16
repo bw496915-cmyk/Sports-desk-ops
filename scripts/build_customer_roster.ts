@@ -99,9 +99,11 @@ const out = {
   summary: {
     playersInRoster: roster.players.length,
     customers: customers.length,
-    withPositions: customers.filter((row) => row.openPositions !== undefined)
-      .length,
-    positions: positionByCustomer.size,
+    duplicateRows: roster.players.length - customers.length,
+    openPositions: totalPositions,
+    customersWithPositions: customers.filter(
+      (row) => row.openPositions !== undefined,
+    ).length,
   },
   customers,
 };
