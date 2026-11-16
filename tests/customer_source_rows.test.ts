@@ -242,7 +242,8 @@ const BETS = {
       agent: { id: "AG1" },
       wagered: 5000,
       toWin: 9000,
-      wagerNumber: "700001",
+      wagerNumber: "1",
+      ticketNumber: "T-8001",
       sport: "Basketball",
       subSport: "PREGAME",
       wagerType: "M",
@@ -254,7 +255,8 @@ const BETS = {
       agent: { id: "AG1" },
       wagered: 2500,
       toWin: 5000,
-      wagerNumber: "800002",
+      wagerNumber: "1",
+      ticketNumber: "T-8002",
       sport: "Basketball",
       subSport: "PREGAME",
       wagerType: "S",
@@ -266,7 +268,8 @@ const BETS = {
       agent: { id: "AG9" },
       wagered: 1000,
       toWin: 2500,
-      wagerNumber: "900001",
+      wagerNumber: "1",
+      ticketNumber: "T-9001",
       sport: "Tennis",
       wagerType: "M",
       description: "Tennis Final",
@@ -284,7 +287,8 @@ describe("customerRowFromLiveBets", () => {
     expect(row.provenance).toBe("live-bets");
     expect(row.open_positions).toHaveLength(2);
     expect(row.open_positions?.[0]).toMatchObject({
-      wager_number: "700001",
+      ticket_number: "T-8001",
+      wager_number: "1",
       sport: "Basketball",
       risk_usd: 50,
       to_win_usd: 90,
@@ -299,8 +303,9 @@ describe("customerRowFromLiveBets", () => {
     const lp = rows.find((row) => row.customer_id === "LP1");
     // WC8036 and FREDOVIP come from the ticker capture; LP1 exists only in the pending one.
     expect(rows).toHaveLength(3);
-    // 700001 appears in both captures; the union keeps one, plus 700002 and 800002.
-    expect(wc?.open_positions).toHaveLength(3);
+    // The pending rows all carry wagerNumber "1"; ticketNumber is their identity, so both
+    // pending tickets survive next to the two ticker wagers instead of collapsing to one.
+    expect(wc?.open_positions).toHaveLength(4);
     expect(lp?.open_positions).toHaveLength(1);
     expect(lp?.open_positions?.[0]?.risk_usd).toBe(10);
   });

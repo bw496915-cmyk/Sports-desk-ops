@@ -110,6 +110,8 @@ export interface HarvestedLiveProfile {
 /** One open ticket attributed to a customer. `status` is open by construction: settled rows come
  * from the graded/ledger artifacts, not these live captures. */
 export interface HarvestedPosition {
+  /** The pending capture's per-row identity; `wagerNumber` is "1" on every row. */
+  readonly ticketNumber: string | null;
   readonly wagerNumber: string | null;
   readonly sport: string;
   readonly wagerType: string;
@@ -769,6 +771,7 @@ export async function harvestLiveCustomerProfiles(
         const toWinCents = Number(r.ToWinAmount);
         const wagerNumber = String(r.WagerNumber ?? "").trim();
         acc.positions.push({
+          ticketNumber: null,
           wagerNumber: wagerNumber === "" ? null : wagerNumber,
           sport,
           wagerType: wt,
@@ -832,8 +835,10 @@ export async function harvestLiveCustomerProfiles(
         }
 
         const wagerNumber = String(g.wagerNumber ?? "").trim();
+        const ticketNumber = String(g.ticketNumber ?? "").trim();
         const toWinCents = Number(g.toWin);
         const position: HarvestedPosition = {
+          ticketNumber: ticketNumber === "" ? null : ticketNumber,
           wagerNumber: wagerNumber === "" ? null : wagerNumber,
           sport:
             String(g.sport ?? "")
@@ -849,12 +854,13 @@ export async function harvestLiveCustomerProfiles(
           status: "open",
           source: "live-bets",
         };
+        const keyOf = (value: HarvestedPosition): string | null =>
+          value.ticketNumber ?? value.wagerNumber;
+        const positionKey = keyOf(position);
         const existingIndex =
-          position.wagerNumber === null
+          positionKey === null
             ? -1
-            : acc.positions.findIndex(
-                (p) => p.wagerNumber === position.wagerNumber,
-              );
+            : acc.positions.findIndex((p) => keyOf(p) === positionKey);
         if (existingIndex >= 0) {
           const existing = acc.positions[existingIndex]!;
           acc.positions[existingIndex] = {

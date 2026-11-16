@@ -282,6 +282,8 @@ export interface TicketRow {
 /** One open ticket attributed to a customer. Distinct from `TicketRow`: a position is unsettled by
  * construction and carries the live writer/source, while `TicketRow` is the book's recent sample. */
 export interface PositionRow {
+  /** Pending-capture row identity; `wager_number` is "1" on every pending row. */
+  readonly ticket_number?: string;
   readonly wager_number?: string;
   readonly sport?: string;
   readonly market?: string;

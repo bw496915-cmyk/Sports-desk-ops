@@ -97,16 +97,18 @@ for (const live of liveRows) {
     rowById.set(live.customer_id, live);
     continue;
   }
+  const keyOf = (position: {
+    ticket_number?: string;
+    wager_number?: string;
+  }): string | undefined => position.ticket_number ?? position.wager_number;
   const positions = [...(existing.open_positions ?? [])];
   const seen = new Set(
-    positions
-      .map((position) => position.wager_number)
-      .filter((number): number is string => number !== undefined),
+    positions.map(keyOf).filter((key): key is string => key !== undefined),
   );
   for (const position of live.open_positions ?? []) {
-    const number = position.wager_number;
-    if (number !== undefined && seen.has(number)) continue;
-    if (number !== undefined) seen.add(number);
+    const key = keyOf(position);
+    if (key !== undefined && seen.has(key)) continue;
+    if (key !== undefined) seen.add(key);
     positions.push(position);
   }
   const merged = {

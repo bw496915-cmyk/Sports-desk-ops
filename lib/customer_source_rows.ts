@@ -120,6 +120,7 @@ function sportOfDescription(description: string | null): string | null {
 function harvestedPosition(value: unknown): PositionRow | null {
   const position = asRow(value);
   if (!position) return null;
+  const ticket = text(position.ticketNumber);
   const number = text(position.wagerNumber);
   const sport = text(position.sport);
   const market = text(position.wagerType);
@@ -130,6 +131,7 @@ function harvestedPosition(value: unknown): PositionRow | null {
   const writer = text(position.writer);
   const source = text(position.source);
   return {
+    ...(ticket === null ? {} : { ticket_number: ticket }),
     ...(number === null ? {} : { wager_number: number }),
     ...(sport === null ? {} : { sport }),
     ...(market === null ? {} : { market }),
@@ -276,12 +278,14 @@ function liveBetCustomerId(row: JsonRow): string | null {
 function liveBetPosition(row: JsonRow): PositionRow {
   const risk = finite(row.wagered) ?? finite(row.riskUsd);
   const toWin = finite(row.toWin) ?? finite(row.toWinAmount);
+  const ticket = text(row.ticketNumber) ?? text(row.ticket_number);
   const number = text(row.wagerNumber) ?? text(row.wager_number);
   const sport = text(row.sport);
   const market = text(row.wagerType) ?? text(row.subSport);
   const selection = text(row.description) ?? text(row.chosenTeam);
   const placedAt = text(row.acceptedAt);
   return {
+    ...(ticket === null ? {} : { ticket_number: ticket }),
     ...(number === null ? {} : { wager_number: number }),
     ...(sport === null ? {} : { sport }),
     ...(market === null ? {} : { market }),
@@ -381,15 +385,15 @@ export function customerRowsFromLiveCaptures(
       continue;
     }
     const positions = [...(existing.open_positions ?? [])];
+    const keyOf = (position: PositionRow): string | undefined =>
+      position.ticket_number ?? position.wager_number;
     const seen = new Set(
-      positions
-        .map((position) => position.wager_number)
-        .filter((number): number is string => number !== undefined),
+      positions.map(keyOf).filter((key): key is string => key !== undefined),
     );
     for (const position of pending.open_positions ?? []) {
-      const number = position.wager_number;
-      if (number !== undefined && seen.has(number)) continue;
-      if (number !== undefined) seen.add(number);
+      const key = keyOf(position);
+      if (key !== undefined && seen.has(key)) continue;
+      if (key !== undefined) seen.add(key);
       positions.push(position);
     }
     byId.set(id, {
