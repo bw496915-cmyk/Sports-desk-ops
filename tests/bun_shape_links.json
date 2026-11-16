@@ -67,6 +67,7 @@
   "FetchProxyOption": 200,
   "FetchSessionInit": 404,
   "FetchSession": 404,
+  "Serve": 200,
   "Server": 200,
   "connect": 200,
   "dns": 200,

@@ -1,4 +1,4 @@
-# Bun shape contracts — the 94 shapes this repository calls
+# Bun shape contracts — the 95 shapes this repository calls
 
 The single source of truth is layered, and nothing here restates upstream text: **declarations** come from `bun-types@1.4.4` (the surface the reference site renders), **behaviour** from probes against the local `Bun 1.4.4` binary (`tests/bun_baseline.json`), **property attributes** from the pinned Bun commit `38afee6c84`. When they disagree: declarations win on names and signatures, the Bun source wins on attributes, and the measured binary wins on behaviour.
 
@@ -633,6 +633,13 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `services/sportsdesk_telegram_bot.ts`, `bin/bun_surface.ts`
 - **Evidence:** `surface:FetchSession`, `test:tests/bun_capabilities.test.ts` · deep dive: [§7.3](./bun_server_runtime_shapes_runbook.md)
+
+#### Bun.Serve (type)
+
+- **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/Serve)
+- **Shape:** type-only: declared, no runtime value
+- **Here:** `services/live_bets_typed_server.ts`
+- **Evidence:** `test:tests/live_bets_typed_server.test.ts`
 
 #### Bun.Server (type)
 

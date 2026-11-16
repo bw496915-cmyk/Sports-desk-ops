@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-16T16:34:08.540Z",
+  "generatedAt": "2026-11-16T16:41:32.221Z",
   "runtime": "Bun 1.4.4",
   "shapes": {
     "$": {
@@ -268,6 +268,10 @@
       "link": "https://bun.com/docs/runtime/semver"
     },
     "serve": {
+      "documented": true,
+      "link": "https://bun.com/docs/runtime/http/tls"
+    },
+    "Serve": {
       "documented": true,
       "link": "https://bun.com/docs/runtime/http/tls"
     },
