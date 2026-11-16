@@ -135,16 +135,62 @@ export interface AgentExposure {
   readonly positions: number;
   readonly openRiskUsd: number;
   readonly openToWinUsd: number;
+  /** Largest single-customer risk inside the subtree. */
+  readonly topCustomerRiskUsd: number;
+  /** That customer's share of the subtree's open risk, 0–100 (one decimal). */
+  readonly topCustomerSharePct: number;
+  readonly maxTicketRiskUsd: number;
+  readonly avgTicketRiskUsd: number;
 }
+
+export interface TreeCollision {
+  readonly key: string;
+  readonly agentIds: readonly string[];
+}
+
+/** Index the tree's collision list (one login presented under several agent ids). */
+export function treeCollisionIndex(
+  collisions: unknown,
+): ReadonlyMap<string, TreeCollision> {
+  const index = new Map<string, TreeCollision>();
+  if (!Array.isArray(collisions)) return index;
+  for (const value of collisions) {
+    if (value === null || typeof value !== "object") continue;
+    const row = value as Record<string, unknown>;
+    const key = str(row.key);
+    if (key === null || !Array.isArray(row.agentIds)) continue;
+    const agentIds = row.agentIds
+      .map((id) => str(id)?.toUpperCase() ?? null)
+      .filter((id): id is string => id !== null);
+    for (const agentId of agentIds) {
+      index.set(agentId, { key, agentIds });
+    }
+  }
+  return index;
+}
+
+interface ExposureAccumulator {
+  customers: number;
+  positions: number;
+  riskUsd: number;
+  toWinUsd: number;
+  maxTicketRiskUsd: number;
+  riskByCustomer: Map<string, number>;
+}
+
+const round2 = (value: number): number => Math.round(value * 100) / 100;
+const round1 = (value: number): number => Math.round(value * 10) / 10;
 
 /**
  * Open-position exposure per agent subtree, from the tree's parent links. A customer counts once
  * toward its own agent and every ancestor, so an agent's entry is the whole downline below it;
- * agents outside the tree still get their own direct exposure.
+ * agents outside the tree still get their own direct exposure. Concentration is measured per
+ * subtree (top customer share, largest ticket), never inferred.
  */
 export function treeSubtreeExposure(
   nodes: Readonly<Record<string, { readonly p?: string | null | undefined }>>,
   profiles: Iterable<{
+    readonly customerId: string;
     readonly agentId: string;
     readonly positions: readonly {
       readonly risk_usd?: number | undefined;
@@ -158,40 +204,65 @@ export function treeSubtreeExposure(
     const up = typeof node.p === "string" ? node.p.trim().toUpperCase() : "";
     if (key !== "" && up !== "") parent.set(key, up);
   }
-  const exposure = new Map<string, AgentExposure>();
-  const add = (agent: string, value: AgentExposure): void => {
-    const current = exposure.get(agent);
-    exposure.set(agent, {
-      customers: (current?.customers ?? 0) + value.customers,
-      positions: (current?.positions ?? 0) + value.positions,
-      openRiskUsd: (current?.openRiskUsd ?? 0) + value.openRiskUsd,
-      openToWinUsd: (current?.openToWinUsd ?? 0) + value.openToWinUsd,
-    });
-  };
+  const accumulated = new Map<string, ExposureAccumulator>();
   for (const profile of profiles) {
     const agent = profile.agentId.trim().toUpperCase();
     if (agent === "") continue;
-    const risk = profile.positions.reduce(
+    const customer = profile.customerId.trim().toUpperCase();
+    const riskUsd = profile.positions.reduce(
       (total, position) => total + (position.risk_usd ?? 0),
       0,
     );
-    const toWin = profile.positions.reduce(
+    const toWinUsd = profile.positions.reduce(
       (total, position) => total + (position.to_win_usd ?? 0),
       0,
     );
-    const value: AgentExposure = {
-      customers: 1,
-      positions: profile.positions.length,
-      openRiskUsd: risk,
-      openToWinUsd: toWin,
-    };
+    const maxTicket = profile.positions.reduce(
+      (max, position) => Math.max(max, position.risk_usd ?? 0),
+      0,
+    );
     const seen = new Set<string>();
     let current = agent;
     while (current !== "" && !seen.has(current)) {
       seen.add(current);
-      add(current, value);
+      const acc = accumulated.get(current) ?? {
+        customers: 0,
+        positions: 0,
+        riskUsd: 0,
+        toWinUsd: 0,
+        maxTicketRiskUsd: 0,
+        riskByCustomer: new Map<string, number>(),
+      };
+      acc.customers += 1;
+      acc.positions += profile.positions.length;
+      acc.riskUsd += riskUsd;
+      acc.toWinUsd += toWinUsd;
+      acc.maxTicketRiskUsd = Math.max(acc.maxTicketRiskUsd, maxTicket);
+      if (customer !== "") {
+        acc.riskByCustomer.set(
+          customer,
+          (acc.riskByCustomer.get(customer) ?? 0) + riskUsd,
+        );
+      }
+      accumulated.set(current, acc);
       current = parent.get(current) ?? "";
     }
+  }
+  const exposure = new Map<string, AgentExposure>();
+  for (const [agent, acc] of accumulated) {
+    const topCustomerRiskUsd = Math.max(0, ...acc.riskByCustomer.values());
+    exposure.set(agent, {
+      customers: acc.customers,
+      positions: acc.positions,
+      openRiskUsd: round2(acc.riskUsd),
+      openToWinUsd: round2(acc.toWinUsd),
+      topCustomerRiskUsd: round2(topCustomerRiskUsd),
+      topCustomerSharePct:
+        acc.riskUsd > 0 ? round1((topCustomerRiskUsd / acc.riskUsd) * 100) : 0,
+      maxTicketRiskUsd: round2(acc.maxTicketRiskUsd),
+      avgTicketRiskUsd:
+        acc.positions > 0 ? round2(acc.riskUsd / acc.positions) : 0,
+    });
   }
   return exposure;
 }

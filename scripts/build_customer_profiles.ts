@@ -30,6 +30,7 @@ import { ticketWriterDisposition } from "../lib/live_writer_policy.ts";
 import { fetchLiveFeedObject } from "../lib/live_feed_source.ts";
 import {
   loadAgentDownline,
+  treeCollisionIndex,
   treeDownlineCounts,
   treeSubtreeExposure,
 } from "../lib/agent_downline.ts";
@@ -220,6 +221,9 @@ const agentIds = new Set(
     .filter((agent) => agent !== "" && agent !== "UNASSIGNED"),
 );
 const treeExposure = treeSubtreeExposure(tree.nodes, labelledProfiles);
+const treeCollisions = treeCollisionIndex(
+  (tree as { collisions?: unknown }).collisions,
+);
 for (const agent of treeExposure.keys()) agentIds.add(agent);
 const treeCounts = treeDownlineCounts(tree.nodes, agentIds);
 let downlineMatched = 0;
@@ -228,12 +232,14 @@ const enrichedProfiles = labelledProfiles.map((profile) => {
   const rollup = downline?.byAgent.get(agent);
   const counts = treeCounts.get(agent);
   const exposure = treeExposure.get(agent);
+  const collision = treeCollisions.get(agent);
   if (rollup !== undefined) downlineMatched++;
   return {
     ...profile,
     ...(rollup === undefined ? {} : { downline: rollup }),
     ...(counts === undefined ? {} : { treeDownline: counts }),
     ...(exposure === undefined ? {} : { treeExposure: exposure }),
+    ...(collision === undefined ? {} : { treeCollision: collision }),
   };
 });
 
@@ -265,6 +271,9 @@ await Bun.write(
           agent,
           ...exposure,
           ...(treeCounts.get(agent) ?? {}),
+          ...(treeCollisions.get(agent) === undefined
+            ? {}
+            : { collision: treeCollisions.get(agent) }),
         })),
       downline: {
         status: downline === null ? "missing" : "ok",

@@ -18,6 +18,7 @@
 import type {
   AgentDownlineRollup,
   AgentExposure,
+  TreeCollision,
   TreeDownlineCounts,
 } from "./agent_downline.ts";
 import { portalIso } from "./bet_flags.ts";
@@ -400,6 +401,8 @@ export interface CustomerProfile {
   readonly treeDownline?: TreeDownlineCounts;
   /** Open-position exposure for the agent's whole tree subtree (including itself). */
   readonly treeExposure?: AgentExposure;
+  /** Tree collision for this agent login, when the tree reports one. */
+  readonly treeCollision?: TreeCollision;
   /** Data-quality notes that change how a number should be read. */
   readonly flags: readonly string[];
 }

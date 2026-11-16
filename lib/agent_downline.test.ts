@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   loadAgentDownline,
+  treeCollisionIndex,
   treeDownlineCounts,
   treeSubtreeExposure,
 } from "./agent_downline.ts";
@@ -66,33 +67,55 @@ describe("tree subtree exposure", () => {
       },
       [
         {
+          customerId: "C1",
           agentId: "A1",
           positions: [{ risk_usd: 100, to_win_usd: 250 }],
         },
         {
+          customerId: "C2",
           agentId: "LEAF",
           positions: [{ risk_usd: 50, to_win_usd: 90 }],
         },
         {
+          customerId: "C3",
           agentId: "OUTSIDE",
           positions: [{ risk_usd: 10, to_win_usd: 20 }],
         },
       ],
     );
-    expect(exposure.get("ROOT")).toEqual({
+    expect(exposure.get("ROOT")).toMatchObject({
       customers: 2,
       positions: 2,
       openRiskUsd: 150,
       openToWinUsd: 340,
+      topCustomerRiskUsd: 100,
+      topCustomerSharePct: 66.7,
+      maxTicketRiskUsd: 100,
+      avgTicketRiskUsd: 75,
     });
     expect(exposure.get("A1")?.openRiskUsd).toBe(150);
     expect(exposure.get("B1")?.openRiskUsd).toBe(50);
     expect(exposure.get("LEAF")?.customers).toBe(1);
-    expect(exposure.get("OUTSIDE")).toEqual({
+    expect(exposure.get("OUTSIDE")).toMatchObject({
       customers: 1,
       positions: 1,
       openRiskUsd: 10,
       openToWinUsd: 20,
+      topCustomerRiskUsd: 10,
+      topCustomerSharePct: 100,
+      maxTicketRiskUsd: 10,
+      avgTicketRiskUsd: 10,
     });
+  });
+});
+
+describe("tree collisions", () => {
+  test("indexes every colliding agent id under the shared key", () => {
+    const index = treeCollisionIndex([
+      { key: "BRANDON", agentIds: ["BRANDON.", "BRANDON.."] },
+    ]);
+    expect(index.get("BRANDON.")?.key).toBe("BRANDON");
+    expect(index.get("BRANDON..")?.agentIds).toEqual(["BRANDON.", "BRANDON.."]);
+    expect(index.get("OTHER")).toBeUndefined();
   });
 });
