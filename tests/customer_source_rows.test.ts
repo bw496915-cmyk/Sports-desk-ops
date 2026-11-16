@@ -310,3 +310,34 @@ describe("customerRowFromLiveBets", () => {
     expect(lp?.open_positions?.[0]?.risk_usd).toBe(10);
   });
 });
+
+describe("null-ticket positions", () => {
+  test("two pending rows with wagerNumber 1 and no ticket do not collapse", () => {
+    const rows = customerRowsFromLiveCaptures(
+      {},
+      {
+        games: [
+          {
+            customerID: "NT1",
+            wagerNumber: "1",
+            wagered: 100,
+            toWin: 200,
+            sport: "Basketball",
+            description: "a",
+          },
+          {
+            customerID: "NT1",
+            wagerNumber: "1",
+            wagered: 100,
+            toWin: 200,
+            sport: "Basketball",
+            description: "b",
+          },
+        ],
+      },
+    );
+    // The union cannot dedupe an identity it does not have; both rows survive, and the
+    // builder refuses/counts them rather than silently collapsing one.
+    expect(rows[0]?.open_positions).toHaveLength(2);
+  });
+});

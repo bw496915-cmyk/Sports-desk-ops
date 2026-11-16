@@ -13,6 +13,7 @@ import type {
   PositionRow,
   TicketRow,
 } from "./customer_profile.ts";
+import { positionIdentity } from "./position_identity.ts";
 import { usdFromWireCents } from "./wire_money.ts";
 
 type JsonRow = Record<string, unknown>;

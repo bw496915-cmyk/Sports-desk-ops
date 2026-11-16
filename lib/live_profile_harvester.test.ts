@@ -192,3 +192,47 @@ describe("live profile harvester reports measured values only", () => {
     expect(map.get("CUST_SINGLE")?.positions).toHaveLength(1);
   });
 });
+
+describe("position identity refusals", () => {
+  test("pending rows without a ticket are refused, not keyed on wagerNumber 1", async () => {
+    const root = mkdtempSync(join(tmpdir(), "harvester-null-ticket-"));
+    try {
+      mkdirSync(join(root, "data"), { recursive: true });
+      writeFileSync(
+        join(root, "data/live-bets.json"),
+        JSON.stringify({
+          games: [
+            {
+              customerID: "NT_CUST",
+              wagerNumber: "1",
+              wagered: 100,
+              toWin: 200,
+              sport: "Basketball",
+              description: "first ticket without a ticket number",
+            },
+            {
+              customerID: "NT_CUST",
+              wagerNumber: "1",
+              wagered: 100,
+              toWin: 200,
+              sport: "Basketball",
+              description: "second ticket without a ticket number",
+            },
+          ],
+        }),
+      );
+      const result = await harvestLiveCustomerProfiles({
+        repoRoot: root,
+        limit: 10,
+      });
+      expect(result.positionRefusals).toEqual({
+        nullTicket: 2,
+        nullWager: 0,
+      });
+      const profile = result.profiles.find((p) => p.id === "NT_CUST");
+      expect(profile?.positions ?? []).toHaveLength(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

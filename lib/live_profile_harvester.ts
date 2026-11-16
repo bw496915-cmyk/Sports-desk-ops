@@ -23,6 +23,7 @@ import {
   type Dod6V54LifetimeReader,
 } from "./dod6_v54_lifetime_reader.ts";
 import { normalizeCanonicalCustomer } from "./dod6_spine_overlay.ts";
+import { positionIdentity } from "./position_identity.ts";
 
 export type LiveAnomalyFlag =
   | "WHALE_SINGLE_AGENT_CONDUIT"
@@ -146,6 +147,11 @@ export interface LiveProfileHarvestResult {
   readonly dodSpineMatchedCount: number;
   readonly flaggedProfilesCount: number;
   readonly patternCounts: Readonly<Record<LiveAnomalyFlag, number>>;
+  /** Positions dropped for having no honest identity; the denominator travels with the stat. */
+  readonly positionRefusals: {
+    readonly nullTicket: number;
+    readonly nullWager: number;
+  };
   /** Missing/malformed inputs are named; a zero scan is never mistaken for a clean read. */
   readonly sources: HarvestSources;
   readonly profiles: readonly HarvestedLiveProfile[];
@@ -627,6 +633,8 @@ export async function harvestLiveCustomerProfiles(
     dodSpine: "missing",
   };
 
+  const positionRefusals = { nullTicket: 0, nullWager: 0 };
+
   const getOrCreate = (rawId: string, rawAgent: string): RawAccumulator => {
     const id = rawId.trim().toUpperCase();
     const agentId = rawAgent.trim().toUpperCase() || "UNASSIGNED";
@@ -770,7 +778,7 @@ export async function harvestLiveCustomerProfiles(
 
         const toWinCents = Number(r.ToWinAmount);
         const wagerNumber = String(r.WagerNumber ?? "").trim();
-        acc.positions.push({
+        const tickerPosition: HarvestedPosition = {
           ticketNumber: null,
           wagerNumber: wagerNumber === "" ? null : wagerNumber,
           sport,
@@ -785,7 +793,15 @@ export async function harvestLiveCustomerProfiles(
           vip: Boolean(r.VIP),
           status: "open",
           source: "live-wagers",
-        });
+        };
+        const tickerIdentity = positionIdentity(tickerPosition);
+        if (tickerIdentity.key === null) {
+          if (tickerIdentity.refusal === "null_ticket")
+            positionRefusals.nullTicket++;
+          else positionRefusals.nullWager++;
+        } else {
+          acc.positions.push(tickerPosition);
+        }
 
         if (acc.sampleWagers.length < 6 && desc) {
           acc.sampleWagers.push({
@@ -854,13 +870,16 @@ export async function harvestLiveCustomerProfiles(
           status: "open",
           source: "live-bets",
         };
-        const keyOf = (value: HarvestedPosition): string | null =>
-          value.ticketNumber ?? value.wagerNumber;
-        const positionKey = keyOf(position);
-        const existingIndex =
-          positionKey === null
-            ? -1
-            : acc.positions.findIndex((p) => keyOf(p) === positionKey);
+        const positionKey = positionIdentity(position);
+        if (positionKey.key === null) {
+          if (positionKey.refusal === "null_ticket")
+            positionRefusals.nullTicket++;
+          else positionRefusals.nullWager++;
+          continue;
+        }
+        const existingIndex = acc.positions.findIndex(
+          (p) => positionIdentity(p).key === positionKey.key,
+        );
         if (existingIndex >= 0) {
           const existing = acc.positions[existingIndex]!;
           acc.positions[existingIndex] = {
@@ -1010,6 +1029,7 @@ export async function harvestLiveCustomerProfiles(
     flaggedProfilesCount: allProfiles.filter((p) => p.anomalyFlags.length > 0)
       .length,
     patternCounts,
+    positionRefusals,
     sources,
     profiles: filtered.slice(0, limit),
   };

@@ -24,6 +24,7 @@ import {
   customerRowFromHarvestedProfile,
   customerRowsFromLiveCaptures,
 } from "../lib/customer_source_rows.ts";
+import { positionIdentity } from "../lib/position_identity.ts";
 
 const REPO = join(import.meta.dir, "..");
 const { values } = parseArgs({
@@ -87,6 +88,7 @@ const liveBetsDoc = await Bun.file(join(REPO, "data", "live-bets.json"))
   .json()
   .catch(() => null);
 const liveRows = customerRowsFromLiveCaptures(liveWagersDoc, liveBetsDoc);
+const positionRefusals = { nullTicket: 0, nullWager: 0 };
 const rowById = new Map(
   rows.map((row) => [row.customer_id.trim().toUpperCase(), row]),
 );
@@ -97,18 +99,21 @@ for (const live of liveRows) {
     rowById.set(live.customer_id, live);
     continue;
   }
-  const keyOf = (position: {
-    ticket_number?: string;
-    wager_number?: string;
-  }): string | undefined => position.ticket_number ?? position.wager_number;
   const positions = [...(existing.open_positions ?? [])];
   const seen = new Set(
-    positions.map(keyOf).filter((key): key is string => key !== undefined),
+    positions
+      .map((position) => positionIdentity(position).key)
+      .filter((key): key is string => key !== null),
   );
   for (const position of live.open_positions ?? []) {
-    const key = keyOf(position);
-    if (key !== undefined && seen.has(key)) continue;
-    if (key !== undefined) seen.add(key);
+    const identity = positionIdentity(position);
+    if (identity.key === null) {
+      if (identity.refusal === "null_ticket") positionRefusals.nullTicket++;
+      else positionRefusals.nullWager++;
+      continue;
+    }
+    if (seen.has(identity.key)) continue;
+    seen.add(identity.key);
     positions.push(position);
   }
   const merged = {
@@ -158,6 +163,7 @@ await Bun.write(
         "recent-sample (5 tickets per customer); lifetime numbers come from the book",
       liveProxy: "GSLIVE channel — unverified as a live-betting flag",
       summary,
+      positionRefusals,
       profiles: labelledProfiles,
     },
     null,
