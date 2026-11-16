@@ -1,4 +1,4 @@
-# Bun shape contracts — the 92 shapes this repository calls
+# Bun shape contracts — the 93 shapes this repository calls
 
 The single source of truth is layered, and nothing here restates upstream text: **declarations** come from `bun-types@1.4.4` (the surface the reference site renders), **behaviour** from probes against the local `Bun 1.4.4` binary (`tests/bun_baseline.json`), **property attributes** from the pinned Bun commit `38afee6c84`. When they disagree: declarations win on names and signatures, the Bun source wins on attributes, and the measured binary wins on behaviour.
 
@@ -63,6 +63,13 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `lib/schema_cli_errors.ts`, `lib/local_path.ts`
 - **Evidence:** `probe:proc.paths`
+
+#### Bun.pathToFileURL
+
+- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Shape:** value: `function` · writable true · enumerable true
+- **Here:** `src/lib/source_location_url.ts`
+- **Evidence:** `test:tests/bun_url_native_utils.test.ts`
 
 #### Bun.gc
 
