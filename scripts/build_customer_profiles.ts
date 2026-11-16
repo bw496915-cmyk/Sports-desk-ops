@@ -335,12 +335,10 @@ const feedProfiles = enrichedProfiles.map((profile) => {
     rosterAgent === undefined
       ? undefined
       : roster?.playerCountByAgent.get(normalizeRosterId(rosterAgent));
-  const inRoot =
-    rootWeeklyAgent !== null &&
-    (normalizeRosterId(profile.agentId) === rootWeeklyAgent ||
-      profile.placement.chain.some(
-        (agent) => normalizeRosterId(agent) === rootWeeklyAgent,
-      ));
+  // The hierarchy capture is scoped to the weekly figure's agent (BILLY666),
+  // so every player in the projected roster is in that downline. GENERAL has no
+  // parent/master field, so tree descent cannot be reconstructed here.
+  const inWeeklyScope = rosterAgent !== undefined;
   return {
     ...profile,
     ...(info === undefined
@@ -357,7 +355,7 @@ const feedProfiles = enrichedProfiles.map((profile) => {
               normalizeRosterId(profile.agentId),
           },
         }),
-    ...(inRoot && weeklyFigure !== null ? { weeklyFigure } : {}),
+    ...(inWeeklyScope && weeklyFigure !== null ? { weeklyFigure } : {}),
   };
 });
 
