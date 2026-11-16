@@ -28,9 +28,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-
-const ROOT = resolve(import.meta.dir, "..");
+import { join } from "node:path";
 
 /** Every document whose citations are audited. The ledger's own anchor registry is excluded. */
 export const CITING_DOCS = [
