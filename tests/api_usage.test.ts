@@ -95,6 +95,87 @@ describe("api_usage · trackedFetch", () => {
     }
   });
 
+  test("coalesces concurrent identical plain GETs into one network call", async () => {
+    let fetchCalls = 0;
+    globalThis.fetch = (async () => {
+      fetchCalls += 1;
+      await Bun.sleep(25);
+      return new Response("shared-body", { status: 200 });
+    }) as unknown as typeof fetch;
+    try {
+      const [a, b] = await Promise.all([
+        trackedFetch("/api/kpis?window=24"),
+        trackedFetch("/api/kpis?window=24"),
+      ]);
+      expect(fetchCalls).toBe(1);
+      expect(await a.text()).toBe("shared-body");
+      expect(await b.text()).toBe("shared-body");
+      const snapshot = getApiUsageSnapshot();
+      expect(snapshot.calls).toBe(2);
+      expect(snapshot.coalesced).toBe(1);
+      expect(snapshot.rows[0]?.key).toBe("GET /api/kpis");
+      expect(snapshot.rows[0]?.coalesced).toBe(1);
+      expect(snapshot.rows[0]?.pending).toBe(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("does not coalesce different queries or a non-GET", async () => {
+    let fetchCalls = 0;
+    globalThis.fetch = (async () => {
+      fetchCalls += 1;
+      await Bun.sleep(10);
+      return new Response("ok", { status: 200 });
+    }) as unknown as typeof fetch;
+    try {
+      await Promise.all([
+        trackedFetch("/api/kpis?window=1"),
+        trackedFetch("/api/kpis?window=2"),
+        trackedFetch("/api/kpis", { method: "POST" }),
+      ]);
+      expect(fetchCalls).toBe(3);
+      expect(getApiUsageSnapshot().coalesced).toBe(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("does not coalesce a GET that carries caller options", async () => {
+    let fetchCalls = 0;
+    globalThis.fetch = (async () => {
+      fetchCalls += 1;
+      await Bun.sleep(10);
+      return new Response("ok", { status: 200 });
+    }) as unknown as typeof fetch;
+    try {
+      await Promise.all([
+        trackedFetch("/api/kpis", { headers: { "x-test": "1" } }),
+        trackedFetch("/api/kpis", { headers: { "x-test": "1" } }),
+      ]);
+      expect(fetchCalls).toBe(2);
+      expect(getApiUsageSnapshot().coalesced).toBe(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("a sequential GET after settle is a new network call", async () => {
+    let fetchCalls = 0;
+    globalThis.fetch = (async () => {
+      fetchCalls += 1;
+      return new Response("ok", { status: 200 });
+    }) as unknown as typeof fetch;
+    try {
+      await trackedFetch("/api/kpis");
+      await trackedFetch("/api/kpis");
+      expect(fetchCalls).toBe(2);
+      expect(getApiUsageSnapshot().coalesced).toBe(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("records a transport failure and rethrows", async () => {
     globalThis.fetch = (async () => {
       throw new Error("network down");

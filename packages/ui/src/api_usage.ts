@@ -16,6 +16,7 @@ export interface ApiUsageRow {
   readonly ok: number;
   readonly failed: number;
   readonly pending: number;
+  readonly coalesced: number;
   readonly avgMs: number | null;
   readonly lastMs: number | null;
   readonly lastStatus: number | null;
@@ -28,6 +29,7 @@ export interface ApiUsageSnapshot {
   readonly ok: number;
   readonly failed: number;
   readonly pending: number;
+  readonly coalesced: number;
   readonly avgMs: number | null;
 }
 
@@ -36,6 +38,7 @@ interface MutableRow {
   ok: number;
   failed: number;
   pending: number;
+  coalesced: number;
   completed: number;
   totalMs: number;
   lastMs: number | null;
@@ -49,6 +52,7 @@ export type ApiUsageInput = string | URL | Request;
 export interface ApiCallToken {
   readonly key: string;
   readonly startedAtMs: number;
+  readonly coalesced: boolean;
 }
 
 const rows = new Map<string, MutableRow>();
@@ -61,6 +65,7 @@ let cachedSnapshot: ApiUsageSnapshot = {
   ok: 0,
   failed: 0,
   pending: 0,
+  coalesced: 0,
   avgMs: null,
 };
 
@@ -117,6 +122,7 @@ function mutableRow(key: string): MutableRow {
       ok: 0,
       failed: 0,
       pending: 0,
+      coalesced: 0,
       completed: 0,
       totalMs: 0,
       lastMs: null,
@@ -134,12 +140,13 @@ function notify(): void {
 }
 
 /** Begin one API call; pair with {@link endApiCall}. Exported for tests. */
-export function beginApiCall(key: string): ApiCallToken {
+export function beginApiCall(key: string, coalesced = false): ApiCallToken {
   const row = mutableRow(key);
   row.calls += 1;
   row.pending += 1;
+  if (coalesced) row.coalesced += 1;
   notify();
-  return { key, startedAtMs: performance.now() };
+  return { key, startedAtMs: performance.now(), coalesced };
 }
 
 /** Finish one API call; `status === null` records a transport failure. */
@@ -162,6 +169,7 @@ function buildSnapshot(): ApiUsageSnapshot {
   let ok = 0;
   let failed = 0;
   let pending = 0;
+  let coalesced = 0;
   let totalMs = 0;
   let completed = 0;
   const snapshotRows: ApiUsageRow[] = [];
@@ -170,6 +178,7 @@ function buildSnapshot(): ApiUsageSnapshot {
     ok += row.ok;
     failed += row.failed;
     pending += row.pending;
+    coalesced += row.coalesced;
     totalMs += row.totalMs;
     completed += row.completed;
     snapshotRows.push({
@@ -178,6 +187,7 @@ function buildSnapshot(): ApiUsageSnapshot {
       ok: row.ok,
       failed: row.failed,
       pending: row.pending,
+      coalesced: row.coalesced,
       avgMs: row.completed > 0 ? Math.round(row.totalMs / row.completed) : null,
       lastMs: row.lastMs,
       lastStatus: row.lastStatus,
@@ -191,6 +201,7 @@ function buildSnapshot(): ApiUsageSnapshot {
     ok,
     failed,
     pending,
+    coalesced,
     avgMs: completed > 0 ? Math.round(totalMs / completed) : null,
   };
 }
@@ -226,16 +237,77 @@ export function resetApiUsage(): void {
   notify();
 }
 
-/** Drop-in `fetch` that records endpoint usage without changing the response. */
+/** In-flight plain GETs, keyed by absolute URL; StrictMode mounts overlap. */
+const inFlightGet = new Map<
+  string,
+  Promise<{ readonly template: Response; readonly status: number }>
+>();
+
+/** Coalesce only plain, signal-free GETs; options/headers keep their own request. */
+function coalescableGet(input: ApiUsageInput, init?: RequestInit): boolean {
+  if (typeof input !== "string" && !(input instanceof URL)) return false;
+  if (init === undefined) return true;
+  for (const key of Object.keys(init)) {
+    if (key !== "method") return false;
+  }
+  return (init.method ?? "GET").toUpperCase() === "GET";
+}
+
+function absoluteUrl(input: ApiUsageInput): string {
+  if (typeof input === "string")
+    return new URL(input, "http://dashboard.local").href;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
+/**
+ * Drop-in `fetch` that records endpoint usage without changing the response.
+ * Concurrent identical plain GETs share one network request and each caller
+ * gets its own `Response` clone; the meter reports both calls and the reuse.
+ */
 export async function trackedFetch(
   input: ApiUsageInput,
   init?: RequestInit,
 ): Promise<Response> {
-  const token = beginApiCall(apiUsageKey(input, init?.method));
+  const usageKey = apiUsageKey(input, init?.method);
+  const coalescable = coalescableGet(input, init);
+  const requestKey = coalescable ? `GET ${absoluteUrl(input)}` : null;
+  const shared = requestKey === null ? undefined : inFlightGet.get(requestKey);
+  const token = beginApiCall(usageKey, shared !== undefined);
+
+  if (shared !== undefined) {
+    try {
+      const { template, status } = await shared;
+      endApiCall(token, status);
+      return template.clone() as unknown as Response;
+    } catch (error) {
+      endApiCall(token, null);
+      throw error;
+    }
+  }
+
+  const own = (async () => {
+    // Bun's global `Response` and the undici fetch typings disagree about the
+    // Headers shape; the runtime returns the same class.
+    const response = (await fetch(input, init)) as unknown as Response;
+    return { template: response, status: response.status };
+  })();
+
+  if (requestKey !== null) {
+    inFlightGet.set(requestKey, own);
+    void own
+      .finally(() => {
+        if (inFlightGet.get(requestKey) === own) inFlightGet.delete(requestKey);
+      })
+      .catch(() => {});
+  }
+
   try {
-    const response = await fetch(input, init);
-    endApiCall(token, response.status);
-    return response;
+    const { template, status } = await own;
+    endApiCall(token, status);
+    // The template stays unread, so every caller (including late joiners) can
+    // clone it; nobody may consume the shared body.
+    return (coalescable ? template.clone() : template) as unknown as Response;
   } catch (error) {
     endApiCall(token, null);
     throw error;

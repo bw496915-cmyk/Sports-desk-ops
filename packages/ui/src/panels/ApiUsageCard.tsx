@@ -53,8 +53,12 @@ export function ApiUsageCard(): React.ReactElement {
               color: "#64748b",
             }}
           >
-            {usage.calls} calls · {usage.ok} ok · {usage.failed} failed
+            {usage.calls} calls
+            {usage.coalesced > 0
+              ? ` · ${usage.calls - usage.coalesced} network · ${usage.coalesced} coalesced`
+              : ""}
             {" · "}
+            {usage.ok} ok · {usage.failed} failed{" · "}
             avg {formatMs(usage.avgMs)}
             {usage.pending > 0 ? ` · ${usage.pending} pending` : ""}
           </span>
@@ -137,7 +141,14 @@ export function ApiUsageCard(): React.ReactElement {
                         {row.key}
                       </code>
                     </td>
-                    <td style={styles.td}>{row.calls}</td>
+                    <td style={styles.td}>
+                      {row.calls}
+                      {row.coalesced > 0 ? (
+                        <div style={styles.custSub}>
+                          {row.coalesced} coalesced
+                        </div>
+                      ) : null}
+                    </td>
                     <td style={{ ...styles.td, color: "#86efac" }}>{row.ok}</td>
                     <td
                       style={{

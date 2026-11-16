@@ -1282,6 +1282,20 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect((html.match(/Team -3/g) ?? []).length).toBe(120);
   });
 
+  test("ApiUsageCard reports coalesced requests separately from network calls", () => {
+    resetApiUsage();
+    try {
+      endApiCall(beginApiCall("GET /api/kpis"), 200);
+      endApiCall(beginApiCall("GET /api/kpis", true), 200);
+      const html = renderToStaticMarkup(React.createElement(ApiUsageCard));
+      expect(html).toContain("2 calls");
+      expect(html).toContain("1 network");
+      expect(html).toContain("1 coalesced");
+    } finally {
+      resetApiUsage();
+    }
+  });
+
   test("ApiUsageCard renders the empty state and normalized session rows", () => {
     resetApiUsage();
     try {
