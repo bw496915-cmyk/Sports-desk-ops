@@ -63,6 +63,7 @@
   "zstdCompress": 200,
   "zstdCompressSync": 200,
   "zstdDecompressSync": 200,
+  "BunRequest": 200,
   "FetchProxyOption": 200,
   "FetchSessionInit": 404,
   "FetchSession": 404,

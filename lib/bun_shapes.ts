@@ -753,6 +753,13 @@ export const BUN_SHAPES: readonly BunShape[] = [
   },
   // network
   {
+    name: "BunRequest",
+    kind: "type",
+    subsystem: "network",
+    heading: "Bun.BunRequest (type)",
+    evidence: ["test:tests/bun_request_contract.test.ts"],
+  },
+  {
     name: "FetchProxyOption",
     kind: "type",
     subsystem: "network",
