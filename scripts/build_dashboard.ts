@@ -179,9 +179,14 @@ export async function computeDashboardDceMatrix(): Promise<
     readonly features: readonly Feature[];
     readonly totalJsBytes: number;
     readonly totalCssBytes: number;
+    readonly gzipJsBytes: number;
+    readonly inputFileCount: number | null;
+    readonly bundleHash8: string;
     readonly hasDebugSentinel: boolean;
     readonly hasExperimentalSentinel: boolean;
     readonly hasProdSentinel: boolean;
+    readonly hasTestSentinel: boolean;
+    readonly hasAnalyticsSentinel: boolean;
   }[]
 > {
   const targets: readonly BuildTarget[] = ["prod", "dev", "test"];
@@ -193,6 +198,7 @@ export async function computeDashboardDceMatrix(): Promise<
         target: "browser",
         features: feats,
         minify: t === "prod",
+        metafile: true,
       });
       if (!build.success) {
         throw new Error(
@@ -215,17 +221,33 @@ export async function computeDashboardDceMatrix(): Promise<
         }),
       );
       const jsCombined = jsChunks.join("");
+      const gzipJsBytes = Bun.gzipSync(jsCombined).byteLength;
+      const inputFileCount =
+        build.metafile !== undefined
+          ? Object.keys(build.metafile.inputs).length
+          : null;
+      const bundleHash8 = new Bun.CryptoHasher("sha256")
+        .update(jsCombined)
+        .digest("hex")
+        .slice(0, 8);
 
       return {
         target: t,
         features: feats,
         totalJsBytes,
         totalCssBytes,
+        gzipJsBytes,
+        inputFileCount,
+        bundleHash8,
         hasDebugSentinel: jsCombined.includes("[DCE_DEBUG_TRACE_ACTIVE]"),
         hasExperimentalSentinel: jsCombined.includes(
           "[DCE_EXPERIMENTAL_MATRIX_ACTIVE]",
         ),
         hasProdSentinel: jsCombined.includes("[DCE_PROD_TARGET_ACTIVE]"),
+        hasTestSentinel: jsCombined.includes("[DCE_TEST_HARNESS_ACTIVE]"),
+        hasAnalyticsSentinel: jsCombined.includes(
+          "[DCE_ANALYTICS_TELEMETRY_ACTIVE]",
+        ),
       };
     }),
   );
