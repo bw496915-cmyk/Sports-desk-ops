@@ -235,7 +235,8 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/stringWidth)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `lib/wagers_report.ts`, `lib/cli_inspect.ts`
-- **Evidence:** `probe:text.width`
+- **Evidence:** `probe:text.width`, `tests/bun_v140_primitives.test.ts`
+- **Measured semantics (2026-11-16):** native SIMD column count that ignores ANSI/OSC-8 sequences and combines grapheme clusters (`e` + combining accent = 1, `👨‍👩‍👧` = 2, `👍🏽` = 2). CJK wide characters count 2; East Asian ambiguous characters default to 1 and accept `{ ambiguousIsNarrow: false }` for 2. It covers Latin-1, UTF-16 and UTF-8 input; the checked-in primitives test pins the widths used for CLI padding.
 
 #### Bun.wrapAnsi
 
@@ -347,8 +348,9 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/deepEquals)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `dsh-plugin/verify-load.mjs`, `lib/alerts.ts`
-- **Evidence:** `probe:data.compare`
+- **Here:** `lib/f402_hierarchy_dedupe.ts`, `lib/wager_config.ts`, `scripts/r2_manifest_cas_promote.ts`
+- **Evidence:** `probe:data.compare`, `tests/bun_deep_equals.test.ts`, `data.compare`
+- **Measured semantics (2026-11-16):** loose mode compares JSON-shaped values, so an extra own key whose value is `undefined` is ignored; strict mode (`true` third argument) requires the same own-key shape. Strict also separates a sparse array hole from an explicit `undefined` and a class instance from a plain literal. Use strict for dedupe/change detection where losing an `undefined` field would hide a change; use loose only when the values have already crossed a JSON boundary that drops `undefined`.
 
 #### Bun.semver
 
