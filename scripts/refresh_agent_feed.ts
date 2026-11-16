@@ -12,6 +12,7 @@ import { parseArgs } from "node:util";
 import { buildHierarchyFormBody } from "../lib/f402_hierarchy_envelope.ts";
 import { PROBE_HOST, MANAGER_RRO } from "../lib/f402_hierarchy_config.ts";
 import { createF402ReplayTransport } from "../lib/f402_replay_transport.ts";
+import { buildManagerWagersByFigureDateBody } from "../lib/f402_probe.ts";
 import {
   WEEKLY_FIGURE_LITE_PATH,
   buildWeeklyFigureLiteFormBody,
@@ -31,6 +32,9 @@ const { values } = parseArgs({
     "agent-owner": { type: "string" },
     out: { type: "string", default: join(ROOT, "Scratch", "agent-feed") },
     "dry-run": { type: "boolean", default: false },
+    customer: { type: "string", default: "DAN105" },
+    "figure-date": { type: "string", default: "2026-11-12" },
+    date: { type: "string", default: "2026-11-16" },
   },
 });
 const agentId = values["agent-id"].trim();
@@ -50,6 +54,19 @@ if (values["dry-run"]) {
             ),
           ),
           mode: "projected",
+        },
+        wagers: {
+          url: `${PROBE_HOST}/cloud/api/Report/getWagersByFigureDate`,
+          body: JSON.parse(
+            buildManagerWagersByFigureDateBody({
+              agentID: agentId,
+              agentOwner,
+              customerID: values.customer,
+              date: values.date,
+              figureDate: values["figure-date"],
+              graded: 0,
+            }),
+          ),
         },
         weekly: {
           url: `${PROBE_HOST}${WEEKLY_FIGURE_LITE_PATH}`,
@@ -76,6 +93,7 @@ await mkdir(outDir, { recursive: true });
 const hierarchyOut = join(outDir, "hierarchy.projected.json");
 const rosterOut = join(outDir, "roster.projected.json");
 const weeklyOut = join(outDir, "weekly.json");
+const wagersOut = join(outDir, "wagers.json");
 
 const fetched = Bun.spawnSync({
   cmd: [
@@ -133,6 +151,30 @@ try {
   }
   if (!response.ok) throw new Error(`weekly ${response.status}`);
   weeklyRaw = await response.json();
+  const wagersResponse = await transport.fetch(
+    `${PROBE_HOST}/cloud/api/Report/getWagersByFigureDate`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: buildManagerWagersByFigureDateBody({
+        agentID: agentId,
+        agentOwner,
+        customerID: values.customer,
+        date: values.date,
+        figureDate: values["figure-date"],
+        graded: 0,
+      }),
+      redirect: "manual",
+    },
+  );
+  if (wagersResponse.status === 401 || wagersResponse.redirected) {
+    throw new Error("session expired — re-auth required");
+  }
+  if (!wagersResponse.ok) throw new Error(`wagers ${wagersResponse.status}`);
+  await Bun.write(
+    wagersOut,
+    `${JSON.stringify({ fetchedAt: new Date().toISOString(), customerID: values.customer, figureDate: values["figure-date"], raw: await wagersResponse.json() }, null, 2)}\n`,
+  );
 } finally {
   await transport.close();
 }
