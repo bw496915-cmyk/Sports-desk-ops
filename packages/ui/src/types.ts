@@ -194,6 +194,8 @@ export interface LiveWager {
   /** Channel family derived from `ticketWriter` (shared vocabulary with ingest). */
   readonly writer?: WagerChannel | undefined;
   readonly sport: string;
+  /** League / sub-sport when the source carries it; null when unknown. */
+  readonly subSport?: string | null | undefined;
   readonly betType: string;
   readonly event: string;
   readonly selection: string;

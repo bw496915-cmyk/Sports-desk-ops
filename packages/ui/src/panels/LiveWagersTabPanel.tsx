@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   PARTNER_118_CHANNELS,
   WAGER_CHANNEL_LABELS,
@@ -218,6 +218,12 @@ export function LiveWagersTabPanel({
   onSelectAgent,
 }: LiveWagersTabPanelProps): React.ReactElement {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [paused, setPaused] = useState(false);
+  const [frozenWagers, setFrozenWagers] = useState<readonly LiveWager[] | null>(
+    null,
+  );
+  const [pendingNew, setPendingNew] = useState(0);
+  const seenTicketIdsRef = useRef<Set<string>>(new Set());
   const isGsliveScope = wagerChannelFilter.toUpperCase() === "GSLIVE";
 
   // A game selection belongs to the GSLIVE scope; leaving it must not silently keep
@@ -227,6 +233,33 @@ export function LiveWagersTabPanel({
   }, [wagerChannelFilter]);
 
   const activeWagers = wagers;
+  // Pause freezes the table only; channel profiles and the GSLIVE logs stay live.
+  const tableWagers =
+    paused && frozenWagers !== null ? frozenWagers : activeWagers;
+
+  useEffect(() => {
+    const ids = new Set(wagers.map((w) => w.ticketId));
+    if (paused) {
+      let added = 0;
+      for (const id of ids) {
+        if (!seenTicketIdsRef.current.has(id)) added += 1;
+      }
+      if (added > 0) setPendingNew((count) => count + added);
+    }
+    seenTicketIdsRef.current = ids;
+  }, [wagers, paused]);
+
+  const toggleWagersPause = () => {
+    if (paused) {
+      setPaused(false);
+      setFrozenWagers(null);
+      setPendingNew(0);
+      return;
+    }
+    setPaused(true);
+    setFrozenWagers(activeWagers);
+    setPendingNew(0);
+  };
   const activeProvenance: DashboardSourceProvenance = wagersError
     ? {
         kind: "unavailable",
@@ -263,13 +296,31 @@ export function LiveWagersTabPanel({
   const baseSportIds = new Set(SPORT_PILLS.map((p) => p.id.toUpperCase()));
   const extraSportPills: Array<{ id: string; label: string }> = [];
   for (const w of activeWagers) {
-    const up = w.sport.toUpperCase();
-    if (up && !baseSportIds.has(up)) {
-      baseSportIds.add(up);
-      extraSportPills.push({ id: up, label: up });
+    for (const value of [w.sport, w.subSport ?? ""]) {
+      const up = value.toUpperCase();
+      if (up && !baseSportIds.has(up)) {
+        baseSportIds.add(up);
+        extraSportPills.push({ id: up, label: up });
+      }
     }
   }
-  const sportPills = [...SPORT_PILLS, ...extraSportPills];
+  const availableSportIds = new Set<string>();
+  for (const w of activeWagers) {
+    for (const value of [w.sport, w.subSport ?? ""]) {
+      const up = value.toUpperCase();
+      if (up !== "") availableSportIds.add(up);
+    }
+  }
+  // Keep only sport/league pills that can match a row (plus All); a league pill with no
+  // subsport data would filter the table to zero rows.
+  const sportPills = [
+    ...SPORT_PILLS.filter(
+      (pill) =>
+        pill.id.toUpperCase() === "ALL" ||
+        availableSportIds.has(pill.id.toUpperCase()),
+    ),
+    ...extraSportPills,
+  ];
 
   const baseTypeIds = new Set(BET_TYPE_PILLS.map((p) => p.id.toUpperCase()));
   const extraTypePills: Array<{ id: string; label: string }> = [];
@@ -282,7 +333,7 @@ export function LiveWagersTabPanel({
   }
   const betTypePills = [...BET_TYPE_PILLS, ...extraTypePills];
 
-  const filteredWagers = activeWagers
+  const filteredWagers = tableWagers
     .filter((w) => {
       const q = wagerSearch.trim().toLowerCase();
       const matchesSearch =
@@ -300,11 +351,13 @@ export function LiveWagersTabPanel({
             /in-play|live|halftime/i.test(w.alertBadge) ||
             w.alertTier === "LATENCY"));
       if (!matchesSearch) return false;
-      if (
-        wagerSportFilter !== "ALL" &&
-        w.sport.toUpperCase() !== wagerSportFilter.toUpperCase()
-      )
-        return false;
+      if (wagerSportFilter !== "ALL") {
+        const sportFilter = wagerSportFilter.toUpperCase();
+        const subSport = (w.subSport ?? "").toUpperCase();
+        if (w.sport.toUpperCase() !== sportFilter && subSport !== sportFilter) {
+          return false;
+        }
+      }
       if (wagerAlertFilter !== "ALL" && w.alertTier !== wagerAlertFilter)
         return false;
       if (
@@ -350,6 +403,22 @@ export function LiveWagersTabPanel({
   // Hard render bound from wagers.toml: the feed may carry more rows than the
   // desk wants mounted in one table pass.
   const visibleWagers = filteredWagers.slice(0, WAGERS_TABLE.max_rows);
+  const wagersAgeSeconds =
+    wagersLastUpdatedAt === null
+      ? null
+      : Math.max(0, Math.round((Date.now() - wagersLastUpdatedAt) / 1000));
+  const wagerStreamState = paused
+    ? "paused"
+    : streamingConnected === false
+      ? "fallback"
+      : "live";
+  const freshVisibleCount = visibleWagers.filter(
+    (w) => newTicketIds?.has(w.ticketId) === true,
+  ).length;
+  // Stable per capture: a filter must not make the column appear/disappear.
+  const showSubSportColumn = activeWagers.some(
+    (w) => (w.subSport ?? "") !== "",
+  );
 
   // Aggregate per-customer CLV & dollar edge across the active slice
   const sliceCustomerMap = new Map<
@@ -750,23 +819,93 @@ export function LiveWagersTabPanel({
             ) : null}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span
+              data-wagers-stream={wagerStreamState}
+              title="WebSocket push on capture changes; the table also refetches every 10s while this tab is open"
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                color: paused
+                  ? "#f59e0b"
+                  : wagerStreamState === "fallback"
+                    ? "#94a3b8"
+                    : "#4ade80",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {paused
+                ? "⏸ paused"
+                : wagerStreamState === "fallback"
+                  ? "◌ polling"
+                  : "● live"}
+              {!paused && wagersAgeSeconds !== null
+                ? ` · ${wagersAgeSeconds}s ago`
+                : ""}
+              {paused && pendingNew > 0 ? ` · ${pendingNew} new` : ""}
+              {!paused ? (
+                <span style={{ color: "#64748b", fontWeight: 500 }}>
+                  {" "}
+                  · auto 10s
+                </span>
+              ) : null}
+              {freshVisibleCount > 0 ? (
+                <span style={{ color: "#4ade80", fontWeight: 700 }}>
+                  {" "}
+                  · +{freshVisibleCount} new
+                </span>
+              ) : null}
+            </span>
             <span style={{ fontSize: "11px", color: "#64748b" }}>
               {provenanceBadge.detail} · showing {visibleWagers.length}/
               {filteredWagers.length} · autoExecute: false invariant active
             </span>
-            {onRefreshWagers ? (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                flexShrink: 0,
+                whiteSpace: "nowrap",
+              }}
+            >
               <button
                 type="button"
+                data-wagers-pause="true"
+                onClick={toggleWagersPause}
+                title={
+                  paused
+                    ? "Resume live updates for the table"
+                    : "Freeze the table while you read; updates keep arriving"
+                }
                 style={{
                   ...styles.actionBtn,
                   padding: "4px 8px",
                   fontSize: "11px",
+                  ...(paused
+                    ? {
+                        color: "#f59e0b",
+                        borderColor: "rgba(245, 158, 11, 0.5)",
+                      }
+                    : {}),
                 }}
-                onClick={onRefreshWagers}
               >
-                ↻ Refresh
+                {paused ? "▶ Resume" : "⏸ Pause"}
               </button>
-            ) : null}
+              {onRefreshWagers ? (
+                <button
+                  type="button"
+                  style={{
+                    ...styles.actionBtn,
+                    padding: "4px 8px",
+                    fontSize: "11px",
+                  }}
+                  onClick={onRefreshWagers}
+                  title="Fetch /api/wagers now (the table also auto-refreshes every 10s)"
+                >
+                  ↻ Refresh
+                </button>
+              ) : null}
+            </span>
           </div>
         </div>
 
@@ -792,7 +931,21 @@ export function LiveWagersTabPanel({
                 </th>
                 <th style={styles.th}>Customer</th>
                 <th style={styles.th}>Sub-Agent / Master</th>
-                <th style={styles.th}>Sport / Type</th>
+                <th style={styles.th}>Sport</th>
+                {showSubSportColumn ? (
+                  <th
+                    style={styles.th}
+                    title="League / sub-sport from the source (F402 SubSport). Live betTicker captures do not carry it."
+                  >
+                    Subsport
+                  </th>
+                ) : null}
+                <th
+                  style={styles.th}
+                  title="Bet type from the ticket (Moneyline, Spread, Total, Parlay, Straight, Live). The channel follows 'via'."
+                >
+                  Bet Type
+                </th>
                 <th style={styles.th}>Event & Market Selection</th>
                 <th
                   style={{
@@ -850,9 +1003,12 @@ export function LiveWagersTabPanel({
               {visibleWagers.map((w) => (
                 <tr
                   key={w.ticketId}
-                  style={styles.wagerRow(
-                    selectedWager?.ticketId === w.ticketId,
-                  )}
+                  style={{
+                    ...styles.wagerRow(selectedWager?.ticketId === w.ticketId),
+                    ...(newTicketIds?.has(w.ticketId) === true
+                      ? { backgroundColor: "rgba(74, 222, 128, 0.10)" }
+                      : {}),
+                  }}
                   onClick={() => onSelectWager(w)}
                 >
                   <td style={styles.td}>
@@ -891,6 +1047,18 @@ export function LiveWagersTabPanel({
                       >
                         {copiedTicketId === w.ticketId ? "✓" : "📋"}
                       </button>
+                      {newTicketIds?.has(w.ticketId) === true ? (
+                        <span
+                          style={{
+                            color: "#4ade80",
+                            fontWeight: 800,
+                            fontSize: "9px",
+                            letterSpacing: "0.06em",
+                          }}
+                        >
+                          NEW
+                        </span>
+                      ) : null}
                     </div>
                     <div style={styles.custSub}>{w.timestamp}</div>
                   </td>
@@ -960,11 +1128,18 @@ export function LiveWagersTabPanel({
                     <div style={styles.custSub}>Master: {w.masterAgent}</div>
                   </td>
                   <td style={styles.td}>
-                    <div style={{ fontWeight: 600 }}>{w.sport}</div>
-                    <div style={styles.custSub}>
-                      {w.betType}
-                      {w.ticketWriter ? ` · ${w.ticketWriter}` : ""}
-                    </div>
+                    <div style={{ fontWeight: 600 }}>{w.sport || "—"}</div>
+                  </td>
+                  {showSubSportColumn ? (
+                    <td style={styles.td}>
+                      <div style={{ fontWeight: 600 }}>{w.subSport ?? "—"}</div>
+                    </td>
+                  ) : null}
+                  <td style={styles.td}>
+                    <div style={{ fontWeight: 600 }}>{w.betType}</div>
+                    {w.ticketWriter ? (
+                      <div style={styles.custSub}>via {w.ticketWriter}</div>
+                    ) : null}
                   </td>
                   <td style={styles.td}>
                     <div style={{ fontWeight: 600 }}>{w.event}</div>
@@ -1078,7 +1253,7 @@ export function LiveWagersTabPanel({
               {visibleWagers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={showSubSportColumn ? 12 : 11}
                     data-wagers-empty={activeProvenance.kind}
                     style={{
                       ...styles.td,

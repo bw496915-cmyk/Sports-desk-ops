@@ -1024,12 +1024,11 @@ export function App(): React.ReactElement {
   // endpoint is stat-cached server-side, so an unchanged capture costs a stat.
   useEffect(() => {
     if (activeTab !== "wagers") return;
-    const interval = setInterval(
-      () => {
-        void fetchLiveWagers();
-      },
-      connected ? 30_000 : 10_000,
-    );
+    // The socket pushes on capture changes; this timed refetch keeps the visible table
+    // fresh even when a watcher miss or a dropped socket frame would otherwise freeze it.
+    const interval = setInterval(() => {
+      void fetchLiveWagers();
+    }, 10_000);
     return () => clearInterval(interval);
   }, [activeTab, connected]);
 
@@ -1095,6 +1094,9 @@ export function App(): React.ReactElement {
         case "alerts-updated":
           fetchAlerts();
           fetchHealth();
+          break;
+        case "automations-updated":
+          void fetchR2Pipeline(true);
           break;
         case "ack":
         case "ignore":

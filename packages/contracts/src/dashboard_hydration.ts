@@ -143,7 +143,8 @@ export type DashboardWsEventName =
   | "dashboard-updated"
   | "wagers-updated"
   | "tiers-updated"
-  | "alerts-updated";
+  | "alerts-updated"
+  | "automations-updated";
 
 export interface DashboardWsEventFrame {
   readonly type: "topic-event";
@@ -172,6 +173,7 @@ export type ParsedDashboardWsAction =
       readonly tiers?: TierStyleMap | undefined;
     }
   | { readonly kind: "alerts-updated" }
+  | { readonly kind: "automations-updated" }
   | { readonly kind: "ack"; readonly ackType: string }
   | { readonly kind: "ignore" };
 
@@ -207,6 +209,9 @@ export function parseDashboardWsSignal(raw: string): ParsedDashboardWsAction {
   if (trimmed === "tiers-updated") return { kind: "tiers-updated" };
   if (trimmed === "alerts-updated" || trimmed === "syndicate-alerts") {
     return { kind: "alerts-updated" };
+  }
+  if (trimmed === "automations-updated") {
+    return { kind: "automations-updated" };
   }
 
   if (!trimmed.startsWith("{")) {
@@ -249,6 +254,9 @@ export function parseDashboardWsSignal(raw: string): ParsedDashboardWsAction {
       }
       if (event === "alerts-updated" || topic === "syndicate-alerts") {
         return { kind: "alerts-updated" };
+      }
+      if (event === "automations-updated") {
+        return { kind: "automations-updated" };
       }
       return { kind: "ignore" };
     }

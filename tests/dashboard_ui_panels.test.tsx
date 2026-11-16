@@ -673,6 +673,12 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     // stake emphasis floor (dashboard.toml) tags overweight samples.
     expect(html).toContain("wagers-policy/v1");
     expect(html).toContain("HIGH RISK");
+    // Sport and bet type are separate columns, not one combined cell.
+    expect(html).toContain("Sport</th>");
+    expect(html).toContain("Subsport</th>");
+    expect(html).toContain("Bet Type</th>");
+    expect(html).toContain("via GSLIVE");
+    expect(html).not.toContain("Sport / Type");
     expect(html).not.toContain("wagers-dead-table-sentinel");
     // Partner 118 split: channel pills + per-channel profile cards.
     expect(html).toContain("🔴 GSLIVE");
@@ -1285,6 +1291,8 @@ test("LiveWagersTabPanel shows the streaming status and highlights fresh rows", 
   expect(live).toContain("auto 10s");
   expect(live).toContain("NEW");
   expect(live).toContain("s ago");
+  expect(live).toContain('data-wagers-pause="true"');
+  expect(live).toContain("+1 new");
 
   const fallback = renderToStaticMarkup(
     React.createElement(LiveWagersTabPanel, {
@@ -1295,4 +1303,70 @@ test("LiveWagersTabPanel shows the streaming status and highlights fresh rows", 
   );
   expect(fallback).toContain('data-wagers-stream="fallback"');
   expect(fallback).toContain("◌ polling");
+});
+
+test("sport filter also matches the subsport/league", () => {
+  const noop = () => {};
+  const wager = FIXTURE_LIVE_WAGERS[0]!;
+  const base = {
+    wagers: FIXTURE_LIVE_WAGERS,
+    wagerSearch: "",
+    onWagerSearchChange: noop,
+    wagerSportFilter: "NFL",
+    onWagerSportFilterChange: noop,
+    wagerAlertFilter: "ALL",
+    onWagerAlertFilterChange: noop,
+    wagerChannelFilter: "ALL",
+    onWagerChannelFilterChange: noop,
+    wagerTypeFilter: "ALL",
+    onWagerTypeFilterChange: noop,
+    wagerSortField: "timestamp" as const,
+    wagerSortDir: "desc" as const,
+    onWagerSort: noop,
+    selectedWager: wager,
+    onSelectWager: noop,
+    copiedTicketId: null,
+    onCopyText: noop,
+    tiersConfig: null,
+    onSelectCustomerById: noop,
+    onInspectPty: noop,
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(LiveWagersTabPanel, base),
+  );
+  expect(html).toContain("#W-109281");
+  expect(html).not.toContain("#W-109287");
+});
+
+test("the subsport column and league pills hide when the capture has no subsport", () => {
+  const noop = () => {};
+  const wager = FIXTURE_LIVE_WAGERS[0]!;
+  const base = {
+    wagers: FIXTURE_LIVE_WAGERS.map((w) => ({ ...w, subSport: null })),
+    wagerSearch: "",
+    onWagerSearchChange: noop,
+    wagerSportFilter: "ALL",
+    onWagerSportFilterChange: noop,
+    wagerAlertFilter: "ALL",
+    onWagerAlertFilterChange: noop,
+    wagerChannelFilter: "ALL",
+    onWagerChannelFilterChange: noop,
+    wagerTypeFilter: "ALL",
+    onWagerTypeFilterChange: noop,
+    wagerSortField: "timestamp" as const,
+    wagerSortDir: "desc" as const,
+    onWagerSort: noop,
+    selectedWager: wager,
+    onSelectWager: noop,
+    copiedTicketId: null,
+    onCopyText: noop,
+    tiersConfig: null,
+    onSelectCustomerById: noop,
+    onInspectPty: noop,
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(LiveWagersTabPanel, base),
+  );
+  expect(html).not.toContain("Subsport</th>");
+  expect(html).not.toContain(">NFL</button>");
 });

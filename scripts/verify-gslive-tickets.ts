@@ -3,6 +3,7 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -82,6 +83,22 @@ export interface R2ClientConfig {
   ): string;
 }
 
+function redactedR2View(fields: {
+  readonly bucket: string;
+  readonly endpoint: string;
+  readonly region: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
+}): Record<string, string> {
+  return {
+    bucket: fields.bucket,
+    endpoint: fields.endpoint,
+    region: fields.region,
+    accessKeyId: redactFingerprint(fields.accessKeyId),
+    secretAccessKey: redactFingerprint(fields.secretAccessKey),
+  };
+}
+
 function createRedactedR2Config(raw: {
   bucket: string;
   endpoint: string;
@@ -93,13 +110,14 @@ function createRedactedR2Config(raw: {
   const _accessKeyId = raw.accessKeyId;
   const _secretAccessKey = raw.secretAccessKey;
 
-  const safeSummary = () => ({
-    bucket: raw.bucket,
-    endpoint: raw.endpoint,
-    region: raw.region,
-    accessKeyId: redactFingerprint(_accessKeyId),
-    secretAccessKey: redactFingerprint(_secretAccessKey),
-  });
+  const safeSummary = () =>
+    redactedR2View({
+      bucket: raw.bucket,
+      endpoint: raw.endpoint,
+      region: raw.region,
+      accessKeyId: _accessKeyId,
+      secretAccessKey: _secretAccessKey,
+    });
 
   const cfg = {
     bucket: raw.bucket,
@@ -308,13 +326,7 @@ function sealS3ClientInspection(
   client: S3Client,
   config: R2ClientConfig,
 ): S3Client {
-  const safeClientView = () => ({
-    bucket: config.bucket,
-    endpoint: config.endpoint,
-    region: config.region,
-    accessKeyId: redactFingerprint(config.accessKeyId),
-    secretAccessKey: redactFingerprint(config.secretAccessKey),
-  });
+  const safeClientView = () => redactedR2View(config);
 
   Object.defineProperties(client, {
     toJSON: {
@@ -416,12 +428,19 @@ export interface RuntimePreflightReport {
 
 const PREFLIGHT_SECRET_ENV_NAMES = [
   "F402_AUTH_JWT",
+  "F402_BEARER_TOKEN",
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
   "CLOUDFLARE_API_TOKEN",
   "CLOUDFLARE_R2_API_TOKEN",
   "DATABASE_URL",
 ] as const;
+
+function activePreflightSecrets(): string[] {
+  return PREFLIGHT_SECRET_ENV_NAMES.map((name) => Bun.env[name] ?? "").filter(
+    (value) => value !== "",
+  );
+}
 
 /**
  * Startup guard: verify the native bindings the pipeline needs, enforce Cloudflare token
@@ -464,9 +483,7 @@ export function runRuntimePreflightAudit(options?: {
     );
   }
 
-  const activeSecrets = PREFLIGHT_SECRET_ENV_NAMES.map(
-    (name) => Bun.env[name] ?? "",
-  ).filter((value) => value !== "");
+  const activeSecrets = activePreflightSecrets();
 
   const globalS3 =
     typeof Bun.s3 === "object" && Bun.s3 !== null ? Bun.s3 : null;
@@ -570,10 +587,14 @@ export function summarizeTicketPayload(raw: unknown): TicketPayloadTotals {
     }
     actionableTickets += 1;
     const wageredCents = asFiniteCents(
-      row.AmountWagered ?? row.wageredUsd ?? row.riskUsd,
+      row.AmountWagered ?? row.amountWagered ?? row.wageredUsd ?? row.riskUsd,
     );
-    const volumeCents = asFiniteCents(row.VolumeAmount ?? row.volumeUsd);
-    const toWinCents = asFiniteCents(row.ToWinAmount ?? row.toWinUsd);
+    const volumeCents = asFiniteCents(
+      row.VolumeAmount ?? row.volumeAmount ?? row.volumeUsd,
+    );
+    const toWinCents = asFiniteCents(
+      row.ToWinAmount ?? row.toWinAmount ?? row.toWinUsd,
+    );
     if (volumeCents !== 0 && volumeCents !== wageredCents) {
       volumeMismatchCount += 1;
     }
@@ -621,13 +642,19 @@ export function readGsliveTicketVerifyArtifact(
 function writeAtomicJson(targetPath: string, payload: unknown): void {
   mkdirSync(dirname(targetPath), { recursive: true });
   const serialized = `${JSON.stringify(payload, null, 2)}\n`;
-  const activeSecrets = PREFLIGHT_SECRET_ENV_NAMES.map(
-    (name) => Bun.env[name] ?? "",
-  ).filter((value) => value !== "");
-  assertNoSecretLeak(serialized, activeSecrets);
+  assertNoSecretLeak(serialized, activePreflightSecrets());
   const tmpPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`;
-  writeFileSync(tmpPath, serialized, "utf8");
-  renameSync(tmpPath, targetPath);
+  try {
+    writeFileSync(tmpPath, serialized, "utf8");
+    renameSync(tmpPath, targetPath);
+  } catch (err) {
+    try {
+      unlinkSync(tmpPath);
+    } catch {
+      // Ignore cleanup failure for non-existent tmp file
+    }
+    throw err;
+  }
 }
 
 export interface RunGsliveTicketVerificationOptions {
@@ -801,7 +828,7 @@ export async function runGsliveTicketVerification(
         datedKey,
       };
       const receiptJson = JSON.stringify(receipt, null, 2);
-      assertNoSecretLeak(receiptJson, []);
+      assertNoSecretLeak(receiptJson, activePreflightSecrets());
       await client.file(datedKey).write(receiptJson, {
         type: "application/json",
       });

@@ -28,6 +28,32 @@ function formatSla(slaSeconds: number): string {
   return `${(slaSeconds / 3600).toFixed(0)}h`;
 }
 
+function formatUsdCents(cents: number): string {
+  const usd = cents / 100;
+  return usd.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: Math.abs(usd) >= 100 ? 0 : 2,
+  });
+}
+
+const SECTION_CARD_STYLE: React.CSSProperties = {
+  borderRadius: "8px",
+  padding: "14px 16px",
+  backgroundColor: "rgba(15, 23, 42, 0.9)",
+  border: "1px solid #334155",
+  display: "flex",
+  flexDirection: "column",
+  gap: "12px",
+};
+
+const METRIC_BOX_STYLE: React.CSSProperties = {
+  padding: "6px 8px",
+  borderRadius: "5px",
+  backgroundColor: "rgba(30, 41, 59, 0.55)",
+  border: "1px solid rgba(51, 65, 85, 0.7)",
+};
+
 function stateBadgeColors(state: R2SinkDetail["state"]): {
   readonly fg: string;
   readonly bg: string;
@@ -487,17 +513,7 @@ export function R2PipelineTabPanel({
 
       {/* GSLive Ticket Verification & Secret Redaction Canary */}
       {(automations !== undefined || onVerifyTickets !== undefined) && (
-        <div
-          style={{
-            borderRadius: "8px",
-            padding: "14px 16px",
-            backgroundColor: "rgba(15, 23, 42, 0.9)",
-            border: "1px solid #334155",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-          }}
-        >
+        <div style={SECTION_CARD_STYLE}>
           <div
             style={{
               display: "flex",
@@ -599,78 +615,80 @@ export function R2PipelineTabPanel({
           )}
 
           {ticketVerify ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                gap: "8px",
-                fontSize: "12px",
-              }}
-            >
+            <>
               <div
                 style={{
-                  padding: "6px 8px",
-                  borderRadius: "5px",
-                  backgroundColor: "rgba(30, 41, 59, 0.55)",
-                  border: "1px solid rgba(51, 65, 85, 0.7)",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                  gap: "8px",
+                  fontSize: "12px",
                 }}
               >
-                <div style={{ fontSize: "10px", color: "#94a3b8" }}>
-                  Actionable / Rows
+                <div style={METRIC_BOX_STYLE}>
+                  <div style={{ fontSize: "10px", color: "#94a3b8" }}>
+                    Actionable / Rows
+                  </div>
+                  <div style={{ fontWeight: 700, color: "#f1f5f9" }}>
+                    {ticketVerify.actionableTickets} / {ticketVerify.totalRows}
+                  </div>
                 </div>
-                <div style={{ fontWeight: 700, color: "#f1f5f9" }}>
-                  {ticketVerify.actionableTickets} / {ticketVerify.totalRows}
+                <div style={METRIC_BOX_STYLE}>
+                  <div style={{ fontSize: "10px", color: "#94a3b8" }}>
+                    Wagered / Volume
+                  </div>
+                  <div style={{ fontWeight: 700, color: "#f1f5f9" }}>
+                    {formatUsdCents(ticketVerify.totalWageredCents)} /{" "}
+                    {formatUsdCents(ticketVerify.totalVolumeCents)}
+                  </div>
                 </div>
-              </div>
-              <div
-                style={{
-                  padding: "6px 8px",
-                  borderRadius: "5px",
-                  backgroundColor: "rgba(30, 41, 59, 0.55)",
-                  border: "1px solid rgba(51, 65, 85, 0.7)",
-                }}
-              >
-                <div style={{ fontSize: "10px", color: "#94a3b8" }}>
-                  Sentinel Noise / ΔVol
+                <div style={METRIC_BOX_STYLE}>
+                  <div style={{ fontSize: "10px", color: "#94a3b8" }}>
+                    Sentinel Noise / ΔVol
+                  </div>
+                  <div style={{ fontWeight: 700, color: "#f1f5f9" }}>
+                    {ticketVerify.sentinelNoiseCount} noise ·{" "}
+                    {ticketVerify.volumeMismatchCount} Δ
+                  </div>
                 </div>
-                <div style={{ fontWeight: 700, color: "#f1f5f9" }}>
-                  {ticketVerify.sentinelNoiseCount} noise ·{" "}
-                  {ticketVerify.volumeMismatchCount} Δ
+                <div style={METRIC_BOX_STYLE}>
+                  <div style={{ fontSize: "10px", color: "#94a3b8" }}>
+                    F402 / R2 Status
+                  </div>
+                  <div style={{ fontWeight: 700, color: "#f1f5f9" }}>
+                    {ticketVerify.f402Status} / {ticketVerify.r2Status}
+                  </div>
                 </div>
-              </div>
-              <div
-                style={{
-                  padding: "6px 8px",
-                  borderRadius: "5px",
-                  backgroundColor: "rgba(30, 41, 59, 0.55)",
-                  border: "1px solid rgba(51, 65, 85, 0.7)",
-                }}
-              >
-                <div style={{ fontSize: "10px", color: "#94a3b8" }}>
-                  F402 / R2 Status
-                </div>
-                <div style={{ fontWeight: 700, color: "#f1f5f9" }}>
-                  {ticketVerify.f402Status} / {ticketVerify.r2Status}
-                </div>
-              </div>
-              <div
-                style={{
-                  padding: "6px 8px",
-                  borderRadius: "5px",
-                  backgroundColor: "rgba(30, 41, 59, 0.55)",
-                  border: "1px solid rgba(51, 65, 85, 0.7)",
-                }}
-              >
-                <div style={{ fontSize: "10px", color: "#94a3b8" }}>
-                  Verified At
-                </div>
-                <div style={{ fontWeight: 600, color: "#cbd5e1" }}>
-                  {ticketVerify.verifiedAt
-                    ? `${ticketVerify.verifiedAt.slice(0, 16)}Z`
-                    : "—"}
+                <div style={METRIC_BOX_STYLE}>
+                  <div style={{ fontSize: "10px", color: "#94a3b8" }}>
+                    Verified At
+                  </div>
+                  <div style={{ fontWeight: 600, color: "#cbd5e1" }}>
+                    {ticketVerify.verifiedAt
+                      ? `${ticketVerify.verifiedAt.slice(0, 16)}Z`
+                      : "—"}
+                  </div>
                 </div>
               </div>
-            </div>
+              {(ticketVerify.sourcePath || ticketVerify.r2PublishedKey) && (
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "#94a3b8",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {ticketVerify.sourcePath
+                    ? `source=${ticketVerify.sourcePath}`
+                    : ""}
+                  {ticketVerify.sourcePath && ticketVerify.r2PublishedKey
+                    ? " · "
+                    : ""}
+                  {ticketVerify.r2PublishedKey
+                    ? `r2=${ticketVerify.r2PublishedKey}`
+                    : ""}
+                </div>
+              )}
+            </>
           ) : (
             <div style={{ fontSize: "12px", color: "#94a3b8" }}>
               No verification receipt recorded yet. Run Dry-Run Verify or{" "}
@@ -689,17 +707,7 @@ export function R2PipelineTabPanel({
 
       {/* Automations & Scheduled Jobs */}
       {automations && (
-        <div
-          style={{
-            borderRadius: "8px",
-            padding: "14px 16px",
-            backgroundColor: "rgba(15, 23, 42, 0.9)",
-            border: "1px solid #334155",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-          }}
-        >
+        <div style={SECTION_CARD_STYLE}>
           <div
             style={{
               display: "flex",
@@ -759,10 +767,9 @@ export function R2PipelineTabPanel({
               <div
                 key={sched.id}
                 style={{
+                  ...METRIC_BOX_STYLE,
                   padding: "8px 10px",
                   borderRadius: "6px",
-                  backgroundColor: "rgba(30, 41, 59, 0.55)",
-                  border: "1px solid rgba(51, 65, 85, 0.7)",
                   display: "flex",
                   flexDirection: "column",
                   gap: "4px",
@@ -800,6 +807,11 @@ export function R2PipelineTabPanel({
                 <div style={{ color: "#94a3b8", fontFamily: "monospace" }}>
                   {sched.scheduleTime} · {sched.tz} · {sched.owner}
                 </div>
+                {sched.lastTriggeredAt && (
+                  <div style={{ color: "#cbd5e1" }}>
+                    Last run: {sched.lastTriggeredAt.slice(0, 16)}Z
+                  </div>
+                )}
                 {sched.missingRequirements.length > 0 && (
                   <div style={{ color: "#fbbf24" }}>
                     Missing: {sched.missingRequirements.join(", ")}

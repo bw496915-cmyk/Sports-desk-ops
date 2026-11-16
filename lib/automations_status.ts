@@ -69,8 +69,21 @@ export function buildAutomationsSnapshot(
   const rawSchedules =
     options.schedules ?? ReportingSchedulerService.defaultSchedules();
 
+  const bridge = readBridgeSnapshot(
+    options.bridgeStatePath ?? resolveBridgeRollupStatePath(),
+  );
+  const ticketVerification: TicketVerificationSummary | null =
+    readGsliveTicketVerifyArtifact(options.ticketVerifyPath);
+
   const schedules: AutomationScheduleSummary[] = rawSchedules.map((s) => {
     const missing = checkShellJobRequirements(s.shellJob?.requires, env);
+    const derivedLastRun =
+      s.lastTriggeredAt ??
+      (s.id === "sched_gslive_tickets_verify_30m"
+        ? (ticketVerification?.verifiedAt ?? null)
+        : s.reportType === "BRIDGE_ROLLUP_DIGEST"
+          ? bridge.updatedAt
+          : null);
     return {
       id: s.id,
       name: s.name,
@@ -81,15 +94,9 @@ export function buildAutomationsSnapshot(
       enabled: s.enabled,
       gateReady: missing.length === 0,
       missingRequirements: missing,
-      lastTriggeredAt: s.lastTriggeredAt ?? null,
+      lastTriggeredAt: derivedLastRun,
     };
   });
-
-  const bridge = readBridgeSnapshot(
-    options.bridgeStatePath ?? resolveBridgeRollupStatePath(),
-  );
-  const ticketVerification: TicketVerificationSummary | null =
-    readGsliveTicketVerifyArtifact(options.ticketVerifyPath);
 
   return {
     observedAt: nowDate.toISOString(),

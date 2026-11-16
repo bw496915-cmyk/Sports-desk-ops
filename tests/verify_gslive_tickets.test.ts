@@ -6,7 +6,10 @@ import { inspect as nodeInspect } from "node:util";
 import { S3Client } from "bun";
 import { createDashboardApi } from "@sportsdesk-ops/api";
 import { createR2PipelineService } from "@sportsdesk-ops/backend";
-import type { R2PipelineApiResponse } from "@sportsdesk-ops/contracts";
+import {
+  parseDashboardWsSignal,
+  type R2PipelineApiResponse,
+} from "@sportsdesk-ops/contracts";
 import { buildAutomationsSnapshot } from "../lib/automations_status.ts";
 import {
   assertCloudflareTokenIsolation,
@@ -439,8 +442,19 @@ describe("GSLive ticket verification, automations & dashboard integration", () =
       expect(verifySched).toBeDefined();
       expect(verifySched?.owner).toBe("daemon");
       expect(verifySched?.gateReady).toBe(true);
+      expect(verifySched?.lastTriggeredAt).toBe("2026-11-15T20:30:00.000Z");
       expect(automations.bridgeJobs).toHaveLength(1);
       expect(automations.ticketVerification?.actionableTickets).toBe(1);
+      expect(
+        parseDashboardWsSignal(
+          JSON.stringify({
+            type: "topic-event",
+            topic: "dashboard",
+            event: "automations-updated",
+            timestamp: "2026-11-15T20:30:00.000Z",
+          }),
+        ),
+      ).toEqual({ kind: "automations-updated" });
 
       const r2Service = createR2PipelineService({
         publicBase: "https://pub.example.r2.dev",

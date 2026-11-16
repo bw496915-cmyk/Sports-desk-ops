@@ -241,7 +241,11 @@ export function normalizeHydratedWagerRow(
     writer: wagerChannelOf(raw.writer ?? ticketWriter),
     ...(Number.isFinite(volumeUsd) ? { volumeUsd } : {}),
     ...(raw.vip === true ? { vip: true } : {}),
-    sport: String(raw.sport ?? "OTHER").toUpperCase(),
+    sport: raw.sport == null ? "" : String(raw.sport).toUpperCase(),
+    subSport:
+      raw.subSport == null || String(raw.subSport).trim() === ""
+        ? null
+        : String(raw.subSport).toUpperCase(),
     betType: String(raw.betType ?? "Straight"),
     event: String(raw.event ?? "Event Matchup"),
     selection: String(raw.selection ?? "Selection"),
