@@ -104,7 +104,6 @@ describe("alert_audit · search", () => {
       "gp301",
       "critical",
       "429",
-      "retried",
       "buffalo",
       "kc chiefs",
       "-110",

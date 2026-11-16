@@ -34,9 +34,7 @@ export interface AlertAuditLine {
 }
 
 /** Normalize one delivery record for export. Missing fields become `null`. */
-export function toAlertAuditLine(
-  alert: DashboardAlertRecord,
-): AlertAuditLine {
+export function toAlertAuditLine(alert: DashboardAlertRecord): AlertAuditLine {
   return {
     deliveryId: alert.deliveryId,
     status: alert.status,

@@ -50,6 +50,18 @@ export interface CustomersTabPanelProps {
   readonly profilesUnavailableReason?: string | null | undefined;
   /** One-line provenance for the rows on screen (counts + source endpoint). */
   readonly profilesProvenance?: string | null | undefined;
+  readonly matrixMode?: boolean | undefined;
+  readonly matrixProfileOverlay?:
+    | {
+        readonly total: number;
+        readonly liveOpen: number;
+        readonly ranked: number;
+        readonly cohort: number;
+        readonly liveWagersDistinct: number;
+      }
+    | null
+    | undefined;
+  readonly onOpenTerminalRadar?: ((customerId: string) => void) | undefined;
 }
 
 interface CustomerCohortSummary {
@@ -166,7 +178,12 @@ export function CustomersTabPanel({
   onViewCustomerWagers,
   profilesUnavailableReason = null,
   profilesProvenance = null,
+  matrixMode = false,
+  matrixProfileOverlay = null,
+  onOpenTerminalRadar,
 }: CustomersTabPanelProps): React.ReactElement {
+  const showOpenRisk =
+    matrixMode && sortedCustomers.some((c) => (c.openRiskUsd ?? 0) > 0);
   const effectiveStatus: "pending" | "ready" | "unavailable" =
     cohortsStatus ?? (cohortsReport !== null ? "ready" : "pending");
   const kpiCards = deriveCustomerCohortKpiCards({
@@ -444,8 +461,48 @@ export function CustomersTabPanel({
           >
             ✅ High-Hold Whales
           </button>
+          {matrixMode ? (
+            <>
+              {(
+                ["TIER_1", "TIER_2", "TIER_3", "TIER_4", "TIER_5"] as const
+              ).map((tier) => (
+                <button
+                  key={tier}
+                  type="button"
+                  style={styles.pill(filterTier === tier)}
+                  onClick={() => onFilterTierChange(tier)}
+                  title={`Filter by data tier ${tier} (30d rankings)`}
+                >
+                  {tier.replace("TIER_", "T")}
+                </button>
+              ))}
+            </>
+          ) : null}
         </div>
       </div>
+
+      {matrixMode && matrixProfileOverlay ? (
+        <div
+          data-customers-matrix="overlay"
+          style={{
+            margin: "0 12px 10px",
+            padding: "10px 12px",
+            borderRadius: "8px",
+            border: "1px solid rgba(56, 189, 248, 0.35)",
+            background:
+              "linear-gradient(90deg, rgba(56, 189, 248, 0.1), rgba(168, 85, 247, 0.08))",
+            fontSize: "12px",
+            color: "#cbd5e1",
+          }}
+        >
+          <strong style={{ color: "#7dd3fc" }}>Matrix overlay</strong> merges{" "}
+          <b>{matrixProfileOverlay.cohort}</b> cohort rows,{" "}
+          <b>{matrixProfileOverlay.ranked}</b> ranked players, and{" "}
+          <b>{matrixProfileOverlay.liveOpen}</b> live-open customers (
+          {matrixProfileOverlay.liveWagersDistinct} on the wager tape). Tiers
+          and scores follow API payloads — not hardcoded cutoffs.
+        </div>
+      ) : null}
 
       {profilesProvenance !== null && (
         <div
@@ -463,7 +520,10 @@ export function CustomersTabPanel({
 
       {/* Two-Column Grid: Customer Table & Deep Inspector */}
       {(() => {
-        if (profilesUnavailableReason !== null) {
+        if (
+          profilesUnavailableReason !== null &&
+          !(matrixMode && sortedCustomers.length > 0)
+        ) {
           return (
             <div
               role="status"
@@ -646,6 +706,11 @@ export function CustomersTabPanel({
                         </span>
                       </th>
                       <th style={styles.th}>Specialization</th>
+                      {showOpenRisk ? (
+                        <th style={styles.th} title="Open risk from live tape">
+                          24h Open
+                        </th>
+                      ) : null}
                       <th style={styles.th}>Correlated Par</th>
                       <th
                         className="sortable"
@@ -791,6 +856,17 @@ export function CustomersTabPanel({
                               {cust.score.toFixed(1)} ·{" "}
                               {cust.tier.replace("TIER_", "T")}
                             </span>
+                            {cust.tierLabel ? (
+                              <div
+                                style={{
+                                  fontSize: "10px",
+                                  color: "#94a3b8",
+                                  marginTop: "2px",
+                                }}
+                              >
+                                {cust.tierLabel}
+                              </div>
+                            ) : null}
                           </td>
                           <td style={styles.td}>
                             <div>{cust.sizingStrategy}</div>
@@ -813,6 +889,13 @@ export function CustomersTabPanel({
                               {cust.timingArchetype}
                             </div>
                           </td>
+                          {showOpenRisk ? (
+                            <td style={styles.td}>
+                              {(cust.openRiskUsd ?? 0) > 0
+                                ? `$${cust.openRiskUsd!.toLocaleString()}`
+                                : "—"}
+                            </td>
+                          ) : null}
                           <td style={styles.td}>
                             {isUnknown(cust, "correlation") ? (
                               <span style={{ color: "#64748b" }}>—</span>
@@ -990,6 +1073,23 @@ export function CustomersTabPanel({
                       >
                         💻 Terminal
                       </button>
+                      {onOpenTerminalRadar ? (
+                        <button
+                          type="button"
+                          style={{
+                            ...styles.actionBtn,
+                            padding: "4px 8px",
+                            fontSize: "11px",
+                            cursor: "pointer",
+                          }}
+                          onClick={() =>
+                            onOpenTerminalRadar(selectedCustomer.id)
+                          }
+                          title="Run profile &lt;id&gt; --radar in Bun.Terminal"
+                        >
+                          📊 Radar
+                        </button>
+                      ) : null}
                       {onViewCustomerWagers && (
                         <button
                           type="button"
@@ -1038,9 +1138,22 @@ export function CustomersTabPanel({
                         Portal ↗
                       </a>
                       <span style={styles.tierBadge(selectedCustomer.tier)}>
-                        {selectedCustomer.tier} (Score:{" "}
-                        {selectedCustomer.score.toFixed(1)}/10.0)
+                        {selectedCustomer.tierLabel ?? selectedCustomer.tier}{" "}
+                        (Score: {selectedCustomer.score.toFixed(1)}/10.0)
                       </span>
+                      {selectedCustomer.source ? (
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            backgroundColor: "rgba(148, 163, 184, 0.15)",
+                            color: "#94a3b8",
+                          }}
+                        >
+                          source: {selectedCustomer.source}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 

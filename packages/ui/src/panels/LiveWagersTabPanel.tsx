@@ -974,7 +974,18 @@ export function LiveWagersTabPanel({
                 >
                   Bet Type
                 </th>
-                <th style={styles.th}>Event & Market Selection</th>
+                <th
+                  style={styles.th}
+                  title="Game or matchup the ticket was written on"
+                >
+                  Event
+                </th>
+                <th
+                  style={styles.th}
+                  title="Pick, line and price for the selected market"
+                >
+                  Market Selection
+                </th>
                 <th
                   style={{
                     ...styles.th,
@@ -1169,8 +1180,10 @@ export function LiveWagersTabPanel({
                       <div style={styles.custSub}>via {w.ticketWriter}</div>
                     ) : null}
                   </td>
-                  <td style={styles.td}>
+                  <td style={styles.td} data-wager-event={w.ticketId}>
                     <div style={{ fontWeight: 600 }}>{w.event}</div>
+                  </td>
+                  <td style={styles.td} data-wager-market={w.ticketId}>
                     <div style={{ color: "#f59e0b", fontWeight: 700 }}>
                       {formatWagerSelection(w)}
                     </div>
@@ -1281,7 +1294,7 @@ export function LiveWagersTabPanel({
               {visibleWagers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={showSubSportColumn ? 12 : 11}
+                    colSpan={showSubSportColumn ? 13 : 12}
                     data-wagers-empty={activeProvenance.kind}
                     style={{
                       ...styles.td,

@@ -155,7 +155,12 @@ export interface ShowcaseCustomer {
   /** Fields the customer book did not carry; set by profile_rows, never guessed. */
   readonly unknown?: readonly string[] | undefined;
   /** Where the row came from; every row the Profiles tab shows is cohort data, not a live book fetch. */
-  readonly source?: "book" | "fixture" | "backtest" | undefined;
+  readonly source?:
+    "book" | "fixture" | "backtest" | "rankings" | "live-open" | undefined;
+  /** Human tier label when the API carried one (30d rankings). */
+  readonly tierLabel?: string | undefined;
+  /** Open risk in USD when synthesized from the live wager tape (`?matrix=1` overlay). */
+  readonly openRiskUsd?: number | undefined;
 }
 
 export interface RankedPlayer30d {

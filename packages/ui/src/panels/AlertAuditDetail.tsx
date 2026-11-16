@@ -35,7 +35,7 @@ function field(label: string, value: React.ReactNode): React.ReactElement {
   );
 }
 
-function card(title: string): React.CSSProperties {
+function card(): React.CSSProperties {
   return {
     flex: "1 1 260px",
     minWidth: 0,
@@ -72,7 +72,7 @@ export function AlertAuditDetail({
         padding: "10px 0 14px",
       }}
     >
-      <div style={card("payload")}>
+      <div style={card()}>
         <div
           style={{
             fontSize: "10px",
@@ -93,7 +93,7 @@ export function AlertAuditDetail({
         {field("Directive", payload.directive ?? "—")}
       </div>
 
-      <div style={card("delivery")}>
+      <div style={card()}>
         <div
           style={{
             fontSize: "10px",
@@ -115,7 +115,7 @@ export function AlertAuditDetail({
         {field("Retried from", alert.retriedFrom ?? "—")}
       </div>
 
-      <div style={card("timing")}>
+      <div style={card()}>
         <div
           style={{
             fontSize: "10px",

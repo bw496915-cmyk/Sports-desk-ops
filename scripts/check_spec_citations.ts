@@ -29,6 +29,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { runGateBunDocBlobSha } from "../packages/sportsdesk-ops/src/lib/gate_bun_doc_blob_sha.ts";
 
 const ROOT = resolve(import.meta.dir, "..");
 
@@ -431,6 +432,18 @@ function label(citation: Citation): string {
 }
 
 if (import.meta.main) {
+  const blobGate = await runGateBunDocBlobSha({
+    repoRoot: ROOT,
+    moduleDir: resolve(ROOT, "packages/sportsdesk-ops/src/lib"),
+  });
+  if (!blobGate.ok) {
+    process.stderr.write(`${JSON.stringify(blobGate)}\n`);
+    process.exit(65);
+  }
+  console.log(
+    `${blobGate.gate}: pass — ${blobGate.validated_citations} pinned citation(s), ${blobGate.ast_symbol_locations_verified} AST symbol location(s) at ${blobGate.audited_bun_commit.slice(0, 10)}`,
+  );
+
   let { citations, anchors } = collectDocCitations(ROOT);
   let problems = auditCitations(citations, ROOT, anchors);
 

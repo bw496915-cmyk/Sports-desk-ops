@@ -70,6 +70,17 @@ interface Report {
 }
 
 describe("dx bun", () => {
+  test("maps xml-parse pipeline primitives in JSON pipeline pins", async () => {
+    const report = JSON.parse((await run(["--json"])).stdout) as Report & {
+      pipeline: { id: string; bun: string; ok: boolean }[];
+    };
+    expect(report.pipeline.every((row) => row.ok)).toBe(true);
+    const ids = report.pipeline.map((row) => row.id);
+    expect(ids).toContain("xml-ingest");
+    expect(ids).toContain("r2-chunk-hasher");
+    expect(ids).toContain("cli-bins-shim");
+  });
+
   test("reports the running version and a complete surface as JSON", async () => {
     const result = await run(["--json"]);
     expect(result.code).toBe(0);
@@ -216,6 +227,11 @@ describe("dx bun", () => {
     const report = JSON.parse(result.stdout) as Report;
 
     expect(report.types?.error).toBeNull();
+    expect(report.entityInventory?.doc).toBe("E_DOC_SNAPSHOT_ENTITY_INVENTORY");
+    expect(report.entityInventory?.total).toBe(
+      report.types?.entityInventory.total,
+    );
+    expect(report.types?.entityInventory.error).toBeNull();
     expect(report.types?.declared).toBeGreaterThan(100);
     expect(report.types?.declaredTypes.length).toBeGreaterThan(200);
     expect(report.types?.moduleParity).toBe(true);

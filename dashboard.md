@@ -123,7 +123,7 @@
 ## ⚙️ Automated Shell Directives
 
 > Executed by `./bin/dx dashboard --exec` (`handleDashboardCli` in `cli/sportsdesk_cli.ts`).
-> `Bun.markdown.ansi` [`AnsiTheme`](https://bun.com/reference/bun/markdown/AnsiTheme) flags: `--theme dark|light|mono|accessible`, `--columns <n>` (`0` disables wrapping), `--light` / `--dark`, `--colors` / `--no-color`, `--hyperlinks` / `--no-hyperlinks`, `--kitty-graphics`, `--linkify-symbols`.
+> `Bun.markdown.ansi` `AnsiTheme` flags: `--theme dark|light|mono|accessible`, `--columns <n>` (`0` disables wrapping), `--light` / `--dark`, `--colors` / `--no-color`, `--hyperlinks` / `--no-hyperlinks`, `--kitty-graphics`, `--linkify-symbols`.
 > Customer CLI helpers: `bun run customers index|list|find|search`, `bun run customers:profiles`, `bun run audit:customer-book`, `bun run normalize:customer-book`, `./bin/dx bridge coverage|value|match`.
 
 ```sh

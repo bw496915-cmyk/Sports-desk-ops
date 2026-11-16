@@ -8,6 +8,7 @@ import { App } from "../packages/ui/src/App.tsx";
 import { renderAnsiReact } from "../packages/ui/src/ansi.tsx";
 import * as uiBarrel from "../packages/ui/src/index.ts";
 import {
+  AlertAuditDetail,
   AlertsTabPanel,
   BetTickerTabPanel,
   buildRegistryRootCss,
@@ -821,6 +822,68 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(html).toContain("1 Dead");
     expect(html).toContain("429 Too Many Requests");
     expect(html).toContain("Retry DLQ");
+
+    // Audit-stream controls: search, evidence copy, row expansion and age.
+    expect(html).toContain('data-alert-search="true"');
+    expect(html).toContain('data-alert-copy-audit="true"');
+    expect(html).toContain("⧉ Copy audit (1)");
+    expect(html).toContain("Showing 1/1");
+    expect(html).toContain('data-alert-expand="dead-uuid-12345678"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('data-alert-age="true"');
+    expect(html).toContain('scope="col"');
+    // Collapsed by default: the evidence block is not in the initial render.
+    expect(html).not.toContain("data-alert-detail-row");
+  });
+
+  test("AlertAuditDetail renders payload, lineage and timestamps for one delivery", () => {
+    const createdAt = "2026-11-15T22:27:24.000Z";
+    const html = renderToStaticMarkup(
+      React.createElement(AlertAuditDetail, {
+        now: Date.parse("2026-11-16T00:27:24.000Z"),
+        alert: {
+          deliveryId: "dead-uuid-12345678",
+          wagerId: "W-109281",
+          tier: "CRITICAL",
+          status: "dead",
+          payload: {
+            customerId: "GP301",
+            sport: "NFL",
+            event: "Kansas City Chiefs @ Buffalo Bills",
+            selection: "KC Chiefs -3.5",
+            oddsAmerican: "-110",
+            amountUsd: 5500,
+            clvCents: 14.2,
+            directive: "Clamp Max $250",
+          },
+          createdAt,
+          updatedAt: "2026-11-15T22:29:24.000Z",
+          attempts: 5,
+          finalError: "429 Too Many Requests",
+          retriedFrom: "orig-uuid-00000001",
+          acknowledgedBy: "desk-operator",
+          acknowledgedNotes: "escalated to partner desk",
+          messageId: 4477,
+        },
+      }),
+    );
+    expect(html).toContain("TICKET PAYLOAD");
+    expect(html).toContain("Kansas City Chiefs @ Buffalo Bills");
+    expect(html).toContain("KC Chiefs -3.5");
+    expect(html).toContain("$5,500");
+    expect(html).toContain("14.2¢");
+    expect(html).toContain("Clamp Max $250");
+    expect(html).toContain("DELIVERY &amp; LINEAGE");
+    expect(html).toContain("dead-uuid-12345678");
+    expect(html).toContain("5 / 5");
+    expect(html).toContain("4477");
+    expect(html).toContain("429 Too Many Requests");
+    expect(html).toContain("orig-uuid-00000001");
+    expect(html).toContain("TIMESTAMPS &amp; ACK");
+    expect(html).toContain(createdAt);
+    expect(html).toContain("desk-operator");
+    expect(html).toContain("escalated to partner desk");
+    expect(html).toContain("2h ago");
   });
 
   test("LiveWagersTabPanel renders incoming wagers table and selected ticket inspector", () => {
@@ -867,10 +930,13 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     // stake emphasis floor (dashboard.toml) tags overweight samples.
     expect(html).toContain("wagers-policy/v1");
     expect(html).toContain("HIGH RISK");
-    // Sport and bet type are separate columns, not one combined cell.
+    // Sport, bet type, event and market are separate columns, not combined cells.
     expect(html).toContain("Sport</th>");
     expect(html).toContain("Subsport</th>");
     expect(html).toContain("Bet Type</th>");
+    expect(html).toContain("Event</th>");
+    expect(html).toContain("Market Selection</th>");
+    expect(html).not.toContain("Event &amp; Market Selection");
     expect(html).toContain("via GSLIVE");
     expect(html).not.toContain("Sport / Type");
     expect(html).not.toContain("wagers-dead-table-sentinel");
@@ -1084,6 +1150,10 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     const occurrences = (html.match(/Steelers \(Live\) \+27½ \+100/g) ?? [])
       .length;
     expect(occurrences).toBe(1);
+    // Event and market render in distinct cells.
+    expect(html).toContain('data-wager-event="769158444"');
+    expect(html).toContain('data-wager-market="769158444"');
+    expect(html).toContain("Event Matchup</div></td>");
     expect(html).toContain("Steelers (Live) +27½ +100 (-110)");
     expect(html).not.toContain(
       "Steelers (Live) +27½ +100 Steelers (Live) +27½ +100",

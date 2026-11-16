@@ -85,6 +85,7 @@
     "layoff:risk": "bun run cli/sportsdesk_layoff_risk_cli.ts",
     "fraud": "bun run cli/sportsdesk_fraud_cli.ts",
     "cli:bins": "bun run scripts/dx_scripts.ts --bins",
+    "cli:bins:verify": "bun run scripts/verify_cli_bins.ts",
     "identity:diagnostic": "bun run scripts/identity_diagnostic.ts",
     "parse:graded-wagers": "bun run scripts/parse_graded_wagers_html.ts",
     "parse:pending-panel": "bun run scripts/parse_data_tables_html.ts",

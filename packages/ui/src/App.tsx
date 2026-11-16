@@ -13,6 +13,7 @@ import { newTicketIds as diffNewTicketIds } from "./live_stream.ts";
 import {
   backtestRowsToProfiles,
   bookRowsToProfiles,
+  mergeMatrixProfileOverlay,
   mergeProfileRows,
 } from "./profile_rows.ts";
 import {
@@ -335,17 +336,6 @@ export function App(): React.ReactElement {
     setActiveTab("wagers");
   };
 
-  const profileCustomers = useMemo<readonly ShowcaseCustomer[]>(() => {
-    if (cohortsReport === null) return [];
-    return mergeProfileRows(
-      bookRowsToProfiles(cohortsReport.fixtures, "fixture"),
-      backtestRowsToProfiles(cohortsReport.backtestAll),
-    );
-  }, [cohortsReport]);
-  const profilesProvenance =
-    cohortsReport === null || profileCustomers.length === 0
-      ? null
-      : `${profileCustomers.length} cohort customers · ${cohortsReport.fixtures.length} fixture rows + ${cohortsReport.backtestAll.length} backtest rows · ${cohortsReport.provenance.label} · GET /api/customers`;
   const [rankings, setRankings] = useState<NormalizedRankingsResult | null>(
     null,
   );
@@ -353,6 +343,58 @@ export function App(): React.ReactElement {
     "pending" | "ready" | "unavailable"
   >("pending");
   const [rankingsError, setRankingsError] = useState<string | null>(null);
+
+  const cohortProfileRows = useMemo<readonly ShowcaseCustomer[]>(() => {
+    if (cohortsReport === null) return [];
+    return mergeProfileRows(
+      bookRowsToProfiles(cohortsReport.fixtures, "fixture"),
+      backtestRowsToProfiles(cohortsReport.backtestAll),
+    );
+  }, [cohortsReport]);
+
+  const profileCustomers = useMemo<readonly ShowcaseCustomer[]>(() => {
+    if (!showBuildMatrix) return cohortProfileRows;
+    return mergeMatrixProfileOverlay(
+      cohortProfileRows,
+      rankings?.players ?? null,
+      liveWagers,
+    );
+  }, [
+    cohortsReport,
+    cohortProfileRows,
+    showBuildMatrix,
+    rankings?.players,
+    liveWagers,
+  ]);
+
+  const matrixProfileOverlay = useMemo(() => {
+    if (!showBuildMatrix) return null;
+    const ids = new Set(profileCustomers.map((c) => c.id.toUpperCase()));
+    let liveOnly = 0;
+    let rankedOnly = 0;
+    for (const c of profileCustomers) {
+      if (c.source === "live-open") liveOnly += 1;
+      if (c.source === "rankings") rankedOnly += 1;
+    }
+    return {
+      total: ids.size,
+      liveOpen: liveOnly,
+      ranked: rankedOnly,
+      cohort: cohortProfileRows.length,
+      liveWagersDistinct: new Set(
+        liveWagers.map((w) => w.customerId.toUpperCase()),
+      ).size,
+    };
+  }, [showBuildMatrix, profileCustomers, cohortProfileRows.length, liveWagers]);
+
+  const profilesProvenance =
+    profileCustomers.length === 0
+      ? null
+      : showBuildMatrix && matrixProfileOverlay
+        ? `${profileCustomers.length} profiles · matrix overlay: ${matrixProfileOverlay.cohort} cohort + ${matrixProfileOverlay.ranked} ranked + ${matrixProfileOverlay.liveOpen} live-open (${matrixProfileOverlay.liveWagersDistinct} on tape) · GET /api/customers + /api/rankings/all + /api/wagers`
+        : cohortsReport === null
+          ? null
+          : `${profileCustomers.length} cohort customers · ${cohortsReport.fixtures.length} fixture rows + ${cohortsReport.backtestAll.length} backtest rows · ${cohortsReport.provenance.label} · GET /api/customers`;
 
   const fetchTiersConfig = async () => {
     try {
@@ -1253,7 +1295,15 @@ export function App(): React.ReactElement {
     if (filterTier === "SYNDICATE") return cust.syndicateRisk === "HIGH";
     if (filterTier === "STEAM") return cust.timingArchetype === "STEAM_CHASER";
     if (filterTier === "RECREATIONAL")
-      return cust.tier === "TIER_5_RECREATIONAL";
+      return (
+        cust.tier === "TIER_5_RECREATIONAL" || cust.tier.includes("TIER_5")
+      );
+    if (filterTier.startsWith("TIER_")) {
+      return (
+        cust.tier.includes(filterTier) ||
+        cust.tierLabel?.includes(filterTier) === true
+      );
+    }
     return true;
   });
 
@@ -1286,6 +1336,29 @@ export function App(): React.ReactElement {
     setSearchQuery(customerId);
     setActiveTab("customers");
   };
+
+  useEffect(() => {
+    const fromUrl = resolveInitialUrlParam("customer");
+    if (!fromUrl) return;
+    const upper = fromUrl.toUpperCase();
+    const found = profileCustomers.find((c) => c.id.toUpperCase() === upper);
+    if (found) {
+      setSelectedCustomer(found);
+      setSearchQuery(fromUrl);
+    }
+  }, [profileCustomers]);
+
+  useEffect(() => {
+    if (!showBuildMatrix || typeof window === "undefined") return;
+    if (activeTab !== "customers") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("matrix", "1");
+    url.searchParams.set("tab", "customers");
+    if (selectedCustomer) {
+      url.searchParams.set("customer", selectedCustomer.id);
+    }
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }, [showBuildMatrix, activeTab, selectedCustomer]);
 
   const daemon4020 = r2PipelineData?.daemon4020;
   const daemonState = resolveDaemon4020State(daemon4020);
@@ -2086,6 +2159,12 @@ export function App(): React.ReactElement {
               profileCustomers.length === 0 ? PROFILES_UNAVAILABLE_REASON : null
             }
             profilesProvenance={profilesProvenance}
+            matrixMode={showBuildMatrix}
+            matrixProfileOverlay={matrixProfileOverlay}
+            onOpenTerminalRadar={(customerId) => {
+              setActiveTab("terminal");
+              void runTerminalCommand(`profile ${customerId} --radar`);
+            }}
             onViewCustomerWagers={(customerId) => {
               setWagerSportFilter("ALL");
               setWagerAlertFilter("ALL");
