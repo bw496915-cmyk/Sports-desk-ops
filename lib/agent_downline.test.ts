@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadAgentDownline, treeDownlineCounts } from "./agent_downline.ts";
+import {
+  loadAgentDownline,
+  treeDownlineCounts,
+  treeSubtreeExposure,
+} from "./agent_downline.ts";
 
 describe("agent downline", () => {
   test("indexes agents by uppercase login and keeps missing fields null", async () => {
@@ -48,5 +52,47 @@ describe("agent downline", () => {
       descendantAgents: 5,
     });
     expect(counts.get("A1")).toEqual({ directAgents: 2, descendantAgents: 3 });
+  });
+});
+
+describe("tree subtree exposure", () => {
+  test("a customer counts toward its agent and every ancestor", () => {
+    const exposure = treeSubtreeExposure(
+      {
+        ROOT: {},
+        A1: { p: "ROOT" },
+        B1: { p: "A1" },
+        LEAF: { p: "B1" },
+      },
+      [
+        {
+          agentId: "A1",
+          positions: [{ risk_usd: 100, to_win_usd: 250 }],
+        },
+        {
+          agentId: "LEAF",
+          positions: [{ risk_usd: 50, to_win_usd: 90 }],
+        },
+        {
+          agentId: "OUTSIDE",
+          positions: [{ risk_usd: 10, to_win_usd: 20 }],
+        },
+      ],
+    );
+    expect(exposure.get("ROOT")).toEqual({
+      customers: 2,
+      positions: 2,
+      openRiskUsd: 150,
+      openToWinUsd: 340,
+    });
+    expect(exposure.get("A1")?.openRiskUsd).toBe(150);
+    expect(exposure.get("B1")?.openRiskUsd).toBe(50);
+    expect(exposure.get("LEAF")?.customers).toBe(1);
+    expect(exposure.get("OUTSIDE")).toEqual({
+      customers: 1,
+      positions: 1,
+      openRiskUsd: 10,
+      openToWinUsd: 20,
+    });
   });
 });

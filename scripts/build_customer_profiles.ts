@@ -31,6 +31,7 @@ import { fetchLiveFeedObject } from "../lib/live_feed_source.ts";
 import {
   loadAgentDownline,
   treeDownlineCounts,
+  treeSubtreeExposure,
 } from "../lib/agent_downline.ts";
 import { LIVE_POSITIONS_R2_KEYS } from "../lib/live_positions_r2_publisher.ts";
 
@@ -218,17 +219,21 @@ const agentIds = new Set(
     .map((profile) => profile.agentId.trim().toUpperCase())
     .filter((agent) => agent !== "" && agent !== "UNASSIGNED"),
 );
+const treeExposure = treeSubtreeExposure(tree.nodes, labelledProfiles);
+for (const agent of treeExposure.keys()) agentIds.add(agent);
 const treeCounts = treeDownlineCounts(tree.nodes, agentIds);
 let downlineMatched = 0;
 const enrichedProfiles = labelledProfiles.map((profile) => {
   const agent = profile.agentId.trim().toUpperCase();
   const rollup = downline?.byAgent.get(agent);
   const counts = treeCounts.get(agent);
+  const exposure = treeExposure.get(agent);
   if (rollup !== undefined) downlineMatched++;
   return {
     ...profile,
     ...(rollup === undefined ? {} : { downline: rollup }),
     ...(counts === undefined ? {} : { treeDownline: counts }),
+    ...(exposure === undefined ? {} : { treeExposure: exposure }),
   };
 });
 
@@ -253,6 +258,14 @@ await Bun.write(
       summary,
       positionRefusals,
       writerExclusions,
+      agentExposureTop: [...treeExposure.entries()]
+        .sort((a, b) => b[1].openRiskUsd - a[1].openRiskUsd)
+        .slice(0, 20)
+        .map(([agent, exposure]) => ({
+          agent,
+          ...exposure,
+          ...(treeCounts.get(agent) ?? {}),
+        })),
       downline: {
         status: downline === null ? "missing" : "ok",
         source: downlinePath.replace(REPO, "."),

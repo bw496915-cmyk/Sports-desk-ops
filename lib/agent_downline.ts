@@ -129,3 +129,69 @@ export function treeDownlineCounts(
   }
   return counts;
 }
+
+export interface AgentExposure {
+  readonly customers: number;
+  readonly positions: number;
+  readonly openRiskUsd: number;
+  readonly openToWinUsd: number;
+}
+
+/**
+ * Open-position exposure per agent subtree, from the tree's parent links. A customer counts once
+ * toward its own agent and every ancestor, so an agent's entry is the whole downline below it;
+ * agents outside the tree still get their own direct exposure.
+ */
+export function treeSubtreeExposure(
+  nodes: Readonly<Record<string, { readonly p?: string | null | undefined }>>,
+  profiles: Iterable<{
+    readonly agentId: string;
+    readonly positions: readonly {
+      readonly risk_usd?: number | undefined;
+      readonly to_win_usd?: number | undefined;
+    }[];
+  }>,
+): ReadonlyMap<string, AgentExposure> {
+  const parent = new Map<string, string>();
+  for (const [id, node] of Object.entries(nodes)) {
+    const key = id.trim().toUpperCase();
+    const up = typeof node.p === "string" ? node.p.trim().toUpperCase() : "";
+    if (key !== "" && up !== "") parent.set(key, up);
+  }
+  const exposure = new Map<string, AgentExposure>();
+  const add = (agent: string, value: AgentExposure): void => {
+    const current = exposure.get(agent);
+    exposure.set(agent, {
+      customers: (current?.customers ?? 0) + value.customers,
+      positions: (current?.positions ?? 0) + value.positions,
+      openRiskUsd: (current?.openRiskUsd ?? 0) + value.openRiskUsd,
+      openToWinUsd: (current?.openToWinUsd ?? 0) + value.openToWinUsd,
+    });
+  };
+  for (const profile of profiles) {
+    const agent = profile.agentId.trim().toUpperCase();
+    if (agent === "") continue;
+    const risk = profile.positions.reduce(
+      (total, position) => total + (position.risk_usd ?? 0),
+      0,
+    );
+    const toWin = profile.positions.reduce(
+      (total, position) => total + (position.to_win_usd ?? 0),
+      0,
+    );
+    const value: AgentExposure = {
+      customers: 1,
+      positions: profile.positions.length,
+      openRiskUsd: risk,
+      openToWinUsd: toWin,
+    };
+    const seen = new Set<string>();
+    let current = agent;
+    while (current !== "" && !seen.has(current)) {
+      seen.add(current);
+      add(current, value);
+      current = parent.get(current) ?? "";
+    }
+  }
+  return exposure;
+}

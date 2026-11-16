@@ -17,6 +17,7 @@
 
 import type {
   AgentDownlineRollup,
+  AgentExposure,
   TreeDownlineCounts,
 } from "./agent_downline.ts";
 import { portalIso } from "./bet_flags.ts";
@@ -397,6 +398,8 @@ export interface CustomerProfile {
   readonly downline?: AgentDownlineRollup;
   /** Direct and descendant agent counts for the agent, from the tree. */
   readonly treeDownline?: TreeDownlineCounts;
+  /** Open-position exposure for the agent's whole tree subtree (including itself). */
+  readonly treeExposure?: AgentExposure;
   /** Data-quality notes that change how a number should be read. */
   readonly flags: readonly string[];
 }
