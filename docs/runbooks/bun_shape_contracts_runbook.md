@@ -159,19 +159,8 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/which)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `lib/bun_runtime.ts`, `lib/f402_hierarchy_envelope.ts`, `scripts/agent_env_doctor.ts`
-- **Evidence:** `surface:which`, `probe:proc.paths`, `tests/bun_capabilities.test.ts`
-- **Measured semantics (POSIX; Bun 1.4.4):** returns the absolute executable or `null` (native; no `which` package needed).
-- **Candidate predicate:** a non-executable file, a directory, and a broken symlink all return `null`; a symlink returns its **literal path**, not the resolved target. PATH strings are not canonicalized (`/tmp/tool` stays `/tmp/tool`).
-- **PATH:** with no override it uses the process **launch** PATH, so mutating `Bun.env.PATH` afterwards does not re-resolve it; an explicit `{ PATH }` replaces the search path and is read fresh. Test form: stage a fake binary with `Bun.which(name, { PATH: `${tmpDir}:${Bun.env.PATH ?? ""}` })`; setting `Bun.env.PATH` alone is a no-op for the default lookup.
-- **`cwd`:** only bases relative PATH entries (`{ cwd: dir, PATH: "." }`); it does not add the cwd implicitly.
-- **Empty segments and `~`:** empty segments (`:/bin`, `/bin:`, `/bin::/usr/bin`, `:`) are **skipped, not treated as `.`** — stricter than POSIX, which closes the classic cwd-shadow vector; wanting that behavior now requires an explicit `.` entry. `~` is not expanded. PATH strings get no shell treatment. Other implementations vary, so do not assume POSIX here.
-- **`Bun.spawn` relation:** default `Bun.spawn([name])` also uses the launch PATH snapshot, so mutating `Bun.env.PATH` is a no-op for both. Dynamic PATH requires an explicit `{ PATH }` to `Bun.which` and an explicit `env` to `Bun.spawn`, or spawning the absolute path returned by `Bun.which` (the recommended pattern). An explicit `env` **replaces** the child environment; use `env: { ...Bun.env, PATH }` or the child loses `HOME`, `TMPDIR`, and friends.
-- **Empty segments in spawn:** `Bun.spawn` also skips empty PATH segments rather than applying POSIX `execvp`'s `.` rule, so it agrees with `Bun.which`; the absolute-path pattern remains preferred for consistency, not because the two disagree here.
-- **Symlinked `cwd`:** `cwd` is joined literally; `{ cwd: "/tmp/link", PATH: "." }` returns `/tmp/link/./tool` — the `./` stays in the result and is not `realpath`'d. Assert the literal joined form (including `./`); `endsWith("/tool")` passes while `endsWith("/./tool")` or an exact `join(cwd, "tool")` comparison fails.
-- **Windows:** not exercised on Windows. `PATHEXT`, case-folding, and `.` entries are expected to diverge from the POSIX table.
-- **Test protocol:** after a Bun pin bump, run `bun test tests/bun_capabilities.test.ts -t 'which:'`. The stable-prefix tests are `which: resolves against PATH…`, `which: PATH override…`, `which: launch PATH snapshot…`, `which: cwd…`, `which: skips empty segments…`, `which: requires an executable…`, `which: default lookup and Bun.spawn…`, and `which: spawn env replace and empty segments…`. These are measured behaviors, not a written Bun guarantee.
-- Shell launchers (`bin/dx`) keep `command -v`: they run before Bun, and `command -v` also resolves aliases, functions, and builtins, which `Bun.which` cannot see.
+- **Here:** `bin/bun_surface.ts`, `scripts/agent_env_doctor.ts`
+- **Evidence:** `surface:which`, `probe:proc.paths`
 
 #### Bun.write
 
@@ -235,8 +224,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/stringWidth)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `lib/wagers_report.ts`, `lib/cli_inspect.ts`
-- **Evidence:** `probe:text.width`, `tests/bun_v140_primitives.test.ts`
-- **Measured semantics (2026-11-16):** native SIMD column count that ignores ANSI/OSC-8 sequences and combines grapheme clusters (`e` + combining accent = 1, `👨‍👩‍👧` = 2, `👍🏽` = 2). CJK wide characters count 2; East Asian ambiguous characters default to 1 and accept `{ ambiguousIsNarrow: false }` for 2. It covers Latin-1, UTF-16 and UTF-8 input; the checked-in primitives test pins the widths used for CLI padding.
+- **Evidence:** `probe:text.width`
 
 #### Bun.wrapAnsi
 
@@ -348,9 +336,8 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/deepEquals)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `lib/f402_hierarchy_dedupe.ts`, `lib/wager_config.ts`, `scripts/r2_manifest_cas_promote.ts`
-- **Evidence:** `probe:data.compare`, `tests/bun_deep_equals.test.ts`, `data.compare`
-- **Measured semantics (2026-11-16):** loose mode compares JSON-shaped values, so an extra own key whose value is `undefined` is ignored; strict mode (`true` third argument) requires the same own-key shape. Strict also separates a sparse array hole from an explicit `undefined` and a class instance from a plain literal. Use strict for dedupe/change detection where losing an `undefined` field would hide a change; use loose only when the values have already crossed a JSON boundary that drops `undefined`.
+- **Here:** `dsh-plugin/verify-load.mjs`, `lib/alerts.ts`
+- **Evidence:** `probe:data.compare`
 
 #### Bun.semver
 
