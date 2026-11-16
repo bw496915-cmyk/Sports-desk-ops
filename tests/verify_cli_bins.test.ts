@@ -13,8 +13,8 @@ describe("verify_cli_bins", () => {
       bin?: Record<string, string>;
     };
     const binKeys = Object.keys(rootPkg.bin ?? {}).sort();
-    expect(REQUIRED_CLI_BINS.length).toBe(binKeys.length);
-    expect([...REQUIRED_CLI_BINS].sort()).toEqual(binKeys);
+    expect(REQUIRED_CLI_BINS.length as number).toBe(binKeys.length);
+    expect([...(REQUIRED_CLI_BINS as readonly string[])].sort()).toEqual(binKeys);
   });
 
   test("verifyWorkspaceCliBins resolves all shims via Bun.which", async () => {

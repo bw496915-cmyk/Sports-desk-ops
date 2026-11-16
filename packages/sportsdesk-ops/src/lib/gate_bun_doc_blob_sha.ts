@@ -94,17 +94,18 @@ export async function resolveAuditedBunCommit(
       endpoint: env.R2_ENDPOINT,
       bucket: "sportsdesk-ops-reports",
     });
-    const res = await s3.fetch("manifests/bun-catalog/latest", {
-      method: "GET",
-    });
-    if (res.ok) {
-      const manifest = (await res.json()) as { audited_bun_commit?: string };
+    try {
+      const manifest = JSON.parse(
+        await s3.file("manifests/bun-catalog/latest").text(),
+      ) as { audited_bun_commit?: string };
       if (
         manifest.audited_bun_commit &&
         /^[0-9a-f]{40}$/.test(manifest.audited_bun_commit)
       ) {
         return manifest.audited_bun_commit;
       }
+    } catch {
+      // Missing catalog falls back to Bun.revision.
     }
   }
   return Bun.revision;

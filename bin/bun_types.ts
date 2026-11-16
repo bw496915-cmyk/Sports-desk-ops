@@ -313,14 +313,14 @@ function collectBunNamespaceMembers(
 export function deriveAmbientDtsKindNumbers(
   ctx: BunProbeContext,
 ): EntityInventoryReport {
-  const counts: AmbientDtsKindNumbers = {
+  const counts = {
     functions: 0,
     classes: 0,
     interfaces: 0,
     types: 0,
     variables: 0,
     namespaces: 0,
-  };
+  } satisfies AmbientDtsKindNumbers;
 
   for (const symbol of collectBunNamespaceMembers(ctx).values()) {
     const kind = classifyAmbientMember(ctx.checker, symbol, ctx.anchor);

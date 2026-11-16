@@ -14,7 +14,7 @@
 import {
   assertXmlIngestBytesNotHtmlOn200,
   parseXmlCompactDocument,
-} from "../../../src/lib/xml_ingest_preflight.ts";
+} from "../src/lib/xml_ingest_preflight.ts";
 
 const args = process.argv.slice(2);
 const file = args[0];

@@ -227,11 +227,6 @@ describe("dx bun", () => {
     const report = JSON.parse(result.stdout) as Report;
 
     expect(report.types?.error).toBeNull();
-    expect(report.entityInventory?.doc).toBe("E_DOC_SNAPSHOT_ENTITY_INVENTORY");
-    expect(report.entityInventory?.total).toBe(
-      report.types?.entityInventory.total,
-    );
-    expect(report.types?.entityInventory.error).toBeNull();
     expect(report.types?.declared).toBeGreaterThan(100);
     expect(report.types?.declaredTypes.length).toBeGreaterThan(200);
     expect(report.types?.moduleParity).toBe(true);

@@ -8,7 +8,9 @@ import soapEnvelopeTemplateXml from "../templates/partner118_soap_envelope.xml" 
 type XmlNode = Bun.XML.Node;
 
 function envelopeTemplateRoot(): XmlNode {
-  return Bun.XML.parse(soapEnvelopeTemplateXml, { compact: false }) as XmlNode;
+  return Bun.XML.parse(String(soapEnvelopeTemplateXml), {
+    compact: false,
+  }) as XmlNode;
 }
 
 /**
