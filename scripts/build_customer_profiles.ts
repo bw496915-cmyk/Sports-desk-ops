@@ -116,12 +116,13 @@ for (const live of liveRows) {
     seen.add(identity.key);
     positions.push(position);
   }
+  const recentTickets = existing.recent_tickets ?? live.recent_tickets;
   const merged = {
     ...existing,
     ...(existing.agent_id === undefined && live.agent_id !== undefined
       ? { agent_id: live.agent_id }
       : {}),
-    recent_tickets: existing.recent_tickets ?? live.recent_tickets,
+    ...(recentTickets === undefined ? {} : { recent_tickets: recentTickets }),
     ...(positions.length === 0 ? {} : { open_positions: positions }),
   };
   rows[rows.indexOf(existing)] = merged;

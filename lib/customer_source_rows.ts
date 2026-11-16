@@ -386,26 +386,27 @@ export function customerRowsFromLiveCaptures(
       continue;
     }
     const positions = [...(existing.open_positions ?? [])];
-    const keyOf = (position: PositionRow): string | undefined =>
-      position.ticket_number ?? position.wager_number;
     const seen = new Set(
-      positions.map(keyOf).filter((key): key is string => key !== undefined),
+      positions
+        .map((position) => positionIdentity(position).key)
+        .filter((key): key is string => key !== null),
     );
     for (const position of pending.open_positions ?? []) {
-      const key = keyOf(position);
-      if (key !== undefined && seen.has(key)) continue;
-      if (key !== undefined) seen.add(key);
+      const key = positionIdentity(position).key;
+      if (key !== null && seen.has(key)) continue;
+      if (key !== null) seen.add(key);
       positions.push(position);
     }
+    const recentTickets =
+      (pending.recent_tickets?.length ?? 0) > 0
+        ? pending.recent_tickets
+        : existing.recent_tickets;
     byId.set(id, {
       ...existing,
       ...(existing.agent_id === undefined && pending.agent_id !== undefined
         ? { agent_id: pending.agent_id }
         : {}),
-      recent_tickets:
-        (pending.recent_tickets?.length ?? 0) > 0
-          ? pending.recent_tickets
-          : existing.recent_tickets,
+      ...(recentTickets === undefined ? {} : { recent_tickets: recentTickets }),
       ...(positions.length === 0 ? {} : { open_positions: positions }),
     });
   }
