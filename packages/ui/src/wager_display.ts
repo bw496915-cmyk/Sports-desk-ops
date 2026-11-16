@@ -9,6 +9,8 @@
  */
 
 /** The three fields needed to render a pick; structural so any wager row fits. */
+import { sanitizeCaptureText } from "./capture_text.ts";
+
 export interface WagerSelectionParts {
   readonly selection: string;
   readonly lineDisplay: string;
@@ -49,9 +51,9 @@ export function formatWagerSelection(
   wager: WagerSelectionParts,
   options: WagerSelectionOptions = {},
 ): string {
-  const selection = collapse(wager.selection);
-  const line = collapse(wager.lineDisplay);
-  const odds = collapse(wager.oddsAmerican);
+  const selection = collapse(sanitizeCaptureText(wager.selection));
+  const line = collapse(sanitizeCaptureText(wager.lineDisplay));
+  const odds = collapse(sanitizeCaptureText(wager.oddsAmerican));
 
   const parts: string[] = [];
   if (selection.length > 0) parts.push(selection);

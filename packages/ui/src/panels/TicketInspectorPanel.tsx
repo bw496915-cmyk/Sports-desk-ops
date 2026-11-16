@@ -7,6 +7,7 @@ import type React from "react";
 import { styles } from "../dashboard_styles.ts";
 import { clvEdgeTone } from "../config/wagers.ts";
 import { DASHBOARD_THRESHOLDS } from "../config/dashboard.ts";
+import { sanitizeCaptureText } from "../capture_text.ts";
 import { formatWagerSelection } from "../wager_display.ts";
 import {
   buildAlertsTabTicketHref,
@@ -128,8 +129,10 @@ export function TicketInspectorPanel({
           <div style={styles.inspectorSub}>
             Placed {wager.timestamp} · {wager.sport}
             {wager.subSport ? ` / ${wager.subSport}` : ""} · {wager.betType} ·{" "}
-            {wager.lineDisplay} ({wager.oddsAmerican})
-            {wager.ticketWriter ? ` · writer ${wager.ticketWriter}` : ""}
+            {sanitizeCaptureText(wager.lineDisplay)} ({wager.oddsAmerican})
+            {wager.ticketWriter
+              ? ` · writer ${sanitizeCaptureText(wager.ticketWriter)}`
+              : ""}
           </div>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>

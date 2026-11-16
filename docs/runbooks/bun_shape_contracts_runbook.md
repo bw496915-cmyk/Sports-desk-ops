@@ -159,7 +159,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/which)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `scripts/agent_env_doctor.ts`, `scripts/dx_workspaces.ts`
+- **Here:** `bin/bun_surface.ts`, `scripts/agent_env_doctor.ts`
 - **Evidence:** `surface:which`, `probe:proc.paths`
 
 #### Bun.write

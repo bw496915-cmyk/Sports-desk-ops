@@ -6,6 +6,7 @@
  */
 
 import type React from "react";
+import { sanitizeCaptureText } from "../capture_text.ts";
 import { useEffect, useRef, useState } from "react";
 import { copyText } from "../clipboard.ts";
 import {
@@ -642,7 +643,7 @@ function EventSummary({
         overflow: "hidden",
         textOverflow: "ellipsis",
       }}
-      title={`${event.ticketId} · ${event.event} · ${event.selection} ${event.lineDisplay}`}
+      title={`${event.ticketId} · ${sanitizeCaptureText(event.event)} · ${sanitizeCaptureText(event.selection)} ${sanitizeCaptureText(event.lineDisplay)}`}
     >
       <span style={{ color: "#e2e8f0", fontWeight: 600 }}>
         {tierDot(event.alertTier)} {event.customerId}
@@ -660,8 +661,11 @@ function EventSummary({
         </span>
       ) : null}{" "}
       <span style={{ color: "#cbd5e1" }}>
-        {event.event} · {event.selection}{" "}
-        {event.lineDisplay !== event.selection ? event.lineDisplay : ""}
+        {sanitizeCaptureText(event.event)} ·{" "}
+        {sanitizeCaptureText(event.selection)}{" "}
+        {event.lineDisplay !== event.selection
+          ? sanitizeCaptureText(event.lineDisplay)
+          : ""}
       </span>
     </span>
   );

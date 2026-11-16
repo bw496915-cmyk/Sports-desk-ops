@@ -325,11 +325,16 @@ export function buildBookdeskopsTokensDeskHref(
   origin: string = DEFAULT_BOOKDESKOPS_SERVE_LOCAL,
 ): string {
   const u = new URL("/_dev/serve-local/tokens", origin.replace(/\/$/, ""));
-  if (slice?.subSport !== "ALL" && slice?.subSport !== undefined) {
-    u.searchParams.set("subSport", slice.subSport);
-  }
-  if (slice?.sport !== "ALL" && slice?.sport !== undefined) {
-    u.searchParams.set("sport", slice.sport);
+  for (const [key, val] of [
+    ["sport", slice?.sport],
+    ["subSport", slice?.subSport],
+    ["period", slice?.period],
+    ["market", slice?.market],
+    ["regime", slice?.regime],
+  ] as const) {
+    if (val !== undefined && val !== "ALL") {
+      u.searchParams.set(key, val);
+    }
   }
   u.hash = "compile-time";
   return u.href;

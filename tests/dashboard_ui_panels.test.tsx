@@ -1199,6 +1199,165 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(html).toContain("2 dead alert(s) in DLQ");
   });
 
+  test("BetTickerTabPanel reports the rendered page and can reveal the whole filtered stream", () => {
+    const noop = () => {};
+    const tickets = Array.from({ length: 130 }, (_, index) => {
+      const ticketNumber = 10_000 + index;
+      return {
+        wagerNumber: ticketNumber,
+        ticketId: String(ticketNumber),
+        customerId: `C${index}`,
+        agentId: "AG1",
+        masterAgent: "MASTER",
+        ticketWriter: "Internet",
+        writer: "internet",
+        wagerType: "S",
+        wagerTypeLabel: "Spread",
+        amountWageredCents: 1_000 + index,
+        volumeAmountCents: 1_000 + index,
+        toWinAmountCents: 900 + index,
+        volumeDiffers: false,
+        isSentinelNoise: false,
+        vip: false,
+        live: index % 2 === 0,
+        insertedAt: `2026-11-12T18:${String(index % 60).padStart(2, "0")}:00Z`,
+        legCount: 1,
+        shortDesc: "Team -3",
+        sport: "NFL",
+        selection: "Team -3",
+        alertFlags: [],
+      };
+    });
+    const html = renderToStaticMarkup(
+      React.createElement(BetTickerTabPanel, {
+        data: {
+          schemaVersion: 1,
+          observedAt: "2026-11-12T18:00:00Z",
+          autoExecute: false,
+          provenance: {
+            kind: "live",
+            label: "live feed",
+            sourcePath: "data/live-wagers.json",
+            observedAt: "2026-11-12T18:00:00Z",
+          },
+          localFeed: {
+            rawRowCount: 130,
+            actionableTicketCount: 130,
+            sentinelNoiseCount: 0,
+            totalWageredCents: 1_000,
+            totalVolumeCents: 1_000,
+            totalToWinCents: 1_000,
+            volumeDiffersCount: 0,
+            vipCount: 0,
+            liveCount: 65,
+            flagCount: 0,
+            byRule: {},
+            byWriter: [],
+            byWagerType: [],
+            tickets,
+          },
+          bridge3aR2: { available: false, error: "not captured" },
+          pendingGames: { available: false },
+          captureHealth: { available: false },
+        },
+        loading: false,
+        error: null,
+        onRefresh: noop,
+        onSelectAgent: noop,
+        onSelectCustomerById: noop,
+        onInspectPty: noop,
+      }),
+    );
+    expect(html).toContain("Showing 120 of 130 filtered");
+    expect(html).toContain("130 captured");
+    expect(html).toContain('data-bet-ticker-show-all="expand"');
+    expect(html).toContain("Show all 130 rows");
+    expect(html).toContain("⧉ Copy rows (130)");
+    expect((html.match(/Team -3/g) ?? []).length).toBe(120);
+  });
+
+  test("BetTickerTabPanel sanitizes portal markup in channels and selections", () => {
+    const noop = () => {};
+    const html = renderToStaticMarkup(
+      React.createElement(BetTickerTabPanel, {
+        data: {
+          schemaVersion: 1,
+          observedAt: "2026-11-12T18:00:00Z",
+          autoExecute: false,
+          provenance: {
+            kind: "live",
+            label: "live feed",
+            sourcePath: "data/live-wagers.json",
+            observedAt: "2026-11-12T18:00:00Z",
+          },
+          localFeed: {
+            rawRowCount: 1,
+            actionableTicketCount: 1,
+            sentinelNoiseCount: 0,
+            totalWageredCents: 1000,
+            totalVolumeCents: 1000,
+            totalToWinCents: 900,
+            volumeDiffersCount: 0,
+            vipCount: 0,
+            liveCount: 0,
+            flagCount: 0,
+            byRule: {},
+            byWriter: [
+              {
+                writer: '<strong style="color:#D90000">ALERT </strong>',
+                count: 1,
+                wageredCents: 1000,
+                volumeCents: 1000,
+                toWinCents: 900,
+                isSentinelNoise: false,
+              },
+            ],
+            byWagerType: [],
+            tickets: [
+              {
+                wagerNumber: 12_345,
+                ticketId: "12345",
+                customerId: "GP301",
+                agentId: "AG1",
+                masterAgent: "MASTER",
+                ticketWriter: '<strong style="color:#D90000">ALERT </strong>',
+                writer: "alert",
+                wagerType: "S",
+                wagerTypeLabel: "Spread",
+                amountWageredCents: 1000,
+                volumeAmountCents: 1000,
+                toWinAmountCents: 900,
+                volumeDiffers: false,
+                isSentinelNoise: false,
+                vip: false,
+                live: false,
+                insertedAt: "2026-11-12T18:00:00Z",
+                legCount: 1,
+                shortDesc: "Kings +4&#189; -115",
+                sport: "NBA",
+                selection: "Kings +4&#189; -115",
+                alertFlags: ["ALERT_SENTINEL_TWIN"],
+              },
+            ],
+          },
+          bridge3aR2: { available: false, error: "not captured" },
+          pendingGames: { available: false },
+          captureHealth: { available: false },
+        },
+        loading: false,
+        error: null,
+        onRefresh: noop,
+        onSelectAgent: noop,
+        onSelectCustomerById: noop,
+        onInspectPty: noop,
+      }),
+    );
+    expect(html).toContain("Kings +4½ -115");
+    expect(html).toContain("ALERT");
+    expect(html).not.toContain("&lt;strong");
+    expect(html).not.toContain("&amp;#189;");
+  });
+
   test("BetTickerTabPanel and R2PipelineTabPanel SSR render channels, types, sinks, and remediation", () => {
     const noop = () => {};
     const tickerHtml = renderToStaticMarkup(
@@ -1331,6 +1490,32 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(tickerHtml).toContain("Internet");
     expect(tickerHtml).toContain("/agent/FAKEMONEY");
     expect(tickerHtml).not.toContain("https://desk.bookdeskops.com/agent/");
+    // The stream reports what it actually rendered and exports the whole filter.
+    expect(tickerHtml).toContain("Showing 1 of 1 filtered");
+    expect(tickerHtml).toContain("5 captured");
+    expect(tickerHtml).toContain('data-bet-ticker-copy-rows="true"');
+    expect(tickerHtml).toContain("⧉ Copy rows (1)");
+    expect(tickerHtml).toContain('data-bet-ticker-sort="ticket"');
+    expect(tickerHtml).toContain('data-bet-ticker-sort="wagered"');
+    expect(tickerHtml).toContain('data-bet-ticker-sort="toWin"');
+    expect(tickerHtml).toContain('aria-sort="descending"');
+    expect(tickerHtml).toContain('aria-label="Filter Bet-Ticker rows"');
+    expect(tickerHtml).toContain('scope="col"');
+    // Channel and wager type are separate columns, not one combined cell.
+    expect(tickerHtml).toContain("Channel</th>");
+    expect(tickerHtml).toContain("Type</th>");
+    expect(tickerHtml).not.toContain("Channel / Type");
+    expect(tickerHtml).toContain('data-bet-ticker-channel="9001"');
+    expect(tickerHtml).toContain('data-bet-ticker-type="9001"');
+    expect(tickerHtml).toContain("Spread");
+    // Sport/leg context is separate from the pick text.
+    expect(tickerHtml).toContain("Sport</th>");
+    expect(tickerHtml).toContain("Selection</th>");
+    expect(tickerHtml).toContain('data-bet-ticker-sport="9001"');
+    expect(tickerHtml).toContain('data-bet-ticker-selection="9001"');
+    expect(tickerHtml).toContain("NFL");
+    expect(tickerHtml).toContain("1L");
+    expect(tickerHtml).toContain("Chiefs -3");
 
     const r2Html = renderToStaticMarkup(
       React.createElement(R2PipelineTabPanel, {

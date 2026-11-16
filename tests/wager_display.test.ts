@@ -21,6 +21,16 @@ describe("wager_display · selection/line composition", () => {
     );
   });
 
+  test("decodes capture entities before comparing the line", () => {
+    expect(
+      formatWagerSelection({
+        selection: "Thunder/Kings U 112&#189; -110",
+        lineDisplay: "Thunder/Kings U 112&#189; -110",
+        oddsAmerican: "-110",
+      }),
+    ).toBe("Thunder/Kings U 112½ -110 (-110)");
+  });
+
   test("composes a distinct line and price", () => {
     expect(
       formatWagerSelection({

@@ -14,6 +14,7 @@ import {
 } from "../gslive_game_log.ts";
 import { GsliveGameLogSection } from "./GsliveGameLogSection.tsx";
 import { findAlertForWager } from "../ticket_inspector.ts";
+import { sanitizeCaptureText } from "../capture_text.ts";
 import { formatWagerSelection } from "../wager_display.ts";
 import { TicketInspectorPanel } from "./TicketInspectorPanel.tsx";
 import {
@@ -1177,7 +1178,9 @@ export function LiveWagersTabPanel({
                   <td style={styles.td}>
                     <div style={{ fontWeight: 600 }}>{w.betType}</div>
                     {w.ticketWriter ? (
-                      <div style={styles.custSub}>via {w.ticketWriter}</div>
+                      <div style={styles.custSub}>
+                        via {sanitizeCaptureText(w.ticketWriter)}
+                      </div>
                     ) : null}
                   </td>
                   <td style={styles.td} data-wager-event={w.ticketId}>
