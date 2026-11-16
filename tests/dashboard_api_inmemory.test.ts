@@ -52,6 +52,7 @@ function buildMockDeps(
         payload: {
           cohorts: { backtestCount: 2 },
           backtestTop: [],
+          backtestAll: [],
           fixtures: [],
         },
       }),
@@ -206,7 +207,10 @@ function buildMockDeps(
       provenance: params.forceFixture ? "fixture" : "live_db",
       parameters: params,
     }),
-    getBuildMatrix: async () => [{ target: "prod", features: ["PROD"] }],
+    getBuildMatrix: async () => ({
+      targets: [{ target: "prod", features: ["PROD"] }],
+      generatedAt: "2026-11-15T00:00:00.000Z",
+    }),
     ...overrides,
   };
 }
@@ -351,6 +355,28 @@ describe("@sportsdesk-ops/api in-memory router (zero port bind)", () => {
 
     expect((await call("/api/not-a-route")).status).toBe(404);
     expect((await call("/unknown")).status).toBe(404);
+  });
+
+  test("forwards the build-matrix refresh flag so the Re-compile button actually reprobes", async () => {
+    const probes: Array<boolean | undefined> = [];
+    const api = createDashboardApi(
+      buildMockDeps({
+        getBuildMatrix: async (force) => {
+          probes.push(force);
+          return {
+            targets: [{ target: "prod", features: ["PROD"] }],
+            generatedAt: "2026-11-15T00:00:00.000Z",
+          };
+        },
+      }),
+    );
+    const call = (path: string) =>
+      api.fetch(new Request(`http://dashboard.local${path}`));
+
+    expect((await call("/api/build-matrix")).status).toBe(200);
+    expect((await call("/api/build-matrix?refresh=0")).status).toBe(200);
+    expect((await call("/api/build-matrix?refresh=1")).status).toBe(200);
+    expect(probes).toEqual([false, false, true]);
   });
 
   test("enforces optional auth gate and manages WebSocket topic subscriptions", async () => {

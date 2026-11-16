@@ -4,6 +4,7 @@
  */
 
 import type {
+  AutomationsSnapshot,
   BetTickerBridge3aSnapshot,
   Daemon4020Status,
   R2PipelineApiResponse,
@@ -519,6 +520,8 @@ export interface R2PipelineServiceOptions {
   readonly cacheTtlMs?: number | undefined;
   readonly fetchImpl?: R2Fetcher | undefined;
   readonly now?: (() => Date) | undefined;
+  readonly getAutomationsSnapshot?:
+    (() => Promise<AutomationsSnapshot> | AutomationsSnapshot) | undefined;
 }
 
 export function createR2PipelineService(
@@ -668,13 +671,18 @@ export function createR2PipelineService(
       return cachedResponse;
     }
 
-    const [sinkResults, daemon4020] = await Promise.all([
+    const [sinkResults, daemon4020, automations] = await Promise.all([
       Promise.all(R2_PIPELINE_TARGETS.map((t) => probeSingleSink(t, nowMs))),
       probeDaemon4020Status({
         origin: options.daemon4020Origin,
         fetchImpl: options.fetchImpl,
         now: getNow,
       }),
+      options.getAutomationsSnapshot
+        ? Promise.resolve(options.getAutomationsSnapshot()).catch(
+            () => undefined,
+          )
+        : Promise.resolve(undefined),
     ]);
 
     const sinks = sinkResults.map((r) => r.sink);
@@ -719,6 +727,7 @@ export function createR2PipelineService(
       dataStaleKeys,
       sinks,
       daemon4020,
+      ...(automations === undefined ? {} : { automations }),
     };
 
     cachedResponse = response;

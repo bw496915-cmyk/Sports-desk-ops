@@ -77,6 +77,7 @@ function tierFor(score: number): ShowcaseCustomer["tier"] {
 
 export function bookRowsToProfiles(
   rows: ReadonlyArray<Row>,
+  source: "book" | "fixture" = "book",
 ): ShowcaseCustomer[] {
   return rows.map((row, idx) => {
     const id = String(row.customer_id ?? row.customerId ?? `BOOK-${idx}`);
@@ -155,8 +156,100 @@ export function bookRowsToProfiles(
       action: score >= 7 ? "ALERT_OPERATOR" : "ACCEPT_NORMAL",
       ipAddress: String(row.ip_subnet ?? "—"),
       unknown,
+      source,
     };
   });
+}
+
+/**
+ * Map the backtest leaderboard (`/api/customers` `backtestAll`) onto the Profiles shape.
+ * The rows carry parlay exposure and CLV, not a per-ticket book: everything that would need
+ * tickets or a live profile (Gini, VaR, syndicate, correlation, limits, delay) is listed in
+ * `unknown` and rendered as "—" rather than as a measured zero.
+ */
+export function backtestRowsToProfiles(
+  rows: ReadonlyArray<Row>,
+): ShowcaseCustomer[] {
+  return rows.map((row, idx) => {
+    const id = String(
+      row.customerId ?? row.customer_id ?? row.customer ?? `BACKTEST-${idx}`,
+    );
+    const rawSharp = Number(row.sharpScore ?? row.sharp_score);
+    const sharpKnown = Number.isFinite(rawSharp) && rawSharp > 0;
+    const score = sharpKnown ? clamp(rawSharp / 10, 0, 10) : 0;
+    const clvBps = num(row.avgClvBps ?? row.clv_bps);
+    const clvScore = clamp(clvBps / 100, -10, 10);
+    const tickets = num(row.totalParlayTickets);
+    const handle = num(row.totalParlayHandleUsd);
+    const meanStake = tickets > 0 && handle > 0 ? handle / tickets : 0;
+    const contextType = String(
+      row.contextType ?? row.context_type ?? "UNKNOWN",
+    );
+    const unknown: string[] = [
+      "syndicate",
+      "correlation",
+      "gini",
+      "sizing",
+      "var95",
+      "holdPct",
+      "ltv",
+      "limit",
+      "delay",
+      "tickets",
+    ];
+    if (!sharpKnown) unknown.push("sharpness");
+    if (meanStake === 0) unknown.push("meanStake");
+
+    return {
+      id,
+      name: id,
+      agentId: String(row.agentId ?? row.agent_id ?? "—"),
+      masterAgent: String(row.masterAgent ?? row.master_agent ?? "—"),
+      tier: tierFor(score),
+      score: round(score, 2),
+      clvScore: round(clvScore, 2),
+      skillScore: round(clvScore, 2),
+      sizingScore: 0,
+      sigScore: 0,
+      timingScore: 0,
+      sizingStrategy: "PENDING_TICKETS",
+      gini: 0,
+      meanStake: round(meanStake, 2),
+      specialization: String(row.dominantComboFamily ?? contextType),
+      timingArchetype: contextType,
+      correlatedRisk: "NONE",
+      correlatedExploitRate: 0,
+      syndicateRisk: "LOW",
+      syndicateProb: 0,
+      subAccountIndex: null,
+      var95Usd: 0,
+      cvar95Usd: 0,
+      holdPct: 0,
+      ltvUsd: 0,
+      recommendedLimitUsd: 0,
+      inPlayDelaySec: 0,
+      lineShadeCents: 0,
+      shadowCopyMultiplier: 1,
+      action: score >= 7 ? "ALERT_OPERATOR" : "ACCEPT_NORMAL",
+      ipAddress: String(row.ipSubnet ?? row.ip_subnet ?? "—"),
+      unknown,
+      source: "backtest",
+    };
+  });
+}
+
+/** Union by customer ID; earlier groups win, so a richer row beats a backtest row. */
+export function mergeProfileRows(
+  ...groups: ReadonlyArray<ReadonlyArray<ShowcaseCustomer>>
+): ShowcaseCustomer[] {
+  const byId = new Map<string, ShowcaseCustomer>();
+  for (const group of groups) {
+    for (const row of group) {
+      const key = row.id.trim().toUpperCase();
+      if (key && !byId.has(key)) byId.set(key, row);
+    }
+  }
+  return [...byId.values()];
 }
 
 /**
@@ -173,5 +266,8 @@ export function selectProfileRows(payload: {
     kind === "capture" || kind === "live"
       ? (payload.book ?? [])
       : payload.fixtures;
-  return bookRowsToProfiles(authoritative);
+  return bookRowsToProfiles(
+    authoritative,
+    kind === "capture" || kind === "live" ? "book" : "fixture",
+  );
 }

@@ -132,6 +132,8 @@ export interface CustomersCohortsSummary {
 export interface CustomersApiResponse {
   readonly cohorts: CustomersCohortsSummary;
   readonly backtestTop: ReadonlyArray<Record<string, unknown>>;
+  /** Full backtest-cohort list (backtestTop is the leaderboard's first 20). */
+  readonly backtestAll: ReadonlyArray<Record<string, unknown>>;
   readonly fixtures: ReadonlyArray<Record<string, unknown>>;
   readonly provenance: DashboardSourceProvenance;
 }
@@ -450,6 +452,60 @@ export interface R2SinkDetail {
   readonly metrics: readonly R2SinkRollupMetric[];
 }
 
+export type TicketVerificationMode =
+  "live" | "fixture" | "dry-run" | "unmeasured";
+
+export interface TicketVerificationSummary {
+  readonly schemaVersion: 1;
+  readonly available: boolean;
+  readonly mode: TicketVerificationMode;
+  readonly verifiedAt: string | null;
+  readonly sourcePath: string | null;
+  readonly totalRows: number;
+  readonly actionableTickets: number;
+  readonly sentinelNoiseCount: number;
+  readonly volumeMismatchCount: number;
+  readonly totalWageredCents: number;
+  readonly totalVolumeCents: number;
+  readonly totalToWinCents: number;
+  readonly canaryPassed: boolean;
+  readonly clientSealed: boolean;
+  readonly f402Status: "ok" | "skipped" | "error";
+  readonly r2Status: "ok" | "skipped" | "error";
+  readonly r2PublishedKey: string | null;
+  readonly error: string | null;
+  readonly remediation: string | null;
+}
+
+export interface BridgeJobStatusSummary {
+  readonly id: string;
+  readonly label: string;
+  readonly ok: boolean;
+  readonly durationMs: number;
+  readonly error?: string | undefined;
+}
+
+export interface AutomationScheduleSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly scheduleTime: string;
+  readonly tz: string;
+  readonly reportType: string;
+  readonly owner: "daemon" | "bot";
+  readonly enabled: boolean;
+  readonly gateReady: boolean;
+  readonly missingRequirements: readonly string[];
+  readonly lastTriggeredAt: string | null;
+}
+
+export interface AutomationsSnapshot {
+  readonly observedAt: string;
+  readonly bridgeRollupUpdatedAt: string | null;
+  readonly bridgeJobs: readonly BridgeJobStatusSummary[];
+  readonly schedules: readonly AutomationScheduleSummary[];
+  readonly ticketVerification: TicketVerificationSummary | null;
+}
+
 export interface R2PipelineApiResponse {
   readonly schemaVersion: 1;
   readonly bucketPublicBase: string;
@@ -461,6 +517,7 @@ export interface R2PipelineApiResponse {
   readonly dataStaleKeys: readonly string[];
   readonly sinks: readonly R2SinkDetail[];
   readonly daemon4020: Daemon4020Status;
+  readonly automations?: AutomationsSnapshot | undefined;
 }
 
 export interface AgentDetailApiResponse {

@@ -10,8 +10,16 @@ export {
 export {
   BuildMatrixDrawer,
   type BuildMatrixDrawerProps,
-  HOUDINI_TOKENS,
 } from "./BuildMatrixDrawer.tsx";
+export {
+  buildRegistryRootCss,
+  HOUDINI_TOKENS,
+  TOKEN_ALIAS_SPECS,
+  TOKENS_TOML_VERSION,
+  type HoudiniTokenSpec,
+  type TokenAliasSpec,
+  type TokenAxis,
+} from "../token_registry.ts";
 export {
   CustomersTabPanel,
   type CustomersTabPanelProps,

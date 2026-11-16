@@ -18,6 +18,7 @@
  *    are sentinels rather than wagers, so neither may be summed into stake.
  */
 
+import { wagerChannelOf, type WagerChannel } from "@sportsdesk-ops/contracts";
 import { SPORT_CATEGORIES } from "./sport_taxonomy.ts";
 
 /** Parse a bet-ticker XML feed with Bun's native parser (compact shape). */
@@ -73,8 +74,7 @@ export interface LiveWager {
   readonly volumeDiffers: boolean;
   readonly ticketWriter: string;
   /** Channel family inferred from `TicketWriter`; `other` for anything unrecognised. */
-  readonly writer:
-    "gslive" | "gsbuilder" | "internet" | "alert" | "blocked" | "other";
+  readonly writer: WagerChannel;
   readonly insertedAt: string;
   readonly vip: boolean;
   /**
@@ -120,14 +120,6 @@ export interface WagerListArtifact {
   readonly provenance: WagerListProvenance;
 }
 
-const WRITERS: Readonly<Record<string, LiveWager["writer"]>> = {
-  gslive: "gslive",
-  gsbuilder: "gsbuilder",
-  internet: "internet",
-  alert: "alert",
-  blocked: "blocked",
-};
-
 function text(value: unknown): string {
   return value === null || value === undefined ? "" : String(value).trim();
 }
@@ -148,9 +140,9 @@ function number(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-/** `GSLIVE   ` → `gslive`; anything unknown → `other`. */
-export function writerOf(ticketWriter: unknown): LiveWager["writer"] {
-  return WRITERS[text(ticketWriter).toLowerCase()] ?? "other";
+/** `GSLIVE   ` → `gslive`; anything unknown → `other` (shared with the dashboard). */
+export function writerOf(ticketWriter: unknown): WagerChannel {
+  return wagerChannelOf(ticketWriter);
 }
 
 /**

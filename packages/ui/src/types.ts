@@ -1,10 +1,13 @@
 import type {
   AgentDetailApiResponse,
+  AutomationScheduleSummary,
+  AutomationsSnapshot,
   BetTickerApiResponse,
   BetTickerBridge3aSnapshot,
   BetTickerChannelBucket,
   BetTickerTicketRow,
   BetTickerTypeBucket,
+  BridgeJobStatusSummary,
   CustomersApiResponse,
   CustomersCohortsSummary,
   Daemon4020State,
@@ -16,17 +19,23 @@ import type {
   R2PipelineApiResponse,
   R2SinkDetail,
   SlabPolicySummary,
+  TicketVerificationMode,
+  TicketVerificationSummary,
+  WagerChannel,
   WagerTier,
   WagersWireContractSummary,
 } from "@sportsdesk-ops/contracts";
 
 export type {
   AgentDetailApiResponse,
+  AutomationScheduleSummary,
+  AutomationsSnapshot,
   BetTickerApiResponse,
   BetTickerBridge3aSnapshot,
   BetTickerChannelBucket,
   BetTickerTicketRow,
   BetTickerTypeBucket,
+  BridgeJobStatusSummary,
   CustomersApiResponse,
   CustomersCohortsSummary,
   Daemon4020State,
@@ -37,8 +46,10 @@ export type {
   LiveWagersApiResponse,
   R2PipelineApiResponse,
   R2SinkDetail,
-  WagersWireContractSummary,
   SlabPolicySummary,
+  TicketVerificationMode,
+  TicketVerificationSummary,
+  WagersWireContractSummary,
 };
 
 export interface DashboardData {
@@ -143,6 +154,8 @@ export interface ShowcaseCustomer {
   readonly portalReconciliation?: CustomerPortalReconciliation | undefined;
   /** Fields the customer book did not carry; set by profile_rows, never guessed. */
   readonly unknown?: readonly string[] | undefined;
+  /** Where the row came from; every row the Profiles tab shows is cohort data, not a live book fetch. */
+  readonly source?: "book" | "fixture" | "backtest" | undefined;
 }
 
 export interface RankedPlayer30d {
@@ -178,6 +191,8 @@ export interface LiveWager {
   readonly agentId: string;
   readonly masterAgent: string;
   readonly ticketWriter?: string | undefined;
+  /** Channel family derived from `ticketWriter` (shared vocabulary with ingest). */
+  readonly writer?: WagerChannel | undefined;
   readonly sport: string;
   readonly betType: string;
   readonly event: string;

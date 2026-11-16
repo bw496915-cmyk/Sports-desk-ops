@@ -135,11 +135,49 @@ function buildHydrationApi(options: {
     },
     getTaxonomyCatalog: () => [],
     runShadowPricing: async () => ({}),
-    getBuildMatrix: async () => [],
+    getBuildMatrix: async () => ({
+      targets: [],
+      generatedAt: "2026-11-15T00:00:00.000Z",
+    }),
   });
 }
 
 describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero port bind)", () => {
+  test("normalizeLiveWagersResponse keeps the writer channel, volume and VIP", () => {
+    const payload = normalizeLiveWagersResponse({
+      wagers: [
+        {
+          ticketId: "W-1",
+          ticketWriter: "GSBUILDER   ",
+          volumeUsd: 2100,
+          vip: true,
+          riskUsd: 2000,
+          toWinUsd: 1800,
+        },
+        {
+          ticketId: "W-2",
+          ticketWriter: "GSLIVE",
+          riskUsd: 500,
+          toWinUsd: 450,
+        },
+        { ticketId: "W-3", riskUsd: 100, toWinUsd: 90 },
+      ],
+      provenance: {
+        kind: "capture",
+        label: "test capture",
+        sourcePath: "data/live-wagers.json",
+        observedAt: "2026-11-15T00:00:00Z",
+      },
+    });
+    expect(payload?.wagers[0]?.writer).toBe("gsbuilder");
+    expect(payload?.wagers[0]?.ticketWriter).toBe("GSBUILDER");
+    expect(payload?.wagers[0]?.volumeUsd).toBe(2100);
+    expect(payload?.wagers[0]?.vip).toBe(true);
+    expect(payload?.wagers[1]?.writer).toBe("gslive");
+    expect(payload?.wagers[2]?.writer).toBe("other");
+    expect(payload?.wagers[2]?.ticketWriter).toBeUndefined();
+  });
+
   test("normalizeLiveWagersResponse carries wire_contract, and drops a malformed block", () => {
     const base = {
       wagers: [],
@@ -364,6 +402,7 @@ describe("@sportsdesk-ops/ui live hydration & Signal-Honesty provenance (zero po
           uniqueSurveillanceCount: 500,
         },
         backtestTop: [],
+        backtestAll: [],
         fixtures: [],
         provenance: {
           kind: "capture",

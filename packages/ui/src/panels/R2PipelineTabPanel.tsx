@@ -10,6 +10,9 @@ export interface R2PipelineTabPanelProps {
   readonly loading: boolean;
   readonly error: string | null;
   readonly onRefresh: (force?: boolean) => void;
+  readonly onVerifyTickets?: (dryRun?: boolean) => void;
+  readonly verifyingTickets?: boolean;
+  readonly verifyTicketsError?: string | null;
 }
 
 function formatAge(ageSeconds: number | null): string {
@@ -68,8 +71,13 @@ export function R2PipelineTabPanel({
   loading,
   error,
   onRefresh,
+  onVerifyTickets,
+  verifyingTickets = false,
+  verifyTicketsError = null,
 }: R2PipelineTabPanelProps): React.ReactElement {
   const [copiedCmdId, setCopiedCmdId] = useState<string | null>(null);
+  const automations = data?.automations;
+  const ticketVerify = automations?.ticketVerification ?? null;
 
   const daemon = data?.daemon4020;
   const daemonState = resolveDaemon4020State(daemon);
@@ -476,6 +484,332 @@ export function R2PipelineTabPanel({
           );
         })}
       </div>
+
+      {/* GSLive Ticket Verification & Secret Redaction Canary */}
+      {(automations !== undefined || onVerifyTickets !== undefined) && (
+        <div
+          style={{
+            borderRadius: "8px",
+            padding: "14px 16px",
+            backgroundColor: "rgba(15, 23, 42, 0.9)",
+            border: "1px solid #334155",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "10px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{ fontWeight: 700, fontSize: "13px", color: "#f8fafc" }}
+              >
+                🎫 GSLive Ticket Verification &amp; #private Redaction Canary
+              </span>
+              {ticketVerify && (
+                <span
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color:
+                      ticketVerify.canaryPassed && ticketVerify.clientSealed
+                        ? "#4ade80"
+                        : "#f87171",
+                    backgroundColor:
+                      ticketVerify.canaryPassed && ticketVerify.clientSealed
+                        ? "rgba(34, 197, 94, 0.14)"
+                        : "rgba(239, 68, 68, 0.14)",
+                    border: `1px solid ${
+                      ticketVerify.canaryPassed && ticketVerify.clientSealed
+                        ? "#22c55e"
+                        : "#ef4444"
+                    }`,
+                  }}
+                >
+                  {ticketVerify.canaryPassed && ticketVerify.clientSealed
+                    ? `CANARY PASS · ${ticketVerify.mode.toUpperCase()}`
+                    : "CANARY FAIL"}
+                </span>
+              )}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              {onVerifyTickets && (
+                <button
+                  type="button"
+                  style={{
+                    ...styles.actionBtn,
+                    padding: "4px 10px",
+                    fontSize: "11px",
+                    cursor: verifyingTickets ? "wait" : "pointer",
+                  }}
+                  disabled={verifyingTickets}
+                  onClick={() => onVerifyTickets(true)}
+                >
+                  {verifyingTickets ? "Verifying…" : "▶ Run Dry-Run Verify"}
+                </button>
+              )}
+              <button
+                type="button"
+                style={{
+                  ...styles.actionBtn,
+                  padding: "4px 8px",
+                  fontSize: "11px",
+                  fontFamily: "monospace",
+                }}
+                onClick={() => {
+                  void copyText("bun run verify:gslive-tickets -- --dry-run");
+                  setCopiedCmdId("verify-gslive-tickets");
+                  setTimeout(() => setCopiedCmdId(null), 1800);
+                }}
+              >
+                {copiedCmdId === "verify-gslive-tickets"
+                  ? "✓ Copied CLI"
+                  : "📋 bun run verify:gslive-tickets -- --dry-run"}
+              </button>
+            </div>
+          </div>
+
+          {verifyTicketsError && (
+            <div style={{ fontSize: "12px", color: "#f87171" }}>
+              {verifyTicketsError}
+            </div>
+          )}
+
+          {ticketVerify ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: "8px",
+                fontSize: "12px",
+              }}
+            >
+              <div
+                style={{
+                  padding: "6px 8px",
+                  borderRadius: "5px",
+                  backgroundColor: "rgba(30, 41, 59, 0.55)",
+                  border: "1px solid rgba(51, 65, 85, 0.7)",
+                }}
+              >
+                <div style={{ fontSize: "10px", color: "#94a3b8" }}>
+                  Actionable / Rows
+                </div>
+                <div style={{ fontWeight: 700, color: "#f1f5f9" }}>
+                  {ticketVerify.actionableTickets} / {ticketVerify.totalRows}
+                </div>
+              </div>
+              <div
+                style={{
+                  padding: "6px 8px",
+                  borderRadius: "5px",
+                  backgroundColor: "rgba(30, 41, 59, 0.55)",
+                  border: "1px solid rgba(51, 65, 85, 0.7)",
+                }}
+              >
+                <div style={{ fontSize: "10px", color: "#94a3b8" }}>
+                  Sentinel Noise / ΔVol
+                </div>
+                <div style={{ fontWeight: 700, color: "#f1f5f9" }}>
+                  {ticketVerify.sentinelNoiseCount} noise ·{" "}
+                  {ticketVerify.volumeMismatchCount} Δ
+                </div>
+              </div>
+              <div
+                style={{
+                  padding: "6px 8px",
+                  borderRadius: "5px",
+                  backgroundColor: "rgba(30, 41, 59, 0.55)",
+                  border: "1px solid rgba(51, 65, 85, 0.7)",
+                }}
+              >
+                <div style={{ fontSize: "10px", color: "#94a3b8" }}>
+                  F402 / R2 Status
+                </div>
+                <div style={{ fontWeight: 700, color: "#f1f5f9" }}>
+                  {ticketVerify.f402Status} / {ticketVerify.r2Status}
+                </div>
+              </div>
+              <div
+                style={{
+                  padding: "6px 8px",
+                  borderRadius: "5px",
+                  backgroundColor: "rgba(30, 41, 59, 0.55)",
+                  border: "1px solid rgba(51, 65, 85, 0.7)",
+                }}
+              >
+                <div style={{ fontSize: "10px", color: "#94a3b8" }}>
+                  Verified At
+                </div>
+                <div style={{ fontWeight: 600, color: "#cbd5e1" }}>
+                  {ticketVerify.verifiedAt
+                    ? `${ticketVerify.verifiedAt.slice(0, 16)}Z`
+                    : "—"}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+              No verification receipt recorded yet. Run Dry-Run Verify or{" "}
+              <code>bun run verify:gslive-tickets -- --dry-run</code>.
+            </div>
+          )}
+
+          {ticketVerify?.error && (
+            <div style={{ fontSize: "11px", color: "#fbbf24" }}>
+              {ticketVerify.error}
+              {ticketVerify.remediation ? ` — ${ticketVerify.remediation}` : ""}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Automations & Scheduled Jobs */}
+      {automations && (
+        <div
+          style={{
+            borderRadius: "8px",
+            padding: "14px 16px",
+            backgroundColor: "rgba(15, 23, 42, 0.9)",
+            border: "1px solid #334155",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "8px",
+            }}
+          >
+            <span
+              style={{ fontWeight: 700, fontSize: "13px", color: "#f8fafc" }}
+            >
+              ⏱️ Scheduled Automations &amp; Bridge Rollups (
+              {automations.schedules.filter((s) => s.gateReady).length}/
+              {automations.schedules.length} gate-ready)
+            </span>
+            <span style={{ fontSize: "11px", color: "#94a3b8" }}>
+              Last bridge cycle:{" "}
+              {automations.bridgeRollupUpdatedAt
+                ? `${automations.bridgeRollupUpdatedAt.slice(0, 16)}Z`
+                : "unrecorded"}
+            </span>
+          </div>
+
+          {automations.bridgeJobs.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {automations.bridgeJobs.map((job) => (
+                <span
+                  key={job.id}
+                  style={{
+                    padding: "3px 8px",
+                    borderRadius: "6px",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    color: job.ok ? "#4ade80" : "#f87171",
+                    backgroundColor: job.ok
+                      ? "rgba(34, 197, 94, 0.12)"
+                      : "rgba(239, 68, 68, 0.12)",
+                    border: `1px solid ${job.ok ? "#22c55e" : "#ef4444"}`,
+                  }}
+                  title={job.error ?? `${job.durationMs}ms`}
+                >
+                  {job.ok ? "✓" : "✗"} {job.id} ({job.durationMs}ms)
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: "8px",
+            }}
+          >
+            {automations.schedules.map((sched) => (
+              <div
+                key={sched.id}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: "6px",
+                  backgroundColor: "rgba(30, 41, 59, 0.55)",
+                  border: "1px solid rgba(51, 65, 85, 0.7)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4px",
+                  fontSize: "11px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: "#f1f5f9" }}>
+                    {sched.name}
+                  </span>
+                  <span
+                    style={{
+                      padding: "1px 6px",
+                      borderRadius: "999px",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      color: sched.gateReady ? "#4ade80" : "#fbbf24",
+                      backgroundColor: sched.gateReady
+                        ? "rgba(34, 197, 94, 0.12)"
+                        : "rgba(245, 158, 11, 0.12)",
+                      border: `1px solid ${sched.gateReady ? "#22c55e" : "#f59e0b"}`,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {sched.gateReady ? "READY" : "GATED"}
+                  </span>
+                </div>
+                <div style={{ color: "#94a3b8", fontFamily: "monospace" }}>
+                  {sched.scheduleTime} · {sched.tz} · {sched.owner}
+                </div>
+                {sched.missingRequirements.length > 0 && (
+                  <div style={{ color: "#fbbf24" }}>
+                    Missing: {sched.missingRequirements.join(", ")}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

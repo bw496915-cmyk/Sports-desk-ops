@@ -4,10 +4,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   parseDashboardWsSignal,
   resolveDaemon4020State,
+  wagerChannelOf,
 } from "@sportsdesk-ops/contracts";
 import "./desk.css";
 import { ShadowPricingPanel } from "./ShadowPricingPanel.tsx";
 import { styles } from "./dashboard_styles.ts";
+import { newTicketIds as diffNewTicketIds } from "./live_stream.ts";
+import {
+  backtestRowsToProfiles,
+  bookRowsToProfiles,
+  mergeProfileRows,
+} from "./profile_rows.ts";
 import {
   fetchRankingsSlice,
   type NormalizedRankingsResult,
@@ -41,8 +48,10 @@ import {
 import {
   DASHBOARD_API,
   DASHBOARD_DEFAULT_TAB,
+  DASHBOARD_META,
   dashboardApiUrl,
 } from "./config/dashboard.ts";
+import { TOKENS_TOML_VERSION } from "./tokens.registry.generated.ts";
 import { WAGERS_DEFAULTS } from "./config/wagers.ts";
 import { DEMO_CUSTOMER_COUNT } from "./data/demo_customers.ts";
 import {
@@ -86,8 +95,6 @@ export const PROFILES_UNAVAILABLE_REASON =
   "sharpness score. VaR and sharpness components have no source yet, so they stay blank rather than " +
   `computed from nothing. The cohort is ${DEMO_CUSTOMER_COUNT} synthetic fixtures — a demo surface, not the book. ` +
   "Real-account profiles are a separate surface, blocked on the same exposure constraint as #242.";
-
-const PROFILE_CUSTOMERS: readonly ShowcaseCustomer[] = [];
 
 function getCsrfToken(): string {
   if (typeof document === "undefined") return "";
@@ -137,6 +144,12 @@ export function App(): React.ReactElement {
   >(null);
   const [buildMatrixLoading, setBuildMatrixLoading] = useState<boolean>(false);
   const [buildMatrixError, setBuildMatrixError] = useState<string | null>(null);
+  const [buildMatrixGeneratedAt, setBuildMatrixGeneratedAt] = useState<
+    string | null
+  >(null);
+  const [buildMatrixCompiledMs, setBuildMatrixCompiledMs] = useState<
+    number | null
+  >(null);
   const [rankingsFilter, setRankingsFilter] = useState<RankingsFilter>("ALL");
   const [rankingsSearch, setRankingsSearch] = useState<string>(() =>
     resolveInitialUrlParam("agent"),
@@ -149,6 +162,7 @@ export function App(): React.ReactElement {
   const [wagerSportFilter, setWagerSportFilter] = useState<string>("ALL");
   const [wagerAlertFilter, setWagerAlertFilter] = useState<string>("ALL");
   const [wagerTypeFilter, setWagerTypeFilter] = useState<string>("ALL");
+  const [wagerChannelFilter, setWagerChannelFilter] = useState<string>("ALL");
   const [copiedTicketId, setCopiedTicketId] = useState<string | null>(null);
   const [selectedWager, setSelectedWager] = useState<LiveWager | null>(null);
   // Default sort comes from packages/ui/src/config/wagers.toml ([table] table).
@@ -161,6 +175,7 @@ export function App(): React.ReactElement {
   const [clockTime, setClockTime] = useState<string>("");
   const [terminalCategory, setTerminalCategory] =
     useState<TerminalCategory>("ALL");
+  const [copiedCommandIdx, setCopiedCommandIdx] = useState<number | null>(null);
   const [copiedTerminalIdx, setCopiedTerminalIdx] = useState<number | null>(
     null,
   );
@@ -172,6 +187,16 @@ export function App(): React.ReactElement {
     "interactive",
   );
   const [connected, setConnected] = useState(false);
+  /** Wager-stream bookkeeping: when the feed last landed and which tickets are new. */
+  const seenWagerIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedWagersRef = useRef(false);
+  const freshTicketsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const [newTicketIds, setNewTicketIds] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
+  const [wagersUpdatedAt, setWagersUpdatedAt] = useState<number | null>(null);
   const [benchResult, setBenchResult] = useState<string | null>(null);
   const [benchLoading, setBenchLoading] = useState(false);
   const [reverseIp, setReverseIp] = useState("1.1.1.1");
@@ -206,12 +231,30 @@ export function App(): React.ReactElement {
     useState<R2PipelineApiResponse | null>(null);
   const [r2PipelineLoading, setR2PipelineLoading] = useState<boolean>(false);
   const [r2PipelineError, setR2PipelineError] = useState<string | null>(null);
+  const [verifyingTickets, setVerifyingTickets] = useState<boolean>(false);
+  const [verifyTicketsError, setVerifyTicketsError] = useState<string | null>(
+    null,
+  );
   const [cohortsReport, setCohortsReport] =
     useState<CustomersApiResponse | null>(null);
   const [cohortsStatus, setCohortsStatus] = useState<
     "pending" | "ready" | "unavailable"
   >("pending");
   const [cohortsError, setCohortsError] = useState<string | null>(null);
+  // Every customer row the desk actually has: fixture-book rows first (richer), then the
+  // full backtest cohort. A missing/unavailable payload leaves this empty, which is what
+  // keeps the Profiles tab in its explicit "no source" state.
+  const profileCustomers = useMemo<readonly ShowcaseCustomer[]>(() => {
+    if (cohortsReport === null) return [];
+    return mergeProfileRows(
+      bookRowsToProfiles(cohortsReport.fixtures, "fixture"),
+      backtestRowsToProfiles(cohortsReport.backtestAll),
+    );
+  }, [cohortsReport]);
+  const profilesProvenance =
+    cohortsReport === null || profileCustomers.length === 0
+      ? null
+      : `${profileCustomers.length} cohort customers · ${cohortsReport.fixtures.length} fixture rows + ${cohortsReport.backtestAll.length} backtest rows · ${cohortsReport.provenance.label} · GET /api/customers`;
   const [rankings, setRankings] = useState<NormalizedRankingsResult | null>(
     null,
   );
@@ -262,6 +305,26 @@ export function App(): React.ReactElement {
       setWireContract(normalized.wireContract);
       setSlabPolicy(normalized.slabPolicy);
       setWagersError(null);
+
+      // Streaming: mark tickets that were not in the previous snapshot. The first load
+      // is not "new" — every row would otherwise flash.
+      const nextIds = new Set(normalized.wagers.map((w) => w.ticketId));
+      if (hasLoadedWagersRef.current) {
+        const fresh = diffNewTicketIds(seenWagerIdsRef.current, nextIds);
+        if (fresh.length > 0) {
+          setNewTicketIds(new Set(fresh));
+          if (freshTicketsTimerRef.current !== null) {
+            clearTimeout(freshTicketsTimerRef.current);
+          }
+          freshTicketsTimerRef.current = setTimeout(() => {
+            setNewTicketIds(new Set());
+            freshTicketsTimerRef.current = null;
+          }, 15_000);
+        }
+      }
+      hasLoadedWagersRef.current = true;
+      seenWagerIdsRef.current = nextIds;
+      setWagersUpdatedAt(Date.now());
       if (normalized.wagers.length > 0) {
         setSelectedWager((prev) =>
           prev && normalized.wagers.some((w) => w.ticketId === prev.ticketId)
@@ -363,22 +426,55 @@ export function App(): React.ReactElement {
     }
   };
 
-  const fetchBuildMatrix = () => {
+  const runTicketVerification = async (dryRun = true) => {
+    setVerifyingTickets(true);
+    try {
+      const res = await fetch("/api/gslive/verify-tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun }),
+      });
+      if (!res.ok) {
+        setVerifyTicketsError(
+          `POST /api/gslive/verify-tickets returned HTTP ${res.status}`,
+        );
+        return;
+      }
+      setVerifyTicketsError(null);
+      await fetchR2Pipeline(true);
+    } catch (err) {
+      setVerifyTicketsError(
+        `POST /api/gslive/verify-tickets failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      setVerifyingTickets(false);
+    }
+  };
+
+  const fetchBuildMatrix = (force = false) => {
     setBuildMatrixLoading(true);
     setBuildMatrixError(null);
-    fetch("/api/build-matrix")
+    const startedAt = performance.now();
+    fetch(force ? "/api/build-matrix?refresh=1" : "/api/build-matrix")
       .then(async (r) => {
         if (!r.ok) {
-          throw new Error(`GET /api/build-matrix returned HTTP ${r.status}`);
+          throw new Error(
+            `GET /api/build-matrix${force ? "?refresh=1" : ""} returned HTTP ${r.status}`,
+          );
         }
         return (await r.json()) as {
           targets?: readonly BuildMatrixRow[];
+          generatedAt?: string;
         };
       })
       .then((json) => {
         if (json?.targets) {
           debugDashboardTrace("loaded DCE build matrix", json);
           setBuildMatrixRows(json.targets);
+          setBuildMatrixGeneratedAt(
+            typeof json.generatedAt === "string" ? json.generatedAt : null,
+          );
+          setBuildMatrixCompiledMs(Math.round(performance.now() - startedAt));
         }
       })
       .catch((err) => {
@@ -769,8 +865,40 @@ export function App(): React.ReactElement {
       });
 
       if (res.ok) {
-        const json = await res.json();
-        setTerminalHistory((prev) => [...prev, json]);
+        const json = (await res.json()) as Partial<TerminalHistoryEntry> & {
+          error?: string;
+        };
+        const stdout = json.stdout;
+        if (typeof stdout !== "string") {
+          setTerminalHistory((prev) => [
+            ...prev,
+            {
+              command: trimmed,
+              stdout: `\x1b[31m[TERMINAL_BAD_PAYLOAD] POST /api/terminal/exec returned no stdout string\x1b[0m\n\x1b[90mThe command did not produce a renderable result; nothing was added verbatim.\x1b[0m`,
+              exitCode: 1,
+              durationMs: 0,
+              timestamp: Date.now(),
+            },
+          ]);
+        } else {
+          setTerminalHistory((prev) => [
+            ...prev,
+            {
+              command:
+                typeof json.command === "string" && json.command.length > 0
+                  ? json.command
+                  : trimmed,
+              stdout,
+              exitCode: typeof json.exitCode === "number" ? json.exitCode : 0,
+              durationMs:
+                typeof json.durationMs === "number" ? json.durationMs : 0,
+              timestamp:
+                typeof json.timestamp === "number"
+                  ? json.timestamp
+                  : Date.now(),
+            },
+          ]);
+        }
       } else {
         const err = await res.json().catch(() => ({ error: res.statusText }));
         setTerminalHistory((prev) => [
@@ -799,9 +927,6 @@ export function App(): React.ReactElement {
     } finally {
       setTerminalLoading(false);
       setTerminalCommand("");
-      setTimeout(() => {
-        terminalBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 50);
     }
   };
 
@@ -886,6 +1011,29 @@ export function App(): React.ReactElement {
   };
 
   useEffect(() => {
+    return () => {
+      if (freshTicketsTimerRef.current !== null) {
+        clearTimeout(freshTicketsTimerRef.current);
+        freshTicketsTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Streaming: the socket is primary, but a timed refresh is the backstop — a watcher that
+  // misses a write (or a host with no watcher at all) must not leave the logs stale. The
+  // endpoint is stat-cached server-side, so an unchanged capture costs a stat.
+  useEffect(() => {
+    if (activeTab !== "wagers") return;
+    const interval = setInterval(
+      () => {
+        void fetchLiveWagers();
+      },
+      connected ? 30_000 : 10_000,
+    );
+    return () => clearInterval(interval);
+  }, [activeTab, connected]);
+
+  useEffect(() => {
     void fetchDashboard();
 
     // Hot-reload WebSocket connection with React StrictMode-safe lifecycle
@@ -966,7 +1114,7 @@ export function App(): React.ReactElement {
     };
   }, []);
 
-  const filteredCustomers = PROFILE_CUSTOMERS.filter((cust) => {
+  const filteredCustomers = profileCustomers.filter((cust) => {
     const matchesSearch =
       cust.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       cust.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1009,7 +1157,7 @@ export function App(): React.ReactElement {
 
   const handleSelectCustomerById = (customerId: string) => {
     const upper = customerId.trim().toUpperCase();
-    const found = PROFILE_CUSTOMERS.find((c) => c.id.toUpperCase() === upper);
+    const found = profileCustomers.find((c) => c.id.toUpperCase() === upper);
     if (found) {
       setSelectedCustomer(found);
     }
@@ -1277,7 +1425,8 @@ export function App(): React.ReactElement {
             onClick={() => setActiveTab("customers")}
             title="Inspect individual sharp originators, sizing models, and risk (Ctrl+1)"
           >
-            👥 Profiles (—)
+            👥 Profiles (
+            {profileCustomers.length > 0 ? profileCustomers.length : "—"})
             <span style={styles.keyShortcutBadge}>Ctrl+1</span>
           </button>
           <button
@@ -1421,7 +1570,9 @@ export function App(): React.ReactElement {
           target={runtimeFlags.target}
           enabledFeatures={runtimeFlags.enabledFeatures}
           error={buildMatrixError}
-          onRefresh={fetchBuildMatrix}
+          generatedAt={buildMatrixGeneratedAt}
+          compiledMs={buildMatrixCompiledMs}
+          onRefresh={() => fetchBuildMatrix(true)}
         />
       ) : null}
 
@@ -1505,36 +1656,52 @@ export function App(): React.ReactElement {
             {liveWagers.filter((w) => w.sport.toUpperCase() === "NCAAB").length}
             )
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setWagerSportFilter("ALL");
-              setWagerSearch("live");
-              setActiveTab("wagers");
-            }}
-            style={{
-              padding: "3px 9px",
-              borderRadius: "999px",
-              border: "1px solid rgba(192, 132, 252, 0.35)",
-              backgroundColor: "rgba(192, 132, 252, 0.12)",
-              color: "#d8b4fe",
-              fontSize: "11px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-            title="Filter Live Wagers to GSLive / In-Play tickets"
-          >
-            🔴 GSLive / In-Play (
-            {
-              liveWagers.filter(
-                (w) =>
-                  w.alertTier === "LATENCY" ||
-                  /live|in-play/i.test(w.selection) ||
-                  /ezl/i.test(w.ticketWriter ?? ""),
-              ).length
-            }
-            )
-          </button>
+          {(
+            [
+              {
+                id: "GSLIVE",
+                label: "🔴 GSLIVE",
+                title: "Filter Live Wagers to GSLIVE (Partner 118 in-play)",
+              },
+              {
+                id: "GSBUILDER",
+                label: "🧩 GS Builder",
+                title:
+                  "Filter Live Wagers to GS Builder (Partner 118 SGP builder)",
+              },
+            ] as const
+          ).map((channel) => {
+            const count = liveWagers.filter(
+              (w) =>
+                (w.writer ?? wagerChannelOf(w.ticketWriter)) ===
+                channel.id.toLowerCase(),
+            ).length;
+            return (
+              <button
+                key={channel.id}
+                type="button"
+                onClick={() => {
+                  setWagerSportFilter("ALL");
+                  setWagerSearch("");
+                  setWagerChannelFilter(channel.id);
+                  setActiveTab("wagers");
+                }}
+                style={{
+                  padding: "3px 9px",
+                  borderRadius: "999px",
+                  border: "1px solid rgba(192, 132, 252, 0.35)",
+                  backgroundColor: "rgba(192, 132, 252, 0.12)",
+                  color: "#d8b4fe",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+                title={channel.title}
+              >
+                {channel.label} ({count})
+              </button>
+            );
+          })}
           <button
             type="button"
             onClick={() => {
@@ -1653,7 +1820,10 @@ export function App(): React.ReactElement {
               void runTerminalCommand(`profile ${customerId}`);
             }}
             onSelectAgent={(agentId) => setSelectedAgentId(agentId)}
-            profilesUnavailableReason={PROFILES_UNAVAILABLE_REASON}
+            profilesUnavailableReason={
+              profileCustomers.length === 0 ? PROFILES_UNAVAILABLE_REASON : null
+            }
+            profilesProvenance={profilesProvenance}
             onViewCustomerWagers={(customerId) => {
               setWagerSportFilter("ALL");
               setWagerAlertFilter("ALL");
@@ -1703,6 +1873,12 @@ export function App(): React.ReactElement {
               void copyText(stdout);
               setCopiedTerminalIdx(idx);
               setTimeout(() => setCopiedTerminalIdx(null), 1500);
+            }}
+            copiedCommandIdx={copiedCommandIdx}
+            onCopyCommand={(idx, command) => {
+              void copyText(command);
+              setCopiedCommandIdx(idx);
+              setTimeout(() => setCopiedCommandIdx(null), 1500);
             }}
             terminalLoading={terminalLoading}
             terminalBottomRef={terminalBottomRef}
@@ -1770,7 +1946,7 @@ export function App(): React.ReactElement {
         ) : activeTab === "shadow" ? (
           <ShadowPricingPanel
             onInspectAccount={(accountId) => {
-              const found = PROFILE_CUSTOMERS.find(
+              const found = profileCustomers.find(
                 (c) => c.id.toUpperCase() === accountId.toUpperCase(),
               );
               if (found) {
@@ -1807,12 +1983,20 @@ export function App(): React.ReactElement {
             onRefresh={(force) => {
               void fetchR2Pipeline(Boolean(force));
             }}
+            onVerifyTickets={(dryRun) => {
+              void runTicketVerification(dryRun ?? true);
+            }}
+            verifyingTickets={verifyingTickets}
+            verifyTicketsError={verifyTicketsError}
           />
         ) : (
           <LiveWagersTabPanel
             wagers={liveWagers}
             provenance={wagersProvenance}
             wagersError={wagersError}
+            wagersLastUpdatedAt={wagersUpdatedAt}
+            newTicketIds={newTicketIds}
+            streamingConnected={connected}
             wireContract={wireContract}
             slabPolicy={slabPolicy}
             onRefreshWagers={() => {
@@ -1824,6 +2008,8 @@ export function App(): React.ReactElement {
             onWagerSportFilterChange={setWagerSportFilter}
             wagerAlertFilter={wagerAlertFilter}
             onWagerAlertFilterChange={setWagerAlertFilter}
+            wagerChannelFilter={wagerChannelFilter}
+            onWagerChannelFilterChange={setWagerChannelFilter}
             wagerTypeFilter={wagerTypeFilter}
             onWagerTypeFilterChange={setWagerTypeFilter}
             wagerSortField={wagerSortField}
@@ -1853,8 +2039,9 @@ export function App(): React.ReactElement {
         <span>Updated: {data?.updatedAt ?? "—"}</span>
         <span>
           Native Bun HTML Bundler + Bun.serve Routes + bun:bundle (
-          {runtimeFlags.target}) + tokens.toml v1.2.0 · dashboard.toml v2.0.0 ·
-          autoExecute: false invariant active
+          {runtimeFlags.target}) + tokens.toml v{TOKENS_TOML_VERSION} ·
+          dashboard.toml v{DASHBOARD_META.version} · autoExecute: false
+          invariant active
         </span>
       </footer>
 

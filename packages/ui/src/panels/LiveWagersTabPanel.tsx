@@ -1,5 +1,18 @@
 import type React from "react";
+import { useEffect, useState } from "react";
+import {
+  PARTNER_118_CHANNELS,
+  WAGER_CHANNEL_LABELS,
+  wagerChannelOf,
+  type WagerChannel,
+} from "@sportsdesk-ops/contracts";
 import { styles } from "../dashboard_styles.ts";
+import {
+  buildGsliveEventLog,
+  buildGsliveGameLog,
+  gameKeyOf,
+} from "../gslive_game_log.ts";
+import { GsliveGameLogSection } from "./GsliveGameLogSection.tsx";
 import {
   formatProvenanceBadge,
   PENDING_WAGERS_PROVENANCE,
@@ -34,6 +47,12 @@ export interface LiveWagersTabPanelProps {
   readonly wagers?: readonly LiveWager[] | undefined;
   readonly provenance?: DashboardSourceProvenance | undefined;
   readonly wagersError?: string | null | undefined;
+  /** Epoch ms of the last successful wager fetch, for the stream status line. */
+  readonly wagersLastUpdatedAt?: number | null | undefined;
+  /** Ticket ids that arrived in the latest refresh (highlighted, then cleared by the caller). */
+  readonly newTicketIds?: ReadonlySet<string> | undefined;
+  /** WebSocket state; false means the stream is on the polling fallback. */
+  readonly streamingConnected?: boolean | undefined;
   readonly onRefreshWagers?: (() => void) | undefined;
   readonly wagerSearch: string;
   readonly onWagerSearchChange: (value: string) => void;
@@ -41,6 +60,9 @@ export interface LiveWagersTabPanelProps {
   readonly onWagerSportFilterChange: (sport: string) => void;
   readonly wagerAlertFilter: string;
   readonly onWagerAlertFilterChange: (tier: string) => void;
+  /** Channel split: ALL, GSLIVE, GSBUILDER, INTERNET (case-insensitive). */
+  readonly wagerChannelFilter?: string | undefined;
+  readonly onWagerChannelFilterChange?: ((channel: string) => void) | undefined;
   readonly wagerTypeFilter: string;
   readonly onWagerTypeFilterChange: (betType: string) => void;
   readonly wagerSortField: WagerSortField;
@@ -71,6 +93,79 @@ const ALERT_PILLS = [
 ];
 const TIER_ORDER = WAGER_TIER_RANK;
 
+const CHANNEL_PILLS: readonly {
+  readonly id: string;
+  readonly label: string;
+}[] = [
+  { id: "ALL", label: "All Channels" },
+  { id: "GSLIVE", label: "🔴 GSLIVE" },
+  { id: "GSBUILDER", label: "🧩 GS Builder" },
+  { id: "INTERNET", label: "🌐 Internet" },
+];
+
+/** Channel of a row: the hydrated family when present, else the writer string. */
+function channelOfWager(w: LiveWager): WagerChannel {
+  return w.writer ?? wagerChannelOf(w.ticketWriter);
+}
+
+interface ChannelProfile {
+  readonly channel: WagerChannel;
+  readonly label: string;
+  readonly tickets: number;
+  readonly riskUsd: number;
+  readonly toWinUsd: number;
+  readonly avgTicketUsd: number;
+  readonly liveTickets: number;
+  readonly topCustomerId: string | null;
+  readonly topCustomerRiskUsd: number;
+}
+
+function profileChannels(
+  wagers: readonly LiveWager[],
+  channels: readonly WagerChannel[],
+): ChannelProfile[] {
+  return channels.map((channel) => {
+    const rows = wagers.filter((w) => channelOfWager(w) === channel);
+    const byCustomer = new Map<string, number>();
+    let riskUsd = 0;
+    let toWinUsd = 0;
+    let liveTickets = 0;
+    for (const w of rows) {
+      riskUsd += w.riskUsd;
+      toWinUsd += w.toWinUsd;
+      if (
+        w.alertTier === "LATENCY" ||
+        /in-play|live|halftime/i.test(w.selection)
+      ) {
+        liveTickets += 1;
+      }
+      byCustomer.set(
+        w.customerId,
+        (byCustomer.get(w.customerId) ?? 0) + w.riskUsd,
+      );
+    }
+    let topCustomerId: string | null = null;
+    let topCustomerRiskUsd = 0;
+    for (const [id, risk] of byCustomer) {
+      if (risk > topCustomerRiskUsd) {
+        topCustomerId = id;
+        topCustomerRiskUsd = risk;
+      }
+    }
+    return {
+      channel,
+      label: WAGER_CHANNEL_LABELS[channel],
+      tickets: rows.length,
+      riskUsd,
+      toWinUsd,
+      avgTicketUsd: rows.length > 0 ? Math.round(riskUsd / rows.length) : 0,
+      liveTickets,
+      topCustomerId,
+      topCustomerRiskUsd,
+    };
+  });
+}
+
 /** Stake emphasis is owned by `dashboard.toml`, not duplicated in wagers.toml. */
 const HIGH_RISK_WAGER_USD = DASHBOARD_THRESHOLDS.high_risk_wager_usd;
 
@@ -94,6 +189,9 @@ export function LiveWagersTabPanel({
   wagers = [],
   provenance = PENDING_WAGERS_PROVENANCE,
   wagersError = null,
+  wagersLastUpdatedAt = null,
+  newTicketIds,
+  streamingConnected,
   onRefreshWagers,
   wagerSearch,
   onWagerSearchChange,
@@ -101,6 +199,8 @@ export function LiveWagersTabPanel({
   onWagerSportFilterChange,
   wagerAlertFilter,
   onWagerAlertFilterChange,
+  wagerChannelFilter = "ALL",
+  onWagerChannelFilterChange = () => {},
   wagerTypeFilter,
   onWagerTypeFilterChange,
   wagerSortField,
@@ -117,6 +217,15 @@ export function LiveWagersTabPanel({
   onInspectPty,
   onSelectAgent,
 }: LiveWagersTabPanelProps): React.ReactElement {
+  const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const isGsliveScope = wagerChannelFilter.toUpperCase() === "GSLIVE";
+
+  // A game selection belongs to the GSLIVE scope; leaving it must not silently keep
+  // filtering another channel's table.
+  useEffect(() => {
+    setSelectedGame(null);
+  }, [wagerChannelFilter]);
+
   const activeWagers = wagers;
   const activeProvenance: DashboardSourceProvenance = wagersError
     ? {
@@ -135,6 +244,21 @@ export function LiveWagersTabPanel({
   ).length;
   const totalRiskUsd = activeWagers.reduce((acc, w) => acc + w.riskUsd, 0);
   const totalToWinUsd = activeWagers.reduce((acc, w) => acc + w.toWinUsd, 0);
+  // Partner 118 split is computed over the whole capture, not the filtered slice, so the
+  // two channel profiles stay comparable while an operator narrows the table.
+  const partner118Profiles = profileChannels(
+    activeWagers,
+    PARTNER_118_CHANNELS,
+  );
+  const nonPartnerTicketCount =
+    activeWagers.length -
+    partner118Profiles.reduce((acc, profile) => acc + profile.tickets, 0);
+  // Game/event logs only exist for the GSLIVE scope; deriving them elsewhere would show
+  // an empty section on every channel.
+  const gsliveGames = isGsliveScope ? buildGsliveGameLog(activeWagers) : [];
+  const gsliveEvents = isGsliveScope
+    ? buildGsliveEventLog(activeWagers, selectedGame)
+    : [];
 
   const baseSportIds = new Set(SPORT_PILLS.map((p) => p.id.toUpperCase()));
   const extraSportPills: Array<{ id: string; label: string }> = [];
@@ -182,6 +306,17 @@ export function LiveWagersTabPanel({
       )
         return false;
       if (wagerAlertFilter !== "ALL" && w.alertTier !== wagerAlertFilter)
+        return false;
+      if (
+        wagerChannelFilter !== "ALL" &&
+        channelOfWager(w).toUpperCase() !== wagerChannelFilter.toUpperCase()
+      )
+        return false;
+      if (
+        isGsliveScope &&
+        selectedGame !== null &&
+        gameKeyOf(w) !== selectedGame
+      )
         return false;
       if (
         wagerTypeFilter !== "ALL" &&
@@ -361,6 +496,21 @@ export function LiveWagersTabPanel({
         </div>
 
         <div style={styles.tierFilterGroup}>
+          {CHANNEL_PILLS.map((pill) => (
+            <button
+              key={pill.id}
+              type="button"
+              style={styles.filterPill(
+                wagerChannelFilter.toUpperCase() === pill.id.toUpperCase(),
+              )}
+              onClick={() => onWagerChannelFilterChange(pill.id)}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={styles.tierFilterGroup}>
           {betTypePills.map((pill) => (
             <button
               key={pill.id}
@@ -390,6 +540,114 @@ export function LiveWagersTabPanel({
           ))}
         </div>
       </div>
+
+      {/* Partner 118 channel profile: GSLIVE vs GSBUILDER, split before filtering */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "stretch",
+          gap: "10px",
+          padding: "0 14px 10px",
+        }}
+      >
+        {partner118Profiles.map((profile) => {
+          const active =
+            wagerChannelFilter.toUpperCase() === profile.channel.toUpperCase();
+          return (
+            <button
+              key={profile.channel}
+              type="button"
+              data-channel-profile={profile.channel}
+              onClick={() =>
+                onWagerChannelFilterChange(
+                  active ? "ALL" : profile.channel.toUpperCase(),
+                )
+              }
+              title={`Filter Live Wagers to ${profile.label} tickets`}
+              style={{
+                flex: "1 1 320px",
+                textAlign: "left",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                backgroundColor: active
+                  ? "rgba(56, 189, 248, 0.14)"
+                  : "rgba(15, 23, 42, 0.75)",
+                border: `1px solid ${active ? "rgba(56, 189, 248, 0.55)" : "rgba(148, 163, 184, 0.25)"}`,
+                color: "#e2e8f0",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  gap: "8px",
+                }}
+              >
+                <span style={{ fontWeight: 700, fontSize: "12px" }}>
+                  {profile.channel === "gslive" ? "🔴" : "🧩"} {profile.label}
+                </span>
+                <span style={{ fontSize: "11px", color: "#94a3b8" }}>
+                  {profile.tickets} ticket{profile.tickets === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div
+                style={{ fontSize: "11px", color: "#cbd5e1", marginTop: "4px" }}
+              >
+                ${profile.riskUsd.toLocaleString()} risk · $
+                {profile.toWinUsd.toLocaleString()} to-win · avg $
+                {profile.avgTicketUsd.toLocaleString()}
+              </div>
+              <div
+                style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}
+              >
+                {profile.liveTickets} live-marked · top{" "}
+                {profile.topCustomerId ?? "—"}
+                {profile.topCustomerId !== null
+                  ? ` ($${profile.topCustomerRiskUsd.toLocaleString()})`
+                  : ""}
+              </div>
+            </button>
+          );
+        })}
+        <div
+          style={{
+            flex: "1 1 180px",
+            padding: "10px 12px",
+            borderRadius: "8px",
+            backgroundColor: "rgba(15, 23, 42, 0.55)",
+            border: "1px solid rgba(148, 163, 184, 0.18)",
+            fontSize: "11px",
+            color: "#94a3b8",
+          }}
+        >
+          <div style={{ fontWeight: 700, color: "#cbd5e1" }}>
+            Other channels
+          </div>
+          <div style={{ marginTop: "4px" }}>
+            {nonPartnerTicketCount} ticket
+            {nonPartnerTicketCount === 1 ? "" : "s"} (Internet, other writers)
+          </div>
+        </div>
+      </div>
+
+      {isGsliveScope && (
+        <GsliveGameLogSection
+          games={gsliveGames}
+          events={gsliveEvents}
+          selectedGame={selectedGame}
+          onSelectGame={setSelectedGame}
+          onSelectEvent={(ticketId) => {
+            const wager = activeWagers.find((w) => w.ticketId === ticketId);
+            if (wager !== undefined) onSelectWager(wager);
+          }}
+          lastUpdatedAt={wagersLastUpdatedAt}
+          newTicketIds={newTicketIds}
+          connected={streamingConnected}
+        />
+      )}
 
       {/* Slice Edge Leaderboard: Who is beating the desk in the active filter slice */}
       {topSliceBeaters.length > 0 && (

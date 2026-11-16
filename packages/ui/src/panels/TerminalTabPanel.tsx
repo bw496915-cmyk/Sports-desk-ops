@@ -1,7 +1,20 @@
 import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import { renderAnsiReact } from "../ansi.tsx";
 import { styles } from "../dashboard_styles.ts";
 import type { TerminalCategory, TerminalHistoryEntry } from "../types.ts";
+
+/** Output longer than this collapses to a preview so one verbose command cannot bury the log. */
+const TERMINAL_OUTPUT_PREVIEW_LINES = 40;
+
+const ENTRY_ACTION_STYLE: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  color: "#64748b",
+  cursor: "pointer",
+  fontSize: "11px",
+  padding: "0 4px",
+};
 
 export interface TerminalTabPanelProps {
   readonly terminalCategory: TerminalCategory;
@@ -10,6 +23,8 @@ export interface TerminalTabPanelProps {
   readonly onClearHistory: () => void;
   readonly copiedTerminalIdx: number | null;
   readonly onCopyOutput: (idx: number, stdout: string) => void;
+  readonly copiedCommandIdx: number | null;
+  readonly onCopyCommand: (idx: number, command: string) => void;
   readonly terminalLoading: boolean;
   readonly terminalBottomRef: React.RefObject<HTMLDivElement>;
   readonly terminalCommand: string;
@@ -72,6 +87,8 @@ export function TerminalTabPanel({
   onClearHistory,
   copiedTerminalIdx,
   onCopyOutput,
+  copiedCommandIdx,
+  onCopyCommand,
   terminalLoading,
   terminalBottomRef,
   terminalCommand,
@@ -82,6 +99,48 @@ export function TerminalTabPanel({
   onAutocomplete,
   onRunCommand,
 }: TerminalTabPanelProps): React.ReactElement {
+  const [pinnedToLatest, setPinnedToLatest] = useState<boolean>(true);
+  const [expandedEntries, setExpandedEntries] = useState<readonly number[]>([]);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!pinnedToLatest) return;
+    terminalBottomRef.current?.scrollIntoView({ block: "end" });
+  }, [
+    pinnedToLatest,
+    terminalHistory.length,
+    terminalLoading,
+    terminalBottomRef,
+  ]);
+
+  const handleBodyScroll = () => {
+    const el = bodyRef.current;
+    if (el === null) return;
+    setPinnedToLatest(el.scrollHeight - el.scrollTop - el.clientHeight <= 24);
+  };
+
+  const toggleEntry = (idx: number) => {
+    setExpandedEntries((prev) =>
+      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx],
+    );
+  };
+
+  const visibleOutput = (idx: number, stdout: string): string => {
+    if (expandedEntries.includes(idx)) return stdout;
+    const lines = stdout.split("\n");
+    if (lines.length <= TERMINAL_OUTPUT_PREVIEW_LINES) return stdout;
+    const hidden = lines.length - TERMINAL_OUTPUT_PREVIEW_LINES;
+    return `${lines.slice(0, TERMINAL_OUTPUT_PREVIEW_LINES).join("\n")}\n\x1b[90m… ${hidden} more lines (Show all)\x1b[0m`;
+  };
+
+  const jumpToLatest = () => {
+    setPinnedToLatest(true);
+    terminalBottomRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  };
+
   return (
     <div style={styles.terminalContainer}>
       {/* Window title bar */}
@@ -188,7 +247,12 @@ export function TerminalTabPanel({
       </div>
 
       {/* Scrollable Terminal Screen */}
-      <div style={styles.terminalBody}>
+      <div
+        ref={bodyRef}
+        data-terminal-body="true"
+        onScroll={handleBodyScroll}
+        style={styles.terminalBody}
+      >
         {terminalHistory.map((item, idx) => (
           <div key={idx} style={styles.terminalEntry}>
             <div style={styles.terminalPromptLine}>
@@ -201,31 +265,64 @@ export function TerminalTabPanel({
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
+                  flexWrap: "wrap",
                 }}
               >
+                <span style={styles.terminalMeta}>
+                  {new Date(item.timestamp).toLocaleTimeString("en-US", {
+                    hour12: false,
+                  })}
+                  {item.durationMs > 0 ? ` · ${item.durationMs}ms` : ""}
+                </span>
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: item.exitCode === 0 ? "#4ade80" : "#f87171",
+                  }}
+                >
+                  exit {item.exitCode}
+                </span>
                 <button
                   type="button"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#64748b",
-                    cursor: "pointer",
-                    fontSize: "11px",
-                    padding: "0 4px",
-                  }}
+                  style={ENTRY_ACTION_STYLE}
+                  title="Copy the command text"
+                  onClick={() => onCopyCommand(idx, item.command)}
+                >
+                  {copiedCommandIdx === idx ? "✓ cmd" : "⧉ cmd"}
+                </button>
+                <button
+                  type="button"
+                  style={ENTRY_ACTION_STYLE}
+                  title={`Run "${item.command}" again`}
+                  onClick={() => onRunCommand(item.command)}
+                >
+                  ↻ Rerun
+                </button>
+                <button
+                  type="button"
+                  style={ENTRY_ACTION_STYLE}
                   title="Copy raw terminal output"
                   onClick={() => onCopyOutput(idx, item.stdout)}
                 >
                   {copiedTerminalIdx === idx ? "✓ Copied" : "📋 Copy"}
                 </button>
-                <span style={styles.terminalMeta}>
-                  {item.durationMs > 0 && `[${item.durationMs}ms] `}
-                  exit: {item.exitCode}
-                </span>
               </div>
             </div>
             <div style={styles.terminalOutput}>
-              {renderAnsiReact(item.stdout)}
+              {renderAnsiReact(visibleOutput(idx, item.stdout))}
+              {item.stdout.split("\n").length >
+                TERMINAL_OUTPUT_PREVIEW_LINES && (
+                <button
+                  type="button"
+                  style={{ ...ENTRY_ACTION_STYLE, marginTop: "6px" }}
+                  onClick={() => toggleEntry(idx)}
+                >
+                  {expandedEntries.includes(idx)
+                    ? "Collapse output"
+                    : `Show all ${item.stdout.split("\n").length} lines`}
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -240,6 +337,28 @@ export function TerminalTabPanel({
           </div>
         )}
         <div ref={terminalBottomRef} />
+        {!pinnedToLatest && (
+          <button
+            type="button"
+            onClick={jumpToLatest}
+            style={{
+              position: "sticky",
+              bottom: "0",
+              marginLeft: "auto",
+              display: "block",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              border: "1px solid rgba(56, 189, 248, 0.4)",
+              backgroundColor: "rgba(56, 189, 248, 0.16)",
+              color: "#7dd3fc",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            ↓ Jump to latest
+          </button>
+        )}
       </div>
 
       {/* Keyboard Shortcuts Legend Bar */}
