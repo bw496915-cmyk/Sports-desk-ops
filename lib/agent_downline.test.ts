@@ -69,12 +69,26 @@ describe("tree subtree exposure", () => {
         {
           customerId: "C1",
           agentId: "A1",
-          positions: [{ risk_usd: 100, to_win_usd: 250, sport: "Football" }],
+          positions: [
+            {
+              risk_usd: 100,
+              to_win_usd: 250,
+              sport: "Football",
+              writer: "Internet",
+            },
+          ],
         },
         {
           customerId: "C2",
           agentId: "LEAF",
-          positions: [{ risk_usd: 50, to_win_usd: 90, sport: "Basketball" }],
+          positions: [
+            {
+              risk_usd: 50,
+              to_win_usd: 90,
+              sport: "Basketball",
+              writer: "GSBUILDER",
+            },
+          ],
         },
         {
           customerId: "C3",
@@ -101,6 +115,19 @@ describe("tree subtree exposure", () => {
       avgTicketRiskUsd: 75,
     });
     expect(exposure.get("A1")?.openRiskUsd).toBe(150);
+    expect(exposure.get("A1")?.topCustomers[0]).toMatchObject({
+      key: "C1",
+      riskUsd: 100,
+      sharePct: 66.7,
+    });
+    expect(exposure.get("A1")?.sports[0]).toMatchObject({
+      key: "Football",
+      riskUsd: 100,
+    });
+    expect(exposure.get("A1")?.writers.map((w) => w.key)).toEqual([
+      "Internet",
+      "GSBUILDER",
+    ]);
     expect(exposure.get("B1")?.openRiskUsd).toBe(50);
     expect(exposure.get("LEAF")?.customers).toBe(1);
     expect(exposure.get("OUTSIDE")).toMatchObject({

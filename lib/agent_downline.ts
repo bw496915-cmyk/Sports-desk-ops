@@ -130,6 +130,13 @@ export function treeDownlineCounts(
   return counts;
 }
 
+export interface AgentRiskBucket {
+  /** Customer login, sport label, or writer name, depending on the bucket. */
+  readonly key: string;
+  readonly riskUsd: number;
+  readonly sharePct: number;
+}
+
 export interface AgentExposure {
   readonly customers: number;
   readonly positions: number;
@@ -154,6 +161,12 @@ export interface AgentExposure {
   readonly topSportRiskUsd: number;
   readonly topSportSharePct: number;
   readonly sportCount: number;
+  /** Largest customer risks in the subtree (top 3). */
+  readonly topCustomers: readonly AgentRiskBucket[];
+  /** Sport buckets in the subtree (top 5). */
+  readonly sports: readonly AgentRiskBucket[];
+  /** Writer buckets in the subtree (top 5); pending rows have no writer. */
+  readonly writers: readonly AgentRiskBucket[];
 }
 
 export interface TreeCollision {
@@ -194,6 +207,7 @@ interface ExposureAccumulator {
   maxTicketRiskUsd: number;
   riskByCustomer: Map<string, number>;
   riskBySport: Map<string, number>;
+  riskByWriter: Map<string, number>;
 }
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
@@ -214,6 +228,7 @@ export function treeSubtreeExposure(
       readonly risk_usd?: number | undefined;
       readonly to_win_usd?: number | undefined;
       readonly sport?: string | undefined;
+      readonly writer?: string | undefined;
     }[];
   }>,
 ): ReadonlyMap<string, AgentExposure> {
@@ -236,6 +251,7 @@ export function treeSubtreeExposure(
     maxTicketRiskUsd: 0,
     riskByCustomer: new Map<string, number>(),
     riskBySport: new Map<string, number>(),
+    riskByWriter: new Map<string, number>(),
   });
   for (const profile of profiles) {
     const agent = profile.agentId.trim().toUpperCase();
@@ -285,6 +301,12 @@ export function treeSubtreeExposure(
             (acc.riskBySport.get(sport) ?? 0) + (position.risk_usd ?? 0),
           );
         }
+        const writer = position.writer?.trim() ?? "";
+        const writerKey = writer === "" ? "unknown" : writer;
+        acc.riskByWriter.set(
+          writerKey,
+          (acc.riskByWriter.get(writerKey) ?? 0) + (position.risk_usd ?? 0),
+        );
       }
       accumulated.set(current, acc);
       current = parent.get(current) ?? "";
@@ -301,6 +323,18 @@ export function treeSubtreeExposure(
     const [topSport, topSportRiskUsd] = [...acc.riskBySport.entries()].sort(
       (a, b) => b[1] - a[1],
     )[0] ?? [null, 0];
+    const bucket = (
+      map: Map<string, number>,
+      limit: number,
+    ): AgentRiskBucket[] =>
+      [...map.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([key, risk]) => ({
+          key,
+          riskUsd: round2(risk),
+          sharePct: riskUsd > 0 ? round1((risk / riskUsd) * 100) : 0,
+        }));
     exposure.set(agent, {
       customers,
       positions,
@@ -324,6 +358,9 @@ export function treeSubtreeExposure(
       topSportSharePct:
         riskUsd > 0 ? round1((topSportRiskUsd / riskUsd) * 100) : 0,
       sportCount: acc.riskBySport.size,
+      topCustomers: bucket(acc.riskByCustomer, 3),
+      sports: bucket(acc.riskBySport, 5),
+      writers: bucket(acc.riskByWriter, 5),
     });
   }
   return exposure;
