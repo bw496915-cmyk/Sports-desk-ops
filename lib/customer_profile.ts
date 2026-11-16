@@ -279,8 +279,25 @@ export interface TicketRow {
   readonly placed_at?: string;
 }
 
+/** One open ticket attributed to a customer. Distinct from `TicketRow`: a position is unsettled by
+ * construction and carries the live writer/source, while `TicketRow` is the book's recent sample. */
+export interface PositionRow {
+  readonly wager_number?: string;
+  readonly sport?: string;
+  readonly market?: string;
+  readonly selection?: string;
+  readonly risk_usd?: number;
+  readonly to_win_usd?: number;
+  readonly placed_at?: string;
+  readonly writer?: string;
+  /** Placeholder: live captures only produce open positions; settled rows are not wired yet. */
+  readonly status?: string;
+  readonly source?: string;
+}
+
 /** Artifact a synthesized row came from; the book's own rows leave this unset. */
-export type CustomerRowProvenance = "harvested-live-profiles" | "live-wagers";
+export type CustomerRowProvenance =
+  "harvested-live-profiles" | "live-wagers" | "live-bets";
 
 export interface CustomerRow {
   readonly customer_id: string;
@@ -303,6 +320,8 @@ export interface CustomerRow {
   readonly churn_hazard?: number;
   readonly churn_mode?: string;
   readonly recent_tickets?: readonly TicketRow[];
+  /** Open ticket-level positions harvested from the live captures. */
+  readonly open_positions?: readonly PositionRow[];
 }
 
 export interface Bucket {
@@ -359,6 +378,8 @@ export interface CustomerProfile {
     readonly ipSubnet: string;
   };
   readonly tickets: TicketSummary;
+  /** Open positions, one row per ticket; empty when no live capture carried this customer. */
+  readonly positions: readonly PositionRow[];
   readonly placement: Placement;
   /** Data-quality notes that change how a number should be read. */
   readonly flags: readonly string[];
@@ -519,6 +540,7 @@ export function buildCustomerProfile(
       ipSubnet: text(row.ip_subnet),
     },
     tickets,
+    positions: row.open_positions ?? [],
     placement,
     flags,
   };

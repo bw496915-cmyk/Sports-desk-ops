@@ -103,6 +103,25 @@ export interface HarvestedLiveProfile {
   readonly dodBinaryRow: number | null;
   readonly anomalyFlags: readonly LiveAnomalyFlag[];
   readonly sampleWagers: readonly HarvestedSampleWager[];
+  /** Open ticket-level positions from the live captures, not the six-row sample. */
+  readonly positions: readonly HarvestedPosition[];
+}
+
+/** One open ticket attributed to a customer. `status` is open by construction: settled rows come
+ * from the graded/ledger artifacts, not these live captures. */
+export interface HarvestedPosition {
+  readonly wagerNumber: string | null;
+  readonly sport: string;
+  readonly wagerType: string;
+  readonly description: string;
+  readonly riskUsd: number;
+  readonly toWinUsd: number | null;
+  readonly placedAtIso: string | null;
+  readonly writer: string | null;
+  readonly vip: boolean;
+  /** Placeholder until settled positions are wired: every captured row is open by construction. */
+  readonly status: "open";
+  readonly source: "live-wagers" | "live-bets";
 }
 
 export type HarvestSourceStatus = "ok" | "missing" | "malformed";
@@ -154,6 +173,8 @@ interface RawAccumulator {
   sports: Map<string, number>;
   wagerTypes: Map<string, number>;
   sampleWagers: HarvestedSampleWager[];
+  /** Every open ticket seen for this customer, deduped by wager number across captures. */
+  positions: HarvestedPosition[];
   latestSelection: string;
   dodSettledStakedCents: number | null;
   dodSettledNetCents: number | null;
@@ -569,6 +590,7 @@ function buildProfileFromAccumulator(
     dodBinaryRow,
     anomalyFlags: flags,
     sampleWagers: acc.sampleWagers.slice(0, 6),
+    positions: [...acc.positions].sort((a, b) => b.riskUsd - a.riskUsd),
   };
 }
 
@@ -624,6 +646,7 @@ export async function harvestLiveCustomerProfiles(
         sports: new Map(),
         wagerTypes: new Map(),
         sampleWagers: [],
+        positions: [],
         latestSelection: "",
         dodSettledStakedCents: null,
         dodSettledNetCents: null,
@@ -743,6 +766,24 @@ export async function harvestLiveCustomerProfiles(
         acc.sports.set(sport, (acc.sports.get(sport) ?? 0) + 1);
         acc.wagerTypes.set(wt, (acc.wagerTypes.get(wt) ?? 0) + 1);
 
+        const toWinCents = Number(r.ToWinAmount);
+        const wagerNumber = String(r.WagerNumber ?? "").trim();
+        acc.positions.push({
+          wagerNumber: wagerNumber === "" ? null : wagerNumber,
+          sport,
+          wagerType: wt,
+          description: desc,
+          riskUsd: riskCents / 100,
+          toWinUsd: Number.isFinite(toWinCents) ? toWinCents / 100 : null,
+          placedAtIso: Number.isFinite(whenMs)
+            ? new Date(whenMs).toISOString()
+            : null,
+          writer: writer === "" ? null : writer,
+          vip: Boolean(r.VIP),
+          status: "open",
+          source: "live-wagers",
+        });
+
         if (acc.sampleWagers.length < 6 && desc) {
           acc.sampleWagers.push({
             sport: sport.toUpperCase(),
@@ -788,6 +829,44 @@ export async function harvestLiveCustomerProfiles(
         if (acc.openRisk24hCents === 0) {
           acc.openRisk24hCents += riskCents;
           acc.openTickets24h += 1;
+        }
+
+        const wagerNumber = String(g.wagerNumber ?? "").trim();
+        const toWinCents = Number(g.toWin);
+        const position: HarvestedPosition = {
+          wagerNumber: wagerNumber === "" ? null : wagerNumber,
+          sport:
+            String(g.sport ?? "")
+              .trim()
+              .toUpperCase() || "OTHER",
+          wagerType: String(g.wagerType ?? "").trim(),
+          description: String(g.description ?? "").trim(),
+          riskUsd: riskCents / 100,
+          toWinUsd: Number.isFinite(toWinCents) ? toWinCents / 100 : null,
+          placedAtIso: String(g.acceptedAt ?? "").trim() || null,
+          writer: null,
+          vip: false,
+          status: "open",
+          source: "live-bets",
+        };
+        const existingIndex =
+          position.wagerNumber === null
+            ? -1
+            : acc.positions.findIndex(
+                (p) => p.wagerNumber === position.wagerNumber,
+              );
+        if (existingIndex >= 0) {
+          const existing = acc.positions[existingIndex]!;
+          acc.positions[existingIndex] = {
+            ...existing,
+            sport: position.sport !== "OTHER" ? position.sport : existing.sport,
+            wagerType: position.wagerType || existing.wagerType,
+            description: position.description || existing.description,
+            toWinUsd: position.toWinUsd ?? existing.toWinUsd,
+            placedAtIso: position.placedAtIso ?? existing.placedAtIso,
+          };
+        } else {
+          acc.positions.push(position);
         }
       }
       sources.liveBets = "ok";

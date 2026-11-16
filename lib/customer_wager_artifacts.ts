@@ -20,6 +20,7 @@
 
 import { resolve } from "node:path";
 import { summarizeCardCorpus, type CardCorpus } from "./wager_card.ts";
+import { WIRE_MONEY_PER_USD, usdFromWireCents } from "./wire_money.ts";
 
 type JsonRow = Record<string, unknown>;
 
@@ -71,11 +72,11 @@ const num = (value: unknown): number | null => {
  * $19.4M), and the suspected-bot bundle's `totalWageredCents` of 51,375 for TTN97 equals the
  * graded sum read as cents. Reading these as dollars overstates every figure by 100x.
  */
-export const WIRE_MONEY_PER_USD = 100;
+export { WIRE_MONEY_PER_USD };
 
 /** Wire cents -> USD. Missing money reads as 0, matching the capture's own zero for a blank. */
 const usdFromWire = (value: unknown): number =>
-  (num(value) ?? 0) / WIRE_MONEY_PER_USD;
+  usdFromWireCents(num(value) ?? 0);
 
 /** Column names that may arrive padded in a fixed-width export (`"TTN97     "`). */
 const customerIdOf = (row: JsonRow): string | null => {

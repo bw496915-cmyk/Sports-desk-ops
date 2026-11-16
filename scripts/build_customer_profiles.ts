@@ -20,7 +20,10 @@ import {
   type CustomerRow,
   type TreeIndex,
 } from "../lib/customer_profile.ts";
-import { customerRowFromHarvestedProfile } from "../lib/customer_source_rows.ts";
+import {
+  customerRowFromHarvestedProfile,
+  customerRowsFromLiveCaptures,
+} from "../lib/customer_source_rows.ts";
 
 const REPO = join(import.meta.dir, "..");
 const { values } = parseArgs({
@@ -73,6 +76,49 @@ if (await harvestedFile.exists()) {
   } catch {
     // signal honesty: an unreadable harvested artifact adds no rows
   }
+}
+
+// Every customer that appears in either live capture, independent of the ranked harvest.
+// A wager must reach a profile even when the customer is not in the book or the flagged top-N.
+const liveWagersDoc = await Bun.file(join(REPO, "data", "live-wagers.json"))
+  .json()
+  .catch(() => null);
+const liveBetsDoc = await Bun.file(join(REPO, "data", "live-bets.json"))
+  .json()
+  .catch(() => null);
+const liveRows = customerRowsFromLiveCaptures(liveWagersDoc, liveBetsDoc);
+const rowById = new Map(
+  rows.map((row) => [row.customer_id.trim().toUpperCase(), row]),
+);
+for (const live of liveRows) {
+  const existing = rowById.get(live.customer_id);
+  if (existing === undefined) {
+    rows.push(live);
+    rowById.set(live.customer_id, live);
+    continue;
+  }
+  const positions = [...(existing.open_positions ?? [])];
+  const seen = new Set(
+    positions
+      .map((position) => position.wager_number)
+      .filter((number): number is string => number !== undefined),
+  );
+  for (const position of live.open_positions ?? []) {
+    const number = position.wager_number;
+    if (number !== undefined && seen.has(number)) continue;
+    if (number !== undefined) seen.add(number);
+    positions.push(position);
+  }
+  const merged = {
+    ...existing,
+    ...(existing.agent_id === undefined && live.agent_id !== undefined
+      ? { agent_id: live.agent_id }
+      : {}),
+    recent_tickets: existing.recent_tickets ?? live.recent_tickets,
+    ...(positions.length === 0 ? {} : { open_positions: positions }),
+  };
+  rows[rows.indexOf(existing)] = merged;
+  rowById.set(live.customer_id, merged);
 }
 
 const tree = (await Bun.file(resolve(values.tree ?? "")).json()) as TreeIndex;
