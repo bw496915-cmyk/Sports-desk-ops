@@ -368,6 +368,39 @@ const profileCoverage = {
   ).length,
 };
 
+const rosterLevels: Record<string, number> = {};
+const rosterTypes: Record<string, number> = {};
+if (roster !== null) {
+  for (const agent of roster.byAgent.values()) {
+    if (agent.level !== null) {
+      const key = String(agent.level);
+      rosterLevels[key] = (rosterLevels[key] ?? 0) + 1;
+    }
+    if (agent.type !== null) {
+      rosterTypes[agent.type] = (rosterTypes[agent.type] ?? 0) + 1;
+    }
+  }
+}
+const mismatchedProfiles = feedProfiles.filter(
+  (profile) =>
+    profile.roster !== undefined && !profile.roster.agentMatchesProfile,
+);
+const agentFeedBlock = {
+  ...agentFeed,
+  profileCoverage,
+  rosterLevels,
+  rosterTypes,
+  mismatches: {
+    count: mismatchedProfiles.length,
+    sample: mismatchedProfiles.slice(0, 10).map((profile) => ({
+      customerId: profile.customerId,
+      profileAgent: profile.agentId,
+      rosterAgent: profile.roster?.agentId ?? null,
+      level: profile.roster?.level ?? null,
+    })),
+  },
+};
+
 const outPath = resolve(values.out ?? "");
 await Bun.write(
   outPath,
@@ -400,7 +433,7 @@ await Bun.write(
             ? {}
             : { collision: treeCollisions.get(agent) }),
         })),
-      agentFeed: { ...agentFeed, profileCoverage },
+      agentFeed: agentFeedBlock,
       downline: {
         status: downline === null ? "missing" : "ok",
         source: downlinePath.replace(REPO, "."),
