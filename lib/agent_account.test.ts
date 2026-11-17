@@ -150,3 +150,24 @@ describe("admin account config projection", () => {
     expect(JSON.stringify(projected)).not.toContain("should-not-survive");
   });
 });
+
+describe("bare INFO shape", () => {
+  test("web-reports accepts the INFO object without the wrapper", () => {
+    const projected = projectWebReportsConfig({
+      AgentID: "BILLY666  ",
+      showPending: "on",
+    });
+    expect(projected.agentId).toBe("BILLY666");
+    expect(projected.displayFlags).toEqual({ showPending: "on" });
+  });
+
+  test("pending web-reports accepts the bare INFO object", () => {
+    const projected = projectWebReportsPendingConfig({
+      AgentID: "BILLY666  ",
+      NameF: "on",
+      PasswordF: "off",
+    });
+    expect(projected.agentId).toBe("BILLY666");
+    expect(projected.columnFlags).toEqual({ NameF: "on", PasswordF: "off" });
+  });
+});

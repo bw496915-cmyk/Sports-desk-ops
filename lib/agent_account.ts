@@ -17,6 +17,33 @@ const SENSITIVE = new Set([
   "commentsforcustomer",
 ]);
 
+/**
+ * Accept either the wrapped `{ INFO: {...} }` or the bare INFO object. A bare
+ * object with no identifying/flag fields is refused, so `{}` does not become INFO.
+ */
+function infoOf(raw: unknown, label: string): Record<string, unknown> {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`${label} response must be an object`);
+  }
+  const doc = raw as Record<string, unknown>;
+  const wrapped = doc.INFO;
+  if (
+    wrapped !== null &&
+    typeof wrapped === "object" &&
+    !Array.isArray(wrapped)
+  ) {
+    return wrapped as Record<string, unknown>;
+  }
+  if (
+    "AgentID" in doc ||
+    "CustomerID" in doc ||
+    Object.keys(doc).some((key) => /^show/i.test(key) || /F$/.test(key))
+  ) {
+    return doc;
+  }
+  throw new Error(`${label} response lacks INFO`);
+}
+
 const trim = (value: unknown): string | null =>
   typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 
@@ -95,15 +122,7 @@ export function projectWebReportsConfig(
 ): ProjectedWebReportsConfig {
   if (raw === null || typeof raw !== "object")
     throw new Error("web-reports response must be an object");
-  const infoRaw = (raw as Record<string, unknown>).INFO;
-  if (
-    infoRaw === null ||
-    typeof infoRaw !== "object" ||
-    Array.isArray(infoRaw)
-  ) {
-    throw new Error("web-reports response lacks INFO");
-  }
-  const info = scrub(infoRaw) as Record<string, unknown>;
+  const info = scrub(infoOf(raw, "web-reports")) as Record<string, unknown>;
   const displayFlags: Record<string, string> = {};
   for (const [key, value] of Object.entries(info)) {
     if (/^show/i.test(key) && typeof value === "string")
@@ -136,15 +155,10 @@ export function projectWebReportsPendingConfig(
 ): ProjectedWebReportsPendingConfig {
   if (raw === null || typeof raw !== "object")
     throw new Error("pending web-reports response must be an object");
-  const infoRaw = (raw as Record<string, unknown>).INFO;
-  if (
-    infoRaw === null ||
-    typeof infoRaw !== "object" ||
-    Array.isArray(infoRaw)
-  ) {
-    throw new Error("pending web-reports response lacks INFO");
-  }
-  const info = scrub(infoRaw) as Record<string, unknown>;
+  const info = scrub(infoOf(raw, "pending web-reports")) as Record<
+    string,
+    unknown
+  >;
   const columnFlags: Record<string, string> = {};
   for (const [key, value] of Object.entries(info)) {
     if (key !== "AgentID" && /F$/.test(key) && typeof value === "string") {
