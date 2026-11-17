@@ -220,6 +220,11 @@ async function probe(target: HostTarget): Promise<EndpointProbeObservation> {
     }
   })();
 
+  // Bun DNS reference: prefetch warms a later fetch()/Bun.connect() so it can skip the
+  // lookup (measured: prefetch miss -> fetch cache hit). Experimental, so it never decides
+  // the verdict; the lookup above is the DNS signal.
+  Bun.dns.prefetch(target.hostname, target.port);
+
   const started = performance.now();
   const fetched = await (async () => {
     try {
