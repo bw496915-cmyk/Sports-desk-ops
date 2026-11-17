@@ -1,0 +1,22 @@
+{
+  "id": "dx-help",
+  "description": "./bin/dx help. The help text embeds the live 'bun run --help' flag catalog, so it is a direct probe of the runtime's CLI surface (a Bun bump that adds/removes/renames a flag shows up here as a diff). Throwaway HOME; no network. The DX_VERIFY_RUNTIME guard itself is covered by verify-bun-fake-pin and tests/toolchain_verify_bun.test.ts.",
+  "argv": ["./bin/dx", "help"],
+  "cwd": ".",
+  "env": {
+    "PATH": "{bun_dir}:/usr/bin:/bin",
+    "HOME": "{tmp_home}",
+    "TZ": "UTC",
+    "LANG": "C.UTF-8",
+    "NO_COLOR": "1",
+    "FORCE_COLOR": "0"
+  },
+  "network": "none",
+  "runtime": "any",
+  "normalizer": "raw",
+  "inputs": {
+    "worktree": true,
+    "files": ["toolchain/bun.pin.json"]
+  },
+  "timeout_s": 120
+}
