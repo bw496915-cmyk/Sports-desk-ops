@@ -20,7 +20,7 @@ import {
   mapR2ErrorExitCode,
   syncCanonicalGovernanceManifestsToR2,
   verifyCanonicalR2Manifests,
-} from "../packages/sportsdesk-ops/src/lib/r2_manifest_cas.ts";
+} from "../lib/r2_manifest_cas.ts";
 
 export interface R2Config {
   readonly accountId: string;

@@ -33,7 +33,7 @@ import {
   probeR2ManifestState,
   promoteCanonicalManifestWithCas,
   writeContentAddressedChunkWithRetry,
-} from "../packages/sportsdesk-ops/src/lib/r2_manifest_cas.ts";
+} from "../lib/r2_manifest_cas.ts";
 import {
   LIVE_WAGER_TYPE_CODE3,
   PairwiseWagerColumnStore,

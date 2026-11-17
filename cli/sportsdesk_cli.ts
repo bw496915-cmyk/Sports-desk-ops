@@ -2648,8 +2648,7 @@ export async function main(): Promise<void> {
     } else if (sub === "--verify" || sub === "verify") {
       const { verifyCanonicalR2Surface } =
         await import("../services/sportsdesk_r2_sync.ts");
-      const { mapR2ErrorExitCode } =
-        await import("../packages/sportsdesk-ops/src/lib/r2_manifest_cas.ts");
+      const { mapR2ErrorExitCode } = await import("../lib/r2_manifest_cas.ts");
       try {
         const ok = await verifyCanonicalR2Surface({
           json: jsonFlag,
@@ -2663,8 +2662,7 @@ export async function main(): Promise<void> {
     } else if (sub === "--sync" || sub === "sync") {
       const { syncCanonicalR2Surface } =
         await import("../services/sportsdesk_r2_sync.ts");
-      const { mapR2ErrorExitCode } =
-        await import("../packages/sportsdesk-ops/src/lib/r2_manifest_cas.ts");
+      const { mapR2ErrorExitCode } = await import("../lib/r2_manifest_cas.ts");
       const targetDir =
         rawArgs.slice(2).find((arg) => !arg.startsWith("-")) || "reports";
       try {
@@ -2697,8 +2695,7 @@ export async function main(): Promise<void> {
     }
     const { runCanonicalStaleSurface } =
       await import("../services/sportsdesk_r2_sync.ts");
-    const { mapR2ErrorExitCode } =
-      await import("../packages/sportsdesk-ops/src/lib/r2_manifest_cas.ts");
+    const { mapR2ErrorExitCode } = await import("../lib/r2_manifest_cas.ts");
     const jsonFlag = rawArgs.includes("--json");
     const includeBridges = rawArgs.includes("--include-bridges");
     const windowMinArg = getArgValue(rawArgs, ["--window-min"], "");
