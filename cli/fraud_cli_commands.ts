@@ -324,6 +324,10 @@ export const HELP_COMMANDS: readonly CommandHelp[] = [
       "zero-Map/zero-Set deduplicated follower attribution between customerA and customerB.",
       "Local file flags (--input/--file) and .json/.jsonl/.sqlite/.dodbin paths fail closed",
       "with ERR_OPS_LOCAL_JSON_FORBIDDEN (exit 78).",
+      "Declared networked exception (contract rev 3): reads R2_ACCESS_KEY_ID and",
+      "R2_SECRET_ACCESS_KEY from the environment; writes nothing; prints no tokens.",
+      "Exit classes: 65 data/reconciliation, 70 integrity, 74 CAS/IO, 77 token isolation,",
+      "78 config.",
     ],
     arguments: [
       {

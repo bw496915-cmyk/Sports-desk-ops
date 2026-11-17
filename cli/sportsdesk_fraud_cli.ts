@@ -11,7 +11,9 @@
  * - exit codes: 0 ok, 2 usage_error, 3 refusal (source_missing / insufficient_corpus /
  *   model_missing / unknown_subject), 1 everything else
  *
- * Read-only, always: no network, no secrets/keychain, no artifact mutation. The single write is
+ * Roster commands are read-only and offline: no network, no secrets/keychain, no artifact
+ * mutation. The declared `cross-ref` exception (contract rev 3) reads R2 credentials from the
+ * environment and calls R2; it writes nothing and prints no tokens. The single write is
  * `model fit --write` → `reports/security/fraud-model.json` (atomic tmp+rename, mode 0600).
  *
  * Honesty floor: every success payload carries `sources: FraudSourceState[]` (MISSING ≠ 0,
@@ -2036,8 +2038,12 @@ Exit codes:
   2  usage_error (unknown command/flag, missing or invalid value)
   3  refusal (source_missing, insufficient_corpus, model_missing, unknown_subject)
   1  everything else
+  cross-ref (declared networked exception): 65 data/reconciliation, 70 integrity, 74 CAS/IO,
+    77 token isolation, 78 config
 
-Read-only: no network, no secrets/keychain, no artifact mutation. The only write is
+Roster commands are read-only and offline: no network, no secrets/keychain, no artifact
+mutation. The declared \`cross-ref\` exception (contract rev 3) reads R2 credentials from the
+environment and calls R2; it writes nothing and prints no tokens. The only write is
 \`model fit --write\` → ${FRAUD_MODEL_REL_PATH} (atomic, 0600).
 
 Examples:
