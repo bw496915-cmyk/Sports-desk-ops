@@ -241,8 +241,9 @@ export async function fetchF402Pending(
     "https://fantasy402.com"
   ).replace(/\/+$/, "");
   const url = `${base}/cloud/api/Manager/getPending`;
+  const agentId = options.agentId ?? Bun.env.F402_AGENT_ID ?? "";
   const body: Record<string, string | number> = {
-    agentID: options.agentId ?? Bun.env.F402_AGENT_ID ?? "",
+    agentID: agentId,
     path: "/qubic/api/Manager/getPending",
     RRO: 1,
     date: options.date,
@@ -251,7 +252,9 @@ export async function fetchF402Pending(
     typeSort: "2",
     week: 0,
     customerID: "0",
-    agentOwner: options.agentOwner ?? Bun.env.F402_AGENT_OWNER ?? "",
+    // The server 500s (empty text/html) when agentOwner is empty; the ticker body sets it to the
+    // agent id, and the pending read must match that shape.
+    agentOwner: options.agentOwner ?? Bun.env.F402_AGENT_OWNER ?? agentId,
   };
   const fetchImpl = options.fetchImpl ?? fetch;
   const response = await fetchImpl(url, {
