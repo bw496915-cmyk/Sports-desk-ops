@@ -11,8 +11,14 @@ import {
   type PairwiseR2Reader,
 } from "../packages/sportsdesk-ops/src/bin/sportsdesk-fraud-cross-ref.ts";
 import {
+  CANONICAL_R2_SINK_SPECS,
+  evaluateCanonicalR2ManifestStaleness,
   normalizeStrongETag,
   promoteCanonicalManifestWithCas,
+  publishEdgeTopologyManifestToR2,
+  publishOpsSupervisorManifestToR2,
+  syncCanonicalGovernanceManifestsToR2,
+  verifyCanonicalR2Manifests,
   type CasR2ClientLike,
 } from "../packages/sportsdesk-ops/src/lib/r2_manifest_cas.ts";
 import { publishWagersByStateSnapshotToR2 } from "../scripts/publish_wagers_snapshot.ts";
@@ -1374,5 +1380,151 @@ describe("sportsdesk-fraud cross-ref governance & R2 lineage envelope", () => {
     );
     expect(bleedProc.exitCode).toBe(77);
     expect(bleedProc.stderr.toString()).toContain("ERR_CF_TOKEN_BLEED_10000");
+  });
+
+  test("CANONICAL_R2_SINK_SPECS registers ops-supervisor & edge-topology with dual-clock verify, staleness, and If-Match CAS", async () => {
+    expect(CANONICAL_R2_SINK_SPECS["wagers-by-state"].manifestKey).toBe(
+      WAGERS_BY_STATE_MANIFEST_KEY,
+    );
+    expect(CANONICAL_R2_SINK_SPECS["syndicate-rings"].manifestKey).toBe(
+      SYNDICATE_RINGS_MANIFEST_KEY,
+    );
+    expect(CANONICAL_R2_SINK_SPECS["ops-supervisor"]).toMatchObject({
+      sinkId: "ops-supervisor",
+      manifestKey: "manifests/ops-supervisor/latest",
+      generationPrefix: "generations/ops-supervisor",
+      lane: "ops-control-plane",
+      skillOrdinalU8: 16,
+      domain: "[Ops & Governance]",
+      r2Bucket: R2_BUCKET,
+    });
+    expect(CANONICAL_R2_SINK_SPECS["edge-topology"]).toMatchObject({
+      sinkId: "edge-topology",
+      manifestKey: "manifests/edge-topology/latest",
+      generationPrefix: "generations/edge-topology",
+      lane: "ops-edge-ci",
+      skillOrdinalU8: 4,
+      r2Region: "ENAM",
+      domain: "[Ops & Governance]",
+      r2Bucket: R2_BUCKET,
+    });
+
+    const casHarness = createInMemoryCasR2Client();
+    const okEnv = makeLiveEnv();
+    const baseMs = Date.parse("2026-11-17T20:00:00.000Z");
+
+    // Publish wagers-by-state + initial syndicate-rings first
+    await publishWagersByStateSnapshotToR2({
+      client: casHarness.client,
+      env: okEnv,
+      nowMs: baseMs,
+      liveTickerDoc: {
+        observedAt: new Date(baseMs).toISOString(),
+        LIST: [
+          {
+            WagerNumber: 1001,
+            CustomerID: "C001",
+            AmountWagered: 500,
+            InsertDateTime: "2026-11-17 15:00:00.000",
+            TicketWriter: "Internet",
+            ShortDesc: "S.Basketball #547 Pistons +12 -110 - For Game",
+          },
+        ],
+      },
+    });
+
+    // Before syncing ops-supervisor & edge-topology, verifyCanonicalR2Manifests reports ok=false
+    const preVerify = await verifyCanonicalR2Manifests({
+      client: casHarness.client,
+      env: okEnv,
+    });
+    expect(preVerify.ok).toBe(false);
+    expect(preVerify.circuit_state).toBe("OPEN");
+
+    // syncCanonicalGovernanceManifestsToR2 requires SPORTSDESK_LIVE_INGEST=1
+    let noLiveErr: unknown = null;
+    try {
+      await syncCanonicalGovernanceManifestsToR2({
+        client: casHarness.client,
+        env: { ...okEnv, SPORTSDESK_LIVE_INGEST: "0" },
+        nowMs: baseMs,
+      });
+    } catch (err) {
+      noLiveErr = err;
+    }
+    expect((noLiveErr as { exitCode?: number }).exitCode).toBe(65);
+
+    // Sync gen=1 ops-supervisor and edge-topology with SPORTSDESK_LIVE_INGEST=1
+    const syncGen1 = await syncCanonicalGovernanceManifestsToR2({
+      client: casHarness.client,
+      env: {
+        ...okEnv,
+        SPORTSDESK_LIVE_INGEST: "1",
+        CLOUDFLARE_ACCOUNT_ID: "acc-test-enam",
+      },
+      nowMs: baseMs + 5_000,
+    });
+    expect(syncGen1.opsSupervisor.manifest.generation_u32).toBe(1);
+    expect(syncGen1.opsSupervisor.manifest.lane).toBe("ops-control-plane");
+    expect(syncGen1.opsSupervisor.manifest.skillOrdinalU8).toBe(16);
+    expect(syncGen1.edgeTopology.manifest.generation_u32).toBe(1);
+    expect(syncGen1.edgeTopology.manifest.snapshot_gen_u32).toBe(1);
+    expect(syncGen1.edgeTopology.manifest.r2_region).toBe("ENAM");
+    expect(syncGen1.edgeTopology.manifest.account_scope).toBe("acc-test-enam");
+    expect(syncGen1.edgeTopology.manifest.etag_cas).toBe("If-None-Match:*");
+    expect(syncGen1.edgeTopology.manifest.drift_exit_code).toBe(0);
+
+    // Non-zero drift_exit_code aborts edge-topology promotion
+    let driftErr: unknown = null;
+    try {
+      await publishEdgeTopologyManifestToR2({
+        client: casHarness.client,
+        env: okEnv,
+        driftExitCode: 2,
+      });
+    } catch (err) {
+      driftErr = err;
+    }
+    expect((driftErr as { exitCode?: number }).exitCode).toBe(65);
+
+    // gen=2 ops-supervisor uses strict If-Match ETag
+    const opsGen2 = await publishOpsSupervisorManifestToR2({
+      client: casHarness.client,
+      env: okEnv,
+      nowMs: baseMs + 10_000,
+    });
+    expect(opsGen2.manifest.generation_u32).toBe(2);
+    expect(opsGen2.prevETag).toBe(syncGen1.opsSupervisor.newETag);
+
+    // All 4 canonical manifests present, CLOSED, gap="0", and fresh within SLA
+    const verified = await verifyCanonicalR2Manifests({
+      client: casHarness.client,
+      env: okEnv,
+    });
+    expect(verified.ok).toBe(true);
+    expect(verified.circuit_state).toBe("CLOSED");
+    expect(verified.unresolved_gap_cents).toBe("0");
+    expect(verified.sinks).toHaveLength(4);
+
+    const freshReport = await evaluateCanonicalR2ManifestStaleness({
+      client: casHarness.client,
+      env: okEnv,
+      nowMs: baseMs + 60_000,
+      slaMs: 3_600_000,
+    });
+    expect(freshReport.ok).toBe(true);
+    expect(freshReport.degraded_count).toBe(0);
+    expect(freshReport.circuit_state).toBe("CLOSED");
+
+    // Advance clock past SLA -> marks sinks stale on dual clocks
+    const staleReport = await evaluateCanonicalR2ManifestStaleness({
+      client: casHarness.client,
+      env: okEnv,
+      nowMs: baseMs + 7_200_000,
+      slaMs: 3_600_000,
+    });
+    expect(staleReport.ok).toBe(false);
+    expect(staleReport.degraded_count).toBeGreaterThan(0);
+    expect(staleReport.circuit_state).toBe("OPEN");
   });
 });

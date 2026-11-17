@@ -458,3 +458,696 @@ export async function promoteCanonicalManifestWithCas<TManifest>(params: {
     newETag: normalizeStrongETag(rawNewETag),
   };
 }
+
+export type CanonicalR2SinkId =
+  "wagers-by-state" | "syndicate-rings" | "ops-supervisor" | "edge-topology";
+
+export interface CanonicalR2SinkSpec {
+  readonly sinkId: CanonicalR2SinkId;
+  readonly domain: "[Ops & Governance]" | "[DOD Spine]";
+  readonly r2Bucket: typeof R2_BUCKET;
+  readonly manifestKey: string;
+  readonly generationPrefix: string;
+  readonly lane: string;
+  readonly skillOrdinalU8: number;
+  readonly slaMs: number;
+  readonly r2Region?: "ENAM";
+}
+
+export const CANONICAL_R2_SINK_SPECS: Readonly<
+  Record<CanonicalR2SinkId, CanonicalR2SinkSpec>
+> = {
+  "wagers-by-state": {
+    sinkId: "wagers-by-state",
+    domain: "[Ops & Governance]",
+    r2Bucket: R2_BUCKET,
+    manifestKey: "manifests/wagers-by-state/latest",
+    generationPrefix: "generations/wagers-by-state",
+    lane: "ops-wagers-spine",
+    skillOrdinalU8: 15,
+    slaMs: 60 * 60 * 1000,
+  },
+  "syndicate-rings": {
+    sinkId: "syndicate-rings",
+    domain: "[DOD Spine]",
+    r2Bucket: R2_BUCKET,
+    manifestKey: "manifests/syndicate-rings/latest",
+    generationPrefix: "generations/syndicate-rings",
+    lane: "dod-syndicate-rings",
+    skillOrdinalU8: 14,
+    slaMs: 60 * 60 * 1000,
+  },
+  "ops-supervisor": {
+    sinkId: "ops-supervisor",
+    domain: "[Ops & Governance]",
+    r2Bucket: R2_BUCKET,
+    manifestKey: "manifests/ops-supervisor/latest",
+    generationPrefix: "generations/ops-supervisor",
+    lane: "ops-control-plane",
+    skillOrdinalU8: 16,
+    slaMs: 60 * 60 * 1000,
+  },
+  "edge-topology": {
+    sinkId: "edge-topology",
+    domain: "[Ops & Governance]",
+    r2Bucket: R2_BUCKET,
+    manifestKey: "manifests/edge-topology/latest",
+    generationPrefix: "generations/edge-topology",
+    lane: "ops-edge-ci",
+    skillOrdinalU8: 4,
+    r2Region: "ENAM",
+    slaMs: 60 * 60 * 1000,
+  },
+} as const;
+
+export interface OpsSupervisorManifest {
+  readonly domain: "[Ops & Governance]";
+  readonly sink_id: "ops-supervisor";
+  readonly r2_bucket: string;
+  readonly lane: "ops-control-plane";
+  readonly skillOrdinalU8: 16;
+  readonly generation_u32: number;
+  readonly merkle_root_sha256: string;
+  readonly watermark_cursor: string;
+  readonly data_window_max_epoch_ms: number;
+  readonly r2_published_at_epoch_ms: number;
+  readonly circuit_state: "CLOSED" | "OPEN";
+  readonly unresolved_gap_cents: string;
+}
+
+export interface EdgeTopologyManifest {
+  readonly domain: "[Ops & Governance]";
+  readonly sink_id: "edge-topology";
+  readonly account_scope: string;
+  readonly r2_bucket: string;
+  readonly r2_region: "ENAM";
+  readonly lane: "ops-edge-ci";
+  readonly skillOrdinalU8: 4;
+  readonly snapshot_gen_u32: number;
+  readonly generation_u32: number;
+  readonly merkle_root_sha256: string;
+  readonly etag_cas: string;
+  readonly data_window_max_epoch_ms: number;
+  readonly r2_published_at_epoch_ms: number;
+  readonly drift_exit_code: number;
+  readonly circuit_state: "CLOSED" | "OPEN";
+  readonly unresolved_gap_cents: string;
+}
+
+export interface CanonicalManifestRecord {
+  readonly domain?: string;
+  readonly sink_id?: string;
+  readonly r2_bucket?: string;
+  readonly generation_u32?: number;
+  readonly snapshot_gen_u32?: number;
+  readonly merkle_root_sha256?: string;
+  readonly watermark_cursor?: string;
+  readonly data_window_max_epoch_ms?: number;
+  readonly r2_published_at_epoch_ms?: number;
+  readonly circuit_state?: string;
+  readonly unresolved_gap_cents?: string;
+  readonly poison_bit?: number;
+  readonly drift_exit_code?: number;
+}
+
+export async function publishOpsSupervisorManifestToR2(options: {
+  readonly client: CasR2ClientLike;
+  readonly env?: R2CasEnv;
+  readonly watermarkCursor?: string;
+  readonly dataWindowMaxEpochMs?: number;
+  readonly unresolvedGapCents?: unknown;
+  readonly nowMs?: number;
+  readonly fetchImpl?: typeof fetch;
+}): Promise<{
+  readonly manifestKey: string;
+  readonly generationKey: string;
+  readonly prevETag: string | null;
+  readonly newETag: string | null;
+  readonly manifest: OpsSupervisorManifest;
+}> {
+  const env = options.env ?? Bun.env;
+  assertR2TokenIsolationAndEnv(env);
+  const gapCents = String(options.unresolvedGapCents ?? "0").trim();
+  assertZeroReconciliationGapCents(gapCents);
+
+  const spec = CANONICAL_R2_SINK_SPECS["ops-supervisor"];
+  const probe = await probeR2ManifestState<OpsSupervisorManifest>(
+    options.client,
+    spec.manifestKey,
+    options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl },
+  );
+  const nextGenerationU32 = probe.exists
+    ? ((probe.payload.generation_u32 >>> 0) + 1) >>> 0
+    : 1;
+  const nowMs = options.nowMs ?? Date.now();
+  const dataWindowMaxEpochMs = options.dataWindowMaxEpochMs ?? nowMs;
+  const watermarkCursor =
+    options.watermarkCursor ?? `${spec.lane}:gen-${nextGenerationU32}`;
+
+  const hasher = new Bun.CryptoHasher("sha256");
+  hasher.update(
+    `${spec.sinkId}|gen=${nextGenerationU32}|lane=${spec.lane}|skill=${spec.skillOrdinalU8}|wm=${watermarkCursor}|dw=${dataWindowMaxEpochMs}\n`,
+  );
+  const merkleRootSha256 = hasher.digest("hex");
+  const publishedEpochMs = options.nowMs ?? Date.now();
+
+  const manifest: OpsSupervisorManifest = {
+    domain: "[Ops & Governance]",
+    sink_id: "ops-supervisor",
+    r2_bucket: env.R2_BUCKET_NAME?.trim() || spec.r2Bucket,
+    lane: "ops-control-plane",
+    skillOrdinalU8: 16,
+    generation_u32: nextGenerationU32,
+    merkle_root_sha256: merkleRootSha256,
+    watermark_cursor: watermarkCursor,
+    data_window_max_epoch_ms: dataWindowMaxEpochMs,
+    r2_published_at_epoch_ms: publishedEpochMs,
+    circuit_state: "CLOSED",
+    unresolved_gap_cents: gapCents,
+  };
+
+  const promo = await promoteCanonicalManifestWithCas({
+    client: options.client,
+    sinkId: spec.sinkId,
+    manifestKey: spec.manifestKey,
+    prevETag: probe.etag,
+    nextGenerationU32,
+    merkleRootSha256,
+    manifest,
+    unresolvedGapCents: gapCents,
+    metadata: {
+      pii: "none",
+      domain: "ops-governance",
+      "sink-id": spec.sinkId,
+      lane: spec.lane,
+      "generation-u32": String(nextGenerationU32),
+      "merkle-root-sha256": merkleRootSha256,
+    },
+    ...(options.fetchImpl === undefined
+      ? {}
+      : { fetchImpl: options.fetchImpl }),
+  });
+
+  return {
+    manifestKey: promo.manifestKey,
+    generationKey: promo.generationKey,
+    prevETag: probe.etag,
+    newETag: promo.newETag,
+    manifest,
+  };
+}
+
+export async function publishEdgeTopologyManifestToR2(options: {
+  readonly client: CasR2ClientLike;
+  readonly env?: R2CasEnv;
+  readonly accountScope?: string;
+  readonly dataWindowMaxEpochMs?: number;
+  readonly driftExitCode?: number;
+  readonly unresolvedGapCents?: unknown;
+  readonly nowMs?: number;
+  readonly fetchImpl?: typeof fetch;
+}): Promise<{
+  readonly manifestKey: string;
+  readonly generationKey: string;
+  readonly prevETag: string | null;
+  readonly newETag: string | null;
+  readonly manifest: EdgeTopologyManifest;
+}> {
+  const env = options.env ?? Bun.env;
+  assertR2TokenIsolationAndEnv(env);
+  const gapCents = String(options.unresolvedGapCents ?? "0").trim();
+  assertZeroReconciliationGapCents(gapCents);
+
+  const driftExitCode = Math.trunc(options.driftExitCode ?? 0);
+  if (driftExitCode !== 0) {
+    throw new R2ManifestCasError(
+      "ERR_R2_SINK_BACKPRESSURE",
+      `ERR_R2_SINK_BACKPRESSURE: edge-topology drift_exit_code=${driftExitCode} !== 0`,
+      65,
+    );
+  }
+
+  const spec = CANONICAL_R2_SINK_SPECS["edge-topology"];
+  const probe = await probeR2ManifestState<EdgeTopologyManifest>(
+    options.client,
+    spec.manifestKey,
+    options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl },
+  );
+  const prevGen = probe.exists
+    ? (probe.payload.snapshot_gen_u32 ?? probe.payload.generation_u32) >>> 0
+    : 0;
+  const nextGenerationU32 = (prevGen + 1) >>> 0;
+  const nowMs = options.nowMs ?? Date.now();
+  const dataWindowMaxEpochMs = options.dataWindowMaxEpochMs ?? nowMs;
+  const accountScope =
+    options.accountScope?.trim() ||
+    env.CLOUDFLARE_ACCOUNT_ID?.trim() ||
+    "sportsdesk-default";
+  const etagCas =
+    probe.etag === null ? "If-None-Match:*" : `If-Match:${probe.etag}`;
+
+  const hasher = new Bun.CryptoHasher("sha256");
+  hasher.update(
+    `${spec.sinkId}|gen=${nextGenerationU32}|scope=${accountScope}|region=ENAM|lane=${spec.lane}|skill=${spec.skillOrdinalU8}|dw=${dataWindowMaxEpochMs}\n`,
+  );
+  const merkleRootSha256 = hasher.digest("hex");
+  const publishedEpochMs = options.nowMs ?? Date.now();
+
+  const manifest: EdgeTopologyManifest = {
+    domain: "[Ops & Governance]",
+    sink_id: "edge-topology",
+    account_scope: accountScope,
+    r2_bucket: env.R2_BUCKET_NAME?.trim() || spec.r2Bucket,
+    r2_region: "ENAM",
+    lane: "ops-edge-ci",
+    skillOrdinalU8: 4,
+    snapshot_gen_u32: nextGenerationU32,
+    generation_u32: nextGenerationU32,
+    merkle_root_sha256: merkleRootSha256,
+    etag_cas: etagCas,
+    data_window_max_epoch_ms: dataWindowMaxEpochMs,
+    r2_published_at_epoch_ms: publishedEpochMs,
+    drift_exit_code: 0,
+    circuit_state: "CLOSED",
+    unresolved_gap_cents: gapCents,
+  };
+
+  const promo = await promoteCanonicalManifestWithCas({
+    client: options.client,
+    sinkId: spec.sinkId,
+    manifestKey: spec.manifestKey,
+    prevETag: probe.etag,
+    nextGenerationU32,
+    merkleRootSha256,
+    manifest,
+    unresolvedGapCents: gapCents,
+    metadata: {
+      pii: "none",
+      domain: "ops-governance",
+      "sink-id": spec.sinkId,
+      lane: spec.lane,
+      "r2-region": "ENAM",
+      "generation-u32": String(nextGenerationU32),
+      "merkle-root-sha256": merkleRootSha256,
+    },
+    ...(options.fetchImpl === undefined
+      ? {}
+      : { fetchImpl: options.fetchImpl }),
+  });
+
+  return {
+    manifestKey: promo.manifestKey,
+    generationKey: promo.generationKey,
+    prevETag: probe.etag,
+    newETag: promo.newETag,
+    manifest,
+  };
+}
+
+export async function syncCanonicalGovernanceManifestsToR2(options: {
+  readonly client: CasR2ClientLike;
+  readonly env?: R2CasEnv;
+  readonly requireLiveIngest?: boolean;
+  readonly nowMs?: number;
+  readonly fetchImpl?: typeof fetch;
+}): Promise<{
+  readonly schemaVersion: 1;
+  readonly command: "r2 --sync";
+  readonly domain: "[Ops & Governance]";
+  readonly r2_bucket: string;
+  readonly circuit_state: "CLOSED";
+  readonly unresolved_gap_cents: "0";
+  readonly opsSupervisor: Awaited<
+    ReturnType<typeof publishOpsSupervisorManifestToR2>
+  >;
+  readonly edgeTopology: Awaited<
+    ReturnType<typeof publishEdgeTopologyManifestToR2>
+  >;
+}> {
+  const env = options.env ?? Bun.env;
+  assertR2TokenIsolationAndEnv(env);
+  if (
+    (options.requireLiveIngest ?? true) &&
+    env.SPORTSDESK_LIVE_INGEST !== "1"
+  ) {
+    throw new R2ManifestCasError(
+      "ERR_R2_SINK_BACKPRESSURE",
+      "ERR_R2_SINK_BACKPRESSURE: set SPORTSDESK_LIVE_INGEST=1 to sync canonical R2 governance manifests",
+      65,
+    );
+  }
+
+  const nowMs = options.nowMs ?? Date.now();
+  const wagersProbe = await probeR2ManifestState<CanonicalManifestRecord>(
+    options.client,
+    CANONICAL_R2_SINK_SPECS["wagers-by-state"].manifestKey,
+    options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl },
+  );
+  const dataWindowMaxEpochMs =
+    wagersProbe.exists &&
+    typeof wagersProbe.payload.data_window_max_epoch_ms === "number" &&
+    Number.isFinite(wagersProbe.payload.data_window_max_epoch_ms)
+      ? wagersProbe.payload.data_window_max_epoch_ms
+      : nowMs;
+  const wagersWatermark = wagersProbe.exists
+    ? (wagersProbe.payload.watermark_cursor ??
+      `wagers-gen-${wagersProbe.payload.generation_u32 ?? 0}`)
+    : "ops-control-plane:bootstrap";
+
+  const [opsSupervisor, edgeTopology] = await Promise.all([
+    publishOpsSupervisorManifestToR2({
+      client: options.client,
+      env,
+      watermarkCursor: wagersWatermark,
+      dataWindowMaxEpochMs,
+      unresolvedGapCents: "0",
+      ...(options.nowMs === undefined ? {} : { nowMs: options.nowMs }),
+      ...(options.fetchImpl === undefined
+        ? {}
+        : { fetchImpl: options.fetchImpl }),
+    }),
+    publishEdgeTopologyManifestToR2({
+      client: options.client,
+      env,
+      dataWindowMaxEpochMs,
+      driftExitCode: 0,
+      unresolvedGapCents: "0",
+      ...(options.nowMs === undefined ? {} : { nowMs: options.nowMs }),
+      ...(options.fetchImpl === undefined
+        ? {}
+        : { fetchImpl: options.fetchImpl }),
+    }),
+  ]);
+
+  return {
+    schemaVersion: 1,
+    command: "r2 --sync",
+    domain: "[Ops & Governance]",
+    r2_bucket: env.R2_BUCKET_NAME?.trim() || R2_BUCKET,
+    circuit_state: "CLOSED",
+    unresolved_gap_cents: "0",
+    opsSupervisor,
+    edgeTopology,
+  };
+}
+
+export interface CanonicalSinkVerifyEntry {
+  readonly sink_id: CanonicalR2SinkId;
+  readonly manifest_key: string;
+  readonly domain: string;
+  readonly lane: string;
+  readonly skillOrdinalU8: number;
+  readonly exists: boolean;
+  readonly etag: string | null;
+  readonly generation_u32: number;
+  readonly merkle_root_sha256: string | null;
+  readonly data_window_max_epoch_ms: number | null;
+  readonly r2_published_at_epoch_ms: number | null;
+  readonly circuit_state: string;
+  readonly unresolved_gap_cents: string;
+  readonly poison_bit: number;
+  readonly ok: boolean;
+}
+
+export async function verifyCanonicalR2Manifests(options: {
+  readonly client: CasR2ClientLike;
+  readonly env?: R2CasEnv;
+  readonly fetchImpl?: typeof fetch;
+}): Promise<{
+  readonly schemaVersion: 1;
+  readonly command: "r2 --verify";
+  readonly domain: "[Ops & Governance]";
+  readonly r2_bucket: string;
+  readonly circuit_state: "CLOSED" | "OPEN";
+  readonly unresolved_gap_cents: string;
+  readonly ok: boolean;
+  readonly sinks: readonly CanonicalSinkVerifyEntry[];
+}> {
+  const env = options.env ?? Bun.env;
+  assertR2TokenIsolationAndEnv(env);
+
+  const specs = Object.values(CANONICAL_R2_SINK_SPECS);
+  const probes = await Promise.all(
+    specs.map((spec) =>
+      probeR2ManifestState<CanonicalManifestRecord>(
+        options.client,
+        spec.manifestKey,
+        options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl },
+      ),
+    ),
+  );
+
+  let totalGapCents = 0n;
+  const sinks: CanonicalSinkVerifyEntry[] = [];
+  for (let i = 0; i < specs.length; i++) {
+    const spec = specs[i]!;
+    const probe = probes[i]!;
+    if (!probe.exists) {
+      sinks.push({
+        sink_id: spec.sinkId,
+        manifest_key: spec.manifestKey,
+        domain: spec.domain,
+        lane: spec.lane,
+        skillOrdinalU8: spec.skillOrdinalU8,
+        exists: false,
+        etag: null,
+        generation_u32: 0,
+        merkle_root_sha256: null,
+        data_window_max_epoch_ms: null,
+        r2_published_at_epoch_ms: null,
+        circuit_state: "OPEN",
+        unresolved_gap_cents: "0",
+        poison_bit: 0,
+        ok: false,
+      });
+      continue;
+    }
+
+    const rawGap = String(probe.payload.unresolved_gap_cents ?? "0").trim();
+    let gapBig = 0n;
+    let gapValid = true;
+    try {
+      assertZeroReconciliationGapCents(rawGap);
+    } catch {
+      gapValid = false;
+      try {
+        if (/^[+-]?\d+$/.test(rawGap)) {
+          gapBig = BigInt(rawGap);
+        } else {
+          gapBig = 1n;
+        }
+      } catch {
+        gapBig = 1n;
+      }
+    }
+    totalGapCents += gapBig < 0n ? -gapBig : gapBig;
+
+    const circuitState = probe.payload.circuit_state ?? "CLOSED";
+    const poisonBit = Number(probe.payload.poison_bit ?? 0);
+    const driftExitCode = Number(probe.payload.drift_exit_code ?? 0);
+    const generationU32 =
+      Number(
+        probe.payload.generation_u32 ?? probe.payload.snapshot_gen_u32 ?? 0,
+      ) >>> 0;
+    const sinkOk =
+      gapValid &&
+      circuitState === "CLOSED" &&
+      poisonBit === 0 &&
+      driftExitCode === 0 &&
+      generationU32 > 0;
+
+    sinks.push({
+      sink_id: spec.sinkId,
+      manifest_key: spec.manifestKey,
+      domain: spec.domain,
+      lane: spec.lane,
+      skillOrdinalU8: spec.skillOrdinalU8,
+      exists: true,
+      etag: probe.etag,
+      generation_u32: generationU32,
+      merkle_root_sha256: probe.payload.merkle_root_sha256 ?? null,
+      data_window_max_epoch_ms:
+        typeof probe.payload.data_window_max_epoch_ms === "number"
+          ? probe.payload.data_window_max_epoch_ms
+          : null,
+      r2_published_at_epoch_ms:
+        typeof probe.payload.r2_published_at_epoch_ms === "number"
+          ? probe.payload.r2_published_at_epoch_ms
+          : null,
+      circuit_state: circuitState,
+      unresolved_gap_cents: rawGap,
+      poison_bit: poisonBit,
+      ok: sinkOk,
+    });
+  }
+
+  const allOk = sinks.every((s) => s.ok);
+  return {
+    schemaVersion: 1,
+    command: "r2 --verify",
+    domain: "[Ops & Governance]",
+    r2_bucket: env.R2_BUCKET_NAME?.trim() || R2_BUCKET,
+    circuit_state: allOk ? "CLOSED" : "OPEN",
+    unresolved_gap_cents: totalGapCents.toString(),
+    ok: allOk,
+    sinks,
+  };
+}
+
+export interface CanonicalSinkStalenessEntry {
+  readonly sink_id: CanonicalR2SinkId;
+  readonly manifest_key: string;
+  readonly lane: string;
+  readonly state: "fresh" | "stale" | "missing";
+  readonly sla_ms: number;
+  readonly generation_u32: number;
+  readonly data_window_max_epoch_ms: number | null;
+  readonly r2_published_at_epoch_ms: number | null;
+  readonly data_window_age_ms: number | null;
+  readonly published_age_ms: number | null;
+  readonly poison_bit: number;
+  readonly circuit_state: string;
+  readonly unresolved_gap_cents: string;
+  readonly reason: string;
+}
+
+export async function evaluateCanonicalR2ManifestStaleness(options: {
+  readonly client: CasR2ClientLike;
+  readonly env?: R2CasEnv;
+  readonly nowMs?: number;
+  readonly slaMs?: number;
+  readonly fetchImpl?: typeof fetch;
+}): Promise<{
+  readonly schemaVersion: 1;
+  readonly command: "stale";
+  readonly domain: "[Ops & Governance]";
+  readonly r2_bucket: string;
+  readonly observed_at_epoch_ms: number;
+  readonly circuit_state: "CLOSED" | "OPEN";
+  readonly unresolved_gap_cents: string;
+  readonly degraded_count: number;
+  readonly ok: boolean;
+  readonly sinks: readonly CanonicalSinkStalenessEntry[];
+}> {
+  const env = options.env ?? Bun.env;
+  assertR2TokenIsolationAndEnv(env);
+  const nowMs = options.nowMs ?? Date.now();
+  const specs = Object.values(CANONICAL_R2_SINK_SPECS);
+  const probes = await Promise.all(
+    specs.map((spec) =>
+      probeR2ManifestState<CanonicalManifestRecord>(
+        options.client,
+        spec.manifestKey,
+        options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl },
+      ),
+    ),
+  );
+
+  let degradedCount = 0;
+  let totalGapCents = 0n;
+  const sinks: CanonicalSinkStalenessEntry[] = [];
+
+  for (let i = 0; i < specs.length; i++) {
+    const spec = specs[i]!;
+    const probe = probes[i]!;
+    const slaMs = options.slaMs ?? spec.slaMs;
+
+    if (!probe.exists) {
+      degradedCount++;
+      sinks.push({
+        sink_id: spec.sinkId,
+        manifest_key: spec.manifestKey,
+        lane: spec.lane,
+        state: "missing",
+        sla_ms: slaMs,
+        generation_u32: 0,
+        data_window_max_epoch_ms: null,
+        r2_published_at_epoch_ms: null,
+        data_window_age_ms: null,
+        published_age_ms: null,
+        poison_bit: 0,
+        circuit_state: "OPEN",
+        unresolved_gap_cents: "0",
+        reason: "manifest missing",
+      });
+      continue;
+    }
+
+    const p = probe.payload;
+    const dataWinMs =
+      typeof p.data_window_max_epoch_ms === "number" &&
+      Number.isFinite(p.data_window_max_epoch_ms)
+        ? p.data_window_max_epoch_ms
+        : null;
+    const pubMs =
+      typeof p.r2_published_at_epoch_ms === "number" &&
+      Number.isFinite(p.r2_published_at_epoch_ms)
+        ? p.r2_published_at_epoch_ms
+        : null;
+    const dataWinAgeMs =
+      dataWinMs === null ? null : Math.max(0, nowMs - dataWinMs);
+    const pubAgeMs = pubMs === null ? null : Math.max(0, nowMs - pubMs);
+    const poisonBit = Number(p.poison_bit ?? 0);
+    const circuitState = p.circuit_state ?? "CLOSED";
+    const rawGap = String(p.unresolved_gap_cents ?? "0").trim();
+    const generationU32 =
+      Number(p.generation_u32 ?? p.snapshot_gen_u32 ?? 0) >>> 0;
+
+    let gapBig = 0n;
+    try {
+      assertZeroReconciliationGapCents(rawGap);
+    } catch {
+      try {
+        gapBig = /^[+-]?\d+$/.test(rawGap) ? BigInt(rawGap) : 1n;
+      } catch {
+        gapBig = 1n;
+      }
+    }
+    totalGapCents += gapBig < 0n ? -gapBig : gapBig;
+
+    const reasons: string[] = [];
+    if (dataWinAgeMs === null) reasons.push("missing data_window_max_epoch_ms");
+    else if (dataWinAgeMs > slaMs)
+      reasons.push(`data_window age ${dataWinAgeMs}ms > sla ${slaMs}ms`);
+    if (pubAgeMs === null) reasons.push("missing r2_published_at_epoch_ms");
+    else if (pubAgeMs > slaMs)
+      reasons.push(`published age ${pubAgeMs}ms > sla ${slaMs}ms`);
+    if (poisonBit !== 0) reasons.push(`poison_bit=${poisonBit}`);
+    if (circuitState !== "CLOSED")
+      reasons.push(`circuit_state=${circuitState}`);
+    if (gapBig !== 0n) reasons.push(`unresolved_gap_cents=${rawGap}`);
+
+    const isFresh = reasons.length === 0;
+    if (!isFresh) degradedCount++;
+
+    sinks.push({
+      sink_id: spec.sinkId,
+      manifest_key: spec.manifestKey,
+      lane: spec.lane,
+      state: isFresh ? "fresh" : "stale",
+      sla_ms: slaMs,
+      generation_u32: generationU32,
+      data_window_max_epoch_ms: dataWinMs,
+      r2_published_at_epoch_ms: pubMs,
+      data_window_age_ms: dataWinAgeMs,
+      published_age_ms: pubAgeMs,
+      poison_bit: poisonBit,
+      circuit_state: circuitState,
+      unresolved_gap_cents: rawGap,
+      reason: isFresh ? "ok" : reasons.join("; "),
+    });
+  }
+
+  return {
+    schemaVersion: 1,
+    command: "stale",
+    domain: "[Ops & Governance]",
+    r2_bucket: env.R2_BUCKET_NAME?.trim() || R2_BUCKET,
+    observed_at_epoch_ms: nowMs,
+    circuit_state: degradedCount === 0 ? "CLOSED" : "OPEN",
+    unresolved_gap_cents: totalGapCents.toString(),
+    degraded_count: degradedCount,
+    ok: degradedCount === 0,
+    sinks,
+  };
+}

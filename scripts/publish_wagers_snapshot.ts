@@ -600,7 +600,7 @@ export async function publishWagersByStateSnapshotToR2(options: {
     },
   );
 
-  const publishedEpochMs = Date.now();
+  const publishedEpochMs = options.nowMs ?? Date.now();
   const wagersManifest: WagersByStateCanonicalManifest = {
     domain: "[Ops & Governance]",
     sink_id: "wagers-by-state",
