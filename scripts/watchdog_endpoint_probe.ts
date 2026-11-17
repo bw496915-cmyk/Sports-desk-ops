@@ -25,7 +25,11 @@ import {
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { SPORTSDESK_CORE_HOSTS, type HostTarget } from "../lib/bun_dns.ts";
+import {
+  SPORTSDESK_CORE_HOSTS,
+  type DnsResolverBackend,
+  type HostTarget,
+} from "../lib/bun_dns.ts";
 import { readDnsCacheStats, resolveHost } from "../lib/preflight.ts";
 import { resolveTelegramCredentials } from "../lib/telegram_alert_sender.ts";
 import {
@@ -48,10 +52,20 @@ const DEFAULT_STATE_PATH = resolve(
 const PROBE_TIMEOUT_MS = 5_000;
 const EXIT = { ok: 0, alert: 1, error: 2 } as const;
 
+/** Bun DNS reference: `lookup` takes `backend`; c-ares avoids the getaddrinfo slow path. */
+const DNS_BACKENDS: readonly DnsResolverBackend[] = [
+  "c-ares",
+  "system",
+  "getaddrinfo",
+  "libc",
+];
+const DEFAULT_DNS_BACKEND: DnsResolverBackend = "c-ares";
+
 interface Options {
   readonly json: boolean;
   readonly dryRun: boolean;
   readonly hosts: readonly string[];
+  readonly backend: DnsResolverBackend;
   readonly statePath: string;
   readonly help: boolean;
 }
@@ -66,6 +80,7 @@ interface ProbeJson {
   readonly checkedAt: string;
   readonly intervalSeconds: number;
   readonly dryRun: boolean;
+  readonly resolver: DnsResolverBackend;
   readonly alerts: number;
   readonly hosts: readonly {
     readonly host: string;
@@ -87,6 +102,17 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function parseBackend(raw: string | undefined): DnsResolverBackend {
+  if (raw === undefined || raw.trim() === "") return DEFAULT_DNS_BACKEND;
+  const backend = DNS_BACKENDS.find((candidate) => candidate === raw.trim());
+  if (backend === undefined) {
+    throw new Error(
+      `invalid --backend "${raw}" (allowed: ${DNS_BACKENDS.join(", ")})`,
+    );
+  }
+  return backend;
+}
+
 function parseOptions(): Options {
   const { values } = parseArgs({
     args: Bun.argv.slice(2),
@@ -94,6 +120,7 @@ function parseOptions(): Options {
       json: { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
       host: { type: "string", multiple: true },
+      backend: { type: "string" },
       state: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -102,6 +129,7 @@ function parseOptions(): Options {
     json: values.json ?? false,
     dryRun: values["dry-run"] ?? false,
     hosts: values.host ?? [],
+    backend: parseBackend(values.backend),
     statePath:
       values.state === undefined || values.state.trim() === ""
         ? DEFAULT_STATE_PATH
@@ -117,6 +145,8 @@ Usage: bun run scripts/watchdog_endpoint_probe.ts [flags]
 
 Flags:
   --host <hostname>   Probe only this core host (repeatable). Default: all core hosts.
+  --backend <name>    DNS resolver: c-ares (default) | system | getaddrinfo | libc.
+                      c-ares avoids the documented getaddrinfo slow path under concurrent loads.
   --state <path>      State file (default: scratch/watchdog/endpoint-probe-state.json).
   --dry-run           Probe and print, but do not write state or page Telegram.
   --json              Print one JSON object on stdout.
@@ -134,12 +164,12 @@ function readState(path: string): StateFile {
   if (!existsSync(path)) return empty;
   const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`endpoint probe: ${path} is not a JSON object`);
+    throw new Error(`${path} is not a JSON object`);
   }
   const record = parsed as Record<string, unknown>;
   if (record.schemaVersion !== ENDPOINT_PROBE_STATE_SCHEMA_VERSION) {
     throw new Error(
-      `endpoint probe: ${path} schemaVersion is ${String(record.schemaVersion)}; expected ${ENDPOINT_PROBE_STATE_SCHEMA_VERSION}`,
+      `${path} schemaVersion is ${String(record.schemaVersion)}; expected ${ENDPOINT_PROBE_STATE_SCHEMA_VERSION}`,
     );
   }
   if (
@@ -147,16 +177,14 @@ function readState(path: string): StateFile {
     record.hosts === null ||
     Array.isArray(record.hosts)
   ) {
-    throw new Error(`endpoint probe: ${path} has no hosts object`);
+    throw new Error(`${path} has no hosts object`);
   }
   const hosts: Record<string, EndpointProbeState> = {};
   for (const [host, raw] of Object.entries(
     record.hosts as Record<string, unknown>,
   )) {
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-      throw new Error(
-        `endpoint probe: ${path} host "${host}" is not an object`,
-      );
+      throw new Error(`${path} host "${host}" is not an object`);
     }
     const entry = raw as Record<string, unknown>;
     if (
@@ -165,7 +193,7 @@ function readState(path: string): StateFile {
       entry.consecutiveFailures < 0
     ) {
       throw new Error(
-        `endpoint probe: ${path} host "${host}" has an invalid consecutiveFailures`,
+        `${path} host "${host}" has an invalid consecutiveFailures`,
       );
     }
     if (
@@ -173,9 +201,7 @@ function readState(path: string): StateFile {
       (typeof entry.lastCheckedAtMs !== "number" ||
         !Number.isFinite(entry.lastCheckedAtMs))
     ) {
-      throw new Error(
-        `endpoint probe: ${path} host "${host}" has an invalid lastCheckedAtMs`,
-      );
+      throw new Error(`${path} host "${host}" has an invalid lastCheckedAtMs`);
     }
     hosts[host] = {
       consecutiveFailures: Math.trunc(entry.consecutiveFailures),
@@ -192,15 +218,18 @@ function writeState(path: string, state: StateFile): void {
   renameSync(tmp, path);
 }
 
-async function probe(target: HostTarget): Promise<EndpointProbeObservation> {
+async function probe(
+  target: HostTarget,
+  backend: DnsResolverBackend,
+): Promise<EndpointProbeObservation> {
   const lookup = await (async () => {
     try {
       const answers = await resolveHost(target.hostname, {
-        // Bun DNS reference: getaddrinfo is the documented slow path under concurrent
-        // loads, and this probe resolves every core host in parallel. c-ares also returns
-        // real TTLs. Omit family so an IPv4-only host still resolves (c-ares does not
-        // honor V4MAPPED; family 6 + flags returned AAAA only).
-        backend: "c-ares",
+        // Default c-ares: the Bun DNS reference warns that getaddrinfo is the slow path
+        // under concurrent loads, and this probe resolves every core host in parallel.
+        // --backend overrides this for diagnostics. Omit family so an IPv4-only host still
+        // resolves (c-ares does not honor V4MAPPED; family 6 + flags returned AAAA only).
+        backend,
       });
       const addresses = answers.map((answer) => answer.address);
       const ttlSeconds = answers.map((answer) => Number(answer.ttl));
@@ -296,6 +325,7 @@ async function sendTelegram(
 function renderJson(
   nowMs: number,
   dryRun: boolean,
+  resolver: DnsResolverBackend,
   verdicts: readonly EndpointProbeVerdict[],
 ): ProbeJson {
   return {
@@ -303,6 +333,7 @@ function renderJson(
     checkedAt: new Date(nowMs).toISOString(),
     intervalSeconds: ENDPOINT_PROBE_INTERVAL_SECONDS,
     dryRun,
+    resolver,
     alerts: verdicts.filter((verdict) => verdict.status === "alert").length,
     hosts: verdicts.map((verdict) => ({
       host: verdict.target.hostname,
@@ -343,7 +374,7 @@ async function run(): Promise<number> {
   const state = readState(options.statePath);
   const nowMs = Date.now();
   const observations = await Promise.all(
-    targets.map((target) => probe(target)),
+    targets.map((target) => probe(target, options.backend)),
   );
   const verdicts = observations.map((observation) =>
     evaluateEndpointProbe({
@@ -358,9 +389,14 @@ async function run(): Promise<number> {
 
   if (options.json) {
     console.log(
-      JSON.stringify(renderJson(nowMs, options.dryRun, verdicts), null, 2),
+      JSON.stringify(
+        renderJson(nowMs, options.dryRun, options.backend, verdicts),
+        null,
+        2,
+      ),
     );
   } else {
+    console.log(`DNS resolver: ${options.backend}`);
     for (const verdict of verdicts) console.log(verdict.message);
     const alerts = verdicts.filter((verdict) => verdict.status === "alert");
     if (alerts.length > 0) {
