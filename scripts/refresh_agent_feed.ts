@@ -22,7 +22,11 @@ import {
   assertProjectedRoster,
   projectUsersRoster,
 } from "../lib/users_roster.ts";
-import { projectAccountInfoOwner } from "../lib/agent_account.ts";
+import {
+  projectAccountInfoOwner,
+  projectWebReportsConfig,
+  projectWebReportsPendingConfig,
+} from "../lib/agent_account.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const { values } = parseArgs({
@@ -100,6 +104,8 @@ const rosterOut = join(outDir, "roster.projected.json");
 const weeklyOut = join(outDir, "weekly.json");
 const wagersOut = join(outDir, "wagers.json");
 const accountOut = join(outDir, "account.json");
+const webReportsOut = join(outDir, "web-reports.json");
+const webReportsPendingOut = join(outDir, "web-reports-pending.json");
 
 const fetched = Bun.spawnSync({
   cmd: [
@@ -205,6 +211,40 @@ try {
     await accountResponse.json(),
   );
   await Bun.write(accountOut, `${JSON.stringify(projectedAccount, null, 2)}\n`);
+  for (const [operation, out, project] of [
+    ["getConfigWebReports", webReportsOut, projectWebReportsConfig],
+    [
+      "getConfigWebReportsPending",
+      webReportsPendingOut,
+      projectWebReportsPendingConfig,
+    ],
+  ] as const) {
+    const response = await transport.fetch(
+      `${PROBE_HOST}/cloud/api/Manager/${operation}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        body: new URLSearchParams({
+          agentID: agentId,
+          operation,
+          RRO: "1",
+          agentOwner,
+        }).toString(),
+        redirect: "manual",
+      },
+    );
+    if (response.status === 401 || response.redirected) {
+      throw new Error("session expired — re-auth required");
+    }
+    if (!response.ok) throw new Error(`${operation} ${response.status}`);
+    await Bun.write(
+      out,
+      `${JSON.stringify(project(await response.json()), null, 2)}\n`,
+    );
+  }
 } finally {
   await transport.close();
 }
