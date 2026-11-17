@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   projectAccountInfoOwner,
   projectWebReportsConfig,
+  projectWebReportsPendingConfig,
 } from "./agent_account.ts";
 
 describe("account config projection", () => {
@@ -56,5 +57,27 @@ describe("web-reports config projection", () => {
     expect(projected.displayFlags.showPending).toBe("on");
     expect(projected.weeklyScroll).toBe("off");
     expect(JSON.stringify(projected)).not.toContain("should-not-survive");
+  });
+});
+
+describe("pending web-reports config projection", () => {
+  test("keeps column flags and trims the AgentID", () => {
+    const projected = projectWebReportsPendingConfig({
+      INFO: {
+        AgentID: "BILLY666                                          ",
+        CustomerIDF: "on",
+        PasswordF: "off",
+        NameF: "on",
+        AgentF: "on",
+        Config: "",
+      },
+    });
+    expect(projected.agentId).toBe("BILLY666");
+    expect(projected.columnFlags).toEqual({
+      CustomerIDF: "on",
+      PasswordF: "off",
+      NameF: "on",
+      AgentF: "on",
+    });
   });
 });

@@ -122,3 +122,39 @@ export function projectWebReportsConfig(
     projectedAt: new Date().toISOString(),
   };
 }
+
+export interface ProjectedWebReportsPendingConfig {
+  readonly schemaVersion: 1;
+  readonly agentId: string | null;
+  readonly columnFlags: Readonly<Record<string, string>>;
+  readonly projectedAt: string;
+}
+
+/** Project getConfigWebReportsPending ({ INFO }) — column visibility flags only. */
+export function projectWebReportsPendingConfig(
+  raw: unknown,
+): ProjectedWebReportsPendingConfig {
+  if (raw === null || typeof raw !== "object")
+    throw new Error("pending web-reports response must be an object");
+  const infoRaw = (raw as Record<string, unknown>).INFO;
+  if (
+    infoRaw === null ||
+    typeof infoRaw !== "object" ||
+    Array.isArray(infoRaw)
+  ) {
+    throw new Error("pending web-reports response lacks INFO");
+  }
+  const info = scrub(infoRaw) as Record<string, unknown>;
+  const columnFlags: Record<string, string> = {};
+  for (const [key, value] of Object.entries(info)) {
+    if (key !== "AgentID" && /F$/.test(key) && typeof value === "string") {
+      columnFlags[key] = value;
+    }
+  }
+  return {
+    schemaVersion: 1,
+    agentId: trim(info.AgentID),
+    columnFlags,
+    projectedAt: new Date().toISOString(),
+  };
+}
