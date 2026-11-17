@@ -12,11 +12,11 @@ service name). The runner never carries a second host list.
 
 For each target, per tick:
 
-1. **DNS** — `Bun.dns.lookup` with `backend: "c-ares"` by default. Bun's DNS reference warns that
+1. **DNS** — `Bun.dns.lookup` with `backend: "c-ares"` by default. [Bun's DNS reference](https://bun.sh/reference/bun/dns#dns-resolver-client) warns that
    `getaddrinfo` is the slow path under concurrent loads, and the probe resolves all hosts in
    parallel. `--backend` accepts `c-ares | system | getaddrinfo | libc` for diagnosis. Family is
    left at the resolver default (dual-stack) so an IPv4-only host still resolves.
-2. **Warm-up** — `Bun.dns.prefetch(host, port)` before the fetch. Documented and measured to let the
+2. **Warm-up** — [`Bun.dns.prefetch(host, port)`](https://bun.sh/reference/bun/dns/prefetch) before the fetch. The reference documents the hand-off; measured to let the
    later `fetch()` skip a lookup. Experimental; it never decides the verdict.
 3. **Reachability** — `GET https://host:port/` with a 5 s timeout and `redirect: "manual"`. A 3xx or
    4xx response is reachable (Telegram's API root answers 404 by design); no response or a 5xx is a
@@ -34,7 +34,7 @@ failure does not blank the others.
   rather than silently resetting the counts.
 - `--dry-run` probes and prints but writes no state and sends no page.
 
-Diagnostics are not gates: DNS `ttlSeconds` (per answer) and Bun cache stats (`getCacheStats`) are
+Diagnostics are not gates: DNS [`ttlSeconds`](https://bun.sh/reference/bun/DNSLookup) (per answer) and Bun cache stats (`getCacheStats`) are
 reported in `--json` only. They describe the resolver/cache, not whether the endpoint answered.
 
 ## Exit codes
@@ -89,3 +89,11 @@ cache stats. Human output names the resolver and prints one line per host.
 
 This runbook covers the endpoint watchdog only. The F402 session-refresh watchdog and its journal
 are documented separately in [`f402_session_refresh.md`](./f402_session_refresh.md).
+
+## References
+
+- [`Bun.dns.lookup`](https://bun.sh/reference/bun/dns#basic-usage) — options
+- [DNS resolver client](https://bun.sh/reference/bun/dns#dns-resolver-client) — c-ares / system /
+  getaddrinfo / libc
+- [`Bun.dns.prefetch`](https://bun.sh/reference/bun/dns/prefetch) — warm-up for a later fetch
+- [`DNSLookup`](https://bun.sh/reference/bun/DNSLookup) — `ttl` is c-ares-only

@@ -8,7 +8,7 @@
  * transitions and thresholds are unit-tested without a live resolver.
  *
  * Gating rule: `prefetch`/`getCacheStats` are documented Experimental APIs
- * (https://bun.sh/reference/bun/dns) that describe Bun's internal cache; they are telemetry
+ * (https://bun.sh/reference/bun/dns; prefetch: https://bun.sh/reference/bun/dns/prefetch) that describe Bun's internal cache; they are telemetry
  * only. A verdict comes from the observable path (`Bun.dns.lookup` + the endpoint fetch): a
  * cache with errors but a reachable endpoint is still reachable.
  */
@@ -34,8 +34,9 @@ export interface EndpointProbeLookup {
   readonly ok: boolean;
   readonly addresses: readonly string[];
   /**
-   * Resolver TTLs in seconds. Bun's DNS reference: `ttl` is 0 unless the c-ares backend is used;
-   * the runner pins c-ares. Diagnostics only — never part of the verdict.
+   * Resolver TTLs in seconds. Bun's DNSLookup reference
+   * (https://bun.sh/reference/bun/DNSLookup): `ttl` is 0 unless the c-ares backend is used; the
+   * runner pins c-ares. Diagnostics only — never part of the verdict.
    */
   readonly ttlSeconds: readonly number[];
   readonly error: string | null;

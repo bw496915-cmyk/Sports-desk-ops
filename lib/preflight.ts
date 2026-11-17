@@ -79,10 +79,15 @@ export interface DnsLookupOptions {
   readonly family?: 0 | 4 | 6;
   /** Resolver flags such as `V4MAPPED | ALL`; omit for the default. */
   readonly flags?: number;
-  /** Resolver backend (Bun DNS reference); `c-ares` returns real TTLs. */
+  /** Resolver backend; see https://bun.sh/reference/bun/dns#dns-resolver-client. */
   readonly backend?: DnsResolverBackend;
 }
 
+/**
+ * Resolve a host through Bun's DNS cache. The option contract is documented at
+ * https://bun.sh/reference/bun/dns#basic-usage; the resolver note is at
+ * https://bun.sh/reference/bun/dns#dns-resolver-client.
+ */
 export async function resolveHost(
   host: string,
   options?: DnsLookupOptions,

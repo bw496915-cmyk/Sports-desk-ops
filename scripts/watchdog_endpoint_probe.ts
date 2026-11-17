@@ -56,7 +56,7 @@ const PROBE_TIMEOUT_MS = 5_000;
 const LOOKUP_TIMEOUT_MS = 5_000;
 const EXIT = { ok: 0, alert: 1, error: 2 } as const;
 
-/** Bun DNS reference: `lookup` takes `backend`; c-ares avoids the getaddrinfo slow path. */
+/** Bun DNS reference (https://bun.sh/reference/bun/dns#dns-resolver-client): `lookup` takes `backend`; c-ares avoids the getaddrinfo slow path. */
 const DNS_BACKENDS: readonly DnsResolverBackend[] = [
   "c-ares",
   "system",
@@ -159,7 +159,9 @@ Flags:
   -h, --help          Show this help.
 
 Cadence: LaunchAgent StartInterval 900 (15 min); pages after ${ENDPOINT_PROBE_DEFAULT_FAIL_THRESHOLD}
-consecutive failures. Exit codes: 0 ok (or --dry-run), 1 alert sent, 2 could not evaluate/alert.`;
+consecutive failures. Exit codes: 0 ok (or --dry-run), 1 alert sent, 2 could not evaluate/alert.
+
+Reference: https://bun.sh/reference/bun/dns#dns-resolver-client`;
 }
 
 export function readState(path: string): StateFile {
@@ -229,7 +231,7 @@ async function resolveWithTimeout(host: string, backend: DnsResolverBackend) {
   try {
     return await Promise.race([
       resolveHost(host, {
-        // Default c-ares: the Bun DNS reference warns that getaddrinfo is the slow path
+        // Default c-ares: the Bun DNS reference (https://bun.sh/reference/bun/dns#dns-resolver-client) warns that getaddrinfo is the slow path
         // under concurrent loads, and this probe resolves every core host in parallel.
         // --backend overrides this for diagnostics. Omit family so an IPv4-only host still
         // resolves (c-ares does not honor V4MAPPED; family 6 + flags returned AAAA only).
@@ -285,7 +287,7 @@ async function probe(
     }
   })();
 
-  // Bun DNS reference: prefetch warms a later fetch()/Bun.connect() so it can skip the
+  // Bun DNS reference (https://bun.sh/reference/bun/dns/prefetch): prefetch warms a later fetch()/Bun.connect() so it can skip the
   // lookup (measured: prefetch miss -> fetch cache hit). Experimental, so it never decides
   // the verdict; the lookup above is the DNS signal.
   Bun.dns.prefetch(target.hostname, target.port);
