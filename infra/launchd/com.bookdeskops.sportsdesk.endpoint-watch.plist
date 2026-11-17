@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  SportsDesk endpoint watchdog LaunchAgent (template).
+
+  Runs `scripts/watchdog_endpoint_probe.ts` every 15 minutes: DNS resolution plus HTTPS
+  reachability for `SPORTSDESK_CORE_HOSTS`, with two-consecutive-failure paging. Independent of
+  the F402 session-refresh watchdog on purpose — a stale session journal and a dead endpoint are
+  different failure classes with different cadences.
+
+  Telegram credentials come from the login keychain via `resolveTelegramCredentials`; this agent
+  runs Bun with `--no-env-file` and carries no token. State is
+  `scratch/watchdog/endpoint-probe-state.json`; stdout/stderr land in scratch so a failed page is
+  still visible on the host.
+
+  Substitute these placeholders before loading (see `scripts/install_endpoint_watch_agent.sh`):
+    __OPERATOR_HOME__  absolute path to $HOME on the target machine
+    __REPO_PATH__      absolute path to the sportsdesk-ops working copy
+    __BUN_BIN__        absolute path to the pinned Bun binary
+    __BUN_BIN_DIR__    directory containing that Bun binary
+
+  StartInterval is wall-clock seconds, not elapsed. KeepAlive would be wrong here: each tick is a
+  one-shot, idempotent check, so StartInterval + RunAtLoad is the correct supervision shape.
+-->
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.bookdeskops.sportsdesk.endpoint-watch</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>__BUN_BIN__</string>
+      <string>--no-orphans</string>
+      <string>--no-env-file</string>
+      <string>run</string>
+      <string>scripts/watchdog_endpoint_probe.ts</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_PATH__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>HOME</key>
+      <string>__OPERATOR_HOME__</string>
+      <!-- Bun is invoked by absolute path; Homebrew stays on PATH for the keychain helper. -->
+      <key>PATH</key>
+      <string>__BUN_BIN_DIR__:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+      <key>NO_PROXY</key>
+      <string>127.0.0.1,localhost,::1</string>
+    </dict>
+
+    <!-- Fire every 15 minutes. DNS/TLS/endpoint health degrades slower than a session heartbeat;
+         two consecutive failures are required before paging. -->
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <!-- Also run once immediately after `launchctl bootstrap` so the first check is not 15 min away. -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Rate-limit retries if the Telegram API fails; the state file already persists the
+         consecutive-failure count. -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_PATH__/scratch/endpoint-watch.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>__REPO_PATH__/scratch/endpoint-watch.stderr.log</string>
+
+    <key>Nice</key>
+    <integer>5</integer>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+  </dict>
+</plist>
