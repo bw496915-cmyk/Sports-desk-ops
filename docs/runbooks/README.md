@@ -14,6 +14,7 @@ Evidence ledger and OpenAPI citations use **filename only** (for example `operat
 | [token_architecture_and_verification_runbook.md](./token_architecture_and_verification_runbook.md) | Design tokens, CIEDE2000, WCAG, `gen:tokens`                          |
 | [cloudflare_r2_and_api_runbook.md](./cloudflare_r2_and_api_runbook.md)                             | R2 sync, API tokens, reporting pipeline archive                       |
 | [os_bun_cron_integration_guide.md](./os_bun_cron_integration_guide.md)                             | Crontab / systemd schedules for `bun run reports`                     |
+| [endpoint_watchdog.md](./endpoint_watchdog.md)                                                     | 15-min DNS/HTTPS endpoint watchdog: LaunchAgent, state, paging        |
 | [vps_domain_setup_runbook.md](./vps_domain_setup_runbook.md)                                       | `scripts/deploy/deploy_to_vps.sh` production install                  |
 | [wagers_live_capture_runbook.md](./wagers_live_capture_runbook.md)                                 | `wagers:capture` / `wagers:watch`: ajax.php artifact + journal        |
 
