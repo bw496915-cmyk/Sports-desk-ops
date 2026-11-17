@@ -357,6 +357,26 @@ export async function executePairwiseCrossRefFromR2(params: {
     );
   }
 
+  const rawGap = String(wagersManifest.unresolved_gap_cents ?? "0").trim();
+  let parsedGapCents: bigint;
+  try {
+    parsedGapCents = rawGap.length > 0 ? BigInt(rawGap) : 1n;
+  } catch (cause) {
+    throw new PairwiseCrossRefError(
+      "ERR_OPS_RECONCILIATION_GAP",
+      `ERR_OPS_RECONCILIATION_GAP: invalid unresolved_gap_cents (${rawGap})`,
+      65,
+      cause,
+    );
+  }
+  if (parsedGapCents !== 0n) {
+    throw new PairwiseCrossRefError(
+      "ERR_OPS_RECONCILIATION_GAP",
+      `ERR_OPS_RECONCILIATION_GAP: unresolved_gap_cents=${parsedGapCents.toString()}`,
+      65,
+    );
+  }
+
   const chunkBytes = await readR2BinaryChunk(
     params.r2,
     wagersManifest.chunk_key,
@@ -418,7 +438,7 @@ export async function executePairwiseCrossRefFromR2(params: {
     data_window_max_epoch_ms: wagersManifest.data_window_max_epoch_ms,
     r2_published_at_epoch_ms: wagersManifest.r2_published_at_epoch_ms,
     circuit_state: wagersManifest.circuit_state ?? "CLOSED",
-    unresolved_gap_cents: wagersManifest.unresolved_gap_cents ?? "0",
+    unresolved_gap_cents: "0",
     manifests: {
       wagersByState: {
         key: WAGERS_BY_STATE_MANIFEST_KEY,

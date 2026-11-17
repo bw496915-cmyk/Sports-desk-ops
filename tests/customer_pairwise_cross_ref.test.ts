@@ -902,6 +902,42 @@ describe("sportsdesk-fraud cross-ref governance & R2 lineage envelope", () => {
     expect(payload.analysis.overlaps[0]?.lagMsU32).toBe(10_000);
     expect("overlapStore" in payload.analysis).toBe(false);
     expect("sources" in payload).toBe(false);
+
+    // Non-zero unresolved_gap_cents trips ERR_OPS_RECONCILIATION_GAP (exit 65, zero retries)
+    const gappedObjects = new Map(r2Objects);
+    gappedObjects.set(
+      WAGERS_BY_STATE_MANIFEST_KEY,
+      new TextEncoder().encode(
+        JSON.stringify({
+          domain: "[Ops & Governance]",
+          sink_id: "wagers-by-state",
+          r2_bucket: R2_BUCKET,
+          generation_u32: 19,
+          merkle_root_sha256: chunkSha256,
+          watermark_cursor: "wm-19:3",
+          data_window_max_epoch_ms: baseMs + 30_000,
+          r2_published_at_epoch_ms: baseMs + 31_000,
+          chunk_key: chunkKey,
+          circuit_state: "CLOSED",
+          unresolved_gap_cents: "250",
+        }),
+      ),
+    );
+    let capturedErr: unknown = null;
+    try {
+      await executePairwiseCrossRefFromR2({
+        r2: createInMemoryR2Reader(gappedObjects),
+        customerA: "C001",
+        customerB: "C002",
+      });
+    } catch (err) {
+      capturedErr = err;
+    }
+    expect(capturedErr).toBeInstanceOf(Error);
+    expect((capturedErr as { message: string }).message).toContain(
+      "ERR_OPS_RECONCILIATION_GAP",
+    );
+    expect((capturedErr as { exitCode?: number }).exitCode).toBe(65);
   });
 
   test("bun x --no-install sportsdesk-fraud cross-ref enforces --help, ERR_OPS_LOCAL_JSON_FORBIDDEN (exit 78), and preflight gates", () => {

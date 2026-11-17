@@ -60,6 +60,7 @@
     "typecheck": "bun run --cwd ../.. typecheck",
     "lint:check": "bun --bun run --cwd ../.. oxlint --deny-warnings packages/sportsdesk-ops/src src/lib/customer_pairwise_cross_ref.ts src/lib/portal_taxonomy_normalizer.ts src/lib/syndicate_bot_detector.ts src/lib/syndicate_adjacency_rollup.ts cli/sportsdesk_fraud_cli.ts tests/customer_pairwise_cross_ref.test.ts && bun --bun run --cwd ../.. oxlint --type-aware -c .oxlintrc.type-aware.json --deny-warnings packages/sportsdesk-ops/src src/lib/customer_pairwise_cross_ref.ts src/lib/portal_taxonomy_normalizer.ts src/lib/syndicate_bot_detector.ts src/lib/syndicate_adjacency_rollup.ts cli/sportsdesk_fraud_cli.ts tests/customer_pairwise_cross_ref.test.ts",
     "weblog:rollup": "bun run --cwd ../.. weblog:rollup",
+    "verify:docs-staleness:strict": "bun run --cwd ../.. verify:docs",
     "gen:tokens:gate": "bun run --cwd ../.. gen:tokens:gate",
     "schema": "bun run --cwd ../.. schema",
     "schema:list": "bun run --cwd ../.. schema:list",
