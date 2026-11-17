@@ -15,7 +15,9 @@ For each target, per tick:
 1. **DNS** — `Bun.dns.lookup` with `backend: "c-ares"` by default. [Bun's DNS reference](https://bun.sh/reference/bun/dns#dns-resolver-client) warns that
    `getaddrinfo` is the slow path under concurrent loads, and the probe resolves all hosts in
    parallel. `--backend` accepts `c-ares | system | getaddrinfo | libc` for diagnosis. Family is
-   left at the resolver default (dual-stack) so an IPv4-only host still resolves.
+   left at the resolver default (dual-stack) so an IPv4-only host still resolves. The endpoint
+   port is passed with the lookup, matching the prefetch; the docs note port distinguishes IPv6
+   vs IPv4-only connections.
 2. **Warm-up** — [`Bun.dns.prefetch(host, port)`](https://bun.sh/reference/bun/dns/prefetch) before the fetch. The reference documents the hand-off; measured to let the
    later `fetch()` skip a lookup. Experimental; it never decides the verdict.
 3. **Reachability** — `GET https://host:port/` with a 5 s timeout and `redirect: "manual"`. A 3xx or

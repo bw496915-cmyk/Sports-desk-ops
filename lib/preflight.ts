@@ -74,13 +74,20 @@ export function warmCaptureNetwork(baseUrl: string): {
   return { host: parsed.hostname, port };
 }
 
+export type DnsLookupFamily = 0 | 4 | 6 | "IPv4" | "IPv6" | "any";
+export type DnsLookupSocketType = "udp" | "tcp";
+
 export interface DnsLookupOptions {
-  /** Restrict to IPv4 (4), IPv6 (6) or any family (0); omit for the resolver default. */
-  readonly family?: 0 | 4 | 6;
-  /** Resolver flags such as `V4MAPPED | ALL`; omit for the default. */
+  /** Restrict to IPv4 (4), IPv6 (6), any family (0), or the documented string aliases. */
+  readonly family?: DnsLookupFamily;
+  /** Resolver flags such as `ADDRCONFIG`, `V4MAPPED` or `ALL`; omit for the default. */
   readonly flags?: number;
   /** Resolver backend; see https://bun.sh/reference/bun/dns#dns-resolver-client. */
   readonly backend?: DnsResolverBackend;
+  /** Port keying the resolver entry; the docs note it distinguishes IPv6 vs IPv4-only connections. */
+  readonly port?: number;
+  /** Resolver socket type; `udp` is the default. */
+  readonly socketType?: DnsLookupSocketType;
 }
 
 /**

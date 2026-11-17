@@ -226,7 +226,11 @@ function writeState(path: string, state: StateFile): void {
   renameSync(tmp, path);
 }
 
-async function resolveWithTimeout(host: string, backend: DnsResolverBackend) {
+async function resolveWithTimeout(
+  host: string,
+  port: number,
+  backend: DnsResolverBackend,
+) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -235,7 +239,10 @@ async function resolveWithTimeout(host: string, backend: DnsResolverBackend) {
         // under concurrent loads, and this probe resolves every core host in parallel.
         // --backend overrides this for diagnostics. Omit family so an IPv4-only host still
         // resolves (c-ares does not honor V4MAPPED; family 6 + flags returned AAAA only).
+        // Port matches the prefetch/fetch; the reference notes port distinguishes IPv6 vs
+        // IPv4-only connections.
         backend,
+        port,
       }),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
@@ -268,7 +275,11 @@ async function probe(
 ): Promise<EndpointProbeObservation> {
   const lookup = await (async () => {
     try {
-      const answers = await resolveWithTimeout(target.hostname, backend);
+      const answers = await resolveWithTimeout(
+        target.hostname,
+        target.port,
+        backend,
+      );
       const addresses = answers.map((answer) => answer.address);
       const ttlSeconds = answers.map((answer) => Number(answer.ttl));
       return {
