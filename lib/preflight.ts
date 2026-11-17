@@ -7,6 +7,7 @@
  * failed" from "the page did not load".
  */
 
+import type { DnsResolverBackend } from "./bun_dns.ts";
 import { type TlsProvenance, probeTls } from "./tls_provenance.ts";
 
 export interface DnsAnswer {
@@ -74,10 +75,12 @@ export function warmCaptureNetwork(baseUrl: string): {
 }
 
 export interface DnsLookupOptions {
-  /** Restrict to IPv4 (4) or IPv6 (6); omit for the resolver default. */
-  readonly family?: 4 | 6;
-  /** Resolver flags such as `V4MAPPED | ALL` from `bun:dns`; omit for the default. */
+  /** Restrict to IPv4 (4), IPv6 (6) or any family (0); omit for the resolver default. */
+  readonly family?: 0 | 4 | 6;
+  /** Resolver flags such as `V4MAPPED | ALL`; omit for the default. */
   readonly flags?: number;
+  /** Resolver backend (Bun DNS reference); `c-ares` returns real TTLs. */
+  readonly backend?: DnsResolverBackend;
 }
 
 export async function resolveHost(

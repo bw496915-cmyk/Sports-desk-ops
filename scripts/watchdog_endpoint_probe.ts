@@ -25,8 +25,6 @@ import {
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { ALL, V4MAPPED } from "node:dns";
-
 import { SPORTSDESK_CORE_HOSTS, type HostTarget } from "../lib/bun_dns.ts";
 import { readDnsCacheStats, resolveHost } from "../lib/preflight.ts";
 import { resolveTelegramCredentials } from "../lib/telegram_alert_sender.ts";
@@ -197,8 +195,11 @@ async function probe(target: HostTarget): Promise<EndpointProbeObservation> {
   const lookup = await (async () => {
     try {
       const answers = await resolveHost(target.hostname, {
-        family: 6,
-        flags: V4MAPPED | ALL,
+        // Bun DNS reference: getaddrinfo is the documented slow path under concurrent
+        // loads, and this probe resolves every core host in parallel. c-ares also returns
+        // real TTLs. Omit family so an IPv4-only host still resolves (c-ares does not
+        // honor V4MAPPED; family 6 + flags returned AAAA only).
+        backend: "c-ares",
       });
       const addresses = answers.map((answer) => answer.address);
       return {

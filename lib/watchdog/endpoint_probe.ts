@@ -7,9 +7,10 @@
  * the state file and Telegram. Nothing here touches the network or the filesystem, so the
  * transitions and thresholds are unit-tested without a live resolver.
  *
- * Gating rule: `prefetch`/`getCacheStats` describe Bun's internal cache and are telemetry only.
- * A verdict comes from the observable path (`Bun.dns.lookup` + the endpoint fetch): a cache
- * with errors but a reachable endpoint is still reachable.
+ * Gating rule: `prefetch`/`getCacheStats` are documented Experimental APIs
+ * (https://bun.sh/reference/bun/dns) that describe Bun's internal cache; they are telemetry
+ * only. A verdict comes from the observable path (`Bun.dns.lookup` + the endpoint fetch): a
+ * cache with errors but a reachable endpoint is still reachable.
  */
 
 import type { HostTarget } from "../bun_dns.ts";
