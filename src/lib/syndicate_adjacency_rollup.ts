@@ -54,7 +54,11 @@ export interface SyndicateRingsSnapshotManifest {
   readonly generation_u32: number;
   readonly spine_generation_u32: number;
   readonly merkle_root_sha256: string;
+  readonly data_window_max_epoch_ms: number;
   readonly r2_published_at_epoch_ms: number;
+  readonly poison_bit: 0 | 1;
+  readonly circuit_state: "CLOSED" | "OPEN";
+  readonly unresolved_gap_cents: string;
   readonly active_edge_count_u32: number;
   readonly ring_count_u32: number;
   readonly rings: readonly SyndicateRingSummary[];
@@ -530,6 +534,14 @@ export class SyndicateAdjacencyRollupArena {
   }
 }
 
+function createSyndicateCasRejectedError(
+  message: string,
+): Error & { readonly exitCode: 74 } {
+  const err = new Error(message) as Error & { exitCode: 74 };
+  err.exitCode = 74;
+  return err;
+}
+
 export async function flushTopSyndicateRingsToR2(
   r2: SyndicateRingsStore,
   rollupArena: SyndicateAdjacencyRollupArena,
@@ -537,6 +549,7 @@ export async function flushTopSyndicateRingsToR2(
     readonly nextGenerationU32: number;
     readonly spineGenerationU32: number;
     readonly expectedPrevETag: string;
+    readonly dataWindowMaxEpochMs?: number;
     readonly minEdgeFollowCount?: number;
     readonly topKRings?: number;
     readonly flushEpochMs?: number;
@@ -548,12 +561,20 @@ export async function flushTopSyndicateRingsToR2(
     typeof expectedPrevETag !== "string" ||
     expectedPrevETag.trim().length === 0
   ) {
-    throw new Error(
+    throw createSyndicateCasRejectedError(
       `ERR_R2_MANIFEST_CAS_REJECTED: Missing expectedPrevETag for ${SYNDICATE_RINGS_MANIFEST_KEY}`,
+    );
+  }
+  const trimmedExpectedETag = expectedPrevETag.trim();
+  const isInitialCreate = trimmedExpectedETag === "*";
+  if (isInitialCreate && params.nextGenerationU32 >>> 0 !== 1) {
+    throw createSyndicateCasRejectedError(
+      `ERR_R2_MANIFEST_CAS_REJECTED: Initial If-None-Match=* requires nextGenerationU32===1 (got ${params.nextGenerationU32})`,
     );
   }
 
   const flushEpochMs = params.flushEpochMs ?? Date.now();
+  const dataWindowMaxEpochMs = params.dataWindowMaxEpochMs ?? flushEpochMs;
   const rings = rollupArena.extractTopSyndicateRings(
     params.minEdgeFollowCount ?? 2,
     params.topKRings ?? 25,
@@ -583,7 +604,11 @@ export async function flushTopSyndicateRingsToR2(
     generation_u32: params.nextGenerationU32,
     spine_generation_u32: params.spineGenerationU32,
     merkle_root_sha256: merkleRootSha256,
+    data_window_max_epoch_ms: dataWindowMaxEpochMs,
     r2_published_at_epoch_ms: flushEpochMs,
+    poison_bit: 0,
+    circuit_state: "CLOSED",
+    unresolved_gap_cents: "0",
     active_edge_count_u32: rollupArena.edgeCount,
     ring_count_u32: rings.length,
     rings,
@@ -591,11 +616,26 @@ export async function flushTopSyndicateRingsToR2(
   const serialized = JSON.stringify(manifest);
 
   // Read the current ETag first: a stale expectation must not write orphan blobs.
-  const current = await r2.stat(SYNDICATE_RINGS_MANIFEST_KEY);
-  if (current.etag !== expectedPrevETag) {
-    throw new Error(
-      `ERR_R2_MANIFEST_CAS_REJECTED: ${SYNDICATE_RINGS_MANIFEST_KEY} is at ${String(current.etag)} but expected ${expectedPrevETag}`,
-    );
+  if (isInitialCreate) {
+    let existingEtag = "";
+    try {
+      const current = await r2.stat(SYNDICATE_RINGS_MANIFEST_KEY);
+      existingEtag = current.etag?.trim() ?? "";
+    } catch {
+      existingEtag = "";
+    }
+    if (existingEtag.length > 0) {
+      throw createSyndicateCasRejectedError(
+        `ERR_R2_MANIFEST_CAS_REJECTED: ${SYNDICATE_RINGS_MANIFEST_KEY} already exists at ${existingEtag} (expected absent for *)`,
+      );
+    }
+  } else {
+    const current = await r2.stat(SYNDICATE_RINGS_MANIFEST_KEY);
+    if (current.etag !== trimmedExpectedETag) {
+      throw createSyndicateCasRejectedError(
+        `ERR_R2_MANIFEST_CAS_REJECTED: ${SYNDICATE_RINGS_MANIFEST_KEY} is at ${String(current.etag)} but expected ${trimmedExpectedETag}`,
+      );
+    }
   }
 
   const snapshotKey = `${SYNDICATE_RINGS_SNAPSHOT_PREFIX}/${flushEpochMs}-${merkle16}.json`;
@@ -614,7 +654,9 @@ export async function flushTopSyndicateRingsToR2(
   try {
     response = await doFetch(url, {
       method: "PUT",
-      headers: { "If-Match": expectedPrevETag },
+      headers: isInitialCreate
+        ? { "If-None-Match": "*" }
+        : { "If-Match": trimmedExpectedETag },
       body: serialized,
     });
   } catch (cause) {
@@ -624,8 +666,8 @@ export async function flushTopSyndicateRingsToR2(
     );
   }
   if (response.status === 412) {
-    throw new Error(
-      `ERR_R2_MANIFEST_CAS_REJECTED: HTTP 412 promoting ${SYNDICATE_RINGS_MANIFEST_KEY} (expected ETag=${expectedPrevETag})`,
+    throw createSyndicateCasRejectedError(
+      `ERR_R2_MANIFEST_CAS_REJECTED: HTTP 412 promoting ${SYNDICATE_RINGS_MANIFEST_KEY} (expected ETag=${trimmedExpectedETag})`,
     );
   }
   if (!response.ok) {

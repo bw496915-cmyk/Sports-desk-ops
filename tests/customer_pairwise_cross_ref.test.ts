@@ -1,16 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
+import { R2PreconditionFailedError } from "../lib/r2_s3_client.ts";
 import {
-  LIVE_WAGERS_R2_KEY,
   R2_BUCKET,
   SYNDICATE_RINGS_MANIFEST_KEY,
   WAGERS_BY_STATE_MANIFEST_KEY,
-  WAGERS_BY_STATE_SNAPSHOT_KEY,
   assertPairwiseCrossRefLivePreflight,
   executePairwiseCrossRefFromR2,
   resolveR2Endpoint,
   type PairwiseR2Reader,
 } from "../packages/sportsdesk-ops/src/bin/sportsdesk-fraud-cross-ref.ts";
+import {
+  normalizeStrongETag,
+  promoteCanonicalManifestWithCas,
+  type CasR2ClientLike,
+} from "../packages/sportsdesk-ops/src/lib/r2_manifest_cas.ts";
+import { publishWagersByStateSnapshotToR2 } from "../scripts/publish_wagers_snapshot.ts";
 import {
   LEG_FLAG_IS_ALT_SPREAD_PLUS_5000,
   LEG_FLAG_IS_LIVE_INPLAY,
@@ -68,6 +73,108 @@ function makeLiveEnv(): Record<string, string> {
   env.R2_SECRET_ACCESS_KEY = "test-r2-secret";
   env.R2_ENDPOINT = "https://r2.sportsdesk.test";
   return env;
+}
+
+function createInMemoryCasR2Client(
+  initialObjects?: ReadonlyMap<string, Uint8Array>,
+): {
+  readonly client: CasR2ClientLike & PairwiseR2Reader;
+  readonly objects: Map<string, Uint8Array>;
+  readonly etags: Map<string, string>;
+  readonly conditionalPuts: Array<{
+    readonly key: string;
+    readonly ifMatch?: string;
+    readonly ifNoneMatch?: string;
+  }>;
+  readonly simulateConcurrentRaceOnKey: (key: string) => void;
+} {
+  const objects = new Map<string, Uint8Array>(initialObjects);
+  const etags = new Map<string, string>();
+  const raceKeys = new Set<string>();
+  const conditionalPuts: Array<{
+    readonly key: string;
+    readonly ifMatch?: string;
+    readonly ifNoneMatch?: string;
+  }> = [];
+
+  const computeEtag = (bytes: Uint8Array): string => {
+    const h = new Bun.CryptoHasher("sha256");
+    h.update(bytes);
+    return `"${h.digest("hex").slice(0, 16)}"`;
+  };
+
+  for (const [k, v] of objects) {
+    etags.set(k, computeEtag(v));
+  }
+
+  const client: CasR2ClientLike & PairwiseR2Reader = {
+    async headEtag(key: string) {
+      return etags.get(key) ?? null;
+    },
+    async write(key: string, data: Uint8Array | string) {
+      const bytes =
+        typeof data === "string" ? new TextEncoder().encode(data) : data;
+      objects.set(key, bytes);
+      etags.set(key, computeEtag(bytes));
+      return bytes.byteLength;
+    },
+    async writeWithMetadata(key: string, data: Uint8Array | string, opts = {}) {
+      conditionalPuts.push({
+        key,
+        ...(opts.ifMatch === undefined ? {} : { ifMatch: opts.ifMatch }),
+        ...(opts.ifNoneMatch === undefined
+          ? {}
+          : { ifNoneMatch: opts.ifNoneMatch }),
+      });
+      if (raceKeys.delete(key)) {
+        const winnerBytes = new TextEncoder().encode('{"race":"winner"}');
+        objects.set(key, winnerBytes);
+        etags.set(key, computeEtag(winnerBytes));
+        throw new R2PreconditionFailedError(key);
+      }
+      const existingEtag = etags.get(key);
+      if (opts.ifNoneMatch === "*" && existingEtag !== undefined) {
+        throw new R2PreconditionFailedError(key);
+      }
+      if (opts.ifMatch !== undefined && opts.ifMatch !== existingEtag) {
+        throw new R2PreconditionFailedError(key);
+      }
+      const bytes =
+        typeof data === "string" ? new TextEncoder().encode(data) : data;
+      objects.set(key, bytes);
+      etags.set(key, computeEtag(bytes));
+      return bytes.byteLength;
+    },
+    file(key: string) {
+      return {
+        async text() {
+          const buf = objects.get(key);
+          if (!buf) throw new Error(`NoSuchKey: ${key}`);
+          return new TextDecoder().decode(buf);
+        },
+        async bytes() {
+          const buf = objects.get(key);
+          if (!buf) throw new Error(`NoSuchKey: ${key}`);
+          return buf;
+        },
+      };
+    },
+    async stat(key: string) {
+      const buf = objects.get(key);
+      if (!buf) throw new Error(`NoSuchKey: ${key}`);
+      return { etag: etags.get(key), size: buf.byteLength };
+    },
+  };
+
+  return {
+    client,
+    objects,
+    etags,
+    conditionalPuts,
+    simulateConcurrentRaceOnKey(key: string) {
+      raceKeys.add(key);
+    },
+  };
 }
 
 function createInMemoryR2Reader(
@@ -953,83 +1060,253 @@ describe("sportsdesk-fraud cross-ref governance & R2 lineage envelope", () => {
     expect((capturedErr as { exitCode?: number }).exitCode).toBe(65);
   });
 
-  test("executePairwiseCrossRefFromR2 falls back to R2 live-wagers/latest.json + wagers-by-state/latest.json when manifests are absent", async () => {
-    const fallbackObjects = new Map<string, Uint8Array>([
-      [
-        LIVE_WAGERS_R2_KEY,
-        new TextEncoder().encode(
-          JSON.stringify({
-            schemaVersion: 1,
-            source: "f402-bet-ticker",
-            observedAt: "2026-11-17T20:10:00.001Z",
-            partial: true,
-            LIST: [
-              {
-                WagerNumber: 769271281,
-                CustomerID: "TACO323   ",
-                Login: "TACO323",
-                AmountWagered: 1500,
-                InsertDateTime: "2026-11-17 14:56:05.157",
-                TicketWriter: "Internet",
-                ShortDesc:
-                  "P.Basketball #547 Pistons  12 -150 - buying 2 For Game Basketball #548 Knicks/Raptors O 212&#189; -110 - For Game",
-              },
-              {
-                WagerNumber: 769271503,
-                CustomerID: "TACO166   ",
-                Login: "TACO166",
-                AmountWagered: 1600,
-                InsertDateTime: "2026-11-17 14:56:45.157",
-                TicketWriter: "Internet",
-                ShortDesc:
-                  "P.Basketball #547 Pistons +12 -110 - For Game Basketball #548 Knicks/Raptors U 212½ -110 - For Game",
-              },
-              {
-                WagerNumber: 769270980,
-                CustomerID: "TACO166   ",
-                Login: "TACO166",
-                AmountWagered: 11000,
-                InsertDateTime: "2026-11-17 14:57:00.000",
-                TicketWriter: "ALERT",
-                ShortDesc: "S:Basketball #547 Pistons +12 -110 - For Game",
-              },
-            ],
-          }),
-        ),
-      ],
-      [
-        WAGERS_BY_STATE_SNAPSHOT_KEY,
-        new TextEncoder().encode(
-          JSON.stringify({
-            schemaVersion: 1,
-            generatedAt: "2026-11-17T20:00:08.932Z",
-            sourceSha256:
-              "67ea4389bdb20a2a5880f25ee0bfe49ed8dff8a6cd63bd6e8f932f981a7476c1",
-          }),
-        ),
-      ],
-    ]);
+  test("executePairwiseCrossRefFromR2 fails closed without .json fallback and rejects poisoned syndicate-rings", async () => {
+    const emptyR2 = createInMemoryR2Reader(
+      new Map<string, Uint8Array>([
+        ["live-wagers/latest.json", new TextEncoder().encode('{"LIST":[]}')],
+        [
+          "wagers-by-state/latest.json",
+          new TextEncoder().encode('{"schemaVersion":2}'),
+        ],
+      ]),
+    );
+    let missingErr: unknown = null;
+    try {
+      await executePairwiseCrossRefFromR2({
+        r2: emptyR2,
+        customerA: "TACO323",
+        customerB: "TACO166",
+      });
+    } catch (err) {
+      missingErr = err;
+    }
+    expect(missingErr).toBeInstanceOf(Error);
+    expect((missingErr as Error).message).toContain("ERR_R2_SINK_BACKPRESSURE");
+    expect((missingErr as { exitCode?: number }).exitCode).toBe(65);
 
+    const poisonedR2 = createInMemoryR2Reader(
+      new Map<string, Uint8Array>([
+        [
+          WAGERS_BY_STATE_MANIFEST_KEY,
+          new TextEncoder().encode(
+            JSON.stringify({
+              domain: "[Ops & Governance]",
+              sink_id: "wagers-by-state",
+              r2_bucket: R2_BUCKET,
+              generation_u32: 1,
+              merkle_root_sha256: "a".repeat(64),
+              watermark_cursor: "wm-1:1",
+              data_window_max_epoch_ms: 1_763_262_300_000,
+              r2_published_at_epoch_ms: 1_763_262_301_000,
+              chunk_key: "chunks/missing.bin",
+              circuit_state: "CLOSED",
+              unresolved_gap_cents: "0",
+            }),
+          ),
+        ],
+        [
+          SYNDICATE_RINGS_MANIFEST_KEY,
+          new TextEncoder().encode(
+            JSON.stringify({
+              domain: "[DOD Spine]",
+              r2_bucket: R2_BUCKET,
+              manifest_key: SYNDICATE_RINGS_MANIFEST_KEY,
+              generation_u32: 1,
+              spine_generation_u32: 1,
+              merkle_root_sha256: "b".repeat(64),
+              data_window_max_epoch_ms: 1_763_262_300_000,
+              r2_published_at_epoch_ms: 1_763_262_301_000,
+              poison_bit: 1,
+              circuit_state: "OPEN",
+              unresolved_gap_cents: "0",
+              active_edge_count_u32: 0,
+              ring_count_u32: 0,
+              rings: [],
+            }),
+          ),
+        ],
+      ]),
+    );
+    let poisonErr: unknown = null;
+    try {
+      await executePairwiseCrossRefFromR2({
+        r2: poisonedR2,
+        customerA: "TACO323",
+        customerB: "TACO166",
+      });
+    } catch (err) {
+      poisonErr = err;
+    }
+    expect(poisonErr).toBeInstanceOf(Error);
+    expect((poisonErr as Error).message).toContain("poison_bit=1");
+    expect((poisonErr as { exitCode?: number }).exitCode).toBe(65);
+  });
+
+  test("publishWagersByStateSnapshotToR2 enforces If-None-Match/If-Match CAS, 0 rebases on 412 (exit 74), and zero unresolved_gap_cents (exit 65)", async () => {
+    const casHarness = createInMemoryCasR2Client();
+    const okEnv = makeLiveEnv();
+    const tickerDoc = {
+      observedAt: "2026-11-17T20:10:00.001Z",
+      LIST: [
+        {
+          WagerNumber: 769271281,
+          CustomerID: "TACO323   ",
+          Login: "TACO323",
+          AmountWagered: 1500,
+          InsertDateTime: "2026-11-17 14:56:05.157",
+          TicketWriter: "Internet",
+          ShortDesc:
+            "P.Basketball #547 Pistons  12 -150 - buying 2 For Game Basketball #548 Knicks/Raptors O 212&#189; -110 - For Game",
+        },
+        {
+          WagerNumber: 769271503,
+          CustomerID: "TACO166   ",
+          Login: "TACO166",
+          AmountWagered: 1600,
+          InsertDateTime: "2026-11-17 14:56:45.157",
+          TicketWriter: "Internet",
+          ShortDesc:
+            "P.Basketball #547 Pistons +12 -110 - For Game Basketball #548 Knicks/Raptors U 212½ -110 - For Game",
+        },
+        {
+          WagerNumber: 769270980,
+          CustomerID: "TACO166   ",
+          Login: "TACO166",
+          AmountWagered: 11000,
+          InsertDateTime: "2026-11-17 14:57:00.000",
+          TicketWriter: "ALERT",
+          ShortDesc: "S:Basketball #547 Pistons +12 -110 - For Game",
+        },
+      ],
+    };
+
+    // gen=1: uses If-None-Match: "*" and promotes both wagers-by-state and initial syndicate-rings
+    const gen1 = await publishWagersByStateSnapshotToR2({
+      client: casHarness.client,
+      env: okEnv,
+      liveTickerDoc: tickerDoc,
+    });
+    expect(gen1.generation_u32).toBe(1);
+    expect(gen1.prevETag).toBeNull();
+    expect(gen1.newETag).not.toBeNull();
+    expect(gen1.chunkKey).toMatch(/^chunks\/[0-9a-f]{64}\.bin$/);
+    expect(gen1.generationKey).toMatch(
+      /^generations\/wagers-by-state\/gen-1-[0-9a-f]{16}$/,
+    );
+    expect(gen1.data_window_max_epoch_ms).toBe(
+      Date.parse("2026-11-17T19:56:45.157Z"),
+    );
+    expect(gen1.syndicateRingsInitialized).toBe(true);
+    expect(casHarness.conditionalPuts[0]).toEqual({
+      key: WAGERS_BY_STATE_MANIFEST_KEY,
+      ifNoneMatch: "*",
+    });
+    expect(casHarness.conditionalPuts[1]).toEqual({
+      key: SYNDICATE_RINGS_MANIFEST_KEY,
+      ifNoneMatch: "*",
+    });
+
+    // cross-ref reads purely from promoted manifests + SoA chunk (zero .json fallback)
     const payload = await executePairwiseCrossRefFromR2({
-      r2: createInMemoryR2Reader(fallbackObjects),
+      r2: casHarness.client,
       customerA: "TACO323",
       customerB: "TACO166",
     });
-
     expect(payload.circuit_state).toBe("CLOSED");
     expect(payload.unresolved_gap_cents).toBe("0");
+    expect(payload.generation_u32).toBe(1);
     expect(payload.data_window_max_epoch_ms).toBe(
       Date.parse("2026-11-17T19:56:45.157Z"),
     );
-    expect(payload.hydratedRows).toBe(4); // 2 parlay legs for TACO323 + 2 for TACO166; ALERT dropped
-    expect(payload.manifests.wagersByState.chunk_key).toBe(LIVE_WAGERS_R2_KEY);
-    expect(payload.analysis.totalWagersA).toBe(2);
-    expect(payload.analysis.totalWagersB).toBe(2);
-    expect(payload.analysis.sharedEventsCount).toBe(2);
-    expect(payload.analysis.sameSideCount).toBe(1); // #547 Pistons +12 same side
-    expect(payload.analysis.oppositeSideCount).toBe(1); // #548 O vs U opposite side
-    expect(payload.analysis.pregameFollowsAtoB).toBe(1); // 40,000ms <= 90,000ms tip window
+    expect(payload.manifests.syndicateRings.poison_bit).toBe(0);
+    expect(payload.manifests.syndicateRings.circuit_state).toBe("CLOSED");
+    expect(payload.hydratedRows).toBe(4);
+    expect(payload.analysis.sameSideCount).toBe(1);
+    expect(payload.analysis.oppositeSideCount).toBe(1);
+    expect(payload.analysis.pregameFollowsAtoB).toBe(1);
     expect(payload.analysis.minSameSideLagMsU32).toBe(40_000);
+
+    // gen=2: promotes with strict If-Match: gen1.newETag
+    const gen2 = await publishWagersByStateSnapshotToR2({
+      client: casHarness.client,
+      env: okEnv,
+      liveTickerDoc: tickerDoc,
+    });
+    expect(gen2.generation_u32).toBe(2);
+    expect(gen2.prevETag).toBe(gen1.newETag);
+    expect(gen2.syndicateRingsInitialized).toBe(false);
+    expect(casHarness.conditionalPuts[2]).toEqual({
+      key: WAGERS_BY_STATE_MANIFEST_KEY,
+      ifMatch: gen1.newETag!,
+    });
+
+    // Weak R2 ETag prefixes (W/"...") normalize to strong ETag comparison
+    expect(normalizeStrongETag('W/"abc123"')).toBe('"abc123"');
+    expect(normalizeStrongETag("   ")).toBeNull();
+
+    // Zero rebases on HTTP 412 -> ERR_R2_MANIFEST_CAS_REJECTED (exit 74)
+    const putsBeforeRace = casHarness.conditionalPuts.length;
+    const casRaceClient = createInMemoryCasR2Client(casHarness.objects);
+    casRaceClient.simulateConcurrentRaceOnKey(WAGERS_BY_STATE_MANIFEST_KEY);
+    let casErr: unknown = null;
+    try {
+      await promoteCanonicalManifestWithCas({
+        client: casRaceClient.client,
+        sinkId: "wagers-by-state",
+        manifestKey: WAGERS_BY_STATE_MANIFEST_KEY,
+        prevETag: gen2.newETag!,
+        nextGenerationU32: 3,
+        merkleRootSha256: gen2.merkle_root_sha256,
+        manifest: { generation_u32: 3 },
+        unresolvedGapCents: "0",
+      });
+    } catch (err) {
+      casErr = err;
+    }
+    expect(casErr).toBeInstanceOf(Error);
+    expect((casErr as Error).message).toContain("ERR_R2_MANIFEST_CAS_REJECTED");
+    expect((casErr as { exitCode?: number }).exitCode).toBe(74);
+    expect(casRaceClient.conditionalPuts).toHaveLength(1);
+    expect(casHarness.conditionalPuts).toHaveLength(putsBeforeRace);
+
+    // Pre-promotion non-zero unresolved_gap_cents -> ERR_OPS_RECONCILIATION_GAP (exit 65) leaving gen=2 intact
+    let gapErr: unknown = null;
+    try {
+      await publishWagersByStateSnapshotToR2({
+        client: casHarness.client,
+        env: okEnv,
+        unresolvedGapCents: "250",
+        liveTickerDoc: tickerDoc,
+      });
+    } catch (err) {
+      gapErr = err;
+    }
+    expect(gapErr).toBeInstanceOf(Error);
+    expect((gapErr as Error).message).toContain("ERR_OPS_RECONCILIATION_GAP");
+    expect((gapErr as { exitCode?: number }).exitCode).toBe(65);
+    const intactLatest = JSON.parse(
+      await casHarness.client.file(WAGERS_BY_STATE_MANIFEST_KEY).text(),
+    ) as { generation_u32: number };
+    expect(intactLatest.generation_u32).toBe(2);
+
+    // Token bleed guard -> ERR_CF_TOKEN_BLEED_10000 (exit 77)
+    let tokenErr: unknown = null;
+    try {
+      await publishWagersByStateSnapshotToR2({
+        client: casHarness.client,
+        env: {
+          ...okEnv,
+          CLOUDFLARE_R2_API_TOKEN: "r2",
+          CLOUDFLARE_API_TOKEN: "cf",
+        },
+        liveTickerDoc: tickerDoc,
+      });
+    } catch (err) {
+      tokenErr = err;
+    }
+    expect(tokenErr).toBeInstanceOf(Error);
+    expect((tokenErr as Error).message).toContain("ERR_CF_TOKEN_BLEED_10000");
+    expect((tokenErr as { exitCode?: number }).exitCode).toBe(77);
   });
 
   test("bun x --no-install sportsdesk-fraud cross-ref enforces --help, ERR_OPS_LOCAL_JSON_FORBIDDEN (exit 78), and preflight gates", () => {

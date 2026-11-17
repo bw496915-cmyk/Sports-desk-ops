@@ -3,24 +3,18 @@
 /**
  * Live R2-backed pairwise customer wager cross-reference subcommand for `bun x sportsdesk-fraud cross-ref`.
  *
- * Zero local `.json` / `.jsonl` / `.sqlite` / `.dodbin` reads: hydrates contiguous SoA
- * `PairwiseWagerColumnStore` slices directly from `sportsdesk-ops-reports` R2 manifests
- * (`manifests/wagers-by-state/latest` and `manifests/syndicate-rings/latest`) via `Bun.S3Client`.
+ * Zero local `.json` / `.jsonl` / `.sqlite` / `.dodbin` reads and zero `.json` pointer fallbacks:
+ * strictly hydrates contiguous SoA `PairwiseWagerColumnStore` binary chunks directly from
+ * `sportsdesk-ops-reports` R2 CAS manifests (`manifests/wagers-by-state/latest` and
+ * `manifests/syndicate-rings/latest`) via `Bun.S3Client`.
  */
 
 import { parseArgs } from "node:util";
-import { portalIso } from "../../../../lib/bet_flags.ts";
 import {
-  LIVE_WAGER_TYPE_CODE3,
-  SOURCE_BRIDGE_IDS,
-  asLineHundredths,
-  encodePairwiseSoAChunk,
-  evaluateColumnarPairwiseCrossRef,
   hydratePairwiseColumnStoreFromSoAChunk,
-  packSubSportComboKey15,
-  parseDualSurfaceBetGroupToken,
-  parseFixedPointDecimalToBigInt,
+  evaluateColumnarPairwiseCrossRef,
   PairwiseWagerColumnStore,
+  SOURCE_BRIDGE_IDS,
   type PairwiseCrossRefResult,
   type PairwiseOverlapRecord,
   type SourceBridgeId2,
@@ -29,25 +23,18 @@ import {
   SYNDICATE_RINGS_MANIFEST_KEY,
   type SyndicateRingsSnapshotManifest,
 } from "../../../../src/lib/syndicate_adjacency_rollup.ts";
+import {
+  R2ManifestCasError,
+  R2_BUCKET,
+  RETIRED_FALLBACK_ENV_KEYS,
+  assertZeroReconciliationGapCents,
+  mapR2ErrorExitCode,
+  resolveR2EndpointFromEnv,
+} from "../lib/r2_manifest_cas.ts";
 
-export const R2_BUCKET = "sportsdesk-ops-reports" as const;
+export { R2_BUCKET, SYNDICATE_RINGS_MANIFEST_KEY };
 export const WAGERS_BY_STATE_MANIFEST_KEY =
   "manifests/wagers-by-state/latest" as const;
-export const LIVE_WAGERS_R2_KEY = "live-wagers/latest.json" as const;
-export const WAGERS_BY_STATE_SNAPSHOT_KEY =
-  "wagers-by-state/latest.json" as const;
-export { SYNDICATE_RINGS_MANIFEST_KEY };
-
-const RETIRED_FALLBACK_ENV_KEYS = [
-  "DOD6_SPINE_PATH",
-  "DOD_SPINE_PATH",
-  "F402_BETS_JSONL_PATH",
-  "DOD_SQLITE_PATH",
-  "AWS_ACCESS_KEY_ID",
-  "AWS_SECRET_ACCESS_KEY",
-  "S3_ACCESS_KEY_ID",
-  "S3_SECRET_ACCESS_KEY",
-] as const;
 
 const FORBIDDEN_LOCAL_EXT_RE = /\.(?:json|jsonl|sqlite|dodbin)(?:$|\?)/i;
 
@@ -134,7 +121,10 @@ export interface PairwiseCrossRefR2Payload {
       readonly generation_u32: number;
       readonly spine_generation_u32: number;
       readonly merkle_root_sha256: string;
+      readonly data_window_max_epoch_ms: number;
       readonly r2_published_at_epoch_ms: number;
+      readonly poison_bit: 0 | 1;
+      readonly circuit_state: "CLOSED" | "OPEN";
       readonly active_edge_count_u32: number;
       readonly ring_count_u32: number;
     };
@@ -233,16 +223,7 @@ export function assertPairwiseCrossRefLivePreflight(
 export function resolveR2Endpoint(
   env: Readonly<Record<string, string | undefined>>,
 ): string | undefined {
-  if (env.R2_ENDPOINT && env.R2_ENDPOINT.trim().length > 0) {
-    return env.R2_ENDPOINT.trim();
-  }
-  if (
-    env.CLOUDFLARE_ACCOUNT_ID &&
-    env.CLOUDFLARE_ACCOUNT_ID.trim().length > 0
-  ) {
-    return `https://${env.CLOUDFLARE_ACCOUNT_ID.trim()}.r2.cloudflarestorage.com`;
-  }
-  return undefined;
+  return resolveR2EndpointFromEnv(env);
 }
 
 function createR2ReaderFromEnv(
@@ -262,7 +243,7 @@ function createR2ReaderFromEnv(
     accessKeyId,
     secretAccessKey,
     endpoint,
-    bucket: R2_BUCKET,
+    bucket: env.R2_BUCKET_NAME?.trim() || R2_BUCKET,
   });
 }
 
@@ -354,364 +335,6 @@ function projectJsonAnalysis(
   };
 }
 
-function isR2NoSuchKeyError(err: unknown): boolean {
-  if (err === null || typeof err !== "object") {
-    return /NoSuchKey|404|does not exist/i.test(String(err));
-  }
-  const obj = err as {
-    readonly code?: unknown;
-    readonly name?: unknown;
-    readonly status?: unknown;
-    readonly message?: unknown;
-    readonly cause?: unknown;
-  };
-  if (obj.status === 404) return true;
-  if (typeof obj.code === "string" && /NoSuchKey|ENOENT|404/i.test(obj.code)) {
-    return true;
-  }
-  if (
-    typeof obj.message === "string" &&
-    /NoSuchKey|404|does not exist/i.test(obj.message)
-  ) {
-    return true;
-  }
-  return obj.cause !== undefined ? isR2NoSuchKeyError(obj.cause) : false;
-}
-
-async function tryReadR2JsonManifest<T>(
-  r2: PairwiseR2Reader,
-  key: string,
-): Promise<T | null> {
-  try {
-    return await readR2JsonManifest<T>(r2, key);
-  } catch (err) {
-    if (isR2NoSuchKeyError(err)) {
-      return null;
-    }
-    throw err;
-  }
-}
-
-interface RawLiveWagerRow {
-  readonly WagerNumber?: unknown;
-  readonly CustomerID?: unknown;
-  readonly Login?: unknown;
-  readonly AmountWagered?: unknown;
-  readonly InsertDateTime?: unknown;
-  readonly TicketWriter?: unknown;
-  readonly ShortDesc?: unknown;
-}
-
-interface LiveWagersSnapshotDocument {
-  readonly observedAt?: unknown;
-  readonly LIST?: readonly RawLiveWagerRow[];
-}
-
-interface WagersByStateSnapshotDocument {
-  readonly generatedAt?: unknown;
-  readonly capturedAt?: unknown;
-  readonly sourceSha256?: unknown;
-}
-
-const SPORT_CODE6_MAP: ReadonlyArray<readonly [RegExp, number]> = [
-  [/football|nfl|cfb|ncaaf/i, 1],
-  [/baseball|mlb|ncaa\s*baseball/i, 2],
-  [/basketball|nba|cbb|ncaab|wnba/i, 3],
-  [/hockey|nhl/i, 4],
-  [/soccer|mls|epl|uefa|champions/i, 5],
-];
-
-function inferSportCode6(text: string): number {
-  for (const [pattern, code] of SPORT_CODE6_MAP) {
-    if (pattern.test(text)) return code;
-  }
-  return 1;
-}
-
-function inferPeriodCode4(segment: string): number {
-  if (/\b(?:1st\s+Half|1H)\b/i.test(segment)) return 1;
-  if (/\b(?:2nd\s+Half|2H)\b/i.test(segment)) return 2;
-  if (/\b(?:1st\s+Quarter|1Q)\b/i.test(segment)) return 3;
-  if (/\b(?:2nd\s+Quarter|2Q)\b/i.test(segment)) return 4;
-  if (/\b(?:3rd\s+Quarter|3Q)\b/i.test(segment)) return 5;
-  if (/\b(?:4th\s+Quarter|4Q)\b/i.test(segment)) return 6;
-  return 0;
-}
-
-function parseInsertDateTimeEpochMs(raw: unknown): number {
-  if (typeof raw === "number") {
-    return Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : 0;
-  }
-  const iso = portalIso(raw);
-  if (iso === null) return 0;
-  const parsed = Date.parse(iso);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
-
-function parseSafeDecimalHundredths(raw: string): number {
-  const cleaned = raw.trim().replaceAll("\u00BD", ".5").replaceAll(",", "");
-  if (!/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(cleaned)) {
-    return 0;
-  }
-  const scaled = parseFixedPointDecimalToBigInt(cleaned, 2);
-  const absLimit = 2_000_000_000n;
-  if (scaled > absLimit || scaled < -absLimit) return 0;
-  return Number(scaled);
-}
-
-function parseLegAttributes(
-  rawRot: number,
-  segment: string,
-  ticketPrefix: string,
-  prevContext: string,
-): {
-  readonly subSportCode6: number;
-  readonly wagerTypeCode3: number;
-  readonly periodCode4: number;
-  readonly marketKindCode2: number;
-  readonly sideCode2: number;
-  readonly lineHundredths: number;
-  readonly oddsAmerican: number;
-} {
-  const headOnly = segment.split(/\s+-\s+(?:buying|For)\b/i)[0] ?? segment;
-  const subSportCode6 = inferSportCode6(
-    `${prevContext} ${segment} ${ticketPrefix}`,
-  );
-  const isLive =
-    /^L[:.]/i.test(ticketPrefix) || (rawRot >= 9000 && rawRot <= 9999);
-  const wagerTypeCode3 = isLive ? LIVE_WAGER_TYPE_CODE3 : 0;
-  const periodCode4 = inferPeriodCode4(segment);
-
-  const totalMatch =
-    /\b([OU])\s*([0-9]+(?:\.[0-9]+|\u00BD)?)\b/i.exec(headOnly) ??
-    /\b(Over|Under)\s*([0-9]+(?:\.[0-9]+|\u00BD)?)\b/i.exec(headOnly);
-  if (totalMatch) {
-    const marketKindCode2 = 1;
-    const sideCode2 = totalMatch[1]!.toUpperCase().startsWith("U") ? 1 : 0;
-    const lineHundredths = parseSafeDecimalHundredths(totalMatch[2]!);
-    const tailAfterTotal = headOnly.slice(
-      (totalMatch.index ?? 0) + totalMatch[0].length,
-    );
-    const oddsMatch = /[+-]\d{3,4}/.exec(tailAfterTotal);
-    const oddsAmerican = oddsMatch ? Math.trunc(Number(oddsMatch[0])) : -110;
-    return {
-      subSportCode6,
-      wagerTypeCode3,
-      periodCode4,
-      marketKindCode2,
-      sideCode2,
-      lineHundredths,
-      oddsAmerican,
-    };
-  }
-
-  const numericTokens: string[] = [];
-  const tokRe = /(?:^|\s)([+-]?\d+(?:\.\d+)?\u00BD?|[+-]?\u00BD)(?=$|[\s,])/g;
-  let tokMatch: RegExpExecArray | null;
-  while ((tokMatch = tokRe.exec(headOnly)) !== null) {
-    numericTokens.push(tokMatch[1]!);
-  }
-  const lastTok = numericTokens[numericTokens.length - 1];
-  const prevTok =
-    numericTokens.length >= 2
-      ? numericTokens[numericTokens.length - 2]
-      : undefined;
-
-  const explicitMl =
-    /^M[:.]/i.test(ticketPrefix) || /\bML\b|Money\s*Line/i.test(segment);
-  if (
-    explicitMl ||
-    (numericTokens.length === 1 &&
-      lastTok !== undefined &&
-      Math.abs(parseSafeDecimalHundredths(lastTok)) >= 10_000)
-  ) {
-    const oddsVal = lastTok
-      ? Math.trunc(parseSafeDecimalHundredths(lastTok) / 100)
-      : -110;
-    return {
-      subSportCode6,
-      wagerTypeCode3,
-      periodCode4,
-      marketKindCode2: 2,
-      sideCode2: rawRot & 1 ? 0 : 1,
-      lineHundredths: 0,
-      oddsAmerican: oddsVal,
-    };
-  }
-
-  if (prevTok !== undefined && lastTok !== undefined) {
-    return {
-      subSportCode6,
-      wagerTypeCode3,
-      periodCode4,
-      marketKindCode2: 0,
-      sideCode2: rawRot & 1 ? 0 : 1,
-      lineHundredths: parseSafeDecimalHundredths(prevTok),
-      oddsAmerican: Math.trunc(parseSafeDecimalHundredths(lastTok) / 100),
-    };
-  }
-
-  if (lastTok !== undefined) {
-    return {
-      subSportCode6,
-      wagerTypeCode3,
-      periodCode4,
-      marketKindCode2: 0,
-      sideCode2: rawRot & 1 ? 0 : 1,
-      lineHundredths: parseSafeDecimalHundredths(lastTok),
-      oddsAmerican: -110,
-    };
-  }
-
-  return {
-    subSportCode6,
-    wagerTypeCode3,
-    periodCode4,
-    marketKindCode2: 0,
-    sideCode2: rawRot & 1 ? 0 : 1,
-    lineHundredths: 0,
-    oddsAmerican: -110,
-  };
-}
-
-async function hydrateLiveWagersSnapshotFromR2(r2: PairwiseR2Reader): Promise<{
-  readonly store: PairwiseWagerColumnStore;
-  readonly manifest: WagersByStateR2Manifest;
-}> {
-  const [liveWagersDoc, wagersByStateDoc] = await Promise.all([
-    readR2JsonManifest<LiveWagersSnapshotDocument>(r2, LIVE_WAGERS_R2_KEY),
-    tryReadR2JsonManifest<WagersByStateSnapshotDocument>(
-      r2,
-      WAGERS_BY_STATE_SNAPSHOT_KEY,
-    ),
-  ]);
-
-  const rows = Array.isArray(liveWagersDoc.LIST) ? liveWagersDoc.LIST : [];
-  let estimatedLegs = 0;
-  for (const row of rows) {
-    const desc = String(row.ShortDesc ?? "");
-    const matches = desc.match(/#\d{3,6}\b/g);
-    if (matches) estimatedLegs += matches.length;
-  }
-
-  const store = new PairwiseWagerColumnStore(Math.max(1, estimatedLegs));
-  const observedMs =
-    typeof liveWagersDoc.observedAt === "string"
-      ? Date.parse(liveWagersDoc.observedAt)
-      : Date.now();
-  const fallbackEpochMs = Number.isFinite(observedMs) ? observedMs : Date.now();
-  let maxEpochMs = 0;
-
-  for (const row of rows) {
-    const writer = String(row.TicketWriter ?? "")
-      .trim()
-      .toUpperCase();
-    if (writer === "ALERT") {
-      continue;
-    }
-
-    const rawCustomer = String(row.CustomerID ?? row.Login ?? "").trim();
-    if (rawCustomer.length === 0) continue;
-
-    const descRaw = String(row.ShortDesc ?? "").replaceAll("&#189;", "\u00BD");
-    const legRe = /#(\d{3,6})\b([^#]*)/g;
-    const prefix = descRaw.slice(0, 32);
-    const bridgeId =
-      writer === "GSLIVE"
-        ? SOURCE_BRIDGE_IDS.PARTNER_118_BRIDGE_3C
-        : SOURCE_BRIDGE_IDS.FANTASY_402_BRIDGE_3AB;
-
-    const wagerGroup64 = /^M\.G\d+/i.test(descRaw)
-      ? parseDualSurfaceBetGroupToken(descRaw.split(/\s+/)[0] ?? "")
-      : typeof row.WagerNumber === "number" && Number.isFinite(row.WagerNumber)
-        ? BigInt(Math.trunc(row.WagerNumber))
-        : 0n;
-
-    const placedMs =
-      parseInsertDateTimeEpochMs(row.InsertDateTime) || fallbackEpochMs;
-    if (placedMs > maxEpochMs) maxEpochMs = placedMs;
-
-    const stakeNum =
-      typeof row.AmountWagered === "number" &&
-      Number.isFinite(row.AmountWagered)
-        ? BigInt(Math.trunc(row.AmountWagered))
-        : 0n;
-
-    let match: RegExpExecArray | null;
-    while ((match = legRe.exec(descRaw)) !== null) {
-      const rawRot = Number(match[1]);
-      if (!Number.isInteger(rawRot) || rawRot < 0 || rawRot > 0x0fffff) {
-        continue;
-      }
-      const prevContext = descRaw.slice(
-        Math.max(0, match.index - 24),
-        match.index,
-      );
-      const attrs = parseLegAttributes(
-        rawRot,
-        match[2] ?? "",
-        prefix,
-        prevContext,
-      );
-      const key15 = packSubSportComboKey15(
-        attrs.subSportCode6,
-        attrs.wagerTypeCode3,
-        attrs.periodCode4,
-        attrs.marketKindCode2,
-      );
-      store.appendLeg(
-        rawCustomer,
-        wagerGroup64,
-        rawRot,
-        key15,
-        asLineHundredths(attrs.lineHundredths),
-        attrs.oddsAmerican,
-        stakeNum,
-        placedMs,
-        bridgeId,
-        attrs.sideCode2,
-      );
-    }
-  }
-
-  const chunkBytes = encodePairwiseSoAChunk(store);
-  const hasher = new Bun.CryptoHasher("sha256");
-  hasher.update(chunkBytes);
-  const merkleRootSha256 = hasher.digest("hex");
-
-  const publishedIso =
-    typeof wagersByStateDoc?.generatedAt === "string"
-      ? wagersByStateDoc.generatedAt
-      : typeof liveWagersDoc.observedAt === "string"
-        ? liveWagersDoc.observedAt
-        : "";
-  const publishedMs = publishedIso ? Date.parse(publishedIso) : fallbackEpochMs;
-  const sourceShaPrefix =
-    typeof wagersByStateDoc?.sourceSha256 === "string" &&
-    wagersByStateDoc.sourceSha256.length >= 16
-      ? wagersByStateDoc.sourceSha256.slice(0, 16)
-      : merkleRootSha256.slice(0, 16);
-
-  return {
-    store,
-    manifest: {
-      domain: "[Ops & Governance]",
-      sink_id: "wagers-by-state",
-      r2_bucket: R2_BUCKET,
-      generation_u32: 0,
-      merkle_root_sha256: merkleRootSha256,
-      watermark_cursor: `${sourceShaPrefix}:${store.length}`,
-      data_window_max_epoch_ms: maxEpochMs > 0 ? maxEpochMs : fallbackEpochMs,
-      r2_published_at_epoch_ms: Number.isFinite(publishedMs)
-        ? publishedMs
-        : fallbackEpochMs,
-      chunk_key: LIVE_WAGERS_R2_KEY,
-      circuit_state: "CLOSED",
-      unresolved_gap_cents: "0",
-    },
-  };
-}
-
 export async function executePairwiseCrossRefFromR2(params: {
   readonly r2: PairwiseR2Reader;
   readonly customerA: string;
@@ -719,109 +342,88 @@ export async function executePairwiseCrossRefFromR2(params: {
   readonly bridgeFilter?: SourceBridgeId2 | "ALL";
   readonly maxSampleOverlaps?: number;
 }): Promise<PairwiseCrossRefR2Payload> {
-  const [manifestWagers, manifestRings] = await Promise.all([
-    tryReadR2JsonManifest<WagersByStateR2Manifest>(
+  const [wagersManifest, ringsManifest] = await Promise.all([
+    readR2JsonManifest<WagersByStateR2Manifest>(
       params.r2,
       WAGERS_BY_STATE_MANIFEST_KEY,
     ),
-    tryReadR2JsonManifest<SyndicateRingsSnapshotManifest>(
+    readR2JsonManifest<SyndicateRingsSnapshotManifest>(
       params.r2,
       SYNDICATE_RINGS_MANIFEST_KEY,
     ),
   ]);
 
-  let wagersManifest: WagersByStateR2Manifest;
-  let store: PairwiseWagerColumnStore;
-  let hydratedRows: number;
-
-  if (manifestWagers !== null) {
-    wagersManifest = manifestWagers;
-    if (
-      typeof wagersManifest.chunk_key !== "string" ||
-      wagersManifest.chunk_key.trim().length === 0
-    ) {
-      throw new PairwiseCrossRefError(
-        "ERR_R2_SINK_BACKPRESSURE",
-        `ERR_R2_SINK_BACKPRESSURE: ${WAGERS_BY_STATE_MANIFEST_KEY} missing chunk_key`,
-        65,
-      );
-    }
-
-    const rawGap = String(wagersManifest.unresolved_gap_cents ?? "0").trim();
-    let parsedGapCents: bigint;
-    try {
-      parsedGapCents = rawGap.length > 0 ? BigInt(rawGap) : 1n;
-    } catch (cause) {
-      throw new PairwiseCrossRefError(
-        "ERR_OPS_RECONCILIATION_GAP",
-        `ERR_OPS_RECONCILIATION_GAP: invalid unresolved_gap_cents (${rawGap})`,
-        65,
-        cause,
-      );
-    }
-    if (parsedGapCents !== 0n) {
-      throw new PairwiseCrossRefError(
-        "ERR_OPS_RECONCILIATION_GAP",
-        `ERR_OPS_RECONCILIATION_GAP: unresolved_gap_cents=${parsedGapCents.toString()}`,
-        65,
-      );
-    }
-
-    const chunkBytes = await readR2BinaryChunk(
-      params.r2,
-      wagersManifest.chunk_key,
+  if (
+    typeof wagersManifest.chunk_key !== "string" ||
+    wagersManifest.chunk_key.trim().length === 0
+  ) {
+    throw new PairwiseCrossRefError(
+      "ERR_R2_SINK_BACKPRESSURE",
+      `ERR_R2_SINK_BACKPRESSURE: ${WAGERS_BY_STATE_MANIFEST_KEY} missing chunk_key`,
+      65,
     );
-    if (chunkBytes.byteLength < 16) {
-      throw new PairwiseCrossRefError(
-        "ERR_SOA_BINARY_TRUNCATED",
-        "ERR_SOA_BINARY_TRUNCATED: R2 SoA chunk smaller than 16-byte header",
-        65,
-      );
-    }
-    const declaredRowCount = new DataView(
-      chunkBytes.buffer,
-      chunkBytes.byteOffset,
-      16,
-    ).getUint32(8, true);
-
-    store = new PairwiseWagerColumnStore(Math.max(1, declaredRowCount));
-    try {
-      hydratedRows = hydratePairwiseColumnStoreFromSoAChunk(
-        chunkBytes,
-        "ALL",
-        store,
-      );
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      const exitCode = message.includes("ERR_BRIDGE_CHANNEL_CONTAMINATION")
-        ? 70
-        : 65;
-      throw new PairwiseCrossRefError(
-        message.split(":")[0] ?? "ERR_SOA_BINARY_TRUNCATED",
-        message,
-        exitCode,
-        cause,
-      );
-    }
-  } else {
-    const fallback = await hydrateLiveWagersSnapshotFromR2(params.r2);
-    wagersManifest = fallback.manifest;
-    store = fallback.store;
-    hydratedRows = store.length;
   }
 
-  const ringsManifest: SyndicateRingsSnapshotManifest = manifestRings ?? {
-    domain: "[DOD Spine]",
-    r2_bucket: R2_BUCKET,
-    manifest_key: SYNDICATE_RINGS_MANIFEST_KEY,
-    generation_u32: 0,
-    spine_generation_u32: 0,
-    merkle_root_sha256: "0".repeat(64),
-    r2_published_at_epoch_ms: 0,
-    active_edge_count_u32: 0,
-    ring_count_u32: 0,
-    rings: [],
-  };
+  try {
+    assertZeroReconciliationGapCents(
+      wagersManifest.unresolved_gap_cents ?? "0",
+    );
+    assertZeroReconciliationGapCents(ringsManifest.unresolved_gap_cents ?? "0");
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    throw new PairwiseCrossRefError(
+      "ERR_OPS_RECONCILIATION_GAP",
+      message,
+      cause instanceof R2ManifestCasError ? cause.exitCode : 65,
+      cause,
+    );
+  }
+
+  if ((ringsManifest.poison_bit ?? 0) !== 0) {
+    throw new PairwiseCrossRefError(
+      "ERR_R2_SINK_BACKPRESSURE",
+      `ERR_R2_SINK_BACKPRESSURE: ${SYNDICATE_RINGS_MANIFEST_KEY} has poison_bit=${String(ringsManifest.poison_bit)}`,
+      65,
+    );
+  }
+
+  const chunkBytes = await readR2BinaryChunk(
+    params.r2,
+    wagersManifest.chunk_key,
+  );
+  if (chunkBytes.byteLength < 16) {
+    throw new PairwiseCrossRefError(
+      "ERR_SOA_BINARY_TRUNCATED",
+      "ERR_SOA_BINARY_TRUNCATED: R2 SoA chunk smaller than 16-byte header",
+      65,
+    );
+  }
+  const declaredRowCount = new DataView(
+    chunkBytes.buffer,
+    chunkBytes.byteOffset,
+    16,
+  ).getUint32(8, true);
+
+  const store = new PairwiseWagerColumnStore(Math.max(1, declaredRowCount));
+  let hydratedRows: number;
+  try {
+    hydratedRows = hydratePairwiseColumnStoreFromSoAChunk(
+      chunkBytes,
+      "ALL",
+      store,
+    );
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    const exitCode = message.includes("ERR_BRIDGE_CHANNEL_CONTAMINATION")
+      ? 70
+      : 65;
+    throw new PairwiseCrossRefError(
+      message.split(":")[0] ?? "ERR_SOA_BINARY_TRUNCATED",
+      message,
+      exitCode,
+      cause,
+    );
+  }
 
   const crossRef = evaluateColumnarPairwiseCrossRef(
     store,
@@ -834,6 +436,10 @@ export async function executePairwiseCrossRefFromR2(params: {
   );
 
   const generationU32 = wagersManifest.generation_u32 >>> 0;
+  const ringsCircuitState =
+    ringsManifest.circuit_state === "OPEN" ? "OPEN" : "CLOSED";
+  const ringsPoisonBit: 0 | 1 = (ringsManifest.poison_bit ?? 0) === 1 ? 1 : 0;
+
   return {
     schemaVersion: 1,
     command: "cross-ref",
@@ -864,7 +470,12 @@ export async function executePairwiseCrossRefFromR2(params: {
         generation_u32: ringsManifest.generation_u32 >>> 0,
         spine_generation_u32: ringsManifest.spine_generation_u32 >>> 0,
         merkle_root_sha256: ringsManifest.merkle_root_sha256,
+        data_window_max_epoch_ms:
+          ringsManifest.data_window_max_epoch_ms ??
+          ringsManifest.r2_published_at_epoch_ms,
         r2_published_at_epoch_ms: ringsManifest.r2_published_at_epoch_ms,
+        poison_bit: ringsPoisonBit,
+        circuit_state: ringsCircuitState,
         active_edge_count_u32: ringsManifest.active_edge_count_u32 >>> 0,
         ring_count_u32: ringsManifest.ring_count_u32 >>> 0,
       },
@@ -1028,16 +639,6 @@ if (import.meta.main) {
     if (err instanceof PairwiseCrossRefError) {
       process.exit(err.exitCode);
     }
-    const exitCode =
-      message.includes("ERR_DOD_LEGACY_FALLBACK_REMOVED") ||
-      message.includes("ERR_OPS_LOCAL_JSON_FORBIDDEN")
-        ? 78
-        : message.includes("ERR_CF_TOKEN_BLEED_10000")
-          ? 77
-          : message.includes("ERR_DOD_CSR_CONSERVATION_BREACH") ||
-              message.includes("ERR_BRIDGE_CHANNEL_CONTAMINATION")
-            ? 70
-            : 65;
-    process.exit(exitCode);
+    process.exit(mapR2ErrorExitCode(err));
   });
 }
