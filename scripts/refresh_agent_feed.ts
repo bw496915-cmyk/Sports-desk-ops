@@ -22,6 +22,7 @@ import {
   assertProjectedRoster,
   projectUsersRoster,
 } from "../lib/users_roster.ts";
+import { projectAccountInfoOwner } from "../lib/agent_account.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const { values } = parseArgs({
@@ -68,6 +69,10 @@ if (values["dry-run"]) {
             }),
           ),
         },
+        account: {
+          url: `${PROBE_HOST}/cloud/api/Manager/getAccountInfoOwner`,
+          body: { operation: "getAccountInfoOwner", agentOwner: agentId },
+        },
         weekly: {
           url: `${PROBE_HOST}${WEEKLY_FIGURE_LITE_PATH}`,
           body: Object.fromEntries(
@@ -94,6 +99,7 @@ const hierarchyOut = join(outDir, "hierarchy.projected.json");
 const rosterOut = join(outDir, "roster.projected.json");
 const weeklyOut = join(outDir, "weekly.json");
 const wagersOut = join(outDir, "wagers.json");
+const accountOut = join(outDir, "account.json");
 
 const fetched = Bun.spawnSync({
   cmd: [
@@ -179,6 +185,26 @@ try {
     wagersOut,
     `${JSON.stringify({ fetchedAt: new Date().toISOString(), customerID: values.customer, figureDate: values["figure-date"], raw: await wagersResponse.json() }, null, 2)}\n`,
   );
+  const accountResponse = await transport.fetch(
+    `${PROBE_HOST}/cloud/api/Manager/getAccountInfoOwner`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        operation: "getAccountInfoOwner",
+        agentOwner: agentId,
+      }),
+      redirect: "manual",
+    },
+  );
+  if (accountResponse.status === 401 || accountResponse.redirected) {
+    throw new Error("session expired — re-auth required");
+  }
+  if (!accountResponse.ok) throw new Error(`account ${accountResponse.status}`);
+  const projectedAccount = projectAccountInfoOwner(
+    await accountResponse.json(),
+  );
+  await Bun.write(accountOut, `${JSON.stringify(projectedAccount, null, 2)}\n`);
 } finally {
   await transport.close();
 }
