@@ -81,3 +81,47 @@ describe("pending web-reports config projection", () => {
     });
   });
 });
+
+describe("account projection boundaries", () => {
+  test("scrubs nested sensitive keys and preserves preferences", () => {
+    const projected = projectAccountInfoOwner({
+      accountInfo: {
+        customerID: "C1",
+        extra: {
+          code: "nested-token",
+          Password: "nested-password",
+          NameFirst: "Nested",
+        },
+      },
+      preferenceDate: [{ BettingMode: "advance" }],
+    });
+    const text = JSON.stringify(projected);
+    expect(text).not.toContain("nested-token");
+    expect(text).not.toContain("nested-password");
+    expect(text).not.toContain("Nested");
+    expect(projected.preferences).toEqual([{ BettingMode: "advance" }]);
+  });
+
+  test("a blank AgentID becomes null, not an empty string", () => {
+    const projected = projectAccountInfoOwner({
+      accountInfo: { AgentID: "          ", Office: "NOLAROSE" },
+    });
+    expect(projected.agentId).toBeNull();
+    expect(projected.office).toBe("NOLAROSE");
+  });
+
+  test("web-reports config refuses a response without INFO", () => {
+    expect(() => projectWebReportsConfig({})).toThrow("INFO");
+  });
+
+  test("pending web-reports config refuses a response without INFO", () => {
+    expect(() => projectWebReportsPendingConfig({})).toThrow("INFO");
+  });
+
+  test("pending config ignores non-flag keys and non-string values", () => {
+    const projected = projectWebReportsPendingConfig({
+      INFO: { AgentID: "A1", NameF: 1, Weird: "x", AgentF: "on" },
+    });
+    expect(projected.columnFlags).toEqual({ AgentF: "on" });
+  });
+});
