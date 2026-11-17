@@ -860,7 +860,7 @@ export async function checkLiveSpecHash(
   const localPath = join(rootDir, "docs", "openapi.json");
   let localBytes: Uint8Array;
   try {
-    localBytes = readFileSync(localPath);
+    localBytes = await Bun.file(localPath).bytes();
   } catch (error) {
     return {
       check: {
