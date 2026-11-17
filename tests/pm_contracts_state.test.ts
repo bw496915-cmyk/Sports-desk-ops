@@ -58,8 +58,9 @@ function barePackageName(specifier: string): string | null {
   ) {
     return null;
   }
-  const parts = specifier.split("/");
-  return specifier.startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0];
+  const [first, second] = specifier.split("/");
+  if (specifier.startsWith("@")) return second ? `${first}/${second}` : null;
+  return first ?? null;
 }
 
 function stripShebang(source: string): string {
