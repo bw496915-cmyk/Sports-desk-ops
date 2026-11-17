@@ -77,6 +77,24 @@ if (values["dry-run"]) {
           url: `${PROBE_HOST}/cloud/api/Manager/getAccountInfoOwner`,
           body: { operation: "getAccountInfoOwner", agentOwner: agentId },
         },
+        webReports: {
+          url: `${PROBE_HOST}/cloud/api/Manager/getConfigWebReports`,
+          body: {
+            agentID: agentId,
+            operation: "getConfigWebReports",
+            RRO: 1,
+            agentOwner,
+          },
+        },
+        webReportsPending: {
+          url: `${PROBE_HOST}/cloud/api/Manager/getConfigWebReportsPending`,
+          body: {
+            agentID: agentId,
+            operation: "getConfigWebReportsPending",
+            RRO: 1,
+            agentOwner,
+          },
+        },
         weekly: {
           url: `${PROBE_HOST}${WEEKLY_FIGURE_LITE_PATH}`,
           body: Object.fromEntries(
