@@ -20,6 +20,7 @@ const TARGET: HostTarget = {
 const OK_LOOKUP: EndpointProbeLookup = {
   ok: true,
   addresses: ["203.0.113.10"],
+  ttlSeconds: [300],
   error: null,
 };
 
@@ -73,6 +74,7 @@ describe("evaluateEndpointProbe", () => {
     expect(verdict.message).toContain("probe.example: ok");
     expect(verdict.message).toContain("HTTP 200");
     expect(verdict.message).not.toContain("ALERT");
+    expect(verdict.ttlSeconds).toEqual([300]);
   });
 
   test("one lookup failure stays below the threshold and does not alert", () => {
@@ -80,7 +82,12 @@ describe("evaluateEndpointProbe", () => {
       nowMs: 2_000,
       state: state(0),
       observation: observation({
-        lookup: { ok: false, addresses: [], error: "getaddrinfo EAI_AGAIN" },
+        lookup: {
+          ok: false,
+          addresses: [],
+          ttlSeconds: [],
+          error: "getaddrinfo EAI_AGAIN",
+        },
       }),
     });
     expect(verdict.status).toBe("ok");
@@ -96,7 +103,12 @@ describe("evaluateEndpointProbe", () => {
       nowMs: 2_000,
       state: state(1),
       observation: observation({
-        lookup: { ok: false, addresses: [], error: "getaddrinfo EAI_AGAIN" },
+        lookup: {
+          ok: false,
+          addresses: [],
+          ttlSeconds: [],
+          error: "getaddrinfo EAI_AGAIN",
+        },
       }),
     });
     expect(verdict.status).toBe("alert");
@@ -155,6 +167,19 @@ describe("evaluateEndpointProbe", () => {
     expect(serverError.message).toContain("HTTP 503");
   });
 
+  test("resolver TTLs are carried as diagnostics and never gate", () => {
+    const verdict = evaluateEndpointProbe({
+      nowMs: 2_000,
+      state: state(0),
+      observation: observation({
+        lookup: { ...OK_LOOKUP, ttlSeconds: [0] },
+      }),
+    });
+    expect(verdict.status).toBe("ok");
+    expect(verdict.code).toBeNull();
+    expect(verdict.ttlSeconds).toEqual([0]);
+  });
+
   test("cache telemetry never changes the verdict", () => {
     const verdict = evaluateEndpointProbe({
       nowMs: 2_000,
@@ -174,7 +199,7 @@ describe("evaluateEndpointProbe", () => {
       state: state(1),
       failThreshold: 3,
       observation: observation({
-        lookup: { ok: false, addresses: [], error: "nxdomain" },
+        lookup: { ok: false, addresses: [], ttlSeconds: [], error: "nxdomain" },
       }),
     });
     expect(secondOfThree.consecutiveFailures).toBe(2);
@@ -185,7 +210,7 @@ describe("evaluateEndpointProbe", () => {
       state: state(2),
       failThreshold: 3,
       observation: observation({
-        lookup: { ok: false, addresses: [], error: "nxdomain" },
+        lookup: { ok: false, addresses: [], ttlSeconds: [], error: "nxdomain" },
       }),
     });
     expect(thirdOfThree.consecutiveFailures).toBe(3);
@@ -196,7 +221,7 @@ describe("evaluateEndpointProbe", () => {
       state: state(0),
       failThreshold: 0,
       observation: observation({
-        lookup: { ok: false, addresses: [], error: "nxdomain" },
+        lookup: { ok: false, addresses: [], ttlSeconds: [], error: "nxdomain" },
       }),
     });
     expect(clamped.status).toBe("alert");
@@ -207,7 +232,7 @@ describe("evaluateEndpointProbe", () => {
       nowMs: 2_000,
       state: state(-5),
       observation: observation({
-        lookup: { ok: false, addresses: [], error: "nxdomain" },
+        lookup: { ok: false, addresses: [], ttlSeconds: [], error: "nxdomain" },
       }),
     });
     expect(verdict.consecutiveFailures).toBe(1);

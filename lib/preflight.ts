@@ -12,7 +12,7 @@ import { type TlsProvenance, probeTls } from "./tls_provenance.ts";
 
 export interface DnsAnswer {
   readonly address: string;
-  readonly family: number;
+  readonly family: 4 | 6;
   readonly ttl: number;
 }
 
@@ -90,7 +90,7 @@ export async function resolveHost(
   const answers = await Bun.dns.lookup(host, options);
   return answers.map((answer) => ({
     address: String(answer.address),
-    family: Number(answer.family),
+    family: answer.family,
     ttl: Number(answer.ttl),
   }));
 }

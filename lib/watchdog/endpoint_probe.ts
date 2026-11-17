@@ -33,6 +33,11 @@ export type EndpointProbeFailureCode =
 export interface EndpointProbeLookup {
   readonly ok: boolean;
   readonly addresses: readonly string[];
+  /**
+   * Resolver TTLs in seconds. Bun's DNS reference: `ttl` is 0 unless the c-ares backend is used;
+   * the runner pins c-ares. Diagnostics only — never part of the verdict.
+   */
+  readonly ttlSeconds: readonly number[];
   readonly error: string | null;
 }
 
@@ -72,6 +77,8 @@ export interface EndpointProbeVerdict {
   readonly checkedAtMs: number;
   readonly message: string;
   readonly addresses: readonly string[];
+  /** Diagnostics only; see EndpointProbeLookup.ttlSeconds. */
+  readonly ttlSeconds: readonly number[];
   readonly fetchStatus: number | null;
   readonly latencyMs: number | null;
   /** Telemetry only; never part of the verdict. */
@@ -148,6 +155,7 @@ export function evaluateEndpointProbe(
     checkedAtMs: input.nowMs,
     message,
     addresses: input.observation.lookup.addresses,
+    ttlSeconds: input.observation.lookup.ttlSeconds,
     fetchStatus: input.observation.fetch.status,
     latencyMs: input.observation.fetch.latencyMs,
     cacheStats: input.observation.cacheStats,

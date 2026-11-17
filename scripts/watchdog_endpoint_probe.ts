@@ -76,6 +76,7 @@ interface ProbeJson {
     readonly consecutiveFailures: number;
     readonly message: string;
     readonly addresses: readonly string[];
+    readonly ttlSeconds: readonly number[];
     readonly fetchStatus: number | null;
     readonly latencyMs: number | null;
     readonly cacheStats: Readonly<Record<string, number>> | null;
@@ -202,13 +203,20 @@ async function probe(target: HostTarget): Promise<EndpointProbeObservation> {
         backend: "c-ares",
       });
       const addresses = answers.map((answer) => answer.address);
+      const ttlSeconds = answers.map((answer) => Number(answer.ttl));
       return {
         ok: addresses.length > 0,
         addresses,
+        ttlSeconds,
         error: addresses.length > 0 ? null : "no addresses returned",
       };
     } catch (error) {
-      return { ok: false, addresses: [], error: messageOf(error) };
+      return {
+        ok: false,
+        addresses: [],
+        ttlSeconds: [],
+        error: messageOf(error),
+      };
     }
   })();
 
@@ -300,6 +308,7 @@ function renderJson(
       consecutiveFailures: verdict.consecutiveFailures,
       message: verdict.message,
       addresses: verdict.addresses,
+      ttlSeconds: verdict.ttlSeconds,
       fetchStatus: verdict.fetchStatus,
       latencyMs: verdict.latencyMs,
       cacheStats: verdict.cacheStats,
