@@ -385,9 +385,25 @@ const mismatchedProfiles = feedProfiles.filter(
   (profile) =>
     profile.roster !== undefined && !profile.roster.agentMatchesProfile,
 );
+const weeklyMeta =
+  weeklyDoc === null
+    ? null
+    : {
+        source:
+          typeof (weeklyDoc as Record<string, unknown>).source === "string"
+            ? (weeklyDoc as Record<string, unknown>).source
+            : null,
+        units: (weeklyDoc as Record<string, unknown>).units ?? null,
+        dayBoundary: (weeklyDoc as Record<string, unknown>).dayBoundary ?? null,
+        weekBoundary:
+          (weeklyDoc as Record<string, unknown>).weekBoundary ?? null,
+        serverDate: (weeklyDoc as Record<string, unknown>).serverDate ?? null,
+      };
+
 const agentFeedBlock = {
   ...agentFeed,
   profileCoverage,
+  weeklyMeta,
   rosterLevels,
   rosterTypes,
   mismatches: {
