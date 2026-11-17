@@ -62,10 +62,12 @@ describe("fetchF402Pending body", () => {
   });
 
   test("falls back to the keychain agent id when env and option are empty", async () => {
-    const savedAgentId = Bun.env.F402_AGENT_ID;
-    const savedOwner = Bun.env.F402_AGENT_OWNER;
-    delete Bun.env.F402_AGENT_ID;
-    delete Bun.env.F402_AGENT_OWNER;
+    // types/env.d.ts declares F402_AGENT_ID read-only; this test has to clear and restore it.
+    const env = Bun.env as Record<string, string | undefined>;
+    const savedAgentId = env.F402_AGENT_ID;
+    const savedOwner = env.F402_AGENT_OWNER;
+    delete env.F402_AGENT_ID;
+    delete env.F402_AGENT_OWNER;
     try {
       const capture: Capture = {};
       await fetchF402Pending({
@@ -77,8 +79,8 @@ describe("fetchF402Pending body", () => {
       expect(capture.body?.agentID).toBe("KEYCHAIN1");
       expect(capture.body?.agentOwner).toBe("KEYCHAIN1");
     } finally {
-      if (savedAgentId !== undefined) Bun.env.F402_AGENT_ID = savedAgentId;
-      if (savedOwner !== undefined) Bun.env.F402_AGENT_OWNER = savedOwner;
+      if (savedAgentId !== undefined) env.F402_AGENT_ID = savedAgentId;
+      if (savedOwner !== undefined) env.F402_AGENT_OWNER = savedOwner;
     }
   });
 });
