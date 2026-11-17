@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import {
+  LIVE_WAGERS_R2_KEY,
   R2_BUCKET,
   SYNDICATE_RINGS_MANIFEST_KEY,
   WAGERS_BY_STATE_MANIFEST_KEY,
+  WAGERS_BY_STATE_SNAPSHOT_KEY,
   assertPairwiseCrossRefLivePreflight,
   executePairwiseCrossRefFromR2,
+  resolveR2Endpoint,
   type PairwiseR2Reader,
 } from "../packages/sportsdesk-ops/src/bin/sportsdesk-fraud-cross-ref.ts";
 import {
@@ -777,6 +780,16 @@ describe("sportsdesk-fraud cross-ref governance & R2 lineage envelope", () => {
       assertPairwiseCrossRefLivePreflight(["C001", "C002"], missingR2),
     ).toThrow(/ERR_CF_R2_CREDENTIALS_MISSING/);
 
+    const accountDerived = makeLiveEnv();
+    delete accountDerived.R2_ENDPOINT;
+    accountDerived.CLOUDFLARE_ACCOUNT_ID = "7a470541a704caaf91e71efccc78fd36";
+    expect(resolveR2Endpoint(accountDerived)).toBe(
+      "https://7a470541a704caaf91e71efccc78fd36.r2.cloudflarestorage.com",
+    );
+    expect(() =>
+      assertPairwiseCrossRefLivePreflight(["C001", "C002"], accountDerived),
+    ).not.toThrow();
+
     expect(() =>
       assertPairwiseCrossRefLivePreflight(["C001", "C002"], okEnv),
     ).not.toThrow();
@@ -938,6 +951,85 @@ describe("sportsdesk-fraud cross-ref governance & R2 lineage envelope", () => {
       "ERR_OPS_RECONCILIATION_GAP",
     );
     expect((capturedErr as { exitCode?: number }).exitCode).toBe(65);
+  });
+
+  test("executePairwiseCrossRefFromR2 falls back to R2 live-wagers/latest.json + wagers-by-state/latest.json when manifests are absent", async () => {
+    const fallbackObjects = new Map<string, Uint8Array>([
+      [
+        LIVE_WAGERS_R2_KEY,
+        new TextEncoder().encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            source: "f402-bet-ticker",
+            observedAt: "2026-11-17T20:10:00.001Z",
+            partial: true,
+            LIST: [
+              {
+                WagerNumber: 769271281,
+                CustomerID: "TACO323   ",
+                Login: "TACO323",
+                AmountWagered: 1500,
+                InsertDateTime: "2026-11-17 14:56:05.157",
+                TicketWriter: "Internet",
+                ShortDesc:
+                  "P.Basketball #547 Pistons  12 -150 - buying 2 For Game Basketball #548 Knicks/Raptors O 212&#189; -110 - For Game",
+              },
+              {
+                WagerNumber: 769271503,
+                CustomerID: "TACO166   ",
+                Login: "TACO166",
+                AmountWagered: 1600,
+                InsertDateTime: "2026-11-17 14:56:45.157",
+                TicketWriter: "Internet",
+                ShortDesc:
+                  "P.Basketball #547 Pistons +12 -110 - For Game Basketball #548 Knicks/Raptors U 212½ -110 - For Game",
+              },
+              {
+                WagerNumber: 769270980,
+                CustomerID: "TACO166   ",
+                Login: "TACO166",
+                AmountWagered: 11000,
+                InsertDateTime: "2026-11-17 14:57:00.000",
+                TicketWriter: "ALERT",
+                ShortDesc: "S:Basketball #547 Pistons +12 -110 - For Game",
+              },
+            ],
+          }),
+        ),
+      ],
+      [
+        WAGERS_BY_STATE_SNAPSHOT_KEY,
+        new TextEncoder().encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            generatedAt: "2026-11-17T20:00:08.932Z",
+            sourceSha256:
+              "67ea4389bdb20a2a5880f25ee0bfe49ed8dff8a6cd63bd6e8f932f981a7476c1",
+          }),
+        ),
+      ],
+    ]);
+
+    const payload = await executePairwiseCrossRefFromR2({
+      r2: createInMemoryR2Reader(fallbackObjects),
+      customerA: "TACO323",
+      customerB: "TACO166",
+    });
+
+    expect(payload.circuit_state).toBe("CLOSED");
+    expect(payload.unresolved_gap_cents).toBe("0");
+    expect(payload.data_window_max_epoch_ms).toBe(
+      Date.parse("2026-11-17T19:56:45.157Z"),
+    );
+    expect(payload.hydratedRows).toBe(4); // 2 parlay legs for TACO323 + 2 for TACO166; ALERT dropped
+    expect(payload.manifests.wagersByState.chunk_key).toBe(LIVE_WAGERS_R2_KEY);
+    expect(payload.analysis.totalWagersA).toBe(2);
+    expect(payload.analysis.totalWagersB).toBe(2);
+    expect(payload.analysis.sharedEventsCount).toBe(2);
+    expect(payload.analysis.sameSideCount).toBe(1); // #547 Pistons +12 same side
+    expect(payload.analysis.oppositeSideCount).toBe(1); // #548 O vs U opposite side
+    expect(payload.analysis.pregameFollowsAtoB).toBe(1); // 40,000ms <= 90,000ms tip window
+    expect(payload.analysis.minSameSideLagMsU32).toBe(40_000);
   });
 
   test("bun x --no-install sportsdesk-fraud cross-ref enforces --help, ERR_OPS_LOCAL_JSON_FORBIDDEN (exit 78), and preflight gates", () => {
