@@ -13,6 +13,9 @@
  * reachable (Telegram's API root answers 404 by design); a 5xx or a missing response does not.
  *
  * Exit codes: 0 healthy (or --dry-run), 1 alert detected and sent, 2 could not evaluate or alert.
+ *
+ * Install: scripts/install_endpoint_watch_agent.sh install
+ * Runbook: docs/runbooks/endpoint_watchdog.md
  */
 
 import {
@@ -50,6 +53,7 @@ const DEFAULT_STATE_PATH = resolve(
   "endpoint-probe-state.json",
 );
 const PROBE_TIMEOUT_MS = 5_000;
+const LOOKUP_TIMEOUT_MS = 5_000;
 const EXIT = { ok: 0, alert: 1, error: 2 } as const;
 
 /** Bun DNS reference: `lookup` takes `backend`; c-ares avoids the getaddrinfo slow path. */
@@ -102,7 +106,7 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function parseBackend(raw: string | undefined): DnsResolverBackend {
+export function parseBackend(raw: string | undefined): DnsResolverBackend {
   if (raw === undefined || raw.trim() === "") return DEFAULT_DNS_BACKEND;
   const backend = DNS_BACKENDS.find((candidate) => candidate === raw.trim());
   if (backend === undefined) {
@@ -113,9 +117,11 @@ function parseBackend(raw: string | undefined): DnsResolverBackend {
   return backend;
 }
 
-function parseOptions(): Options {
+export function parseOptions(
+  argv: readonly string[] = Bun.argv.slice(2),
+): Options {
   const { values } = parseArgs({
-    args: Bun.argv.slice(2),
+    args: [...argv],
     options: {
       json: { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
@@ -156,7 +162,7 @@ Cadence: LaunchAgent StartInterval 900 (15 min); pages after ${ENDPOINT_PROBE_DE
 consecutive failures. Exit codes: 0 ok (or --dry-run), 1 alert sent, 2 could not evaluate/alert.`;
 }
 
-function readState(path: string): StateFile {
+export function readState(path: string): StateFile {
   const empty: StateFile = {
     schemaVersion: ENDPOINT_PROBE_STATE_SCHEMA_VERSION,
     hosts: {},
@@ -218,19 +224,49 @@ function writeState(path: string, state: StateFile): void {
   renameSync(tmp, path);
 }
 
+async function resolveWithTimeout(host: string, backend: DnsResolverBackend) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      resolveHost(host, {
+        // Default c-ares: the Bun DNS reference warns that getaddrinfo is the slow path
+        // under concurrent loads, and this probe resolves every core host in parallel.
+        // --backend overrides this for diagnostics. Omit family so an IPv4-only host still
+        // resolves (c-ares does not honor V4MAPPED; family 6 + flags returned AAAA only).
+        backend,
+      }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(new Error(`lookup timeout after ${LOOKUP_TIMEOUT_MS}ms`)),
+          LOOKUP_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+function failedObservation(
+  target: HostTarget,
+  error: string,
+): EndpointProbeObservation {
+  return {
+    target,
+    lookup: { ok: false, addresses: [], ttlSeconds: [], error },
+    fetch: { ok: false, status: null, latencyMs: null, error },
+    cacheStats: null,
+  };
+}
+
 async function probe(
   target: HostTarget,
   backend: DnsResolverBackend,
 ): Promise<EndpointProbeObservation> {
   const lookup = await (async () => {
     try {
-      const answers = await resolveHost(target.hostname, {
-        // Default c-ares: the Bun DNS reference warns that getaddrinfo is the slow path
-        // under concurrent loads, and this probe resolves every core host in parallel.
-        // --backend overrides this for diagnostics. Omit family so an IPv4-only host still
-        // resolves (c-ares does not honor V4MAPPED; family 6 + flags returned AAAA only).
-        backend,
-      });
+      const answers = await resolveWithTimeout(target.hostname, backend);
       const addresses = answers.map((answer) => answer.address);
       const ttlSeconds = answers.map((answer) => Number(answer.ttl));
       return {
@@ -322,7 +358,7 @@ async function sendTelegram(
   }
 }
 
-function renderJson(
+export function renderJson(
   nowMs: number,
   dryRun: boolean,
   resolver: DnsResolverBackend,
@@ -352,14 +388,35 @@ function renderJson(
   };
 }
 
-async function run(): Promise<number> {
-  const options = parseOptions();
-  if (options.help) {
-    console.log(usage());
-    return EXIT.ok;
+export function buildNextState(
+  state: StateFile,
+  verdicts: readonly EndpointProbeVerdict[],
+): StateFile {
+  const nextHosts: Record<string, EndpointProbeState> = {};
+  for (const verdict of verdicts) {
+    nextHosts[verdict.target.hostname] = {
+      consecutiveFailures: verdict.consecutiveFailures,
+      lastCheckedAtMs: verdict.checkedAtMs,
+    };
   }
+  // Keep state for core hosts not selected by --host; prune entries for retired hosts so the
+  // file cannot grow without bound.
+  for (const [host, hostState] of Object.entries(state.hosts)) {
+    if (
+      nextHosts[host] === undefined &&
+      SPORTSDESK_CORE_HOSTS.some((target) => target.hostname === host)
+    ) {
+      nextHosts[host] = hostState;
+    }
+  }
+  return {
+    schemaVersion: ENDPOINT_PROBE_STATE_SCHEMA_VERSION,
+    hosts: nextHosts,
+  };
+}
 
-  const wanted = new Set(options.hosts.map((host) => host.toLowerCase()));
+export function selectTargets(requested: readonly string[]): HostTarget[] {
+  const wanted = new Set(requested.map((host) => host.toLowerCase()));
   const targets = SPORTSDESK_CORE_HOSTS.filter(
     (target) => wanted.size === 0 || wanted.has(target.hostname.toLowerCase()),
   );
@@ -367,15 +424,33 @@ async function run(): Promise<number> {
     const known = SPORTSDESK_CORE_HOSTS.map((target) => target.hostname).join(
       ", ",
     );
-    console.error(`endpoint probe: unknown --host (allowed: ${known})`);
-    return EXIT.error;
+    throw new Error(`unknown --host (allowed: ${known})`);
+  }
+  return targets;
+}
+
+async function run(): Promise<number> {
+  const options = parseOptions();
+  if (options.help) {
+    console.log(usage());
+    return EXIT.ok;
   }
 
+  const targets = selectTargets(options.hosts);
   const state = readState(options.statePath);
   const nowMs = Date.now();
-  const observations = await Promise.all(
+  const settled = await Promise.allSettled(
     targets.map((target) => probe(target, options.backend)),
   );
+  const observations = settled.map((result, index) => {
+    const target = targets[index];
+    if (target === undefined) {
+      throw new Error("endpoint probe: target mapping lost");
+    }
+    return result.status === "fulfilled"
+      ? result.value
+      : failedObservation(target, messageOf(result.reason));
+  });
   const verdicts = observations.map((observation) =>
     evaluateEndpointProbe({
       nowMs,
@@ -408,17 +483,7 @@ async function run(): Promise<number> {
 
   if (options.dryRun) return EXIT.ok;
 
-  const nextHosts: Record<string, EndpointProbeState> = { ...state.hosts };
-  for (const verdict of verdicts) {
-    nextHosts[verdict.target.hostname] = {
-      consecutiveFailures: verdict.consecutiveFailures,
-      lastCheckedAtMs: verdict.checkedAtMs,
-    };
-  }
-  writeState(options.statePath, {
-    schemaVersion: ENDPOINT_PROBE_STATE_SCHEMA_VERSION,
-    hosts: nextHosts,
-  });
+  writeState(options.statePath, buildNextState(state, verdicts));
 
   const alerts = verdicts.filter((verdict) => verdict.status === "alert");
   if (alerts.length === 0) return EXIT.ok;
