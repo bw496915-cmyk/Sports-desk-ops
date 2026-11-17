@@ -2,7 +2,7 @@
 /**
  * SportsDesk security/fraud CLI — the one implementation behind the `fraud_*` plugin tools.
  *
- * Contract: `Scratch/security/SECURITY-PLUGIN-CONTRACT.md` (rev 2).
+ * Contract: `docs/security-plugin-contract.md` (rev 3).
  * - one command per invocation: status | bets | queue | ip-graph | weblog | patterns | explore |
  *   model | dossier | research; `model` subcommands are report (default) | fit | score <accountId>
  * - global flags anywhere: --root/-r, --json/-j, --now/-n, --help/-h; closed per-command flag
