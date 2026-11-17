@@ -37,7 +37,7 @@ function infoOf(raw: unknown, label: string): Record<string, unknown> {
   if (
     "AgentID" in doc ||
     "CustomerID" in doc ||
-    Object.keys(doc).some((key) => /^show/i.test(key) || /F$/.test(key))
+    Object.keys(doc).some((key) => /^show/i.test(key) || key.endsWith("F"))
   ) {
     return doc;
   }
@@ -161,7 +161,7 @@ export function projectWebReportsPendingConfig(
   >;
   const columnFlags: Record<string, string> = {};
   for (const [key, value] of Object.entries(info)) {
-    if (key !== "AgentID" && /F$/.test(key) && typeof value === "string") {
+    if (key !== "AgentID" && key.endsWith("F") && typeof value === "string") {
       columnFlags[key] = value;
     }
   }
