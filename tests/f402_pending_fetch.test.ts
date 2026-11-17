@@ -60,4 +60,25 @@ describe("fetchF402Pending body", () => {
     });
     expect(capture.body?.agentOwner).toBe("OWNER1");
   });
+
+  test("falls back to the keychain agent id when env and option are empty", async () => {
+    const savedAgentId = Bun.env.F402_AGENT_ID;
+    const savedOwner = Bun.env.F402_AGENT_OWNER;
+    delete Bun.env.F402_AGENT_ID;
+    delete Bun.env.F402_AGENT_OWNER;
+    try {
+      const capture: Capture = {};
+      await fetchF402Pending({
+        token: "t".repeat(24),
+        date: "2026-11-17",
+        resolveAgentId: async () => "KEYCHAIN1",
+        fetchImpl: fakeFetch(capture),
+      });
+      expect(capture.body?.agentID).toBe("KEYCHAIN1");
+      expect(capture.body?.agentOwner).toBe("KEYCHAIN1");
+    } finally {
+      if (savedAgentId !== undefined) Bun.env.F402_AGENT_ID = savedAgentId;
+      if (savedOwner !== undefined) Bun.env.F402_AGENT_OWNER = savedOwner;
+    }
+  });
 });

@@ -2,6 +2,14 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { readF402Session, type F402Session } from "./f402_session.ts";
+import {
+  F402_KEYCHAIN_NAMES,
+  readSecretCanonicalThenLegacy,
+} from "./secrets.ts";
+
+/** Desk-server path: the keychain holds the agent id when the cron env does not. */
+const defaultResolveAgentId = (): Promise<string | null> =>
+  readSecretCanonicalThenLegacy(F402_KEYCHAIN_NAMES.agentId);
 
 export class F402PendingFetchError extends Error {
   constructor(message: string) {
@@ -199,6 +207,8 @@ export interface PendingFetchOptions {
   readonly date: string;
   readonly agentId?: string;
   readonly agentOwner?: string;
+  /** Test/daemon seam: keychain agent-id read when both option and env are empty. */
+  readonly resolveAgentId?: () => Promise<string | null>;
   readonly baseUrl?: string;
   readonly fetchImpl?: (input: string, init: RequestInit) => Promise<Response>;
 }
@@ -241,7 +251,20 @@ export async function fetchF402Pending(
     "https://fantasy402.com"
   ).replace(/\/+$/, "");
   const url = `${base}/cloud/api/Manager/getPending`;
-  const agentId = options.agentId ?? Bun.env.F402_AGENT_ID ?? "";
+  const explicitAgentId = (options.agentId ?? "").trim();
+  const envAgentId = (Bun.env.F402_AGENT_ID ?? "").trim();
+  const agentId =
+    explicitAgentId !== ""
+      ? explicitAgentId
+      : envAgentId !== ""
+        ? envAgentId
+        : (
+            (await (options.resolveAgentId ?? defaultResolveAgentId)()) ?? ""
+          ).trim();
+  const explicitOwner = (options.agentOwner ?? "").trim();
+  const envOwner = (Bun.env.F402_AGENT_OWNER ?? "").trim();
+  const agentOwner =
+    explicitOwner !== "" ? explicitOwner : envOwner !== "" ? envOwner : agentId;
   const body: Record<string, string | number> = {
     agentID: agentId,
     path: "/qubic/api/Manager/getPending",
@@ -254,7 +277,7 @@ export async function fetchF402Pending(
     customerID: "0",
     // The server 500s (empty text/html) when agentOwner is empty; the ticker body sets it to the
     // agent id, and the pending read must match that shape.
-    agentOwner: options.agentOwner ?? Bun.env.F402_AGENT_OWNER ?? agentId,
+    agentOwner,
   };
   const fetchImpl = options.fetchImpl ?? fetch;
   const response = await fetchImpl(url, {
