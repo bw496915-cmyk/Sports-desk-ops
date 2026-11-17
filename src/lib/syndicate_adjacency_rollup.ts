@@ -4,18 +4,19 @@
  * connected-component ring extraction, plus a presigned If-Match CAS flush to R2.
  */
 
+import { COMBO_KEY15_MASK } from "./portal_taxonomy_normalizer.ts";
 import {
-  REGIME_BIT_BOTH,
-  REGIME_BIT_LIVE,
-  REGIME_BIT_PREGAME,
+  REGIME_BOTH,
+  REGIME_LIVE_IN_PLAY,
+  REGIME_PREGAME,
   type SyndicateFollowEdge,
 } from "./syndicate_bot_detector.ts";
 
 export type SyndicateRegimeScope = "PREGAME_ONLY" | "LIVE_ONLY" | "DUAL_REGIME";
 
 function classifyRegimeScope(mask: number): SyndicateRegimeScope {
-  if ((mask & REGIME_BIT_BOTH) === REGIME_BIT_BOTH) return "DUAL_REGIME";
-  return (mask & REGIME_BIT_LIVE) !== 0 ? "LIVE_ONLY" : "PREGAME_ONLY";
+  if ((mask & REGIME_BOTH) === REGIME_BOTH) return "DUAL_REGIME";
+  return (mask & REGIME_LIVE_IN_PLAY) !== 0 ? "LIVE_ONLY" : "PREGAME_ONLY";
 }
 
 export const SYNDICATE_RINGS_MANIFEST_KEY =
@@ -185,7 +186,7 @@ export class SyndicateAdjacencyRollupArena {
       edge.followerCustomerRow,
       edge.lagMsU32 ?? edge.lastLagMsU32 ?? edge.avgLagMsU32 ?? 0,
       edge.lastPackedComboKey15,
-      edge.regimeBit ?? REGIME_BIT_PREGAME,
+      edge.regimeBit ?? REGIME_PREGAME,
     );
   }
 
@@ -194,7 +195,7 @@ export class SyndicateAdjacencyRollupArena {
     followerRow: number,
     lagMsU32: number,
     packedComboKey15: number,
-    regimeBit: number = REGIME_BIT_PREGAME,
+    regimeBit: number = REGIME_PREGAME,
   ): boolean {
     if (
       leaderRow === followerRow ||
@@ -206,7 +207,7 @@ export class SyndicateAdjacencyRollupArena {
     const encodedLeader = (leaderRow + 1) >>> 0;
     const followerPlusOne = (followerRow + 1) >>> 0;
     const lag = lagMsU32 >>> 0;
-    const mask = regimeBit & REGIME_BIT_BOTH;
+    const mask = regimeBit & REGIME_BOTH;
     // Keyed by directed (leaderRow, followerRow); per-regime hit/lag/key columns allow
     // both combined CSR compaction (edgeCount = 1, regimeMask = 0b11) and strict regime slicing.
     let slot =
@@ -225,9 +226,15 @@ export class SyndicateAdjacencyRollupArena {
         this.followCountU32Col[slot] = 1;
         this.sumLagMsU32Col[slot] = lag;
         this.minLagMsU32Col[slot] = lag;
-        this.lastPackedComboKey15Col[slot] = packedComboKey15 & 0x7fff;
+        this.lastPackedComboKey15Col[slot] =
+          packedComboKey15 & COMBO_KEY15_MASK;
         this.regimeMaskU8Col[slot] = mask;
-        this.recordSlotRegime(slot, mask, lag, packedComboKey15 & 0x7fff);
+        this.recordSlotRegime(
+          slot,
+          mask,
+          lag,
+          packedComboKey15 & COMBO_KEY15_MASK,
+        );
         this.activeEdgeCount += 1;
         return true;
       }
@@ -242,9 +249,15 @@ export class SyndicateAdjacencyRollupArena {
         if (lag < this.minLagMsU32Col[slot]!) {
           this.minLagMsU32Col[slot] = lag;
         }
-        this.lastPackedComboKey15Col[slot] = packedComboKey15 & 0x7fff;
+        this.lastPackedComboKey15Col[slot] =
+          packedComboKey15 & COMBO_KEY15_MASK;
         this.regimeMaskU8Col[slot]! |= mask;
-        this.recordSlotRegime(slot, mask, lag, packedComboKey15 & 0x7fff);
+        this.recordSlotRegime(
+          slot,
+          mask,
+          lag,
+          packedComboKey15 & COMBO_KEY15_MASK,
+        );
         return true;
       }
       slot = (slot + 1) & this.edgeMask;
@@ -258,7 +271,7 @@ export class SyndicateAdjacencyRollupArena {
     lag: number,
     key15: number,
   ): void {
-    if ((mask & REGIME_BIT_PREGAME) !== 0) {
+    if ((mask & REGIME_PREGAME) !== 0) {
       const prevCount = this.pregameCountCol[slot]!;
       this.pregameCountCol[slot] = prevCount + 1;
       if (prevCount === 0 || lag < this.pregameMinLagCol[slot]!) {
@@ -266,7 +279,7 @@ export class SyndicateAdjacencyRollupArena {
       }
       this.pregameKey15Col[slot] = key15;
     }
-    if ((mask & REGIME_BIT_LIVE) !== 0) {
+    if ((mask & REGIME_LIVE_IN_PLAY) !== 0) {
       const prevCount = this.liveCountCol[slot]!;
       this.liveCountCol[slot] = prevCount + 1;
       if (prevCount === 0 || lag < this.liveMinLagCol[slot]!) {
@@ -276,14 +289,14 @@ export class SyndicateAdjacencyRollupArena {
     }
   }
 
-  compactToCsr(regimeFilterMask: number = REGIME_BIT_BOTH): number {
+  compactToCsr(regimeFilterMask: number = REGIME_BOTH): number {
     this.csrRowHeadU32Col.fill(0);
-    const filterMask = regimeFilterMask & REGIME_BIT_BOTH;
+    const filterMask = regimeFilterMask & REGIME_BOTH;
     for (let slot = 0; slot < this.edgeCapacity; slot += 1) {
       const encodedLeader = this.leaderRowPlusOneCol[slot]!;
       if (encodedLeader === 0) continue;
       if (
-        filterMask !== REGIME_BIT_BOTH &&
+        filterMask !== REGIME_BOTH &&
         (this.regimeMaskU8Col[slot]! & filterMask) === 0
       ) {
         continue;
@@ -296,10 +309,7 @@ export class SyndicateAdjacencyRollupArena {
       this.rowWriteCursorCol[row] = this.csrRowHeadU32Col[row]!;
     }
     const compactedTotal = this.csrRowHeadU32Col[this.maxCustomers]!;
-    if (
-      filterMask === REGIME_BIT_BOTH &&
-      compactedTotal !== this.activeEdgeCount
-    ) {
+    if (filterMask === REGIME_BOTH && compactedTotal !== this.activeEdgeCount) {
       throw new Error(
         `ERR_DOD_CSR_CONSERVATION_BREACH: Compacted CSR edge sum (${compactedTotal}) !== activeEdgeCount (${this.activeEdgeCount})`,
       );
@@ -308,28 +318,28 @@ export class SyndicateAdjacencyRollupArena {
       const encodedLeader = this.leaderRowPlusOneCol[slot]!;
       if (encodedLeader === 0) continue;
       const edgeRegime = this.regimeMaskU8Col[slot]!;
-      if (filterMask !== REGIME_BIT_BOTH && (edgeRegime & filterMask) === 0) {
+      if (filterMask !== REGIME_BOTH && (edgeRegime & filterMask) === 0) {
         continue;
       }
       const leaderRow = encodedLeader - 1;
       const dst = this.rowWriteCursorCol[leaderRow]!;
       this.rowWriteCursorCol[leaderRow] = dst + 1;
       const count =
-        filterMask === REGIME_BIT_BOTH
+        filterMask === REGIME_BOTH
           ? this.followCountU32Col[slot]!
-          : filterMask === REGIME_BIT_LIVE
+          : filterMask === REGIME_LIVE_IN_PLAY
             ? this.liveCountCol[slot]!
             : this.pregameCountCol[slot]!;
       const minLag =
-        filterMask === REGIME_BIT_BOTH
+        filterMask === REGIME_BOTH
           ? this.minLagMsU32Col[slot]!
-          : filterMask === REGIME_BIT_LIVE
+          : filterMask === REGIME_LIVE_IN_PLAY
             ? this.liveMinLagCol[slot]!
             : this.pregameMinLagCol[slot]!;
       const comboKey15 =
-        filterMask === REGIME_BIT_BOTH
+        filterMask === REGIME_BOTH
           ? this.lastPackedComboKey15Col[slot]!
-          : filterMask === REGIME_BIT_LIVE
+          : filterMask === REGIME_LIVE_IN_PLAY
             ? this.liveKey15Col[slot]!
             : this.pregameKey15Col[slot]!;
       this.csrFollowerRowU32Col[dst] = this.followerRowCol[slot]!;
@@ -339,7 +349,7 @@ export class SyndicateAdjacencyRollupArena {
       this.csrMinLagMsU32Col[dst] = minLag;
       this.csrLastComboKey15Col[dst] = comboKey15;
       this.csrRegimeMaskU8Col[dst] =
-        filterMask === REGIME_BIT_BOTH ? edgeRegime : filterMask;
+        filterMask === REGIME_BOTH ? edgeRegime : filterMask;
     }
     return compactedTotal;
   }
@@ -347,9 +357,9 @@ export class SyndicateAdjacencyRollupArena {
   extractTopSyndicateRings(
     minEdgeFollowCount = 2,
     topKRings = 25,
-    regimeFilterMask: number = REGIME_BIT_BOTH,
+    regimeFilterMask: number = REGIME_BOTH,
   ): readonly SyndicateRingSummary[] {
-    const filterMask = regimeFilterMask & REGIME_BIT_BOTH;
+    const filterMask = regimeFilterMask & REGIME_BOTH;
     this.compactToCsr(filterMask);
 
     this.inboundHitsCol.fill(0);
