@@ -68,7 +68,8 @@ drop a final empty element; the iterator is for streams that never end.
 it is `true` even when stdout is piped (`process.stdout.isTTY === undefined`) unless `NO_COLOR=1`
 is set; `FORCE_COLOR=1` overrides `NO_COLOR=1`. Assigning `Bun.enableANSIColors` mutates the global
 flag, so read it once at startup or gate through `useColor()` (`lib/ansi_color.ts`), which checks
-`FORCE_COLOR` -> `NO_COLOR` -> `isTTY && Bun.enableANSIColors`. `FORCE_COLOR=0` and `NO_COLOR=0`
+`FORCE_COLOR` (`"1"|"2"|"3"|"true"` / `"0"`) -> `"NO_COLOR" in env` (any value, even empty) ->
+`isTTY && Bun.enableANSIColors`. `FORCE_COLOR=0` and `NO_COLOR=0`
 do **not** disable colour on a TTY in Bun itself, unlike Node and the no-color.org convention. Use
 `NO_COLOR=1` (or `useColor()`). Agent shells often export both variables already, so clear them
 before measuring.

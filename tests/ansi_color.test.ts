@@ -76,7 +76,13 @@ describe("piped stdout ANSI gating", () => {
   const cleanEnv = (): Record<string, string> => {
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
-      if (v !== undefined && k !== "NO_COLOR" && k !== "FORCE_COLOR") {
+      if (
+        v !== undefined &&
+        k !== "NO_COLOR" &&
+        k !== "FORCE_COLOR" &&
+        k !== "CLICOLOR" &&
+        k !== "CLICOLOR_FORCE"
+      ) {
         env[k] = v;
       }
     }
@@ -97,6 +103,7 @@ describe("piped stdout ANSI gating", () => {
     });
     expect(base.exitCode).toBe(0);
     expect(base.stdout.toString()).not.toContain("\x1b[");
+    expect(base.stderr.toString()).not.toContain("\x1b[");
 
     const forced = Bun.spawnSync(["bun", "-e", script], {
       env: { ...cleanEnv(), FORCE_COLOR: "1" },
@@ -113,6 +120,7 @@ describe("piped stdout ANSI gating", () => {
     });
     expect(noColor.exitCode).toBe(0);
     expect(noColor.stdout.toString()).not.toContain("\x1b[");
+    expect(noColor.stderr.toString()).not.toContain("\x1b[");
   });
 
   test("formatManagerProbeTable respects explicit colors=false and colors=true overrides", () => {
