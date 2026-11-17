@@ -56,20 +56,27 @@ const PROBE_TIMEOUT_MS = 5_000;
 const LOOKUP_TIMEOUT_MS = 5_000;
 const EXIT = { ok: 0, alert: 1, error: 2 } as const;
 
-/** Bun DNS reference (https://bun.sh/reference/bun/dns#dns-resolver-client): `lookup` takes `backend`; c-ares avoids the getaddrinfo slow path. */
-const DNS_BACKENDS: readonly DnsResolverBackend[] = [
+/**
+ * The runner leaves the resolver backend unset by default: the probe must measure the path the
+ * app's fetch()/Bun.connect() takes, and Bun's default differs by OS (c-ares on Linux,
+ * system/getaddrinfo on macOS). `default` is the sentinel meaning "do not pass backend".
+ * https://bun.sh/reference/bun/dns#dns-resolver-client
+ */
+const DEFAULT_DNS_BACKEND = "default" as const;
+type ProbeBackend = DnsResolverBackend | typeof DEFAULT_DNS_BACKEND;
+const DNS_BACKENDS: readonly ProbeBackend[] = [
+  DEFAULT_DNS_BACKEND,
   "c-ares",
   "system",
   "getaddrinfo",
   "libc",
 ];
-const DEFAULT_DNS_BACKEND: DnsResolverBackend = "c-ares";
 
 interface Options {
   readonly json: boolean;
   readonly dryRun: boolean;
   readonly hosts: readonly string[];
-  readonly backend: DnsResolverBackend;
+  readonly backend: ProbeBackend;
   readonly statePath: string;
   readonly help: boolean;
 }
@@ -84,7 +91,7 @@ interface ProbeJson {
   readonly checkedAt: string;
   readonly intervalSeconds: number;
   readonly dryRun: boolean;
-  readonly resolver: DnsResolverBackend;
+  readonly resolver: ProbeBackend;
   readonly alerts: number;
   readonly hosts: readonly {
     readonly host: string;
@@ -106,7 +113,7 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function parseBackend(raw: string | undefined): DnsResolverBackend {
+export function parseBackend(raw: string | undefined): ProbeBackend {
   if (raw === undefined || raw.trim() === "") return DEFAULT_DNS_BACKEND;
   const backend = DNS_BACKENDS.find((candidate) => candidate === raw.trim());
   if (backend === undefined) {
@@ -151,8 +158,9 @@ Usage: bun run scripts/watchdog_endpoint_probe.ts [flags]
 
 Flags:
   --host <hostname>   Probe only this core host (repeatable). Default: all core hosts.
-  --backend <name>    DNS resolver: c-ares (default) | system | getaddrinfo | libc.
-                      c-ares avoids the documented getaddrinfo slow path under concurrent loads.
+  --backend <name>    DNS resolver: default (Bun platform default) | c-ares | system |
+                      getaddrinfo | libc. The default leaves the choice to Bun so the probe
+                      mirrors the app's fetch()/Bun.connect() path; override for diagnosis.
   --state <path>      State file (default: scratch/watchdog/endpoint-probe-state.json).
   --dry-run           Probe and print, but do not write state or page Telegram.
   --json              Print one JSON object on stdout.
@@ -229,20 +237,20 @@ function writeState(path: string, state: StateFile): void {
 async function resolveWithTimeout(
   host: string,
   port: number,
-  backend: DnsResolverBackend,
+  backend: ProbeBackend,
 ) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       resolveHost(host, {
-        // Default c-ares: the Bun DNS reference (https://bun.sh/reference/bun/dns#dns-resolver-client) warns that getaddrinfo is the slow path
-        // under concurrent loads, and this probe resolves every core host in parallel.
-        // --backend overrides this for diagnostics. Omit family so an IPv4-only host still
-        // resolves (c-ares does not honor V4MAPPED; family 6 + flags returned AAAA only).
-        // Port matches the prefetch/fetch; the reference notes port distinguishes IPv6 vs
-        // IPv4-only connections.
-        backend,
+        // Do not pin the backend: the probe measures the same resolver path the app's
+        // fetch()/Bun.connect() takes, and Bun's default differs by OS (c-ares on Linux,
+        // system/getaddrinfo on macOS). --backend is a diagnostic override only.
+        // socketType tcp mirrors HTTPS; port matches the prefetch/fetch and the reference
+        // notes port distinguishes IPv6 vs IPv4-only connections. Family stays unset.
+        ...(backend === DEFAULT_DNS_BACKEND ? {} : { backend }),
         port,
+        socketType: "tcp",
       }),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
@@ -271,7 +279,7 @@ function failedObservation(
 
 async function probe(
   target: HostTarget,
-  backend: DnsResolverBackend,
+  backend: ProbeBackend,
 ): Promise<EndpointProbeObservation> {
   const lookup = await (async () => {
     try {
@@ -374,7 +382,7 @@ async function sendTelegram(
 export function renderJson(
   nowMs: number,
   dryRun: boolean,
-  resolver: DnsResolverBackend,
+  resolver: ProbeBackend,
   verdicts: readonly EndpointProbeVerdict[],
 ): ProbeJson {
   return {
@@ -484,7 +492,9 @@ async function run(): Promise<number> {
       ),
     );
   } else {
-    console.log(`DNS resolver: ${options.backend}`);
+    console.log(
+      `DNS resolver: ${options.backend === DEFAULT_DNS_BACKEND ? "Bun default" : options.backend}`,
+    );
     for (const verdict of verdicts) console.log(verdict.message);
     const alerts = verdicts.filter((verdict) => verdict.status === "alert");
     if (alerts.length > 0) {

@@ -99,7 +99,11 @@ export async function resolveHost(
   host: string,
   options?: DnsLookupOptions,
 ): Promise<DnsAnswer[]> {
-  const answers = await Bun.dns.lookup(host, options);
+  const answers = await Bun.dns.lookup(host, {
+    ...options,
+    // HTTPS callers need the TCP resolver path; backend/family stay at Bun's defaults.
+    socketType: options?.socketType ?? "tcp",
+  });
   return answers.map((answer) => ({
     address: String(answer.address),
     family: answer.family,

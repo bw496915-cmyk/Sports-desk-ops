@@ -20,7 +20,7 @@ import {
 describe("endpoint probe runner options", () => {
   test("defaults are c-ares, no host filter, and the scratch state path", () => {
     const options = parseOptions([]);
-    expect(options.backend).toBe("c-ares");
+    expect(options.backend).toBe("default");
     expect(options.hosts).toEqual([]);
     expect(options.json).toBe(false);
     expect(options.dryRun).toBe(false);
@@ -51,6 +51,7 @@ describe("endpoint probe runner options", () => {
   });
 
   test("rejects an unknown backend with the allowed list", () => {
+    expect(parseBackend("default")).toBe("default");
     expect(() => parseBackend("nope")).toThrow(/invalid --backend "nope"/);
     expect(() => parseBackend("nope")).toThrow(
       /c-ares, system, getaddrinfo, libc/,

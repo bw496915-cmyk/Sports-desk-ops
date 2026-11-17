@@ -35,8 +35,9 @@ export interface EndpointProbeLookup {
   readonly addresses: readonly string[];
   /**
    * Resolver TTLs in seconds. Bun's DNSLookup reference
-   * (https://bun.sh/reference/bun/DNSLookup): `ttl` is 0 unless the c-ares backend is used; the
-   * runner pins c-ares. Diagnostics only — never part of the verdict.
+   * (https://bun.sh/reference/bun/DNSLookup): `ttl` is 0 unless the c-ares backend is used. The
+   * runner leaves the backend at Bun's platform default, so TTLs may be 0. Diagnostics only —
+   * never part of the verdict.
    */
   readonly ttlSeconds: readonly number[];
   readonly error: string | null;
