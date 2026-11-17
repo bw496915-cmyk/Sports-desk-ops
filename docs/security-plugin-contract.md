@@ -1,4 +1,4 @@
-# SportsDesk security/fraud plugin v1 — frozen contract (rev 2)
+# SportsDesk security/fraud plugin v1 — frozen contract (rev 3)
 
 Owner: Lead. Freeze for `fraud-core` (lib + CLI + tests) and `fraud-ui` (Client half).
 Bundle: `dsh-plugin-security/` (package `dsh-plugin-sportsdesk-security`). Host half is Lead-owned.
@@ -12,7 +12,8 @@ ticket captures), repo modules for GSLive bet-event parsing/weblog activity/surv
 predicates, but nothing that joins them into one security surface or learns from them. This
 plugin is the read-only security console: normalizes the log artifacts, runs named sportsbook
 fraud/surveillance detectors, and fits a transparent weak-label risk model whose limits are
-reported, not hidden. No live betting, no order path, no credentials, no artifact mutation.
+reported, not hidden. No live betting, no order path, no credentials outside the declared
+`networked_commands` exception (rev 3), no artifact mutation.
 
 ## Measured data reality (recon 2026-11-04T19:49Z; measured, not assumed)
 
@@ -166,13 +167,19 @@ interface FraudFinding {
 
 ## CLI contract (`cli/sportsdesk_fraud_cli.ts`)
 
-- one command per invocation: `status | bets | ip-graph | weblog | patterns | model | dossier | research`
+- one command per invocation from the surface declared below: the offline `roster` plus the
+  declared `networked_commands` exception (rev 3).
 - global flags anywhere: `--root/-r`, `--json/-j`, `--now/-n <iso>`, `--help/-h`; closed flag
   specs (unknown flag = exit 2); mirror `cli/watchlist_autobet_cli.ts` argument parsing.
-- `--json` stdout is exactly one object; diagnostics on stderr. Exit codes: 0 ok, 2 usage,
-  3 refusal (`insufficient_corpus`, `model_missing`, `unknown_subject`, `source_missing`), else 1.
+- `--json` stdout is exactly one object; diagnostics on stderr. For `roster` commands: 0 ok,
+  2 usage, 3 refusal (`insufficient_corpus`, `model_missing`, `unknown_subject`, `source_missing`),
+  else 1. A `networked_commands` entry uses the exit classes in its block (65 data/reconciliation,
+  70 integrity, 74 CAS/I/O, 77 token isolation, 78 config); those classes are derived from the
+  implementation and must not be renumbered without a rev bump.
 - success envelope `{ success: true, schemaVersion: 1, command, generatedAt, ...payload }`;
   failure `{ success: false, schemaVersion: 1, command, error: { code, message, details? } }`.
+  This applies to every command, including `networked_commands`; a command that omits `success` or
+  `generatedAt` is non-conformant.
 - commands:
   - `status` → `{ sources: FraudSourceState[], sourceMatrix: CompactSourceState[], corpus: { rows, accounts, agents, window, sha256 } | null, model: ModelState, nextStep }`
     - `sources[]` is the full evidence row per log source, canonical order (`FRAUD_SOURCE_IDS`).
@@ -204,9 +211,90 @@ state, provenance, ageSeconds, stale, records, note, reason }` (no path/bytes/mt
   - `dossier <accountId|agentId>` → hierarchy (agent-index), bet aggregates, findings, model score,
     masked IP clusters, evidence pointers, source freshness; refusal `unknown_subject`.
   - `research` → `{ catalog: config/fraud-research.json, modelLimits: [...] }`
-- no command reads secrets/network/keychain, prints cookies/tokens, mutates captured artifacts,
-  or emits a raw IP/userID pair. `fit --write` is the only write and only under `reports/security/`.
+- no command outside `networked_commands` reads secrets/network/keychain, prints cookies/tokens,
+  mutates captured artifacts, or emits a raw IP/userID pair. A declared networked command may read
+  exactly its declared `env`, `network.destination` and `reads`; it must not write, and it must
+  still never print tokens or emit a raw IP/userID pair. `fit --write` is the only write and only
+  under `reports/security/`.
 - every command prints source states in its envelope (the UI's honesty floor).
+
+### Command surface (machine-readable, rev 3)
+
+This block is the contract for the CLI surface. A conformance test parses it and fails when the
+command table, a secret/network use, or the envelope disagrees with it.
+
+```yaml
+command_surface:
+  roster:
+    - status
+    - bets
+    - queue
+    - ip-graph
+    - weblog
+    - patterns
+    - explore
+    - model
+    - dossier
+    - research
+  networked_commands:
+    cross-ref:
+      summary: "Live R2-backed columnar pairwise customer wager cross-reference"
+      # Source path (not the packages/sportsdesk-ops/bin shim) — the gate scans this file.
+      implementation: packages/sportsdesk-ops/src/bin/sportsdesk-fraud-cross-ref.ts
+      aliases: [pairwise-cross-ref]
+      env:
+        required: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY]
+        optional:
+          - R2_BUCKET_NAME
+          - R2_ENDPOINT
+          - CLOUDFLARE_ACCOUNT_ID
+          # Read only by the token-bleed preflight; both set → exit 77.
+          - CLOUDFLARE_R2_API_TOKEN
+          - CLOUDFLARE_API_TOKEN
+      reads_secrets: true
+      network:
+        transport: "Bun.S3Client"
+        destination: "r2:sportsdesk-ops-reports"
+      reads:
+        - manifests/wagers-by-state/latest
+        - manifests/syndicate-rings/latest
+        - "chunks/<merkle_root_sha256>.bin"
+      writes: []
+      envelope:
+        success: true
+        # Stays 1: success/generatedAt are additive, no consumer pins exact keys, and the
+        # shared failure envelope remains 1. Bump to 2 only on a breaking shape change.
+        schemaVersion: 1
+        generatedAt: true
+      # Derived from the implementation; do not renumber without a rev bump.
+      # 65: ERR_CF_R2_CREDENTIALS_MISSING, ERR_OPS_RECONCILIATION_GAP,
+      #     ERR_R2_SINK_BACKPRESSURE, ERR_SOA_BINARY_*
+      # 70: ERR_BRIDGE_CHANNEL_CONTAMINATION
+      # 74: ERR_R2_MANIFEST_CAS_REJECTED, ERR_R2_CHUNK_*
+      # 77: ERR_CF_TOKEN_BLEED_10000 (registered in
+      #     src/telemetry/skill-error-frame.ts PREFLIGHT_ERROR_SPECS)
+      # 78: ERR_DOD_LEGACY_FALLBACK_REMOVED, ERR_OPS_LOCAL_JSON_FORBIDDEN (config, not storage)
+      exit_codes:
+        usage: 2
+        refusal: 3
+        data_or_reconciliation: 65
+        integrity: 70
+        cas_or_io: 74
+        permission: 77
+        config: 78
+```
+
+Conformance gate (required in `verify-changed`):
+
+- `HELP_COMMANDS ⊆ roster ∪ networked_commands`.
+- A command outside `networked_commands` that constructs `Bun.S3Client`/`R2S3Client`, reads a
+  declared secret env name, or imports `R2S3Client` fails.
+- Every `networked_commands` entry declares `env`, `reads_secrets`, `network`, `reads`, `writes`,
+  `envelope` and `exit_codes`; a missing field fails.
+- The command must emit the declared envelope fields.
+- `networked_commands` are CLI-only in v1: no Host tool and no UI surface may invoke them.
+- Declared but not enforced by this gate (v2): the Host tool/UI restriction. The gate covers the
+  CLI surface and source files only.
 
 ## Detector catalog v1 (ids are API)
 
@@ -264,13 +352,16 @@ Data quality: `SOURCE_STALE`, `SOURCE_EPHEMERAL` (unmanifested corpus), `SUSPECT
 ## Host half (Lead)
 
 Tools (all shell `bun run cli/sportsdesk_fraud_cli.ts … --json --root <repoPath>`):
-`fraud_status`, `fraud_bets`, `fraud_ip_graph`, `fraud_weblog`, `fraud_patterns`,
-`fraud_model` (actions report/fit/score; `fit` requires exactly `confirm: true`),
+`fraud_status`, `fraud_bets`, `fraud_queue`, `fraud_ip_graph`, `fraud_weblog`, `fraud_patterns`,
+`fraud_explore`, `fraud_model` (actions report/fit/score; `fit` requires exactly `confirm: true`),
 `fraud_dossier`, `fraud_research`. Read tools return the CLI payload unchanged on success;
 failure → `{ available: false, reason: <CLI code>, message, command, cli }`. `fraud_status`'s
 description names every source id in canonical order and states the `sources[]` + `sourceMatrix`
 one-row-per-source contract (a missing source reports its reason; a null record count is not
 counted, never 0).
+
+No Host tool invokes a `networked_commands` entry; `cross-ref` is CLI-only in v1 (declared, not
+gate-enforced — see the conformance gate note).
 
 Host GET routes (GET only, same-origin, `no-store`, 4 s CLI timeout):
 `/api/security/status`, `/api/security/bets`, `/api/security/ip-graph`,
@@ -334,3 +425,13 @@ bun --bun run oxlint --deny-warnings dsh-plugin-security/client.js
 
 Acceptance: all commands exit 0 (or documented refusal), every answer carries source states and
 masked identifiers, tests prove leakage-safety and determinism, model output states its limits.
+
+## Revision history
+
+- **rev 3 (2026-11-17)** — declared `cross-ref` in `networked_commands` (R2 env/secrets, manifest
+  and chunk reads, exit classes 65/70/74/77/78, uniform envelope); scoped the no-network/no-secrets
+  rule to non-networked commands; added the conformance gate; completed the roster with `queue` and
+  `explore` (already shipped in the CLI and Host tools); kept `cross-ref` `schemaVersion` at 1
+  because the two envelope fields are additive and the failure envelope is unchanged; moved the
+  contract from the gitignored `Scratch/security/` path to `docs/security-plugin-contract.md`.
+- **rev 2 (2026-11-08)** — frozen for `fraud-core` and `fraud-ui`.
