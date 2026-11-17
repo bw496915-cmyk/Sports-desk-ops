@@ -158,3 +158,43 @@ export function projectWebReportsPendingConfig(
     projectedAt: new Date().toISOString(),
   };
 }
+
+export interface ProjectedAccountAdminConfig {
+  readonly schemaVersion: 1;
+  readonly agentId: string | null;
+  readonly masterAgentId: string | null;
+  readonly masterLogin: string | null;
+  readonly startOfWeek: number | null;
+  readonly distributionStartOfWeek: number | null;
+  readonly isOffice: number | null;
+  readonly projectedAt: string;
+}
+
+/** Project the account-admin INFO shape (CustomerID/MasterAgentID/StartOfWeek). */
+export function projectAccountAdminConfig(
+  raw: unknown,
+): ProjectedAccountAdminConfig {
+  if (raw === null || typeof raw !== "object")
+    throw new Error("admin account response must be an object");
+  const infoRaw = (raw as Record<string, unknown>).INFO;
+  if (
+    infoRaw === null ||
+    typeof infoRaw !== "object" ||
+    Array.isArray(infoRaw)
+  ) {
+    throw new Error("admin account response lacks INFO");
+  }
+  const info = scrub(infoRaw) as Record<string, unknown>;
+  const num = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) ? value : null;
+  return {
+    schemaVersion: 1,
+    agentId: trim(info.CustomerID) ?? trim(info.AgentID),
+    masterAgentId: trim(info.MasterAgentID),
+    masterLogin: trim(info.MasterLogin),
+    startOfWeek: num(info.StartOfWeek),
+    distributionStartOfWeek: num(info.DistributionStartOfWeek),
+    isOffice: num(info.IsOffice),
+    projectedAt: new Date().toISOString(),
+  };
+}

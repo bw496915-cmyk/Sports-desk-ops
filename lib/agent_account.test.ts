@@ -3,6 +3,7 @@ import {
   projectAccountInfoOwner,
   projectWebReportsConfig,
   projectWebReportsPendingConfig,
+  projectAccountAdminConfig,
 } from "./agent_account.ts";
 
 describe("account config projection", () => {
@@ -123,5 +124,29 @@ describe("account projection boundaries", () => {
       INFO: { AgentID: "A1", NameF: 1, Weird: "x", AgentF: "on" },
     });
     expect(projected.columnFlags).toEqual({ AgentF: "on" });
+  });
+});
+
+describe("admin account config projection", () => {
+  test("keeps the master link and week-start fields, trimmed", () => {
+    const projected = projectAccountAdminConfig({
+      INFO: {
+        CustomerID: "BILLY666  ",
+        AgentID: "BILLY666                                          ",
+        MasterAgentID: "CSLEVEL2                                          ",
+        MasterLogin: "CSLEVEL2",
+        StartOfWeek: 1,
+        DistributionStartOfWeek: 1,
+        IsOffice: 0,
+        Password: "should-not-survive",
+      },
+    });
+    expect(projected.agentId).toBe("BILLY666");
+    expect(projected.masterAgentId).toBe("CSLEVEL2");
+    expect(projected.masterLogin).toBe("CSLEVEL2");
+    expect(projected.startOfWeek).toBe(1);
+    expect(projected.distributionStartOfWeek).toBe(1);
+    expect(projected.isOffice).toBe(0);
+    expect(JSON.stringify(projected)).not.toContain("should-not-survive");
   });
 });
