@@ -157,6 +157,26 @@ jobs:
       - name: Main-gate smoke (innerHTML sinks + VPS tree)
         timeout-minutes: 2
         run: bun bin/check-innerhtml.ts && bun test tests/dashboard_credentials.test.ts
+      # The docs contract (fabricated contract, freshness, headers, dist parity) lived only in
+      # `verify`, which is skipped on pull requests — so a docs-heavy PR merged unvalidated and
+      # the failure surfaced in the nightly run hours later (#271). It costs seconds.
+      # The projection's staleness check needs the f402 artifact, which is gitignored, so CI can
+      # never run it. This checks what a PR CAN break: the committed projection still carries the
+      # population block and no customer-identifying key (#279).
+      # Four committed synthetic rows. Permitted-keys-only means a new field is a decision in
+      # check_demo_fixture.ts, not something that rides along (#283).
+      - name: Demo customer fixture policy
+        timeout-minutes: 1
+        run: bun run scripts/check_demo_fixture.ts
+
+      - name: Rankings summary projection policy
+        timeout-minutes: 1
+        run: bun run scripts/project_rankings_summary.ts --policy
+
+      - name: "Docs gates (verify_docs: fabricated-contract, freshness, headers, dist)"
+        timeout-minutes: 2
+        run: bun run verify:docs
+
       - name: Bun test changed files
         run: bun run test:changed
       - name: Changed dsh-plugin bundles (verify-load)
@@ -175,6 +195,27 @@ jobs:
         env:
           GITHUB_BASE_REF: ${{ github.base_ref }}
         run: bash scripts/ci/test-changed-nsh.sh
+
+  lint-native:
+    # Native `bun lint` ships in the canary channel, not in the pinned 1.4.4 runtime (and the
+    # migrated `"lint": "bun lint"` script recurses there). This job is the parity check against
+    # .oxlintrc.json; the repo pin and every other job stay on .bun-version.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: canary
+      - name: Install dependencies
+        timeout-minutes: 5
+        run: bun install --frozen-lockfile --no-env-file
+      - name: Native lint (oxlint config parity)
+        timeout-minutes: 3
+        run: bun run lint:native
+      - name: Native lint (type-aware)
+        timeout-minutes: 5
+        run: bun run lint:native:type-aware
 
   code-mode:
     # Property-based + mutation gate for the Code Mode profile tools. Unlike the PR ratchet this
