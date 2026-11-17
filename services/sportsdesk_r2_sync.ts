@@ -162,6 +162,7 @@ export async function syncReportsDirectory(dirPath: string): Promise<void> {
 
 export async function verifyCanonicalR2Surface(options?: {
   readonly json?: boolean;
+  readonly includeBridges?: boolean;
   readonly env?: R2CasEnv;
 }): Promise<boolean> {
   const env = options?.env ?? Bun.env;
@@ -178,7 +179,13 @@ export async function verifyCanonicalR2Surface(options?: {
   }
 
   const client = createScopedR2S3Client(env);
-  const report = await verifyCanonicalR2Manifests({ client, env });
+  const report = await verifyCanonicalR2Manifests({
+    client,
+    env,
+    ...(options?.includeBridges === undefined
+      ? {}
+      : { includeBridges: options.includeBridges }),
+  });
   if (wantJson) {
     process.stdout.write(`${JSON.stringify(report)}\n`);
   } else {
@@ -219,6 +226,7 @@ export async function syncCanonicalR2Surface(options?: {
 
 export async function runCanonicalStaleSurface(options?: {
   readonly json?: boolean;
+  readonly includeBridges?: boolean;
   readonly slaMs?: number;
   readonly env?: R2CasEnv;
 }): Promise<boolean> {
@@ -227,6 +235,9 @@ export async function runCanonicalStaleSurface(options?: {
   const report = await evaluateCanonicalR2ManifestStaleness({
     client,
     env,
+    ...(options?.includeBridges === undefined
+      ? {}
+      : { includeBridges: options.includeBridges }),
     ...(options?.slaMs === undefined ? {} : { slaMs: options.slaMs }),
   });
   if (options?.json) {
@@ -247,11 +258,12 @@ export async function runCanonicalStaleSurface(options?: {
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const json = args.includes("--json");
+  const includeBridges = args.includes("--include-bridges");
   (async () => {
     if (args.includes("--info")) {
       getR2ConfigInfo();
     } else if (args.includes("--verify")) {
-      const ok = await verifyCanonicalR2Surface({ json });
+      const ok = await verifyCanonicalR2Surface({ json, includeBridges });
       if (!ok) process.exitCode = 65;
     } else {
       const target = args.find((a) => !a.startsWith("-")) ?? "reports";

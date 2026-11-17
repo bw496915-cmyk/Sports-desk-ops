@@ -64,7 +64,11 @@ export function mapR2ErrorExitCode(err: unknown): number {
   if (message.includes("ERR_CF_TOKEN_BLEED_10000")) {
     return 77;
   }
-  if (message.includes("ERR_R2_MANIFEST_CAS_REJECTED")) {
+  if (
+    message.includes("ERR_R2_MANIFEST_CAS_REJECTED") ||
+    message.includes("ERR_R2_CHUNK_PUT_RETRY") ||
+    message.includes("ERR_R2_CHUNK_MERKLE_MISMATCH")
+  ) {
     return 74;
   }
   if (
@@ -289,7 +293,7 @@ export async function writeContentAddressedChunkWithRetry(
     throw new R2ManifestCasError(
       "ERR_R2_CHUNK_MERKLE_MISMATCH",
       `ERR_R2_CHUNK_MERKLE_MISMATCH: expected=${options.expectedSha256} actual=${merkleRootSha256}`,
-      65,
+      74,
     );
   }
 
@@ -325,7 +329,7 @@ export async function writeContentAddressedChunkWithRetry(
         throw new R2ManifestCasError(
           "ERR_R2_CHUNK_MERKLE_MISMATCH",
           `ERR_R2_CHUNK_MERKLE_MISMATCH: wrote ${written} of ${chunkBytes.byteLength} bytes to ${chunkKey}`,
-          65,
+          74,
         );
       }
       const uploadedEtag = normalizeStrongETag(await client.headEtag(chunkKey));
@@ -333,7 +337,7 @@ export async function writeContentAddressedChunkWithRetry(
         throw new R2ManifestCasError(
           "ERR_R2_CHUNK_MERKLE_MISMATCH",
           `ERR_R2_CHUNK_MERKLE_MISMATCH: missing ETag after upload on ${chunkKey}`,
-          65,
+          74,
         );
       }
       return {
@@ -357,7 +361,7 @@ export async function writeContentAddressedChunkWithRetry(
     `ERR_R2_CHUNK_PUT_RETRY: failed writing ${chunkKey} after ${maxRetries + 1} attempt(s): ${
       lastError instanceof Error ? lastError.message : String(lastError)
     }`,
-    65,
+    74,
     lastError,
   );
 }
@@ -462,8 +466,13 @@ export async function promoteCanonicalManifestWithCas<TManifest>(params: {
 export type CanonicalR2SinkId =
   "wagers-by-state" | "syndicate-rings" | "ops-supervisor" | "edge-topology";
 
-export interface CanonicalR2SinkSpec {
-  readonly sinkId: CanonicalR2SinkId;
+export type BridgeR2SinkId = "xml-ingest" | "f402-weblog";
+export type AnyR2SinkId = CanonicalR2SinkId | BridgeR2SinkId;
+
+export interface CanonicalR2SinkSpec<
+  TSinkId extends AnyR2SinkId = CanonicalR2SinkId,
+> {
+  readonly sinkId: TSinkId;
   readonly domain: "[Ops & Governance]" | "[DOD Spine]";
   readonly r2Bucket: typeof R2_BUCKET;
   readonly manifestKey: string;
@@ -475,7 +484,7 @@ export interface CanonicalR2SinkSpec {
 }
 
 export const CANONICAL_R2_SINK_SPECS: Readonly<
-  Record<CanonicalR2SinkId, CanonicalR2SinkSpec>
+  Record<CanonicalR2SinkId, CanonicalR2SinkSpec<CanonicalR2SinkId>>
 > = {
   "wagers-by-state": {
     sinkId: "wagers-by-state",
@@ -520,6 +529,88 @@ export const CANONICAL_R2_SINK_SPECS: Readonly<
   },
 } as const;
 
+export const BRIDGE_R2_SINK_SPECS: Readonly<
+  Record<BridgeR2SinkId, CanonicalR2SinkSpec<BridgeR2SinkId>>
+> = {
+  "xml-ingest": {
+    sinkId: "xml-ingest",
+    domain: "[Ops & Governance]",
+    r2Bucket: R2_BUCKET,
+    manifestKey: "manifests/xml-ingest/latest",
+    generationPrefix: "generations/xml-ingest",
+    lane: "ops-xml-ingest",
+    skillOrdinalU8: 11,
+    slaMs: 60 * 60 * 1000,
+  },
+  "f402-weblog": {
+    sinkId: "f402-weblog",
+    domain: "[Ops & Governance]",
+    r2Bucket: R2_BUCKET,
+    manifestKey: "manifests/f402-weblog/latest",
+    generationPrefix: "f402-weblog",
+    lane: "ops-weblog-bridge",
+    skillOrdinalU8: 12,
+    slaMs: 90 * 60 * 1000,
+  },
+} as const;
+
+export const STAGE_4_LEDGER_PUBLISH_SNAPSHOT = {
+  stage: "STAGE_4_LEDGER_PUBLISH" as const,
+  branch: "cross_reference_customer_wagers" as const,
+  r2_bucket: R2_BUCKET,
+  recorded_at_iso: "2026-11-17T21:11:06.000Z" as const,
+  preserved_docs: ["DOC-13"] as const,
+  targets: {
+    "DOC-14": {
+      label: "LIVE-01" as const,
+      sinks: ["wagers-by-state", "syndicate-rings"] as const,
+    },
+    "DOC-16": {
+      label: "LIVE-02" as const,
+      sinks: ["ops-supervisor", "edge-topology"] as const,
+    },
+    "LIVE-KEEP-HUD": {
+      label: "LIVE-KEEP-HUD" as const,
+      sinks: [
+        "wagers-by-state",
+        "syndicate-rings",
+        "ops-supervisor",
+        "edge-topology",
+      ] as const,
+    },
+  },
+  sinks: {
+    "wagers-by-state": {
+      manifest_key: "manifests/wagers-by-state/latest",
+      generation_u32: 2,
+      etag: '"85d8da3a296d25ac823034cb7cf880de"',
+      merkle_root_sha256:
+        "762d82a5191e06e2437b456e5fe6282434319fbe0e442ebdf49cc4e5a08de392",
+    },
+    "syndicate-rings": {
+      manifest_key: "manifests/syndicate-rings/latest",
+      generation_u32: 1,
+      etag: '"bccc9736b9e8b17d3f321f09f3b0699d"',
+      merkle_root_sha256:
+        "b1128b66f0c6d8155b428b7112802f506f02783f78c75dca0ac2b6962f46da2d",
+    },
+    "ops-supervisor": {
+      manifest_key: "manifests/ops-supervisor/latest",
+      generation_u32: 1,
+      etag: '"20725e1d57a7ee8212bdccbd5572dc6b"',
+      merkle_root_sha256:
+        "ab2fba43fb87506793b448b0986170cd21420826c5698da456e9312ec1e2ded6",
+    },
+    "edge-topology": {
+      manifest_key: "manifests/edge-topology/latest",
+      generation_u32: 1,
+      etag: '"9896acf3f47030389ffa5ef540e7e6ff"',
+      merkle_root_sha256:
+        "0a64e1e196dfddb6c79c73774c043aa15bb5ba6283ae615bb70f6132f0ac216e",
+    },
+  },
+} as const;
+
 export interface OpsSupervisorManifest {
   readonly domain: "[Ops & Governance]";
   readonly sink_id: "ops-supervisor";
@@ -561,6 +652,8 @@ export interface CanonicalManifestRecord {
   readonly generation_u32?: number;
   readonly snapshot_gen_u32?: number;
   readonly merkle_root_sha256?: string;
+  readonly sha256?: string;
+  readonly deskDate?: string;
   readonly watermark_cursor?: string;
   readonly data_window_max_epoch_ms?: number;
   readonly r2_published_at_epoch_ms?: number;
@@ -852,7 +945,7 @@ export async function syncCanonicalGovernanceManifestsToR2(options: {
 }
 
 export interface CanonicalSinkVerifyEntry {
-  readonly sink_id: CanonicalR2SinkId;
+  readonly sink_id: AnyR2SinkId;
   readonly manifest_key: string;
   readonly domain: string;
   readonly lane: string;
@@ -872,6 +965,7 @@ export interface CanonicalSinkVerifyEntry {
 export async function verifyCanonicalR2Manifests(options: {
   readonly client: CasR2ClientLike;
   readonly env?: R2CasEnv;
+  readonly includeBridges?: boolean;
   readonly fetchImpl?: typeof fetch;
 }): Promise<{
   readonly schemaVersion: 1;
@@ -886,7 +980,13 @@ export async function verifyCanonicalR2Manifests(options: {
   const env = options.env ?? Bun.env;
   assertR2TokenIsolationAndEnv(env);
 
-  const specs = Object.values(CANONICAL_R2_SINK_SPECS);
+  const specs: readonly CanonicalR2SinkSpec<AnyR2SinkId>[] =
+    options.includeBridges
+      ? [
+          ...Object.values(CANONICAL_R2_SINK_SPECS),
+          ...Object.values(BRIDGE_R2_SINK_SPECS),
+        ]
+      : Object.values(CANONICAL_R2_SINK_SPECS);
   const probes = await Promise.all(
     specs.map((spec) =>
       probeR2ManifestState<CanonicalManifestRecord>(
@@ -945,10 +1045,20 @@ export async function verifyCanonicalR2Manifests(options: {
     const circuitState = probe.payload.circuit_state ?? "CLOSED";
     const poisonBit = Number(probe.payload.poison_bit ?? 0);
     const driftExitCode = Number(probe.payload.drift_exit_code ?? 0);
+    const merkleRoot =
+      probe.payload.merkle_root_sha256 ?? probe.payload.sha256 ?? null;
     const generationU32 =
-      Number(
-        probe.payload.generation_u32 ?? probe.payload.snapshot_gen_u32 ?? 0,
-      ) >>> 0;
+      typeof probe.payload.generation_u32 === "number" ||
+      typeof probe.payload.snapshot_gen_u32 === "number"
+        ? Number(
+            probe.payload.generation_u32 ?? probe.payload.snapshot_gen_u32,
+          ) >>> 0
+        : typeof probe.payload.sha256 === "string" &&
+            probe.payload.sha256.length > 0 &&
+            typeof probe.payload.data_window_max_epoch_ms === "number" &&
+            typeof probe.payload.r2_published_at_epoch_ms === "number"
+          ? 1
+          : 0;
     const sinkOk =
       gapValid &&
       circuitState === "CLOSED" &&
@@ -965,7 +1075,7 @@ export async function verifyCanonicalR2Manifests(options: {
       exists: true,
       etag: probe.etag,
       generation_u32: generationU32,
-      merkle_root_sha256: probe.payload.merkle_root_sha256 ?? null,
+      merkle_root_sha256: merkleRoot,
       data_window_max_epoch_ms:
         typeof probe.payload.data_window_max_epoch_ms === "number"
           ? probe.payload.data_window_max_epoch_ms
@@ -995,7 +1105,7 @@ export async function verifyCanonicalR2Manifests(options: {
 }
 
 export interface CanonicalSinkStalenessEntry {
-  readonly sink_id: CanonicalR2SinkId;
+  readonly sink_id: AnyR2SinkId;
   readonly manifest_key: string;
   readonly lane: string;
   readonly state: "fresh" | "stale" | "missing";
@@ -1014,6 +1124,7 @@ export interface CanonicalSinkStalenessEntry {
 export async function evaluateCanonicalR2ManifestStaleness(options: {
   readonly client: CasR2ClientLike;
   readonly env?: R2CasEnv;
+  readonly includeBridges?: boolean;
   readonly nowMs?: number;
   readonly slaMs?: number;
   readonly fetchImpl?: typeof fetch;
@@ -1032,7 +1143,13 @@ export async function evaluateCanonicalR2ManifestStaleness(options: {
   const env = options.env ?? Bun.env;
   assertR2TokenIsolationAndEnv(env);
   const nowMs = options.nowMs ?? Date.now();
-  const specs = Object.values(CANONICAL_R2_SINK_SPECS);
+  const specs: readonly CanonicalR2SinkSpec<AnyR2SinkId>[] =
+    options.includeBridges
+      ? [
+          ...Object.values(CANONICAL_R2_SINK_SPECS),
+          ...Object.values(BRIDGE_R2_SINK_SPECS),
+        ]
+      : Object.values(CANONICAL_R2_SINK_SPECS);
   const probes = await Promise.all(
     specs.map((spec) =>
       probeR2ManifestState<CanonicalManifestRecord>(
@@ -1091,7 +1208,15 @@ export async function evaluateCanonicalR2ManifestStaleness(options: {
     const circuitState = p.circuit_state ?? "CLOSED";
     const rawGap = String(p.unresolved_gap_cents ?? "0").trim();
     const generationU32 =
-      Number(p.generation_u32 ?? p.snapshot_gen_u32 ?? 0) >>> 0;
+      typeof p.generation_u32 === "number" ||
+      typeof p.snapshot_gen_u32 === "number"
+        ? Number(p.generation_u32 ?? p.snapshot_gen_u32) >>> 0
+        : typeof p.sha256 === "string" &&
+            p.sha256.length > 0 &&
+            dataWinMs !== null &&
+            pubMs !== null
+          ? 1
+          : 0;
 
     let gapBig = 0n;
     try {

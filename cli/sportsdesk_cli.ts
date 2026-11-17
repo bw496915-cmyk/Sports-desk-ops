@@ -2642,6 +2642,7 @@ export async function main(): Promise<void> {
   if (cmd === "r2") {
     const sub = rawArgs[1] || "--info";
     const jsonFlag = rawArgs.includes("--json");
+    const includeBridges = rawArgs.includes("--include-bridges");
     if (sub === "--info" || sub === "info") {
       getR2ConfigInfo();
     } else if (sub === "--verify" || sub === "verify") {
@@ -2650,7 +2651,10 @@ export async function main(): Promise<void> {
       const { mapR2ErrorExitCode } =
         await import("../packages/sportsdesk-ops/src/lib/r2_manifest_cas.ts");
       try {
-        const ok = await verifyCanonicalR2Surface({ json: jsonFlag });
+        const ok = await verifyCanonicalR2Surface({
+          json: jsonFlag,
+          includeBridges,
+        });
         if (!ok) process.exitCode = 65;
       } catch (err) {
         console.error(err instanceof Error ? err.message : String(err));
@@ -2671,7 +2675,7 @@ export async function main(): Promise<void> {
       }
     } else {
       console.log(
-        "Usage: bun sportsdesk_cli.ts r2 [--info|--verify [--json]|--sync [dir] [--json]]",
+        "Usage: bun sportsdesk_cli.ts r2 [--info|--verify [--json] [--include-bridges]|--sync [dir] [--json]]",
       );
     }
     return;
@@ -2696,6 +2700,7 @@ export async function main(): Promise<void> {
     const { mapR2ErrorExitCode } =
       await import("../packages/sportsdesk-ops/src/lib/r2_manifest_cas.ts");
     const jsonFlag = rawArgs.includes("--json");
+    const includeBridges = rawArgs.includes("--include-bridges");
     const windowMinArg = getArgValue(rawArgs, ["--window-min"], "");
     const parsedWindowMin = windowMinArg ? Number(windowMinArg) : Number.NaN;
     const slaMs =
@@ -2705,6 +2710,7 @@ export async function main(): Promise<void> {
     try {
       const ok = await runCanonicalStaleSurface({
         json: jsonFlag,
+        includeBridges,
         ...(slaMs === undefined ? {} : { slaMs }),
       });
       if (!ok) process.exitCode = 1;

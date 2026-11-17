@@ -11,7 +11,9 @@ import {
   type PairwiseR2Reader,
 } from "../packages/sportsdesk-ops/src/bin/sportsdesk-fraud-cross-ref.ts";
 import {
+  BRIDGE_R2_SINK_SPECS,
   CANONICAL_R2_SINK_SPECS,
+  STAGE_4_LEDGER_PUBLISH_SNAPSHOT,
   evaluateCanonicalR2ManifestStaleness,
   normalizeStrongETag,
   promoteCanonicalManifestWithCas,
@@ -19,6 +21,7 @@ import {
   publishOpsSupervisorManifestToR2,
   syncCanonicalGovernanceManifestsToR2,
   verifyCanonicalR2Manifests,
+  writeContentAddressedChunkWithRetry,
   type CasR2ClientLike,
 } from "../packages/sportsdesk-ops/src/lib/r2_manifest_cas.ts";
 import { publishWagersByStateSnapshotToR2 } from "../scripts/publish_wagers_snapshot.ts";
@@ -1526,5 +1529,121 @@ describe("sportsdesk-fraud cross-ref governance & R2 lineage envelope", () => {
     expect(staleReport.ok).toBe(false);
     expect(staleReport.degraded_count).toBeGreaterThan(0);
     expect(staleReport.circuit_state).toBe("OPEN");
+
+    // BRIDGE_R2_SINK_SPECS & includeBridges:true audits all 6 manifests on demand
+    expect(Object.keys(BRIDGE_R2_SINK_SPECS)).toEqual([
+      "xml-ingest",
+      "f402-weblog",
+    ]);
+    await casHarness.client.write(
+      BRIDGE_R2_SINK_SPECS["xml-ingest"].manifestKey,
+      JSON.stringify({
+        domain: "[Ops & Governance]",
+        sink_id: "xml-ingest",
+        generation_u32: 4,
+        merkle_root_sha256: "e".repeat(64),
+        data_window_max_epoch_ms: baseMs,
+        r2_published_at_epoch_ms: baseMs + 1_000,
+        circuit_state: "CLOSED",
+        unresolved_gap_cents: "0",
+      }),
+    );
+    await casHarness.client.write(
+      BRIDGE_R2_SINK_SPECS["f402-weblog"].manifestKey,
+      JSON.stringify({
+        schemaVersion: 1,
+        kind: "f402-weblog-manifest",
+        deskDate: "2026-11-17",
+        sha256: "d".repeat(64),
+        data_window_max_epoch_ms: baseMs,
+        r2_published_at_epoch_ms: baseMs + 2_000,
+      }),
+    );
+
+    const sixVerify = await verifyCanonicalR2Manifests({
+      client: casHarness.client,
+      env: okEnv,
+      includeBridges: true,
+    });
+    expect(sixVerify.ok).toBe(true);
+    expect(sixVerify.sinks).toHaveLength(6);
+
+    const sixStale = await evaluateCanonicalR2ManifestStaleness({
+      client: casHarness.client,
+      env: okEnv,
+      includeBridges: true,
+      nowMs: baseMs + 60_000,
+      slaMs: 3_600_000,
+    });
+    expect(sixStale.ok).toBe(true);
+    expect(sixStale.sinks).toHaveLength(6);
+
+    // Chunk faults (ERR_R2_CHUNK_MERKLE_MISMATCH & ERR_R2_CHUNK_PUT_RETRY) report exit 74 (EX_IOERR)
+    let mismatchErr: unknown = null;
+    try {
+      await writeContentAddressedChunkWithRetry(
+        casHarness.client,
+        new Uint8Array([1, 2, 3]),
+        { expectedSha256: "0".repeat(64), maxRetries: 0, baseDelayMs: 0 },
+      );
+    } catch (err) {
+      mismatchErr = err;
+    }
+    expect((mismatchErr as Error).message).toContain(
+      "ERR_R2_CHUNK_MERKLE_MISMATCH",
+    );
+    expect((mismatchErr as { exitCode?: number }).exitCode).toBe(74);
+
+    const failingChunkClient: CasR2ClientLike = {
+      async headEtag() {
+        return null;
+      },
+      async write() {
+        throw new Error("simulated chunk S3 reset");
+      },
+      async writeWithMetadata() {
+        return 0;
+      },
+      file() {
+        return {
+          async text() {
+            return "";
+          },
+          async bytes() {
+            return new Uint8Array(0);
+          },
+        };
+      },
+      async stat() {
+        return {};
+      },
+    };
+    let retryErr: unknown = null;
+    try {
+      await writeContentAddressedChunkWithRetry(
+        failingChunkClient,
+        new Uint8Array([4, 5, 6]),
+        { maxRetries: 1, baseDelayMs: 0 },
+      );
+    } catch (err) {
+      retryErr = err;
+    }
+    expect((retryErr as Error).message).toContain("ERR_R2_CHUNK_PUT_RETRY");
+    expect((retryErr as { exitCode?: number }).exitCode).toBe(74);
+
+    // STAGE_4_LEDGER_PUBLISH_SNAPSHOT records DOC-14, DOC-16, LIVE-KEEP-HUD while leaving DOC-13 untouched
+    expect(STAGE_4_LEDGER_PUBLISH_SNAPSHOT.preserved_docs).toEqual(["DOC-13"]);
+    expect(STAGE_4_LEDGER_PUBLISH_SNAPSHOT.targets["DOC-14"].label).toBe(
+      "LIVE-01",
+    );
+    expect(STAGE_4_LEDGER_PUBLISH_SNAPSHOT.targets["DOC-16"].label).toBe(
+      "LIVE-02",
+    );
+    expect(
+      STAGE_4_LEDGER_PUBLISH_SNAPSHOT.sinks["wagers-by-state"].generation_u32,
+    ).toBe(2);
+    expect(
+      STAGE_4_LEDGER_PUBLISH_SNAPSHOT.sinks["edge-topology"].generation_u32,
+    ).toBe(1);
   });
 });
