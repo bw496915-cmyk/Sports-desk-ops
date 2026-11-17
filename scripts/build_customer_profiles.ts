@@ -308,10 +308,6 @@ const agentFeed = {
         },
 };
 
-const rootWeeklyAgent =
-  typeof weeklyDoc?.agentId === "string" && weeklyDoc.agentId.trim() !== ""
-    ? normalizeRosterId(weeklyDoc.agentId)
-    : null;
 const weeklyFigure =
   weeklyDoc?.weekly !== null &&
   typeof weeklyDoc?.weekly === "object" &&
@@ -444,7 +440,7 @@ await Bun.write(
         .map(([agent, exposure]) => ({
           agent,
           ...exposure,
-          ...(treeCounts.get(agent) ?? {}),
+          ...treeCounts.get(agent),
           ...(treeCollisions.get(agent) === undefined
             ? {}
             : { collision: treeCollisions.get(agent) }),
