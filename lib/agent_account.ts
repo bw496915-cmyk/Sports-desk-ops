@@ -80,3 +80,45 @@ export function projectAccountInfoOwner(raw: unknown): ProjectedAccountConfig {
     projectedAt: new Date().toISOString(),
   };
 }
+
+export interface ProjectedWebReportsConfig {
+  readonly schemaVersion: 1;
+  readonly agentId: string | null;
+  readonly displayFlags: Readonly<Record<string, string>>;
+  readonly weeklyScroll: string | null;
+  readonly projectedAt: string;
+}
+
+/** Project getConfigWebReports ({ INFO }) without retaining arbitrary config fields. */
+export function projectWebReportsConfig(
+  raw: unknown,
+): ProjectedWebReportsConfig {
+  if (raw === null || typeof raw !== "object")
+    throw new Error("web-reports response must be an object");
+  const infoRaw = (raw as Record<string, unknown>).INFO;
+  if (
+    infoRaw === null ||
+    typeof infoRaw !== "object" ||
+    Array.isArray(infoRaw)
+  ) {
+    throw new Error("web-reports response lacks INFO");
+  }
+  const info = scrub(infoRaw) as Record<string, unknown>;
+  const displayFlags: Record<string, string> = {};
+  for (const [key, value] of Object.entries(info)) {
+    if (/^show/i.test(key) && typeof value === "string")
+      displayFlags[key] = value;
+  }
+  const adds = info.adds;
+  const weeklyScroll =
+    adds !== null && typeof adds === "object" && !Array.isArray(adds)
+      ? trim((adds as Record<string, unknown>).weeklyScroll)
+      : null;
+  return {
+    schemaVersion: 1,
+    agentId: trim(info.AgentID),
+    displayFlags,
+    weeklyScroll,
+    projectedAt: new Date().toISOString(),
+  };
+}

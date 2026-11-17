@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { projectAccountInfoOwner } from "./agent_account.ts";
+import {
+  projectAccountInfoOwner,
+  projectWebReportsConfig,
+} from "./agent_account.ts";
 
 describe("account config projection", () => {
   test("drops the JWT, passwords, names and trims padding", () => {
@@ -33,5 +36,25 @@ describe("account config projection", () => {
 
   test("refuses a response without accountInfo", () => {
     expect(() => projectAccountInfoOwner({ INFO: {} })).toThrow("accountInfo");
+  });
+});
+
+describe("web-reports config projection", () => {
+  test("trims AgentID and keeps only display flags plus weeklyScroll", () => {
+    const projected = projectWebReportsConfig({
+      INFO: {
+        AgentID: "BILLY666                                          ",
+        Config: "",
+        showPassword: "on",
+        showPending: "on",
+        adds: { AgentID: "BILLY666  ", weeklyScroll: "off" },
+        Password: "should-not-survive",
+      },
+    });
+    expect(projected.agentId).toBe("BILLY666");
+    expect(projected.displayFlags.showPassword).toBe("on");
+    expect(projected.displayFlags.showPending).toBe("on");
+    expect(projected.weeklyScroll).toBe("off");
+    expect(JSON.stringify(projected)).not.toContain("should-not-survive");
   });
 });
