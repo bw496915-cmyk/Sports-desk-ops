@@ -73,8 +73,18 @@ export function warmCaptureNetwork(baseUrl: string): {
   return { host: parsed.hostname, port };
 }
 
-export async function resolveHost(host: string): Promise<DnsAnswer[]> {
-  const answers = await Bun.dns.lookup(host);
+export interface DnsLookupOptions {
+  /** Restrict to IPv4 (4) or IPv6 (6); omit for the resolver default. */
+  readonly family?: 4 | 6;
+  /** Resolver flags such as `V4MAPPED | ALL` from `bun:dns`; omit for the default. */
+  readonly flags?: number;
+}
+
+export async function resolveHost(
+  host: string,
+  options?: DnsLookupOptions,
+): Promise<DnsAnswer[]> {
+  const answers = await Bun.dns.lookup(host, options);
   return answers.map((answer) => ({
     address: String(answer.address),
     family: Number(answer.family),
