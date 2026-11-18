@@ -41,6 +41,17 @@ describe("Bun.markdown.AnsiTheme <-> design/tokens.toml v1.5.0 gates", () => {
     expect(formatChannelBadge(16, SD_ANSI_THEMES.pipe_ascii)).toBe("[UNKNOWN]");
   });
 
+  test("emitGeneratedAnsiTokensModule rejects an empty profile set instead of emitting invalid TS", () => {
+    // generate_tokens.ts passes `ssot.cli_ansi_profiles ?? {}`; without this
+    // guard the union joins nothing and the generated file reads
+    // `export type AnsiProfileKey = ;`, which fails at parse time.
+    expect(() =>
+      emitGeneratedAnsiTokensModule({}, [
+        { channel_id: 0, channel_code: "NON_SPORTS", hex: "#94a3b8" },
+      ]),
+    ).toThrow("ERR_SPEC_ANSI_PROFILES_MISSING");
+  });
+
   test("emitGeneratedAnsiTokensModule rejects sparse or non-contiguous channel_id", () => {
     expect(() =>
       emitGeneratedAnsiTokensModule({}, [

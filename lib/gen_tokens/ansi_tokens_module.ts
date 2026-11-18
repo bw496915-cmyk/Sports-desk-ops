@@ -26,6 +26,13 @@ export function emitGeneratedAnsiTokensModule(
     }
   }
   const profileKeys = Object.keys(profiles);
+  if (profileKeys.length === 0) {
+    // An empty profile set would emit `export type AnsiProfileKey = ;`
+    // (a parse error, not a type error) because the union joins nothing.
+    throw new Error(
+      "ERR_SPEC_ANSI_PROFILES_MISSING: design/tokens.toml declares no [cli.markdown_ansi.*] profiles",
+    );
+  }
   const lines: string[] = [
     "// AUTO-GENERATED FROM design/tokens.toml — DO NOT EDIT",
     `export type AnsiProfileKey = ${profileKeys.map((k) => JSON.stringify(k)).join(" | ")};`,
