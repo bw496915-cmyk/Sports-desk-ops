@@ -11,6 +11,7 @@ import {
 import {
   buildLookupOptions,
   buildNextState,
+  formatIpForUrl,
   parseBackend,
   parseOptions,
   readState,
@@ -23,6 +24,8 @@ describe("endpoint probe runner options", () => {
     const options = parseOptions([]);
     expect(options.backend).toBe("default");
     expect(options.hosts).toEqual([]);
+    expect(options.port).toBeUndefined();
+    expect(options.ip).toBeUndefined();
     expect(options.json).toBe(false);
     expect(options.dryRun).toBe(false);
     expect(options.help).toBe(false);
@@ -63,6 +66,64 @@ describe("endpoint probe runner options", () => {
       port: 443,
       socketType: "tcp",
     });
+  });
+
+  test("port and ip overrides require one host and --dry-run", () => {
+    const options = parseOptions([
+      "--dry-run",
+      "--host",
+      "api.telegram.org",
+      "--port",
+      "8443",
+      "--ip",
+      "149.154.166.110",
+    ]);
+    expect(options.port).toBe(8_443);
+    expect(options.ip).toBe("149.154.166.110");
+
+    expect(() =>
+      parseOptions(["--host", "api.telegram.org", "--port", "8443"]),
+    ).toThrow(/require --dry-run/);
+    expect(() => parseOptions(["--dry-run", "--port", "8443"])).toThrow(
+      /exactly one --host/,
+    );
+    expect(() =>
+      parseOptions([
+        "--dry-run",
+        "--host",
+        "api.telegram.org",
+        "--host",
+        "clob.polymarket.com",
+        "--ip",
+        "1.1.1.1",
+      ]),
+    ).toThrow(/exactly one --host/);
+    expect(() =>
+      parseOptions(["--dry-run", "--host", "api.telegram.org", "--port", "0"]),
+    ).toThrow(/invalid --port/);
+    expect(() =>
+      parseOptions([
+        "--dry-run",
+        "--host",
+        "api.telegram.org",
+        "--port",
+        "70000",
+      ]),
+    ).toThrow(/invalid --port/);
+    expect(() =>
+      parseOptions([
+        "--dry-run",
+        "--host",
+        "api.telegram.org",
+        "--ip",
+        "999.1.1.1",
+      ]),
+    ).toThrow(/invalid --ip/);
+  });
+
+  test("brackets IPv6 for the URL authority", () => {
+    expect(formatIpForUrl("149.154.166.110")).toBe("149.154.166.110");
+    expect(formatIpForUrl("2001:db8::1")).toBe("[2001:db8::1]");
   });
 
   test("rejects an unknown backend with the allowed list", () => {
@@ -232,10 +293,17 @@ describe("endpoint probe JSON rendering", () => {
       state: { consecutiveFailures: 1, lastCheckedAtMs: 1_000 },
       observation: failing,
     });
-    const json = renderJson(2_000, true, "c-ares", [okVerdict, alertVerdict]);
+    const json = renderJson(
+      2_000,
+      true,
+      "c-ares",
+      [okVerdict, alertVerdict],
+      null,
+    );
 
     expect(json.resolver).toBe("c-ares");
     expect(json.socketType).toBe("tcp");
+    expect(json.ip).toBeNull();
     expect(json.dryRun).toBe(true);
     expect(json.alerts).toBe(1);
     expect(json.hosts).toHaveLength(2);

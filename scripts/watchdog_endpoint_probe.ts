@@ -25,6 +25,7 @@ import {
   renameSync,
   writeFileSync,
 } from "node:fs";
+import { isIP } from "node:net";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
@@ -81,6 +82,8 @@ interface Options {
   readonly dryRun: boolean;
   readonly hosts: readonly string[];
   readonly backend: ProbeBackend;
+  readonly port?: number;
+  readonly ip?: string;
   readonly statePath: string;
   readonly help: boolean;
 }
@@ -97,6 +100,7 @@ interface ProbeJson {
   readonly dryRun: boolean;
   readonly resolver: ProbeBackend;
   readonly socketType: "tcp";
+  readonly ip: string | null;
   readonly alerts: number;
   readonly hosts: readonly {
     readonly host: string;
@@ -129,6 +133,24 @@ export function parseBackend(raw: string | undefined): ProbeBackend {
   return backend;
 }
 
+function parsePort(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`invalid --port "${raw}" (expected 1-65535)`);
+  }
+  return port;
+}
+
+function parseIp(raw: string | undefined): string | undefined {
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const ip = raw.trim();
+  if (isIP(ip) === 0) {
+    throw new Error(`invalid --ip "${raw}" (expected IPv4 or IPv6)`);
+  }
+  return ip;
+}
+
 export function parseOptions(
   argv: readonly string[] = Bun.argv.slice(2),
 ): Options {
@@ -139,15 +161,29 @@ export function parseOptions(
       "dry-run": { type: "boolean", default: false },
       host: { type: "string", multiple: true },
       backend: { type: "string" },
+      port: { type: "string" },
+      ip: { type: "string" },
       state: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
   });
+  const dryRun = values["dry-run"] ?? false;
+  const hosts = values.host ?? [];
+  const port = parsePort(values.port);
+  const ip = parseIp(values.ip);
+  if ((port !== undefined || ip !== undefined) && !dryRun) {
+    throw new Error("--port/--ip are diagnostic and require --dry-run");
+  }
+  if ((port !== undefined || ip !== undefined) && hosts.length !== 1) {
+    throw new Error("--port/--ip require exactly one --host");
+  }
   return {
     json: values.json ?? false,
-    dryRun: values["dry-run"] ?? false,
-    hosts: values.host ?? [],
+    dryRun,
+    hosts,
     backend: parseBackend(values.backend),
+    ...(port === undefined ? {} : { port }),
+    ...(ip === undefined ? {} : { ip }),
     statePath:
       values.state === undefined || values.state.trim() === ""
         ? DEFAULT_STATE_PATH
@@ -163,6 +199,9 @@ Usage: bun run scripts/watchdog_endpoint_probe.ts [flags]
 
 Flags:
   --host <hostname>   Probe only this core host (repeatable). Default: all core hosts.
+  --port <n>          Target port override, 1-65535. Diagnostic: requires one --host and --dry-run.
+  --ip <addr>         Dial this IPv4/IPv6 address for the fetch, keeping the hostname for TLS
+                      SNI and Host. Diagnostic: requires one --host and --dry-run.
   --backend <name>    DNS resolver: default (Bun platform default) | c-ares | system |
                       getaddrinfo | libc. The default leaves the choice to Bun so the probe
                       mirrors the app's fetch()/Bun.connect() path; override for diagnosis.
@@ -286,9 +325,15 @@ function failedObservation(
   };
 }
 
+/** Bracket IPv6 for a URL authority; IPv4 is unchanged. */
+export function formatIpForUrl(ip: string): string {
+  return isIP(ip) === 6 ? `[${ip}]` : ip;
+}
+
 async function probe(
   target: HostTarget,
   backend: ProbeBackend,
+  ipOverride?: string,
 ): Promise<EndpointProbeObservation> {
   const lookup = await (async () => {
     try {
@@ -317,21 +362,31 @@ async function probe(
 
   // Bun DNS reference (https://bun.sh/reference/bun/dns/prefetch): prefetch warms a later fetch()/Bun.connect() so it can skip the
   // lookup (measured: prefetch miss -> fetch cache hit). Experimental, so it never decides
-  // the verdict; the lookup above is the DNS signal.
-  Bun.dns.prefetch(target.hostname, target.port);
+  // the verdict; the lookup above is the DNS signal. Skip it when dialing an explicit IP —
+  // there is no name to prefetch.
+  if (ipOverride === undefined) {
+    Bun.dns.prefetch(target.hostname, target.port);
+  }
 
   const started = performance.now();
   const fetched = await (async () => {
     try {
-      const response = await fetch(
-        `https://${target.hostname}:${target.port}/`,
-        {
-          method: "GET",
-          redirect: "manual",
-          signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-          headers: { "user-agent": "sportsdesk-endpoint-probe/1" },
+      const fetchHost =
+        ipOverride === undefined ? target.hostname : formatIpForUrl(ipOverride);
+      const response = await fetch(`https://${fetchHost}:${target.port}/`, {
+        method: "GET",
+        redirect: "manual",
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        headers: {
+          "user-agent": "sportsdesk-endpoint-probe/1",
+          // Keep the logical Host when dialing an explicit IP.
+          ...(ipOverride === undefined ? {} : { host: target.hostname }),
         },
-      );
+        // Keep certificate verification against the hostname, not the IP.
+        ...(ipOverride === undefined
+          ? {}
+          : { tls: { serverName: target.hostname } }),
+      });
       return {
         ok: true,
         status: response.status,
@@ -393,6 +448,7 @@ export function renderJson(
   dryRun: boolean,
   resolver: ProbeBackend,
   verdicts: readonly EndpointProbeVerdict[],
+  ip: string | null,
 ): ProbeJson {
   return {
     schemaVersion: 1,
@@ -401,6 +457,7 @@ export function renderJson(
     dryRun,
     resolver,
     socketType: "tcp",
+    ip,
     alerts: verdicts.filter((verdict) => verdict.status === "alert").length,
     hosts: verdicts.map((verdict) => ({
       host: verdict.target.hostname,
@@ -467,11 +524,16 @@ async function run(): Promise<number> {
     return EXIT.ok;
   }
 
-  const targets = selectTargets(options.hosts);
+  const baseTargets = selectTargets(options.hosts);
+  const portOverride = options.port;
+  const targets =
+    portOverride === undefined
+      ? baseTargets
+      : baseTargets.map((target) => ({ ...target, port: portOverride }));
   const state = readState(options.statePath);
   const nowMs = Date.now();
   const settled = await Promise.allSettled(
-    targets.map((target) => probe(target, options.backend)),
+    targets.map((target) => probe(target, options.backend, options.ip)),
   );
   const observations = settled.map((result, index) => {
     const target = targets[index];
@@ -496,7 +558,13 @@ async function run(): Promise<number> {
   if (options.json) {
     console.log(
       JSON.stringify(
-        renderJson(nowMs, options.dryRun, options.backend, verdicts),
+        renderJson(
+          nowMs,
+          options.dryRun,
+          options.backend,
+          verdicts,
+          options.ip ?? null,
+        ),
         null,
         2,
       ),

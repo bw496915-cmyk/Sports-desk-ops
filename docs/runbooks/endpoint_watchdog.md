@@ -80,6 +80,23 @@ bun run scripts/watchdog_endpoint_probe.ts --dry-run --backend system --host api
 `--json` includes the resolver, per-host status/code, consecutive failures, addresses, TTLs and
 cache stats. Human output names the resolver and prints one line per host.
 
+## Diagnostic target overrides
+
+`--port` and `--ip` are one-off diagnostics, not scheduler configuration. Both require `--dry-run`
+and exactly one `--host`, so they cannot mix the scheduled consecutive-failure counts.
+
+```sh
+bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --port 8443
+bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --ip 149.154.166.110
+bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --ip 149.154.166.110 --port 443
+```
+
+`--ip` dials the address while keeping the target hostname for TLS SNI and the HTTP `Host`
+header, so certificate verification still runs against the name. The DNS lookup still runs
+against the hostname and is reported separately; if DNS fails but the IP answers, the JSON shows
+both. IPv6 literals are bracketed automatically, and the prefetch is skipped when dialing an IP.
+`--json` reports the override in `ip` and the effective `port` per host.
+
 ## Troubleshooting
 
 - **Exit 2 with "TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are unavailable"** — the keychain lookup did
