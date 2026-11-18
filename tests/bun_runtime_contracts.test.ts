@@ -70,19 +70,29 @@ describe("Bun runtime fail-closed contracts (measured on 1.4.4)", () => {
     );
   });
 
-  test("Bun.Archive accepts a lazy Blob handle and silently yields an empty archive", () => {
-    // The asymmetry in the fail-closed story. Bun.hash, Bun.SHA256,
+  test("Bun.Archive: re-serialising drops a lazy Blob handle, parsing throws", async () => {
+    // The asymmetry is method-dependent, not absolute. Bun.hash, Bun.SHA256,
     // Bun.CryptoHasher, Bun.TOML.parse and Bun.YAML.parse all reject an
     // unhydrated handle with "File blob cannot be used here" (pinned above).
-    // Bun.Archive does NOT: `S3File extends Blob` (bun.com/docs/runtime/s3) and
-    // Blob is a valid ArchiveInput, so it builds a well-formed archive with zero
-    // members. A caller that forgets `await handle.bytes()` gets 0 bytes and no
-    // error, which is exactly the empty-digest poison class in the other APIs.
+    // Bun.Archive splits by method, because `Blob` is a legal ArchiveInput
+    // (bun-types 1.4.4) and `S3File extends Blob` (bun.com/docs/runtime/s3):
+    //   bytes() / blob()    -> re-serialise the member set: 0 bytes, no error
+    //   files() / extract() -> parse the wrapped bytes and fail closed
+    // So the silent-empty hazard is only reachable through the re-serialising
+    // methods. A caller that forgets `await handle.bytes()` and reaches for
+    // `.bytes()` on the archive gets 0 bytes; one that parses gets an error.
     const localHandle = Bun.file(import.meta.path);
     expect(() => new Bun.Archive(localHandle as never)).not.toThrow();
-    return expect(
-      new Bun.Archive(localHandle as never).bytes(),
-    ).resolves.toHaveLength(0);
+
+    expect(await new Bun.Archive(localHandle as never).bytes()).toHaveLength(0);
+    await expect(new Bun.Archive(localHandle as never).files()).rejects.toThrow(
+      "Unrecognized archive format",
+    );
+    await expect(
+      new Bun.Archive(localHandle as never).extract(
+        `${Bun.env.TMPDIR ?? "/tmp"}/unused-archive-extract`,
+      ),
+    ).rejects.toThrow();
   });
 
   test("Bun.s3.file is a lazy Blob whose size is not synchronously available", () => {
