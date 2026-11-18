@@ -33,6 +33,21 @@ describe("Bun Native DNS & Networking Engine", () => {
     expect(typeof stats.hitRatePercent).toBe("number");
     expect(stats.hitRatePercent).toBeGreaterThanOrEqual(0);
     expect(stats.hitRatePercent).toBeLessThanOrEqual(100);
+    expect(typeof stats.cacheHitsTotal).toBe("number");
+    expect(typeof stats.classifiedRequests).toBe("number");
+    expect(typeof stats.unclassifiedRequests).toBe("number");
+    expect(typeof stats.cacheHitRatePercent).toBe("number");
+    expect(stats.cacheHitsTotal).toBe(
+      stats.cacheHitsCompleted + stats.cacheHitsInflight,
+    );
+    expect(stats.classifiedRequests).toBe(
+      stats.cacheHitsTotal + stats.cacheMisses,
+    );
+    expect(stats.unclassifiedRequests).toBe(
+      Math.max(0, stats.totalCount - stats.classifiedRequests),
+    );
+    expect(stats.cacheHitRatePercent).toBeGreaterThanOrEqual(0);
+    expect(stats.cacheHitRatePercent).toBeLessThanOrEqual(100);
     expect(stats.defaultTtlSeconds).toBeGreaterThanOrEqual(1);
   });
 
@@ -49,6 +64,10 @@ describe("Bun Native DNS & Networking Engine", () => {
       30,
     );
     expect(populated.hitRatePercent).toBe(50);
+    expect(populated.cacheHitsTotal).toBe(2);
+    expect(populated.classifiedRequests).toBe(4);
+    expect(populated.unclassifiedRequests).toBe(0);
+    expect(populated.cacheHitRatePercent).toBe(50);
     expect(populated.defaultTtlSeconds).toBe(30);
 
     const empty = computeDnsTelemetry(
@@ -63,6 +82,59 @@ describe("Bun Native DNS & Networking Engine", () => {
       30,
     );
     expect(empty.hitRatePercent).toBe(0);
+  });
+
+  it("separates request hit rate from classified cache hit rate", () => {
+    // A prefetch on an already-cached host increments totalCount without
+    // incrementing a hit or a miss; the request rate includes it.
+    const prefetched = computeDnsTelemetry(
+      {
+        cacheHitsCompleted: 1,
+        cacheHitsInflight: 0,
+        cacheMisses: 1,
+        size: 2,
+        errors: 0,
+        totalCount: 3,
+      },
+      30,
+    );
+    expect(prefetched.hitRatePercent).toBe(33.3);
+    expect(prefetched.cacheHitRatePercent).toBe(50);
+    expect(prefetched.cacheHitsTotal).toBe(1);
+    expect(prefetched.classifiedRequests).toBe(2);
+    expect(prefetched.unclassifiedRequests).toBe(1);
+
+    // A concurrent request coalesced into one in-flight hit still counts as a hit.
+    const coalesced = computeDnsTelemetry(
+      {
+        cacheHitsCompleted: 0,
+        cacheHitsInflight: 1,
+        cacheMisses: 1,
+        size: 1,
+        errors: 0,
+        totalCount: 2,
+      },
+      30,
+    );
+    expect(coalesced.cacheHitsTotal).toBe(1);
+    expect(coalesced.hitRatePercent).toBe(50);
+    expect(coalesced.cacheHitRatePercent).toBe(50);
+
+    // A resolution failure is a miss plus an error, not an unclassified request.
+    const failed = computeDnsTelemetry(
+      {
+        cacheHitsCompleted: 0,
+        cacheHitsInflight: 0,
+        cacheMisses: 1,
+        size: 0,
+        errors: 1,
+        totalCount: 1,
+      },
+      30,
+    );
+    expect(failed.classifiedRequests).toBe(1);
+    expect(failed.unclassifiedRequests).toBe(0);
+    expect(failed.cacheHitRatePercent).toBe(0);
   });
 
   it("falls back to a 30s TTL for invalid or non-positive config", () => {
@@ -120,6 +192,8 @@ describe("Bun Native DNS & Networking Engine", () => {
     expect(md).toContain("Bun Native DNS Cache");
     expect(md).toContain("Cache Size");
     expect(md).toContain("Hit Rate");
+    expect(md).toContain("Cache Hit Rate");
+    expect(md).toContain("Unclassified Requests");
   });
 
   it("benchmarks resolver latency between system and c-ares", async () => {

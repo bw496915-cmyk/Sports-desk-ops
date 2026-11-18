@@ -1981,7 +1981,9 @@ export async function handleDnsCommand(args: string[] = []): Promise<void> {
   console.log(
     `  • Cache Size:       ${telemetry.size} / ${BUN_DNS_CACHE_CAPACITY} entries`,
   );
-  console.log(`  • Hit Rate:         ${telemetry.hitRatePercent}%`);
+  console.log(`  • Request Hit Rate: ${telemetry.hitRatePercent}%`);
+  console.log(`  • Cache Hit Rate:   ${telemetry.cacheHitRatePercent}%`);
+  console.log(`  • Unclassified Req: ${telemetry.unclassifiedRequests}`);
   console.log(`  • Hits (Completed): ${telemetry.cacheHitsCompleted}`);
   console.log(`  • Hits (Inflight):  ${telemetry.cacheHitsInflight}`);
   console.log(`  • Cache Misses:     ${telemetry.cacheMisses}`);

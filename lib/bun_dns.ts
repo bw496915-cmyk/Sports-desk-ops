@@ -68,7 +68,14 @@ export interface DnsCacheTelemetry {
   readonly size: number;
   readonly errors: number;
   readonly totalCount: number;
+  /** (completed + inflight hits) / totalCount; totalCount includes every request. */
   readonly hitRatePercent: number;
+  readonly cacheHitsTotal: number;
+  /** Completed + inflight hits + misses; excludes unclassified prefetch requests. */
+  readonly classifiedRequests: number;
+  readonly unclassifiedRequests: number;
+  /** Hits / classifiedRequests; the cache-efficiency rate. */
+  readonly cacheHitRatePercent: number;
   readonly defaultTtlSeconds: number;
 }
 
@@ -114,9 +121,18 @@ export function computeDnsTelemetry(
   defaultTtlSeconds = resolveDnsTtlSeconds(),
 ): DnsCacheTelemetry {
   const hits = stats.cacheHitsCompleted + stats.cacheHitsInflight;
+  const classifiedRequests = hits + stats.cacheMisses;
+  const unclassifiedRequests = Math.max(
+    0,
+    stats.totalCount - classifiedRequests,
+  );
   const hitRatePercent =
     stats.totalCount > 0
       ? Math.round((hits / stats.totalCount) * 1000) / 10
+      : 0.0;
+  const cacheHitRatePercent =
+    classifiedRequests > 0
+      ? Math.round((hits / classifiedRequests) * 1000) / 10
       : 0.0;
   return {
     cacheHitsCompleted: stats.cacheHitsCompleted,
@@ -126,6 +142,10 @@ export function computeDnsTelemetry(
     errors: stats.errors,
     totalCount: stats.totalCount,
     hitRatePercent,
+    cacheHitsTotal: hits,
+    classifiedRequests,
+    unclassifiedRequests,
+    cacheHitRatePercent,
     defaultTtlSeconds,
   };
 }
@@ -226,7 +246,9 @@ export function formatDnsTelemetryMarkdown(): string {
     `| Metric | Value | Reference / Notes |\n` +
     `|:---|:---:|:---|\n` +
     `| **Cache Size** | \`${telemetry.size} / ${BUN_DNS_CACHE_CAPACITY} entries\` | Max capacity: ${BUN_DNS_CACHE_CAPACITY} concurrent entries |\n` +
-    `| **Hit Rate** | \`${telemetry.hitRatePercent}%\` | (completed + inflight hits) / totalCount across fetch/Bun.connect |\n` +
+    `| **Request Hit Rate** | \`${telemetry.hitRatePercent}%\` | (completed + inflight hits) / totalCount (all requests) |\n` +
+    `| **Cache Hit Rate** | \`${telemetry.cacheHitRatePercent}%\` | Hits / (hits + misses), excluding unclassified prefetch requests |\n` +
+    `| **Unclassified Requests** | \`${telemetry.unclassifiedRequests}\` | totalCount minus classified hits + misses |\n` +
     `| **Cache Hits (Completed)** | \`${telemetry.cacheHitsCompleted}\` | Cached zero-latency lookups |\n` +
     `| **Cache Hits (Inflight)** | \`${telemetry.cacheHitsInflight}\` | Simultaneous connections joined into 1 lookup |\n` +
     `| **Cache Misses** | \`${telemetry.cacheMisses}\` | Network DNS queries dispatched |\n` +
