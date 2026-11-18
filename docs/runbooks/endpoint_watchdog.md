@@ -130,6 +130,14 @@ The layers are independent, not aliases: measured 2026-11-17 with an echo endpoi
 with `--ip`, SNI and Host currently both carry the target hostname, but neither is derived from
 the dial address. A `Host` mismatch can therefore change HTTP routing without failing TLS.
 
+Certificate verification is **pinned**: `rejectUnauthorized: true` is set on the HTTP fetch
+(primary and per-address), the WebSocket upgrade, the Telegram page and the `probeTls` handshake.
+Bun's client default follows `NODE_TLS_REJECT_UNAUTHORIZED`, so an exported `0` would otherwise
+silently disable it; the bot token is especially sensitive. `checkServerIdentity` is not
+overridden, and `ca`/`cert`/`key`/`passphrase` are not set — the core hosts are public and the
+probe carries no client certificate or private CA. See
+[`Bun.TLSOptions`](https://bun.sh/reference/bun/TLSOptions).
+
 ### Protocols
 
 - The HTTP probe is HTTPS-only; `--port` changes the port, not the scheme.

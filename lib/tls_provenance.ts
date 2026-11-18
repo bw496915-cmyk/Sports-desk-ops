@@ -106,6 +106,8 @@ export async function probeTls(
       port,
       tls: {
         servername: options.servername ?? host,
+        // An environment override can weaken Bun's client default; pin verification on regardless.
+        rejectUnauthorized: true,
         ...(options.alpnProtocols === undefined
           ? {}
           : { ALPNProtocols: options.alpnProtocols }),

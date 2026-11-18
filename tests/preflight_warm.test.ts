@@ -27,10 +27,25 @@ describe("capture network warm-up", () => {
       "scripts/capture/session.ts",
       "lib/f402_replay_transport.ts",
       "services/sportsdesk_telegram_bot.ts",
+      "scripts/watchdog_endpoint_probe.ts",
+      "lib/tls_provenance.ts",
     ]) {
       const text = await Bun.file(join(import.meta.dir, "..", path)).text();
       expect(text, path).not.toContain("NODE_TLS_REJECT_UNAUTHORIZED");
       expect(text, path).not.toMatch(/rejectUnauthorized:\s*false/);
+    }
+  });
+
+  test("the endpoint probe pins certificate verification on", async () => {
+    for (const path of [
+      "scripts/watchdog_endpoint_probe.ts",
+      "lib/tls_provenance.ts",
+    ]) {
+      const text = await Bun.file(join(import.meta.dir, "..", path)).text();
+      expect(text, path).toContain("rejectUnauthorized: true");
+      expect(text, path).not.toContain("NODE_TLS_REJECT_UNAUTHORIZED");
+      expect(text, path).not.toMatch(/rejectUnauthorized:\s*false/);
+      expect(text, path).not.toContain("checkServerIdentity");
     }
   });
 });

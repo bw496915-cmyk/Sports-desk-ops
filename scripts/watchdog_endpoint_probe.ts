@@ -492,7 +492,14 @@ export async function probeWebSocket(
     try {
       socket = new WebSocket(
         href,
-        secure ? { tls: { serverName: hostname } } : undefined,
+        secure
+          ? {
+              tls: {
+                serverName: hostname,
+                rejectUnauthorized: true,
+              },
+            }
+          : undefined,
       );
     } catch (error) {
       resolve({
@@ -604,7 +611,10 @@ async function fetchAddress(
         // node:tls alias; `serverName` wins if both are set. `hostname` is the dial/URL host,
         // not a TLS field — the HTTP Host header is separate and set above. Certificate
         // verification uses this serverName.
-        tls: { serverName: target.hostname } satisfies BunFetchRequestInitTLS,
+        tls: {
+          serverName: target.hostname,
+          rejectUnauthorized: true,
+        } satisfies BunFetchRequestInitTLS,
         ...(httpVersion === "auto" ? {} : { protocol: httpVersion }),
       },
     );
@@ -694,9 +704,11 @@ async function probe(
         // fetch's TLS field is `serverName` (typed by BunFetchRequestInitTLS); `servername`
         // is the node:tls alias and serverName wins. `hostname` is the dial/URL host, not a
         // TLS field. Verification uses the logical hostname even when the URL host is an IP.
-        ...(ipOverride === undefined
-          ? {}
-          : { tls: { serverName: target.hostname } }),
+        tls: {
+          // Pin verification regardless of environment overrides.
+          rejectUnauthorized: true,
+          ...(ipOverride === undefined ? {} : { serverName: target.hostname }),
+        },
         ...(httpVersion === "auto" ? {} : { protocol: httpVersion }),
       });
       return {
@@ -755,6 +767,8 @@ async function sendTelegram(
           text,
           disable_web_page_preview: true,
         }),
+        // The bot token is sensitive; never let an env var disable verification here.
+        tls: { rejectUnauthorized: true },
       },
     );
     const body = (await response.json()) as {
