@@ -37,6 +37,7 @@ import {
 import {
   readDnsCacheStats,
   resolveHost,
+  type DnsAnswer,
   type DnsLookupOptions,
 } from "../lib/preflight.ts";
 import { resolveTelegramCredentials } from "../lib/telegram_alert_sender.ts";
@@ -84,6 +85,7 @@ interface Options {
   readonly backend: ProbeBackend;
   readonly port?: number;
   readonly ip?: string;
+  readonly allIps: boolean;
   readonly statePath: string;
   readonly help: boolean;
 }
@@ -101,6 +103,7 @@ interface ProbeJson {
   readonly resolver: ProbeBackend;
   readonly socketType: "tcp";
   readonly ip: string | null;
+  readonly allIps: boolean;
   readonly alerts: number;
   readonly hosts: readonly {
     readonly host: string;
@@ -112,10 +115,24 @@ interface ProbeJson {
     readonly message: string;
     readonly addresses: readonly string[];
     readonly ttlSeconds: readonly number[];
+    readonly addressProbes: readonly AddressProbe[];
     readonly fetchStatus: number | null;
     readonly latencyMs: number | null;
     readonly cacheStats: Readonly<Record<string, number>> | null;
   }[];
+}
+
+export interface AddressProbe {
+  readonly address: string;
+  readonly family: 4 | 6;
+  readonly status: number | null;
+  readonly latencyMs: number | null;
+  readonly error: string | null;
+}
+
+interface ProbeResult {
+  readonly observation: EndpointProbeObservation;
+  readonly addressProbes: readonly AddressProbe[];
 }
 
 function messageOf(error: unknown): string {
@@ -163,6 +180,7 @@ export function parseOptions(
       backend: { type: "string" },
       port: { type: "string" },
       ip: { type: "string" },
+      "all-ips": { type: "boolean", default: false },
       state: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -171,11 +189,15 @@ export function parseOptions(
   const hosts = values.host ?? [];
   const port = parsePort(values.port);
   const ip = parseIp(values.ip);
-  if ((port !== undefined || ip !== undefined) && !dryRun) {
-    throw new Error("--port/--ip are diagnostic and require --dry-run");
+  const allIps = values["all-ips"] ?? false;
+  const diagnostic = port !== undefined || ip !== undefined || allIps;
+  if (diagnostic && !dryRun) {
+    throw new Error(
+      "--port/--ip/--all-ips are diagnostic and require --dry-run",
+    );
   }
-  if ((port !== undefined || ip !== undefined) && hosts.length !== 1) {
-    throw new Error("--port/--ip require exactly one --host");
+  if (diagnostic && hosts.length !== 1) {
+    throw new Error("--port/--ip/--all-ips require exactly one --host");
   }
   return {
     json: values.json ?? false,
@@ -184,6 +206,7 @@ export function parseOptions(
     backend: parseBackend(values.backend),
     ...(port === undefined ? {} : { port }),
     ...(ip === undefined ? {} : { ip }),
+    allIps,
     statePath:
       values.state === undefined || values.state.trim() === ""
         ? DEFAULT_STATE_PATH
@@ -202,6 +225,8 @@ Flags:
   --port <n>          Target port override, 1-65535. Diagnostic: requires one --host and --dry-run.
   --ip <addr>         Dial this IPv4/IPv6 address for the fetch, keeping the hostname for TLS
                       SNI and Host. Diagnostic: requires one --host and --dry-run.
+  --all-ips           Also probe every address returned by the DNS lookup, with per-address
+                      results in --json. Diagnostic: requires one --host and --dry-run.
   --backend <name>    DNS resolver: default (Bun platform default) | c-ares | system |
                       getaddrinfo | libc. The default leaves the choice to Bun so the probe
                       mirrors the app's fetch()/Bun.connect() path; override for diagnosis.
@@ -330,11 +355,51 @@ export function formatIpForUrl(ip: string): string {
   return isIP(ip) === 6 ? `[${ip}]` : ip;
 }
 
+async function fetchAddress(
+  target: HostTarget,
+  address: string,
+): Promise<AddressProbe> {
+  const started = performance.now();
+  const family = isIP(address) === 6 ? 6 : 4;
+  try {
+    const response = await fetch(
+      `https://${formatIpForUrl(address)}:${target.port}/`,
+      {
+        method: "GET",
+        redirect: "manual",
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        headers: {
+          "user-agent": "sportsdesk-endpoint-probe/1",
+          host: target.hostname,
+        },
+        tls: { serverName: target.hostname },
+      },
+    );
+    return {
+      address,
+      family,
+      status: response.status,
+      latencyMs: Math.round(performance.now() - started),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      address,
+      family,
+      status: null,
+      latencyMs: Math.round(performance.now() - started),
+      error: messageOf(error),
+    };
+  }
+}
+
 async function probe(
   target: HostTarget,
   backend: ProbeBackend,
-  ipOverride?: string,
-): Promise<EndpointProbeObservation> {
+  ipOverride: string | undefined,
+  allIps: boolean,
+): Promise<ProbeResult> {
+  let resolvedAnswers: DnsAnswer[] = [];
   const lookup = await (async () => {
     try {
       const answers = await resolveWithTimeout(
@@ -342,6 +407,7 @@ async function probe(
         target.port,
         backend,
       );
+      resolvedAnswers = answers;
       const addresses = answers.map((answer) => answer.address);
       const ttlSeconds = answers.map((answer) => Number(answer.ttl));
       return {
@@ -403,11 +469,26 @@ async function probe(
     }
   })();
 
+  // Address probes are opt-in via --all-ips; the primary fetch already covers --ip alone.
+  const addressProbes = allIps
+    ? await Promise.all(
+        [
+          ...new Set([
+            ...(ipOverride === undefined ? [] : [ipOverride]),
+            ...resolvedAnswers.map((answer) => answer.address),
+          ]),
+        ].map((address) => fetchAddress(target, address)),
+      )
+    : [];
+
   return {
-    target,
-    lookup,
-    fetch: fetched,
-    cacheStats: readDnsCacheStats() ?? null,
+    observation: {
+      target,
+      lookup,
+      fetch: fetched,
+      cacheStats: readDnsCacheStats() ?? null,
+    },
+    addressProbes,
   };
 }
 
@@ -449,6 +530,8 @@ export function renderJson(
   resolver: ProbeBackend,
   verdicts: readonly EndpointProbeVerdict[],
   ip: string | null,
+  allIps: boolean,
+  addressProbesByHost: Readonly<Record<string, readonly AddressProbe[]>>,
 ): ProbeJson {
   return {
     schemaVersion: 1,
@@ -458,6 +541,7 @@ export function renderJson(
     resolver,
     socketType: "tcp",
     ip,
+    allIps,
     alerts: verdicts.filter((verdict) => verdict.status === "alert").length,
     hosts: verdicts.map((verdict) => ({
       host: verdict.target.hostname,
@@ -469,6 +553,7 @@ export function renderJson(
       message: verdict.message,
       addresses: verdict.addresses,
       ttlSeconds: verdict.ttlSeconds,
+      addressProbes: addressProbesByHost[verdict.target.hostname] ?? [],
       fetchStatus: verdict.fetchStatus,
       latencyMs: verdict.latencyMs,
       cacheStats: verdict.cacheStats,
@@ -533,16 +618,22 @@ async function run(): Promise<number> {
   const state = readState(options.statePath);
   const nowMs = Date.now();
   const settled = await Promise.allSettled(
-    targets.map((target) => probe(target, options.backend, options.ip)),
+    targets.map((target) =>
+      probe(target, options.backend, options.ip, options.allIps),
+    ),
   );
+  const addressProbesByHost: Record<string, readonly AddressProbe[]> = {};
   const observations = settled.map((result, index) => {
     const target = targets[index];
     if (target === undefined) {
       throw new Error("endpoint probe: target mapping lost");
     }
-    return result.status === "fulfilled"
-      ? result.value
-      : failedObservation(target, messageOf(result.reason));
+    if (result.status === "fulfilled") {
+      addressProbesByHost[target.hostname] = result.value.addressProbes;
+      return result.value.observation;
+    }
+    addressProbesByHost[target.hostname] = [];
+    return failedObservation(target, messageOf(result.reason));
   });
   const verdicts = observations.map((observation) =>
     evaluateEndpointProbe({
@@ -564,6 +655,8 @@ async function run(): Promise<number> {
           options.backend,
           verdicts,
           options.ip ?? null,
+          options.allIps,
+          addressProbesByHost,
         ),
         null,
         2,

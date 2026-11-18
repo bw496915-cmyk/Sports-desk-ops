@@ -26,6 +26,7 @@ describe("endpoint probe runner options", () => {
     expect(options.hosts).toEqual([]);
     expect(options.port).toBeUndefined();
     expect(options.ip).toBeUndefined();
+    expect(options.allIps).toBe(false);
     expect(options.json).toBe(false);
     expect(options.dryRun).toBe(false);
     expect(options.help).toBe(false);
@@ -119,6 +120,22 @@ describe("endpoint probe runner options", () => {
         "999.1.1.1",
       ]),
     ).toThrow(/invalid --ip/);
+  });
+
+  test("--all-ips is diagnostic too", () => {
+    const options = parseOptions([
+      "--dry-run",
+      "--host",
+      "api.telegram.org",
+      "--all-ips",
+    ]);
+    expect(options.allIps).toBe(true);
+    expect(() =>
+      parseOptions(["--host", "api.telegram.org", "--all-ips"]),
+    ).toThrow(/require --dry-run/);
+    expect(() => parseOptions(["--dry-run", "--all-ips"])).toThrow(
+      /exactly one --host/,
+    );
   });
 
   test("brackets IPv6 for the URL authority", () => {
@@ -299,16 +316,63 @@ describe("endpoint probe JSON rendering", () => {
       "c-ares",
       [okVerdict, alertVerdict],
       null,
+      false,
+      {},
     );
 
     expect(json.resolver).toBe("c-ares");
     expect(json.socketType).toBe("tcp");
     expect(json.ip).toBeNull();
+    expect(json.allIps).toBe(false);
+    expect(json.hosts[0]?.addressProbes).toEqual([]);
     expect(json.dryRun).toBe(true);
     expect(json.alerts).toBe(1);
     expect(json.hosts).toHaveLength(2);
     expect(json.hosts[0]?.ttlSeconds).toEqual([60]);
     expect(json.hosts[1]?.code).toBe("lookup-failed");
     expect(json.hosts[1]?.consecutiveFailures).toBe(2);
+  });
+
+  test("per-address probes render without changing the verdict", () => {
+    const target = SPORTSDESK_CORE_HOSTS[0];
+    if (target === undefined) throw new Error("core hosts fixture is empty");
+    const verdict = evaluateEndpointProbe({
+      nowMs: 2_000,
+      state: { consecutiveFailures: 0, lastCheckedAtMs: null },
+      observation: {
+        target,
+        lookup: {
+          ok: true,
+          addresses: ["149.154.166.110"],
+          ttlSeconds: [60],
+          error: null,
+        },
+        fetch: { ok: true, status: 302, latencyMs: 12, error: null },
+        cacheStats: null,
+      },
+    });
+    const json = renderJson(
+      2_000,
+      true,
+      "c-ares",
+      [verdict],
+      "149.154.166.110",
+      true,
+      {
+        [target.hostname]: [
+          {
+            address: "149.154.166.110",
+            family: 4,
+            status: 302,
+            latencyMs: 12,
+            error: null,
+          },
+        ],
+      },
+    );
+    expect(json.allIps).toBe(true);
+    expect(json.ip).toBe("149.154.166.110");
+    expect(json.hosts[0]?.addressProbes).toHaveLength(1);
+    expect(json.hosts[0]?.addressProbes[0]?.status).toBe(302);
   });
 });

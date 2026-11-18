@@ -82,12 +82,13 @@ cache stats. Human output names the resolver and prints one line per host.
 
 ## Diagnostic target overrides
 
-`--port` and `--ip` are one-off diagnostics, not scheduler configuration. Both require `--dry-run`
-and exactly one `--host`, so they cannot mix the scheduled consecutive-failure counts.
+`--port`, `--ip` and `--all-ips` are one-off diagnostics, not scheduler configuration. They require
+`--dry-run` and exactly one `--host`, so they cannot mix the scheduled consecutive-failure counts.
 
 ```sh
 bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --port 8443
 bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --ip 149.154.166.110
+bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --all-ips
 bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --ip 149.154.166.110 --port 443
 ```
 
@@ -95,7 +96,12 @@ bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --i
 header, so certificate verification still runs against the name. The DNS lookup still runs
 against the hostname and is reported separately; if DNS fails but the IP answers, the JSON shows
 both. IPv6 literals are bracketed automatically, and the prefetch is skipped when dialing an IP.
-`--json` reports the override in `ip` and the effective `port` per host.
+
+`--all-ips` probes **every address returned by the lookup**, each with the same SNI/Host and a 5 s
+timeout. Per-address status, latency and error land in the host's `addressProbes` array. The host
+verdict still comes from the primary path (the hostname fetch, or the `--ip` override), so one bad
+edge address is reported as a diagnostic rather than silently turning into a synthetic host
+failure. `--json` reports `ip`, `allIps`, the effective `port`, and `addressProbes` per host.
 
 ## Troubleshooting
 
