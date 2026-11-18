@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+/* eslint-disable no-loss-of-precision -- the literals are the subject of the rounding assertions */
+
 // Bun v1.4.5 fixed large hexadecimal, octal and binary literals rounding to a
 // different double than Node, and the same bug in Bun.JSONC.parse().
 // The IEEE-754 nearest double for 0xb3c8bf81fdf2247 is 0xb3c8bf81fdf2280.
