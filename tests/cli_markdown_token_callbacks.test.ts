@@ -94,6 +94,26 @@ describe("Bun.markdown.render() token callbacks", () => {
     expect(ascii).toContain("Inspect (https://desk.bookdeskops.com/modes/5)");
   });
 
+  test("a fenced command block stays a block, not inline prose", () => {
+    const md =
+      "Run:\n\n```bash\nbun test --changed\nbun run verify:fast\n```\n";
+    const ansi = renderTrueColorOpsMarkdown(
+      md,
+      SD_ANSI_THEMES.ghostty_interactive,
+    );
+    // Language label plus one painted panel line per command.
+    expect(ansi).toContain("bash");
+    expect(
+      ansi.split("\n").filter((l) => l.includes("\x1b[48;2;18;28;49m")),
+    ).toHaveLength(3);
+    expect(ansi.includes("\x1b[0m")).toBe(false);
+
+    const ascii = renderTrueColorOpsMarkdown(md, SD_ANSI_THEMES.pipe_ascii);
+    expect(ascii.includes("\x1b")).toBe(false);
+    expect(ascii).toContain("# bash");
+    expect(ascii).toContain("  bun test --changed");
+  });
+
   test("consecutive calls reset the table accumulator with zero bleed", () => {
     const first = renderTrueColorOpsMarkdown(
       SAMPLE_RUNBOOK_MD,

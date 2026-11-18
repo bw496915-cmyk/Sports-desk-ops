@@ -75,6 +75,7 @@ function bg(hex: string): string {
 const SGR = Object.freeze({
   heading1: fg(tokenHex("--sd-focus-ring")),
   heading2: fg(tokenHex("--sd-text-primary")),
+  textPrimary: fg(tokenHex("--sd-text-primary")),
   codeBg: bg(tokenHex("--sd-surface-elevated")),
   codeFg: fg(tokenHex("--sd-route-devig")),
   calloutBar: fg(tokenHex("--sd-sla-stale")),
@@ -224,6 +225,45 @@ export const SD_MARKDOWN_TOKEN_CALLBACKS = Object.freeze({
   codespan(children: string): string {
     if (ctx.ascii) return children;
     return `${SGR.codeBg}${SGR.codeFg} ${children} ${FG_BG_RESET}`;
+  },
+
+  /**
+   * Fenced / indented blocks. Without this the body renders inline with prose,
+   * so a multi-line command block is indistinguishable from a paragraph — the
+   * reason this callback exists rather than letting children pass through.
+   */
+  code(children: string, meta: { language?: string }): string {
+    const body = children.replace(/\n+$/, "");
+    if (body.length === 0) return "";
+    const lines = body.split("\n");
+    const label =
+      typeof meta.language === "string" && meta.language.length > 0
+        ? meta.language
+        : "";
+
+    if (ctx.ascii) {
+      const out = label.length > 0 ? [`# ${label}`] : [];
+      for (const line of lines) out.push(`  ${line}`);
+      return `${out.join("\n")}\n`;
+    }
+
+    const width = lines.reduce(
+      (max, line) => Math.max(max, visibleWidth(line)),
+      0,
+    );
+    const out: string[] = [];
+    if (label.length > 0) {
+      out.push(
+        `${SGR.codeBg}${SGR.codeFg} ${label.padEnd(width + 1)}${FG_BG_RESET}`,
+      );
+    }
+    for (const line of lines) {
+      const padding = " ".repeat(Math.max(0, width - visibleWidth(line)));
+      out.push(
+        `${SGR.codeBg}${SGR.textPrimary} ${line}${padding} ${FG_BG_RESET}`,
+      );
+    }
+    return `${out.join("\n")}\n`;
   },
 
   link(children: string, meta: { href: string }): string {
