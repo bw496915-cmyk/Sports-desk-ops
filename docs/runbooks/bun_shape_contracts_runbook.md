@@ -1,4 +1,4 @@
-# Bun shape contracts — the 128 shapes this repository calls
+# Bun shape contracts — the 129 shapes this repository calls
 
 The single source of truth is layered, and nothing here restates upstream text: **declarations** come from `bun-types@1.4.4` (the surface the reference site renders), **behaviour** from probes against the local `Bun 1.4.4` binary (`tests/bun_baseline.json`), **property attributes** from the pinned Bun commit `38afee6c84`. When they disagree: declarations win on names and signatures, the Bun source wins on attributes, and the measured binary wins on behaviour.
 
@@ -444,7 +444,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `object` · writable false · enumerable true
 - **Members (2):** `order`, `satisfies`
 - **Here:** `scripts/nsh_desk_cli.ts`, `bin/bun_surface.ts`
-- **Evidence:** `test:tests/bun_capabilities.test.ts`, `test:tests/bun_cli_flags.test.ts`, `test:tests/bun_config_policy.test.ts`, `test:tests/bun_test_patterns.test.ts`
+- **Evidence:** `test:tests/bun_capabilities.test.ts`, `test:tests/bun_cli_flags.test.ts`, `test:tests/bun_config_policy.test.ts`, `test:tests/bun_semver_wildcards.test.ts`
 
 #### Bun.TOML
 
@@ -467,7 +467,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (2):** `parse`, `stringify`
 - **Here:** `lib/customer_profile.ts`, `lib/bun_xml_golden_ast.ts`
-- **Evidence:** `surface:XML`, `test:tests/bun_builtin_replacements.test.ts`, `test:tests/bun_loaders_and_import_attributes.test.ts`, `test:tests/bun_xml_contract.test.ts`
+- **Evidence:** `surface:XML`, `test:tests/bun_builtin_replacements.test.ts`, `test:tests/bun_loaders_and_import_attributes.test.ts`, `test:tests/bun_upstream_reference.test.ts`
 
 #### Bun.YAML
 
@@ -925,7 +925,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `function` · writable true · enumerable true
 - **Status:** declared-only — in the declaration surface, called nowhere; the gate flips this entry the moment it is used
 - **Here:** no call site
-- **Evidence:** `test:tests/bun_capabilities.test.ts`, `test:tests/bun_modules_surface.test.ts`
+- **Evidence:** `test:tests/bun_capabilities.test.ts`, `test:tests/bun_modules_surface.test.ts`, `test:tests/inspect_ansi_diagnostics.test.ts`
 
 #### Bun.listen
 
@@ -933,6 +933,13 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `bin/bun_surface.ts`
 - **Evidence:** `surface:listen`, `test:tests/bun_capabilities.test.ts`, `test:tests/bun_socket_contract.test.ts`, `test:tests/bun_socket_contracts.test.ts` · deep dive: [§8.1](./bun_server_runtime_shapes_runbook.md)
+
+#### Bun.MatchedRoute (type)
+
+- **Source:** declared in `bun-types@1.4.4` · no reference page (see [docs](https://bun.com/blog/bun-v0.5.5#changelog))
+- **Shape:** type-only: declared, no runtime value
+- **Here:** `lib/inspect_diagnostics.ts`
+- **Evidence:** `test:tests/bun_shapes_manifest.test.ts`, `test:tests/inspect_ansi_diagnostics.test.ts`
 
 #### Bun.serve
 

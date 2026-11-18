@@ -598,7 +598,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_cli_flags.test.ts",
       "test:tests/bun_config_policy.test.ts",
-      "test:tests/bun_test_patterns.test.ts",
+      "test:tests/bun_semver_wildcards.test.ts",
     ],
   },
   {
@@ -629,7 +629,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "surface:XML",
       "test:tests/bun_builtin_replacements.test.ts",
       "test:tests/bun_loaders_and_import_attributes.test.ts",
-      "test:tests/bun_xml_contract.test.ts",
+      "test:tests/bun_upstream_reference.test.ts",
     ],
   },
   {
@@ -1226,6 +1226,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
     evidence: [
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_modules_surface.test.ts",
+      "test:tests/inspect_ansi_diagnostics.test.ts",
     ],
   },
   {
@@ -1238,6 +1239,16 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_socket_contract.test.ts",
       "test:tests/bun_socket_contracts.test.ts",
+    ],
+  },
+  {
+    name: "MatchedRoute",
+    kind: "type",
+    subsystem: "network",
+    heading: "Bun.MatchedRoute (type)",
+    evidence: [
+      "test:tests/bun_shapes_manifest.test.ts",
+      "test:tests/inspect_ansi_diagnostics.test.ts",
     ],
   },
   {

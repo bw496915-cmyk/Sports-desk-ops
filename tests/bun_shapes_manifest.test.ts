@@ -99,6 +99,7 @@ describe("manifest", () => {
       "FileSink",
       "Import",
       "ImportKind",
+      "MatchedRoute",
       "Password",
       "S3File",
       "S3FilePresignOptions",

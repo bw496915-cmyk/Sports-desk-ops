@@ -58,6 +58,7 @@ export const SHAPE_SUBSYSTEMS_BY_NAME: Readonly<
   allocUnsafe: "crypto",
   Archive: "storage",
   argv: "process",
+  MatchedRoute: "network",
   ArrayBufferSink: "crypto",
   build: "process",
   BunFile: "process",
