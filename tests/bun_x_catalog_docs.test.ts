@@ -1,53 +1,54 @@
 /**
  * @file tests/bun_x_catalog_docs.test.ts
- * @description `cli/README.md` is the operator-facing `bun x` catalog; it must not drift
- * from the root `package.json` `bin` map.
+ * @description `cli/README.md`'s `bun x` catalog is generated, not hand-maintained.
  *
- * The runtime gate (`tests/bunx_cli_root_layout.test.ts`) covers shims and execution; this
- * covers the documentation table and its prose count, which nothing else parses.
+ * `lib/cli_catalog.ts` derives the rows from root `package.json` `bin`/`scripts` plus each
+ * target's header comment; `scripts/render_cli_readme.ts` writes the marker-delimited block.
+ * These cases fail when the committed text is stale, when a row loses its target, or when the
+ * description derivation stops producing anything useful.
  */
 
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import {
+  readCliCatalog,
+  renderCliReadmeCatalog,
+  requiredCliBins,
+} from "../lib/cli_catalog.ts";
 
 const ROOT = join(import.meta.dir, "..");
 
-async function declaredBins(): Promise<Record<string, string>> {
-  const pkg = (await Bun.file(join(ROOT, "package.json")).json()) as {
-    bin?: Record<string, string>;
-  };
-  return pkg.bin ?? {};
-}
+// @bun-behavior: bun-x-catalog
 
 describe("bun x catalog documentation", () => {
-  test("cli/README.md rows match the root bin map exactly", async () => {
-    const bins = Object.keys(await declaredBins()).sort();
-    const readme = await Bun.file(join(ROOT, "cli/README.md")).text();
-    const rows = [...readme.matchAll(/^\| `bun x ([a-z0-9-]+)`/gm)].map(
-      (match) => match[1]!,
-    );
+  test("cli/README.md catalog matches the generator output", async () => {
+    const current = await Bun.file(join(ROOT, "cli/README.md")).text();
+    expect(await renderCliReadmeCatalog(ROOT, current)).toBe(current);
+  });
 
+  test("generated rows cover every declared bin exactly once", async () => {
+    const rows = await readCliCatalog(ROOT);
+    const bins = await requiredCliBins(ROOT);
     expect(bins.length).toBeGreaterThan(20);
-    expect(rows.length).toBe(bins.length);
-    expect(new Set(rows).size).toBe(rows.length);
-    expect([...rows].sort()).toEqual(bins);
+    expect(rows.map((row) => row.bin)).toEqual([...bins]);
+    expect(new Set(rows.map((row) => row.bin)).size).toBe(rows.length);
   });
 
-  test("the README's mapping count is derived from the bin map", async () => {
-    const bins = Object.keys(await declaredBins()).sort();
-    const readme = await Bun.file(join(ROOT, "cli/README.md")).text();
-    const count = /all (\d+) workspace CLI mappings/.exec(readme);
-    expect(count?.[1]).toBe(String(bins.length));
-  });
-
-  test("every documented target exists and carries a shebang", async () => {
-    for (const [bin, target] of Object.entries(await declaredBins())) {
-      const file = Bun.file(join(ROOT, target));
-      expect(await file.exists()).toBe(true);
+  test("every row keeps an existing target with a shebang", async () => {
+    for (const row of await readCliCatalog(ROOT)) {
+      const file = Bun.file(join(ROOT, row.target));
+      expect(await file.exists(), `${row.bin} (${row.target})`).toBe(true);
       const head = (await file.text()).split("\n")[0] ?? "";
-      expect(head.startsWith("#!/usr/bin/env "), `${bin} (${target})`).toBe(
-        true,
-      );
+      expect(head.startsWith("#!/usr/bin/env "), row.bin).toBe(true);
     }
+  });
+
+  test("descriptions are derived from target headers", async () => {
+    const rows = await readCliCatalog(ROOT);
+    const withDescription = rows.filter((row) => row.description !== null);
+    expect(withDescription.length).toBeGreaterThan(rows.length / 2);
+    expect(rows.find((row) => row.bin === "sportsdesk")?.description).toContain(
+      "SportsDesk",
+    );
   });
 });

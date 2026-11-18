@@ -13,6 +13,8 @@ import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
 
+// @bun-behavior: bun-x-catalog
+
 describe("bun x CLI help surface", () => {
   test("every declared bin answers --help with exit 0 and output", async () => {
     const pkg = (await Bun.file(join(ROOT, "package.json")).json()) as {
