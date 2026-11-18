@@ -27,12 +27,45 @@ export interface PreflightResult {
   readonly dnsCacheStats?: Record<string, number>;
 }
 
+const DEFAULT_URL_PORTS: Readonly<Record<string, number>> = {
+  "http:": 80,
+  "https:": 443,
+  "ws:": 80,
+  "wss:": 443,
+};
+
+function assertDnsPort(port: number, context: string): void {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new RangeError(`ERR_DNS_INVALID_PREFETCH_PORT: ${context}`);
+  }
+}
+
+/** Port precedence: explicit URL port, then scheme default; validated for prefetch. */
+export function resolveUrlPort(url: URL): number {
+  const port =
+    url.port.length > 0 ? Number(url.port) : DEFAULT_URL_PORTS[url.protocol];
+  if (port === undefined) {
+    throw new RangeError(`ERR_DNS_INVALID_PREFETCH_PORT: ${url.href}`);
+  }
+  assertDnsPort(port, url.href);
+  return port;
+}
+
 /** Pre-warm Bun's DNS cache before WebView navigate / fetch (see bun.com/docs/runtime/networking/dns). */
 export function prefetchDns(host: string, port = 443): void {
   const trimmed = host.trim();
   if (trimmed === "") return;
-  if (!Number.isFinite(port) || port <= 0) return;
-  Bun.dns.prefetch(trimmed, port);
+  assertDnsPort(port, `${trimmed}:${String(port)}`);
+  const target =
+    trimmed.startsWith("[") && trimmed.endsWith("]")
+      ? trimmed.slice(1, -1)
+      : trimmed;
+  Bun.dns.prefetch(target, port);
+}
+
+/** Warm the DNS cache for a URL before its HTTP/WebSocket connection is opened. */
+export function prefetchUrl(url: URL): void {
+  prefetchDns(url.hostname, resolveUrlPort(url));
 }
 
 export function readDnsCacheStats(): Record<string, number> | undefined {
@@ -57,12 +90,7 @@ export function warmCaptureNetwork(baseUrl: string): {
   port: number;
 } {
   const parsed = new URL(baseUrl);
-  const port =
-    parsed.port !== ""
-      ? Number(parsed.port)
-      : parsed.protocol === "https:"
-        ? 443
-        : 80;
+  const port = resolveUrlPort(parsed);
   prefetchDns(parsed.hostname, port);
   if (parsed.protocol === "https:" || parsed.protocol === "http:") {
     try {

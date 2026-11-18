@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { prefetchDns, warmCaptureNetwork } from "../lib/preflight.ts";
+import {
+  prefetchDns,
+  resolveUrlPort,
+  warmCaptureNetwork,
+} from "../lib/preflight.ts";
 
 describe("capture network warm-up", () => {
   test("warmCaptureNetwork returns the parsed host/port and prefetches", () => {
@@ -19,6 +23,28 @@ describe("capture network warm-up", () => {
     } finally {
       server.stop(true);
     }
+  });
+
+  test("prefetch ports are validated and URL defaults are scheme-aware", () => {
+    expect(() => prefetchDns("127.0.0.1", 0)).toThrow(
+      /ERR_DNS_INVALID_PREFETCH_PORT/,
+    );
+    expect(() => prefetchDns("127.0.0.1", 70_000)).toThrow(
+      /ERR_DNS_INVALID_PREFETCH_PORT/,
+    );
+    expect(() => prefetchDns("127.0.0.1", 443.5)).toThrow(
+      /ERR_DNS_INVALID_PREFETCH_PORT/,
+    );
+    expect(() => prefetchDns("127.0.0.1", Number.NaN)).toThrow(
+      /ERR_DNS_INVALID_PREFETCH_PORT/,
+    );
+    expect(resolveUrlPort(new URL("http://example.test/"))).toBe(80);
+    expect(resolveUrlPort(new URL("https://example.test/"))).toBe(443);
+    expect(resolveUrlPort(new URL("ws://example.test/"))).toBe(80);
+    expect(resolveUrlPort(new URL("wss://example.test/"))).toBe(443);
+    expect(() => resolveUrlPort(new URL("ftp://example.test/"))).toThrow(
+      /ERR_DNS_INVALID_PREFETCH_PORT/,
+    );
   });
 
   test("capture TLS paths never disable certificate verification", async () => {

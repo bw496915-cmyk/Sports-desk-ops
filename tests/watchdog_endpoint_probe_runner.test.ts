@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { SPORTSDESK_CORE_HOSTS } from "../lib/bun_dns.ts";
+import { resolveUrlPort } from "../lib/preflight.ts";
 import type { TlsProvenance } from "../lib/tls_provenance.ts";
 import {
   evaluateEndpointProbe,
@@ -18,7 +19,6 @@ import {
   parseOptions,
   probeWebSocket,
   readBodyFragments,
-  resolveUrlPort,
   readState,
   renderJson,
   renderWsJson,
