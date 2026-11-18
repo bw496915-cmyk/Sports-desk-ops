@@ -51,10 +51,13 @@ reported in `--json` only. They describe the resolver/cache, not whether the end
 ## Install
 
 ```sh
-scripts/install_endpoint_watch_agent.sh install   # render plist, plutil -lint, launchctl bootstrap
+scripts/install_endpoint_watch_agent.sh install --dry-run # print the render + bootstrap, write nothing
+scripts/install_endpoint_watch_agent.sh install           # render, plutil -lint, bootstrap, verify loaded
 scripts/install_endpoint_watch_agent.sh status    # launchctl print state
 scripts/install_endpoint_watch_agent.sh uninstall # bootout + remove the plist
 ```
+
+`install` checks `launchctl print` after bootstrap and exits `1` if the agent did not load.
 
 The agent is `com.bookdeskops.sportsdesk.endpoint-watch`; the template is
 `infra/launchd/com.bookdeskops.sportsdesk.endpoint-watch.plist`. It runs Bun with

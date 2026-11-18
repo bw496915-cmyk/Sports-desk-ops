@@ -17,10 +17,11 @@ LABEL="com.bookdeskops.sportsdesk.endpoint-watch"
 
 usage() {
   cat >&2 <<'USAGE'
-install_endpoint_watch_agent.sh install|uninstall|status
+install_endpoint_watch_agent.sh install [--dry-run] | uninstall | status
 
   install    Substitute placeholders in the template, write chmod 0600 plist to
              ~/Library/LaunchAgents/, run `plutil -lint`, and `launchctl bootstrap` it.
+             --dry-run prints the rendered target and bootstrap command without writing.
   uninstall  `launchctl bootout` the agent and remove the installed plist.
   status     Print `launchctl print` state for the agent.
 
@@ -29,10 +30,10 @@ Telegram only after two consecutive failures. No `.env.op`/op token is needed.
 USAGE
 }
 
-case "${1:-}" in
-  install|uninstall|status)
-    ACTION="$1"
-    ;;
+ACTION="${1:-}"
+DRY_RUN=0
+case "${ACTION}" in
+  install|uninstall|status) ;;
   -h|--help)
     usage
     exit 0
@@ -42,11 +43,25 @@ case "${1:-}" in
     exit 2
     ;;
   *)
-    echo "error: unknown action '$1'" >&2
+    echo "error: unknown action '${ACTION}'" >&2
     usage
     exit 2
     ;;
 esac
+shift
+if [[ "${1:-}" == "--dry-run" ]]; then
+  DRY_RUN=1
+  shift
+fi
+if [[ $# -gt 0 ]]; then
+  echo "error: unknown argument '$1'" >&2
+  usage
+  exit 2
+fi
+if [[ "${DRY_RUN}" -eq 1 && "${ACTION}" != "install" ]]; then
+  echo "error: --dry-run is only valid with install" >&2
+  exit 2
+fi
 
 resolve_bun_bin() {
   local bun_bin
@@ -105,6 +120,12 @@ cmd_install() {
     exit 1
   fi
 
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    echo "dry-run: would render ${template_plist} -> ${target_plist}"
+    echo "dry-run: would launchctl bootstrap gui/${uid} ${target_plist} with ${bun_bin}"
+    return 0
+  fi
+
   mkdir -p "${HOME}/Library/LaunchAgents" "${REPO_PATH}/scratch"
   RENDER_HOME="${HOME}" \
   RENDER_REPO="${REPO_PATH}" \
@@ -115,6 +136,10 @@ cmd_install() {
   plutil -lint "${target_plist}" >/dev/null
   launchctl bootout "gui/${uid}/${LABEL}" 2>/dev/null || true
   launchctl bootstrap "gui/${uid}" "${target_plist}"
+  if ! launchctl print "gui/${uid}/${LABEL}" >/dev/null 2>&1; then
+    echo "error: ${LABEL} did not load after bootstrap; inspect launchctl print" >&2
+    exit 1
+  fi
   echo "installed: ${target_plist}"
   echo "logs:  tail -f ${REPO_PATH}/scratch/endpoint-watch.stderr.log"
   echo "state: ${REPO_PATH}/scratch/watchdog/endpoint-probe-state.json"
