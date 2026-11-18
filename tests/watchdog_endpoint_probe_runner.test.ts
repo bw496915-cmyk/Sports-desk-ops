@@ -18,6 +18,7 @@ import {
   parseOptions,
   probeWebSocket,
   readBodyFragments,
+  resolveUrlPort,
   readState,
   renderJson,
   renderWsJson,
@@ -579,6 +580,20 @@ describe("endpoint probe JSON rendering", () => {
     expect(json.ip).toBe("149.154.166.110");
     expect(json.hosts[0]?.addressProbes).toHaveLength(1);
     expect(json.hosts[0]?.addressProbes[0]?.status).toBe(302);
+  });
+
+  test("URL ports use scheme defaults and reject invalid prefetch ports", () => {
+    expect(resolveUrlPort(new URL("http://example.test/"))).toBe(80);
+    expect(resolveUrlPort(new URL("https://example.test/"))).toBe(443);
+    expect(resolveUrlPort(new URL("ws://example.test/"))).toBe(80);
+    expect(resolveUrlPort(new URL("wss://example.test/"))).toBe(443);
+    expect(resolveUrlPort(new URL("wss://example.test:8443/"))).toBe(8_443);
+    expect(() => resolveUrlPort(new URL("https://example.test:0/"))).toThrow(
+      /ERR_DNS_INVALID_PREFETCH_PORT/,
+    );
+    expect(() => resolveUrlPort(new URL("ftp://example.test/"))).toThrow(
+      /ERR_DNS_INVALID_PREFETCH_PORT/,
+    );
   });
 
   test("--ws-url parses ws/wss and rejects scheme/conflict/no-dry-run", () => {

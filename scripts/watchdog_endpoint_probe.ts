@@ -194,6 +194,36 @@ function parseHttpVersion(raw: string | undefined): HttpVersion {
   return found;
 }
 
+const DEFAULT_URL_PORTS: Readonly<Record<string, number>> = {
+  "http:": 80,
+  "https:": 443,
+  "ws:": 80,
+  "wss:": 443,
+};
+
+/** Port precedence: explicit URL port, then scheme default. */
+export function resolveUrlPort(url: URL): number {
+  const port =
+    url.port.length > 0 ? Number(url.port) : DEFAULT_URL_PORTS[url.protocol];
+  if (
+    port === undefined ||
+    !Number.isInteger(port) ||
+    port < 1 ||
+    port > 65535
+  ) {
+    throw new RangeError(`ERR_DNS_INVALID_PREFETCH_PORT: ${url.href}`);
+  }
+  return port;
+}
+
+/** Warm the DNS cache for a URL before its HTTP/WebSocket connection is opened. */
+export function prefetchUrl(url: URL): void {
+  const raw = url.hostname;
+  const hostname =
+    raw.startsWith("[") && raw.endsWith("]") ? raw.slice(1, -1) : raw;
+  Bun.dns.prefetch(hostname, resolveUrlPort(url));
+}
+
 function parseWsUrl(raw: string | undefined): string | undefined {
   if (raw === undefined || raw.trim() === "") return undefined;
   let url: URL;
@@ -1014,7 +1044,8 @@ async function run(): Promise<number> {
       rawHost.startsWith("[") && rawHost.endsWith("]")
         ? rawHost.slice(1, -1)
         : rawHost;
-    const port = url.port === "" ? (secure ? 443 : 80) : Number(url.port);
+    const port = resolveUrlPort(url);
+    prefetchUrl(url);
     const target: HostTarget = {
       hostname,
       port,

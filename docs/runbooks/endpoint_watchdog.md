@@ -181,7 +181,9 @@ bun run scripts/watchdog_endpoint_probe.ts --dry-run \
 
 `--ws-url` replaces the HTTP GET with a WebSocket upgrade:
 
-- The URL must be `ws://` or `wss://` and carries host, port and path.
+- The URL must be `ws://` or `wss://` and carries host, port and path. Port precedence is the
+  explicit URL port, then **ws → 80 / wss → 443** (the HTTP 80/443 ternary would give a `ws://`
+  connection port 443). The diagnostic prefetches the resolved hostname/port before the upgrade.
 - It requires `--dry-run`; it cannot combine with `--host`/`--port`/`--ip`/`--all-ips`/
   `--http-version`; it writes no state and pages no Telegram.
 - A successful upgrade is `101`; the verdict message says `WS 101`, and
