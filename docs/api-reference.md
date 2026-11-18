@@ -1899,7 +1899,7 @@ No declared fields.
 
 ### `DELETE /api/v1/blobs/{key}`
 
-> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:732-750` · response not captured
+> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:735-753` · response not captured
 
 **Delete one stored blob**
 
@@ -2195,7 +2195,7 @@ Serves telegram-miniapp-dashboard.html as text/html (services/sportsdesk_webview
 
 ### `GET /ws/live-bets`
 
-> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:751-780` · response not captured
+> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:754-783` · response not captured
 
 **Live-bets WebSocket upgrade**
 
