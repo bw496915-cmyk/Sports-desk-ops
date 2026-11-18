@@ -1252,7 +1252,8 @@ test("XML odds panel reports unknown lines as unit-unconfirmed instead of a fabr
           eventId32: [11, 12, 13],
           comboKey15: [1101, 2050, 1101],
           lineHundredths: [350, 0, -110],
-          lineUnknown: [false, true, false],
+          // Dense bitset words (bit 1 set = the second row's line unit is unknown).
+          lineUnknownFlags: [0b010],
           lineUnknownCount: 1,
           watermarkCursor: "wm-10",
           generatedAt: "2023-11-14T22:13:20.123Z",
