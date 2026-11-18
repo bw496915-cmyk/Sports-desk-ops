@@ -10,6 +10,7 @@
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { styles } from "../dashboard_styles.ts";
+import { formatBytes } from "../format_bytes.ts";
 
 export interface BunImageAssetRow {
   readonly type: "BunImageAssetDiagnostic" | "BunImageAssetScanFailure";
@@ -47,13 +48,6 @@ async function defaultLoadAssets(): Promise<BunAssetsPayload> {
     throw new Error(`image-assets HTTP ${response.status}`);
   }
   return (await response.json()) as BunAssetsPayload;
-}
-
-function formatBytes(bytes: number | null | undefined): string {
-  if (bytes === null || bytes === undefined) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
 }
 
 export function BunAssetsTabPanel({

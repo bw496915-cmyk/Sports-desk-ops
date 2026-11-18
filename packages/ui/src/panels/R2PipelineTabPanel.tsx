@@ -10,6 +10,7 @@ import type {
   R2SinkHistory,
   R2SinkHistorySample,
 } from "../types.ts";
+import { formatBytesDecimal } from "../format_bytes.ts";
 
 export interface R2PipelineTabPanelProps {
   readonly data: R2PipelineApiResponse | null;
@@ -67,13 +68,6 @@ function formatUsdCents(cents: number): string {
     currency: "USD",
     maximumFractionDigits: Math.abs(usd) >= 100 ? 0 : 2,
   });
-}
-
-function formatBytes(bytes: number | null): string {
-  if (bytes === null || !Number.isFinite(bytes)) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 const SPARK_WIDTH = 150;
@@ -851,7 +845,7 @@ export function R2PipelineTabPanel({
                   <span>{sink.reason ?? ""}</span>
                   <span style={{ fontFamily: "monospace" }}>
                     {sink.contentLength !== null
-                      ? formatBytes(sink.contentLength)
+                      ? formatBytesDecimal(sink.contentLength)
                       : ""}
                     {sink.contentLength !== null && sink.sha256 ? " · " : ""}
                     {sink.sha256 ? `sha256:${sink.sha256.slice(0, 12)}` : ""}
