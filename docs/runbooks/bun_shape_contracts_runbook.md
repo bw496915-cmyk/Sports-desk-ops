@@ -701,7 +701,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/Image)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Members (4):** `backend`, `clipboardChangeCount`, `fromClipboard`, `hasClipboardImage`
-- **Here:** `lib/screenshot_encode.ts`, `services/blob_and_live_bets_server.ts`
+- **Here:** `lib/screenshot_encode.ts`, `lib/logo_image.ts`
 - **Evidence:** `surface:Image`, `test:lib/f402_agent_graph_webp.test.ts`, `test:lib/image_errors.test.ts`, `test:scripts/bun_docs_mcp.test.ts`
 
 #### Bun.WebView
