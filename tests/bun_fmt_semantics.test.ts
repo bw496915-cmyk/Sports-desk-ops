@@ -22,15 +22,49 @@ function formatInTemp(ext: string, source: string): string {
 }
 
 describe("bun fmt semantic preservation", () => {
-  test("keeps CSS escapes and descendant selectors", () => {
+  test("keeps the CSS escaped space", () => {
     const out = formatInTemp(
       "css",
-      ".a { font-family: Font\\ Awesome, serif; }\nx |b { color: red; }\n",
+      ".a { font-family: Font\\ Awesome, serif; }\n",
     );
     expect(out).toContain("Font\\ Awesome");
     expect(out).not.toContain("Font\\Awesome");
+  });
+
+  test("keeps descendant and namespace-qualified selectors distinct", () => {
+    const source = readFileSync(
+      join(import.meta.dir, "fixtures/fmt/combinator-vs-namespace.css"),
+      "utf8",
+    );
+    const out = formatInTemp("css", source);
+    // x |b is a descendant combinator; x|b is a namespace qualifier. Both stay.
+    expect(out).toMatch(/x\s+\|b\s*\{/);
+    expect(out).toMatch(/x\|b\s*\{/);
+    expect(out.match(/\|b/g)?.length).toBe(2);
+    expect(out).toContain("@namespace x url");
+  });
+
+  test("fmt --debug-check accepts the selector fixture", () => {
+    const fixture = join(
+      import.meta.dir,
+      "fixtures/fmt/combinator-vs-namespace.css",
+    );
+    const proc = Bun.spawnSync({
+      cmd: [process.execPath, "fmt", "--debug-check", fixture],
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(proc.exitCode, proc.stderr.toString()).toBe(0);
+  });
+
+  test("leaves spec-invalid selector spacing untouched", () => {
+    // Measured on 1.4.4: neither `x| b` nor `x |b` is normalized into a valid form.
+    const out = formatInTemp(
+      "css",
+      "x| b { color: red; }\nx |b { color: blue; }\n",
+    );
+    expect(out).toContain("x| b");
     expect(out).toContain("x |b");
-    expect(out).not.toContain("x|b");
   });
 
   test("keeps Handlebars doctype and script comment lines", () => {
