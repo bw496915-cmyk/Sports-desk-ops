@@ -36,10 +36,9 @@ export async function syncIfChanged(
     data_version: number | bigint;
   } | null;
   const dataVersion = Number(versionRow?.data_version ?? -1);
-  if (dataVersion === state.lastDataVersion && state.lastFingerprint !== "") {
-    return false;
-  }
-
+  // data_version only changes when another connection commits; using it as the
+  // primary gate would miss same-connection writes. Hash the snapshot instead,
+  // and use data_version only as the cheap state marker after a successful sync.
   const rows = db
     .query(
       `SELECT profile_id, color_int, color_css, color_hex, color_label
@@ -55,8 +54,10 @@ export async function syncIfChanged(
   }));
 
   const fingerprint = computeSnapshotFingerprint(snapshot);
-  state.lastDataVersion = dataVersion;
-  if (fingerprint === state.lastFingerprint) return false;
+  if (fingerprint === state.lastFingerprint) {
+    state.lastDataVersion = dataVersion;
+    return false;
+  }
 
   await Promise.all([
     atomicWrite(targets.envPath, renderEnvFile(snapshot, fingerprint, "live")),
@@ -66,6 +67,9 @@ export async function syncIfChanged(
     ),
     atomicWrite(targets.themeGenPath, renderThemeGenTs(snapshot, fingerprint)),
   ]);
+  // Commit the in-memory state only after every rename succeeds. A failed write
+  // must be retried rather than being hidden by a previously observed version.
+  state.lastDataVersion = dataVersion;
   state.lastFingerprint = fingerprint;
   return true;
 }
