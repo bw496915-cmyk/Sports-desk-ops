@@ -543,6 +543,27 @@ describe("Bun capabilities used by the ops tooling", () => {
     }
   });
 
+  test("ArrayBufferSink highWaterMark preallocates without stream mode", () => {
+    const sink = new Bun.ArrayBufferSink();
+    sink.start({ asUint8Array: true, highWaterMark: 64 * 1024 });
+    sink.write("hello");
+    sink.write(new Uint8Array([0x20, 0x77]));
+    const out = sink.end() as Uint8Array;
+    expect(new TextDecoder().decode(out)).toBe("hello w");
+  });
+
+  test("ArrayBufferSink flush returns chunks only in stream mode", () => {
+    const sink = new Bun.ArrayBufferSink();
+    sink.start({ stream: true, highWaterMark: 1024 });
+    sink.write("hel");
+    const first = sink.flush();
+    expect(first).toBeInstanceOf(ArrayBuffer);
+    expect(new TextDecoder().decode(first as ArrayBuffer)).toBe("hel");
+    sink.write("lo");
+    const second = sink.flush();
+    expect(new TextDecoder().decode(second as ArrayBuffer)).toBe("lo");
+  });
+
   test("BunFile.slice is lazy, does not open a missing file, and does not clamp size", async () => {
     const dir = mkdtempSync(join(tmpdir(), "bunfile-slice-lazy-"));
     try {
