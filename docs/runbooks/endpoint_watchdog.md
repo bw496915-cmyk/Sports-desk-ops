@@ -82,7 +82,7 @@ bun run scripts/watchdog_endpoint_probe.ts --dry-run --backend system --host api
 ```
 
 `--json` includes the resolver, per-host status/code, consecutive failures, addresses, TTLs,
-cache stats, and TLS provenance. Human output names the resolver and prints one line per host.
+cache stats, TLS provenance and the requested HTTP version. Human output names the resolver and prints one line per host.
 
 ## Diagnostic target overrides
 
@@ -94,6 +94,8 @@ bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --p
 bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --ip 149.154.166.110
 bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --all-ips
 bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --ip 149.154.166.110 --port 443
+bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --http-version http1.1
+bun run scripts/watchdog_endpoint_probe.ts --dry-run --host clob.polymarket.com --http-version http2
 ```
 
 `--ip` dials the address while keeping the target hostname for TLS SNI and the HTTP `Host`
@@ -123,12 +125,23 @@ the dial address. A `Host` mismatch can therefore change HTTP routing without fa
 
 ### Protocols
 
-- The probe is HTTPS-only; `--port` changes the port, not the scheme.
+- The HTTP probe is HTTPS-only; `--port` changes the port, not the scheme.
+- `--http-version auto|http1.1|http2|http3` (aliases `h1`/`h2`/`h3`), default `auto`. It is
+  diagnostic: it requires `--dry-run` and exactly one `--host`, and passes Bun fetch's
+  `protocol` for that request. `http2`/`http3` are experimental in Bun 1.4.4.
+- The TLS diagnostic ALPN follows the requested version: `http1.1` offers only `http/1.1`,
+  `http2` only `h2`, `auto` offers both. For `api.telegram.org` `auto` negotiates
+  TLSv1.3 / `h2` / `TLS_AES_256_GCM_SHA384`.
+- `http3` is QUIC, not TLS-over-TCP: the TCP TLS provenance probe is skipped and `tlsError`
+  says so. Direct `fetch(protocol: "http3")` succeeds against QUIC-capable endpoints
+  (`cloudflare-quic.com` returned 200 on 2026-11-17); none of the current core hosts
+  negotiated h3 in that sample, so the probe reports a fetch failure for them (and still
+  requires a second consecutive failure before paging).
+- `ws://` / `wss://` are a different protocol: the connection starts with an HTTP Upgrade,
+  not a GET. This probe does not speak the WebSocket upgrade. Bun's `WebSocket` client
+  supports ws/wss with `headers` and `tls.serverName` if a separate WS probe is added.
 - `Bun.TLSOptions` exposes `ALPNProtocols`, `ciphers` and `secureOptions`, but no
   `minVersion`/`maxVersion`; the app's fetch defaults are left untouched.
-- The separate diagnostic handshake offers `h2` + `http/1.1` (Bun's ALPN wire format, not a
-  comma-joined string) and reports the server's choice. For `api.telegram.org` that is
-  TLSv1.3 / `h2` / `TLS_AES_256_GCM_SHA384`.
 - `tls` is diagnostic; the fetch result remains the gate.
 
 `--all-ips` probes **every address returned by the lookup**, each with the same SNI/Host and a 5 s

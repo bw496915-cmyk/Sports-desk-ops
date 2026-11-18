@@ -28,6 +28,7 @@ describe("endpoint probe runner options", () => {
     expect(options.port).toBeUndefined();
     expect(options.ip).toBeUndefined();
     expect(options.allIps).toBe(false);
+    expect(options.httpVersion).toBe("auto");
     expect(options.json).toBe(false);
     expect(options.dryRun).toBe(false);
     expect(options.help).toBe(false);
@@ -137,6 +138,42 @@ describe("endpoint probe runner options", () => {
     expect(() => parseOptions(["--dry-run", "--all-ips"])).toThrow(
       /exactly one --host/,
     );
+  });
+
+  test("--http-version normalizes aliases and requires dry-run/host", () => {
+    expect(
+      parseOptions([
+        "--dry-run",
+        "--host",
+        "api.telegram.org",
+        "--http-version",
+        "h2",
+      ]).httpVersion,
+    ).toBe("http2");
+    expect(
+      parseOptions([
+        "--dry-run",
+        "--host",
+        "api.telegram.org",
+        "--http-version",
+        "http3",
+      ]).httpVersion,
+    ).toBe("http3");
+    expect(() =>
+      parseOptions([
+        "--dry-run",
+        "--host",
+        "api.telegram.org",
+        "--http-version",
+        "nope",
+      ]),
+    ).toThrow(/invalid --http-version/);
+    expect(() =>
+      parseOptions(["--host", "api.telegram.org", "--http-version", "http2"]),
+    ).toThrow(/require --dry-run/);
+    expect(() =>
+      parseOptions(["--dry-run", "--http-version", "http2"]),
+    ).toThrow(/exactly one --host/);
   });
 
   test("brackets IPv6 for the URL authority", () => {
@@ -320,6 +357,7 @@ describe("endpoint probe JSON rendering", () => {
       false,
       {},
       {},
+      "auto",
     );
 
     expect(json.resolver).toBe("c-ares");
@@ -329,6 +367,7 @@ describe("endpoint probe JSON rendering", () => {
     expect(json.hosts[0]?.addressProbes).toEqual([]);
     expect(json.hosts[0]?.tls).toBeNull();
     expect(json.hosts[0]?.tlsError).toBeNull();
+    expect(json.httpVersion).toBe("auto");
     expect(json.dryRun).toBe(true);
     expect(json.alerts).toBe(1);
     expect(json.hosts).toHaveLength(2);
@@ -376,6 +415,7 @@ describe("endpoint probe JSON rendering", () => {
         ],
       },
       {},
+      "auto",
     );
     expect(json.allIps).toBe(true);
     expect(json.ip).toBe("149.154.166.110");
@@ -430,6 +470,7 @@ describe("endpoint probe JSON rendering", () => {
       false,
       {},
       { [target.hostname]: { tls, tlsError: null } },
+      "auto",
     );
     expect(json.hosts[0]?.tls?.tlsVersion).toBe("TLSv1.3");
     expect(json.hosts[0]?.tls?.alpn).toBe("h2");

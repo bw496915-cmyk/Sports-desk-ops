@@ -71,6 +71,14 @@ const EXIT = { ok: 0, alert: 1, error: 2 } as const;
  */
 const DEFAULT_DNS_BACKEND = "default" as const;
 type ProbeBackend = DnsResolverBackend | typeof DEFAULT_DNS_BACKEND;
+
+export type HttpVersion = "auto" | "http1.1" | "http2" | "http3";
+const HTTP_VERSIONS: readonly HttpVersion[] = [
+  "auto",
+  "http1.1",
+  "http2",
+  "http3",
+];
 const DNS_BACKENDS: readonly ProbeBackend[] = [
   DEFAULT_DNS_BACKEND,
   "c-ares",
@@ -87,6 +95,7 @@ interface Options {
   readonly port?: number;
   readonly ip?: string;
   readonly allIps: boolean;
+  readonly httpVersion: HttpVersion;
   readonly statePath: string;
   readonly help: boolean;
 }
@@ -105,6 +114,7 @@ interface ProbeJson {
   readonly socketType: "tcp";
   readonly ip: string | null;
   readonly allIps: boolean;
+  readonly httpVersion: HttpVersion;
   readonly alerts: number;
   readonly hosts: readonly {
     readonly host: string;
@@ -157,6 +167,26 @@ export function parseBackend(raw: string | undefined): ProbeBackend {
   return backend;
 }
 
+function parseHttpVersion(raw: string | undefined): HttpVersion {
+  if (raw === undefined || raw.trim() === "") return "auto";
+  const value = raw.trim().toLowerCase();
+  const normalized =
+    value === "h1"
+      ? "http1.1"
+      : value === "h2"
+        ? "http2"
+        : value === "h3"
+          ? "http3"
+          : value;
+  const found = HTTP_VERSIONS.find((version) => version === normalized);
+  if (found === undefined) {
+    throw new Error(
+      `invalid --http-version "${raw}" (allowed: auto, http1.1, http2, http3; aliases h1/h2/h3)`,
+    );
+  }
+  return found;
+}
+
 function parsePort(raw: string | undefined): number | undefined {
   if (raw === undefined || raw.trim() === "") return undefined;
   const port = Number(raw);
@@ -188,6 +218,7 @@ export function parseOptions(
       port: { type: "string" },
       ip: { type: "string" },
       "all-ips": { type: "boolean", default: false },
+      "http-version": { type: "string" },
       state: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -197,14 +228,18 @@ export function parseOptions(
   const port = parsePort(values.port);
   const ip = parseIp(values.ip);
   const allIps = values["all-ips"] ?? false;
-  const diagnostic = port !== undefined || ip !== undefined || allIps;
+  const httpVersion = parseHttpVersion(values["http-version"]);
+  const diagnostic =
+    port !== undefined || ip !== undefined || allIps || httpVersion !== "auto";
   if (diagnostic && !dryRun) {
     throw new Error(
-      "--port/--ip/--all-ips are diagnostic and require --dry-run",
+      "--port/--ip/--all-ips/--http-version are diagnostic and require --dry-run",
     );
   }
   if (diagnostic && hosts.length !== 1) {
-    throw new Error("--port/--ip/--all-ips require exactly one --host");
+    throw new Error(
+      "--port/--ip/--all-ips/--http-version require exactly one --host",
+    );
   }
   return {
     json: values.json ?? false,
@@ -214,6 +249,7 @@ export function parseOptions(
     ...(port === undefined ? {} : { port }),
     ...(ip === undefined ? {} : { ip }),
     allIps,
+    httpVersion,
     statePath:
       values.state === undefined || values.state.trim() === ""
         ? DEFAULT_STATE_PATH
@@ -234,6 +270,9 @@ Flags:
                       SNI and Host. Diagnostic: requires one --host and --dry-run.
   --all-ips           Also probe every address returned by the DNS lookup, with per-address
                       results in --json. Diagnostic: requires one --host and --dry-run.
+  --http-version <v>  Force HTTP: auto (default) | http1.1 | http2 | http3 (aliases h1/h2/h3).
+                      Diagnostic: requires one --host and --dry-run. http2/http3 are experimental;
+                      http3 is QUIC, so the TCP TLS provenance is skipped.
   --backend <name>    DNS resolver: default (Bun platform default) | c-ares | system |
                       getaddrinfo | libc. The default leaves the choice to Bun so the probe
                       mirrors the app's fetch()/Bun.connect() path; override for diagnosis.
@@ -376,7 +415,21 @@ async function probeTlsSafe(
   host: string,
   port: number,
   servername: string,
+  httpVersion: HttpVersion,
 ): Promise<{ tls: TlsProvenance | null; tlsError: string | null }> {
+  if (httpVersion === "http3") {
+    return {
+      tls: null,
+      tlsError:
+        "HTTP/3 is QUIC; the TCP TLS provenance probe is not applicable",
+    };
+  }
+  const alpn =
+    httpVersion === "http2"
+      ? ["h2"]
+      : httpVersion === "http1.1"
+        ? ["http/1.1"]
+        : ["h2", "http/1.1"];
   try {
     return {
       tls: await probeTls({
@@ -384,9 +437,8 @@ async function probeTlsSafe(
         port,
         servername,
         timeoutMs: PROBE_TIMEOUT_MS,
-        // Offer h2 + http/1.1 so the handshake reports the server's choice; the fetch
-        // negotiates its own ALPN independently.
-        alpnProtocols: alpnWire(["h2", "http/1.1"]),
+        // Offer the ALPN set matching the requested HTTP version (auto offers both).
+        alpnProtocols: alpnWire(alpn),
       }),
       tlsError: null,
     };
@@ -398,10 +450,16 @@ async function probeTlsSafe(
 async function fetchAddress(
   target: HostTarget,
   address: string,
+  httpVersion: HttpVersion,
 ): Promise<AddressProbe> {
   const started = performance.now();
   const family = isIP(address) === 6 ? 6 : 4;
-  const tlsPromise = probeTlsSafe(address, target.port, target.hostname);
+  const tlsPromise = probeTlsSafe(
+    address,
+    target.port,
+    target.hostname,
+    httpVersion,
+  );
   try {
     const response = await fetch(
       `https://${formatIpForUrl(address)}:${target.port}/`,
@@ -418,6 +476,7 @@ async function fetchAddress(
         // not a TLS field — the HTTP Host header is separate and set above. Certificate
         // verification uses this serverName.
         tls: { serverName: target.hostname } satisfies BunFetchRequestInitTLS,
+        ...(httpVersion === "auto" ? {} : { protocol: httpVersion }),
       },
     );
     return {
@@ -445,6 +504,7 @@ async function probe(
   backend: ProbeBackend,
   ipOverride: string | undefined,
   allIps: boolean,
+  httpVersion: HttpVersion,
 ): Promise<ProbeResult> {
   let resolvedAnswers: DnsAnswer[] = [];
   const lookup = await (async () => {
@@ -485,6 +545,7 @@ async function probe(
     ipOverride ?? target.hostname,
     target.port,
     target.hostname,
+    httpVersion,
   );
 
   const started = performance.now();
@@ -507,6 +568,7 @@ async function probe(
         ...(ipOverride === undefined
           ? {}
           : { tls: { serverName: target.hostname } }),
+        ...(httpVersion === "auto" ? {} : { protocol: httpVersion }),
       });
       return {
         ok: true,
@@ -532,7 +594,7 @@ async function probe(
             ...(ipOverride === undefined ? [] : [ipOverride]),
             ...resolvedAnswers.map((answer) => answer.address),
           ]),
-        ].map((address) => fetchAddress(target, address)),
+        ].map((address) => fetchAddress(target, address, httpVersion)),
       )
     : [];
 
@@ -591,6 +653,7 @@ export function renderJson(
   tlsByHost: Readonly<
     Record<string, { tls: TlsProvenance | null; tlsError: string | null }>
   >,
+  httpVersion: HttpVersion,
 ): ProbeJson {
   return {
     schemaVersion: 1,
@@ -601,6 +664,7 @@ export function renderJson(
     socketType: "tcp",
     ip,
     allIps,
+    httpVersion,
     alerts: verdicts.filter((verdict) => verdict.status === "alert").length,
     hosts: verdicts.map((verdict) => ({
       host: verdict.target.hostname,
@@ -680,7 +744,13 @@ async function run(): Promise<number> {
   const nowMs = Date.now();
   const settled = await Promise.allSettled(
     targets.map((target) =>
-      probe(target, options.backend, options.ip, options.allIps),
+      probe(
+        target,
+        options.backend,
+        options.ip,
+        options.allIps,
+        options.httpVersion,
+      ),
     ),
   );
   const addressProbesByHost: Record<string, readonly AddressProbe[]> = {};
@@ -731,6 +801,7 @@ async function run(): Promise<number> {
           options.allIps,
           addressProbesByHost,
           tlsByHost,
+          options.httpVersion,
         ),
         null,
         2,
