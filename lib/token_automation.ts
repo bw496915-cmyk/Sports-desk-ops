@@ -112,7 +112,8 @@ export class AutomatedDualTokenStore {
       CREATE TABLE IF NOT EXISTS profile_themes (
         profile_id    TEXT    PRIMARY KEY
                               CHECK (length(profile_id) BETWEEN 1 AND 64)
-                              CHECK (profile_id GLOB '[a-zA-Z0-9][a-zA-Z0-9._-]*'),
+                              CHECK (profile_id GLOB '[a-zA-Z0-9]*')
+                              CHECK (profile_id NOT GLOB '*[^a-zA-Z0-9._-]*'),
         color_int     INTEGER NOT NULL
                               CHECK (color_int BETWEEN 0 AND 16777215),
         color_css     TEXT    NOT NULL
@@ -120,7 +121,7 @@ export class AutomatedDualTokenStore {
         color_hex     TEXT    GENERATED ALWAYS AS (printf('#%06x', color_int)) STORED,
         color_label   TEXT    NOT NULL
                               CHECK (length(color_label) BETWEEN 1 AND 48)
-                              CHECK (color_label GLOB '[a-zA-Z0-9_-]*'),
+                              CHECK (color_label NOT GLOB '*[^a-zA-Z0-9_-]*'),
         updated_at_ms INTEGER NOT NULL
       ) STRICT;
     `);
@@ -479,6 +480,7 @@ export class AutomatedDualTokenStore {
     if (mode === "native" || bundle.depth === "none") {
       return Bun.markdown.ansi(markdown, bundle.ansiTheme);
     }
+    // trusted-markdown: terminal output via pre-baked ANSI callbacks; never a DOM sink.
     return Bun.markdown.render(
       markdown,
       bundle.renderCallbacks,

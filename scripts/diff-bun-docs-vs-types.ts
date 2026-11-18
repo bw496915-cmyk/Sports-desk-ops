@@ -189,6 +189,7 @@ export function extractDocMembersFromMarkdown(
 ): Set<string> {
   const members = new Set<string>();
 
+  // trusted-markdown: parser pass over docs markdown; every callback returns "" (no output).
   Bun.markdown.render(
     md,
     {
