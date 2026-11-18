@@ -1,11 +1,11 @@
 /**
  * @file packages/ui/src/tokens.registry.generated.ts
- * @description Generated from design/tokens.toml (v1.4.0) via `bun run gen:tokens`.
+ * @description Generated from design/tokens.toml (v1.5.0) via `bun run gen:tokens`.
  * DO NOT EDIT BY HAND — enforced by `bun run gen:tokens:gate`.
  */
 
 /** tokens.toml SSOT version this module was generated from. */
-export const TOKENS_TOML_VERSION = "1.4.0" as const;
+export const TOKENS_TOML_VERSION = "1.5.0" as const;
 
 export type GeneratedTokenGroup =
   "surfaces" | "ui" | "sla" | "ingestion" | "routes";
@@ -116,4 +116,39 @@ export const TOKEN_ALIASES: readonly GeneratedAlias[] = [
   { alias: "--sd-state-danger", target: "--sd-tier-alert", scope: "dashboard" },
   { alias: "--sd-state-info", target: "--sd-tier-phone", scope: "dashboard" },
   { alias: "--sd-state-accent", target: "--sd-focus-ring", scope: "dashboard" },
+];
+
+/** Untyped `:root` declarations for [layout], [motion] and [cas_states]. */
+export const ROOT_OPTION_DECLARATIONS: readonly string[] = [
+  "  --sd-layout-grid-unit: 4px;",
+  "  --sd-layout-card-padding: 12px;",
+  "  --sd-layout-row-height-compact: 28px;",
+  "  --sd-layout-row-height-comfortable: 36px;",
+  "  --sd-layout-border-hairline-width: 1px;",
+  "  --sd-layout-border-interactive-width: 1px;",
+  "  --sd-layout-focus-ring-width: 2px;",
+  "  --sd-layout-focus-ring-offset: 2px;",
+  "  --sd-layout-radius-badge: 4px;",
+  "  --sd-layout-radius-card: 6px;",
+  "  --sd-layout-radius-modal: 8px;",
+  "  --sd-motion-aria-live-coalesce: 500ms;",
+  "  --sd-motion-tooltip-delay: 250ms;",
+  "  --sd-motion-drawer-transition: 140ms;",
+  "  --sd-motion-pulse-critical-period: 1600ms;",
+  "  --sd-cas-committed: #34d399;",
+  "  --sd-cas-committed-bg: #0a2922;",
+  "  --sd-cas-committed-border: #10b981;",
+  '  --sd-cas-committed-glyph: "✓";',
+  "  --sd-cas-retry: #38bdf8;",
+  "  --sd-cas-retry-bg: #0c2438;",
+  "  --sd-cas-retry-border: #29b6f6;",
+  '  --sd-cas-retry-glyph: "↻";',
+  "  --sd-cas-conflict: #fbbf24;",
+  "  --sd-cas-conflict-bg: #2b200c;",
+  "  --sd-cas-conflict-border: #f59e0b;",
+  '  --sd-cas-conflict-glyph: "⚡";',
+  "  --sd-cas-quarantined: #fca5a5;",
+  "  --sd-cas-quarantined-bg: #2d161d;",
+  "  --sd-cas-quarantined-border: #ff7878;",
+  '  --sd-cas-quarantined-glyph: "⛔";',
 ];
