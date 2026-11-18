@@ -257,6 +257,33 @@ describe("Bun reference symbol matching", () => {
     expect(resolveBunSymbolReferenceUrl("Bun.Terminal")).toBe(
       "https://bun.com/reference/bun/Terminal",
     );
+    expect(resolveBunSymbolReferenceUrl("Bun.TerminalOptions")).toBe(
+      "https://bun.com/reference/bun/TerminalOptions",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.Archive")).toBe(
+      "https://bun.com/reference/bun/Archive",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.Image")).toBe(
+      "https://bun.com/reference/bun/Image",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.FetchSession")).toBe(
+      "https://bun.com/reference/bun/FetchSession",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.RedisClient")).toBe(
+      "https://bun.com/reference/bun/RedisClient",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.WebView")).toBe(
+      "https://bun.com/reference/bun/WebView",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.XML")).toBe(
+      "https://bun.com/reference/bun/XML",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.JSONL")).toBe(
+      "https://bun.com/reference/bun/JSONL",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.stringWidth")).toBe(
+      "https://bun.com/reference/bun/stringWidth",
+    );
     expect(resolveBunSymbolReferenceUrl("Bun.connect")).toBe(
       "https://bun.com/reference/bun/connect",
     );
@@ -266,6 +293,89 @@ describe("Bun reference symbol matching", () => {
     expect(
       resolveBunSymbolReferenceUrl("Bun.readableStreamToArrayBuffer"),
     ).toBe("https://bun.com/reference/bun/readableStreamToArrayBuffer");
+    expect(resolveBunSymbolReferenceUrl("Bun.$")).toBe(
+      "https://bun.com/reference/bun/$",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.Archive.blob")).toBe(
+      "https://bun.com/reference/bun/Archive/blob",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.Archive.bytes")).toBe(
+      "https://bun.com/reference/bun/Archive/bytes",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.Archive.extract")).toBe(
+      "https://bun.com/reference/bun/Archive/extract",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.Archive.files")).toBe(
+      "https://bun.com/reference/bun/Archive/files",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.Archive.write")).toBe(
+      "https://bun.com/reference/bun/Archive/write",
+    );
+    expect(resolveBunSymbolReferenceUrl("ArchiveInput")).toBe(
+      "https://bun.com/reference/bun/ArchiveInput",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.ArchiveOptions")).toBe(
+      "https://bun.com/reference/bun/ArchiveOptions",
+    );
+    expect(resolveBunSymbolReferenceUrl("ArchiveExtractOptions")).toBe(
+      "https://bun.com/reference/bun/ArchiveExtractOptions",
+    );
+    expect(resolveBunSymbolReferenceUrl("bun:bundle")).toBe(
+      "https://bun.com/reference/bun/bundle",
+    );
+    expect(resolveBunSymbolReferenceUrl("bun:ffi")).toBe(
+      "https://bun.com/reference/bun/ffi",
+    );
+    expect(resolveBunSymbolReferenceUrl("bun:jsc")).toBe(
+      "https://bun.com/reference/bun/jsc",
+    );
+    expect(resolveBunSymbolReferenceUrl("bun:sqlite")).toBe(
+      "https://bun.com/reference/bun/sqlite",
+    );
+    expect(resolveBunSymbolReferenceUrl("bun:test")).toBe(
+      "https://bun.com/reference/bun/test",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.cron")).toBe(
+      "https://bun.com/reference/bun/cron",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.SQL")).toBe(
+      "https://bun.com/reference/bun/SQL",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.S3Client")).toBe(
+      "https://bun.com/reference/bun/S3Client",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.CookieMap")).toBe(
+      "https://bun.com/reference/bun/CookieMap",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.CryptoHasher")).toBe(
+      "https://bun.com/reference/bun/CryptoHasher",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.Glob")).toBe(
+      "https://bun.com/reference/bun/Glob",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.YAML")).toBe(
+      "https://bun.com/reference/bun/YAML",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.secrets")).toBe(
+      "https://bun.com/reference/bun/secrets",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.semver")).toBe(
+      "https://bun.com/reference/bun/semver",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.CronController")).toBe(
+      "https://bun.com/reference/bun/CronController",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.MatchedRoute")).toBe(
+      "https://bun.com/reference/bun/MatchedRoute",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.BuildConfig")).toBe(
+      "https://bun.com/reference/bun/BuildConfig",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.ServerWebSocket")).toBe(
+      "https://bun.com/reference/bun/ServerWebSocket",
+    );
+    expect(resolveBunSymbolReferenceUrl("toString")).toBeNull();
+    expect(resolveBunSymbolReferenceUrl("constructor")).toBeNull();
     expect(
       resolveBunSymbolReferenceUrl("unknown_nonexistent_symbol"),
     ).toBeNull();
@@ -273,17 +383,22 @@ describe("Bun reference symbol matching", () => {
 
   test("findBunReferenceSymbolsInText extracts symbols present in text", () => {
     const text =
-      "Use `AnsiTheme` along with Bun.markdown.ansi and Bun.serve to build CLI tools.";
+      "Use `AnsiTheme` along with Bun.markdown.ansi, Bun.Archive.extract, `Bun.$`, bun:sqlite, and Bun.serve to build CLI tools.";
     const symbols = findBunReferenceSymbolsInText(text);
     const names = symbols.map((s) => s.symbolName);
     expect(names).toContain("AnsiTheme");
     expect(names).toContain("ansi");
+    expect(names).toContain("extract");
+    expect(names).toContain("$");
+    expect(names).toContain("sqlite");
     expect(names).toContain("serve");
+    // Repeated call returns identical results without regex lastIndex drift
+    expect(findBunReferenceSymbolsInText(text)).toEqual(symbols);
   });
 
   test("linkifyBunSymbolsInMarkdown transforms code spans into OSC 8 markdown links", () => {
     const input =
-      "Configure styling with `AnsiTheme` and render using `Bun.markdown.ansi`.";
+      "Configure styling with `AnsiTheme`, render via `Bun.markdown.ansi`, unpack with `Bun.Archive.extract`, run `Bun.$` with `Bun.TerminalOptions`, or query `bun:sqlite`.";
     const linked = linkifyBunSymbolsInMarkdown(input);
     expect(linked).toContain(
       "[`AnsiTheme`](https://bun.com/reference/bun/markdown/AnsiTheme)",
@@ -291,6 +406,18 @@ describe("Bun reference symbol matching", () => {
     expect(linked).toContain(
       "[`Bun.markdown.ansi`](https://bun.com/reference/bun/markdown/ansi)",
     );
+    expect(linked).toContain(
+      "[`Bun.Archive.extract`](https://bun.com/reference/bun/Archive/extract)",
+    );
+    expect(linked).toContain("[`Bun.$`](https://bun.com/reference/bun/$)");
+    expect(linked).toContain(
+      "[`Bun.TerminalOptions`](https://bun.com/reference/bun/TerminalOptions)",
+    );
+    expect(linked).toContain(
+      "[`bun:sqlite`](https://bun.com/reference/bun/sqlite)",
+    );
+    // Idempotent when called a second time
+    expect(linkifyBunSymbolsInMarkdown(linked)).toBe(linked);
   });
 
   test("sanitizeBunUrl strips tracking parameters while preserving text fragments", () => {

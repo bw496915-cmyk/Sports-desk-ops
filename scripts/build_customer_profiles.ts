@@ -23,10 +23,12 @@ import {
 import {
   customerRowFromHarvestedProfile,
   customerRowsFromLiveCaptures,
+  liveWagerCustomerId,
   liveWagerRows,
 } from "../lib/customer_source_rows.ts";
 import { positionIdentity } from "../lib/position_identity.ts";
 import { ticketWriterDisposition } from "../lib/live_writer_policy.ts";
+import { usdFromWireCents } from "../lib/wire_money.ts";
 import {
   loadProjectedUsersRoster,
   normalizeRosterId,
@@ -157,10 +159,31 @@ const liveBetsDoc = await loadLiveArtifact(
   join(REPO, "data", "live-bets.json"),
 );
 const writerExclusions = { alert: 0, blocked: 0 };
+// Measured writer distribution per customer, from every live wager row (not the five-ticket
+// sample). Harvested sample tickets carry no writer, so without this the book's channel split
+// would be ~98% unknown even though the live capture labels every row.
+const channelEvidence = new Map<
+  string,
+  Record<string, { n: number; riskUsd: number }>
+>();
 for (const row of liveWagerRows(liveWagersDoc)) {
   const disposition = ticketWriterDisposition(row.TicketWriter);
   if (disposition === "alert") writerExclusions.alert++;
   else if (disposition === "blocked") writerExclusions.blocked++;
+  // Alert/blocked writers are system rows, not customer channels: counted above, not here.
+  if (disposition !== "book") continue;
+  const customerId = liveWagerCustomerId(row);
+  if (customerId === null) continue;
+  const writer =
+    String(row.TicketWriter ?? row.ticketWriter ?? "").trim() || "unknown";
+  const cents = Number(row.AmountWagered ?? row.amountWagered);
+  const byWriter = channelEvidence.get(customerId) ?? {};
+  const bucket = byWriter[writer] ?? { n: 0, riskUsd: 0 };
+  bucket.n += 1;
+  if (Number.isFinite(cents) && cents > 0)
+    bucket.riskUsd += usdFromWireCents(cents);
+  byWriter[writer] = bucket;
+  channelEvidence.set(customerId, byWriter);
 }
 const liveRows = customerRowsFromLiveCaptures(liveWagersDoc, liveBetsDoc);
 const positionRefusals = { nullTicket: 0, nullWager: 0 };
@@ -205,7 +228,11 @@ for (const live of liveRows) {
 }
 
 const tree = (await Bun.file(resolve(values.tree ?? "")).json()) as TreeIndex;
-const { profiles, summary } = buildCustomerProfiles(rows, tree);
+const rowsWithChannels = rows.map((row) => {
+  const evidence = channelEvidence.get(row.customer_id.trim().toUpperCase());
+  return evidence === undefined ? row : { ...row, channel_evidence: evidence };
+});
+const { profiles, summary } = buildCustomerProfiles(rowsWithChannels, tree);
 
 // Harvested rows are model-derived and the artifact publishes no lifetime volume, so their profiles
 // carry a source flag: an absent aggregate must not read as a measured zero.
