@@ -57,6 +57,14 @@ export const BUN_ANSI_THEME_REFERENCE_URL = bunReferenceUrl(
   "bun/markdown/AnsiTheme",
 );
 
+/**
+ * Canonical reference URL for Bun's Markdown parser options (`Bun.markdown.Options`).
+ * @see https://bun.com/reference/bun/markdown/Options
+ */
+export const BUN_MARKDOWN_OPTIONS_REFERENCE_URL = bunReferenceUrl(
+  "bun/markdown/Options",
+);
+
 export interface BunReferenceSymbol {
   readonly canonicalUrl: BunUrl;
   readonly symbolPath: string;
@@ -369,7 +377,30 @@ const BUN_NESTED_AND_ALIAS_REFERENCE_SYMBOLS: Readonly<Record<string, string>> =
   {
     AnsiTheme: "bun/markdown/AnsiTheme",
     "Bun.markdown.AnsiTheme": "bun/markdown/AnsiTheme",
+    "Bun.markdown.Options": "bun/markdown/Options",
+    "Bun.markdown.ReactOptions": "bun/markdown/ReactOptions",
+    "Bun.markdown.RenderCallbacks": "bun/markdown/RenderCallbacks",
+    "Bun.markdown.ComponentOverrides": "bun/markdown/ComponentOverrides",
+    "Bun.markdown.Component": "bun/markdown/Component",
+    "Bun.markdown.HeadingMeta": "bun/markdown/HeadingMeta",
+    "Bun.markdown.CodeBlockMeta": "bun/markdown/CodeBlockMeta",
+    "Bun.markdown.ListMeta": "bun/markdown/ListMeta",
+    "Bun.markdown.ListItemMeta": "bun/markdown/ListItemMeta",
+    "Bun.markdown.CellMeta": "bun/markdown/CellMeta",
+    "Bun.markdown.LinkMeta": "bun/markdown/LinkMeta",
+    "Bun.markdown.ImageMeta": "bun/markdown/ImageMeta",
+    "Bun.markdown.ChildrenProps": "bun/markdown/ChildrenProps",
+    "Bun.markdown.HeadingProps": "bun/markdown/HeadingProps",
+    "Bun.markdown.OrderedListProps": "bun/markdown/OrderedListProps",
+    "Bun.markdown.ListItemProps": "bun/markdown/ListItemProps",
+    "Bun.markdown.CodeBlockProps": "bun/markdown/CodeBlockProps",
+    "Bun.markdown.CellProps": "bun/markdown/CellProps",
+    "Bun.markdown.LinkProps": "bun/markdown/LinkProps",
+    "Bun.markdown.ImageProps": "bun/markdown/ImageProps",
+    "Bun.markdown.html": "bun/markdown/html",
     "Bun.markdown.ansi": "bun/markdown/ansi",
+    "Bun.markdown.render": "bun/markdown/render",
+    "Bun.markdown.react": "bun/markdown/react",
     "Bun.inspect.custom": "bun/inspect",
     "Bun.inspect.table": "bun/inspect",
     "Bun.Archive.blob": "bun/Archive/blob",

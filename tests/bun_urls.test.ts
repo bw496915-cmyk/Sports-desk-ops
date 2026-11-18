@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   BUN_ANSI_THEME_REFERENCE_URL,
+  BUN_MARKDOWN_OPTIONS_REFERENCE_URL,
   BUN_ORIGIN,
   bunReferenceUrl,
   bunUrl,
@@ -149,6 +150,9 @@ describe("Bun reference symbol matching", () => {
     expect(BUN_ANSI_THEME_REFERENCE_URL).toBe(
       "https://bun.com/reference/bun/markdown/AnsiTheme",
     );
+    expect(BUN_MARKDOWN_OPTIONS_REFERENCE_URL).toBe(
+      "https://bun.com/reference/bun/markdown/Options",
+    );
   });
 
   test("parseBunReferenceUrl extracts symbol, module, and canonical URL", () => {
@@ -160,6 +164,16 @@ describe("Bun reference symbol matching", () => {
       symbolPath: "bun/markdown/AnsiTheme",
       modulePath: "bun/markdown",
       symbolName: "AnsiTheme",
+    });
+
+    const mdOptions = parseBunReferenceUrl(
+      "https://bun.sh/reference/bun/markdown/Options",
+    );
+    expect(mdOptions).toEqual({
+      canonicalUrl: "https://bun.com/reference/bun/markdown/Options",
+      symbolPath: "bun/markdown/Options",
+      modulePath: "bun/markdown",
+      symbolName: "Options",
     });
 
     const importKind = parseBunReferenceUrl(
@@ -241,6 +255,38 @@ describe("Bun reference symbol matching", () => {
     ).toBe("https://bun.com/reference/bun/markdown/AnsiTheme");
     expect(resolveBunSymbolReferenceUrl("Bun.markdown.ansi")).toBe(
       "https://bun.com/reference/bun/markdown/ansi",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.markdown.Options")).toBe(
+      "https://bun.com/reference/bun/markdown/Options",
+    );
+    expect(resolveBunSymbolReferenceUrl("bun.markdown.options")).toBe(
+      "https://bun.com/reference/bun/markdown/Options",
+    );
+    expect(
+      resolveBunSymbolReferenceUrl(
+        "https://bun.sh/reference/bun/markdown/Options",
+      ),
+    ).toBe("https://bun.com/reference/bun/markdown/Options");
+    expect(resolveBunSymbolReferenceUrl("Bun.markdown.html")).toBe(
+      "https://bun.com/reference/bun/markdown/html",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.markdown.render")).toBe(
+      "https://bun.com/reference/bun/markdown/render",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.markdown.react")).toBe(
+      "https://bun.com/reference/bun/markdown/react",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.markdown.ReactOptions")).toBe(
+      "https://bun.com/reference/bun/markdown/ReactOptions",
+    );
+    expect(resolveBunSymbolReferenceUrl("Bun.markdown.RenderCallbacks")).toBe(
+      "https://bun.com/reference/bun/markdown/RenderCallbacks",
+    );
+    expect(
+      resolveBunSymbolReferenceUrl("Bun.markdown.ComponentOverrides"),
+    ).toBe("https://bun.com/reference/bun/markdown/ComponentOverrides");
+    expect(resolveBunSymbolReferenceUrl("Bun.markdown.ListItemMeta")).toBe(
+      "https://bun.com/reference/bun/markdown/ListItemMeta",
     );
     expect(resolveBunSymbolReferenceUrl("Bun.inspect.custom")).toBe(
       "https://bun.com/reference/bun/inspect",
@@ -383,11 +429,16 @@ describe("Bun reference symbol matching", () => {
 
   test("findBunReferenceSymbolsInText extracts symbols present in text", () => {
     const text =
-      "Use `AnsiTheme` along with Bun.markdown.ansi, Bun.Archive.extract, `Bun.$`, bun:sqlite, and Bun.serve to build CLI tools.";
+      "Use `AnsiTheme` with Bun.markdown.ansi, `Bun.markdown.Options`, Bun.markdown.html, Bun.markdown.render, Bun.markdown.react, Bun.markdown.ListItemMeta, Bun.Archive.extract, `Bun.$`, bun:sqlite, and Bun.serve to build CLI tools.";
     const symbols = findBunReferenceSymbolsInText(text);
     const names = symbols.map((s) => s.symbolName);
     expect(names).toContain("AnsiTheme");
     expect(names).toContain("ansi");
+    expect(names).toContain("Options");
+    expect(names).toContain("html");
+    expect(names).toContain("render");
+    expect(names).toContain("react");
+    expect(names).toContain("ListItemMeta");
     expect(names).toContain("extract");
     expect(names).toContain("$");
     expect(names).toContain("sqlite");
@@ -398,13 +449,28 @@ describe("Bun reference symbol matching", () => {
 
   test("linkifyBunSymbolsInMarkdown transforms code spans into OSC 8 markdown links", () => {
     const input =
-      "Configure styling with `AnsiTheme`, render via `Bun.markdown.ansi`, unpack with `Bun.Archive.extract`, run `Bun.$` with `Bun.TerminalOptions`, or query `bun:sqlite`.";
+      "Configure `Bun.markdown.Options` and `AnsiTheme`, render via `Bun.markdown.ansi`, `Bun.markdown.html`, `Bun.markdown.render` (`Bun.markdown.ListItemMeta`), or `Bun.markdown.react`, unpack with `Bun.Archive.extract`, run `Bun.$` with `Bun.TerminalOptions`, or query `bun:sqlite`.";
     const linked = linkifyBunSymbolsInMarkdown(input);
+    expect(linked).toContain(
+      "[`Bun.markdown.Options`](https://bun.com/reference/bun/markdown/Options)",
+    );
     expect(linked).toContain(
       "[`AnsiTheme`](https://bun.com/reference/bun/markdown/AnsiTheme)",
     );
     expect(linked).toContain(
       "[`Bun.markdown.ansi`](https://bun.com/reference/bun/markdown/ansi)",
+    );
+    expect(linked).toContain(
+      "[`Bun.markdown.html`](https://bun.com/reference/bun/markdown/html)",
+    );
+    expect(linked).toContain(
+      "[`Bun.markdown.render`](https://bun.com/reference/bun/markdown/render)",
+    );
+    expect(linked).toContain(
+      "[`Bun.markdown.ListItemMeta`](https://bun.com/reference/bun/markdown/ListItemMeta)",
+    );
+    expect(linked).toContain(
+      "[`Bun.markdown.react`](https://bun.com/reference/bun/markdown/react)",
     );
     expect(linked).toContain(
       "[`Bun.Archive.extract`](https://bun.com/reference/bun/Archive/extract)",
