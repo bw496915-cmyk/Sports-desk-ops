@@ -15,8 +15,10 @@ import {
   formatIpForUrl,
   parseBackend,
   parseOptions,
+  probeWebSocket,
   readState,
   renderJson,
+  renderWsJson,
   selectTargets,
 } from "../scripts/watchdog_endpoint_probe.ts";
 
@@ -364,6 +366,8 @@ describe("endpoint probe JSON rendering", () => {
     expect(json.socketType).toBe("tcp");
     expect(json.ip).toBeNull();
     expect(json.allIps).toBe(false);
+    expect(json.mode).toBe("http");
+    expect(json.wsUrl).toBeNull();
     expect(json.hosts[0]?.addressProbes).toEqual([]);
     expect(json.hosts[0]?.tls).toBeNull();
     expect(json.hosts[0]?.tlsError).toBeNull();
@@ -421,6 +425,90 @@ describe("endpoint probe JSON rendering", () => {
     expect(json.ip).toBe("149.154.166.110");
     expect(json.hosts[0]?.addressProbes).toHaveLength(1);
     expect(json.hosts[0]?.addressProbes[0]?.status).toBe(302);
+  });
+
+  test("--ws-url parses ws/wss and rejects scheme/conflict/no-dry-run", () => {
+    expect(
+      parseOptions(["--dry-run", "--ws-url", "wss://example.test/ws"]).wsUrl,
+    ).toBe("wss://example.test/ws");
+    expect(
+      parseOptions(["--dry-run", "--ws-url", "ws://127.0.0.1:8080/"]).wsUrl,
+    ).toBe("ws://127.0.0.1:8080/");
+    expect(() =>
+      parseOptions(["--dry-run", "--ws-url", "https://example.test/ws"]),
+    ).toThrow(/must use ws:\/\/ or wss:\/\//);
+    expect(() => parseOptions(["--ws-url", "wss://example.test/ws"])).toThrow(
+      /requires --dry-run/,
+    );
+    expect(() =>
+      parseOptions([
+        "--dry-run",
+        "--host",
+        "api.telegram.org",
+        "--ws-url",
+        "wss://example.test/ws",
+      ]),
+    ).toThrow(/cannot be combined/);
+  });
+
+  test("a WebSocket upgrade opens against a local server", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch(request, server) {
+        return server.upgrade(request)
+          ? undefined
+          : new Response("no upgrade", { status: 400 });
+      },
+      websocket: {
+        open() {},
+        message() {},
+      },
+    });
+    try {
+      const port = server.port;
+      if (port === undefined) throw new Error("local server has no port");
+      const result = await probeWebSocket(
+        `ws://127.0.0.1:${port}/`,
+        "127.0.0.1",
+        false,
+      );
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(101);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("renderWsJson labels the mode and URL without changing the verdict", () => {
+    const target = SPORTSDESK_CORE_HOSTS[0];
+    if (target === undefined) throw new Error("core hosts fixture is empty");
+    const verdict = evaluateEndpointProbe({
+      nowMs: 2_000,
+      state: { consecutiveFailures: 0, lastCheckedAtMs: null },
+      observation: {
+        target,
+        lookup: {
+          ok: true,
+          addresses: ["127.0.0.1"],
+          ttlSeconds: [60],
+          error: null,
+        },
+        fetch: { ok: true, status: 101, latencyMs: 8, error: null },
+        transport: "websocket",
+        cacheStats: null,
+      },
+    });
+    const json = renderWsJson(
+      2_000,
+      verdict,
+      "default",
+      { tls: null, tlsError: "ws:// is plaintext (no TLS)" },
+      "ws://127.0.0.1:8080/",
+    );
+    expect(json.mode).toBe("websocket");
+    expect(json.wsUrl).toBe("ws://127.0.0.1:8080/");
+    expect(json.hosts[0]?.fetchStatus).toBe(101);
+    expect(json.hosts[0]?.message).toContain("WS 101");
   });
 
   test("TLS provenance renders version, cipher, ALPN and certificate", () => {

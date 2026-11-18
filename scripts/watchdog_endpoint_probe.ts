@@ -47,6 +47,7 @@ import {
   ENDPOINT_PROBE_INTERVAL_SECONDS,
   ENDPOINT_PROBE_STATE_SCHEMA_VERSION,
   evaluateEndpointProbe,
+  type EndpointProbeFetch,
   type EndpointProbeObservation,
   type EndpointProbeState,
   type EndpointProbeVerdict,
@@ -96,6 +97,7 @@ interface Options {
   readonly ip?: string;
   readonly allIps: boolean;
   readonly httpVersion: HttpVersion;
+  readonly wsUrl?: string;
   readonly statePath: string;
   readonly help: boolean;
 }
@@ -115,6 +117,8 @@ interface ProbeJson {
   readonly ip: string | null;
   readonly allIps: boolean;
   readonly httpVersion: HttpVersion;
+  readonly mode: "http" | "websocket";
+  readonly wsUrl: string | null;
   readonly alerts: number;
   readonly hosts: readonly {
     readonly host: string;
@@ -187,6 +191,21 @@ function parseHttpVersion(raw: string | undefined): HttpVersion {
   return found;
 }
 
+function parseWsUrl(raw: string | undefined): string | undefined {
+  if (raw === undefined || raw.trim() === "") return undefined;
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    throw new Error(`invalid --ws-url "${raw}"`);
+  }
+  if (url.protocol !== "ws:" && url.protocol !== "wss:") {
+    throw new Error(`--ws-url must use ws:// or wss:// (got ${url.protocol})`);
+  }
+  if (url.hostname === "") throw new Error("--ws-url requires a hostname");
+  return url.href;
+}
+
 function parsePort(raw: string | undefined): number | undefined {
   if (raw === undefined || raw.trim() === "") return undefined;
   const port = Number(raw);
@@ -219,6 +238,7 @@ export function parseOptions(
       ip: { type: "string" },
       "all-ips": { type: "boolean", default: false },
       "http-version": { type: "string" },
+      "ws-url": { type: "string" },
       state: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -229,17 +249,38 @@ export function parseOptions(
   const ip = parseIp(values.ip);
   const allIps = values["all-ips"] ?? false;
   const httpVersion = parseHttpVersion(values["http-version"]);
-  const diagnostic =
-    port !== undefined || ip !== undefined || allIps || httpVersion !== "auto";
-  if (diagnostic && !dryRun) {
-    throw new Error(
-      "--port/--ip/--all-ips/--http-version are diagnostic and require --dry-run",
-    );
-  }
-  if (diagnostic && hosts.length !== 1) {
-    throw new Error(
-      "--port/--ip/--all-ips/--http-version require exactly one --host",
-    );
+  const wsUrl = parseWsUrl(values["ws-url"]);
+  if (wsUrl !== undefined) {
+    if (!dryRun) {
+      throw new Error("--ws-url is diagnostic and requires --dry-run");
+    }
+    if (
+      hosts.length > 0 ||
+      port !== undefined ||
+      ip !== undefined ||
+      allIps ||
+      httpVersion !== "auto"
+    ) {
+      throw new Error(
+        "--ws-url cannot be combined with --host/--port/--ip/--all-ips/--http-version",
+      );
+    }
+  } else {
+    const diagnostic =
+      port !== undefined ||
+      ip !== undefined ||
+      allIps ||
+      httpVersion !== "auto";
+    if (diagnostic && !dryRun) {
+      throw new Error(
+        "--port/--ip/--all-ips/--http-version are diagnostic and require --dry-run",
+      );
+    }
+    if (diagnostic && hosts.length !== 1) {
+      throw new Error(
+        "--port/--ip/--all-ips/--http-version require exactly one --host",
+      );
+    }
   }
   return {
     json: values.json ?? false,
@@ -250,6 +291,7 @@ export function parseOptions(
     ...(ip === undefined ? {} : { ip }),
     allIps,
     httpVersion,
+    ...(wsUrl === undefined ? {} : { wsUrl }),
     statePath:
       values.state === undefined || values.state.trim() === ""
         ? DEFAULT_STATE_PATH
@@ -273,6 +315,8 @@ Flags:
   --http-version <v>  Force HTTP: auto (default) | http1.1 | http2 | http3 (aliases h1/h2/h3).
                       Diagnostic: requires one --host and --dry-run. http2/http3 are experimental;
                       http3 is QUIC, so the TCP TLS provenance is skipped.
+  --ws-url <url>      Probe a ws:// or wss:// WebSocket upgrade instead of an HTTP GET.
+                      Diagnostic: requires --dry-run; cannot combine with the target flags.
   --backend <name>    DNS resolver: default (Bun platform default) | c-ares | system |
                       getaddrinfo | libc. The default leaves the choice to Bun so the probe
                       mirrors the app's fetch()/Bun.connect() path; override for diagnosis.
@@ -409,6 +453,78 @@ function alpnWire(protocols: readonly string[]): Buffer {
     parts.push(Buffer.from([bytes.length]), bytes);
   }
   return Buffer.concat(parts);
+}
+
+export async function probeWebSocket(
+  href: string,
+  hostname: string,
+  secure: boolean,
+): Promise<EndpointProbeFetch> {
+  const started = performance.now();
+  return await new Promise<EndpointProbeFetch>((resolve) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let socket: WebSocket | undefined;
+    const finish = (result: EndpointProbeFetch): void => {
+      if (settled) return;
+      settled = true;
+      if (timer !== undefined) clearTimeout(timer);
+      try {
+        socket?.close();
+      } catch {
+        // already closed; nothing to do
+      }
+      resolve(result);
+    };
+    try {
+      socket = new WebSocket(
+        href,
+        secure ? { tls: { serverName: hostname } } : undefined,
+      );
+    } catch (error) {
+      resolve({
+        ok: false,
+        status: null,
+        latencyMs: Math.round(performance.now() - started),
+        error: messageOf(error),
+      });
+      return;
+    }
+    timer = setTimeout(
+      () =>
+        finish({
+          ok: false,
+          status: null,
+          latencyMs: Math.round(performance.now() - started),
+          error: `WebSocket timeout after ${PROBE_TIMEOUT_MS}ms`,
+        }),
+      PROBE_TIMEOUT_MS,
+    );
+    socket.addEventListener("open", () =>
+      finish({
+        ok: true,
+        status: 101,
+        latencyMs: Math.round(performance.now() - started),
+        error: null,
+      }),
+    );
+    socket.addEventListener("error", () =>
+      finish({
+        ok: false,
+        status: null,
+        latencyMs: Math.round(performance.now() - started),
+        error: "WebSocket error before open",
+      }),
+    );
+    socket.addEventListener("close", () =>
+      finish({
+        ok: false,
+        status: null,
+        latencyMs: Math.round(performance.now() - started),
+        error: "WebSocket closed before open",
+      }),
+    );
+  });
 }
 
 async function probeTlsSafe(
@@ -665,6 +781,8 @@ export function renderJson(
     ip,
     allIps,
     httpVersion,
+    mode: "http",
+    wsUrl: null,
     alerts: verdicts.filter((verdict) => verdict.status === "alert").length,
     hosts: verdicts.map((verdict) => ({
       host: verdict.target.hostname,
@@ -684,6 +802,27 @@ export function renderJson(
       cacheStats: verdict.cacheStats,
     })),
   };
+}
+
+export function renderWsJson(
+  nowMs: number,
+  verdict: EndpointProbeVerdict,
+  resolver: ProbeBackend,
+  tls: { tls: TlsProvenance | null; tlsError: string | null },
+  wsUrl: string,
+): ProbeJson {
+  const base = renderJson(
+    nowMs,
+    true,
+    resolver,
+    [verdict],
+    null,
+    false,
+    {},
+    { [verdict.target.hostname]: tls },
+    "auto",
+  );
+  return { ...base, mode: "websocket", wsUrl };
 }
 
 export function buildNextState(
@@ -731,6 +870,74 @@ async function run(): Promise<number> {
   const options = parseOptions();
   if (options.help) {
     console.log(usage());
+    return EXIT.ok;
+  }
+
+  if (options.wsUrl !== undefined) {
+    const url = new URL(options.wsUrl);
+    const secure = url.protocol === "wss:";
+    const rawHost = url.hostname;
+    const hostname =
+      rawHost.startsWith("[") && rawHost.endsWith("]")
+        ? rawHost.slice(1, -1)
+        : rawHost;
+    const port = url.port === "" ? (secure ? 443 : 80) : Number(url.port);
+    const target: HostTarget = {
+      hostname,
+      port,
+      serviceName: "WebSocket diagnostic",
+    };
+    const lookup = await (async () => {
+      try {
+        const answers = await resolveWithTimeout(
+          hostname,
+          port,
+          options.backend,
+        );
+        const addresses = answers.map((answer) => answer.address);
+        return {
+          ok: addresses.length > 0,
+          addresses,
+          ttlSeconds: answers.map((answer) => Number(answer.ttl)),
+          error: addresses.length > 0 ? null : "no addresses returned",
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          addresses: [],
+          ttlSeconds: [],
+          error: messageOf(error),
+        };
+      }
+    })();
+    const handshake = await probeWebSocket(url.href, hostname, secure);
+    const tls = secure
+      ? await probeTlsSafe(hostname, port, hostname, "http1.1")
+      : { tls: null, tlsError: "ws:// is plaintext (no TLS)" };
+    const nowMs = Date.now();
+    const verdict = evaluateEndpointProbe({
+      nowMs,
+      state: { consecutiveFailures: 0, lastCheckedAtMs: null },
+      observation: {
+        target,
+        lookup,
+        fetch: handshake,
+        transport: "websocket",
+        cacheStats: readDnsCacheStats() ?? null,
+      },
+    });
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          renderWsJson(nowMs, verdict, options.backend, tls, url.href),
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.log(`WebSocket: ${url.href}`);
+      console.log(verdict.message);
+    }
     return EXIT.ok;
   }
 

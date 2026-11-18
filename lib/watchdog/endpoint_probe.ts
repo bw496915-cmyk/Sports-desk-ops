@@ -55,6 +55,8 @@ export interface EndpointProbeObservation {
   readonly target: HostTarget;
   readonly lookup: EndpointProbeLookup;
   readonly fetch: EndpointProbeFetch;
+  /** Diagnostic transport label; a WebSocket handshake is not an HTTP GET. */
+  readonly transport?: "http" | "websocket";
   /** Telemetry only; never affects the verdict. */
   readonly cacheStats: Readonly<Record<string, number>> | null;
 }
@@ -135,10 +137,12 @@ export function evaluateEndpointProbe(
 
   const message = (() => {
     if (failure === null) {
+      const scheme =
+        input.observation.transport === "websocket" ? "WS" : "HTTP";
       const http =
         input.observation.fetch.status === null
           ? "no status"
-          : `HTTP ${input.observation.fetch.status}`;
+          : `${scheme} ${input.observation.fetch.status}`;
       const latency =
         input.observation.fetch.latencyMs === null
           ? ""

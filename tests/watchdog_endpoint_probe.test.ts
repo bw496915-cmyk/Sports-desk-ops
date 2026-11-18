@@ -239,6 +239,22 @@ describe("evaluateEndpointProbe", () => {
     expect(verdict.status).toBe("ok");
   });
 
+  test("a WebSocket transport is labelled WS, not HTTP", () => {
+    const verdict = evaluateEndpointProbe({
+      nowMs: 2_000,
+      state: state(0),
+      observation: {
+        ...observation({
+          fetch: { ok: true, status: 101, latencyMs: 10, error: null },
+        }),
+        transport: "websocket",
+      },
+    });
+    expect(verdict.status).toBe("ok");
+    expect(verdict.message).toContain("WS 101");
+    expect(verdict.message).not.toContain("HTTP 101");
+  });
+
   test("the interval constant is the 15-minute cadence", () => {
     expect(ENDPOINT_PROBE_INTERVAL_SECONDS).toBe(900);
   });

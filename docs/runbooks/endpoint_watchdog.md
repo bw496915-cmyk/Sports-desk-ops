@@ -138,8 +138,9 @@ the dial address. A `Host` mismatch can therefore change HTTP routing without fa
   negotiated h3 in that sample, so the probe reports a fetch failure for them (and still
   requires a second consecutive failure before paging).
 - `ws://` / `wss://` are a different protocol: the connection starts with an HTTP Upgrade,
-  not a GET. This probe does not speak the WebSocket upgrade. Bun's `WebSocket` client
-  supports ws/wss with `headers` and `tls.serverName` if a separate WS probe is added.
+  not a GET. The core-host HTTP probe does not speak that upgrade; use the explicit
+  `--ws-url` diagnostic below, which has no state/paging and cannot combine with the target
+  flags.
 - `Bun.TLSOptions` exposes `ALPNProtocols`, `ciphers` and `secureOptions`, but no
   `minVersion`/`maxVersion`; the app's fetch defaults are left untouched.
 - `tls` is diagnostic; the fetch result remains the gate.
@@ -149,6 +150,25 @@ timeout. Per-address status, latency and error land in the host's `addressProbes
 verdict still comes from the primary path (the hostname fetch, or the `--ip` override), so one bad
 edge address is reported as a diagnostic rather than silently turning into a synthetic host
 failure. `--json` reports `ip`, `allIps`, the effective `port`, and `addressProbes` per host.
+
+## WebSocket diagnostic
+
+```sh
+bun run scripts/watchdog_endpoint_probe.ts --dry-run \
+  --ws-url wss://ws.postman-echo.com/raw
+```
+
+`--ws-url` replaces the HTTP GET with a WebSocket upgrade:
+
+- The URL must be `ws://` or `wss://` and carries host, port and path.
+- It requires `--dry-run`; it cannot combine with `--host`/`--port`/`--ip`/`--all-ips`/
+  `--http-version`; it writes no state and pages no Telegram.
+- A successful upgrade is `101`; the verdict message says `WS 101`, and
+  `--json` adds `mode: "websocket"` plus `wsUrl`. A refused handshake or a timeout is reported
+  as `fetch-failed`.
+- `wss` runs `probeTls` with ALPN `http/1.1` for TLS version/cipher/certificate provenance;
+  `ws` is plaintext (`tls: null`, `tlsError` says so).
+- Measured 2026-11-17: `wss://ws.postman-echo.com/raw` → `WS 101`, ALPN `http/1.1`.
 
 ## Troubleshooting
 
