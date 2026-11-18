@@ -164,6 +164,20 @@ function isUnvalidatedPortExpr(expr: ts.Expression): boolean {
   return false;
 }
 
+function numericLiteralValue(expr: ts.Expression): number | null {
+  if (ts.isNumericLiteral(expr)) return Number(expr.text);
+  if (
+    ts.isPrefixUnaryExpression(expr) &&
+    (expr.operator === ts.SyntaxKind.MinusToken ||
+      expr.operator === ts.SyntaxKind.PlusToken) &&
+    ts.isNumericLiteral(expr.operand)
+  ) {
+    const value = Number(expr.operand.text);
+    return expr.operator === ts.SyntaxKind.MinusToken ? -value : value;
+  }
+  return null;
+}
+
 function auditSourceFile(
   sf: ts.SourceFile,
   checker: ts.TypeChecker,
@@ -400,7 +414,87 @@ function auditSourceFile(
         }
       }
 
-      // 7. Bun.gzipSync / Bun.deflateSync -> memLevel (1..9) & strategy (0..4) range check
+      // 7. FileHandle.createReadStream(options) -> inclusive start/end range and fd lifetime
+      if (
+        ts.isPropertyAccessExpression(expr) &&
+        expr.name.text === "createReadStream" &&
+        checker
+          .typeToString(checker.getTypeAtLocation(expr.expression))
+          .includes("FileHandle")
+      ) {
+        const optArg = node.arguments[0];
+        if (optArg && ts.isObjectLiteralExpression(optArg)) {
+          let start: { value: number; node: ts.Node } | undefined;
+          let end: { value: number; node: ts.Node } | undefined;
+          for (const prop of optArg.properties) {
+            if (!ts.isPropertyAssignment(prop)) continue;
+            const key =
+              ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name)
+                ? prop.name.text
+                : prop.name.getText(sf);
+            if (key === "start" || key === "end") {
+              const value = numericLiteralValue(prop.initializer);
+              if (value === null) continue;
+              if (
+                !Number.isSafeInteger(value) ||
+                value < 0 ||
+                value > Number.MAX_SAFE_INTEGER
+              ) {
+                record(
+                  prop.initializer,
+                  "BUN-FILEHANDLE-READ-RANGE",
+                  Severity.ERROR,
+                  `FileHandle.createReadStream ${key}=${value} is outside [0, MAX_SAFE_INTEGER] or non-integer; both bounds are inclusive and validated at runtime.`,
+                );
+              } else if (key === "start") {
+                start = { value, node: prop.initializer };
+              } else {
+                end = { value, node: prop.initializer };
+              }
+            } else if (
+              key === "autoClose" &&
+              prop.initializer.kind === ts.SyntaxKind.FalseKeyword
+            ) {
+              record(
+                prop,
+                "BUN-FILEHANDLE-READ-AUTOCLOSE",
+                Severity.WARN,
+                "autoClose:false keeps the fd open on 'end'/'error'; close the FileHandle explicitly or accept a descriptor leak.",
+              );
+            } else if (
+              key === "emitClose" &&
+              prop.initializer.kind === ts.SyntaxKind.FalseKeyword
+            ) {
+              record(
+                prop,
+                "BUN-FILEHANDLE-READ-EMITCLOSE",
+                Severity.WARN,
+                "emitClose:false suppresses the 'close' event; cleanup must not wait for it.",
+              );
+            } else if (key === "highWaterMark") {
+              const value = numericLiteralValue(prop.initializer);
+              if (value !== null && (!Number.isInteger(value) || value < 0)) {
+                record(
+                  prop.initializer,
+                  "BUN-FILEHANDLE-READ-HWM",
+                  Severity.WARN,
+                  `highWaterMark=${value} is not a non-negative integer; the default is 64 KiB.`,
+                );
+              }
+            }
+          }
+          if (start && end && start.value > end.value) {
+            record(
+              start.node,
+              "BUN-FILEHANDLE-READ-RANGE",
+              Severity.ERROR,
+              `start=${start.value} > end=${end.value}; both bounds are inclusive.`,
+            );
+          }
+        }
+      }
+
+      // 8. Bun.gzipSync / Bun.deflateSync -> memLevel (1..9) & strategy (0..4) range check
       if (exprText === "Bun.gzipSync" || exprText === "Bun.deflateSync") {
         const optArg = node.arguments[1];
         if (optArg && ts.isObjectLiteralExpression(optArg)) {
