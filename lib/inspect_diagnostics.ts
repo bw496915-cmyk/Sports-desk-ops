@@ -16,6 +16,8 @@
  */
 
 import { basename, isAbsolute, relative, resolve } from "node:path";
+import { formatByteCount } from "./format_bytes.ts";
+import { DEFAULT_MAX_PIXELS } from "./image_limits.ts";
 import {
   redactDiagnosticSurface,
   resolveInspectVisibility,
@@ -514,8 +516,6 @@ export function wrapBunRequestDiagnostic(
 // The source is masked per visibility tier before it reaches a card or JSON body.
 // -----------------------------------------------------------------------------
 
-const DEFAULT_MAX_PIXELS = 16_384 * 16_384;
-
 export type BunImageAssetInput = Uint8Array | ArrayBuffer | Blob | string;
 
 export interface BunImageAssetInit {
@@ -554,12 +554,6 @@ export function maskAssetSource(
     return redactDiagnosticSurface(rel, visibility);
   }
   return `[REDACTED_DIR]/${basename(source)}`;
-}
-
-function formatByteCount(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
 }
 
 export class BunImageAssetDiagnostic {

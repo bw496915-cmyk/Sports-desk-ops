@@ -19,6 +19,13 @@ import {
 } from "./inspect_diagnostics.ts";
 import type { InspectVisibility } from "./inspect_redactor.ts";
 
+/** Default entries per directory (`--limit`). */
+export const DEFAULT_ASSET_LIMIT = 24;
+/** Hard cap on entries per directory (`--limit` is clamped to this). */
+export const MAX_ASSET_LIMIT = 100;
+/** Default skip threshold for one asset (`--max-bytes`). */
+export const DEFAULT_MAX_ASSET_BYTES = 8 * 1024 * 1024;
+
 export const IMAGE_ASSET_EXTENSIONS = new Set([
   ".png",
   ".jpg",
@@ -33,9 +40,9 @@ export const IMAGE_ASSET_EXTENSIONS = new Set([
 ]);
 
 export interface ImageAssetScanOptions {
-  /** Maximum entries returned, clamped to `1..100`. Default 24. */
+  /** Maximum entries returned, clamped to `1..MAX_ASSET_LIMIT`. Default DEFAULT_ASSET_LIMIT. */
   readonly limit?: number | undefined;
-  /** Skip files larger than this many bytes. Default 8 MiB. */
+  /** Skip files larger than this many bytes. Default DEFAULT_MAX_ASSET_BYTES (8 MiB). */
   readonly maxBytes?: number | undefined;
   readonly visibility?: InspectVisibility | undefined;
   readonly maxPixels?: number | undefined;
@@ -43,6 +50,8 @@ export interface ImageAssetScanOptions {
   readonly recursive?: boolean | undefined;
   /** Case-insensitive substring filter on the relative asset name, applied before the limit. */
   readonly filter?: string | undefined;
+  /** Case-insensitive substring exclusion, applied after `filter` and before the limit. */
+  readonly exclude?: string | undefined;
   /** Decode each image to compute its ThumbHash placeholder (slower than header metadata). */
   readonly placeholders?: boolean | undefined;
   /**
@@ -104,13 +113,97 @@ export interface ImageAssetFileScanResult {
   readonly truncated: boolean;
 }
 
+async function inspectFile(
+  path: string,
+  options: ImageAssetScanOptions,
+  maxBytes: number,
+): Promise<BunImageAssetFile> {
+  const file = Bun.file(path);
+  if (file.size > maxBytes) {
+    return Object.freeze({
+      path,
+      entry: failureFor(path, "ERR_IMAGE_TOO_LARGE", options.visibility),
+    });
+  }
+  if (options.headerBytes !== undefined) {
+    try {
+      const prefix = new Uint8Array(
+        await file.slice(0, options.headerBytes).arrayBuffer(),
+      );
+      const header = await readImageHeaderMetadata(prefix);
+      if (!header.ok) {
+        return Object.freeze({
+          path,
+          entry: failureFor(
+            path,
+            header.code,
+            options.visibility,
+            header.requiredBytes,
+          ),
+        });
+      }
+      return Object.freeze({
+        path,
+        entry: new BunImageAssetDiagnostic({
+          source: path,
+          ...header.attributes,
+          bytes: file.size,
+          backend: Bun.Image.backend,
+          visibility: options.visibility,
+        }),
+      });
+    } catch (error) {
+      return Object.freeze({
+        path,
+        entry: failureFor(
+          path,
+          imageErrorCode(error) ?? "ERR_IMAGE_DECODE_FAILED",
+          options.visibility,
+        ),
+      });
+    }
+  }
+  try {
+    return Object.freeze({
+      path,
+      entry: await inspectBunImageAsset(path, {
+        displaySource: path,
+        bytes: file.size,
+        visibility: options.visibility,
+        maxPixels: options.maxPixels,
+        computePlaceholder: options.placeholders === true,
+      }),
+    });
+  } catch (error) {
+    return Object.freeze({
+      path,
+      entry: failureFor(
+        path,
+        imageErrorCode(error) ?? "ERR_IMAGE_DECODE_FAILED",
+        options.visibility,
+      ),
+    });
+  }
+}
+
+function scanLimit(options: ImageAssetScanOptions): number {
+  return Math.max(
+    1,
+    Math.min(options.limit ?? DEFAULT_ASSET_LIMIT, MAX_ASSET_LIMIT),
+  );
+}
+
+function scanMaxBytes(options: ImageAssetScanOptions): number {
+  return options.maxBytes ?? DEFAULT_MAX_ASSET_BYTES;
+}
+
 /** Lists image attributes and real paths under one directory, shallow and name-sorted. */
 export async function scanBunImageAssetFiles(
   dir: string,
   options: ImageAssetScanOptions = {},
 ): Promise<ImageAssetFileScanResult> {
-  const limit = Math.max(1, Math.min(options.limit ?? 24, 100));
-  const maxBytes = options.maxBytes ?? 8 * 1024 * 1024;
+  const limit = scanLimit(options);
+  const maxBytes = scanMaxBytes(options);
   let names: string[];
   try {
     if (options.recursive === true) {
@@ -141,83 +234,38 @@ export async function scanBunImageAssetFiles(
   if (filter !== "") {
     names = names.filter((name) => name.toLowerCase().includes(filter));
   }
+  const exclude = options.exclude?.trim().toLowerCase() ?? "";
+  if (exclude !== "") {
+    names = names.filter((name) => !name.toLowerCase().includes(exclude));
+  }
   names.sort();
 
   const selected = names.slice(0, limit);
   const files = await Promise.all(
-    selected.map(async (name): Promise<BunImageAssetFile> => {
-      const path = join(dir, name);
-      const file = Bun.file(path);
-      if (file.size > maxBytes) {
-        return Object.freeze({
-          path,
-          entry: failureFor(path, "ERR_IMAGE_TOO_LARGE", options.visibility),
-        });
-      }
-      if (options.headerBytes !== undefined) {
-        try {
-          const prefix = new Uint8Array(
-            await file.slice(0, options.headerBytes).arrayBuffer(),
-          );
-          const header = await readImageHeaderMetadata(prefix);
-          if (!header.ok) {
-            return Object.freeze({
-              path,
-              entry: failureFor(
-                path,
-                header.code,
-                options.visibility,
-                header.requiredBytes,
-              ),
-            });
-          }
-          return Object.freeze({
-            path,
-            entry: new BunImageAssetDiagnostic({
-              source: path,
-              ...header.attributes,
-              bytes: file.size,
-              visibility: options.visibility,
-            }),
-          });
-        } catch (error) {
-          return Object.freeze({
-            path,
-            entry: failureFor(
-              path,
-              imageErrorCode(error) ?? "ERR_IMAGE_DECODE_FAILED",
-              options.visibility,
-            ),
-          });
-        }
-      }
-      try {
-        return Object.freeze({
-          path,
-          entry: await inspectBunImageAsset(path, {
-            displaySource: path,
-            bytes: file.size,
-            visibility: options.visibility,
-            maxPixels: options.maxPixels,
-            computePlaceholder: options.placeholders === true,
-          }),
-        });
-      } catch (error) {
-        return Object.freeze({
-          path,
-          entry: failureFor(
-            path,
-            imageErrorCode(error) ?? "ERR_IMAGE_DECODE_FAILED",
-            options.visibility,
-          ),
-        });
-      }
-    }),
+    selected.map((name) => inspectFile(join(dir, name), options, maxBytes)),
   );
   return Object.freeze({
     files: Object.freeze(files),
     total: names.length,
     truncated: names.length > selected.length,
+  });
+}
+
+/** Inspects explicit paths (a file list or an already-expanded glob). */
+export async function scanBunImageAssetPaths(
+  paths: readonly string[],
+  options: ImageAssetScanOptions = {},
+): Promise<ImageAssetFileScanResult> {
+  const limit = scanLimit(options);
+  const maxBytes = scanMaxBytes(options);
+  const selected = paths.slice(0, limit);
+  const files = await Promise.all(
+    selected.map((path) => inspectFile(path, options, maxBytes)),
+  );
+  return Object.freeze({
+    files: Object.freeze(files),
+    total: paths.length,
+    truncated: paths.length > selected.length,
   });
 }
 

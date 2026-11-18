@@ -4,7 +4,7 @@
  * applies `fit: "inside"` with `withoutEnlargement`, and returns the measured WebP attributes.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -12,29 +12,18 @@ import {
   thumbnailDestination,
   writeWebpThumbnail,
 } from "../lib/bun_thumbnail.ts";
+import { makePng } from "./support/image_fixtures.ts";
 
-const PNG_1X1_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const dir = mkdtempSync(join(tmpdir(), "sd-thumb-"));
 
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-async function makePng(
-  path: string,
-  width: number,
-  height: number,
-): Promise<void> {
-  const source = Uint8Array.from(Buffer.from(PNG_1X1_BASE64, "base64"));
-  const bytes = await new Bun.Image(source).resize(width, height).png().bytes();
-  writeFileSync(path, bytes);
-}
-
 describe("writeWebpThumbnail", () => {
   test("caps the long edge and writes a WebP with the pinned backend", async () => {
     const source = join(dir, "wide.png");
-    const destination = join(dir, "thumbs", "wide.png.thumb.webp");
+    const destination = thumbnailDestination(dir, source, join(dir, "thumbs"));
     await makePng(source, 120, 90);
 
     const thumb = await writeWebpThumbnail(source, destination, {
@@ -56,7 +45,7 @@ describe("writeWebpThumbnail", () => {
 
   test("withoutEnlargement leaves a smaller image at its own size", async () => {
     const source = join(dir, "small.png");
-    const destination = join(dir, "small.thumb.webp");
+    const destination = thumbnailDestination(dir, source, dir);
     await makePng(source, 20, 10);
 
     const thumb = await writeWebpThumbnail(source, destination, {
@@ -70,7 +59,7 @@ describe("writeWebpThumbnail", () => {
   test("validates the edge, quality and destination", async () => {
     const source = join(dir, "bad.png");
     await makePng(source, 10, 10);
-    const destination = join(dir, "bad.thumb.webp");
+    const destination = thumbnailDestination(dir, source, dir);
 
     await expect(
       writeWebpThumbnail(source, destination, { maxEdge: 0 }),

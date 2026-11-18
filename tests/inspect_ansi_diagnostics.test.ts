@@ -31,6 +31,7 @@ import {
   runWithInspectVisibility,
   sanitizeRouteRecord,
 } from "../lib/inspect_redactor.ts";
+import { png1x1 } from "./support/image_fixtures.ts";
 
 type InspectOptions = NonNullable<Parameters<typeof Bun.inspect>[1]>;
 
@@ -64,8 +65,6 @@ afterAll(() => {
 
 const RAW_JWT = "eyJhbGciOiJIUzI1NiJ9.eyJtb2RlIjo2fQ.secret_sig_991122";
 const TOKEN = "tok_live_secret_888";
-const PNG_1X1_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const MATCH_URL =
   `/modes/6/weblog-ip?0=live&filter=sharp&token=${TOKEN}` +
   `&X-Amz-Signature=deadbeef123&jwt=${RAW_JWT}` +
@@ -371,7 +370,7 @@ describe("BunRequestDiagnostic", () => {
 
 describe("BunImageAssetDiagnostic", () => {
   test("reads header attributes without decoding pixels", async () => {
-    const png = Uint8Array.from(Buffer.from(PNG_1X1_BASE64, "base64"));
+    const png = png1x1();
     const asset = await inspectBunImageAsset(png, {
       displaySource: join(process.cwd(), "docs/assets/logo.png"),
       visibility: "RISK_MANAGER",
@@ -418,7 +417,7 @@ describe("BunImageAssetDiagnostic", () => {
   test("scan is name-sorted, extension-filtered and failure-labeled", async () => {
     const scanDir = mkdtempSync(join(tmpdir(), "sd-assets-"));
     try {
-      const png = Uint8Array.from(Buffer.from(PNG_1X1_BASE64, "base64"));
+      const png = png1x1();
       writeFileSync(join(scanDir, "b.png"), png);
       writeFileSync(join(scanDir, "a.png"), png);
       writeFileSync(join(scanDir, "note.txt"), "ignored");

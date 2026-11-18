@@ -19,11 +19,14 @@ import {
   relative,
   resolve,
 } from "node:path";
+import { DEFAULT_MAX_PIXELS, MAX_IMAGE_EDGE } from "./image_limits.ts";
 
-const DEFAULT_MAX_EDGE = 400;
-const DEFAULT_QUALITY = 80;
-const DEFAULT_MAX_PIXELS = 16_384 * 16_384;
-const MAX_EDGE = 16_384;
+/** Default long edge for generated thumbnails. */
+export const DEFAULT_THUMBNAIL_EDGE = 400;
+/** Default WebP quality for generated thumbnails. */
+export const DEFAULT_THUMBNAIL_QUALITY = 80;
+/** Longest edge `Bun.Image.resize()` accepts. */
+export const MAX_THUMBNAIL_EDGE = MAX_IMAGE_EDGE;
 
 export type BunImageBackend = "bun" | "system";
 
@@ -91,9 +94,9 @@ export async function writeWebpThumbnail(
   destination: string,
   options: WebpThumbnailOptions = {},
 ): Promise<WebpThumbnail> {
-  const maxEdge = options.maxEdge ?? DEFAULT_MAX_EDGE;
-  const quality = options.quality ?? DEFAULT_QUALITY;
-  assertInt("maxEdge", maxEdge, 1, MAX_EDGE);
+  const maxEdge = options.maxEdge ?? DEFAULT_THUMBNAIL_EDGE;
+  const quality = options.quality ?? DEFAULT_THUMBNAIL_QUALITY;
+  assertInt("maxEdge", maxEdge, 1, MAX_THUMBNAIL_EDGE);
   assertInt("quality", quality, 1, 100);
   if (resolve(source) === resolve(destination)) {
     throw new Error("thumbnail destination must differ from the source");

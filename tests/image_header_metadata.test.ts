@@ -12,9 +12,7 @@ import {
   readImageHeaderMetadata,
   type ImageHeaderResult,
 } from "../lib/image_header.ts";
-
-const PNG_1X1_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+import { png1x1 } from "./support/image_fixtures.ts";
 
 async function growToMetadata(
   bytes: Uint8Array,
@@ -83,7 +81,7 @@ describe("readImageHeaderMetadata", () => {
   });
 
   test("a clean JPEG resolves after walking to SOS + 10", async () => {
-    const png = Uint8Array.from(Buffer.from(PNG_1X1_BASE64, "base64"));
+    const png = png1x1();
     const clean = new Uint8Array(
       await new Bun.Image(png).resize(120, 90).jpeg({ quality: 80 }).bytes(),
     );
