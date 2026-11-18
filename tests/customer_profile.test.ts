@@ -15,6 +15,7 @@ import {
   fmtInt,
   fmtUsd,
   isKeyNumberBuy,
+  isSyntheticCustomerId,
   normalizeCustomerId,
   normalizeObservationTicket,
   parseBuyPointsFromDesc,
@@ -1106,6 +1107,12 @@ describe.skipIf(book === null || book.length !== 220)(
 );
 
 describe("live-derived context labels", () => {
+  test("SYNTH_ ids are recognised as fixtures, case-insensitively", () => {
+    expect(isSyntheticCustomerId("SYNTH_SYN_01")).toBe(true);
+    expect(isSyntheticCustomerId(" synth_rec_03 ")).toBe(true);
+    expect(isSyntheticCustomerId("PTA101")).toBe(false);
+  });
+
   const liveRow = (over: Partial<CustomerRow> = {}): CustomerRow => ({
     customer_id: "LIVE1",
     provenance: "live-wagers",

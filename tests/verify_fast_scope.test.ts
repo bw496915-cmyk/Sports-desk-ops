@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  changedInstallGraph,
   dataPathPattern,
   dataReaderTestFiles,
   filterImported,
@@ -363,5 +364,28 @@ describe("selection recovery for mixed diffs", () => {
       reason: "no-references",
       count: 0,
     });
+  });
+});
+
+describe("install-graph gate", () => {
+  test("a manifest or lockfile change runs the install-graph suites", () => {
+    expect(changedInstallGraph(["package.json"])).toBe(true);
+    expect(changedInstallGraph(["bun.lock"])).toBe(true);
+    expect(changedInstallGraph(["packages/ui/package.json"])).toBe(true);
+    expect(
+      changedInstallGraph([
+        "packages/nsh-desk/package.json",
+        "lib/pm_policy.ts",
+      ]),
+    ).toBe(true);
+  });
+
+  test("changes that test:changed already covers do not trigger it", () => {
+    expect(changedInstallGraph([])).toBe(false);
+    expect(changedInstallGraph(["lib/pm_policy.ts"])).toBe(false);
+    // A foreign lockfile is rejected by the single-lockfile gate, not by this one.
+    expect(changedInstallGraph(["package-lock.json"])).toBe(false);
+    // Nested JSON such as a tsconfig is not a manifest.
+    expect(changedInstallGraph(["packages/ui/tsconfig.json"])).toBe(false);
   });
 });

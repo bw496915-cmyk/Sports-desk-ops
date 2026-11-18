@@ -1419,6 +1419,17 @@ export const DESK_ENDPOINT_CATALOG: readonly DeskEndpointCatalogEntry[] = [
     summary: "Bun.dns cache hit rate, inflight coalescing & core hosts",
   },
   {
+    id: "image-assets",
+    method: "GET",
+    path: "/api/diagnostics/image-assets",
+    aliases: [],
+    plane: "ops",
+    auth: "loopback",
+    autoSweep: true,
+    sweepPath: "/api/diagnostics/image-assets",
+    summary: "Bun.Image attributes for docs/assets, masked under RISK_MANAGER",
+  },
+  {
     id: "governance",
     method: "GET",
     path: "/governance.json",
@@ -3574,31 +3585,35 @@ export function parseXmlOddsSoaPayload(raw: unknown): ParsedXmlOddsSoaPayload {
     lineHundredthsCol[index] = value;
   }
 
-  // Unknown lines are optional for backward compatibility: a body without `lineUnknown`
-  // (the route before the tri-state contract) is an all-known snapshot.
-  const lineUnknownRaw = raw["lineUnknown"];
+  // Unknown lines are optional for backward compatibility: a body without `lineUnknownFlags`
+  // (the route before the tri-state contract) is an all-known snapshot. The wire form is the
+  // dense bitset, so the server never builds one boolean per row.
+  const lineUnknownFlagsRaw = raw["lineUnknownFlags"];
   const lineUnknownCountRaw = raw["lineUnknownCount"];
+  const wordCount = Math.ceil(rowCount / 32);
   let lineUnknownFlags: Uint32Array | undefined;
   let lineUnknownCount = 0;
-  if (lineUnknownRaw !== undefined) {
-    if (!Array.isArray(lineUnknownRaw) || lineUnknownRaw.length !== rowCount) {
+  if (lineUnknownFlagsRaw !== undefined) {
+    if (
+      !Array.isArray(lineUnknownFlagsRaw) ||
+      lineUnknownFlagsRaw.length !== wordCount
+    ) {
       throw new TypeError(
-        `[nsh-desk] /api/xml-odds/soa lineUnknown is not a boolean[] of ${rowCount} entries`,
+        `[nsh-desk] /api/xml-odds/soa lineUnknownFlags is not a ${wordCount}-word bitset`,
       );
     }
-    lineUnknownFlags = new Uint32Array(Math.ceil(rowCount / 32));
-    for (let index = 0; index < rowCount; index += 1) {
-      const value = lineUnknownRaw[index];
-      if (typeof value !== "boolean") {
+    lineUnknownFlags = new Uint32Array(wordCount);
+    for (let word = 0; word < wordCount; word += 1) {
+      const value = lineUnknownFlagsRaw[word];
+      if (!isIntegerInRange(value, 0, 0xffff_ffff)) {
         throw new TypeError(
-          `[nsh-desk] /api/xml-odds/soa lineUnknown[${index}] is not a boolean`,
+          `[nsh-desk] /api/xml-odds/soa lineUnknownFlags[${word}] is not a uint32`,
         );
       }
-      if (value) {
-        const wordIndex = index >>> 5;
-        lineUnknownFlags[wordIndex] =
-          (lineUnknownFlags[wordIndex] ?? 0) | (1 << (index & 31));
-        lineUnknownCount += 1;
+      lineUnknownFlags[word] = value;
+      for (let bit = 0; bit < 32; bit += 1) {
+        if (word * 32 + bit >= rowCount) break;
+        if ((value & (1 << bit)) !== 0) lineUnknownCount += 1;
       }
     }
   }
@@ -3608,14 +3623,14 @@ export function parseXmlOddsSoaPayload(raw: unknown): ParsedXmlOddsSoaPayload {
         "[nsh-desk] /api/xml-odds/soa lineUnknownCount is not a row count",
       );
     }
-    if (lineUnknownRaw === undefined) {
+    if (lineUnknownFlagsRaw === undefined) {
       throw new TypeError(
-        "[nsh-desk] /api/xml-odds/soa lineUnknownCount is present without lineUnknown",
+        "[nsh-desk] /api/xml-odds/soa lineUnknownCount is present without lineUnknownFlags",
       );
     }
     if (lineUnknownCountRaw !== lineUnknownCount) {
       throw new TypeError(
-        `[nsh-desk] /api/xml-odds/soa lineUnknownCount ${lineUnknownCountRaw} does not match ${lineUnknownCount} lineUnknown rows`,
+        `[nsh-desk] /api/xml-odds/soa lineUnknownCount ${lineUnknownCountRaw} does not match ${lineUnknownCount} lineUnknownFlags bits`,
       );
     }
     lineUnknownCount = lineUnknownCountRaw;

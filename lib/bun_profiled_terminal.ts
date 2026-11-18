@@ -11,6 +11,7 @@
  * running, and it does not override a `BUN_OPTIONS` the parent environment already exports.
  */
 import { Database } from "bun:sqlite";
+import { openSportsdeskSqlite } from "./sportsdesk_sqlite.ts";
 
 export type ColorDepth = "none" | "ansi16" | "ansi256" | "truecolor";
 
@@ -52,7 +53,8 @@ export class NamedColorTokenStore {
   readonly #db: Database;
 
   constructor(path = ":memory:") {
-    this.#db = new Database(path);
+    // House rule: SQLite opens only through lib/sportsdesk_sqlite.ts (strict + safeIntegers).
+    this.#db = openSportsdeskSqlite(path);
     this.#db.run(
       `CREATE TABLE IF NOT EXISTS profiles (
         name TEXT PRIMARY KEY,
@@ -101,7 +103,7 @@ export class NamedColorTokenStore {
     if (row === null) return undefined;
     return {
       colors: { accent: row.accent, error: row.error, warn: row.warn },
-      consoleDepth: row.console_depth,
+      consoleDepth: Number(row.console_depth),
     };
   }
 

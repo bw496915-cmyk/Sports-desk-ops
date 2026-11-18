@@ -9,6 +9,7 @@
  * terminal sessions cannot drift apart.
  */
 import { Database } from "bun:sqlite";
+import { openSportsdeskSqlite } from "./sportsdesk_sqlite.ts";
 import {
   BUILTIN_PROFILES,
   deriveColorToken,
@@ -73,7 +74,8 @@ export class AutomatedDualTokenStore {
   private readonly db: Database;
 
   constructor(dbPath = ":memory:", seedBuiltins = true) {
-    this.db = new Database(dbPath, { create: true });
+    // House rule: SQLite opens only through lib/sportsdesk_sqlite.ts (strict + safeIntegers).
+    this.db = openSportsdeskSqlite(dbPath);
     this.db.run("PRAGMA journal_mode = WAL;");
     this.db.run("PRAGMA busy_timeout = 2000;");
 
@@ -195,7 +197,14 @@ export class AutomatedDualTokenStore {
         `SELECT profile, role, color_name, color_number, hex
          FROM dual_theme_tokens WHERE profile = ?1 ORDER BY role`,
       )
-      .all(profile) as StoredDualColorRow[];
+      .all(profile)
+      .map((row) => {
+        // `safeIntegers` returns bigint; the row contract is a number.
+        const stored = row as StoredDualColorRow & {
+          color_number: number | bigint;
+        };
+        return { ...stored, color_number: Number(stored.color_number) };
+      });
   }
 
   getInspect(profile: string): ProfileInspectSettings {
@@ -216,12 +225,12 @@ export class AutomatedDualTokenStore {
     }
     return {
       consoleDepth:
-        row.console_depth >= 999_999
+        Number(row.console_depth) >= 999_999
           ? Number.POSITIVE_INFINITY
-          : row.console_depth,
-      sorted: row.sorted === 1,
-      compact: row.compact === 1,
-      maxArrayLength: row.max_array_length,
+          : Number(row.console_depth),
+      sorted: Number(row.sorted) === 1,
+      compact: Number(row.compact) === 1,
+      maxArrayLength: Number(row.max_array_length),
     };
   }
 

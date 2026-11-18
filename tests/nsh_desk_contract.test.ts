@@ -635,7 +635,8 @@ describe("packages/nsh-desk model and capability contracts", () => {
       // [14:9] subSport6 | [8:6] wagerType3 | [5:2] period4 | [1:0] marketKind2
       expect(outcome.payload.comboKey15).toEqual([1101, 2050]);
       expect(outcome.payload.lineHundredths).toEqual([350, -110]);
-      expect(outcome.payload.lineUnknown).toEqual([false, false]);
+      // One bitset word for two rows; no bit set means every line is known.
+      expect(outcome.payload.lineUnknownFlags).toEqual([0]);
       expect(outcome.payload.lineUnknownCount).toBe(0);
       expect(outcome.payload.watermarkCursor).toBe("wm-9");
       expect(outcome.payload.generatedAt).toBe("2023-11-14T22:13:20.123Z");
@@ -662,14 +663,14 @@ describe("packages/nsh-desk model and capability contracts", () => {
       rowCount: number;
       eventId32: number[];
       comboKey15: number[];
-      lineUnknown: boolean[];
+      lineUnknownFlags: number[];
       lineUnknownCount: number;
     };
     expect(body.success).toBe(true);
     expect(body.rowCount).toBe(2);
     expect(body.eventId32).toEqual([11, 12]);
     expect(body.comboKey15).toEqual([1101, 2050]);
-    expect(body.lineUnknown).toEqual([false, false]);
+    expect(body.lineUnknownFlags).toEqual([0]);
     expect(body.lineUnknownCount).toBe(0);
 
     // A missing artifact is a stated 502, never an empty 200.
@@ -753,7 +754,8 @@ describe("packages/nsh-desk model and capability contracts", () => {
     expect(unknown.available).toBe(true);
     if (unknown.available) {
       expect(unknown.payload.lineHundredths).toEqual([350, 0]);
-      expect(unknown.payload.lineUnknown).toEqual([false, true]);
+      // Bit 1 set: the second row's unit is unknown.
+      expect(unknown.payload.lineUnknownFlags).toEqual([0b10]);
       expect(unknown.payload.lineUnknownCount).toBe(1);
     }
 
@@ -818,7 +820,7 @@ describe("packages/nsh-desk model and capability contracts", () => {
     });
     expect(legacy.available).toBe(true);
     if (legacy.available) {
-      expect(legacy.payload.lineUnknown).toEqual([false, false]);
+      expect(legacy.payload.lineUnknownFlags).toEqual([0]);
       expect(legacy.payload.lineUnknownCount).toBe(0);
     }
   });
@@ -930,7 +932,7 @@ describe("packages/nsh-desk model and capability contracts", () => {
       expect(xmlOddsRowsHeader(loaded.feed)).toBe("2 rows");
     }
 
-    // Unknown rows arrive as a boolean[] and become the feed's dense bitset + count.
+    // Unknown rows arrive as the route's dense bitset word and stay a bitset in the feed.
     const withUnknown = await loadXmlOddsSoaFeed(
       "http://127.0.0.1:4020",
       async () =>
@@ -940,7 +942,7 @@ describe("packages/nsh-desk model and capability contracts", () => {
           eventId32: [11, 12],
           comboKey15: [1101, 2050],
           lineHundredths: [350, 0],
-          lineUnknown: [false, true],
+          lineUnknownFlags: [0b10],
           lineUnknownCount: 1,
           watermarkCursor: "wm-9",
           generatedAt: "2023-11-14T22:13:20.123Z",
@@ -1008,21 +1010,24 @@ describe("packages/nsh-desk model and capability contracts", () => {
     expect(
       parseXmlOddsSoaPayload({
         ...validUnknownBase,
-        lineUnknown: [false, true],
+        lineUnknownFlags: [0b10],
         lineUnknownCount: 1,
       }).lineUnknownCount,
     ).toBe(1);
     expect(parseXmlOddsSoaPayload(validUnknownBase).lineUnknownCount).toBe(0);
     expect(() =>
-      parseXmlOddsSoaPayload({ ...validUnknownBase, lineUnknown: [true] }),
-    ).toThrow(/lineUnknown/);
-    expect(() =>
-      parseXmlOddsSoaPayload({ ...validUnknownBase, lineUnknown: [0, 1] }),
-    ).toThrow(/lineUnknown\[0\]/);
+      parseXmlOddsSoaPayload({ ...validUnknownBase, lineUnknownFlags: [] }),
+    ).toThrow(/lineUnknownFlags/);
     expect(() =>
       parseXmlOddsSoaPayload({
         ...validUnknownBase,
-        lineUnknown: [false, true],
+        lineUnknownFlags: [0x1_0000_0000],
+      }),
+    ).toThrow(/lineUnknownFlags\[0\]/);
+    expect(() =>
+      parseXmlOddsSoaPayload({
+        ...validUnknownBase,
+        lineUnknownFlags: [0b10],
         lineUnknownCount: 2,
       }),
     ).toThrow(/lineUnknownCount/);
@@ -1031,7 +1036,7 @@ describe("packages/nsh-desk model and capability contracts", () => {
         ...validUnknownBase,
         lineUnknownCount: 1,
       }),
-    ).toThrow(/without lineUnknown/);
+    ).toThrow(/without lineUnknownFlags/);
   });
 
   test("the XML odds poll is due on first load and every 60s after", () => {
@@ -1391,7 +1396,7 @@ describe("packages/nsh-desk model and capability contracts", () => {
   });
 
   test("DESK_ENDPOINT_CATALOG achieves 100% route parity with services/sportsdesk_webview_server.ts", async () => {
-    expect(DESK_ENDPOINT_CATALOG.length).toBe(51);
+    expect(DESK_ENDPOINT_CATALOG.length).toBe(52);
     expect(PARSER_WORKBENCH_PRESETS.length).toBe(9);
 
     const registeredPaths = new Set<string>();

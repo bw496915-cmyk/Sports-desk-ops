@@ -23,6 +23,8 @@ export const verifyFetchSessionInitShape: Bun.FetchSessionInit = {
 };
 export type CronControllerShape = Bun.CronController;
 export type ServerShape = Bun.Server<undefined>;
+export type ResourceUsageShape = Bun.ResourceUsage;
+export type SpawnOptionsShape = Bun.SpawnOptions.Writable;
 
 export type ImportShape = Bun.Import;
 export type ImportKindShape = Bun.ImportKind;

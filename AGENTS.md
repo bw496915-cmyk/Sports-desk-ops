@@ -174,6 +174,14 @@ with `bun run audit:tool-calls`.
   `Bun.semver.order(v, "1.4.4-0") >= 0` — see `lib/manager_fetch.ts`. The npm `semver` package in
   `devDependencies` is required by `tests/market_index.test.ts` to match upstream Harness install
   behaviour. Do not swap it out.
+- **Never `bun x <name>` for a bin this repo declares.** `bun x` only prefers the local link; when
+  `node_modules/.bin/<name>` is missing — a fresh worktree, or a bin added in the same commit — it
+  resolves the **name on the npm registry** and runs that package instead. Measured 2026-11-18:
+  `bun x image-assets --help` installed and built `image-assets@0.10.0` (a 2015 iOS asset generator
+  depending on `sharp`) rather than running `scripts/image_asset_diagnostics.ts`; no repository file
+  was written. Run `node_modules/.bin/<bin>` when it is linked, else `bun <package.json bin target>`
+  (`sportsdesk-assets` is the asset bin). `tests/bun_x_cli_help.test.ts` follows that rule, so the
+  help-surface test cannot reach the registry.
 - **`bun run` flag position & profiling flags:**
   - **Runtime & runner flags** (`--watch`, `--hot`, `--smol`, `--check`, `--bun`, `--console-depth=<val>`,
     `--inspect`, `--cpu-prof`, `--heap-prof`, `--no-env-file`) must appear **before** the target script or
@@ -184,6 +192,15 @@ with `bun run audit:tool-calls`.
     bypassing Bun's runtime controls completely.
   - **Profiling flags:** Bun's native profiler flags are `--cpu-prof` (with `--cpu-prof-md` for LLM analysis),
     `--cpu-prof-name`, `--cpu-prof-dir`, and `--heap-prof` — never `--profile-cpu`.
+- **`bun --check` type-checks and then _runs_ the target; `bun check` only checks.** Measured on
+  1.4.4: `bun --check src/dashboard/index.tsx` type-checked clean and executed the browser entry
+  (`ReferenceError: document is not defined`), and `bun --check a.ts b.ts` checked only `a.ts`,
+  ran it with `b.ts` as argv, and never reported `b.ts`'s type error. `bun check a.ts b.ts`
+  reported both and followed the import graph (57 files for the schema set). So use
+  `bun check <files…>` for a gate — `schema:typecheck` used `bun --check` with 43 paths, which
+  checked one file and executed it — and reserve `--check` for entrypoints where running on
+  success is intended. For stdin there is no check-only form: `bun check -` answers
+  `error: Unknown flag "-"`, and `… | bun --check run -` executes the input once it type-checks.
 
 **Environment and tooling**
 

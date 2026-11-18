@@ -51,6 +51,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
     evidence: [
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_file_blob_contract.test.ts",
+      "test:tests/bun_globals_map_summaries.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
     ],
   },
@@ -84,9 +85,9 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.FileSink (type)",
     evidence: [
       "test:tests/bun_capabilities.test.ts",
+      "test:tests/bun_globals_map.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
       "test:tests/bun_shapes_types.test-d.ts",
-      "test:tests/f402_hierarchy_redact_log.test.ts",
     ],
   },
   {
@@ -232,7 +233,19 @@ export const BUN_SHAPES: readonly BunShape[] = [
     kind: "value",
     subsystem: "process",
     heading: "Bun.resolveSync",
-    evidence: ["test:tests/bun_shapes_coverage.test.ts", "probe:proc.paths"],
+    evidence: [
+      "test:tests/bun_shapes_coverage.test.ts",
+      "test:tests/peer_satisfaction.test.ts",
+      "test:tests/react_element_version.test.ts",
+      "probe:proc.paths",
+    ],
+  },
+  {
+    name: "ResourceUsage",
+    kind: "type",
+    subsystem: "process",
+    heading: "Bun.ResourceUsage (type)",
+    evidence: ["test:tests/bun_shapes_types.test-d.ts"],
   },
   {
     name: "sleep",
@@ -263,6 +276,16 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:lib/bun_terminal.test.ts",
       "test:scripts/r2_manifest_cas_promote.test.ts",
       "test:scripts/wagers_by_state_history.test.ts",
+    ],
+  },
+  {
+    name: "SpawnOptions",
+    kind: "type",
+    subsystem: "process",
+    heading: "Bun.SpawnOptions (type)",
+    evidence: [
+      "test:tests/bun_globals_map_summaries.test.ts",
+      "test:tests/bun_shapes_types.test-d.ts",
     ],
   },
   {
@@ -312,15 +335,38 @@ export const BUN_SHAPES: readonly BunShape[] = [
     ],
   },
   {
+    name: "Subprocess",
+    kind: "type",
+    subsystem: "process",
+    heading: "Bun.Subprocess (type)",
+    evidence: [
+      "test:tests/bundle_runtime.test.ts",
+      "test:tests/dev_dashboard_endpoints.test.ts",
+      "test:tests/pty_feature_flags.test.ts",
+      "test:tests/server_port.test.ts",
+    ],
+  },
+  {
     name: "Terminal",
     kind: "value",
     subsystem: "process",
     heading: "Bun.Terminal",
     evidence: [
       "surface:Terminal",
+      "test:tests/bun_aspects_contract.test.ts",
       "test:tests/bun_urls.test.ts",
       "test:tests/pty_feature_flags.test.ts",
-      "test:tests/pty_injection.test.ts",
+    ],
+  },
+  {
+    name: "TerminalOptions",
+    kind: "type",
+    subsystem: "process",
+    heading: "Bun.TerminalOptions (type)",
+    evidence: [
+      "test:tests/bun_aspects_contract.test.ts",
+      "test:tests/bun_reference_symbols.test.ts",
+      "test:tests/bun_urls.test.ts",
     ],
   },
   {
@@ -353,7 +399,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:tests/agent_diagnostics.test.ts",
       "test:tests/auth_and_rate_limit.test.ts",
       "test:tests/bun_capabilities.test.ts",
-      "test:tests/bun_shapes_manifest.test.ts",
+      "test:tests/bun_globals_map_summaries.test.ts",
     ],
   },
   {
@@ -373,7 +419,11 @@ export const BUN_SHAPES: readonly BunShape[] = [
     kind: "value",
     subsystem: "text",
     heading: "Bun.color",
-    evidence: ["test:tests/verify_tokens.test.ts", "probe:text.ansi"],
+    evidence: [
+      "test:tests/token_automation.test.ts",
+      "test:tests/verify_tokens.test.ts",
+      "probe:text.ansi",
+    ],
   },
   {
     name: "enableANSIColors",
@@ -418,8 +468,8 @@ export const BUN_SHAPES: readonly BunShape[] = [
     evidence: [
       "surface:markdown",
       "test:tests/ansi_markdown_theme.test.ts",
+      "test:tests/bun_aspects_contract.test.ts",
       "test:tests/bun_markdown_ansi_example.test.ts",
-      "test:tests/bun_urls.test.ts",
     ],
   },
   {
@@ -453,7 +503,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "surface:stripANSI",
       "test:lib/wagers_capture_config.test.ts",
       "test:scripts/gslive_wagers_by_state.test.ts",
-      "test:tests/bun_cli_flags.test.ts",
+      "test:tests/ansi_markdown_theme.test.ts",
     ],
   },
   {
@@ -484,7 +534,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "surface:CookieMap",
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_request_contract.test.ts",
-      "test:tests/cookie_jar.test.ts",
+      "test:tests/bun_urls.test.ts",
     ],
   },
   {
@@ -574,6 +624,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
     evidence: [
       "test:tests/bun_builtin_replacements.test.ts",
       "test:tests/bun_radix_literal_rounding.test.ts",
+      "test:tests/react_version_pairing.test.ts",
       "probe:data.json",
     ],
   },
@@ -586,7 +637,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:scripts/gslive_all_states_suspect_cron.test.ts",
       "test:scripts/wagers_by_state_history.test.ts",
       "test:tests/bridge_3c_system_error.test.ts",
-      "test:tests/bun_builtin_replacements.test.ts",
+      "test:tests/bun_aspects_contract.test.ts",
     ],
   },
   {
@@ -627,9 +678,9 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.XML",
     evidence: [
       "surface:XML",
+      "test:tests/bun_aspects_contract.test.ts",
       "test:tests/bun_builtin_replacements.test.ts",
       "test:tests/bun_loaders_and_import_attributes.test.ts",
-      "test:tests/bun_upstream_reference.test.ts",
     ],
   },
   {
@@ -665,7 +716,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "surface:cron",
       "test:lib/bun_cron.test.ts",
       "test:tests/bun_capabilities.test.ts",
-      "test:tests/dashboard_metrics.test.ts",
+      "test:tests/bun_urls.test.ts",
     ],
   },
   {
@@ -676,8 +727,8 @@ export const BUN_SHAPES: readonly BunShape[] = [
     evidence: [
       "test:lib/bun_cron.test.ts",
       "test:tests/bun_capabilities.test.ts",
+      "test:tests/bun_reference_symbols.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
-      "test:tests/bun_shapes_types.test-d.ts",
     ],
   },
   {
@@ -696,7 +747,11 @@ export const BUN_SHAPES: readonly BunShape[] = [
     kind: "value",
     subsystem: "storage",
     heading: "Bun.RedisClient",
-    evidence: ["surface:RedisClient", "test:tests/bun_capabilities.test.ts"],
+    evidence: [
+      "surface:RedisClient",
+      "test:tests/bun_capabilities.test.ts",
+      "test:tests/bun_urls.test.ts",
+    ],
   },
   {
     name: "s3",
@@ -793,8 +848,8 @@ export const BUN_SHAPES: readonly BunShape[] = [
     evidence: [
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_eval_patterns.test.ts",
+      "test:tests/bun_urls.test.ts",
       "test:tests/r2_s3_client.test.ts",
-      "test:tests/supervisor.test.ts",
     ],
   },
   {
@@ -817,7 +872,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "surface:SQL",
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_eval_patterns.test.ts",
-      "test:tests/sql_query_cli.test.ts",
+      "test:tests/bun_urls.test.ts",
     ],
   },
   {
@@ -858,7 +913,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:lib/live_provenance.test.ts",
       "test:scripts/r2_manifest_cas_promote.test.ts",
       "test:tests/bun_runtime_contracts.test.ts",
-      "test:tests/bun_webview_screenshot.test.ts",
+      "test:tests/bun_urls.test.ts",
     ],
   },
   {
@@ -1147,8 +1202,8 @@ export const BUN_SHAPES: readonly BunShape[] = [
     evidence: [
       "surface:connect",
       "test:lib/f402_bet_ticker_config.test.ts",
+      "test:tests/bun_aspects_contract.test.ts",
       "test:tests/bun_capabilities.test.ts",
-      "test:tests/bun_socket_contract.test.ts",
     ],
   },
   {
@@ -1171,6 +1226,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
     status: "declared-only",
     evidence: [
       "test:tests/bun_capabilities.test.ts",
+      "test:tests/bun_globals_map_summaries.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
     ],
   },
@@ -1200,9 +1256,9 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.FetchSession",
     evidence: [
       "surface:FetchSession",
+      "test:tests/bun_aspects_contract.test.ts",
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_shapes_types.test-d.ts",
-      "test:tests/fetch_session_contract.test.ts",
     ],
   },
   {
@@ -1211,10 +1267,10 @@ export const BUN_SHAPES: readonly BunShape[] = [
     subsystem: "network",
     heading: "Bun.FetchSessionInit (type)",
     evidence: [
+      "test:tests/bun_reference_symbols.test.ts",
       "test:tests/bun_shape_contracts_links.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
       "test:tests/bun_shapes_types.test-d.ts",
-      "test:tests/fetch_session_contract.test.ts",
     ],
   },
   {
@@ -1247,7 +1303,9 @@ export const BUN_SHAPES: readonly BunShape[] = [
     subsystem: "network",
     heading: "Bun.MatchedRoute (type)",
     evidence: [
+      "test:tests/bun_reference_symbols.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
+      "test:tests/bun_urls.test.ts",
       "test:tests/inspect_ansi_diagnostics.test.ts",
     ],
   },
@@ -1303,7 +1361,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:tests/blob_and_live_bets_server.test.ts",
       "test:tests/blob_live_bets_trace.test.ts",
       "test:tests/bun_141_runtime.test.ts",
-      "test:tests/bun_capabilities.test.ts",
+      "test:tests/bun_aspects_contract.test.ts",
     ],
   },
   {
@@ -1327,7 +1385,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "surface:WebView",
       "test:scripts/bun_docs_mcp.test.ts",
       "test:tests/bun_surface_cli.test.ts",
-      "test:tests/bun_webview_chrome.test.ts",
+      "test:tests/bun_urls.test.ts",
     ],
   },
   {
@@ -1348,10 +1406,10 @@ export const BUN_SHAPES: readonly BunShape[] = [
     subsystem: "meta",
     heading: "Bun.Env (type)",
     evidence: [
+      "test:tests/bun_aspects_contract.test.ts",
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_registry_config.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
-      "test:tests/bun_shapes_types.test-d.ts",
     ],
   },
   {

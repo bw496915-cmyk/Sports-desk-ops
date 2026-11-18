@@ -433,6 +433,14 @@ export interface CustomerProfile {
   readonly flags: readonly string[];
 }
 
+/** The same `SYNTH_` sentinel convention `lib/profile_query_tools.ts` uses for fixture profiles. */
+export const SYNTHETIC_CUSTOMER_PREFIX = "SYNTH_";
+
+/** A book row with this id is a demo fixture, not an observed customer. */
+export function isSyntheticCustomerId(customerId: string): boolean {
+  return customerId.trim().toUpperCase().startsWith(SYNTHETIC_CUSTOMER_PREFIX);
+}
+
 const num = (value: unknown): number =>
   typeof value === "number" && Number.isFinite(value) ? value : 0;
 const text = (value: unknown): string =>

@@ -116,6 +116,7 @@ import {
 } from "./sportsdesk_telegram_bot.ts";
 import { containedAssetPath, isSafeAssetName } from "../lib/asset_path.ts";
 import { cachedJsonFile, readFileBytes } from "../lib/artifact_cache.ts";
+import { bunImageAssetSnapshot } from "../lib/bun_image_asset_snapshot.ts";
 import {
   buildStatusTelemetry,
   graphFingerprint,
@@ -3368,6 +3369,36 @@ export function startServer(options?: ServerOptions) {
         });
       }
 
+      if (pathname === "/api/diagnostics/image-assets") {
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          return new Response("method not allowed", {
+            status: 405,
+            headers: { ...cors, Allow: "GET, HEAD" },
+          });
+        }
+        const requested = Number(url.searchParams.get("limit") ?? "24");
+        const limit = Number.isInteger(requested)
+          ? Math.min(Math.max(requested, 1), 100)
+          : 24;
+        // Same shared source the dev dashboard uses, so both endpoints answer from one cache.
+        const source = bunImageAssetSnapshot(resolve(repoRoot, "docs/assets"), {
+          limit,
+          visibility: "RISK_MANAGER",
+          displayRoot: "docs/assets",
+          ttlMs: 5_000,
+        });
+        const snapshot = await source.snapshot();
+        const headers = {
+          ...cors,
+          ETag: snapshot.etag,
+          "Cache-Control": "no-cache",
+        };
+        if (req.headers.get("if-none-match") === snapshot.etag) {
+          return new Response(null, { status: 304, headers });
+        }
+        return Response.json(snapshot, { headers });
+      }
+
       if (pathname.startsWith("/assets/")) {
         const asset = pathname.slice("/assets/".length);
         // realpath containment, not just a name check: Bun 1.4.4's `routes: { "/*": { dir } }`
@@ -3867,9 +3898,12 @@ export interface XmlOddsSoaPayload {
   readonly comboKey15: readonly number[];
   /** Hundredths for a known line, the legacy 0 sentinel for an unknown one. */
   readonly lineHundredths: readonly number[];
-  /** True where the chunk carried `@lineUnknown="1"` instead of a value (unit unconfirmed). */
-  readonly lineUnknown: readonly boolean[];
-  /** Rows with an unknown line; equals the count of true entries in `lineUnknown`. */
+  /**
+   * Dense bitset words (1 = that row's line unit is unknown), `ceil(rowCount/32)` entries.
+   * A boolean-per-row array is what the data-handling ratchet forbids on this path.
+   */
+  readonly lineUnknownFlags: readonly number[];
+  /** Rows with an unknown line; equals the popcount of `lineUnknownFlags`. */
   readonly lineUnknownCount: number;
   readonly watermarkCursor: string;
   readonly generatedAt: string;
@@ -3999,7 +4033,7 @@ interface ParsedXmlOddsSoaChunk {
   readonly eventId32: number[];
   readonly comboKey15: number[];
   readonly lineHundredths: number[];
-  readonly lineUnknown: boolean[];
+  readonly lineUnknownFlags: Uint32Array;
   readonly lineUnknownCount: number;
   readonly watermarkCursor: string;
 }
@@ -4076,7 +4110,7 @@ function parseXmlOddsSoaChunk(
   const eventId32: number[] = [];
   const comboKey15: number[] = [];
   const lineHundredths: number[] = [];
-  const lineUnknown: boolean[] = [];
+  const lineUnknownFlags = new Uint32Array(Math.ceil(events.length / 32));
   let lineUnknownCount = 0;
   for (let index = 0; index < events.length; index += 1) {
     const event = events[index];
@@ -4142,11 +4176,13 @@ function parseXmlOddsSoaChunk(
         };
       }
       lineUnknownCount += 1;
+      const wordIndex = index >>> 5;
+      lineUnknownFlags[wordIndex] =
+        (lineUnknownFlags[wordIndex] ?? 0) | (1 << (index & 31));
     }
     eventId32.push(eventId);
     comboKey15.push(packed);
     lineHundredths.push(line);
-    lineUnknown.push(!lineKnown);
   }
   if (
     rootLineUnknownCount !== null &&
@@ -4170,7 +4206,7 @@ function parseXmlOddsSoaChunk(
       eventId32,
       comboKey15,
       lineHundredths,
-      lineUnknown,
+      lineUnknownFlags,
       lineUnknownCount,
       watermarkCursor,
     },
@@ -4308,7 +4344,7 @@ export async function readXmlOddsSoaFromR2(
       eventId32: parsed.chunk.eventId32,
       comboKey15: parsed.chunk.comboKey15,
       lineHundredths: parsed.chunk.lineHundredths,
-      lineUnknown: parsed.chunk.lineUnknown,
+      lineUnknownFlags: Array.from(parsed.chunk.lineUnknownFlags),
       lineUnknownCount: parsed.chunk.lineUnknownCount,
       watermarkCursor: parsed.chunk.watermarkCursor,
       generatedAt: new Date(generatedAtMs).toISOString(),

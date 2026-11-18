@@ -17,6 +17,7 @@ import { parseArgs } from "node:util";
 
 import {
   buildCustomerProfiles,
+  isSyntheticCustomerId,
   type CustomerRow,
   type TreeIndex,
 } from "../lib/customer_profile.ts";
@@ -69,7 +70,7 @@ const { values } = parseArgs({
 });
 
 const bookPath = resolve(values.book ?? "");
-const rows = (await Bun.file(bookPath)
+const bookRows = (await Bun.file(bookPath)
   .json()
   .catch((error: unknown) => {
     console.error(
@@ -77,6 +78,15 @@ const rows = (await Bun.file(bookPath)
     );
     process.exit(2);
   })) as CustomerRow[];
+
+// The book may be a demo fixture. Never publish its SYNTH_* sentinel rows into the live-derived
+// artifact: they would read as observed customers in the dashboard KPI and the profile APIs.
+const syntheticRowsExcluded = bookRows.filter((row) =>
+  isSyntheticCustomerId(row.customer_id),
+).length;
+const rows: CustomerRow[] = bookRows.filter(
+  (row) => !isSyntheticCustomerId(row.customer_id),
+);
 
 // Signal honesty: the book can be sparse or synthetic. Merge observed live profiles from
 // reports/harvested-live-profiles.json, and remember which rows came from that model-derived
@@ -451,6 +461,7 @@ await Bun.write(
         book: bookPath.replace(REPO, "."),
         liveFeed: liveFeedProvenance,
         tree: resolve(values.tree ?? "").replace(REPO, "."),
+        ...(syntheticRowsExcluded === 0 ? {} : { syntheticRowsExcluded }),
         ...(harvestedIds.size === 0
           ? {}
           : { harvestedProfiles: harvestedPath.replace(REPO, ".") }),
