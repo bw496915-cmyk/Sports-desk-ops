@@ -3,7 +3,8 @@
 // Audits sportsdesk-ops call sites against Bun v1.4.4+ fail-closed TypeError / RangeError contracts.
 
 import ts from "typescript";
-import { resolve, relative } from "node:path";
+import { readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
 const enum Severity {
   ERROR = "ERROR", // Guaranteed or high-risk runtime TypeError / RangeError
@@ -439,6 +440,138 @@ function auditSourceFile(
   visit(sf);
 }
 
+const REPO_HAZARD_GLOB = new Bun.Glob("**/*.{ts,tsx,js,sh,json,css}");
+const IGNORED_HAZARD_DIRS =
+  /^(node_modules|\.git|Scratch|dist|coverage|reports)\.?\//;
+
+function lineOf(text: string, index: number): number {
+  return text.slice(0, index).split("\n").length;
+}
+
+function addFileFinding(
+  findings: Finding[],
+  file: string,
+  line: number,
+  ruleId: string,
+  detail: string,
+  snippet: string,
+): void {
+  findings.push({
+    ruleId,
+    severity: Severity.WARN,
+    file,
+    line,
+    col: 1,
+    snippet: snippet.replace(/\s+/g, " ").slice(0, 96),
+    detail,
+  });
+}
+
+/**
+ * Version-scoped CLI hazards from the 1.4.5 changelog. The pinned 1.4.4 runtime has the
+ * broken behaviour; these scans are WARN because a later runtime fixes them and the
+ * repo may intentionally opt in after the pin moves.
+ */
+function scanRepositoryHazards(root: string, findings: Finding[]): void {
+  for (const rel of REPO_HAZARD_GLOB.scanSync({
+    cwd: root,
+    onlyFiles: true,
+    dot: false,
+  })) {
+    // The scanner's own rule text contains the hazard strings it checks for.
+    if (
+      IGNORED_HAZARD_DIRS.test(rel) ||
+      rel === "scripts/audit_bun_failclosed_edges.ts"
+    ) {
+      continue;
+    }
+    let text: string;
+    try {
+      text = readFileSync(join(root, rel), "utf8");
+    } catch {
+      continue;
+    }
+
+    const firstLine = text.split("\n", 1)[0] ?? "";
+    if (firstLine.startsWith("#!") && /\benv\s+-S\b/.test(firstLine)) {
+      addFileFinding(
+        findings,
+        rel,
+        1,
+        "BUN-ENV-S-SHEBANG",
+        "`#!/usr/bin/env -S` commands do not run on the pinned 1.4.4 runtime; use a direct interpreter or upgrade past 1.4.5.",
+        firstLine,
+      );
+    }
+
+    for (const match of text.matchAll(
+      /\bbun\b[^\n]*index\.html[^\n]*--(?:port|host)\s+\S+/g,
+    )) {
+      addFileFinding(
+        findings,
+        rel,
+        lineOf(text, match.index ?? 0),
+        "BUN-INDEX-HTML-SPACE-FLAG",
+        "Space-separated `--port 3000` / `--host 0.0.0.0` is ignored by the 1.4.4 HTML dev server; use `--port=…` / `--host=…`.",
+        match[0],
+      );
+    }
+
+    for (const match of text.matchAll(
+      /\bbun\b[^\n]*index\.html[^\n]*--host=::1\b/g,
+    )) {
+      addFileFinding(
+        findings,
+        rel,
+        lineOf(text, match.index ?? 0),
+        "BUN-INDEX-HTML-IPV6-HOST",
+        "`--host=::1` throws RangeError on the pinned 1.4.4 HTML dev server; fixed in 1.4.5.",
+        match[0],
+      );
+    }
+
+    for (const [index, line] of text.split("\n").entries()) {
+      if (
+        /\bbun\b/.test(line) &&
+        /\btest\b/.test(line) &&
+        line.includes("--update-snapshots") &&
+        line.includes("--bail")
+      ) {
+        addFileFinding(
+          findings,
+          rel,
+          index + 1,
+          "BUN-UPDATE-SNAPSHOTS-BAIL",
+          "`bun test --update-snapshots --bail` can empty a snapshot on early exit in 1.4.4; avoid the combination until the pin moves.",
+          line,
+        );
+      }
+    }
+
+    if (rel === "package.json") {
+      try {
+        const pkg = JSON.parse(text) as {
+          scripts?: Record<string, unknown>;
+        };
+        for (const key of ["preversion", "version", "postversion"]) {
+          if (typeof pkg.scripts?.[key] === "string") {
+            addFileFinding(
+              findings,
+              rel,
+              1,
+              "BUN-PM-VERSION-EMPTY-ENV",
+              `\`${key}\` runs with an empty environment in a git repository on 1.4.4; pass explicit env or upgrade.`,
+              `"${key}": ${String(pkg.scripts[key]).slice(0, 60)}`,
+            );
+          }
+        }
+      } catch {
+        // malformed package.json is the package-manager gate's job
+      }
+    }
+  }
+}
+
 function main(): void {
   const startNs = Bun.nanoseconds();
   const rootDir = process.cwd();
@@ -449,6 +582,7 @@ function main(): void {
   const program = loadTypeScriptProgram(tsconfigPath);
   const checker = program.getTypeChecker();
   const findings: Finding[] = [];
+  scanRepositoryHazards(rootDir, findings);
   let scannedFiles = 0;
 
   for (const sf of program.getSourceFiles()) {
