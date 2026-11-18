@@ -11,14 +11,37 @@ const enum Severity {
   WARN = "WARN", // Needs runtime range/NaN guard or behavior changed in v1.4.4+
 }
 
+type RefusalClass = "TypeError" | "RangeError" | "coercion" | null;
+
 interface Finding {
   readonly ruleId: string;
   readonly severity: Severity;
+  /** Why a call site is refused: type, range, coercion, or not a refusal. */
+  readonly errorClass: RefusalClass;
   readonly file: string;
   readonly line: number;
   readonly col: number;
   readonly snippet: string;
   readonly detail: string;
+}
+
+function refusalClassForRule(ruleId: string): RefusalClass {
+  if (
+    ruleId.startsWith("BUN-ZLIB-") ||
+    ruleId === "BUN-DNS-PREFETCH-NAN-RISK" ||
+    ruleId === "BUN-DNS-PREFETCH-PORT" ||
+    ruleId === "BUN-FILEHANDLE-READ-RANGE"
+  ) {
+    return "RangeError";
+  }
+  if (
+    ruleId.startsWith("BUN-HASH-") ||
+    ruleId.startsWith("BUN-INDEXOFLINE-") ||
+    ruleId.startsWith("BUN-PARSE-")
+  ) {
+    return "TypeError";
+  }
+  return null;
 }
 
 const HASH_ALGO_NAMES = new Set([
@@ -214,6 +237,7 @@ function auditSourceFile(
     findings.push({
       ruleId,
       severity,
+      errorClass: refusalClassForRule(ruleId),
       file: relPath,
       line: pos.line + 1,
       col: pos.character + 1,
@@ -238,7 +262,7 @@ function auditSourceFile(
           node,
           "BUN-GLOB-BRACE-STARSTAR",
           Severity.WARN,
-          "Pattern uses `**` inside `{...}` braces: now matches nested subdirectories recursively (previously acted like single `*`). Verify scope matches intent.",
+          "Confirmed in v1.4.4: `**` inside `{...}` braces matches nested subdirectories recursively (previously acted like a single `*`). Verify the broadened scope matches intent.",
         );
       }
     }
@@ -406,7 +430,7 @@ function auditSourceFile(
                   prop,
                   "BUN-GLOB-NONBOOL-OPTION",
                   Severity.WARN,
-                  `Glob.${expr.name.text} option \`${prop.name.getText(sf)}\` has non-boolean type \`${checker.typeToString(propType)}\`; pass strict boolean.`,
+                  `Glob.${expr.name.text} option \`${prop.name.getText(sf)}\` has non-boolean type \`${checker.typeToString(propType)}\`; v1.4.4 honors truthy non-true, but strict boolean remains the typed contract.`,
                 );
               }
             }
@@ -508,7 +532,7 @@ function auditSourceFile(
                   prop,
                   "BUN-ZLIB-MEMLEVEL-RANGE",
                   Severity.ERROR,
-                  `${exprText} memLevel=${v} outside 1..9 now throws.`,
+                  `${exprText} memLevel=${v} outside 1..9 throws RangeError.`,
                 );
               }
             }
@@ -519,7 +543,7 @@ function auditSourceFile(
                   prop,
                   "BUN-ZLIB-STRATEGY-RANGE",
                   Severity.ERROR,
-                  `${exprText} strategy=${v} outside 0..4 now throws.`,
+                  `${exprText} strategy=${v} outside 0..4 throws RangeError.`,
                 );
               }
             }
@@ -553,6 +577,7 @@ function addFileFinding(
   findings.push({
     ruleId,
     severity: Severity.WARN,
+    errorClass: null,
     file,
     line,
     col: 1,

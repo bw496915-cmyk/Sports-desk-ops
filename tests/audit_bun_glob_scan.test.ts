@@ -45,3 +45,44 @@ describe("audit: glob.scan non-boolean options", () => {
     }
   });
 });
+
+test("audit findings carry the TypeError/RangeError taxonomy", () => {
+  const taxonomyFixture = join(ROOT, "tests", "audit-taxonomy-fixture.ts");
+  writeFileSync(
+    taxonomyFixture,
+    [
+      "Bun.hash(null);",
+      'Bun.dns.prefetch("example.com", Number.NaN);',
+      "",
+    ].join("\n"),
+  );
+  try {
+    const proc = Bun.spawnSync({
+      cmd: [
+        process.execPath,
+        "scripts/audit_bun_failclosed_edges.ts",
+        "--json",
+      ],
+      cwd: ROOT,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(proc.exitCode, proc.stderr.toString()).toBe(65);
+    const report = JSON.parse(proc.stdout.toString()) as {
+      findings: Array<{
+        ruleId: string;
+        file: string;
+        errorClass: string | null;
+      }>;
+    };
+    const classes = new Map(
+      report.findings
+        .filter((finding) => finding.file === "tests/audit-taxonomy-fixture.ts")
+        .map((finding) => [finding.ruleId, finding.errorClass]),
+    );
+    expect(classes.get("BUN-HASH-NULLABLE-ARG")).toBe("TypeError");
+    expect(classes.get("BUN-DNS-PREFETCH-NAN-RISK")).toBe("RangeError");
+  } finally {
+    rmSync(taxonomyFixture, { force: true });
+  }
+});

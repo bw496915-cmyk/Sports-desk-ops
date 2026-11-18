@@ -124,6 +124,8 @@ describe("jsonl_stream_replay SSOT", () => {
   });
 
   test("Bun.JSONL.parse / parseChunk handle blank lines and stray delimiters", () => {
+    // Measured on 1.4.4. The v1.4.4 Bun APIs changelog has no JSONL hardening entry:
+    // this pins runtime behaviour, not a fix version.
     const value = '{"wager":1}';
     const valueLength = enc.encode(value).length;
     for (const input of [
