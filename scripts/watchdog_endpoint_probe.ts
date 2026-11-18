@@ -47,6 +47,7 @@ import {
   ENDPOINT_PROBE_INTERVAL_SECONDS,
   ENDPOINT_PROBE_STATE_SCHEMA_VERSION,
   evaluateEndpointProbe,
+  type BodyProbe,
   type EndpointProbeFetch,
   type EndpointProbeObservation,
   type EndpointProbeState,
@@ -133,6 +134,7 @@ interface ProbeJson {
     readonly addressProbes: readonly AddressProbe[];
     readonly tls: TlsProvenance | null;
     readonly tlsError: string | null;
+    readonly body: BodyProbe | null;
     readonly fetchStatus: number | null;
     readonly latencyMs: number | null;
     readonly cacheStats: Readonly<Record<string, number>> | null;
@@ -147,6 +149,7 @@ export interface AddressProbe {
   readonly error: string | null;
   readonly tls: TlsProvenance | null;
   readonly tlsError: string | null;
+  readonly body: BodyProbe | null;
 }
 
 interface ProbeResult {
@@ -583,6 +586,71 @@ async function probeTlsSafe(
   }
 }
 
+const BODY_CAP_BYTES = 64 * 1024;
+const BODY_PREVIEW_CHARS = 256;
+const TEXTUAL_CONTENT =
+  /^(text\/|application\/(json|xml|javascript|x-ndjson)|application\/.*\+json)/i;
+
+/** Read a bounded prefix of the body as fragments; the status line remains the gate. */
+export async function readBodyFragments(
+  response: Response,
+): Promise<BodyProbe> {
+  const started = performance.now();
+  const contentType = response.headers.get("content-type") ?? "";
+  const textual = TEXTUAL_CONTENT.test(contentType);
+  const reader = response.body?.getReader();
+  if (reader === undefined) {
+    return {
+      bytes: 0,
+      firstChunkMs: null,
+      streamMs: Math.round(performance.now() - started),
+      contentType,
+      textPreview: null,
+      truncated: false,
+      error: null,
+    };
+  }
+  let bytes = 0;
+  let firstChunkMs: number | null = null;
+  let truncated = false;
+  let error: string | null = null;
+  const decoder = textual ? new TextDecoder() : null;
+  let preview = "";
+  try {
+    while (bytes < BODY_CAP_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (firstChunkMs === null) {
+        firstChunkMs = Math.round(performance.now() - started);
+      }
+      bytes += value.byteLength;
+      if (decoder !== null) preview += decoder.decode(value, { stream: true });
+      if (bytes >= BODY_CAP_BYTES) {
+        truncated = true;
+        break;
+      }
+    }
+    if (decoder !== null) preview += decoder.decode();
+  } catch (caught) {
+    error = messageOf(caught);
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      // stream already closed
+    }
+  }
+  return {
+    bytes,
+    firstChunkMs,
+    streamMs: Math.round(performance.now() - started),
+    contentType,
+    textPreview: textual ? preview.slice(0, BODY_PREVIEW_CHARS) : null,
+    truncated,
+    error,
+  };
+}
+
 async function fetchAddress(
   target: HostTarget,
   address: string,
@@ -618,12 +686,14 @@ async function fetchAddress(
         ...(httpVersion === "auto" ? {} : { protocol: httpVersion }),
       },
     );
+    const body = await readBodyFragments(response);
     return {
       address,
       family,
       status: response.status,
       latencyMs: Math.round(performance.now() - started),
       error: null,
+      body,
       ...(await tlsPromise),
     };
   } catch (error) {
@@ -633,6 +703,7 @@ async function fetchAddress(
       status: null,
       latencyMs: Math.round(performance.now() - started),
       error: messageOf(error),
+      body: null,
       ...(await tlsPromise),
     };
   }
@@ -716,6 +787,7 @@ async function probe(
         status: response.status,
         latencyMs: Math.round(performance.now() - started),
         error: null,
+        body: await readBodyFragments(response),
       };
     } catch (error) {
       return {
@@ -824,6 +896,7 @@ export function renderJson(
       addressProbes: addressProbesByHost[verdict.target.hostname] ?? [],
       tls: tlsByHost[verdict.target.hostname]?.tls ?? null,
       tlsError: tlsByHost[verdict.target.hostname]?.tlsError ?? null,
+      body: verdict.body ?? null,
       fetchStatus: verdict.fetchStatus,
       latencyMs: verdict.latencyMs,
       cacheStats: verdict.cacheStats,

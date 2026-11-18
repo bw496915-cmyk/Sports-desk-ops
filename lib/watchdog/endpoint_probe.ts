@@ -43,12 +43,24 @@ export interface EndpointProbeLookup {
   readonly error: string | null;
 }
 
+export interface BodyProbe {
+  readonly bytes: number;
+  readonly firstChunkMs: number | null;
+  readonly streamMs: number;
+  readonly contentType: string;
+  readonly textPreview: string | null;
+  readonly truncated: boolean;
+  readonly error: string | null;
+}
+
 export interface EndpointProbeFetch {
   readonly ok: boolean;
   /** Any received HTTP status; null when no response was received. */
   readonly status: number | null;
   readonly latencyMs: number | null;
   readonly error: string | null;
+  /** Bounded body-fragment diagnostics; never part of the verdict. */
+  readonly body?: BodyProbe;
 }
 
 export interface EndpointProbeObservation {
@@ -87,6 +99,8 @@ export interface EndpointProbeVerdict {
   readonly ttlSeconds: readonly number[];
   readonly fetchStatus: number | null;
   readonly latencyMs: number | null;
+  /** Bounded body-fragment diagnostics; never part of the verdict. */
+  readonly body?: BodyProbe;
   /** Telemetry only; never part of the verdict. */
   readonly cacheStats: Readonly<Record<string, number>> | null;
 }
@@ -166,6 +180,9 @@ export function evaluateEndpointProbe(
     ttlSeconds: input.observation.lookup.ttlSeconds,
     fetchStatus: input.observation.fetch.status,
     latencyMs: input.observation.fetch.latencyMs,
+    ...(input.observation.fetch.body === undefined
+      ? {}
+      : { body: input.observation.fetch.body }),
     cacheStats: input.observation.cacheStats,
   };
 }

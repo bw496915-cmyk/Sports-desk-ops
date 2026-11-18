@@ -28,6 +28,11 @@ For each target, per tick:
    cipher, ALPN, authorization and peer certificate (`validTo`, issuer, subject). The diagnostic
    handshake offers `h2` + `http/1.1`; it is separate from the fetch, which negotiates its own
    ALPN. `--json` carries this as `tls` / `tlsError` on the host and on each `addressProbes` entry.
+5. **Body fragments** — read up to 64 KiB of the response body as chunks; report bytes,
+   first-chunk latency, stream duration, content type, a 256-character text preview, truncation
+   and read error. Binary bodies get no preview. Diagnostics only: the status line remains the
+   gate, and a stream that runs long is cancelled at the cap. `--json` carries this as `body` on
+   the host and on each `addressProbes` entry.
 
 Each step is bounded: DNS lookup 5 s, fetch 5 s. A per-target failure is isolated — one host's
 failure does not blank the others.
@@ -48,8 +53,9 @@ failure does not blank the others.
   the failure counts are still persisted.
 - `--dry-run` probes and prints but writes no state and sends no page.
 
-Diagnostics are not gates: DNS [`ttlSeconds`](https://bun.sh/reference/bun/DNSLookup) (per answer) and Bun cache stats (`getCacheStats`) are
-reported in `--json` only. They describe the resolver/cache, not whether the endpoint answered.
+Diagnostics are not gates: DNS [`ttlSeconds`](https://bun.sh/reference/bun/DNSLookup) (per answer),
+Bun cache stats (`getCacheStats`) and the body-fragment record are reported in `--json` only. They
+describe the resolver/cache and the body path, not whether the endpoint answered.
 
 ## Exit codes
 
@@ -89,7 +95,7 @@ bun run scripts/watchdog_endpoint_probe.ts --dry-run --backend system --host api
 ```
 
 `--json` includes the resolver, per-host status/code, consecutive failures, addresses, TTLs,
-cache stats, TLS provenance and the requested HTTP version. Human output names the resolver and prints one line per host.
+cache stats, TLS provenance, body fragments and the requested HTTP version. Human output names the resolver and prints one line per host.
 
 ## Diagnostic target overrides
 

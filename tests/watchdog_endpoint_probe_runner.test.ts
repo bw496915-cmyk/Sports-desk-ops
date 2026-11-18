@@ -17,6 +17,7 @@ import {
   parseBackend,
   parseOptions,
   probeWebSocket,
+  readBodyFragments,
   readState,
   renderJson,
   renderWsJson,
@@ -522,6 +523,7 @@ describe("endpoint probe JSON rendering", () => {
     expect(json.hosts[0]?.addressProbes).toEqual([]);
     expect(json.hosts[0]?.tls).toBeNull();
     expect(json.hosts[0]?.tlsError).toBeNull();
+    expect(json.hosts[0]?.body).toBeNull();
     expect(json.httpVersion).toBe("auto");
     expect(json.dryRun).toBe(true);
     expect(json.alerts).toBe(1);
@@ -566,6 +568,7 @@ describe("endpoint probe JSON rendering", () => {
             error: null,
             tls: null,
             tlsError: null,
+            body: null,
           },
         ],
       },
@@ -600,6 +603,33 @@ describe("endpoint probe JSON rendering", () => {
         "wss://example.test/ws",
       ]),
     ).toThrow(/cannot be combined/);
+  });
+
+  test("reads text body fragments and caps a large body", async () => {
+    const small = await readBodyFragments(
+      new Response("hello", { headers: { "content-type": "text/plain" } }),
+    );
+    expect(small.bytes).toBe(5);
+    expect(small.textPreview).toBe("hello");
+    expect(small.truncated).toBe(false);
+    expect(small.error).toBeNull();
+
+    const large = await readBodyFragments(
+      new Response("x".repeat(70_000), {
+        headers: { "content-type": "text/plain" },
+      }),
+    );
+    expect(large.truncated).toBe(true);
+    expect(large.bytes).toBeGreaterThanOrEqual(64 * 1024);
+    expect(large.textPreview?.length).toBe(256);
+
+    const binary = await readBodyFragments(
+      new Response(new Uint8Array([0, 1, 2]), {
+        headers: { "content-type": "application/octet-stream" },
+      }),
+    );
+    expect(binary.bytes).toBe(3);
+    expect(binary.textPreview).toBeNull();
   });
 
   test("a WebSocket upgrade opens against a local server", async () => {
