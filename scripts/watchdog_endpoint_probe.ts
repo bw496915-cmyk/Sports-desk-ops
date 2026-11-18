@@ -342,11 +342,16 @@ export function readState(path: string): StateFile {
     throw new Error(`${path} is not a JSON object`);
   }
   const record = parsed as Record<string, unknown>;
-  if (record.schemaVersion !== ENDPOINT_PROBE_STATE_SCHEMA_VERSION) {
+  const schemaVersion = record.schemaVersion;
+  if (
+    schemaVersion !== 1 &&
+    schemaVersion !== ENDPOINT_PROBE_STATE_SCHEMA_VERSION
+  ) {
     throw new Error(
-      `${path} schemaVersion is ${String(record.schemaVersion)}; expected ${ENDPOINT_PROBE_STATE_SCHEMA_VERSION}`,
+      `${path} schemaVersion is ${String(schemaVersion)}; expected 1 (migrated) or ${ENDPOINT_PROBE_STATE_SCHEMA_VERSION}`,
     );
   }
+  const isV1 = schemaVersion === 1;
   if (
     typeof record.hosts !== "object" ||
     record.hosts === null ||
@@ -378,9 +383,17 @@ export function readState(path: string): StateFile {
     ) {
       throw new Error(`${path} host "${host}" has an invalid lastCheckedAtMs`);
     }
+    const consecutiveFailures = Math.trunc(entry.consecutiveFailures);
+    if (!isV1 && typeof entry.alerted !== "boolean") {
+      throw new Error(`${path} host "${host}" has an invalid alerted`);
+    }
     hosts[host] = {
-      consecutiveFailures: Math.trunc(entry.consecutiveFailures),
+      consecutiveFailures,
       lastCheckedAtMs: entry.lastCheckedAtMs as number | null,
+      // v1 had no `alerted`; infer it so an already-down host does not re-page on upgrade.
+      alerted: isV1
+        ? consecutiveFailures >= ENDPOINT_PROBE_DEFAULT_FAIL_THRESHOLD
+        : (entry.alerted as boolean),
     };
   }
   return { schemaVersion: ENDPOINT_PROBE_STATE_SCHEMA_VERSION, hosts };
@@ -828,12 +841,15 @@ export function renderWsJson(
 export function buildNextState(
   state: StateFile,
   verdicts: readonly EndpointProbeVerdict[],
+  alertedByHost: Readonly<Record<string, boolean>>,
 ): StateFile {
   const nextHosts: Record<string, EndpointProbeState> = {};
   for (const verdict of verdicts) {
     nextHosts[verdict.target.hostname] = {
       consecutiveFailures: verdict.consecutiveFailures,
       lastCheckedAtMs: verdict.checkedAtMs,
+      alerted:
+        alertedByHost[verdict.target.hostname] ?? verdict.status === "alert",
     };
   }
   // Keep state for core hosts not selected by --host; prune entries for retired hosts so the
@@ -850,6 +866,36 @@ export function buildNextState(
     schemaVersion: ENDPOINT_PROBE_STATE_SCHEMA_VERSION,
     hosts: nextHosts,
   };
+}
+
+export interface PagingDecision {
+  readonly newAlerts: readonly EndpointProbeVerdict[];
+  readonly recoveries: readonly EndpointProbeVerdict[];
+  readonly nextAlerted: Readonly<Record<string, boolean>>;
+}
+
+/**
+ * Page on the transition only: a host that stays down keeps `alerted: true` and does not page
+ * again; a healthy host that was alerted produces one recovery. A below-threshold failure after
+ * an alert is neither healthy nor a new alert, so it keeps the prior alerted state.
+ */
+export function classifyPaging(
+  state: StateFile,
+  verdicts: readonly EndpointProbeVerdict[],
+): PagingDecision {
+  const newAlerts: EndpointProbeVerdict[] = [];
+  const recoveries: EndpointProbeVerdict[] = [];
+  const nextAlerted: Record<string, boolean> = {};
+  for (const verdict of verdicts) {
+    const host = verdict.target.hostname;
+    const prior = state.hosts[host]?.alerted ?? false;
+    const alerting = verdict.status === "alert";
+    const healthy = verdict.status === "ok" && verdict.code === null;
+    if (alerting && !prior) newAlerts.push(verdict);
+    if (healthy && prior) recoveries.push(verdict);
+    nextAlerted[host] = alerting ? true : healthy ? false : prior;
+  }
+  return { newAlerts, recoveries, nextAlerted };
 }
 
 export function selectTargets(requested: readonly string[]): HostTarget[] {
@@ -917,7 +963,7 @@ async function run(): Promise<number> {
     const nowMs = Date.now();
     const verdict = evaluateEndpointProbe({
       nowMs,
-      state: { consecutiveFailures: 0, lastCheckedAtMs: null },
+      state: { consecutiveFailures: 0, lastCheckedAtMs: null, alerted: false },
       observation: {
         target,
         lookup,
@@ -991,6 +1037,7 @@ async function run(): Promise<number> {
       state: state.hosts[observation.target.hostname] ?? {
         consecutiveFailures: 0,
         lastCheckedAtMs: null,
+        alerted: false,
       },
       observation,
     }),
@@ -1027,23 +1074,45 @@ async function run(): Promise<number> {
     }
   }
 
+  const decision = classifyPaging(state, verdicts);
   if (options.dryRun) return EXIT.ok;
 
-  writeState(options.statePath, buildNextState(state, verdicts));
-
-  const alerts = verdicts.filter((verdict) => verdict.status === "alert");
-  if (alerts.length === 0) return EXIT.ok;
+  const alertedByHost: Record<string, boolean> = { ...decision.nextAlerted };
+  const pages = decision.newAlerts.length + decision.recoveries.length;
+  const keepUnacknowledged = (): void => {
+    // A failed page must not mark the transition as delivered, or the next tick would skip it.
+    for (const verdict of decision.newAlerts) {
+      alertedByHost[verdict.target.hostname] =
+        state.hosts[verdict.target.hostname]?.alerted ?? false;
+    }
+    for (const verdict of decision.recoveries) {
+      alertedByHost[verdict.target.hostname] = true;
+    }
+  };
+  if (pages === 0) {
+    writeState(
+      options.statePath,
+      buildNextState(state, verdicts, alertedByHost),
+    );
+    return EXIT.ok;
+  }
 
   const credentials = await resolveTelegramCredentials();
   if (credentials.source === "none") {
+    keepUnacknowledged();
+    writeState(
+      options.statePath,
+      buildNextState(state, verdicts, alertedByHost),
+    );
     console.error(
-      "endpoint probe: alert detected but TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are unavailable",
+      "endpoint probe: page detected but TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are unavailable",
     );
     return EXIT.error;
   }
   const text = [
-    "SportsDesk endpoint watchdog — alert",
-    ...alerts.map((verdict) => `- ${verdict.message}`),
+    "SportsDesk endpoint watchdog",
+    ...decision.newAlerts.map((verdict) => `- ALERT ${verdict.message}`),
+    ...decision.recoveries.map((verdict) => `- RECOVERED ${verdict.message}`),
   ].join("\n");
   const sent = await sendTelegram(
     credentials.botToken,
@@ -1051,10 +1120,18 @@ async function run(): Promise<number> {
     text,
   );
   if (!sent.ok) {
+    keepUnacknowledged();
+    writeState(
+      options.statePath,
+      buildNextState(state, verdicts, alertedByHost),
+    );
     console.error(`endpoint probe: Telegram send failed (${sent.detail})`);
     return EXIT.error;
   }
-  console.log(`endpoint probe: alert sent via ${credentials.source}`);
+  writeState(options.statePath, buildNextState(state, verdicts, alertedByHost));
+  console.log(
+    `endpoint probe: ${decision.newAlerts.length} alert(s), ${decision.recoveries.length} recovery(ies) sent via ${credentials.source}`,
+  );
   return EXIT.alert;
 }
 

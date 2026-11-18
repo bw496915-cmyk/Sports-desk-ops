@@ -57,7 +57,11 @@ function observation(
 }
 
 function state(consecutiveFailures = 0): EndpointProbeState {
-  return { consecutiveFailures, lastCheckedAtMs: 1_700_000_000_000 };
+  return {
+    consecutiveFailures,
+    lastCheckedAtMs: 1_700_000_000_000,
+    alerted: false,
+  };
 }
 
 describe("evaluateEndpointProbe", () => {

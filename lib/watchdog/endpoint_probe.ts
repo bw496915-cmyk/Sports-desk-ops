@@ -25,7 +25,7 @@ export const ENDPOINT_PROBE_DEFAULT_FAIL_THRESHOLD = 2;
 export const ENDPOINT_PROBE_INTERVAL_SECONDS = 15 * 60;
 
 /** State-file schema; a different version is refused by the runner, never guessed. */
-export const ENDPOINT_PROBE_STATE_SCHEMA_VERSION = 1 as const;
+export const ENDPOINT_PROBE_STATE_SCHEMA_VERSION = 2 as const;
 
 export type EndpointProbeFailureCode =
   "lookup-failed" | "fetch-failed" | "http-server-error";
@@ -64,6 +64,8 @@ export interface EndpointProbeObservation {
 export interface EndpointProbeState {
   readonly consecutiveFailures: number;
   readonly lastCheckedAtMs: number | null;
+  /** Whether the alert transition has been reported; suppresses repeat pages. */
+  readonly alerted: boolean;
 }
 
 export interface EndpointProbeInput {

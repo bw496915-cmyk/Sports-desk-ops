@@ -12,6 +12,7 @@ import {
 import {
   buildLookupOptions,
   buildNextState,
+  classifyPaging,
   formatIpForUrl,
   parseBackend,
   parseOptions,
@@ -210,11 +211,11 @@ describe("endpoint probe target selection", () => {
 });
 
 describe("endpoint probe state file", () => {
-  test("a missing file is an empty state, not an error", () => {
+  test("a missing file is an empty v2 state, not an error", () => {
     const dir = mkdtempSync(join(tmpdir(), "endpoint-probe-"));
     try {
       expect(readState(join(dir, "missing.json"))).toEqual({
-        schemaVersion: 1,
+        schemaVersion: 2,
         hosts: {},
       });
     } finally {
@@ -222,18 +223,38 @@ describe("endpoint probe state file", () => {
     }
   });
 
-  test("reads a valid state and refuses a bad schema or bad entry", () => {
+  test("migrates v1, reads v2, and refuses other schemas or bad entries", () => {
     const dir = mkdtempSync(join(tmpdir(), "endpoint-probe-"));
     try {
       const path = join(dir, "state.json");
+
       writeFileSync(
         path,
         JSON.stringify({
           schemaVersion: 1,
           hosts: {
             "api.telegram.org": {
+              consecutiveFailures: 2,
+              lastCheckedAtMs: 123,
+            },
+          },
+        }),
+      );
+      expect(readState(path).hosts["api.telegram.org"]).toEqual({
+        consecutiveFailures: 2,
+        lastCheckedAtMs: 123,
+        alerted: true,
+      });
+
+      writeFileSync(
+        path,
+        JSON.stringify({
+          schemaVersion: 2,
+          hosts: {
+            "api.telegram.org": {
               consecutiveFailures: 1,
               lastCheckedAtMs: 123,
+              alerted: false,
             },
           },
         }),
@@ -241,19 +262,39 @@ describe("endpoint probe state file", () => {
       expect(readState(path).hosts["api.telegram.org"]).toEqual({
         consecutiveFailures: 1,
         lastCheckedAtMs: 123,
+        alerted: false,
       });
 
-      writeFileSync(path, JSON.stringify({ schemaVersion: 2, hosts: {} }));
+      writeFileSync(path, JSON.stringify({ schemaVersion: 3, hosts: {} }));
       expect(() => readState(path)).toThrow(/schemaVersion/);
 
       writeFileSync(
         path,
         JSON.stringify({
-          schemaVersion: 1,
-          hosts: { "api.telegram.org": { consecutiveFailures: -1 } },
+          schemaVersion: 2,
+          hosts: {
+            "api.telegram.org": {
+              consecutiveFailures: -1,
+              alerted: false,
+            },
+          },
         }),
       );
       expect(() => readState(path)).toThrow(/consecutiveFailures/);
+
+      writeFileSync(
+        path,
+        JSON.stringify({
+          schemaVersion: 2,
+          hosts: {
+            "api.telegram.org": {
+              consecutiveFailures: 1,
+              lastCheckedAtMs: 1,
+            },
+          },
+        }),
+      );
+      expect(() => readState(path)).toThrow(/alerted/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -270,7 +311,7 @@ describe("endpoint probe state transition", () => {
 
     const verdict = evaluateEndpointProbe({
       nowMs: 3_000,
-      state: { consecutiveFailures: 2, lastCheckedAtMs: 1_000 },
+      state: { consecutiveFailures: 2, lastCheckedAtMs: 1_000, alerted: true },
       observation: {
         target: probed,
         lookup: {
@@ -286,34 +327,144 @@ describe("endpoint probe state transition", () => {
 
     const next = buildNextState(
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
         hosts: {
           [probed.hostname]: {
             consecutiveFailures: 2,
             lastCheckedAtMs: 1_000,
+            alerted: true,
           },
           [preserved.hostname]: {
             consecutiveFailures: 1,
             lastCheckedAtMs: 2_000,
+            alerted: false,
           },
           "retired.example": {
             consecutiveFailures: 5,
             lastCheckedAtMs: 3_000,
+            alerted: true,
           },
         },
       },
       [verdict],
+      {},
     );
 
     expect(next.hosts[probed.hostname]).toEqual({
       consecutiveFailures: 0,
       lastCheckedAtMs: 3_000,
+      alerted: false,
     });
     expect(next.hosts[preserved.hostname]).toEqual({
       consecutiveFailures: 1,
       lastCheckedAtMs: 2_000,
+      alerted: false,
     });
     expect(next.hosts["retired.example"]).toBeUndefined();
+  });
+});
+
+describe("endpoint probe paging transitions", () => {
+  const target = SPORTSDESK_CORE_HOSTS[0];
+  if (target === undefined) throw new Error("core hosts fixture is empty");
+
+  const healthy = (priorFailures: number) =>
+    evaluateEndpointProbe({
+      nowMs: 2_000,
+      state: {
+        consecutiveFailures: priorFailures,
+        lastCheckedAtMs: 1_000,
+        alerted: priorFailures >= 2,
+      },
+      observation: {
+        target,
+        lookup: {
+          ok: true,
+          addresses: ["203.0.113.10"],
+          ttlSeconds: [60],
+          error: null,
+        },
+        fetch: { ok: true, status: 200, latencyMs: 10, error: null },
+        cacheStats: null,
+      },
+    });
+
+  const failing = (priorFailures: number) =>
+    evaluateEndpointProbe({
+      nowMs: 2_000,
+      state: {
+        consecutiveFailures: priorFailures,
+        lastCheckedAtMs: 1_000,
+        alerted: priorFailures >= 2,
+      },
+      observation: {
+        target,
+        lookup: { ok: false, addresses: [], ttlSeconds: [], error: "nxdomain" },
+        fetch: { ok: false, status: null, latencyMs: null, error: "nxdomain" },
+        cacheStats: null,
+      },
+    });
+
+  const state = (priorFailures: number) => ({
+    schemaVersion: 2 as const,
+    hosts: {
+      [target.hostname]: {
+        consecutiveFailures: priorFailures,
+        lastCheckedAtMs: 1_000,
+        alerted: priorFailures >= 2,
+      },
+    },
+  });
+
+  test("a first alert pages once and marks the host alerted", () => {
+    const decision = classifyPaging(state(1), [failing(1)]);
+    expect(decision.newAlerts).toHaveLength(1);
+    expect(decision.recoveries).toHaveLength(0);
+    expect(decision.nextAlerted[target.hostname]).toBe(true);
+  });
+
+  test("a continuing alert does not page again", () => {
+    const decision = classifyPaging(state(2), [failing(2)]);
+    expect(decision.newAlerts).toHaveLength(0);
+    expect(decision.recoveries).toHaveLength(0);
+    expect(decision.nextAlerted[target.hostname]).toBe(true);
+  });
+
+  test("a recovery pages once and clears the alerted flag", () => {
+    const decision = classifyPaging(state(2), [healthy(2)]);
+    expect(decision.newAlerts).toHaveLength(0);
+    expect(decision.recoveries).toHaveLength(1);
+    expect(decision.nextAlerted[target.hostname]).toBe(false);
+  });
+
+  test("a below-threshold failure after an alert is not a recovery", () => {
+    const verdict = evaluateEndpointProbe({
+      nowMs: 2_000,
+      state: { consecutiveFailures: 0, lastCheckedAtMs: 1_000, alerted: true },
+      observation: {
+        target,
+        lookup: { ok: false, addresses: [], ttlSeconds: [], error: "nxdomain" },
+        fetch: { ok: false, status: null, latencyMs: null, error: "nxdomain" },
+        cacheStats: null,
+      },
+    });
+    expect(verdict.status).toBe("ok");
+    expect(verdict.code).toBe("lookup-failed");
+    const decision = classifyPaging(
+      {
+        schemaVersion: 2,
+        hosts: {
+          [target.hostname]: {
+            consecutiveFailures: 0,
+            lastCheckedAtMs: 1_000,
+            alerted: true,
+          },
+        },
+      },
+      [verdict],
+    );
+    expect(decision.recoveries).toHaveLength(0);
+    expect(decision.nextAlerted[target.hostname]).toBe(true);
   });
 });
 
@@ -342,12 +493,12 @@ describe("endpoint probe JSON rendering", () => {
 
     const okVerdict = evaluateEndpointProbe({
       nowMs: 1_000,
-      state: { consecutiveFailures: 0, lastCheckedAtMs: null },
+      state: { consecutiveFailures: 0, lastCheckedAtMs: null, alerted: false },
       observation: healthy,
     });
     const alertVerdict = evaluateEndpointProbe({
       nowMs: 2_000,
-      state: { consecutiveFailures: 1, lastCheckedAtMs: 1_000 },
+      state: { consecutiveFailures: 1, lastCheckedAtMs: 1_000, alerted: false },
       observation: failing,
     });
     const json = renderJson(
@@ -385,7 +536,7 @@ describe("endpoint probe JSON rendering", () => {
     if (target === undefined) throw new Error("core hosts fixture is empty");
     const verdict = evaluateEndpointProbe({
       nowMs: 2_000,
-      state: { consecutiveFailures: 0, lastCheckedAtMs: null },
+      state: { consecutiveFailures: 0, lastCheckedAtMs: null, alerted: false },
       observation: {
         target,
         lookup: {
@@ -484,7 +635,7 @@ describe("endpoint probe JSON rendering", () => {
     if (target === undefined) throw new Error("core hosts fixture is empty");
     const verdict = evaluateEndpointProbe({
       nowMs: 2_000,
-      state: { consecutiveFailures: 0, lastCheckedAtMs: null },
+      state: { consecutiveFailures: 0, lastCheckedAtMs: null, alerted: false },
       observation: {
         target,
         lookup: {
@@ -516,7 +667,7 @@ describe("endpoint probe JSON rendering", () => {
     if (target === undefined) throw new Error("core hosts fixture is empty");
     const verdict = evaluateEndpointProbe({
       nowMs: 2_000,
-      state: { consecutiveFailures: 0, lastCheckedAtMs: null },
+      state: { consecutiveFailures: 0, lastCheckedAtMs: null, alerted: false },
       observation: {
         target,
         lookup: {

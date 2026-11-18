@@ -35,10 +35,17 @@ failure does not blank the others.
 ## Verdict and state
 
 - A failed probe increments that host's `consecutiveFailures`; a success resets it to 0.
-- The runner pages when `consecutiveFailures >= 2`.
-- State: `scratch/watchdog/endpoint-probe-state.json` (schema version 1, one entry per host).
-  It is written atomically and pruned to current core hosts. A malformed state file exits `2`
-  rather than silently resetting the counts.
+- A host **pages once when it transitions to alerting** (`consecutiveFailures >= 2`). A host that
+  stays down keeps `alerted: true` and does not page again every tick.
+- A host that was alerted and is healthy again sends **one recovery page**. A below-threshold
+  failure after an alert is neither a recovery nor a new alert; it keeps the prior `alerted` state.
+- State: `scratch/watchdog/endpoint-probe-state.json` (schema version 2, one entry per host with
+  `consecutiveFailures`, `lastCheckedAtMs` and `alerted`). It is written atomically and pruned to
+  current core hosts. v1 files are migrated, inferring `alerted` from the failure count so an
+  already-down host does not re-page on upgrade. A malformed state file exits `2` rather than
+  silently resetting the counts.
+- If a page cannot be sent, the transition stays unacknowledged and is retried on the next tick;
+  the failure counts are still persisted.
 - `--dry-run` probes and prints but writes no state and sends no page.
 
 Diagnostics are not gates: DNS [`ttlSeconds`](https://bun.sh/reference/bun/DNSLookup) (per answer) and Bun cache stats (`getCacheStats`) are
@@ -49,7 +56,7 @@ reported in `--json` only. They describe the resolver/cache, not whether the end
 | Code | Meaning                                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------------------- |
 | `0`  | Every selected host is healthy, or `--dry-run` completed                                                       |
-| `1`  | At least one host alerted and the Telegram page was sent                                                       |
+| `1`  | A page (new alert and/or recovery) was sent                                                                    |
 | `2`  | Could not evaluate or alert (bad state file, unknown host/backend, missing Telegram credentials, send failure) |
 
 ## Install
