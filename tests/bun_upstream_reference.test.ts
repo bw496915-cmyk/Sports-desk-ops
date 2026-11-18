@@ -10,6 +10,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { readBunReleaseBehaviors } from "../lib/bun_release_behaviors.ts";
 
 const ROOT = join(import.meta.dir, "..");
 
@@ -37,18 +38,14 @@ async function readJson<T>(relativePath: string): Promise<T> {
 }
 
 describe("Bun upstream reference: XML, bun x and catalogs", () => {
-  test("documents the three surfaces and cites the 1.4.4 release note", async () => {
+  test("documents every measured release behavior and cites the 1.4.4 release note", async () => {
     const doc = await read("docs/bun-upstream-reference.md");
-    for (const heading of [
-      "## `Bun.XML`, `bun x` and package catalogs",
-      "### `Bun.XML` — parse only; validate the tree yourself",
-      "### `bun x` — the bin catalogue",
-      "### Package catalogs — `catalog:` ranges",
-      "## `bun install` flag compatibility",
-      "## `Bun.semver.satisfies` — wildcards and the 2^64 ceiling",
-    ]) {
-      expect(doc).toContain(heading);
+    const behaviors = await readBunReleaseBehaviors(ROOT);
+    expect(behaviors.length).toBeGreaterThan(0);
+    for (const behavior of behaviors) {
+      expect(doc, behavior.id).toContain(behavior.docSection);
     }
+    expect(doc).toContain("## `Bun.XML`, `bun x` and package catalogs");
     expect(doc).toContain(
       "https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4",
     );

@@ -14,6 +14,8 @@ const satisfies = Bun.semver.satisfies;
 /** First value that does not fit in a u64. */
 const OVERFLOW = (2n ** 64n).toString();
 
+// @bun-behavior: semver-wildcards
+
 describe("Bun.semver.satisfies wildcard contract", () => {
   test("wildcards fill the missing parts", () => {
     expect(satisfies("1.0.0", "1.0.x")).toBe(true);

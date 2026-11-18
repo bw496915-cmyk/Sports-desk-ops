@@ -43,6 +43,11 @@ Do not hardcode member counts; run `./bin/dx bun --types` (or `./bin/dx bun --js
 
 Three Bun 1.4.4 surfaces that a `Bun.*` shape row cannot express on its own. Local claims were
 read from the pinned tree; the release-note claims are external and dated, not re-measured here.
+Each subsection below carries a `<!-- bun-behavior: <id> -->` marker, its contract test carries a
+`// @bun-behavior: <id>` tag, and `lib/bun_release_behaviors.ts` derives the registry from both —
+so this list is not maintained by hand.
+
+<!-- bun-behavior: xml-parse -->
 
 ### `Bun.XML` — parse only; validate the tree yourself
 
@@ -64,6 +69,8 @@ read from the pinned tree; the release-note claims are external and dated, not r
   [shape catalog](./runbooks/bun_shape_contracts_runbook.md).
 - Evidence: `bun test tests/xml_feed_spine_hydrator.test.ts tests/xml_parse_sportsdesk_ops_cli.test.ts`.
 
+<!-- bun-behavior: bun-x-catalog -->
+
 ### `bun x` — the bin catalogue
 
 `bun x <bin>` resolves workspace bins declared in `packages/sportsdesk-ops/package.json`;
@@ -76,12 +83,19 @@ read from the pinned tree; the release-note claims are external and dated, not r
 | `bun x sportsdesk-catalog` | `bun run catalog`   | `cli/sportsdesk_catalog_cli.ts`                |
 
 - `bun run cli:bins:verify` checks the declaration/target pairs; a declared bin without its
-  shim target fails the gate.
+  shim target fails the gate. It derives its bin list from the root `package.json` map — there is
+  no hand-kept list to update.
+- `cli/README.md`'s table is generated from the same map: `bun run cli:readme` writes the
+  marker-delimited block and `bun run cli:readme:check` (also
+  `tests/bun_x_catalog_docs.test.ts`) fails on drift. Descriptions come from each target's
+  header comment, so a new bin documents itself.
 - Every bin in the catalog answers `-h` / `--help` with exit 0. `tests/bun_x_cli_help.test.ts`
   spawns all of them, so a bin that treats `--help` as an input filename fails the gate
   (`xml-parse` and `blob-formdata` were fixed on 2026-11-18).
 - Bun 1.4.4 `bunx` additions (release-note, external): `--cwd`, `--env-file`,
   `--minimum-release-age`, `--trust`. Do not assume them on an older pin.
+
+<!-- bun-behavior: package-catalogs -->
 
 ### Package catalogs — `catalog:` ranges
 
@@ -96,6 +110,8 @@ read from the pinned tree; the release-note claims are external and dated, not r
   a `catalog:` reference without an entry is an install failure.
 - Gates: `tests/pm_policy_workspaces.test.ts` (missing and named catalog entries),
   `bun run test:pm-contracts`, `bun run pm:doctor`, `bun run check:pm-state`.
+
+<!-- bun-behavior: install-flags -->
 
 ## `bun install` flag compatibility (measured 2026-11-18)
 
@@ -131,6 +147,8 @@ plain mutable install instead of failing.
   a dirty lockfile, the ignored `--network-timeout` value, `--env-file`, and the `--save-dev`
   dependency-group move.
 
+<!-- bun-behavior: semver-wildcards -->
+
 ## `Bun.semver.satisfies` — wildcards and the 2^64 ceiling (measured 2026-11-18)
 
 Pinned docs: [`docs/runtime/semver.mdx`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/runtime/semver.mdx).
@@ -156,6 +174,29 @@ matters (`tests/market_index.test.ts` does).
   `scripts/probe_bun.ts`.
 - `tests/bun_semver_wildcards.test.ts` re-measures this table on every run, so a Bun bump that
   changes any row fails instead of drifting the prose.
+
+<!-- bun-behavior: bun-fmt -->
+
+## `bun fmt` — check/edit contract (measured 2026-11-18)
+
+The pinned [bun-v1.4.4 release](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4) adds
+`bun fmt`, a Prettier/oxfmt-compatible formatter. Measured on the pinned runtime in an otherwise
+empty directory:
+
+| Command                               | Result                                       |
+| :------------------------------------ | :------------------------------------------- |
+| `bun fmt --check a.ts` on `const x=1` | exit 1; lists the file as needing formatting |
+| `bun fmt a.ts`                        | exit 0; rewrites it to `const x = 1;`        |
+| `bun fmt --check a.ts` afterwards     | exit 0                                       |
+
+- The repo drives this through `bun fmt` (write path), `bun fmt --check --changed` in
+  `verify:fast`, and the CI `format:check` step.
+- `bun fmt` is not `bun lint`: linting stays oxlint (`bun run lint:check`), because bare
+  `bun lint` still resolves to the package `lint` script that rewrites files.
+- Docs: the docs MCP search for `bun fmt check` returns `/guides/format/migrate-from-oxfmt`;
+  `docs/cli/fmt.mdx` does not exist at the audited commit (checked 2026-11-18), so there is no
+  pinned blob to cite for the command page yet.
+- `tests/bun_fmt_contract.test.ts` re-measures the three rows above.
 
 ## Upstream doc commit pins
 
