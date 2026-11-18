@@ -6,30 +6,34 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
-const PNG_1X1_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+import {
+  DEFAULT_THUMBNAIL_EDGE,
+  thumbnailDestination,
+} from "../lib/bun_thumbnail.ts";
+import {
+  DEFAULT_ASSET_LIMIT,
+  DEFAULT_MAX_ASSET_BYTES,
+} from "../lib/bun_image_assets.ts";
+import { formatByteCount } from "../lib/format_bytes.ts";
+import {
+  TOOL_VERSION,
+  FLAG_SPECS,
+  USAGE,
+} from "../scripts/image_asset_cli_spec.ts";
+import { makePng, png1x1 } from "./support/image_fixtures.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "sd-asset-cli-"));
-writeFileSync(
-  join(dir, "a.png"),
-  Uint8Array.from(Buffer.from(PNG_1X1_BASE64, "base64")),
-);
+writeFileSync(join(dir, "a.png"), png1x1());
 writeFileSync(
   join(dir, "b.png"),
-  Uint8Array.from([
-    ...Buffer.from(PNG_1X1_BASE64, "base64"),
-    ...new Uint8Array(64),
-  ]),
+  Uint8Array.from([...png1x1(), ...new Uint8Array(64)]),
 );
 writeFileSync(join(dir, "c.png"), "not an image");
 writeFileSync(join(dir, "note.txt"), "ignored");
 mkdirSync(join(dir, "nested"), { recursive: true });
-writeFileSync(
-  join(dir, "nested", "d.png"),
-  Uint8Array.from(Buffer.from(PNG_1X1_BASE64, "base64")),
-);
+writeFileSync(join(dir, "nested", "d.png"), png1x1());
 
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
@@ -51,18 +55,6 @@ function runCli(args: readonly string[]): CliRun {
     stdout: child.stdout.toString(),
     stderr: child.stderr.toString(),
   };
-}
-
-async function makePng(
-  path: string,
-  width: number,
-  height: number,
-): Promise<void> {
-  const source = Uint8Array.from(Buffer.from(PNG_1X1_BASE64, "base64"));
-  writeFileSync(
-    path,
-    await new Bun.Image(source).resize(width, height).png().bytes(),
-  );
 }
 
 interface CliThumbnail {
@@ -95,8 +87,11 @@ interface CliPayload {
   readonly backend: string;
   readonly recursive: boolean;
   readonly filter: string | null;
+  readonly exclude: string | null;
   readonly sort: string;
   readonly headerBytes: number | null;
+  readonly budgetBytes: number | null;
+  readonly maxDimension: number | null;
   readonly failures: number;
   readonly thumbnails: {
     readonly enabled: boolean;
@@ -153,7 +148,7 @@ test("terminal output renders the BunImageAsset card", () => {
   expect(result.code).toBe(1);
   expect(result.stdout).toContain("BunImageAsset PNG 1×1");
   expect(result.stdout).toContain("[REDACTED_DIR]/a.png");
-  expect(result.stdout).toContain("1 asset(s) could not be decoded");
+  expect(result.stdout).toContain("1 asset(s) failed");
   expect(result.stdout).not.toContain("\x1b");
 });
 
@@ -245,8 +240,22 @@ test("--no-fail exits 0 despite a decode failure", () => {
 test("--version prints the tool and Bun versions", () => {
   const result = runCli(["--version"]);
   expect(result.code).toBe(0);
-  expect(result.stdout).toContain("image_asset_diagnostics 1.3.0");
+  expect(result.stdout).toContain(`image_asset_diagnostics ${TOOL_VERSION}`);
   expect(result.stdout).toContain(`Bun ${Bun.version}`);
+});
+
+test("help is derived from the flag table and shared defaults", () => {
+  expect(USAGE).toContain(`image_asset_diagnostics ${TOOL_VERSION}`);
+  for (const spec of FLAG_SPECS) {
+    expect(USAGE).toContain(spec.flags);
+  }
+  expect(USAGE).toContain(`default ${DEFAULT_ASSET_LIMIT}`);
+  expect(USAGE).toContain(formatByteCount(DEFAULT_MAX_ASSET_BYTES));
+  expect(USAGE).toContain(`default ${DEFAULT_THUMBNAIL_EDGE}`);
+
+  const help = runCli(["--help"]);
+  expect(help.code).toBe(0);
+  expect(help.stdout.trimEnd()).toBe(USAGE.trimEnd());
 });
 
 test("--thumbs writes portable WebP thumbnails and reports their geometry", async () => {
@@ -269,14 +278,17 @@ test("--thumbs writes portable WebP thumbnails and reports their geometry", asyn
     const thumb = directory.thumbnails[0];
     if (thumb === undefined) throw new Error("missing thumbnail report");
     expect(thumb.source).toBe("[REDACTED_DIR]/wide.png");
-    expect(thumb.path).toBe("[REDACTED_DIR]/wide.png.thumb.webp");
+    const expectedDestination = thumbnailDestination(
+      thumbDir,
+      join(thumbDir, "wide.png"),
+      join(thumbDir, ".thumbs"),
+    );
+    expect(thumb.path).toBe(`[REDACTED_DIR]/${basename(expectedDestination)}`);
     expect(thumb.width).toBe(40);
     expect(thumb.height).toBe(30);
     expect(thumb.backend).toBe("bun");
     expect(thumb.bytes).toBeGreaterThan(0);
-    expect(
-      await Bun.file(join(thumbDir, ".thumbs", "wide.png.thumb.webp")).exists(),
-    ).toBe(true);
+    expect(await Bun.file(expectedDestination).exists()).toBe(true);
   } finally {
     rmSync(thumbDir, { recursive: true, force: true });
   }
@@ -294,9 +306,11 @@ test("--thumbs-dir overrides the destination and requires --thumbs", async () =>
       thumbDir,
     ]);
     expect(result.code).toBe(0);
-    expect(await Bun.file(join(outDir, "wide.png.thumb.webp")).exists()).toBe(
-      true,
-    );
+    expect(
+      await Bun.file(
+        thumbnailDestination(thumbDir, join(thumbDir, "wide.png"), outDir),
+      ).exists(),
+    ).toBe(true);
 
     const missingThumbs = runCli([`--thumbs-dir=${outDir}`, thumbDir]);
     expect(missingThumbs.code).toBe(2);
@@ -329,10 +343,7 @@ test("--recursive skips the hidden .thumbs directory", async () => {
 test("--header-bytes reads a PNG from 24 bytes and labels a 23-byte slice", async () => {
   const headerDir = mkdtempSync(join(tmpdir(), "sd-cli-header-"));
   try {
-    writeFileSync(
-      join(headerDir, "a.png"),
-      Uint8Array.from(Buffer.from(PNG_1X1_BASE64, "base64")),
-    );
+    writeFileSync(join(headerDir, "a.png"), png1x1());
 
     const ok = runCli(["--json", "--header-bytes=24", headerDir]);
     expect(ok.code).toBe(0);
@@ -366,7 +377,7 @@ test("--header-bytes reads a PNG from 24 bytes and labels a 23-byte slice", asyn
 test("--header-bytes reports JPEG growth and resolves once the prefix is long enough", async () => {
   const headerDir = mkdtempSync(join(tmpdir(), "sd-cli-header-jpeg-"));
   try {
-    const source = Uint8Array.from(Buffer.from(PNG_1X1_BASE64, "base64"));
+    const source = png1x1();
     writeFileSync(
       join(headerDir, "photo.jpg"),
       await new Bun.Image(source).resize(120, 90).jpeg({ quality: 80 }).bytes(),
@@ -401,6 +412,85 @@ test("--header-bytes cannot be combined with --placeholders", () => {
   const result = runCli(["--header-bytes=24", "--placeholders", dir]);
   expect(result.code).toBe(2);
   expect(result.stderr).toContain("cannot be combined with --placeholders");
+});
+
+test("positional file and glob inputs are expanded", () => {
+  const single = runCli(["--json", join(dir, "a.png")]);
+  expect(single.code).toBe(0);
+  const singlePayload = JSON.parse(single.stdout) as CliPayload;
+  const singleDirectory = singlePayload.directories[0];
+  if (singleDirectory === undefined)
+    throw new Error("missing directory report");
+  expect(singleDirectory.count).toBe(1);
+  expect(singleDirectory.assets[0]?.source).toBe("[REDACTED_DIR]/a.png");
+
+  const glob = runCli(["--json", `${dir}/*.png`]);
+  expect(glob.code).toBe(1); // c.png is not an image
+  const globPayload = JSON.parse(glob.stdout) as CliPayload;
+  const globDirectory = globPayload.directories[0];
+  if (globDirectory === undefined) throw new Error("missing directory report");
+  expect(globDirectory.count).toBe(3);
+
+  const none = runCli(["--json", `${dir}/*.jpg`]);
+  expect(none.code).toBe(0);
+  const nonePayload = JSON.parse(none.stdout) as CliPayload;
+  const noneDirectory = nonePayload.directories[0];
+  if (noneDirectory === undefined) throw new Error("missing directory report");
+  expect(noneDirectory.count).toBe(0);
+  expect(noneDirectory.total).toBe(0);
+});
+
+test("--exclude removes matching names before the limit", () => {
+  const result = runCli(["--json", "--exclude=c", "--limit=10", dir]);
+  expect(result.code).toBe(0);
+  const payload = JSON.parse(result.stdout) as CliPayload;
+  expect(payload.exclude).toBe("c");
+  const directory = payload.directories[0];
+  if (directory === undefined) throw new Error("missing directory report");
+  expect(directory.count).toBe(2);
+  expect(directory.assets.map((asset) => asset.source)).toEqual([
+    "[REDACTED_DIR]/a.png",
+    "[REDACTED_DIR]/b.png",
+  ]);
+});
+
+test("--budget-bytes fails only the over-budget asset", () => {
+  const result = runCli(["--json", "--exclude=c", "--budget-bytes=100", dir]);
+  expect(result.code).toBe(1);
+  const payload = JSON.parse(result.stdout) as CliPayload;
+  expect(payload.budgetBytes).toBe(100);
+  const directory = payload.directories[0];
+  if (directory === undefined) throw new Error("missing directory report");
+  const assets = directory.assets;
+  expect(assets.find((asset) => asset.source.endsWith("a.png"))?.type).toBe(
+    "BunImageAssetDiagnostic",
+  );
+  expect(assets.find((asset) => asset.source.endsWith("b.png"))?.code).toBe(
+    "ERR_ASSET_BUDGET_EXCEEDED",
+  );
+});
+
+test("--max-dimension fails an oversized asset", async () => {
+  const dimDir = mkdtempSync(join(tmpdir(), "sd-cli-dim-"));
+  try {
+    await makePng(join(dimDir, "wide.png"), 120, 90);
+    const fail = runCli(["--json", "--max-dimension=100", dimDir]);
+    expect(fail.code).toBe(1);
+    const failPayload = JSON.parse(fail.stdout) as CliPayload;
+    expect(failPayload.maxDimension).toBe(100);
+    expect(failPayload.directories[0]?.assets[0]?.code).toBe(
+      "ERR_ASSET_DIMENSION_EXCEEDED",
+    );
+
+    const pass = runCli(["--json", "--max-dimension=120", dimDir]);
+    expect(pass.code).toBe(0);
+    const passPayload = JSON.parse(pass.stdout) as CliPayload;
+    expect(passPayload.directories[0]?.assets[0]?.type).toBe(
+      "BunImageAssetDiagnostic",
+    );
+  } finally {
+    rmSync(dimDir, { recursive: true, force: true });
+  }
 });
 
 test("a thumbnail write failure exits 1 with an error code, not a host path", async () => {

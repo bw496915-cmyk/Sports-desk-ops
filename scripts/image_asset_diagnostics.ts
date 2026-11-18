@@ -12,70 +12,38 @@
  */
 
 import { useColor } from "../lib/ansi_color.ts";
-import { join } from "node:path";
+import { statSync } from "node:fs";
+import { dirname, join } from "node:path";
 import {
   scanBunImageAssetFiles,
+  scanBunImageAssetPaths,
   type BunImageAssetFile,
+  type BunImageAssetScanFailure,
 } from "../lib/bun_image_assets.ts";
 import {
+  DEFAULT_THUMBNAIL_EDGE,
+  DEFAULT_THUMBNAIL_QUALITY,
+  MAX_THUMBNAIL_EDGE,
   thumbnailDestination,
   writeWebpThumbnail,
   type BunImageBackend,
 } from "../lib/bun_thumbnail.ts";
+import { formatByteCount } from "../lib/format_bytes.ts";
 import {
   INSPECT_VISIBILITIES,
   type InspectVisibility,
 } from "../lib/inspect_redactor.ts";
 import { maskAssetSource } from "../lib/inspect_diagnostics.ts";
+import {
+  DEFAULT_ASSET_ROOT,
+  TOOL_VERSION,
+  USAGE,
+} from "./image_asset_cli_spec.ts";
 
-const DEFAULT_ROOT = "docs/assets";
-const TOOL_VERSION = "1.3.0";
 const VISIBILITY_NAMES = new Set<string>(INSPECT_VISIBILITIES);
 const SORT_MODES = ["name", "size"] as const;
 type SortMode = (typeof SORT_MODES)[number];
 const BACKEND_MODES = ["bun", "system"] as const;
-const MAX_THUMB_EDGE = 16_384;
-
-const USAGE = `image_asset_diagnostics ${TOOL_VERSION} — Bun.Image asset attributes
-
-Usage:
-  bun run assets:diagnostics [dir ...] [options]
-
-Directories default to ${DEFAULT_ROOT}. Each directory is scanned shallowly unless --recursive.
-
-Options:
-  --json                  Machine output (single JSON object, full entries)
-  --summary               Text totals per directory; skip per-asset cards
-  --limit=N               Entries per directory, clamped to 1..100 (default 24)
-  --recursive, -r         Walk subdirectories with a Bun.Glob (**/*.{png,jpg,…})
-  --filter=TEXT           Case-insensitive substring filter on the relative asset name
-  --sort=name|size        name (default, scan order) or size (largest first)
-  --placeholders          Decode each image to compute its ThumbHash placeholder (slower)
-  --max-bytes=N           Skip files larger than N bytes (default 8 MiB)
-  --header-bytes=N        Read only N bytes per file and resolve dimensions from the header
-  --visibility=TIER       ${INSPECT_VISIBILITIES.join(" | ")}
-  --backend=bun|system    Set Bun.Image.backend before reading (default: runtime value)
-  --thumbs[=EDGE]         Write WebP thumbnails capped at EDGE px (default 400)
-  --thumbs-dir=DIR        Thumbnail directory (default: <dir>/.thumbs)
-  --thumb-quality=N       WebP quality 1..100 (default 80)
-  --no-fail               Exit 0 even when an asset or thumbnail fails
-  --no-color              Disable ANSI color
-  --version, -v           Print the tool and Bun versions
-  -h, --help              Show this help
-
-Thumbnails use \`Bun.Image.backend = "bun"\` unless --backend says otherwise, so resize geometry is
-portable; JPEG/PNG/WebP codecs are byte-identical across platforms, while TIFF/HEIC/AVIF still
-decode through the OS. Hidden \`.thumbs\` directories are skipped by --recursive (Bun.Glob default).
-
-Exit codes: 0 all files readable · 1 any scan or thumbnail failure · 2 invalid argument
-
-Examples:
-  bun run assets:diagnostics
-  bun run assets:diagnostics docs/assets --recursive --filter=pipeline --limit=10
-  bun run assets:diagnostics --json --sort=size --placeholders > /tmp/assets.json
-  bun run assets:diagnostics --header-bytes=65536 --recursive
-  bun run assets:diagnostics --thumbs=320 --recursive --summary
-  bun run assets:diagnostics docs/assets --thumbs --thumbs-dir=scratch/thumbs`;
 
 interface ParsedArgs {
   readonly dirs: readonly string[];
@@ -84,8 +52,11 @@ interface ParsedArgs {
   readonly limit: number | undefined;
   readonly maxBytes: number | undefined;
   readonly headerBytes: number | undefined;
+  readonly budgetBytes: number | undefined;
+  readonly maxDimension: number | undefined;
   readonly recursive: boolean;
   readonly filter: string | undefined;
+  readonly exclude: string | undefined;
   readonly sort: SortMode;
   readonly placeholders: boolean;
   readonly visibility: InspectVisibility;
@@ -125,6 +96,85 @@ interface DirectoryReport {
   readonly thumbnailFailures: number;
 }
 
+type ResolvedInput =
+  | { readonly label: string; readonly kind: "dir"; readonly dir: string }
+  | {
+      readonly label: string;
+      readonly kind: "paths";
+      readonly paths: readonly string[];
+    };
+
+/** Positional args may be directories, single files, or globs already expanded by Bun.Glob. */
+function resolveInputs(args: readonly string[]): readonly ResolvedInput[] {
+  return args.map((arg): ResolvedInput => {
+    let isDirectory = false;
+    let isFile = false;
+    try {
+      const stat = statSync(arg);
+      isDirectory = stat.isDirectory();
+      isFile = stat.isFile();
+    } catch {
+      // Not an existing path; a glob or a directory the scanner will report as empty.
+    }
+    if (isDirectory) return { label: arg, kind: "dir", dir: arg };
+    if (isFile) return { label: arg, kind: "paths", paths: [arg] };
+    if (
+      arg.includes("*") ||
+      arg.includes("?") ||
+      arg.includes("[") ||
+      arg.includes("{")
+    ) {
+      const globAt = arg.search(/[*?[\]{}]/);
+      const prefix = globAt === -1 ? arg : arg.slice(0, globAt);
+      const slash = prefix.lastIndexOf("/");
+      const base = slash === -1 ? "." : prefix.slice(0, slash) || "/";
+      const pattern = slash === -1 ? arg : arg.slice(slash + 1);
+      const matches = [
+        ...new Bun.Glob(pattern).scanSync({
+          cwd: base,
+          onlyFiles: true,
+          dot: false,
+        }),
+      ]
+        .map((relative) => join(base, relative))
+        .sort();
+      return { label: arg, kind: "paths", paths: matches };
+    }
+    return { label: arg, kind: "dir", dir: arg };
+  });
+}
+
+const BUDGET_CODE = "ERR_ASSET_BUDGET_EXCEEDED";
+const DIMENSION_CODE = "ERR_ASSET_DIMENSION_EXCEEDED";
+
+/** Converts over-budget assets into failure entries, so the exit code follows the gate. */
+function applyBudgets(
+  file: BunImageAssetFile,
+  args: ParsedArgs,
+): BunImageAssetFile {
+  if (file.entry.type !== "BunImageAssetDiagnostic") return file;
+  let code: string | null = null;
+  if (
+    args.budgetBytes !== undefined &&
+    (file.entry.bytes ?? 0) > args.budgetBytes
+  ) {
+    code = BUDGET_CODE;
+  } else if (
+    args.maxDimension !== undefined &&
+    (file.entry.width > args.maxDimension ||
+      file.entry.height > args.maxDimension)
+  ) {
+    code = DIMENSION_CODE;
+  }
+  if (code === null) return file;
+  const entry: BunImageAssetScanFailure = Object.freeze({
+    type: "BunImageAssetScanFailure",
+    source: file.entry.source,
+    code,
+  });
+  return Object.freeze({ path: file.path, entry });
+}
+
 function isVisibility(value: string): value is InspectVisibility {
   return VISIBILITY_NAMES.has(value);
 }
@@ -159,15 +209,18 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
   let limit: number | undefined;
   let maxBytes: number | undefined;
   let headerBytes: number | undefined;
+  let budgetBytes: number | undefined;
+  let maxDimension: number | undefined;
   let recursive = false;
   let filter: string | undefined;
+  let exclude: string | undefined;
   let sort: SortMode = "name";
   let placeholders = false;
   let visibility: InspectVisibility = "RISK_MANAGER";
   let backend: BunImageBackend | undefined;
   let thumbs: number | null = null;
   let thumbsDir: string | undefined;
-  let thumbQuality = 80;
+  let thumbQuality = DEFAULT_THUMBNAIL_QUALITY;
   let thumbQualitySet = false;
   let fail = true;
   let color = true;
@@ -190,13 +243,13 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
     } else if (arg === "--no-color") {
       color = false;
     } else if (arg === "--thumbs") {
-      thumbs = 400;
+      thumbs = DEFAULT_THUMBNAIL_EDGE;
     } else if (arg.startsWith("--thumbs=")) {
       thumbs = intInRange(
         "--thumbs",
         arg.slice("--thumbs=".length),
         1,
-        MAX_THUMB_EDGE,
+        MAX_THUMBNAIL_EDGE,
       );
     } else if (arg.startsWith("--thumbs-dir=")) {
       const value = arg.slice("--thumbs-dir=".length).trim();
@@ -229,6 +282,23 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
     } else if (arg.startsWith("--filter=")) {
       const value = arg.slice("--filter=".length).trim();
       filter = value === "" ? undefined : value;
+    } else if (arg.startsWith("--exclude=")) {
+      const value = arg.slice("--exclude=".length).trim();
+      exclude = value === "" ? undefined : value;
+    } else if (arg.startsWith("--budget-bytes=")) {
+      budgetBytes = intInRange(
+        "--budget-bytes",
+        arg.slice("--budget-bytes=".length),
+        1,
+        Number.MAX_SAFE_INTEGER,
+      );
+    } else if (arg.startsWith("--max-dimension=")) {
+      maxDimension = intInRange(
+        "--max-dimension",
+        arg.slice("--max-dimension=".length),
+        1,
+        MAX_THUMBNAIL_EDGE,
+      );
     } else if (arg.startsWith("--sort=")) {
       const value = arg.slice("--sort=".length);
       if (!isSortMode(value)) {
@@ -271,14 +341,17 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
   }
 
   return {
-    dirs: dirs.length === 0 ? [DEFAULT_ROOT] : dirs,
+    dirs: dirs.length === 0 ? [DEFAULT_ASSET_ROOT] : dirs,
     json,
     summary,
     limit,
     maxBytes,
     headerBytes,
+    budgetBytes,
+    maxDimension,
     recursive,
     filter,
+    exclude,
     sort,
     placeholders,
     visibility,
@@ -307,26 +380,34 @@ function errorCodeOf(error: unknown): string {
 }
 
 async function buildReport(
-  root: string,
+  input: ResolvedInput,
   args: ParsedArgs,
 ): Promise<DirectoryReport> {
   // A size sort must see every candidate before the requested limit is applied.
   const scanLimit = args.sort === "size" ? 100 : args.limit;
-  const scan = await scanBunImageAssetFiles(root, {
+  const scanOptions = {
     limit: scanLimit,
     maxBytes: args.maxBytes,
     headerBytes: args.headerBytes,
     visibility: args.visibility,
-    recursive: args.recursive,
-    filter: args.filter,
     placeholders: args.placeholders,
-  });
+  };
+  const scan =
+    input.kind === "dir"
+      ? await scanBunImageAssetFiles(input.dir, {
+          ...scanOptions,
+          recursive: args.recursive,
+          filter: args.filter,
+          exclude: args.exclude,
+        })
+      : await scanBunImageAssetPaths(input.paths, scanOptions);
   const ordered =
     args.sort === "size"
       ? [...scan.files].sort((a, b) => bytesOf(b) - bytesOf(a))
       : scan.files;
-  const files =
+  const limited =
     args.limit === undefined ? ordered : ordered.slice(0, args.limit);
+  const files = limited.map((file) => applyBudgets(file, args));
 
   let failures = 0;
   for (const file of files) {
@@ -336,10 +417,16 @@ async function buildReport(
   const thumbnails: ThumbnailOutcome[] = [];
   let thumbnailFailures = 0;
   if (args.thumbs !== null) {
-    const thumbsDir = args.thumbsDir ?? join(root, ".thumbs");
+    const thumbsRoot =
+      input.kind === "dir" ? input.dir : dirname(input.paths[0] ?? ".");
+    const thumbsDir = args.thumbsDir ?? join(thumbsRoot, ".thumbs");
     for (const file of files) {
       if (file.entry.type !== "BunImageAssetDiagnostic") continue;
-      const destination = thumbnailDestination(root, file.path, thumbsDir);
+      const destination = thumbnailDestination(
+        thumbsRoot,
+        file.path,
+        thumbsDir,
+      );
       try {
         const thumb = await writeWebpThumbnail(file.path, destination, {
           maxEdge: args.thumbs,
@@ -371,7 +458,7 @@ async function buildReport(
   }
 
   return {
-    root,
+    root: input.label,
     total: scan.total,
     truncated: scan.total > files.length,
     failures,
@@ -379,12 +466,6 @@ async function buildReport(
     thumbnails,
     thumbnailFailures,
   };
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
 }
 
 function printText(
@@ -430,7 +511,7 @@ function printText(
             args.visibility,
           );
           console.log(
-            `  ${source} → ${destination} (${thumb.width}×${thumb.height}, ${formatBytes(thumb.bytes)})`,
+            `  ${source} → ${destination} (${thumb.width}×${thumb.height}, ${formatByteCount(thumb.bytes)})`,
           );
         } else {
           console.log(`  ${source} → failed: ${thumb.error}`);
@@ -444,7 +525,9 @@ function printText(
     0,
   );
   if (failures > 0) {
-    console.log(`${failures} asset(s) could not be decoded or thumbnailed.`);
+    console.log(
+      `${failures} asset(s) failed a decode, budget or thumbnail check.`,
+    );
   }
 }
 
@@ -473,8 +556,8 @@ async function main(argv: readonly string[]): Promise<number> {
   }
 
   const reports: DirectoryReport[] = [];
-  for (const dir of args.dirs) {
-    reports.push(await buildReport(dir, args));
+  for (const input of resolveInputs(args.dirs)) {
+    reports.push(await buildReport(input, args));
   }
   const failures = reports.reduce(
     (sum, report) => sum + report.failures + report.thumbnailFailures,
@@ -492,7 +575,10 @@ async function main(argv: readonly string[]): Promise<number> {
           headerBytes: args.headerBytes ?? null,
           recursive: args.recursive,
           filter: args.filter ?? null,
+          exclude: args.exclude ?? null,
           sort: args.sort,
+          budgetBytes: args.budgetBytes ?? null,
+          maxDimension: args.maxDimension ?? null,
           failures,
           thumbnails:
             args.thumbs === null
