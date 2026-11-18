@@ -104,8 +104,12 @@ let ctx: RenderContext = {
 };
 
 function visibleWidth(value: string): number {
-  // `stripANSI` removes SGR and OSC-8 alike, so the width is display width.
-  return Bun.stringWidth(Bun.stripANSI(value), { ambiguousIsNarrow: true });
+  // Same primitive the tests verify with, so padding and measurement cannot
+  // disagree on wide glyphs, emoji sequences or OSC-8 links.
+  return Bun.stringWidth(value, {
+    ambiguousIsNarrow: true,
+    countAnsiEscapeCodes: false,
+  });
 }
 
 function pad(value: string, width: number, align: string): string {
@@ -294,6 +298,8 @@ export function renderTrueColorOpsMarkdown(
   try {
     const markdown =
       typeof input === "string" ? input : new TextDecoder().decode(input);
+    // Callbacks own every element and emit only ANSI, so no source HTML reaches
+    // the output: // trusted-markdown: callbacks replace every block and inline.
     const rendered = Bun.markdown.render(
       markdown,
       SD_MARKDOWN_TOKEN_CALLBACKS as never,
