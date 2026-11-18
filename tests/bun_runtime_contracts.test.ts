@@ -70,6 +70,36 @@ describe("Bun runtime fail-closed contracts (measured on 1.4.4)", () => {
     );
   });
 
+  test("Bun.Archive accepts a lazy Blob handle and silently yields an empty archive", () => {
+    // The asymmetry in the fail-closed story. Bun.hash, Bun.SHA256,
+    // Bun.CryptoHasher, Bun.TOML.parse and Bun.YAML.parse all reject an
+    // unhydrated handle with "File blob cannot be used here" (pinned above).
+    // Bun.Archive does NOT: `S3File extends Blob` (bun.com/docs/runtime/s3) and
+    // Blob is a valid ArchiveInput, so it builds a well-formed archive with zero
+    // members. A caller that forgets `await handle.bytes()` gets 0 bytes and no
+    // error, which is exactly the empty-digest poison class in the other APIs.
+    const localHandle = Bun.file(import.meta.path);
+    expect(() => new Bun.Archive(localHandle as never)).not.toThrow();
+    return expect(
+      new Bun.Archive(localHandle as never).bytes(),
+    ).resolves.toHaveLength(0);
+  });
+
+  test("Bun.s3.file is a lazy Blob whose size is not synchronously available", () => {
+    // Docs: "Like Bun.file(path), the S3Client's file method is synchronous. It
+    // makes no network requests until you call a method that needs one", and
+    // "Size is not synchronously available because it requires a network
+    // request." Measured: NaN, not 0 — so `size === 0` is never a safe test for
+    // "empty object" on a handle; only stat()/bytes() answer that.
+    const s3file = Bun.s3.file("bucket/key.json");
+    expect(s3file).toBeInstanceOf(Blob);
+    expect(Number.isNaN(s3file.size)).toBe(true);
+    // Same silent-empty behaviour as the local handle above.
+    return expect(
+      new Bun.Archive(s3file as never).bytes(),
+    ).resolves.toHaveLength(0);
+  });
+
   test("Bun.indexOfLine rejects strings and reports the newline offset", () => {
     expect(() =>
       Bun.indexOfLine("header\npayload\n" as unknown as Uint8Array, 0),
