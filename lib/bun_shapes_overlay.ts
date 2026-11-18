@@ -64,6 +64,7 @@ export const SHAPE_SUBSYSTEMS_BY_NAME: Readonly<
   BunFile: "process",
   BunRequest: "network",
   color: "text",
+  ColorInput: "text",
   concatArrayBuffers: "crypto",
   connect: "network",
   Cookie: "data",

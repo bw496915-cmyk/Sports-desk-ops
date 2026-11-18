@@ -4,8 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   NamedColorTokenStore,
+  deriveColorToken,
   detectColorDepth,
   formatProfileDotEnv,
+  parseColorInput,
 } from "../lib/bun_profiled_terminal.ts";
 
 const dirs: string[] = [];
@@ -107,4 +109,32 @@ describe("formatProfileDotEnv", () => {
     });
     second.close();
   });
+});
+
+/**
+ * `Bun.ColorInput` covers strings, packed numbers, RGB objects, tuples and typed arrays
+ * (https://bun.com/reference/bun/ColorInput); `deriveColorToken` used to accept only a string.
+ */
+test("deriveColorToken normalises every Bun.ColorInput form", () => {
+  const fromName = deriveColorToken("accent", "rebeccapurple");
+  expect(fromName.name).toBe("rebeccapurple");
+  expect(fromName.hex).toBe("#663399");
+
+  const fromNumber = deriveColorToken("warn", 0xff0000);
+  expect(fromNumber.number).toBe(0xff0000);
+  expect(fromNumber.hex).toBe("#ff0000");
+  // Bun's canonical CSS spelling varies by value ("red" vs a compressed "#00f"), so only its
+  // presence is contractual.
+  expect(fromNumber.name.length).toBeGreaterThan(0);
+
+  const fromTuple = deriveColorToken("error", [255, 128, 0]);
+  expect(fromTuple.number).toBe(0xff8000);
+
+  const fromObject = deriveColorToken("info", { r: 10, g: 20, b: 30, a: 255 });
+  expect(fromObject.number).toBe(0x0a141e);
+
+  expect(parseColorInput("not-a-colour")).toBeNull();
+  const blue = parseColorInput(0x0000ff);
+  expect(blue?.number).toBe(0x0000ff);
+  expect(blue?.name).toMatch(/^(blue|#00f|#0000ff)$/);
 });

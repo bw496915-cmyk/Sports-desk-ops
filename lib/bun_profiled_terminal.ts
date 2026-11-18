@@ -189,23 +189,52 @@ export function colorLuminance(rgb: number): number {
 }
 
 /**
+ * Normalise any `Bun.ColorInput` — a CSS name, a packed 24-bit number, an `{r,g,b,a}` object, an
+ * `[r,g,b(,a)]` tuple, or a typed array — to the pair the dual-token store keeps.
+ *
+ * `Bun.color()` accepts all of them; the store's `color_name` column is TEXT, so the canonical CSS
+ * string is what gets persisted, and the packed number is what renders. A string-only signature
+ * would reject every documented non-string input (and crash on `.trim()`).
+ *
+ * @returns `null` when Bun cannot parse the input.
+ * @see https://bun.com/reference/bun/ColorInput
+ */
+export function parseColorInput(input: Bun.ColorInput): {
+  readonly name: string;
+  readonly number: number;
+} | null {
+  const parsed = Bun.color(input, "number");
+  if (parsed === null) return null;
+  const number = (parsed >>> 0) & 0xffffff;
+  // A string input keeps its own spelling (`rebeccapurple`, not Bun's compressed `#639`);
+  // everything else takes the canonical CSS Bun renders for it (`red`, `#ff8000`).
+  const css = Bun.color(input, "css");
+  const name =
+    typeof input === "string" && input.trim() !== ""
+      ? input.trim().toLowerCase()
+      : typeof css === "string" && css !== ""
+        ? css
+        : `#${number.toString(16).padStart(6, "0")}`;
+  return { name, number };
+}
+
+/**
  * Validate one CSS colour name through `Bun.color()` and precompute its 24-bit number,
  * hex string, foreground escape and luminance.
  * @throws ERR_COLOR_INVALID when Bun cannot parse the name.
  */
 export function deriveColorToken(
   role: ThemeRole,
-  colorName: string,
+  colorName: Bun.ColorInput,
   format: AnsiFormat = "ansi-16m",
 ): DerivedColorToken {
-  const name = colorName.trim().toLowerCase();
-  const parsed = Bun.color(name, "number");
-  if (parsed === null) {
+  const token = parseColorInput(colorName);
+  if (token === null) {
     throw new Error(
       `ERR_COLOR_INVALID: ${JSON.stringify(colorName)} failed Bun.color(..., "number")`,
     );
   }
-  const number = (parsed >>> 0) & 0xffffff;
+  const { name, number } = token;
   return {
     role,
     name,
@@ -225,7 +254,7 @@ export type ProfileInspectSettings = {
 };
 
 export type BuiltinProfile = {
-  readonly colors: Partial<Record<ThemeRole, string>>;
+  readonly colors: Partial<Record<ThemeRole, Bun.ColorInput>>;
   readonly inspect: ProfileInspectSettings;
 };
 

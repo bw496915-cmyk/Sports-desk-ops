@@ -139,3 +139,50 @@ test("codegen subcommand writes both artifacts and exits 2 on an unknown profile
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/**
+ * `Bun.ColorInput` is the union `Bun.color()` accepts — not just a CSS string
+ * (https://bun.com/reference/bun/ColorInput). The store used to call `.trim()` on the argument,
+ * so a packed 24-bit number or an RGB tuple threw a TypeError instead of being stored.
+ */
+test("upsertToken accepts the documented Bun.ColorInput forms", () => {
+  const store = new AutomatedDualTokenStore(":memory:", false);
+  try {
+    const fromNumber = store.upsertToken("p", "accent", 0xff0000);
+    expect(fromNumber.color_name).toBe("red");
+    expect(fromNumber.color_number).toBe(0xff0000);
+    expect(fromNumber.hex).toBe("#ff0000");
+
+    const fromTuple = store.upsertToken("p", "warn", [255, 128, 0]);
+    expect(fromTuple.color_number).toBe(0xff8000);
+    expect(fromTuple.color_name).toBe("#ff8000");
+
+    const fromObject = store.upsertToken("p", "error", {
+      r: 10,
+      g: 20,
+      b: 30,
+      a: 255,
+    });
+    expect(fromObject.color_number).toBe(0x0a141e);
+
+    const fromBytes = store.upsertToken("p", "info", new Uint8Array([1, 2, 3]));
+    expect(fromBytes.color_number).toBe(0x010203);
+
+    // The stored rows come back in `ORDER BY role`, with the CSS name persisted.
+    const rows = store.getRows("p");
+    expect(rows.map((row) => row.role)).toEqual([
+      "accent",
+      "error",
+      "info",
+      "warn",
+    ]);
+    expect(rows.map((row) => row.color_name)).toEqual([
+      "red",
+      "#0a141e",
+      "#010203",
+      "#ff8000",
+    ]);
+  } finally {
+    store.close();
+  }
+});

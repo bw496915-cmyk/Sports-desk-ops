@@ -1,4 +1,4 @@
-# Bun shape contracts — the 133 shapes this repository calls
+# Bun shape contracts — the 134 shapes this repository calls
 
 The single source of truth is layered, and nothing here restates upstream text: **declarations** come from `bun-types@1.4.4` (the surface the reference site renders), **behaviour** from probes against the local `Bun 1.4.4` binary (`tests/bun_baseline.json`), **property attributes** from the pinned Bun commit `38afee6c84`. When they disagree: declarations win on names and signatures, the Bun source wins on attributes, and the measured binary wins on behaviour.
 
@@ -190,10 +190,10 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.ResourceUsage (type)
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · no reference page (see [docs](https://bun.com/docs/runtime/child-process#resource-usage))
 - **Shape:** type-only: declared, no runtime value
 - **Here:** `lib/bun_terminal.ts`
-- **Evidence:** `test:tests/bun_shapes_types.test-d.ts`
+- **Evidence:** `test:tests/bun_shapes_manifest.test.ts`, `test:tests/bun_shapes_types.test-d.ts`
 
 #### Bun.sleep
 
@@ -218,10 +218,10 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.SpawnOptions (type)
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · no reference page (see [docs](https://bun.com/docs/runtime/child-process#reference))
 - **Shape:** type-only: declared, no runtime value
 - **Here:** `lib/bun_terminal.ts`
-- **Evidence:** `test:tests/bun_globals_map_summaries.test.ts`, `test:tests/bun_shapes_types.test-d.ts`
+- **Evidence:** `test:tests/bun_globals_map_summaries.test.ts`, `test:tests/bun_shapes_manifest.test.ts`, `test:tests/bun_shapes_types.test-d.ts`
 
 #### Bun.spawnSync
 
@@ -255,10 +255,10 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.Subprocess (type)
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · no reference page (see [docs](https://bun.com/docs/runtime/child-process#spawn-a-process-bun-spawn))
 - **Shape:** type-only: declared, no runtime value
 - **Here:** `lib/bun_terminal.ts`
-- **Evidence:** `test:tests/bundle_runtime.test.ts`, `test:tests/dev_dashboard_endpoints.test.ts`, `test:tests/pty_feature_flags.test.ts`, `test:tests/server_port.test.ts`
+- **Evidence:** `test:tests/bun_shapes_manifest.test.ts`, `test:tests/bundle_runtime.test.ts`, `test:tests/dev_dashboard_endpoints.test.ts`, `test:tests/pty_feature_flags.test.ts`
 
 #### Bun.Terminal
 
@@ -269,10 +269,10 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.TerminalOptions (type)
 
-- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.4` · no reference page (see [docs](https://bun.com/docs/runtime/child-process#reference))
 - **Shape:** type-only: declared, no runtime value
 - **Here:** `lib/bun_terminal.ts`
-- **Evidence:** `test:tests/bun_aspects_contract.test.ts`, `test:tests/bun_reference_symbols.test.ts`, `test:tests/bun_urls.test.ts`
+- **Evidence:** `test:tests/bun_aspects_contract.test.ts`, `test:tests/bun_reference_symbols.test.ts`, `test:tests/bun_shapes_manifest.test.ts`, `test:tests/bun_urls.test.ts`
 
 #### Bun.unsafe
 
@@ -315,8 +315,15 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/color)
 - **Shape:** value: `function` · writable true · enumerable true
-- **Here:** `cli/sportsdesk_cli.ts`, `packages/contracts/src/wager_tokens.ts`
+- **Here:** `lib/token_automation.ts`, `cli/sportsdesk_cli.ts`
 - **Evidence:** `test:tests/token_automation.test.ts`, `test:tests/verify_tokens.test.ts`, `probe:text.ansi`
+
+#### Bun.ColorInput (type)
+
+- **Source:** declared in `bun-types@1.4.4` · no reference page (declaration only)
+- **Shape:** type-only: declared, no runtime value
+- **Here:** `lib/bun_profiled_terminal.ts`, `lib/token_automation.ts`
+- **Evidence:** `test:tests/bun_profiled_terminal.test.ts`, `test:tests/bun_shapes_manifest.test.ts`, `test:tests/bun_shapes_types.test-d.ts`, `test:tests/token_automation.test.ts`
 
 #### Bun.enableANSIColors
 
@@ -346,7 +353,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (4):** `ansi`, `html`, `react`, `render`
 - **Here:** `lib/token_automation.ts`, `lib/cli_markdown_renderer.ts`
-- **Evidence:** `surface:markdown`, `test:tests/ansi_markdown_theme.test.ts`, `test:tests/bun_aspects_contract.test.ts`, `test:tests/bun_markdown_ansi_example.test.ts` · deep dive: [§12](./bun_server_runtime_shapes_runbook.md)
+- **Evidence:** `surface:markdown`, `test:scripts/diff-bun-docs-vs-types.test.ts`, `test:tests/ansi_markdown_theme.test.ts`, `test:tests/bun_aspects_contract.test.ts` · deep dive: [§12](./bun_server_runtime_shapes_runbook.md)
 
 #### Bun.sliceAnsi
 

@@ -245,7 +245,10 @@ export const BUN_SHAPES: readonly BunShape[] = [
     kind: "type",
     subsystem: "process",
     heading: "Bun.ResourceUsage (type)",
-    evidence: ["test:tests/bun_shapes_types.test-d.ts"],
+    evidence: [
+      "test:tests/bun_shapes_manifest.test.ts",
+      "test:tests/bun_shapes_types.test-d.ts",
+    ],
   },
   {
     name: "sleep",
@@ -285,6 +288,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.SpawnOptions (type)",
     evidence: [
       "test:tests/bun_globals_map_summaries.test.ts",
+      "test:tests/bun_shapes_manifest.test.ts",
       "test:tests/bun_shapes_types.test-d.ts",
     ],
   },
@@ -340,10 +344,10 @@ export const BUN_SHAPES: readonly BunShape[] = [
     subsystem: "process",
     heading: "Bun.Subprocess (type)",
     evidence: [
+      "test:tests/bun_shapes_manifest.test.ts",
       "test:tests/bundle_runtime.test.ts",
       "test:tests/dev_dashboard_endpoints.test.ts",
       "test:tests/pty_feature_flags.test.ts",
-      "test:tests/server_port.test.ts",
     ],
   },
   {
@@ -366,6 +370,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
     evidence: [
       "test:tests/bun_aspects_contract.test.ts",
       "test:tests/bun_reference_symbols.test.ts",
+      "test:tests/bun_shapes_manifest.test.ts",
       "test:tests/bun_urls.test.ts",
     ],
   },
@@ -426,6 +431,18 @@ export const BUN_SHAPES: readonly BunShape[] = [
     ],
   },
   {
+    name: "ColorInput",
+    kind: "type",
+    subsystem: "text",
+    heading: "Bun.ColorInput (type)",
+    evidence: [
+      "test:tests/bun_profiled_terminal.test.ts",
+      "test:tests/bun_shapes_manifest.test.ts",
+      "test:tests/bun_shapes_types.test-d.ts",
+      "test:tests/token_automation.test.ts",
+    ],
+  },
+  {
     name: "enableANSIColors",
     kind: "value",
     subsystem: "text",
@@ -467,9 +484,9 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.markdown",
     evidence: [
       "surface:markdown",
+      "test:scripts/diff-bun-docs-vs-types.test.ts",
       "test:tests/ansi_markdown_theme.test.ts",
       "test:tests/bun_aspects_contract.test.ts",
-      "test:tests/bun_markdown_ansi_example.test.ts",
     ],
   },
   {
