@@ -40,6 +40,7 @@ import {
   type DnsAnswer,
   type DnsLookupOptions,
 } from "../lib/preflight.ts";
+import { probeTls, type TlsProvenance } from "../lib/tls_provenance.ts";
 import { resolveTelegramCredentials } from "../lib/telegram_alert_sender.ts";
 import {
   ENDPOINT_PROBE_DEFAULT_FAIL_THRESHOLD,
@@ -116,6 +117,8 @@ interface ProbeJson {
     readonly addresses: readonly string[];
     readonly ttlSeconds: readonly number[];
     readonly addressProbes: readonly AddressProbe[];
+    readonly tls: TlsProvenance | null;
+    readonly tlsError: string | null;
     readonly fetchStatus: number | null;
     readonly latencyMs: number | null;
     readonly cacheStats: Readonly<Record<string, number>> | null;
@@ -128,11 +131,15 @@ export interface AddressProbe {
   readonly status: number | null;
   readonly latencyMs: number | null;
   readonly error: string | null;
+  readonly tls: TlsProvenance | null;
+  readonly tlsError: string | null;
 }
 
 interface ProbeResult {
   readonly observation: EndpointProbeObservation;
   readonly addressProbes: readonly AddressProbe[];
+  readonly tls: TlsProvenance | null;
+  readonly tlsError: string | null;
 }
 
 function messageOf(error: unknown): string {
@@ -355,12 +362,46 @@ export function formatIpForUrl(ip: string): string {
   return isIP(ip) === 6 ? `[${ip}]` : ip;
 }
 
+/** ALPN wire format: [length, bytes] per protocol. Bun rejects a comma-joined string. */
+function alpnWire(protocols: readonly string[]): Buffer {
+  const parts: Buffer[] = [];
+  for (const protocol of protocols) {
+    const bytes = Buffer.from(protocol, "utf8");
+    parts.push(Buffer.from([bytes.length]), bytes);
+  }
+  return Buffer.concat(parts);
+}
+
+async function probeTlsSafe(
+  host: string,
+  port: number,
+  servername: string,
+): Promise<{ tls: TlsProvenance | null; tlsError: string | null }> {
+  try {
+    return {
+      tls: await probeTls({
+        host,
+        port,
+        servername,
+        timeoutMs: PROBE_TIMEOUT_MS,
+        // Offer h2 + http/1.1 so the handshake reports the server's choice; the fetch
+        // negotiates its own ALPN independently.
+        alpnProtocols: alpnWire(["h2", "http/1.1"]),
+      }),
+      tlsError: null,
+    };
+  } catch (error) {
+    return { tls: null, tlsError: messageOf(error) };
+  }
+}
+
 async function fetchAddress(
   target: HostTarget,
   address: string,
 ): Promise<AddressProbe> {
   const started = performance.now();
   const family = isIP(address) === 6 ? 6 : 4;
+  const tlsPromise = probeTlsSafe(address, target.port, target.hostname);
   try {
     const response = await fetch(
       `https://${formatIpForUrl(address)}:${target.port}/`,
@@ -372,7 +413,11 @@ async function fetchAddress(
           "user-agent": "sportsdesk-endpoint-probe/1",
           host: target.hostname,
         },
-        tls: { serverName: target.hostname },
+        // fetch's TLS field is `serverName` (BunFetchRequestInitTLS). `servername` is the
+        // node:tls alias; `serverName` wins if both are set. `hostname` is the dial/URL host,
+        // not a TLS field — the HTTP Host header is separate and set above. Certificate
+        // verification uses this serverName.
+        tls: { serverName: target.hostname } satisfies BunFetchRequestInitTLS,
       },
     );
     return {
@@ -381,6 +426,7 @@ async function fetchAddress(
       status: response.status,
       latencyMs: Math.round(performance.now() - started),
       error: null,
+      ...(await tlsPromise),
     };
   } catch (error) {
     return {
@@ -389,6 +435,7 @@ async function fetchAddress(
       status: null,
       latencyMs: Math.round(performance.now() - started),
       error: messageOf(error),
+      ...(await tlsPromise),
     };
   }
 }
@@ -434,6 +481,12 @@ async function probe(
     Bun.dns.prefetch(target.hostname, target.port);
   }
 
+  const tlsPromise = probeTlsSafe(
+    ipOverride ?? target.hostname,
+    target.port,
+    target.hostname,
+  );
+
   const started = performance.now();
   const fetched = await (async () => {
     try {
@@ -448,7 +501,9 @@ async function probe(
           // Keep the logical Host when dialing an explicit IP.
           ...(ipOverride === undefined ? {} : { host: target.hostname }),
         },
-        // Keep certificate verification against the hostname, not the IP.
+        // fetch's TLS field is `serverName` (typed by BunFetchRequestInitTLS); `servername`
+        // is the node:tls alias and serverName wins. `hostname` is the dial/URL host, not a
+        // TLS field. Verification uses the logical hostname even when the URL host is an IP.
         ...(ipOverride === undefined
           ? {}
           : { tls: { serverName: target.hostname } }),
@@ -489,6 +544,7 @@ async function probe(
       cacheStats: readDnsCacheStats() ?? null,
     },
     addressProbes,
+    ...(await tlsPromise),
   };
 }
 
@@ -532,6 +588,9 @@ export function renderJson(
   ip: string | null,
   allIps: boolean,
   addressProbesByHost: Readonly<Record<string, readonly AddressProbe[]>>,
+  tlsByHost: Readonly<
+    Record<string, { tls: TlsProvenance | null; tlsError: string | null }>
+  >,
 ): ProbeJson {
   return {
     schemaVersion: 1,
@@ -554,6 +613,8 @@ export function renderJson(
       addresses: verdict.addresses,
       ttlSeconds: verdict.ttlSeconds,
       addressProbes: addressProbesByHost[verdict.target.hostname] ?? [],
+      tls: tlsByHost[verdict.target.hostname]?.tls ?? null,
+      tlsError: tlsByHost[verdict.target.hostname]?.tlsError ?? null,
       fetchStatus: verdict.fetchStatus,
       latencyMs: verdict.latencyMs,
       cacheStats: verdict.cacheStats,
@@ -623,6 +684,10 @@ async function run(): Promise<number> {
     ),
   );
   const addressProbesByHost: Record<string, readonly AddressProbe[]> = {};
+  const tlsByHost: Record<
+    string,
+    { tls: TlsProvenance | null; tlsError: string | null }
+  > = {};
   const observations = settled.map((result, index) => {
     const target = targets[index];
     if (target === undefined) {
@@ -630,9 +695,17 @@ async function run(): Promise<number> {
     }
     if (result.status === "fulfilled") {
       addressProbesByHost[target.hostname] = result.value.addressProbes;
+      tlsByHost[target.hostname] = {
+        tls: result.value.tls,
+        tlsError: result.value.tlsError,
+      };
       return result.value.observation;
     }
     addressProbesByHost[target.hostname] = [];
+    tlsByHost[target.hostname] = {
+      tls: null,
+      tlsError: messageOf(result.reason),
+    };
     return failedObservation(target, messageOf(result.reason));
   });
   const verdicts = observations.map((observation) =>
@@ -657,6 +730,7 @@ async function run(): Promise<number> {
           options.ip ?? null,
           options.allIps,
           addressProbesByHost,
+          tlsByHost,
         ),
         null,
         2,

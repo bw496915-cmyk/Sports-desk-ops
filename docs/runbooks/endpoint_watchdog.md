@@ -24,6 +24,10 @@ For each target, per tick:
 3. **Reachability** — `GET https://host:port/` with a 5 s timeout and `redirect: "manual"`. A 3xx or
    4xx response is reachable (Telegram's API root answers 404 by design); no response or a 5xx is a
    failure.
+4. **TLS/protocol provenance** — `probeTls` (`Bun.connect`) records the negotiated TLS version,
+   cipher, ALPN, authorization and peer certificate (`validTo`, issuer, subject). The diagnostic
+   handshake offers `h2` + `http/1.1`; it is separate from the fetch, which negotiates its own
+   ALPN. `--json` carries this as `tls` / `tlsError` on the host and on each `addressProbes` entry.
 
 Each step is bounded: DNS lookup 5 s, fetch 5 s. A per-target failure is isolated — one host's
 failure does not blank the others.
@@ -77,8 +81,8 @@ bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org
 bun run scripts/watchdog_endpoint_probe.ts --dry-run --backend system --host api.telegram.org
 ```
 
-`--json` includes the resolver, per-host status/code, consecutive failures, addresses, TTLs and
-cache stats. Human output names the resolver and prints one line per host.
+`--json` includes the resolver, per-host status/code, consecutive failures, addresses, TTLs,
+cache stats, and TLS provenance. Human output names the resolver and prints one line per host.
 
 ## Diagnostic target overrides
 
@@ -96,6 +100,29 @@ bun run scripts/watchdog_endpoint_probe.ts --dry-run --host api.telegram.org --i
 header, so certificate verification still runs against the name. The DNS lookup still runs
 against the hostname and is reported separately; if DNS fails but the IP answers, the JSON shows
 both. IPv6 literals are bracketed automatically, and the prefetch is skipped when dialing an IP.
+
+### TLS, SNI and Host
+
+The three names are distinct:
+
+- **`tls.serverName`** (fetch) — SNI and the name the certificate is verified against.
+  `servername` is the `node:tls` alias; `serverName` wins if both are set.
+- **`hostname`** — the dial/URL host, not a TLS field. When `--ip` is set the URL host is the IP.
+- **`Host` header** — HTTP-level routing; we send the logical hostname.
+
+With `--ip`, the probe therefore dials the IP, sends `Host: <hostname>`, and verifies the
+certificate against `<hostname>`. Observed: no TLS option or a wrong `serverName` fails with
+`ERR_TLS_CERT_ALTNAME_INVALID`; the correct name returns the endpoint's status.
+
+### Protocols
+
+- The probe is HTTPS-only; `--port` changes the port, not the scheme.
+- `Bun.TLSOptions` exposes `ALPNProtocols`, `ciphers` and `secureOptions`, but no
+  `minVersion`/`maxVersion`; the app's fetch defaults are left untouched.
+- The separate diagnostic handshake offers `h2` + `http/1.1` (Bun's ALPN wire format, not a
+  comma-joined string) and reports the server's choice. For `api.telegram.org` that is
+  TLSv1.3 / `h2` / `TLS_AES_256_GCM_SHA384`.
+- `tls` is diagnostic; the fetch result remains the gate.
 
 `--all-ips` probes **every address returned by the lookup**, each with the same SNI/Host and a 5 s
 timeout. Per-address status, latency and error land in the host's `addressProbes` array. The host

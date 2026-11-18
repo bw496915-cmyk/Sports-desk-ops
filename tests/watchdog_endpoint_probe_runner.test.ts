@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { SPORTSDESK_CORE_HOSTS } from "../lib/bun_dns.ts";
+import type { TlsProvenance } from "../lib/tls_provenance.ts";
 import {
   evaluateEndpointProbe,
   type EndpointProbeObservation,
@@ -318,6 +319,7 @@ describe("endpoint probe JSON rendering", () => {
       null,
       false,
       {},
+      {},
     );
 
     expect(json.resolver).toBe("c-ares");
@@ -325,6 +327,8 @@ describe("endpoint probe JSON rendering", () => {
     expect(json.ip).toBeNull();
     expect(json.allIps).toBe(false);
     expect(json.hosts[0]?.addressProbes).toEqual([]);
+    expect(json.hosts[0]?.tls).toBeNull();
+    expect(json.hosts[0]?.tlsError).toBeNull();
     expect(json.dryRun).toBe(true);
     expect(json.alerts).toBe(1);
     expect(json.hosts).toHaveLength(2);
@@ -366,13 +370,71 @@ describe("endpoint probe JSON rendering", () => {
             status: 302,
             latencyMs: 12,
             error: null,
+            tls: null,
+            tlsError: null,
           },
         ],
       },
+      {},
     );
     expect(json.allIps).toBe(true);
     expect(json.ip).toBe("149.154.166.110");
     expect(json.hosts[0]?.addressProbes).toHaveLength(1);
     expect(json.hosts[0]?.addressProbes[0]?.status).toBe(302);
+  });
+
+  test("TLS provenance renders version, cipher, ALPN and certificate", () => {
+    const target = SPORTSDESK_CORE_HOSTS[0];
+    if (target === undefined) throw new Error("core hosts fixture is empty");
+    const verdict = evaluateEndpointProbe({
+      nowMs: 2_000,
+      state: { consecutiveFailures: 0, lastCheckedAtMs: null },
+      observation: {
+        target,
+        lookup: {
+          ok: true,
+          addresses: ["149.154.166.110"],
+          ttlSeconds: [60],
+          error: null,
+        },
+        fetch: { ok: true, status: 302, latencyMs: 12, error: null },
+        cacheStats: null,
+      },
+    });
+    const tls: TlsProvenance = {
+      host: "149.154.166.110",
+      port: 443,
+      tlsVersion: "TLSv1.3",
+      cipher: { name: "TLS_AES_128_GCM_SHA256", version: "TLSv1.3" },
+      alpn: "h2",
+      authorized: true,
+      authorizationError: null,
+      peer: {
+        subjectCommonName: "example.test",
+        issuerCommonName: "Test CA",
+        issuerOrganisation: "Test",
+        validFrom: "Nov 01 00:00:00 2026 GMT",
+        validTo: "Feb 01 00:00:00 2027 GMT",
+        fingerprintSha256: "AA:BB:CC",
+      },
+      sessionReused: false,
+      connectMs: 12,
+      measuredAt: "2026-11-17T00:00:00.000Z",
+    };
+    const json = renderJson(
+      2_000,
+      true,
+      "c-ares",
+      [verdict],
+      null,
+      false,
+      {},
+      { [target.hostname]: { tls, tlsError: null } },
+    );
+    expect(json.hosts[0]?.tls?.tlsVersion).toBe("TLSv1.3");
+    expect(json.hosts[0]?.tls?.alpn).toBe("h2");
+    expect(json.hosts[0]?.tls?.authorized).toBe(true);
+    expect(json.hosts[0]?.tls?.peer?.validTo).toBe("Feb 01 00:00:00 2027 GMT");
+    expect(json.hosts[0]?.tlsError).toBeNull();
   });
 });

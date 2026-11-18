@@ -76,6 +76,8 @@ export interface ProbeTlsOptions {
   readonly port?: number;
   readonly timeoutMs?: number;
   readonly servername?: string;
+  /** Offered ALPN protocols, in wire format; e.g. `h2,http/1.1` built with length prefixes. */
+  readonly alpnProtocols?: string | Uint8Array;
 }
 
 export async function probeTls(
@@ -102,7 +104,12 @@ export async function probeTls(
     Bun.connect({
       hostname: host,
       port,
-      tls: { servername: options.servername ?? host },
+      tls: {
+        servername: options.servername ?? host,
+        ...(options.alpnProtocols === undefined
+          ? {}
+          : { ALPNProtocols: options.alpnProtocols }),
+      },
       socket: {
         open(socket: RawSocket) {
           if (settled) {
