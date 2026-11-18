@@ -22,6 +22,10 @@ describe("Bun Native DNS & Networking Engine", () => {
     expect(prefetched).toBe(SPORTSDESK_CORE_HOSTS.length);
   });
 
+  it("rejects a NaN prefetch port", () => {
+    expect(() => dns.prefetch("example.com", Number.NaN)).toThrow(RangeError);
+  });
+
   it("retrieves DNS cache telemetry with valid metrics", () => {
     const stats = getDnsTelemetry();
     expect(typeof stats.size).toBe("number");

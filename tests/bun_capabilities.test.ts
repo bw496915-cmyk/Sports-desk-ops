@@ -973,6 +973,8 @@ describe("Bun capabilities used by the ops tooling", () => {
     // Release fix: non-string arguments are stringified, never passed through.
     expect(Bun.$.escape(null as unknown as string)).toBe("null");
     expect(Bun.$.escape(true as unknown as string)).toBe("true");
+    expect(Bun.$.escape(new String("foo") as unknown as string)).toBe("foo");
+    expect(typeof Bun.$.escape(42 as unknown as string)).toBe("string");
 
     // `$.braces` is pure bash brace expansion — no I/O, safe to call unconditionally.
     expect(Bun.$.braces("index.{js,ts}").sort()).toEqual([
