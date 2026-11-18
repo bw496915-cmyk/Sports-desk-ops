@@ -52,8 +52,11 @@ export function formatChannelBadge(
   channelId4: number,
   theme: Readonly<Bun.markdown.AnsiTheme>,
 ): string {
-  const id = channelId4 & 0x0f;
+  const idx = channelId4 >>> 0;
+  if (idx >= CHANNEL_BADGE_ASCII_LUT.length) {
+    return "[UNKNOWN]";
+  }
   return theme.colors === false
-    ? (CHANNEL_BADGE_ASCII_LUT[id] ?? "[UNKNOWN]")
-    : (CHANNEL_BADGE_ANSI_LUT[id] ?? "[UNKNOWN]");
+    ? CHANNEL_BADGE_ASCII_LUT[idx]!
+    : CHANNEL_BADGE_ANSI_LUT[idx]!;
 }

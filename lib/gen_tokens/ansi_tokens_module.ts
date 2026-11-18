@@ -15,6 +15,16 @@ export function emitGeneratedAnsiTokensModule(
     readonly glyph?: string;
   }>,
 ): string {
+  const sortedChannels = [...channels].sort(
+    (a, b) => a.channel_id - b.channel_id,
+  );
+  for (let i = 0; i < sortedChannels.length; i++) {
+    if (sortedChannels[i]!.channel_id !== i) {
+      throw new Error(
+        `ERR_SPEC_CHANNEL_LUT_NON_CONTIGUOUS: expected ${i}, got ${sortedChannels[i]!.channel_id}`,
+      );
+    }
+  }
   const profileKeys = Object.keys(profiles);
   const lines: string[] = [
     "// AUTO-GENERATED FROM design/tokens.toml — DO NOT EDIT",
@@ -33,7 +43,7 @@ export function emitGeneratedAnsiTokensModule(
   lines.push(
     "export const CHANNEL_ANSI16M_FG_LUT: readonly string[] = Object.freeze([",
   );
-  for (const ch of channels) {
+  for (const ch of sortedChannels) {
     const sgr = Bun.color(ch.hex, "ansi-16m") ?? "";
     lines.push(
       `  ${JSON.stringify(sgr)}, // [${ch.channel_id}] ${ch.channel_code} (${ch.hex})`,
@@ -44,7 +54,7 @@ export function emitGeneratedAnsiTokensModule(
   lines.push(
     "export const CHANNEL_BADGE_ANSI_LUT: readonly string[] = Object.freeze([",
   );
-  for (const ch of channels) {
+  for (const ch of sortedChannels) {
     const sgr = Bun.color(ch.hex, "ansi-16m") ?? "";
     const glyph = ch.glyph ?? "*";
     lines.push(
@@ -56,7 +66,7 @@ export function emitGeneratedAnsiTokensModule(
   lines.push(
     "export const CHANNEL_BADGE_ASCII_LUT: readonly string[] = Object.freeze([",
   );
-  for (const ch of channels) {
+  for (const ch of sortedChannels) {
     lines.push(`  ${JSON.stringify(`[${ch.channel_code}]`)},`);
   }
   lines.push("]);", "");

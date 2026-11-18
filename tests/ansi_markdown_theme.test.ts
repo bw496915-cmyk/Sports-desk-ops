@@ -4,6 +4,7 @@ import {
   formatChannelBadge,
   renderOpsMarkdownAnsi,
 } from "../lib/cli_markdown_renderer.ts";
+import { emitGeneratedAnsiTokensModule } from "../lib/gen_tokens/ansi_tokens_module.ts";
 import { validateAnsiThemeProfiles } from "../lib/gen_tokens/tokens_ssot.ts";
 
 describe("Bun.markdown.AnsiTheme <-> design/tokens.toml v1.5.0 gates", () => {
@@ -36,6 +37,17 @@ describe("Bun.markdown.AnsiTheme <-> design/tokens.toml v1.5.0 gates", () => {
     );
     expect(out.includes("\x1b")).toBe(false);
     expect(formatChannelBadge(6, SD_ANSI_THEMES.pipe_ascii)).toBe("[GSLIVE]");
+    expect(formatChannelBadge(-1, SD_ANSI_THEMES.pipe_ascii)).toBe("[UNKNOWN]");
+    expect(formatChannelBadge(16, SD_ANSI_THEMES.pipe_ascii)).toBe("[UNKNOWN]");
+  });
+
+  test("emitGeneratedAnsiTokensModule rejects sparse or non-contiguous channel_id", () => {
+    expect(() =>
+      emitGeneratedAnsiTokensModule({}, [
+        { channel_id: 0, channel_code: "NON_SPORTS", hex: "#94a3b8" },
+        { channel_id: 2, channel_code: "BLOCKED", hex: "#8fa3bf" },
+      ]),
+    ).toThrow("ERR_SPEC_CHANNEL_LUT_NON_CONTIGUOUS");
   });
 
   test("ghostty_interactive emits OSC-8 hyperlinks and wraps cleanly within columns=120", () => {
