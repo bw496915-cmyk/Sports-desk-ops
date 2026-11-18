@@ -108,11 +108,18 @@ The three names are distinct:
 - **`tls.serverName`** (fetch) — SNI and the name the certificate is verified against.
   `servername` is the `node:tls` alias; `serverName` wins if both are set.
 - **`hostname`** — the dial/URL host, not a TLS field. When `--ip` is set the URL host is the IP.
-- **`Host` header** — HTTP-level routing; we send the logical hostname.
+- **`Host` header** — HTTP-level routing (the HTTP/2 equivalent is `:authority`); we send the
+  logical hostname.
 
 With `--ip`, the probe therefore dials the IP, sends `Host: <hostname>`, and verifies the
 certificate against `<hostname>`. Observed: no TLS option or a wrong `serverName` fails with
 `ERR_TLS_CERT_ALTNAME_INVALID`; the correct name returns the endpoint's status.
+
+The layers are independent, not aliases: measured 2026-11-17 with an echo endpoint — dial
+`54.172.45.38`, TLS SNI `httpbin.org`, `Host: probe.example` — the server echoed
+`Host: probe.example`. The runner sets `tls.serverName` and `headers.host` as separate options;
+with `--ip`, SNI and Host currently both carry the target hostname, but neither is derived from
+the dial address. A `Host` mismatch can therefore change HTTP routing without failing TLS.
 
 ### Protocols
 
