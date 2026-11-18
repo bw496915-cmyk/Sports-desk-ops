@@ -16,6 +16,9 @@ import { promises as nodeDns } from "node:dns";
 
 export type DnsResolverBackend = "c-ares" | "system" | "getaddrinfo" | "libc";
 
+/** Bun's documented DNS cache capacity; getCacheStats() exposes size but not the cap. */
+export const BUN_DNS_CACHE_CAPACITY = 256 as const;
+
 export interface HostTarget {
   readonly hostname: string;
   readonly port: number;
@@ -71,7 +74,7 @@ export interface DnsCacheTelemetry {
 
 /**
  * Prefetches DNS entries across all core SportsDesk external services to warm
- * Bun's 256-entry LRU DNS cache before operational HTTP requests.
+ * Bun's DNS cache before operational HTTP requests.
  */
 export function prefetchSportsDeskEndpoints(
   hosts: readonly HostTarget[] = SPORTSDESK_CORE_HOSTS,
@@ -88,20 +91,33 @@ export function prefetchSportsDeskEndpoints(
   return count;
 }
 
+export type DnsCacheStats = ReturnType<typeof dns.getCacheStats>;
+
 /**
- * Captures real-time DNS cache statistics from Bun's native networking subsystem.
+ * Resolves the configured DNS cache TTL. Bun documents 30s as the default;
+ * non-positive or invalid values fall back to it (a negative TTL is invalid).
  */
-export function getDnsTelemetry(): DnsCacheTelemetry {
-  const stats = dns.getCacheStats();
+export function resolveDnsTtlSeconds(
+  raw: string | undefined = Bun.env.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS,
+): number {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 30;
+  return Math.max(1, Math.floor(parsed));
+}
+
+/**
+ * Pure telemetry calculation. `totalCount` is every connection request, the
+ * documented denominator; completed and inflight cache hits both count as hits.
+ */
+export function computeDnsTelemetry(
+  stats: DnsCacheStats,
+  defaultTtlSeconds = resolveDnsTtlSeconds(),
+): DnsCacheTelemetry {
   const hits = stats.cacheHitsCompleted + stats.cacheHitsInflight;
   const hitRatePercent =
     stats.totalCount > 0
       ? Math.round((hits / stats.totalCount) * 1000) / 10
       : 0.0;
-
-  const defaultTtlSeconds =
-    Number(Bun.env.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS) || 30;
-
   return {
     cacheHitsCompleted: stats.cacheHitsCompleted,
     cacheHitsInflight: stats.cacheHitsInflight,
@@ -112,6 +128,13 @@ export function getDnsTelemetry(): DnsCacheTelemetry {
     hitRatePercent,
     defaultTtlSeconds,
   };
+}
+
+/**
+ * Captures real-time DNS cache statistics from Bun's native networking subsystem.
+ */
+export function getDnsTelemetry(): DnsCacheTelemetry {
+  return computeDnsTelemetry(dns.getCacheStats());
 }
 
 export interface DnsLookupRecord {
@@ -202,13 +225,13 @@ export function formatDnsTelemetryMarkdown(): string {
     `### 🌐 Bun Native DNS Cache & Networking Telemetry\n\n` +
     `| Metric | Value | Reference / Notes |\n` +
     `|:---|:---:|:---|\n` +
-    `| **Cache Size** | \`${telemetry.size} / 256 entries\` | Max capacity: 256 concurrent entries |\n` +
-    `| **Hit Rate** | \`${telemetry.hitRatePercent}%\` | Shared across \`fetch()\`, \`Bun.connect\`, HTTP client |\n` +
+    `| **Cache Size** | \`${telemetry.size} / ${BUN_DNS_CACHE_CAPACITY} entries\` | Max capacity: ${BUN_DNS_CACHE_CAPACITY} concurrent entries |\n` +
+    `| **Hit Rate** | \`${telemetry.hitRatePercent}%\` | (completed + inflight hits) / totalCount across fetch/Bun.connect |\n` +
     `| **Cache Hits (Completed)** | \`${telemetry.cacheHitsCompleted}\` | Cached zero-latency lookups |\n` +
     `| **Cache Hits (Inflight)** | \`${telemetry.cacheHitsInflight}\` | Simultaneous connections joined into 1 lookup |\n` +
     `| **Cache Misses** | \`${telemetry.cacheMisses}\` | Network DNS queries dispatched |\n` +
     `| **Errors** | \`${telemetry.errors}\` | Connection / resolution failures |\n` +
-    `| **Cache TTL** | \`${telemetry.defaultTtlSeconds}s\` | Configurable via \`$BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS\` |\n`
+    `| **Cache TTL** | \`${telemetry.defaultTtlSeconds}s\` | Configurable via \`$BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS\`; invalid values use 30s |\n`
   );
 }
 

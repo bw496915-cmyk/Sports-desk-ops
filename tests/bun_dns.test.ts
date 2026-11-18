@@ -1,14 +1,17 @@
 import { describe, expect, it } from "bun:test";
 import { dns } from "bun";
 import {
+  BUN_DNS_CACHE_CAPACITY,
   benchmarkResolverLatency,
   classifyIpAddress,
+  computeDnsTelemetry,
   ContinuousDnsWarmingManager,
   formatDnsTelemetryMarkdown,
   getDnsTelemetry,
   lookupHost,
   prefetchSportsDeskEndpoints,
   resolveDnsRecordSet,
+  resolveDnsTtlSeconds,
   resolvePrimaryAddress,
   SPORTSDESK_CORE_HOSTS,
 } from "../lib/bun_dns.ts";
@@ -24,9 +27,55 @@ describe("Bun Native DNS & Networking Engine", () => {
     expect(typeof stats.size).toBe("number");
     expect(typeof stats.cacheHitsCompleted).toBe("number");
     expect(typeof stats.cacheMisses).toBe("number");
+    expect(typeof stats.cacheHitsInflight).toBe("number");
+    expect(typeof stats.errors).toBe("number");
     expect(typeof stats.totalCount).toBe("number");
     expect(typeof stats.hitRatePercent).toBe("number");
+    expect(stats.hitRatePercent).toBeGreaterThanOrEqual(0);
+    expect(stats.hitRatePercent).toBeLessThanOrEqual(100);
     expect(stats.defaultTtlSeconds).toBeGreaterThanOrEqual(1);
+  });
+
+  it("computes hit rate over all requests and handles a zero total", () => {
+    const populated = computeDnsTelemetry(
+      {
+        cacheHitsCompleted: 1,
+        cacheHitsInflight: 1,
+        cacheMisses: 2,
+        size: 3,
+        errors: 0,
+        totalCount: 4,
+      },
+      30,
+    );
+    expect(populated.hitRatePercent).toBe(50);
+    expect(populated.defaultTtlSeconds).toBe(30);
+
+    const empty = computeDnsTelemetry(
+      {
+        cacheHitsCompleted: 0,
+        cacheHitsInflight: 0,
+        cacheMisses: 0,
+        size: 0,
+        errors: 0,
+        totalCount: 0,
+      },
+      30,
+    );
+    expect(empty.hitRatePercent).toBe(0);
+  });
+
+  it("falls back to a 30s TTL for invalid or non-positive config", () => {
+    expect(resolveDnsTtlSeconds("5")).toBe(5);
+    expect(resolveDnsTtlSeconds("5.9")).toBe(5);
+    expect(resolveDnsTtlSeconds("0")).toBe(30);
+    expect(resolveDnsTtlSeconds("-1")).toBe(30);
+    expect(resolveDnsTtlSeconds("not-a-number")).toBe(30);
+    expect(resolveDnsTtlSeconds("")).toBe(30);
+  });
+
+  it("pins Bun's documented DNS cache capacity", () => {
+    expect(BUN_DNS_CACHE_CAPACITY).toBe(256);
   });
 
   it("resolves hostname using system and c-ares backends", async () => {
