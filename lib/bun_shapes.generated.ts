@@ -426,6 +426,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.color",
     evidence: [
       "test:tests/token_automation.test.ts",
+      "test:tests/token_theme_registry.test.ts",
       "test:tests/verify_tokens.test.ts",
       "probe:text.ansi",
     ],
