@@ -33,7 +33,11 @@ import {
   type DnsResolverBackend,
   type HostTarget,
 } from "../lib/bun_dns.ts";
-import { readDnsCacheStats, resolveHost } from "../lib/preflight.ts";
+import {
+  readDnsCacheStats,
+  resolveHost,
+  type DnsLookupOptions,
+} from "../lib/preflight.ts";
 import { resolveTelegramCredentials } from "../lib/telegram_alert_sender.ts";
 import {
   ENDPOINT_PROBE_DEFAULT_FAIL_THRESHOLD,
@@ -92,6 +96,7 @@ interface ProbeJson {
   readonly intervalSeconds: number;
   readonly dryRun: boolean;
   readonly resolver: ProbeBackend;
+  readonly socketType: "tcp";
   readonly alerts: number;
   readonly hosts: readonly {
     readonly host: string;
@@ -234,6 +239,19 @@ function writeState(path: string, state: StateFile): void {
   renameSync(tmp, path);
 }
 
+export function buildLookupOptions(
+  port: number,
+  backend: ProbeBackend,
+): DnsLookupOptions {
+  return {
+    // `default` must leave the backend absent, not set to a sentinel string: Bun's platform
+    // default is the path the app's fetch()/Bun.connect() takes.
+    ...(backend === DEFAULT_DNS_BACKEND ? {} : { backend }),
+    port,
+    socketType: "tcp",
+  };
+}
+
 async function resolveWithTimeout(
   host: string,
   port: number,
@@ -242,16 +260,7 @@ async function resolveWithTimeout(
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      resolveHost(host, {
-        // Do not pin the backend: the probe measures the same resolver path the app's
-        // fetch()/Bun.connect() takes, and Bun's default differs by OS (c-ares on Linux,
-        // system/getaddrinfo on macOS). --backend is a diagnostic override only.
-        // socketType tcp mirrors HTTPS; port matches the prefetch/fetch and the reference
-        // notes port distinguishes IPv6 vs IPv4-only connections. Family stays unset.
-        ...(backend === DEFAULT_DNS_BACKEND ? {} : { backend }),
-        port,
-        socketType: "tcp",
-      }),
+      resolveHost(host, buildLookupOptions(port, backend)),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
           () =>
@@ -391,6 +400,7 @@ export function renderJson(
     intervalSeconds: ENDPOINT_PROBE_INTERVAL_SECONDS,
     dryRun,
     resolver,
+    socketType: "tcp",
     alerts: verdicts.filter((verdict) => verdict.status === "alert").length,
     hosts: verdicts.map((verdict) => ({
       host: verdict.target.hostname,

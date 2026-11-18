@@ -9,6 +9,7 @@ import {
   type EndpointProbeObservation,
 } from "../lib/watchdog/endpoint_probe.ts";
 import {
+  buildLookupOptions,
   buildNextState,
   parseBackend,
   parseOptions,
@@ -48,6 +49,20 @@ describe("endpoint probe runner options", () => {
     expect(options.dryRun).toBe(true);
     expect(options.json).toBe(true);
     expect(options.statePath).toBe(resolve("/tmp/endpoint-probe-test.json"));
+  });
+
+  test("default leaves the backend unset, with tcp and the target port", () => {
+    const options = buildLookupOptions(8_443, "default");
+    expect(options).toEqual({ port: 8_443, socketType: "tcp" });
+    expect("backend" in options).toBe(false);
+  });
+
+  test("a backend override is carried explicitly", () => {
+    expect(buildLookupOptions(443, "c-ares")).toEqual({
+      backend: "c-ares",
+      port: 443,
+      socketType: "tcp",
+    });
   });
 
   test("rejects an unknown backend with the allowed list", () => {
@@ -220,6 +235,7 @@ describe("endpoint probe JSON rendering", () => {
     const json = renderJson(2_000, true, "c-ares", [okVerdict, alertVerdict]);
 
     expect(json.resolver).toBe("c-ares");
+    expect(json.socketType).toBe("tcp");
     expect(json.dryRun).toBe(true);
     expect(json.alerts).toBe(1);
     expect(json.hosts).toHaveLength(2);
