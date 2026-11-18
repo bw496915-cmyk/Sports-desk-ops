@@ -30,6 +30,10 @@ Bun CLIs invoked via `bun x <bin>` (linked from `packages/sportsdesk-ops` + root
 
 Run `bun run cli:bins` (or `./bin/dx scripts --bins [--json | --yaml]`) to inspect all 23 workspace CLI mappings and verify `node_modules/.bin/` symlink status.
 
+Every bin above answers `-h` / `--help` with exit 0 (`tests/bun_x_cli_help.test.ts`
+spawns each one). A bin must not treat the flag as an input path — `xml-parse` and
+`blob-formdata` did until 2026-11-18.
+
 Shared libraries live under `../lib/`; long-running daemons under `../services/`.
 
 ## Connected `bun run --help` Surface, Runtime Control & Monitoring
