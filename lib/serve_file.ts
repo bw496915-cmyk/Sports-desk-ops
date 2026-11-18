@@ -28,7 +28,6 @@
  * Bun. This module adds the rules that are its own — dot segments and the method guard.
  */
 
-import { statSync } from "node:fs";
 import { extname } from "node:path";
 
 import { containedAssetPath } from "./asset_path.ts";
@@ -183,7 +182,7 @@ export function createServeFile(options: ServeFileOptions): ServeFile {
   // RFC 9110 §14.6 only requires that it not appear in the body.
   const boundary = options.boundary ?? null;
 
-  return (req, url) => {
+  return async (req, url) => {
     if (req.method !== "GET" && req.method !== "HEAD") {
       return new Response("method not allowed", {
         status: 405,
@@ -209,10 +208,13 @@ export function createServeFile(options: ServeFileOptions): ServeFile {
     const absolute = containedAssetPath(options.root, raw);
     if (absolute === null) return new Response("not found", { status: 404 });
 
+    // `Bun.file(path).stat()` is the declared shape for this (`Promise<node:fs.Stats>`), and it
+    // does not block the event loop the way `statSync` does on every request.
+    const file = Bun.file(absolute);
     let size: number;
     let mtimeMs: number;
     try {
-      const stats = statSync(absolute);
+      const stats = await file.stat();
       if (!stats.isFile()) return new Response("not found", { status: 404 });
       size = stats.size;
       mtimeMs = stats.mtimeMs;
@@ -250,7 +252,6 @@ export function createServeFile(options: ServeFileOptions): ServeFile {
       }
     }
 
-    const file = Bun.file(absolute);
     const rangeHeader = req.headers.get("range");
     const ifRange = req.headers.get("if-range")?.trim();
     // `If-Range` with a validator that no longer matches means "send the whole current file":
