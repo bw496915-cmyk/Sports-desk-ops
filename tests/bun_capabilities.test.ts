@@ -564,6 +564,35 @@ describe("Bun capabilities used by the ops tooling", () => {
     expect(new TextDecoder().decode(second as ArrayBuffer)).toBe("lo");
   });
 
+  test("ArrayBufferSink write accepts string, typed array, ArrayBuffer and SharedArrayBuffer", () => {
+    const sink = new Bun.ArrayBufferSink();
+    sink.start({ asUint8Array: true });
+    sink.write("hello ");
+    sink.write(new Uint8Array([0x77, 0x6f])); // wo
+    const arrayBuffer = new Uint8Array([0x72, 0x6c]).buffer as ArrayBuffer; // rl
+    sink.write(arrayBuffer);
+    const shared = new SharedArrayBuffer(2);
+    new Uint8Array(shared).set([0x64, 0x21]); // d!
+    sink.write(shared);
+    expect(new TextDecoder().decode(sink.end() as Uint8Array)).toBe(
+      "hello world!",
+    );
+  });
+
+  test("ArrayBufferSink stream flush honors asUint8Array and accepts more writes", () => {
+    const sink = new Bun.ArrayBufferSink();
+    sink.start({ stream: true, asUint8Array: true, highWaterMark: 1024 });
+    sink.write("hel");
+    const first = sink.flush();
+    expect(first).toBeInstanceOf(Uint8Array);
+    expect(new TextDecoder().decode(first as Uint8Array)).toBe("hel");
+    sink.write("lo");
+    const second = sink.flush();
+    expect(new TextDecoder().decode(second as Uint8Array)).toBe("lo");
+    sink.write("!");
+    expect(new TextDecoder().decode(sink.end() as Uint8Array)).toBe("!");
+  });
+
   test("BunFile.slice is lazy, does not open a missing file, and does not clamp size", async () => {
     const dir = mkdtempSync(join(tmpdir(), "bunfile-slice-lazy-"));
     try {
