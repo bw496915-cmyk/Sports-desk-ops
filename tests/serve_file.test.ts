@@ -15,6 +15,7 @@ import { join } from "node:path";
 import {
   createServeFile,
   entityTag,
+  ifRangeMatches,
   MAX_RANGES,
   mimeFor,
   parseByteRange,
@@ -156,6 +157,92 @@ describe("If-Range", () => {
     });
     expect(response.status).toBe(200);
     expect(await bodyOf(response)).toEqual(CONTENT);
+  });
+});
+
+describe("If-Modified-Since", () => {
+  // The file is untouched until the "validators track the file" block below.
+  const lastModified = async (): Promise<string> => {
+    const response = await fetch(mediaUrl("/video.mp4"));
+    return response.headers.get("last-modified") ?? "";
+  };
+
+  test("answers 304 when the file has not changed since the given date", async () => {
+    const since = await lastModified();
+    const response = await fetch(mediaUrl("/video.mp4"), {
+      headers: { "If-Modified-Since": since },
+    });
+    expect(response.status).toBe(304);
+    expect(await bodyOf(response)).toHaveLength(0);
+  });
+
+  test("answers 200 when the file is newer than the given date", async () => {
+    const response = await fetch(mediaUrl("/video.mp4"), {
+      headers: { "If-Modified-Since": new Date(0).toUTCString() },
+    });
+    expect(response.status).toBe(200);
+    expect(await bodyOf(response)).toEqual(CONTENT);
+  });
+
+  test("ignores an unparseable date instead of failing the read", async () => {
+    const response = await fetch(mediaUrl("/video.mp4"), {
+      headers: { "If-Modified-Since": "not-a-date" },
+    });
+    expect(response.status).toBe(200);
+  });
+
+  test("If-None-Match outranks If-Modified-Since", async () => {
+    const since = await lastModified();
+    const response = await fetch(mediaUrl("/video.mp4"), {
+      headers: {
+        "If-None-Match": '"some-other-file"',
+        "If-Modified-Since": since,
+      },
+    });
+    expect(response.status).toBe(200);
+  });
+
+  test("If-None-Match: * matches any current representation", async () => {
+    const response = await fetch(mediaUrl("/video.mp4"), {
+      headers: { "If-None-Match": "*" },
+    });
+    expect(response.status).toBe(304);
+  });
+});
+
+describe("If-Range by date", () => {
+  test("serves the range when the date has not passed", async () => {
+    const response = await fetch(mediaUrl("/video.mp4"), {
+      headers: {
+        Range: "bytes=0-9",
+        "If-Range": new Date(Date.now() + 60_000).toUTCString(),
+      },
+    });
+    expect(response.status).toBe(206);
+    expect(await bodyOf(response)).toEqual(CONTENT.slice(0, 10));
+  });
+
+  test("sends the whole file when the date predates the file", async () => {
+    const response = await fetch(mediaUrl("/video.mp4"), {
+      headers: { Range: "bytes=0-9", "If-Range": new Date(0).toUTCString() },
+    });
+    expect(response.status).toBe(200);
+    expect(await bodyOf(response)).toEqual(CONTENT);
+  });
+
+  test("ifRangeMatches rejects weak and unmatched entity-tags", () => {
+    const mtime = 1_700_000_000_000;
+    const etag = entityTag(4096, mtime);
+    expect(ifRangeMatches(etag, etag, mtime)).toBe(true);
+    expect(ifRangeMatches('"other"', etag, mtime)).toBe(false);
+    expect(ifRangeMatches(`W/${etag}`, etag, mtime)).toBe(false);
+    expect(ifRangeMatches("not-a-date", etag, mtime)).toBe(false);
+    expect(
+      ifRangeMatches(new Date(mtime + 5_000).toUTCString(), etag, mtime),
+    ).toBe(true);
+    expect(
+      ifRangeMatches(new Date(mtime - 5_000).toUTCString(), etag, mtime),
+    ).toBe(false);
   });
 });
 

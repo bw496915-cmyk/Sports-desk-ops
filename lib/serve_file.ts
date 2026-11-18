@@ -11,7 +11,8 @@
  *   2. `Range: bytes=0-1,2000-2003` returns the whole file with 200. Legal (`Range` may be
  *      ignored) but the opposite of what was asked: a player fetching a header box and an index
  *      gets the entire body twice over.
- *   3. No `ETag`, so no `304` and every seek or retry pays for the body again.
+ *   3. No `ETag`, so no `304` and every seek or retry pays for the body again. It also ignores
+ *      `If-Modified-Since`, which is the only validator some clients send.
  *   4. No `If-Range`, so a seek issued after the file was replaced splices new bytes into the
  *      client's old buffer.
  *   5. No method guard and no containment: a catch-all `fetch` answers `POST`, and a joined path
@@ -149,6 +150,26 @@ export function entityTag(size: number, mtimeMs: number): string {
 }
 
 /**
+ * Whether an `If-Range` value still describes the current file.
+ *
+ * The header carries a strong entity-tag or an HTTP-date. An entity-tag that does not match, a
+ * weak validator (`W/"…"`, which RFC 9110 §13.1.5 says to ignore here), or an unparseable value
+ * all count as a mismatch — the caller then sends the whole file instead of a range.
+ */
+export function ifRangeMatches(
+  value: string,
+  etag: string,
+  mtimeMs: number,
+): boolean {
+  if (value === etag) return true;
+  // A quoted or weak value is an entity-tag that did not match; never parse it as a date.
+  if (value.startsWith('"') || value.startsWith("W/")) return false;
+  const dateMs = Date.parse(value);
+  if (!Number.isFinite(dateMs)) return false;
+  return Math.floor(mtimeMs / 1_000) <= Math.floor(dateMs / 1_000);
+}
+
+/**
  * A `GET`/`HEAD` handler over `options.root`.
  *
  * Dot-prefixed segments are refused: a handler rooted at a media directory has no business
@@ -209,8 +230,24 @@ export function createServeFile(options: ServeFileOptions): ServeFile {
     };
     if (disposition !== "none") headers["Content-Disposition"] = disposition;
 
-    if (req.headers.get("if-none-match")?.trim() === etag) {
+    const ifNoneMatch = req.headers.get("if-none-match")?.trim();
+    // `*` means "if any current representation exists", which it does — this point is only
+    // reached once the file has been resolved.
+    if (ifNoneMatch === "*" || ifNoneMatch === etag) {
       return new Response(null, { status: 304, headers });
+    }
+    // `If-None-Match` outranks `If-Modified-Since` (RFC 9110 §13.1.3), so the date is only
+    // consulted when no entity-tag was sent. HTTP dates have one-second resolution, so both
+    // sides are floored: a file written 400 ms into a second is not "modified since" that second.
+    if (ifNoneMatch === undefined) {
+      const since = req.headers.get("if-modified-since");
+      const sinceMs = since === null ? Number.NaN : Date.parse(since);
+      if (
+        Number.isFinite(sinceMs) &&
+        Math.floor(mtimeMs / 1_000) <= Math.floor(sinceMs / 1_000)
+      ) {
+        return new Response(null, { status: 304, headers });
+      }
     }
 
     const file = Bun.file(absolute);
@@ -218,8 +255,11 @@ export function createServeFile(options: ServeFileOptions): ServeFile {
     const ifRange = req.headers.get("if-range")?.trim();
     // `If-Range` with a validator that no longer matches means "send the whole current file":
     // splicing a range from the new bytes into the client's old buffer corrupts the stream.
+    // The header carries either a strong entity-tag or an HTTP-date, and a weak validator must
+    // not gate a range at all (RFC 9110 §13.1.5), so anything else is treated as a mismatch.
     const rangeApplies =
-      rangeHeader !== null && (ifRange === undefined || ifRange === etag);
+      rangeHeader !== null &&
+      (ifRange === undefined || ifRangeMatches(ifRange, etag, mtimeMs));
     const parsed: RangeParse = rangeApplies
       ? parseByteRange(rangeHeader, size)
       : { kind: "ignore" };
