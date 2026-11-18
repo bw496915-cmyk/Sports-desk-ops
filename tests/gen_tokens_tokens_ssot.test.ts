@@ -52,15 +52,15 @@ function makeValidMinimalDoc(): Record<string, unknown> {
 }
 
 describe("parseTokensToml", () => {
-  it("parses production tokens.toml v1.4.0 with discriminated sla, thresholds, bridges, bitmasks, aliases, and bijective keymap", async () => {
+  it("parses production tokens.toml v1.5.0 with discriminated sla, thresholds, bridges, bitmasks, aliases, and bijective keymap", async () => {
     const tomlText = await Bun.file(
       resolve(rootDir, "design/tokens.toml"),
     ).text();
     const ssot = parseTokensToml(tomlText);
 
-    expect(ssot.meta.version).toBe("1.4.0");
+    expect(ssot.meta.version).toBe("1.5.0");
     expect(ssot.meta.schema).toBe("sportsdesk-tokens/v1");
-    expect(ssot.meta.updated_at).toBe("2026-11-16T00:45:00Z");
+    expect(ssot.meta.updated_at).toBe("2026-11-18T00:00:00Z");
     expect(ssot.surfaces).toHaveLength(2);
     expect(ssot.ingestion).toHaveLength(11);
     expect(ssot.routes).toHaveLength(4);
