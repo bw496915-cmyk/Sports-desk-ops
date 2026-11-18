@@ -18,6 +18,7 @@ import type { BunRequest } from "bun";
 
 import { imageErrorCode } from "../lib/image_errors.ts";
 import { readImageHeaderMetadata } from "../lib/image_header.ts";
+import { MIME_TYPE_BY_FORMAT } from "../lib/screenshot_encode.ts";
 import {
   BunImageAssetDiagnostic,
   inspectBunImageAsset,
@@ -148,13 +149,7 @@ const MAX_WS_MESSAGE_BYTES = 16 * 1024;
 const TICKET_TTL_SEC = 60;
 const MAX_ACTIVE_TICKETS = 4096;
 const PRESIGN_TTL_SEC = 3600;
-const IMAGE_CONTENT_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/avif",
-  "image/heic",
-]);
+const IMAGE_CONTENT_TYPES = new Set<string>(Object.values(MIME_TYPE_BY_FORMAT));
 const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const CHANNEL_PATTERN = /^[a-z0-9-]{1,32}$/;
 
@@ -180,7 +175,7 @@ class ImageRejectedError extends Error {
 }
 
 /** Prefix budget for the attribute probe; WebP needs 32 bytes, so this is generous. */
-const HEADER_PROBE_BYTES = 64 * 1024;
+export const HEADER_PROBE_BYTES = 64 * 1024;
 
 /**
  * Reads at most `limit` bytes from a response body and cancels the rest, so `?attributes=1` does

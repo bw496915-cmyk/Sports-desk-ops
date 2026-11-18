@@ -2,15 +2,15 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import {
   createBlobLiveBetsServer,
+  HEADER_PROBE_BYTES,
   MemoryBlobStore,
   readResponsePrefix,
   type BlobLiveBetsOptions,
 } from "../services/blob_and_live_bets_server.ts";
+import { png1x1 } from "./support/image_fixtures.ts";
 
 const API_TOKEN = "test-api-token";
 const TICKET_SECRET = "test-ticket-secret";
-const PNG_1X1_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
 interface Harness {
   readonly url: string;
@@ -48,7 +48,7 @@ function auth(token = API_TOKEN): Record<string, string> {
 }
 
 function pngBytes(): Uint8Array {
-  return Uint8Array.from(Buffer.from(PNG_1X1_BASE64, "base64"));
+  return png1x1();
 }
 
 async function ticket(h: Harness): Promise<string> {
@@ -231,10 +231,10 @@ describe("blob + live-bets gateway", () => {
       source: "blobs/photo-3.webp",
       format: "webp",
       backend: "bun",
-      probeBytes: 64 * 1024,
+      probeBytes: HEADER_PROBE_BYTES,
     });
     expect(asset.headerBytes).toBeGreaterThan(0);
-    expect(asset.headerBytes).toBeLessThanOrEqual(64 * 1024);
+    expect(asset.headerBytes).toBeLessThanOrEqual(HEADER_PROBE_BYTES);
     expect(asset.width).toBeGreaterThan(0);
     expect(asset.height).toBeGreaterThan(0);
 
@@ -273,10 +273,10 @@ describe("blob + live-bets gateway", () => {
       height: 896,
       format: "webp",
       bytes: bytes.byteLength,
-      probeBytes: 64 * 1024,
+      probeBytes: HEADER_PROBE_BYTES,
     });
     expect(asset.headerBytes).toBeLessThan(asset.bytes);
-    expect(asset.headerBytes).toBeLessThanOrEqual(64 * 1024);
+    expect(asset.headerBytes).toBeLessThanOrEqual(HEADER_PROBE_BYTES);
   });
 
   test("readResponsePrefix stops at the limit and cancels the body", async () => {
