@@ -90,6 +90,14 @@ Two pre-1.4.4 shapes can poison evidence recorded through the old behaviour:
    `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`; `Bun.hash("")` for the
    no-argument form). Re-derive any stored artifact/evidence hash that matches those values; do
    not treat the digest as proof the blob was read.
+
+   The current repo has three such references: the `getPending` response in
+   `docs/evidence/captures/2026-10-31/getPending.post.json` (`bytes: 0`) and two 500 responses in
+   `docs/evidence/captures/manifest.json` (`responseBytes: 0`). All three are legitimate empty
+   bodies, not blob-handle laundering. The poisoned shape requires a nonzero or unknown byte
+   count, or a producer that hashed a handle. Query the digest **and** the byte length; the digest
+   alone is insufficient.
+
 2. **Deep brace globs.** Pre-fix scans with more than 10 brace groups, or nesting deeper than 10,
    could miss matches silently. Regenerate machine-generated glob inventories and compare the
    result; the v1.4.4 matcher now handles them.
