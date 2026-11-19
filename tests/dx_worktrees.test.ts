@@ -1,20 +1,28 @@
 import { YAML } from "bun";
 import { afterAll, describe, expect, test } from "bun:test";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
   rmSync,
+  symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   classifyBranchMergeProof,
+  classifyDirtyPath,
+  classifyDirtyWork,
   classifyWorktreeDisposition,
+  DEFAULT_PR_LIMIT,
   InspectableWorktreeHygieneReport,
+  parseNumstatZ,
+  parseRawDiffZ,
   parseWorktreeListPorcelain,
   runWorktreeHygiene,
+  summarizeDirtyWork,
 } from "../scripts/dx_worktrees.ts";
 import { cliInspectOptions, inspectReport } from "../lib/cli_inspect.ts";
 
@@ -110,6 +118,7 @@ describe("classifyBranchMergeProof", () => {
         isDefaultBranch: true,
         checkedOutInKeptWorktree: false,
         isAncestor: true,
+        shallow: false,
         aheadCount: 0,
         unappliedCherryCount: null,
         prsForBranch: [],
@@ -123,6 +132,7 @@ describe("classifyBranchMergeProof", () => {
         isDefaultBranch: false,
         checkedOutInKeptWorktree: true,
         isAncestor: true,
+        shallow: false,
         aheadCount: 0,
         unappliedCherryCount: null,
         prsForBranch: [],
@@ -137,6 +147,7 @@ describe("classifyBranchMergeProof", () => {
       isDefaultBranch: false,
       checkedOutInKeptWorktree: false,
       isAncestor: false,
+      shallow: false,
       aheadCount: 2,
       unappliedCherryCount: 2,
       prsForBranch: [
@@ -158,6 +169,7 @@ describe("classifyBranchMergeProof", () => {
       isDefaultBranch: false,
       checkedOutInKeptWorktree: false,
       isAncestor: false,
+      shallow: false,
       aheadCount: 3,
       unappliedCherryCount: 1,
       prsForBranch: [
@@ -181,6 +193,7 @@ describe("classifyBranchMergeProof", () => {
         isDefaultBranch: false,
         checkedOutInKeptWorktree: false,
         isAncestor: true,
+        shallow: false,
         aheadCount: 0,
         unappliedCherryCount: null,
         prsForBranch: [],
@@ -194,6 +207,7 @@ describe("classifyBranchMergeProof", () => {
         isDefaultBranch: false,
         checkedOutInKeptWorktree: false,
         isAncestor: false,
+        shallow: false,
         aheadCount: 1,
         unappliedCherryCount: 0,
         prsForBranch: [],
@@ -207,6 +221,7 @@ describe("classifyBranchMergeProof", () => {
         isDefaultBranch: false,
         checkedOutInKeptWorktree: false,
         isAncestor: false,
+        shallow: false,
         aheadCount: 1,
         unappliedCherryCount: 1,
         prsForBranch: [
@@ -228,6 +243,7 @@ describe("classifyBranchMergeProof", () => {
         isDefaultBranch: false,
         checkedOutInKeptWorktree: false,
         isAncestor: false,
+        shallow: false,
         aheadCount: 4,
         unappliedCherryCount: 4,
         prsForBranch: [],
@@ -248,6 +264,8 @@ describe("classifyWorktreeDisposition", () => {
     existsOnDisk: true,
     modifiedCount: 0,
     untrackedCount: 0,
+    dirtyKind: "clean",
+    contentEditCount: 0,
     headMerged: false,
     mergeReason: "unmerged",
     aheadCount: 1,
@@ -442,5 +460,295 @@ describe("runWorktreeHygiene end-to-end in isolated scratch repo", () => {
     expect(remainingBranches).toContain("feat/unmerged-anchor");
     expect(remainingBranches).not.toContain("feat/merged-wt");
     expect(remainingBranches).not.toContain("chore/standalone-merged");
+  });
+});
+
+// Fixtures captured from git 2.x on Bun 1.4.4 with:
+//   rm link.ts && printf 'line1\n' > link.ts   (symlink dereferenced into a file)
+//   chmod -x mode-only.ts                      (mode bits only)
+//   printf 'changed\n' > content.ts            (a real edit)
+const RAW_DIFF_FIXTURE = [
+  ":100644 100644 dcc2780 0000000 M",
+  "content.ts",
+  ":120000 100644 de76b08 0000000 T",
+  "link.ts",
+  ":100755 100644 d95f3ad 0000000 M",
+  "mode-only.ts",
+  "",
+].join("\0");
+
+const NUMSTAT_FIXTURE = [
+  "1\t1\tcontent.ts",
+  "1\t1\tlink.ts",
+  "0\t0\tmode-only.ts",
+  "",
+].join("\0");
+
+describe("dirty work classification", () => {
+  test("pairs each raw header with its NUL-terminated path", () => {
+    const entries = parseRawDiffZ(RAW_DIFF_FIXTURE);
+    expect(entries.map((e) => e.path)).toEqual([
+      "content.ts",
+      "link.ts",
+      "mode-only.ts",
+    ]);
+    expect(entries.map((e) => e.status)).toEqual(["M", "T", "M"]);
+    const chmodOnly = entries.find((e) => e.path === "mode-only.ts");
+    expect(chmodOnly?.oldMode).toBe("100755");
+    expect(chmodOnly?.newMode).toBe("100644");
+  });
+
+  test("keeps tabs inside a path and reports binary counts as null", () => {
+    const counts = parseNumstatZ(
+      ["1\t2\ta\tb.ts", "-\t-\tlogo.png", ""].join("\0"),
+    );
+    expect(counts.get("a\tb.ts")).toEqual({ added: 1, deleted: 2 });
+    expect(counts.get("logo.png")).toEqual({ added: null, deleted: null });
+  });
+
+  test("separates real edits from chmod noise and symlink dereference", () => {
+    const breakdown = summarizeDirtyWork(
+      parseRawDiffZ(RAW_DIFF_FIXTURE),
+      parseNumstatZ(NUMSTAT_FIXTURE),
+      ["untracked.ts"],
+    );
+    expect(breakdown.contentEdits).toEqual(["content.ts"]);
+    expect(breakdown.typeChanges).toEqual(["link.ts"]);
+    expect(breakdown.modeOnly).toEqual(["mode-only.ts"]);
+    expect(breakdown.untracked).toEqual(["untracked.ts"]);
+    expect(classifyDirtyWork(breakdown)).toBe("has-work");
+  });
+
+  test("a binary edit is content even though its line counts are '-'", () => {
+    const logo = parseRawDiffZ(
+      [":100644 100644 1111111 0000000 M", "logo.png", ""].join("\0"),
+    ).at(0);
+    if (logo === undefined) throw new Error("fixture did not parse");
+    const counts = parseNumstatZ(["-\t-\tlogo.png", ""].join("\0"));
+    expect(classifyDirtyPath(logo, counts.get("logo.png"))).toBe("content");
+  });
+
+  test("mode bits and dereferenced symlinks alone are artifacts, not work", () => {
+    const artifactsOnly = summarizeDirtyWork(
+      parseRawDiffZ(RAW_DIFF_FIXTURE),
+      parseNumstatZ(NUMSTAT_FIXTURE),
+      [],
+    );
+    expect(classifyDirtyWork({ ...artifactsOnly, contentEdits: [] })).toBe(
+      "artifacts-only",
+    );
+    expect(
+      classifyDirtyWork({
+        contentEdits: [],
+        modeOnly: [],
+        typeChanges: [],
+        untracked: [],
+      }),
+    ).toBe("clean");
+  });
+});
+
+describe("classifyBranchMergeProof under a shallow clone", () => {
+  const shaA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+  const proof = (overrides: {
+    readonly shallow: boolean;
+    readonly unappliedCherryCount: number | null;
+    readonly prsForBranch?: readonly {
+      readonly number: number;
+      readonly headRefName: string;
+      readonly headRefOid: string;
+      readonly state: "OPEN" | "MERGED" | "CLOSED";
+      readonly mergedAt: string | null;
+    }[];
+  }) =>
+    classifyBranchMergeProof({
+      name: "feat/deep-history",
+      fullSha: shaA,
+      isDefaultBranch: false,
+      checkedOutInKeptWorktree: false,
+      isAncestor: false,
+      shallow: overrides.shallow,
+      aheadCount: 40,
+      unappliedCherryCount: overrides.unappliedCherryCount,
+      prsForBranch: overrides.prsForBranch ?? [],
+    });
+
+  test("reports unknown ancestry instead of a confident unmerged verdict", () => {
+    const shallow = proof({ shallow: true, unappliedCherryCount: null });
+    expect(shallow.disposition).toBe("unknown:shallow-ancestry");
+    expect(shallow.reason).toContain("--deepen");
+  });
+
+  test("a complete clone still answers unmerged when cherry cannot prove equivalence", () => {
+    expect(
+      proof({ shallow: false, unappliedCherryCount: 40 }).disposition,
+    ).toBe("keep:unmerged");
+  });
+
+  test("an exact merged PR proves a squash merge even in a shallow clone", () => {
+    const prShallow = proof({
+      shallow: true,
+      unappliedCherryCount: null,
+      prsForBranch: [
+        {
+          number: 180,
+          headRefName: "feat/deep-history",
+          headRefOid: shaA,
+          state: "MERGED",
+          mergedAt: "2026-11-13T00:00:00Z",
+        },
+      ],
+    });
+    expect(prShallow.disposition).toBe("clean:squash-pr");
+  });
+});
+
+describe("classifyWorktreeDisposition distinguishes artifact dirt from work", () => {
+  const base = {
+    isPrimary: false,
+    containsCwd: false,
+    registered: true,
+    detached: false,
+    anchoredBranch: null,
+    locked: false,
+    prunable: false,
+    existsOnDisk: true,
+    headMerged: false,
+    mergeReason: "unmerged",
+    aheadCount: 1,
+  } as const;
+
+  test("artifact-only dirt names the recovery command", () => {
+    const artifacts = classifyWorktreeDisposition({
+      ...base,
+      modifiedCount: 35,
+      untrackedCount: 0,
+      dirtyKind: "artifacts-only",
+      contentEditCount: 0,
+    });
+    expect(artifacts.disposition).toBe("keep:dirty-artifacts");
+    expect(artifacts.reason).toContain("git checkout -- .");
+  });
+
+  test("real work counts content edits and untracked files", () => {
+    const work = classifyWorktreeDisposition({
+      ...base,
+      modifiedCount: 5,
+      untrackedCount: 2,
+      dirtyKind: "has-work",
+      contentEditCount: 3,
+    });
+    expect(work.disposition).toBe("keep:dirty");
+    expect(work.reason).toContain("3 content edit(s)");
+  });
+});
+
+describe("runWorktreeHygiene reports dirty work and clone depth", () => {
+  test("splits a copy-damaged worktree into content, symlink and chmod artifacts", async () => {
+    const repo = mkdtempSync(path.join(SCRATCH, "damaged-"));
+    await git(repo, ["init", "-b", "main"]);
+    await Bun.write(path.join(repo, "content.ts"), "original\n");
+    await Bun.write(path.join(repo, "mode-only.ts"), "stable\n");
+    await Bun.write(path.join(repo, "target.ts"), "line1\n");
+    symlinkSync("target.ts", path.join(repo, "link.ts"));
+    await git(repo, ["add", "."]);
+    await git(repo, ["commit", "-m", "initial"]);
+
+    const wt = path.join(SCRATCH, "wt-damaged");
+    await git(repo, ["worktree", "add", "-b", "feat/damaged", wt, "main"]);
+
+    // What a copy tool does to a checkout: the symlink becomes a regular file.
+    rmSync(path.join(wt, "link.ts"));
+    await Bun.write(path.join(wt, "link.ts"), "line1\n");
+    chmodSync(path.join(wt, "mode-only.ts"), 0o755);
+    await Bun.write(path.join(wt, "content.ts"), "edited\n");
+    await Bun.write(path.join(wt, "untracked.ts"), "new\n");
+
+    const report = await runWorktreeHygiene({
+      cwd: repo,
+      offline: true,
+      fetchRemote: false,
+      apply: false,
+      applyRemote: false,
+      ensureAutoDelete: false,
+    });
+
+    expect(report.shallow).toBe(false);
+    const row = report.worktrees.find((w) => w.path === realpathSync(wt));
+    if (row === undefined) throw new Error("damaged worktree was not reported");
+    expect(row.dirtyKind).toBe("has-work");
+    expect(row.dirty.contentEdits).toContain("content.ts");
+    expect(row.dirty.typeChanges).toContain("link.ts");
+    expect(row.dirty.modeOnly).toContain("mode-only.ts");
+    expect(row.dirty.untracked).toEqual(["untracked.ts"]);
+    expect(row.disposition).toBe("keep:dirty");
+
+    // Artifact damage is reported, never removed: the worktree survives the audit.
+    expect(existsSync(path.join(wt, "content.ts"))).toBe(true);
+  });
+
+  test("flags a shallow clone so graft-cut ancestry is not read as evidence", async () => {
+    const source = mkdtempSync(path.join(SCRATCH, "shallow-src-"));
+    await git(source, ["init", "-b", "main"]);
+    await Bun.write(path.join(source, "a.txt"), "a\n");
+    await git(source, ["add", "."]);
+    await git(source, ["commit", "-m", "one"]);
+    await Bun.write(path.join(source, "b.txt"), "b\n");
+    await git(source, ["add", "."]);
+    await git(source, ["commit", "-m", "two"]);
+
+    const clone = path.join(SCRATCH, "shallow-clone");
+    await git(SCRATCH, ["clone", "--depth", "1", `file://${source}`, clone]);
+
+    const report = await runWorktreeHygiene({
+      cwd: clone,
+      offline: true,
+      fetchRemote: false,
+      apply: false,
+      applyRemote: false,
+      ensureAutoDelete: false,
+    });
+
+    expect(report.shallow).toBe(true);
+    const rendered = inspectReport(
+      new InspectableWorktreeHygieneReport(report),
+      cliInspectOptions({ isTTY: false }),
+    );
+    expect(rendered).toContain("shallow");
+  });
+});
+
+describe("dx worktrees CLI surface", () => {
+  const script = path.join(import.meta.dir, "..", "scripts", "dx_worktrees.ts");
+
+  test("--help documents the flags with runnable examples", async () => {
+    const proc = Bun.spawn([process.execPath, script, "--help"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      proc.exited,
+    ]);
+    expect(code).toBe(0);
+    expect(stdout).toContain("--pr-limit");
+    expect(stdout).toContain("Examples:");
+    expect(stdout).toContain("./bin/dx worktrees --apply");
+    expect(stdout).toContain(`default ${DEFAULT_PR_LIMIT}`);
+  });
+
+  test("--pr-limit rejects a non-positive page size with a corrective example", async () => {
+    const proc = Bun.spawn(
+      [process.execPath, script, "--pr-limit", "0", "--offline"],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const [stderr, code] = await Promise.all([
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    expect(code).toBe(2);
+    expect(stderr).toContain("positive integer");
+    expect(stderr).toContain("--pr-limit 2000");
   });
 });

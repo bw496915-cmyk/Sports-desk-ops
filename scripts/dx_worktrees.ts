@@ -48,12 +48,42 @@ export interface GithubPrRecord {
   readonly mergedAt: string | null;
 }
 
+/** One entry from `git diff --raw -z --no-renames HEAD`. */
+export interface RawDiffEntry {
+  readonly path: string;
+  readonly status: string;
+  readonly oldMode: string;
+  readonly newMode: string;
+}
+
+/** How one uncommitted path differs from HEAD. */
+export type DirtyPathKind = "content" | "mode-only" | "typechange";
+
+/**
+ * Uncommitted paths split by what they actually are. A dirty worktree is not
+ * automatically work: chmod noise and dereferenced symlinks inflate
+ * `git status` without holding a single edited line.
+ */
+export interface DirtyWorkBreakdown {
+  /** Bytes changed: work that a checkout or reset would discard. */
+  readonly contentEdits: readonly string[];
+  /** Mode-bit-only change (100755 <-> 100644): chmod noise, no edit. */
+  readonly modeOnly: readonly string[];
+  /** Symlink swapped for a regular file (or the reverse): tooling damage. */
+  readonly typeChanges: readonly string[];
+  /** Files git does not track yet. */
+  readonly untracked: readonly string[];
+}
+
+export type DirtyWorkKind = "clean" | "artifacts-only" | "has-work";
+
 export type WorktreeDisposition =
   | "keep:primary"
   | "keep:cwd"
   | "keep:locked"
   | "keep:orphan-dir"
   | "keep:dirty"
+  | "keep:dirty-artifacts"
   | "keep:ahead"
   | "clean:missing-dir"
   | "clean:merged"
@@ -67,7 +97,8 @@ export type BranchDisposition =
   | "clean:squash-pr"
   | "keep:post-pr-commits"
   | "keep:open-pr"
-  | "keep:unmerged";
+  | "keep:unmerged"
+  | "unknown:shallow-ancestry";
 
 export interface WorktreeAuditRow {
   readonly path: string;
@@ -78,6 +109,8 @@ export interface WorktreeAuditRow {
   readonly existsOnDisk: boolean;
   readonly modifiedCount: number;
   readonly untrackedCount: number;
+  readonly dirty: DirtyWorkBreakdown;
+  readonly dirtyKind: DirtyWorkKind;
   readonly aheadCount: number;
   readonly behindCount: number;
   readonly disposition: WorktreeDisposition;
@@ -111,6 +144,17 @@ export interface WorktreeHygieneReport {
   readonly baseSha: string;
   readonly offline: boolean;
   readonly githubPrsLoaded: number;
+  /**
+   * True when the PR listing hit its page limit, so an older merged PR may be
+   * invisible. Read as "ancestry/cherry evidence only", never as "no PR".
+   */
+  readonly githubPrListTruncated: boolean;
+  /**
+   * True when the clone is shallow. `merge-base --is-ancestor` and `git cherry`
+   * cannot see past the graft, so they return "not merged" for branches that
+   * are in fact merged. Ancestry is then reported as unknown, not as unmerged.
+   */
+  readonly shallow: boolean;
   readonly deleteBranchOnMerge: boolean | null;
   readonly worktrees: readonly WorktreeAuditRow[];
   readonly localBranches: readonly BranchAuditRow[];
@@ -182,6 +226,7 @@ export interface MergeProofInput {
   readonly isDefaultBranch: boolean;
   readonly checkedOutInKeptWorktree: boolean;
   readonly isAncestor: boolean;
+  readonly shallow: boolean;
   readonly aheadCount: number;
   readonly unappliedCherryCount: number | null;
   readonly prsForBranch: readonly GithubPrRecord[];
@@ -244,6 +289,13 @@ export function classifyBranchMergeProof(input: MergeProofInput): {
     };
   }
 
+  if (input.shallow && input.unappliedCherryCount === null) {
+    return {
+      disposition: "unknown:shallow-ancestry",
+      reason: `shallow clone: ancestry is cut off at the graft, so "not merged" is unproven (deepen with 'git fetch --deepen=<n>')`,
+    };
+  }
+
   return {
     disposition: "keep:unmerged",
     reason: `${input.aheadCount} unmerged commit(s), no merged PR match`,
@@ -261,6 +313,8 @@ export interface WorktreeClassificationInput {
   readonly existsOnDisk: boolean;
   readonly modifiedCount: number;
   readonly untrackedCount: number;
+  readonly dirtyKind: DirtyWorkKind;
+  readonly contentEditCount: number;
   readonly headMerged: boolean;
   readonly mergeReason: string;
   readonly aheadCount: number;
@@ -302,9 +356,15 @@ export function classifyWorktreeDisposition(
   }
   const dirtyTotal = input.modifiedCount + input.untrackedCount;
   if (dirtyTotal > 0) {
+    if (input.dirtyKind === "artifacts-only") {
+      return {
+        disposition: "keep:dirty-artifacts",
+        reason: `${dirtyTotal} path(s) differ only by mode bits or symlink type — no content edits; restore with 'git checkout -- .'`,
+      };
+    }
     return {
       disposition: "keep:dirty",
-      reason: `${input.modifiedCount} modified, ${input.untrackedCount} untracked`,
+      reason: `${input.contentEditCount + input.untrackedCount} path(s) of real work (${input.contentEditCount} content edit(s), ${input.untrackedCount} untracked)`,
     };
   }
   if (input.headMerged) {
@@ -353,6 +413,19 @@ async function runCmd(
     proc.exited,
   ]);
   return { code, stdout, stderr };
+}
+
+/**
+ * A shallow clone grafts history, so `merge-base --is-ancestor` answers "no"
+ * for a branch that was merged before the graft and `git cherry` exits
+ * non-zero. Detecting it stops the audit from reporting that as "unmerged".
+ */
+async function detectShallowClone(repoDir: string): Promise<boolean> {
+  const res = await runCmd(
+    ["git", "rev-parse", "--is-shallow-repository"],
+    repoDir,
+  );
+  return res.code === 0 && res.stdout.trim() === "true";
 }
 
 async function dirExists(p: string): Promise<boolean> {
@@ -455,32 +528,190 @@ async function getUnappliedCherryCount(
   return lines.filter((l) => l.startsWith("+")).length;
 }
 
-async function inspectWorktreeDirtiness(wtPath: string): Promise<{
-  readonly modifiedCount: number;
-  readonly untrackedCount: number;
-}> {
-  const res = await runCmd(["git", "status", "--porcelain"], wtPath);
-  if (res.code !== 0) {
-    return { modifiedCount: 0, untrackedCount: 0 };
-  }
-  let modifiedCount = 0;
-  let untrackedCount = 0;
-  for (const rawLine of res.stdout.split(/\r?\n/)) {
-    if (rawLine.length < 2) continue;
-    if (rawLine.startsWith("??")) untrackedCount += 1;
-    else modifiedCount += 1;
-  }
-  return { modifiedCount, untrackedCount };
+/** Added/deleted line counts for one path; null when git reports "-" (binary). */
+export interface DiffLineCounts {
+  readonly added: number | null;
+  readonly deleted: number | null;
 }
 
-async function loadGithubState(repoDir: string): Promise<{
+function absurdDirtyPathKind(value: never): never {
+  throw new Error(`unreachable dirty path kind: ${String(value)}`);
+}
+
+/** Parse `git diff --raw -z --no-renames HEAD` into one entry per path. */
+export function parseRawDiffZ(raw: string): RawDiffEntry[] {
+  const entries: RawDiffEntry[] = [];
+  const tokens = raw.split("\0");
+  for (let i = 0; i + 1 < tokens.length; i += 2) {
+    const header = tokens[i] ?? "";
+    const diffPath = tokens[i + 1] ?? "";
+    if (!header.startsWith(":") || diffPath.length === 0) continue;
+    const fields = header.slice(1).split(" ");
+    const oldMode = fields[0];
+    const newMode = fields[1];
+    const status = fields[4];
+    if (
+      oldMode === undefined ||
+      newMode === undefined ||
+      status === undefined
+    ) {
+      continue;
+    }
+    entries.push({
+      path: diffPath,
+      status: status.slice(0, 1),
+      oldMode,
+      newMode,
+    });
+  }
+  return entries;
+}
+
+/** Parse `git diff --numstat -z --no-renames HEAD` into per-path line counts. */
+export function parseNumstatZ(
+  raw: string,
+): ReadonlyMap<string, DiffLineCounts> {
+  const counts = new Map<string, DiffLineCounts>();
+  for (const record of raw.split("\0")) {
+    if (record.length === 0) continue;
+    const fields = record.split("\t");
+    if (fields.length < 3) continue;
+    const addedRaw = fields[0];
+    const deletedRaw = fields[1];
+    const diffPath = fields.slice(2).join("\t");
+    if (diffPath.length === 0) continue;
+    const toCount = (value: string | undefined): number | null => {
+      if (value === undefined || value === "-") return null;
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+    counts.set(diffPath, {
+      added: toCount(addedRaw),
+      deleted: toCount(deletedRaw),
+    });
+  }
+  return counts;
+}
+
+/**
+ * Decide what one changed path represents.
+ *
+ * A worktree-vs-HEAD raw diff reports `0000000…` as the destination object, so
+ * the shas cannot separate a mode flip from an edit — measured on Bun 1.4.4,
+ * `:100755 100644 d95f3ad 0000000 M` is a chmod and nothing else. The line
+ * counts decide it instead: a chmod-only change is the only entry with zero
+ * added and zero deleted lines.
+ */
+export function classifyDirtyPath(
+  entry: RawDiffEntry,
+  counts: DiffLineCounts | undefined,
+): DirtyPathKind {
+  if (entry.status === "T") return "typechange";
+  const wasSymlink = entry.oldMode === "120000";
+  const isSymlink = entry.newMode === "120000";
+  if (wasSymlink !== isSymlink) return "typechange";
+  if (counts !== undefined && counts.added === 0 && counts.deleted === 0) {
+    return "mode-only";
+  }
+  return "content";
+}
+
+export function summarizeDirtyWork(
+  entries: readonly RawDiffEntry[],
+  numstat: ReadonlyMap<string, DiffLineCounts>,
+  untracked: readonly string[],
+): DirtyWorkBreakdown {
+  const contentEdits: string[] = [];
+  const modeOnly: string[] = [];
+  const typeChanges: string[] = [];
+  for (const entry of entries) {
+    const kind = classifyDirtyPath(entry, numstat.get(entry.path));
+    switch (kind) {
+      case "content":
+        contentEdits.push(entry.path);
+        break;
+      case "mode-only":
+        modeOnly.push(entry.path);
+        break;
+      case "typechange":
+        typeChanges.push(entry.path);
+        break;
+      default:
+        absurdDirtyPathKind(kind);
+    }
+  }
+  return { contentEdits, modeOnly, typeChanges, untracked: [...untracked] };
+}
+
+export function classifyDirtyWork(
+  breakdown: DirtyWorkBreakdown,
+): DirtyWorkKind {
+  if (breakdown.contentEdits.length > 0 || breakdown.untracked.length > 0) {
+    return "has-work";
+  }
+  if (breakdown.modeOnly.length > 0 || breakdown.typeChanges.length > 0) {
+    return "artifacts-only";
+  }
+  return "clean";
+}
+
+export interface WorktreeWorkState {
+  readonly modifiedCount: number;
+  readonly untrackedCount: number;
+  readonly breakdown: DirtyWorkBreakdown;
+  readonly kind: DirtyWorkKind;
+}
+
+const EMPTY_DIRTY_BREAKDOWN: DirtyWorkBreakdown = {
+  contentEdits: [],
+  modeOnly: [],
+  typeChanges: [],
+  untracked: [],
+};
+
+async function inspectWorktreeWork(wtPath: string): Promise<WorktreeWorkState> {
+  const [rawRes, numstatRes, untrackedRes] = await Promise.all([
+    runCmd(["git", "diff", "--raw", "-z", "--no-renames", "HEAD"], wtPath),
+    runCmd(["git", "diff", "--numstat", "-z", "--no-renames", "HEAD"], wtPath),
+    runCmd(["git", "ls-files", "--others", "--exclude-standard", "-z"], wtPath),
+  ]);
+  const entries = rawRes.code === 0 ? parseRawDiffZ(rawRes.stdout) : [];
+  const numstat =
+    numstatRes.code === 0
+      ? parseNumstatZ(numstatRes.stdout)
+      : new Map<string, DiffLineCounts>();
+  // Untracked files are readable even when the branch has no commit yet, so
+  // they are collected independently of the diff.
+  const untracked =
+    untrackedRes.code === 0
+      ? untrackedRes.stdout.split("\0").filter((p) => p.length > 0)
+      : [];
+  const breakdown = summarizeDirtyWork(entries, numstat, untracked);
+  return {
+    modifiedCount: entries.length,
+    untrackedCount: untracked.length,
+    breakdown,
+    kind: classifyDirtyWork(breakdown),
+  };
+}
+
+async function loadGithubState(
+  repoDir: string,
+  prLimit: number,
+): Promise<{
   readonly prsByBranch: ReadonlyMap<string, readonly GithubPrRecord[]>;
   readonly prCount: number;
+  readonly truncated: boolean;
   readonly deleteBranchOnMerge: boolean | null;
 }> {
   const ghBin = Bun.which("gh", { PATH: Bun.env["PATH"] ?? "" });
   if (!ghBin) {
-    return { prsByBranch: new Map(), prCount: 0, deleteBranchOnMerge: null };
+    return {
+      prsByBranch: new Map(),
+      prCount: 0,
+      truncated: false,
+      deleteBranchOnMerge: null,
+    };
   }
 
   const [prRes, repoRes] = await Promise.all([
@@ -492,7 +723,7 @@ async function loadGithubState(repoDir: string): Promise<{
         "--state",
         "all",
         "--limit",
-        "200",
+        String(prLimit),
         "--json",
         "number,headRefName,headRefOid,state,mergedAt",
       ],
@@ -553,7 +784,14 @@ async function loadGithubState(repoDir: string): Promise<{
     }
   }
 
-  return { prsByBranch: map, prCount, deleteBranchOnMerge };
+  return {
+    prsByBranch: map,
+    prCount,
+    // A full page means older PRs may have been left out, so their branches can
+    // look unmerged. Reporting the truncation keeps "no PR" honest.
+    truncated: prCount >= prLimit,
+    deleteBranchOnMerge,
+  };
 }
 
 export class InspectableWorktreeHygieneReport {
@@ -572,10 +810,20 @@ export class InspectableWorktreeHygieneReport {
           ? "enabled"
           : "disabled (recommend --ensure-auto-delete)";
 
+    const prLine = this.data.offline
+      ? "offline"
+      : this.data.githubPrListTruncated
+        ? `${this.data.githubPrsLoaded} PR(s) loaded — PAGE FULL, so an older merged PR may be invisible (raise --pr-limit)`
+        : `${this.data.githubPrsLoaded} PR(s) loaded`;
+    const cloneLine = this.data.shallow
+      ? "shallow — ancestry and cherry cannot prove a merge; deepen with 'git fetch --deepen=<n>' before trusting unknown:shallow-ancestry"
+      : "complete";
+
     const summaryLines = [
       `${padDisplay("Repo Common Root", 24)}: ${this.data.repoCommonRoot}`,
       `${padDisplay("Base Reference", 24)}: ${this.data.baseRef} (${this.data.baseSha.slice(0, 7)})`,
-      `${padDisplay("GitHub PR Metadata", 24)}: ${this.data.offline ? "offline" : `${this.data.githubPrsLoaded} PR(s) loaded`}`,
+      `${padDisplay("Clone History", 24)}: ${cloneLine}`,
+      `${padDisplay("GitHub PR Metadata", 24)}: ${prLine}`,
       `${padDisplay("deleteBranchOnMerge", 24)}: ${autoDelLabel}`,
     ];
 
@@ -584,11 +832,22 @@ export class InspectableWorktreeHygieneReport {
         worktree: w.label,
         branch: w.branch ?? `(detached@${w.headShort})`,
         dirty: w.modifiedCount + w.untrackedCount,
+        work: w.dirty.contentEdits.length + w.dirty.untracked.length,
+        artifacts: w.dirty.modeOnly.length + w.dirty.typeChanges.length,
         ahead: w.aheadCount,
         disposition: w.disposition,
         reason: w.reason,
       })),
-      ["worktree", "branch", "dirty", "ahead", "disposition", "reason"],
+      [
+        "worktree",
+        "branch",
+        "dirty",
+        "work",
+        "artifacts",
+        "ahead",
+        "disposition",
+        "reason",
+      ],
       { colors },
     );
 
@@ -650,6 +909,12 @@ export class InspectableWorktreeHygieneReport {
   }
 }
 
+/**
+ * Default GitHub PR page size. The desk repo carried 392 PRs in Nov 2026, so a
+ * 200-row page silently hid older merges; the report also flags truncation.
+ */
+export const DEFAULT_PR_LIMIT = 1000;
+
 export interface AuditWorktreesOptions {
   readonly cwd: string;
   readonly offline: boolean;
@@ -657,6 +922,8 @@ export interface AuditWorktreesOptions {
   readonly apply: boolean;
   readonly applyRemote: boolean;
   readonly ensureAutoDelete: boolean;
+  /** GitHub PR page size; defaults to DEFAULT_PR_LIMIT. */
+  readonly prLimit?: number;
 }
 
 function compactWorktreeLabel(wtPath: string, commonRoot: string): string {
@@ -693,63 +960,67 @@ export async function runWorktreeHygiene(
     repoCommonRoot,
   );
   const baseSha = baseShaRes.stdout.trim();
+  const prLimit = options.prLimit ?? DEFAULT_PR_LIMIT;
 
-  const [ghState, wtRaw, localRefsRes, remoteRefsRes] = await Promise.all([
-    options.offline
-      ? Promise.resolve({
-          prsByBranch: new Map<string, readonly GithubPrRecord[]>(),
-          prCount: 0,
-          deleteBranchOnMerge: null,
-        })
-      : loadGithubState(repoCommonRoot),
-    runCmd(["git", "worktree", "list", "--porcelain"], repoCommonRoot),
-    (async () => {
-      const res = await runCmd(
-        [
-          "git",
-          "for-each-ref",
-          "--sort=-committerdate",
-          `--format=%(refname:short)|%(objectname)|%(committerdate:short)|%(worktreepath)|%(ahead-behind:${baseRef})`,
-          "refs/heads/",
-        ],
-        repoCommonRoot,
-      );
-      if (res.code === 0) return res;
-      return runCmd(
-        [
-          "git",
-          "for-each-ref",
-          "--sort=-committerdate",
-          "--format=%(refname:short)|%(objectname)|%(committerdate:short)|%(worktreepath)|",
-          "refs/heads/",
-        ],
-        repoCommonRoot,
-      );
-    })(),
-    (async () => {
-      const res = await runCmd(
-        [
-          "git",
-          "for-each-ref",
-          "--sort=-committerdate",
-          `--format=%(refname:short)|%(objectname)|%(committerdate:short)|%(ahead-behind:${baseRef})`,
-          "refs/remotes/origin/",
-        ],
-        repoCommonRoot,
-      );
-      if (res.code === 0) return res;
-      return runCmd(
-        [
-          "git",
-          "for-each-ref",
-          "--sort=-committerdate",
-          "--format=%(refname:short)|%(objectname)|%(committerdate:short)|",
-          "refs/remotes/origin/",
-        ],
-        repoCommonRoot,
-      );
-    })(),
-  ]);
+  const [ghState, wtRaw, localRefsRes, remoteRefsRes, shallow] =
+    await Promise.all([
+      options.offline
+        ? Promise.resolve({
+            prsByBranch: new Map<string, readonly GithubPrRecord[]>(),
+            prCount: 0,
+            truncated: false,
+            deleteBranchOnMerge: null,
+          })
+        : loadGithubState(repoCommonRoot, prLimit),
+      runCmd(["git", "worktree", "list", "--porcelain"], repoCommonRoot),
+      (async () => {
+        const res = await runCmd(
+          [
+            "git",
+            "for-each-ref",
+            "--sort=-committerdate",
+            `--format=%(refname:short)|%(objectname)|%(committerdate:short)|%(worktreepath)|%(ahead-behind:${baseRef})`,
+            "refs/heads/",
+          ],
+          repoCommonRoot,
+        );
+        if (res.code === 0) return res;
+        return runCmd(
+          [
+            "git",
+            "for-each-ref",
+            "--sort=-committerdate",
+            "--format=%(refname:short)|%(objectname)|%(committerdate:short)|%(worktreepath)|",
+            "refs/heads/",
+          ],
+          repoCommonRoot,
+        );
+      })(),
+      (async () => {
+        const res = await runCmd(
+          [
+            "git",
+            "for-each-ref",
+            "--sort=-committerdate",
+            `--format=%(refname:short)|%(objectname)|%(committerdate:short)|%(ahead-behind:${baseRef})`,
+            "refs/remotes/origin/",
+          ],
+          repoCommonRoot,
+        );
+        if (res.code === 0) return res;
+        return runCmd(
+          [
+            "git",
+            "for-each-ref",
+            "--sort=-committerdate",
+            "--format=%(refname:short)|%(objectname)|%(committerdate:short)|",
+            "refs/remotes/origin/",
+          ],
+          repoCommonRoot,
+        );
+      })(),
+      detectShallowClone(repoCommonRoot),
+    ]);
 
   const parsedWorktrees = parseWorktreeListPorcelain(wtRaw.stdout);
   const resolvedWorktreeRows = await Promise.all(
@@ -760,10 +1031,15 @@ export async function runWorktreeHygiene(
         resolvedCwd === absPath || resolvedCwd.startsWith(`${absPath}/`);
       const existsOnDisk = await dirExists(absPath);
 
-      const [dirtiness, abRes] = await Promise.all([
+      const [work, abRes] = await Promise.all([
         existsOnDisk
-          ? inspectWorktreeDirtiness(absPath)
-          : Promise.resolve({ modifiedCount: 0, untrackedCount: 0 }),
+          ? inspectWorktreeWork(absPath)
+          : Promise.resolve({
+              modifiedCount: 0,
+              untrackedCount: 0,
+              breakdown: EMPTY_DIRTY_BREAKDOWN,
+              kind: "clean" as const,
+            }),
         wt.headSha.length > 0
           ? getAheadBehind(repoCommonRoot, wt.headSha, baseRef)
           : Promise.resolve({ ahead: 0, behind: 0, ok: false }),
@@ -791,6 +1067,7 @@ export async function runWorktreeHygiene(
         isDefaultBranch: false,
         checkedOutInKeptWorktree: false,
         isAncestor: isAnc,
+        shallow,
         aheadCount: ahead,
         unappliedCherryCount: unapplied,
         prsForBranch: branchPrs,
@@ -830,8 +1107,10 @@ export async function runWorktreeHygiene(
         locked: wt.locked,
         prunable: wt.prunable,
         existsOnDisk,
-        modifiedCount: dirtiness.modifiedCount,
-        untrackedCount: dirtiness.untrackedCount,
+        modifiedCount: work.modifiedCount,
+        untrackedCount: work.untrackedCount,
+        dirtyKind: work.kind,
+        contentEditCount: work.breakdown.contentEdits.length,
         headMerged,
         mergeReason: mergeProof.reason,
         aheadCount: ahead,
@@ -844,8 +1123,10 @@ export async function runWorktreeHygiene(
         branch: wt.branch,
         registered: true,
         existsOnDisk,
-        modifiedCount: dirtiness.modifiedCount,
-        untrackedCount: dirtiness.untrackedCount,
+        modifiedCount: work.modifiedCount,
+        untrackedCount: work.untrackedCount,
+        dirty: work.breakdown,
+        dirtyKind: work.kind,
         aheadCount: ahead,
         behindCount: behind,
         disposition: classified.disposition,
@@ -889,6 +1170,8 @@ export async function runWorktreeHygiene(
         existsOnDisk: true,
         modifiedCount: 0,
         untrackedCount: 0,
+        dirty: EMPTY_DIRTY_BREAKDOWN,
+        dirtyKind: "clean",
         aheadCount: 0,
         behindCount: 0,
         disposition: "keep:orphan-dir",
@@ -971,6 +1254,7 @@ export async function runWorktreeHygiene(
           isDefaultBranch: isDefault,
           checkedOutInKeptWorktree: checkedOutInKept,
           isAncestor: isAnc,
+          shallow,
           aheadCount: ahead,
           unappliedCherryCount: unapplied,
           prsForBranch: prs,
@@ -1023,6 +1307,7 @@ export async function runWorktreeHygiene(
           isDefaultBranch: isDefault,
           checkedOutInKeptWorktree: false,
           isAncestor: isAnc,
+          shallow,
           aheadCount: ahead,
           unappliedCherryCount: unapplied,
           prsForBranch: prs,
@@ -1069,7 +1354,7 @@ export async function runWorktreeHygiene(
 
     const removedWorktrees: string[] = [];
     for (const wtPath of removeWorktrees) {
-      const freshCheck = await inspectWorktreeDirtiness(wtPath);
+      const freshCheck = await inspectWorktreeWork(wtPath);
       if (freshCheck.modifiedCount > 0 || freshCheck.untrackedCount > 0) {
         continue;
       }
@@ -1169,6 +1454,8 @@ export async function runWorktreeHygiene(
     baseSha,
     offline: options.offline,
     githubPrsLoaded: ghState.prCount,
+    githubPrListTruncated: ghState.truncated,
+    shallow,
     deleteBranchOnMerge: finalDeleteBranchOnMerge,
     worktrees: worktreeRows,
     localBranches,
@@ -1195,9 +1482,23 @@ Flags:
   --ensure-auto-delete   With --apply, enable GitHub deleteBranchOnMerge on the repository
   --fetch                Run 'git fetch --prune origin' during a dry-run audit
   --offline              Skip network/GitHub queries (local git ancestry & cherry only)
+  --pr-limit <n>         GitHub PRs to read, newest first (default ${DEFAULT_PR_LIMIT});
+                         the report flags truncation rather than treating a full page as "no PR"
   --json                 Output machine-readable JSON
   --yaml                 Output machine-readable YAML (Bun.YAML)
-  -h, --help             Show this help`);
+  -h, --help             Show this help
+
+Dirty worktrees are split into real work and artifacts: a path counts as work when
+its bytes changed or git does not track it, and as an artifact when only the mode
+bits or the symlink type changed. A shallow clone is reported as such, because
+'merge-base --is-ancestor' and 'git cherry' cannot see past the graft and would
+otherwise label merged branches as unmerged.
+
+Examples:
+  ./bin/dx worktrees                                  # audit, no writes
+  ./bin/dx worktrees --offline --json                 # audit without network
+  ./bin/dx worktrees --apply                          # prune clean merged worktrees & branches
+  ./bin/dx worktrees --pr-limit 2000 --yaml           # widen the PR page for an old branch`);
 }
 
 async function main(): Promise<number> {
@@ -1209,6 +1510,7 @@ async function main(): Promise<number> {
       "ensure-auto-delete": { type: "boolean", default: false },
       fetch: { type: "boolean", default: false },
       offline: { type: "boolean", default: false },
+      "pr-limit": { type: "string" },
       json: { type: "boolean", default: false },
       yaml: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
@@ -1221,6 +1523,19 @@ async function main(): Promise<number> {
     return 0;
   }
 
+  const prLimitRaw = values["pr-limit"];
+  let prLimit: number | undefined;
+  if (prLimitRaw !== undefined) {
+    const parsed = Number.parseInt(prLimitRaw, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      console.error(
+        `Error: --pr-limit expects a positive integer, got '${prLimitRaw}'.\n  ./bin/dx worktrees --pr-limit 2000`,
+      );
+      return 2;
+    }
+    prLimit = parsed;
+  }
+
   const report = await runWorktreeHygiene({
     cwd: process.cwd(),
     offline: values.offline ?? false,
@@ -1228,6 +1543,7 @@ async function main(): Promise<number> {
     apply: values.apply ?? false,
     applyRemote: values.remote ?? false,
     ensureAutoDelete: values["ensure-auto-delete"] ?? false,
+    ...(prLimit === undefined ? {} : { prLimit }),
   });
 
   if (values.json) {
