@@ -1747,6 +1747,15 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(degradedR2Html).toContain("Reachable — Auth Down (9ms)");
     expect(degradedR2Html).toContain("F402 session expired");
     expect(degradedR2Html).not.toContain("Offline");
+    expect(degradedR2Html).toContain(
+      'href="/live-bets" target="_blank" rel="noreferrer" style="padding:4px 10px;border-radius:6px;background-color:rgba(56, 189, 248, 0.12);color:#38bdf8',
+    );
+    expect(degradedR2Html).toContain("📈 Live Bets / Scoreboard ↗");
+    expect(degradedR2Html).toContain("🕸️ Hierarchy Graph ↗");
+    expect(degradedR2Html).toContain("🩺 Ops Status ↗");
+    expect(degradedR2Html).not.toContain(
+      "background-color:#38bdf8;color:#38bdf8",
+    );
 
     const automationsR2Html = renderToStaticMarkup(
       React.createElement(R2PipelineTabPanel, {
