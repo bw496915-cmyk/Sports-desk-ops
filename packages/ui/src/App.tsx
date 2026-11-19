@@ -14,12 +14,17 @@ import { styles } from "./dashboard_styles.ts";
 import { newTicketIds as diffNewTicketIds } from "./live_stream.ts";
 import {
   backtestRowsToProfiles,
+  isSyntheticShowcaseCustomer,
+  liveOpenWagersToProfiles,
   mergeMatrixProfileOverlay,
+  mergeOpenRiskOverlay,
   mergeProfileRows,
   profileApiPayloadToShowcase,
+  rankingsPlayersToProfiles,
   selectProfileRows,
 } from "./profile_rows.ts";
 import {
+  deriveLiveFormulaCohortKpiCards,
   fetchRankingsSlice,
   type NormalizedRankingsResult,
   normalizeCustomerRatingResponse,
@@ -94,9 +99,13 @@ import {
   type AlertFilter,
   type AlertToastState,
   type BetTickerApiResponse,
+  type Billy666BranchCounts,
+  type Billy666BranchFilter,
   type BuildMatrixRow,
+  type CustomerAccountScope,
   type CustomerRatingApiPayload,
   type CustomersApiResponse,
+  type CustomerScopeCounts,
   type CustomerSortKey,
   type DashboardAlertRecord,
   type DashboardData,
@@ -291,8 +300,14 @@ export function App(): React.ReactElement {
     resolveInitialUrlParam("search"),
   );
   const [filterTier, setFilterTier] = useState<string>("ALL");
+  const [customerScope, setCustomerScope] =
+    useState<CustomerAccountScope>("ALL_REAL");
+  const [masterBranchFilter, setMasterBranchFilter] =
+    useState<Billy666BranchFilter>("ALL");
   const [copiedCliId, setCopiedCliId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] =
+    useState<ShowcaseCustomer | null>(null);
+  const [selectedCustomerHydrated, setSelectedCustomerHydrated] =
     useState<ShowcaseCustomer | null>(null);
   const [selectedCustomerRating, setSelectedCustomerRating] =
     useState<CustomerRatingApiPayload | null>(null);
@@ -449,17 +464,160 @@ export function App(): React.ReactElement {
     return onDemandCustomer ? mergeProfileRows(base, [onDemandCustomer]) : base;
   }, [cohortsReport, onDemandCustomer]);
 
-  const profileCustomers = useMemo<readonly ShowcaseCustomer[]>(() => {
-    if (!showBuildMatrix) return cohortProfileRows;
-    return mergeMatrixProfileOverlay(
-      cohortProfileRows,
-      rankings?.players ?? null,
+  const rankedProfileRows = useMemo<readonly ShowcaseCustomer[]>(
+    () =>
+      rankings?.players ? rankingsPlayersToProfiles(rankings.players) : [],
+    [rankings?.players],
+  );
+
+  const liveOpenProfileRows = useMemo<readonly ShowcaseCustomer[]>(
+    () => (liveWagers.length ? liveOpenWagersToProfiles(liveWagers) : []),
+    [liveWagers],
+  );
+
+  const cutoff7dYmd = useMemo(() => {
+    const endRaw = rankings?.summary.windowEnd;
+    const endYmd =
+      endRaw && /^\d{4}-\d{2}-\d{2}/.test(endRaw)
+        ? endRaw.slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+    const ms = Date.parse(`${endYmd}T12:00:00Z`);
+    if (!Number.isFinite(ms)) return "";
+    return new Date(ms - 6 * 86_400_000).toISOString().slice(0, 10);
+  }, [rankings?.summary.windowEnd]);
+
+  const {
+    realUniverse,
+    withSyntheticUniverse,
+    syntheticCohortCount,
+    scopeCounts,
+    masterBranchCounts,
+    formulaKpiCards,
+  } = useMemo(() => {
+    const realCohort = cohortProfileRows.filter(
+      (c) => !isSyntheticShowcaseCustomer(c),
+    );
+    const synthCohort = cohortProfileRows.filter((c) =>
+      isSyntheticShowcaseCustomer(c),
+    );
+    const mergedReal = mergeOpenRiskOverlay(
+      mergeProfileRows(
+        realCohort,
+        rankedProfileRows,
+        liveOpenProfileRows,
+        onDemandCustomer && !isSyntheticShowcaseCustomer(onDemandCustomer)
+          ? [onDemandCustomer]
+          : [],
+      ),
       liveWagers,
     );
+    const mergedWithSynth = mergeOpenRiskOverlay(
+      mergeProfileRows(
+        mergedReal,
+        synthCohort,
+        onDemandCustomer ? [onDemandCustomer] : [],
+      ),
+      liveWagers,
+    );
+
+    const isActive7d = (c: ShowcaseCustomer): boolean =>
+      (c.openRiskUsd ?? 0) > 0 ||
+      c.source === "live-open" ||
+      (c.lastWagerAt !== undefined &&
+        cutoff7dYmd !== "" &&
+        c.lastWagerAt.slice(0, 10) >= cutoff7dYmd);
+
+    let active7d = 0;
+    let liveOpen = 0;
+    let withClv = 0;
+    let curated = 0;
+    let countNolawolf = 0;
+    let countBilly667 = 0;
+    let countRtest5 = 0;
+    let countSaints2009 = 0;
+    let countOtherBranch = 0;
+
+    for (const c of mergedReal) {
+      if (isActive7d(c)) active7d += 1;
+      if ((c.openRiskUsd ?? 0) > 0 || c.source === "live-open") liveOpen += 1;
+      if (typeof c.clvBps === "number" && Number.isFinite(c.clvBps)) {
+        withClv += 1;
+      }
+      if (
+        c.source === "book" ||
+        c.source === "backtest" ||
+        c.source === "fixture"
+      ) {
+        curated += 1;
+      }
+      const m = c.masterAgent.trim().toUpperCase();
+      const a = c.agentId.trim().toUpperCase();
+      if (m === "NOLAWOLF" || a === "NOLAWOLF") countNolawolf += 1;
+      else if (m === "BILLY667" || a === "BILLY667") countBilly667 += 1;
+      else if (m === "RTEST5" || a === "RTEST5") countRtest5 += 1;
+      else if (m === "SAINTS2009" || a === "SAINTS2009") countSaints2009 += 1;
+      else countOtherBranch += 1;
+    }
+
+    const counts: CustomerScopeCounts = {
+      allReal: mergedReal.length,
+      active7d,
+      liveOpen,
+      withClv,
+      curated,
+      synthetic: synthCohort.length,
+    };
+
+    const branches: Billy666BranchCounts = {
+      all: mergedReal.length,
+      NOLAWOLF: countNolawolf,
+      BILLY667: countBilly667,
+      RTEST5: countRtest5,
+      SAINTS2009: countSaints2009,
+      OTHER: countOtherBranch,
+    };
+
+    return {
+      realUniverse: mergedReal,
+      withSyntheticUniverse: mergedWithSynth,
+      syntheticCohortCount: synthCohort.length,
+      scopeCounts: counts,
+      masterBranchCounts: branches,
+      formulaKpiCards:
+        mergedReal.length > 0
+          ? deriveLiveFormulaCohortKpiCards(mergedReal)
+          : null,
+    };
   }, [
-    cohortsReport,
     cohortProfileRows,
+    rankedProfileRows,
+    liveOpenProfileRows,
+    liveWagers,
+    onDemandCustomer,
+    cutoff7dYmd,
+  ]);
+
+  const includeSyntheticForQuery =
+    customerScope === "ALL_WITH_SYNTHETIC" ||
+    searchQuery.trim().toUpperCase().includes("SYNTH") ||
+    selectedCustomer?.id.toUpperCase().startsWith("SYNTH_") === true ||
+    realUniverse.length === 0;
+
+  const profileCustomers = useMemo<readonly ShowcaseCustomer[]>(() => {
+    if (showBuildMatrix && realUniverse.length === 0) {
+      return mergeMatrixProfileOverlay(
+        cohortProfileRows,
+        rankings?.players ?? null,
+        liveWagers,
+      );
+    }
+    return includeSyntheticForQuery ? withSyntheticUniverse : realUniverse;
+  }, [
     showBuildMatrix,
+    includeSyntheticForQuery,
+    withSyntheticUniverse,
+    realUniverse,
+    cohortProfileRows,
     rankings?.players,
     liveWagers,
   ]);
@@ -485,13 +643,9 @@ export function App(): React.ReactElement {
   }, [showBuildMatrix, profileCustomers, cohortProfileRows.length, liveWagers]);
 
   const profilesProvenance =
-    profileCustomers.length === 0
+    profileCustomers.length === 0 && cohortsReport === null
       ? null
-      : showBuildMatrix && matrixProfileOverlay
-        ? `${profileCustomers.length} profiles · matrix overlay: ${matrixProfileOverlay.cohort} cohort + ${matrixProfileOverlay.ranked} ranked + ${matrixProfileOverlay.liveOpen} live-open (${matrixProfileOverlay.liveWagersDistinct} on tape) · GET /api/customers + /api/rankings/all + /api/wagers`
-        : cohortsReport === null
-          ? null
-          : `${profileCustomers.length} cohort customers · ${cohortsReport.fixtures.length} fixture rows + ${cohortsReport.backtestAll.length} backtest rows · ${cohortsReport.provenance.label} · GET /api/customers`;
+      : `${profileCustomers.length.toLocaleString()} accounts loaded (${scopeCounts.curated.toLocaleString()} curated · ${rankedProfileRows.length.toLocaleString()} 30d active · ${scopeCounts.liveOpen.toLocaleString()} live-open · ${scopeCounts.withClv.toLocaleString()} w/ CLV${syntheticCohortCount > 0 ? ` · ${syntheticCohortCount} synthetic ${includeSyntheticForQuery ? "shown" : "hidden"}` : ""})${rankingsStatus === "pending" ? " · hydrating 30d corpus…" : ""} · GET /api/customers + /api/rankings/all + /api/wagers`;
 
   const fetchTiersConfig = async () => {
     try {
@@ -632,7 +786,7 @@ export function App(): React.ReactElement {
   };
 
   const fetchRankings = async () => {
-    const slice = await fetchRankingsSlice(fetch);
+    const slice = await fetchRankingsSlice(fetch, 10_000);
     if (slice.ok) {
       setRankings(slice.data);
       setRankingsStatus("ready");
@@ -1442,17 +1596,101 @@ export function App(): React.ReactElement {
     };
   }, []);
 
-  const filteredCustomers = profileCustomers.filter((cust) => {
+  const scopedCustomers = useMemo(() => {
+    const scopeMatched = (() => {
+      if (
+        customerScope === "ALL_REAL" ||
+        customerScope === "ALL_WITH_SYNTHETIC"
+      ) {
+        return profileCustomers;
+      }
+      if (customerScope === "ACTIVE_7D") {
+        return profileCustomers.filter(
+          (c) =>
+            (c.openRiskUsd ?? 0) > 0 ||
+            c.source === "live-open" ||
+            (c.lastWagerAt !== undefined &&
+              cutoff7dYmd !== "" &&
+              c.lastWagerAt.slice(0, 10) >= cutoff7dYmd),
+        );
+      }
+      if (customerScope === "LIVE_OPEN") {
+        return profileCustomers.filter(
+          (c) => (c.openRiskUsd ?? 0) > 0 || c.source === "live-open",
+        );
+      }
+      if (customerScope === "WITH_CLV") {
+        return profileCustomers.filter(
+          (c) => typeof c.clvBps === "number" && Number.isFinite(c.clvBps),
+        );
+      }
+      if (customerScope === "CURATED") {
+        return profileCustomers.filter(
+          (c) =>
+            c.source === "book" ||
+            c.source === "backtest" ||
+            c.source === "fixture",
+        );
+      }
+      return profileCustomers;
+    })();
+
+    if (masterBranchFilter === "ALL") return scopeMatched;
+    return scopeMatched.filter((c) => {
+      const m = c.masterAgent.trim().toUpperCase();
+      const a = c.agentId.trim().toUpperCase();
+      const branch =
+        m === "NOLAWOLF" || a === "NOLAWOLF"
+          ? "NOLAWOLF"
+          : m === "BILLY667" || a === "BILLY667"
+            ? "BILLY667"
+            : m === "RTEST5" || a === "RTEST5"
+              ? "RTEST5"
+              : m === "SAINTS2009" || a === "SAINTS2009"
+                ? "SAINTS2009"
+                : "OTHER";
+      return branch === masterBranchFilter;
+    });
+  }, [profileCustomers, customerScope, cutoff7dYmd, masterBranchFilter]);
+
+  const filteredCustomers = scopedCustomers.filter((cust) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      cust.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cust.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cust.specialization.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cust.agentId.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      cust.id.toLowerCase().includes(q) ||
+      cust.name.toLowerCase().includes(q) ||
+      cust.specialization.toLowerCase().includes(q) ||
+      cust.agentId.toLowerCase().includes(q) ||
+      cust.masterAgent.toLowerCase().includes(q);
 
     if (!matchesSearch) return false;
     if (filterTier === "ALL") return true;
     if (filterTier === "POSITIVE_CLV")
       return typeof cust.clvBps === "number" && cust.clvBps > 0;
+    if (filterTier === "POWERED_POS_CLV")
+      return (
+        typeof cust.clvBps === "number" &&
+        Number.isFinite(cust.clvBps) &&
+        cust.clvBps > 0 &&
+        (cust.sharpCandidateGatePassed === true || (cust.clvLegs ?? 0) >= 5)
+      );
+    if (filterTier === "PROFITABLE_CLV")
+      return (
+        typeof cust.clvBps === "number" &&
+        Number.isFinite(cust.clvBps) &&
+        cust.clvBps > 0 &&
+        !(cust.unknown?.includes("ltv") ?? false) &&
+        cust.ltvUsd > 0
+      );
+    if (filterTier === "KEY_NUMBER_BUYER")
+      return cust.isKeyNumberBuyer === true;
+    if (filterTier === "HOOK_OR_SYNDICATE")
+      return (
+        cust.isHalfPointHookBuyer === true ||
+        cust.isProxyConduit === true ||
+        cust.isMultiSeatCluster === true ||
+        cust.syndicateRisk === "HIGH"
+      );
     if (filterTier === "ELITE")
       return (
         cust.tier === "TIER_1_ELITE_ORIGINATOR" ||
@@ -1502,32 +1740,118 @@ export function App(): React.ReactElement {
   }, [filteredCustomers, customerSort]);
 
   useEffect(() => {
-    const cid = selectedCustomer?.id?.trim();
-    if (!cid) {
+    const current = selectedCustomer;
+    const cid = current?.id?.trim();
+    setSelectedCustomerHydrated(null);
+    if (!cid || !current) {
       setSelectedCustomerRating(null);
       setSelectedCustomerRatingLoading(false);
       return;
     }
-    const normRatingKey = (s: string) =>
-      s.trim().toUpperCase().replace(/_\d+$/, "");
-    if (
-      selectedCustomerRating &&
-      normRatingKey(selectedCustomerRating.customerId) === normRatingKey(cid)
-    ) {
-      setSelectedCustomerRatingLoading(false);
-      return;
-    }
     let cancelled = false;
+    const q = encodeURIComponent(cid);
     setSelectedCustomerRatingLoading(true);
-    void trackedFetch(
-      dashboardApiUrl(`/api/customer/rating?id=${encodeURIComponent(cid)}`),
-    )
-      .then(async (res) => {
-        if (!res.ok) return null;
-        return normalizeCustomerRatingResponse(await res.json());
-      })
-      .then((parsed) => {
-        if (!cancelled) setSelectedCustomerRating(parsed);
+    void Promise.all([
+      trackedFetch(dashboardApiUrl(`/api/customer/profile?id=${q}`))
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
+      trackedFetch(dashboardApiUrl(`/api/customer/rating?id=${q}`))
+        .then(async (res) => {
+          if (!res.ok) return null;
+          return normalizeCustomerRatingResponse(await res.json());
+        })
+        .catch(() => null),
+    ])
+      .then(([profRaw, ratingParsed]) => {
+        if (cancelled) return;
+        setSelectedCustomerRating(ratingParsed);
+        if (profRaw || ratingParsed) {
+          const hydrated = profileApiPayloadToShowcase(
+            profRaw ?? { profile: { customerId: cid } },
+            ratingParsed,
+          );
+          if (hydrated) {
+            const hydratedNoTickets =
+              hydrated.unknown?.includes("gini") === true &&
+              hydrated.meanStake === 0;
+            const tableHasSizing =
+              current.gini > 0 || current.meanStake > 0 || current.var95Usd > 0;
+            const mergeSizingFromTable = hydratedNoTickets && tableHasSizing;
+            const nextUnknown = new Set(hydrated.unknown ?? []);
+            if (mergeSizingFromTable) {
+              nextUnknown.delete("meanStake");
+              nextUnknown.delete("sizing");
+              nextUnknown.delete("gini");
+              nextUnknown.delete("var95");
+            }
+            if (
+              current.recommendedLimitUsd > 0 &&
+              hydrated.recommendedLimitUsd === 0
+            ) {
+              nextUnknown.delete("limit");
+            }
+            setSelectedCustomerHydrated({
+              ...hydrated,
+              agentId:
+                hydrated.agentId !== "—" && hydrated.agentId !== ""
+                  ? hydrated.agentId
+                  : current.agentId,
+              masterAgent:
+                hydrated.masterAgent !== "—" &&
+                hydrated.masterAgent !== "" &&
+                hydrated.masterAgent !== "UNKNOWN"
+                  ? hydrated.masterAgent
+                  : current.masterAgent,
+              tierLabel: current.tierLabel ?? hydrated.tierLabel,
+              source: current.source ?? hydrated.source,
+              clvBps: hydrated.clvBps ?? current.clvBps,
+              clvLegs: current.clvLegs ?? hydrated.clvLegs,
+              openRiskUsd: current.openRiskUsd ?? hydrated.openRiskUsd,
+              lastWagerAt: current.lastWagerAt ?? hydrated.lastWagerAt,
+              handle30dUsd: current.handle30dUsd ?? hydrated.handle30dUsd,
+              totalWagers: current.totalWagers ?? hydrated.totalWagers,
+              ...(current.keyNumberBuys30d !== undefined
+                ? { keyNumberBuys30d: current.keyNumberBuys30d }
+                : {}),
+              ...(current.halfPointBuys30d !== undefined
+                ? { halfPointBuys30d: current.halfPointBuys30d }
+                : {}),
+              ...(current.halfPointBuyRatePct !== undefined
+                ? { halfPointBuyRatePct: current.halfPointBuyRatePct }
+                : {}),
+              ...(current.seatCount !== undefined
+                ? { seatCount: current.seatCount }
+                : {}),
+              ...(current.isKeyNumberBuyer ? { isKeyNumberBuyer: true } : {}),
+              ...(current.isHalfPointHookBuyer
+                ? { isHalfPointHookBuyer: true }
+                : {}),
+              ...(current.isMultiSeatCluster
+                ? { isMultiSeatCluster: true }
+                : {}),
+              ...(current.isProxyConduit ? { isProxyConduit: true } : {}),
+              ...(current.sharpCandidateGatePassed !== undefined
+                ? {
+                    sharpCandidateGatePassed: current.sharpCandidateGatePassed,
+                  }
+                : {}),
+              recommendedLimitUsd:
+                hydrated.recommendedLimitUsd > 0
+                  ? hydrated.recommendedLimitUsd
+                  : current.recommendedLimitUsd,
+              ...(mergeSizingFromTable
+                ? {
+                    gini: current.gini,
+                    meanStake: current.meanStake,
+                    sizingStrategy: current.sizingStrategy,
+                    var95Usd: current.var95Usd,
+                    cvar95Usd: current.cvar95Usd,
+                  }
+                : {}),
+              unknown: [...nextUnknown],
+            });
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setSelectedCustomerRating(null);
@@ -1565,6 +1889,7 @@ export function App(): React.ReactElement {
         if (hydrated) {
           setOnDemandCustomer(hydrated);
           setSelectedCustomer(hydrated);
+          setSelectedCustomerHydrated(hydrated);
           setSelectedCustomerRating(ratingParsed);
           setCustomerLookupNotice(null);
         }
@@ -1579,14 +1904,24 @@ export function App(): React.ReactElement {
     const raw = customerId.trim();
     if (raw === "") return;
     const upper = raw.toUpperCase();
-    const found = profileCustomers.find((c) => c.id.toUpperCase() === upper);
-    setSelectedCustomer(found ?? null);
+    const foundInView = profileCustomers.find(
+      (c) => c.id.toUpperCase() === upper,
+    );
+    const foundWithSynth =
+      foundInView ??
+      withSyntheticUniverse.find((c) => c.id.toUpperCase() === upper);
+    if (!foundInView && foundWithSynth) {
+      setCustomerScope("ALL_WITH_SYNTHETIC");
+    } else if (foundInView && customerScope !== "ALL_REAL") {
+      setCustomerScope("ALL_REAL");
+    }
+    setSelectedCustomer(foundWithSynth ?? null);
     setSearchQuery(raw);
     setFilterTier("ALL");
-    setCustomerLookupNotice(found ? null : upper);
+    setCustomerLookupNotice(foundWithSynth ? null : upper);
     setActiveTab("customers");
 
-    if (!found) {
+    if (!foundWithSynth) {
       fetchCustomerOnDemand(upper);
     }
   };
@@ -1595,8 +1930,13 @@ export function App(): React.ReactElement {
     const fromUrl = resolveInitialUrlParam("customer");
     if (!fromUrl) return;
     const upper = fromUrl.toUpperCase();
-    const found = profileCustomers.find((c) => c.id.toUpperCase() === upper);
+    const found =
+      profileCustomers.find((c) => c.id.toUpperCase() === upper) ??
+      withSyntheticUniverse.find((c) => c.id.toUpperCase() === upper);
     if (found) {
+      if (isSyntheticShowcaseCustomer(found)) {
+        setCustomerScope("ALL_WITH_SYNTHETIC");
+      }
       setSelectedCustomer(found);
       setCustomerLookupNotice(null);
     } else if (
@@ -1609,7 +1949,7 @@ export function App(): React.ReactElement {
       }
     }
     setSearchQuery(fromUrl);
-  }, [profileCustomers]);
+  }, [profileCustomers, withSyntheticUniverse]);
 
   const previousTabRef = useRef(activeTab);
   useEffect(() => {
@@ -2090,8 +2430,10 @@ export function App(): React.ReactElement {
             title="Inspect individual sharp originators, sizing models, and risk (Ctrl+1)"
           >
             👥 Profiles (
-            {profileCustomers.length > 0 ? profileCustomers.length : "—"})
-            <span style={styles.keyShortcutBadge}>Ctrl+1</span>
+            {profileCustomers.length > 0
+              ? profileCustomers.length.toLocaleString()
+              : "—"}
+            )<span style={styles.keyShortcutBadge}>Ctrl+1</span>
           </button>
           <button
             type="button"
@@ -2647,8 +2989,17 @@ export function App(): React.ReactElement {
             customerSort={customerSort}
             onCustomerSort={onCustomerSort}
             selectedCustomer={selectedCustomer}
+            inspectedCustomer={selectedCustomerHydrated ?? selectedCustomer}
             selectedCustomerRating={selectedCustomerRating}
             selectedCustomerRatingLoading={selectedCustomerRatingLoading}
+            customerScope={customerScope}
+            onCustomerScopeChange={setCustomerScope}
+            scopeCounts={scopeCounts}
+            formulaKpiCards={formulaKpiCards}
+            masterBranchFilter={masterBranchFilter}
+            onMasterBranchFilterChange={setMasterBranchFilter}
+            masterBranchCounts={masterBranchCounts}
+            rankingsLoading={rankingsStatus === "pending"}
             onSelectCustomer={(customer) => {
               setSelectedCustomer(customer);
               setCustomerLookupNotice(null);
