@@ -88,6 +88,12 @@ jobs:
         run: bun ci --no-env-file
       - name: Lockfile dedupe check
         run: bun dedupe --check
+      # A frozen install must not rewrite bun.lock. If it does, the runner's Bun is a
+      # different version than the one that wrote the lockfile — and on 1.5+ that shows up
+      # as `hasInstallScript` keys appearing or being dropped, which flips the file back and
+      # forth between two states across CI and local dev.
+      - name: Lockfile unchanged after install
+        run: git diff --exit-code -- bun.lock
       - name: Verify CI gates (lockfile, credentials, gitattributes)
         run: bun ./scripts/verify_ci_gates.ts
       - name: Audit harness validator pin (deepseek-harness checkout)
@@ -150,6 +156,12 @@ jobs:
         run: bun ci --no-env-file
       - name: Lockfile dedupe check
         run: bun dedupe --check
+      # A frozen install must not rewrite bun.lock. If it does, the runner's Bun is a
+      # different version than the one that wrote the lockfile — and on 1.5+ that shows up
+      # as `hasInstallScript` keys appearing or being dropped, which flips the file back and
+      # forth between two states across CI and local dev.
+      - name: Lockfile unchanged after install
+        run: git diff --exit-code -- bun.lock
       - name: Check for orphaned node_modules
         timeout-minutes: 1
         run: bun run pm:prune:check
@@ -271,6 +283,12 @@ jobs:
         run: bun ci --no-env-file
       - name: Lockfile dedupe check
         run: bun dedupe --check
+      # A frozen install must not rewrite bun.lock. If it does, the runner's Bun is a
+      # different version than the one that wrote the lockfile — and on 1.5+ that shows up
+      # as `hasInstallScript` keys appearing or being dropped, which flips the file back and
+      # forth between two states across CI and local dev.
+      - name: Lockfile unchanged after install
+        run: git diff --exit-code -- bun.lock
       - name: Native lint (oxlint config parity)
         timeout-minutes: 3
         run: bun run lint:native
@@ -381,6 +399,12 @@ jobs:
         run: bun ci --no-env-file
       - name: Lockfile dedupe check
         run: bun dedupe --check
+      # A frozen install must not rewrite bun.lock. If it does, the runner's Bun is a
+      # different version than the one that wrote the lockfile — and on 1.5+ that shows up
+      # as `hasInstallScript` keys appearing or being dropped, which flips the file back and
+      # forth between two states across CI and local dev.
+      - name: Lockfile unchanged after install
+        run: git diff --exit-code -- bun.lock
       - name: Check for orphaned node_modules
         timeout-minutes: 1
         run: bun run pm:prune:check

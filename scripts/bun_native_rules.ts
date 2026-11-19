@@ -484,9 +484,60 @@ export function checkGlobalInstalls(root: string): RuleResult[] {
   ];
 }
 
+/**
+ * The Bun pin lives in three places: `.bun-version` (what CI installs), `packageManager`
+ * (what `corepack`-style tooling reads) and `engines.bun` (what the manifest advertises).
+ * Nothing enforced agreement, so a bump could reach two of the three and silently leave the
+ * third — CI and local dev on different runtimes, which is how a `bun.lock` written by one
+ * version gets rewritten by another.
+ */
+function checkBunVersionPin(root: string): RuleResult[] {
+  const id = "pm/bun-version-pin";
+  const pinned = readText(join(root, ".bun-version"))?.trim() ?? "";
+  if (pinned === "") {
+    return [{ id, ok: false, detail: ".bun-version is missing or empty" }];
+  }
+
+  let packageManager: unknown = null;
+  let engine: unknown = null;
+  try {
+    const pkg = JSON.parse(readText(join(root, "package.json")) ?? "{}") as {
+      packageManager?: unknown;
+      engines?: { bun?: unknown };
+    };
+    packageManager = pkg.packageManager;
+    engine = pkg.engines?.bun;
+  } catch {
+    return [{ id, ok: false, detail: "package.json is not parseable" }];
+  }
+
+  const expectedPackageManager = `bun@${pinned}`;
+  const problems: string[] = [];
+  if (packageManager !== expectedPackageManager) {
+    problems.push(
+      `packageManager=${String(packageManager)} (expected ${expectedPackageManager})`,
+    );
+  }
+  if (engine !== pinned) {
+    problems.push(`engines.bun=${String(engine)} (expected ${pinned})`);
+  }
+
+  return [
+    {
+      id,
+      ok: problems.length === 0,
+      detail:
+        problems.length === 0
+          ? `.bun-version, packageManager and engines.bun all ${pinned}`
+          : problems.join("; "),
+    },
+  ];
+}
+
 export function runAllRules(root: string): RuleResult[] {
   return [
     ...checkLockfiles(root),
+    ...checkBunVersionPin(root),
     ...checkCredentials(root),
     ...checkEnvIsolation(root),
     ...checkGitattributes(root),
