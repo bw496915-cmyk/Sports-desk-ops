@@ -12,13 +12,24 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
   BRIDGE_WS_PROTOCOL,
   BRIDGE_WS_TOPICS,
+  TELEMETRY_WS_PROTOCOL,
   bridgeProtocols,
   bridgeUpgradeRejection,
   bridgeUpgradeRequest,
   isBridgeUpgrade,
+  publishWagerTick,
   startServer,
   stopBridgeHub,
 } from "../services/sportsdesk_webview_server.ts";
+import {
+  asCents,
+  asLineHundredths,
+  encodeBridgeChannelPackedWord32,
+} from "../lib/bridge_and_channel_router.ts";
+import {
+  asWallEpochMs,
+  readWagerTickFrame,
+} from "../lib/wager_telemetry_hub.ts";
 
 const ADMIN_TOKEN = "bridge-test-admin-token";
 const BLOB_TOKEN = "bridge-test-blob-token";
@@ -79,6 +90,18 @@ describe("bridge handshake pieces", () => {
       bridgeProtocols(upgradeRequest("/api/live-bets", [BRIDGE_WS_PROTOCOL]))
         .token,
     ).toBeNull();
+    expect(
+      bridgeProtocols(upgradeRequest("/api/live-bets", [BRIDGE_WS_PROTOCOL]))
+        .telemetry,
+    ).toBe(false);
+    expect(
+      bridgeProtocols(
+        upgradeRequest("/api/live-bets", [
+          BRIDGE_WS_PROTOCOL,
+          TELEMETRY_WS_PROTOCOL,
+        ]),
+      ).telemetry,
+    ).toBe(true);
   });
 
   test("the synthetic request turns the token into a bearer header", () => {
@@ -212,7 +235,7 @@ function frameQueue(socket: WebSocket) {
 }
 
 describe("daemon hub relays the blob gateway's bridge frames", () => {
-  let hub: Bun.Server<undefined>;
+  let hub: ReturnType<typeof startServer>;
   let gateway: Bun.Server<undefined>;
   let gatewayUrl: string;
   let browser: WebSocket | undefined;
@@ -313,5 +336,108 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     gateway.publish("f402-weblog", JSON.stringify(rollup));
     const frame = await delivered;
     expect(frame).toEqual(rollup as unknown as Frame);
+  }, 20_000);
+
+  test("a telemetry client gets binary ticks only for its subscribed topic", async () => {
+    const socket = await openSocket(
+      `ws://127.0.0.1:${hub.port}/api/live-bets`,
+      [BRIDGE_WS_PROTOCOL, TELEMETRY_WS_PROTOCOL, `bearer-${ADMIN_TOKEN}`],
+    );
+    socket.binaryType = "arraybuffer";
+
+    const subscribed = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("subscribe ack timeout")),
+        5_000,
+      );
+      const onMessage = (event: MessageEvent) => {
+        if (typeof event.data !== "string") return;
+        const frame = JSON.parse(event.data) as Frame;
+        if (
+          frame.type === "SUBSCRIBED" &&
+          frame.channel === "f402-bet-ticker"
+        ) {
+          clearTimeout(timer);
+          socket.removeEventListener("message", onMessage);
+          resolve();
+        }
+      };
+      socket.addEventListener("message", onMessage);
+    });
+
+    socket.send(
+      JSON.stringify({ type: "SUBSCRIBE", channel: "f402-bet-ticker" }),
+    );
+    await subscribed;
+
+    const routeWord32 = encodeBridgeChannelPackedWord32(
+      "BRIDGE_01_F402_BET_TICKER_STREAM",
+      "GSLIVE",
+    );
+    const tick = {
+      routeWord32,
+      lineHundredths: asLineHundredths(-450),
+      stakeCents: asCents(12_500),
+      wagerId: 987_654_321n,
+      wallEpochMs: asWallEpochMs(Date.UTC(2026, 10, 19, 23, 30)),
+    };
+
+    const binary = new Promise<Uint8Array>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("binary tick timeout")),
+        5_000,
+      );
+      const onMessage = (event: MessageEvent) => {
+        if (!(event.data instanceof ArrayBuffer)) return;
+        clearTimeout(timer);
+        socket.removeEventListener("message", onMessage);
+        resolve(new Uint8Array(event.data));
+      };
+      socket.addEventListener("message", onMessage);
+    });
+
+    expect(publishWagerTick(tick)).toMatchObject({
+      clients: 1,
+      delivered: 1,
+      skippedByBridgeMask: 0,
+    });
+    const bytes = await binary;
+    expect(bytes.byteLength).toBe(32);
+    const decoded = readWagerTickFrame(bytes);
+    expect(decoded.routeWord32).toBe(routeWord32);
+    expect(decoded.lineHundredths).toBe(asLineHundredths(-450));
+    expect(decoded.stakeCents).toBe(asCents(12_500));
+    expect(decoded.wagerId).toBe(987_654_321n);
+
+    const unsubscribed = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("unsubscribe ack timeout")),
+        5_000,
+      );
+      const onMessage = (event: MessageEvent) => {
+        if (typeof event.data !== "string") return;
+        const frame = JSON.parse(event.data) as Frame;
+        if (
+          frame.type === "UNSUBSCRIBED" &&
+          frame.channel === "f402-bet-ticker"
+        ) {
+          clearTimeout(timer);
+          socket.removeEventListener("message", onMessage);
+          resolve();
+        }
+      };
+      socket.addEventListener("message", onMessage);
+    });
+    socket.send(
+      JSON.stringify({ type: "UNSUBSCRIBE", channel: "f402-bet-ticker" }),
+    );
+    await unsubscribed;
+
+    expect(publishWagerTick(tick)).toMatchObject({
+      clients: 1,
+      delivered: 0,
+      skippedByBridgeMask: 1,
+    });
+    socket.close();
   }, 20_000);
 });

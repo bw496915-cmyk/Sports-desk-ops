@@ -189,6 +189,15 @@ import {
   WS_BACKPRESSURE_OPTIONS,
 } from "../lib/ws_backpressure.ts";
 import {
+  asTransportBridgeBitMask32,
+  TRANSPORT_BRIDGE_SPECIFICATION_TABLE,
+} from "../lib/bridge_and_channel_router.ts";
+import {
+  WagerTelemetryHub,
+  type WagerTickBroadcastResult,
+  type WagerTickInput,
+} from "../lib/wager_telemetry_hub.ts";
+import {
   createDeskLiveReads,
   parseLiveSourceMode,
   type LivePendingServerOptions,
@@ -3805,9 +3814,9 @@ export function startServer(options?: ServerOptions) {
         { status: 500, headers: baseHeaders },
       );
     },
-  } satisfies Parameters<typeof Bun.serve>[0];
+  } satisfies BridgeServeConfig;
 
-  const server: Bun.Server<undefined> = Bun.serve({
+  const server: Bun.Server<BridgeSocketData> = Bun.serve<BridgeSocketData>({
     ...serveConfig,
     // The dashboard's live bridge upgrades a guarded route that is already in DAEMON_ROUTES.
     fetch: withBridgeUpgrade(
@@ -4657,6 +4666,9 @@ export const BRIDGE_WS_TOPICS = [
 /** Offered first by the dashboard; the server echoes it so the browser accepts the upgrade. */
 export const BRIDGE_WS_PROTOCOL = "sportsdesk.bridge.v1";
 
+/** Opt-in subprotocol for binary wager ticks; without it a socket only ever receives text. */
+export const TELEMETRY_WS_PROTOCOL = "sportsdesk.telemetry.v1";
+
 /** Browsers cannot set headers on a WebSocket, so the bearer rides in the subprotocol list. */
 const BRIDGE_WS_TOKEN_PREFIX = "bearer-";
 
@@ -4665,20 +4677,45 @@ const BRIDGE_WS_PATH = "/api/live-bets";
 
 const BRIDGE_WS_CHANNEL_RE = /^[a-z0-9-]{1,32}$/;
 
+export type BridgeSocketData = { readonly telemetry: boolean };
+
+type BridgeServeConfig = Parameters<typeof Bun.serve<BridgeSocketData>>[0];
+
 type BridgeSocket = {
+  readonly data?: BridgeSocketData | undefined;
   readonly subscriptions: readonly string[];
   subscribe: (channel: string) => void;
   unsubscribe: (channel: string) => void;
-  send: (frame: string) => number;
+  send: (
+    frame: string | Uint8Array | ArrayBuffer,
+    compress?: boolean,
+  ) => number;
+  pause: () => void;
+  resume: () => void;
   close: (code?: number, reason?: string) => void;
 };
 
 type BridgeProtocols = {
   readonly token: string | null;
   readonly echo: string | null;
+  readonly telemetry: boolean;
 };
 
-let bridgeHub: Bun.Server<undefined> | null = null;
+const wagerTelemetryHub = new WagerTelemetryHub();
+/** Bridge bits a socket subscribed to; absent for sockets that did not opt into telemetry. */
+const telemetryMasks = new WeakMap<BridgeSocket, number>();
+
+/** Topic -> transport bridge bit, from the same table that defines the topics. */
+const TOPIC_BRIDGE_BITS: ReadonlyMap<string, number> = new Map(
+  Object.values(TRANSPORT_BRIDGE_SPECIFICATION_TABLE).map(
+    (specification): [string, number] => [
+      specification.webSocketSubscriptionTopic,
+      1 << specification.bridgeOrdinal4,
+    ],
+  ),
+);
+
+let bridgeHub: Bun.Server<BridgeSocketData> | null = null;
 let bridgeRelaySocket: WebSocket | null = null;
 let bridgeRelayTimer: ReturnType<typeof setTimeout> | null = null;
 let bridgeRelayBackoffMs = 1_000;
@@ -4687,7 +4724,7 @@ let bridgeRelayStarted = false;
 let bridgeRelayLastFrameAtIso: string | null = null;
 
 /** Give the upgrade path the live server instance; `startServer` calls this after `Bun.serve`. */
-export function attachBridgeHub(server: Bun.Server<undefined>): void {
+export function attachBridgeHub(server: Bun.Server<BridgeSocketData>): void {
   bridgeHub = server;
 }
 
@@ -4715,6 +4752,7 @@ export function bridgeProtocols(req: Request): BridgeProtocols {
     token:
       bearer === undefined ? null : bearer.slice(BRIDGE_WS_TOKEN_PREFIX.length),
     echo: offered.includes(BRIDGE_WS_PROTOCOL) ? BRIDGE_WS_PROTOCOL : null,
+    telemetry: offered.includes(TELEMETRY_WS_PROTOCOL),
   };
 }
 
@@ -4757,17 +4795,35 @@ export function withBridgeUpgrade(
     );
     if (rejected !== null)
       return bridgeRefusal(rejected.status, rejected.error);
-    const { echo } = bridgeProtocols(req);
-    const upgraded = server.upgrade(
-      req,
-      echo === null ? {} : { headers: { "Sec-WebSocket-Protocol": echo } },
-    );
+    const protocols = bridgeProtocols(req);
+    const upgraded = server.upgrade(req, {
+      data: { telemetry: protocols.telemetry },
+      ...(protocols.echo === null
+        ? {}
+        : { headers: { "Sec-WebSocket-Protocol": protocols.echo } }),
+    });
     return upgraded ? undefined : bridgeRefusal(426, "upgrade_failed");
   };
 }
 
 function bridgeSend(socket: BridgeSocket, payload: unknown): void {
   sendFrameOrClose(socket, JSON.stringify(payload));
+}
+
+/**
+ * Keep the hub mask equal to the channels the socket actually subscribed to. A socket that did
+ * not offer `TELEMETRY_WS_PROTOCOL` is absent from the map and never enters the hub.
+ */
+function updateTelemetryMask(
+  socket: BridgeSocket,
+  bit: number,
+  subscribed: boolean,
+): void {
+  const current = telemetryMasks.get(socket);
+  if (current === undefined) return;
+  const next = subscribed ? current | bit : current & ~bit;
+  telemetryMasks.set(socket, next);
+  wagerTelemetryHub.add(socket, asTransportBridgeBitMask32(next));
 }
 
 /**
@@ -4779,7 +4835,11 @@ export const bridgeWebsocket = {
   // Relayed rollups go out through `bridgeHub.publish`, which drops frames for a stalled tab
   // while the socket stays open; the cap closes it so the page reconnects and resubscribes.
   ...WS_BACKPRESSURE_OPTIONS,
-  open(): void {
+  open(ws: BridgeSocket): void {
+    if (ws.data?.telemetry === true) {
+      telemetryMasks.set(ws, 0);
+      wagerTelemetryHub.add(ws, asTransportBridgeBitMask32(0));
+    }
     startBridgeRelay();
   },
   message(ws: BridgeSocket, raw: string | Buffer): void {
@@ -4808,6 +4868,8 @@ export const bridgeWebsocket = {
     }
     if (msg.type === "SUBSCRIBE") {
       ws.subscribe(msg.channel);
+      const bridgeBit = TOPIC_BRIDGE_BITS.get(msg.channel) ?? 0;
+      if (bridgeBit !== 0) updateTelemetryMask(ws, bridgeBit, true);
       bridgeSend(ws, {
         type: "SUBSCRIBED",
         channel: msg.channel,
@@ -4821,6 +4883,8 @@ export const bridgeWebsocket = {
       return;
     }
     ws.unsubscribe(msg.channel);
+    const bridgeBit = TOPIC_BRIDGE_BITS.get(msg.channel) ?? 0;
+    if (bridgeBit !== 0) updateTelemetryMask(ws, bridgeBit, false);
     bridgeSend(ws, {
       type: "UNSUBSCRIBED",
       channel: msg.channel,
@@ -4828,7 +4892,10 @@ export const bridgeWebsocket = {
       subscriptions: ws.subscriptions,
     });
   },
-  close(): void {},
+  close(ws: BridgeSocket): void {
+    wagerTelemetryHub.remove(ws);
+    telemetryMasks.delete(ws);
+  },
   error(error: Error, ws: BridgeSocket): void {
     console.error("[bridge] websocket handler failed:", error);
     try {
@@ -4838,6 +4905,16 @@ export const bridgeWebsocket = {
     }
   },
 };
+
+/**
+ * Publish one wager tick to telemetry-capable bridge sockets whose subscriptions include the
+ * frame's bridge. Text-only bridge clients are unaffected: they never enter the hub.
+ */
+export function publishWagerTick(
+  input: WagerTickInput,
+): WagerTickBroadcastResult {
+  return wagerTelemetryHub.broadcastTick(input);
+}
 
 /** Connect once to the blob gateway and republish its bridge frames onto the local hub. */
 function startBridgeRelay(): void {
@@ -5475,9 +5552,9 @@ async function buildLogoMetaResponse(
   );
 }
 
-function peerGames<T extends LiveBetGame>(
+function peerGames<T extends LiveBetGame, TWs>(
   req: Request,
-  server: Bun.Server<undefined>,
+  server: Bun.Server<TWs>,
   ingress: Ingress,
   games: readonly T[],
 ): readonly T[] {
@@ -5487,11 +5564,11 @@ function peerGames<T extends LiveBetGame>(
   );
 }
 
-function respondLiveBetsV2(
+function respondLiveBetsV2<TWs>(
   req: Request,
   resolved: import("../src/contracts/live_bets.v2.ts").LiveBetsV2Response,
   cors: Record<string, string>,
-  server: Bun.Server<undefined>,
+  server: Bun.Server<TWs>,
   ingress: Ingress,
 ): Response {
   const trustedPeer = peerIsTrusted(server.requestIP(req)?.address, ingress);
@@ -5570,8 +5647,8 @@ function getOrCreateWebviewMcpHandler(
   return created;
 }
 
-function attachMcpServerStop(
-  server: Bun.Server<undefined>,
+function attachMcpServerStop<TWs>(
+  server: Bun.Server<TWs>,
   owner: object,
 ): void {
   const originalStop = server.stop.bind(server);
