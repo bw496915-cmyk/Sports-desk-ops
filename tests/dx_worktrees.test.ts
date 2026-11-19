@@ -12,6 +12,8 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
+  BRANCH_DISPOSITIONS,
+  buildHygieneSummary,
   classifyBranchMergeProof,
   classifyDirtyPath,
   classifyDirtyWork,
@@ -22,7 +24,18 @@ import {
   parseRawDiffZ,
   parseWorktreeListPorcelain,
   runWorktreeHygiene,
+  sortBranchRows,
+  sortWorktreeRows,
   summarizeDirtyWork,
+  summarizeDirtyWorktrees,
+  type BranchAuditRow,
+  type BranchDisposition,
+  type CleanupCandidates,
+  type DirtyWorkBreakdown,
+  type WorktreeAuditRow,
+  type WorktreeDisposition,
+  WORKTREE_DISPOSITIONS,
+  WORKTREE_REPORT_SCHEMA_VERSION,
 } from "../scripts/dx_worktrees.ts";
 import { cliInspectOptions, inspectReport } from "../lib/cli_inspect.ts";
 
@@ -420,6 +433,43 @@ describe("runWorktreeHygiene end-to-end in isolated scratch repo", () => {
     expect(rendered).toContain("Safe Cleanup Candidates:");
     expect(rendered).toContain("keep:orphan-dir");
 
+    // The report shape is a contract: versioned, summarized, order-stable.
+    expect(dryRun.schemaVersion).toBe(WORKTREE_REPORT_SCHEMA_VERSION);
+    expect(Object.keys(dryRun).sort()).toEqual([
+      "applied",
+      "baseRef",
+      "baseSha",
+      "candidates",
+      "deleteBranchOnMerge",
+      "githubPrListTruncated",
+      "githubPrsLoaded",
+      "localBranches",
+      "offline",
+      "remoteBranches",
+      "repoCommonRoot",
+      "schemaVersion",
+      "shallow",
+      "summary",
+      "worktrees",
+    ]);
+    // Summary totals are derived from the rows, never counted twice.
+    expect(dryRun.summary.worktrees.total).toBe(dryRun.worktrees.length);
+    expect(dryRun.summary.localBranches.total).toBe(
+      dryRun.localBranches.length,
+    );
+    expect(dryRun.summary.remoteBranches.total).toBe(
+      dryRun.remoteBranches.length,
+    );
+    expect(dryRun.summary.candidates.removeWorktrees).toBe(
+      dryRun.candidates.removeWorktrees.length,
+    );
+    expect(Object.keys(dryRun.summary.worktrees.byDisposition)).toEqual([
+      ...WORKTREE_DISPOSITIONS,
+    ]);
+    // Order is part of the shape, so a diff shows only real change.
+    const labels = dryRun.worktrees.map((w) => w.label);
+    expect([...labels].sort()).toEqual(labels);
+
     // Now apply local cleanup
     const appliedReport = await runWorktreeHygiene({
       cwd: wtCwd,
@@ -750,5 +800,184 @@ describe("dx worktrees CLI surface", () => {
     expect(code).toBe(2);
     expect(stderr).toContain("positive integer");
     expect(stderr).toContain("--pr-limit 2000");
+  });
+});
+
+const CLEAN_BREAKDOWN: DirtyWorkBreakdown = {
+  contentEdits: [],
+  modeOnly: [],
+  typeChanges: [],
+  untracked: [],
+};
+
+function worktreeRow(
+  label: string,
+  disposition: WorktreeDisposition,
+  dirty: DirtyWorkBreakdown = CLEAN_BREAKDOWN,
+): WorktreeAuditRow {
+  return {
+    path: `/repo/${label}`,
+    label,
+    headShort: "0000000",
+    branch: label,
+    registered: true,
+    existsOnDisk: true,
+    modifiedCount:
+      dirty.contentEdits.length +
+      dirty.modeOnly.length +
+      dirty.typeChanges.length,
+    untrackedCount: dirty.untracked.length,
+    dirty,
+    dirtyKind: classifyDirtyWork(dirty),
+    aheadCount: 0,
+    behindCount: 0,
+    disposition,
+    reason: "fixture",
+  };
+}
+
+function branchRow(
+  name: string,
+  disposition: BranchDisposition,
+  committerDate = "2026-11-18",
+): BranchAuditRow {
+  return {
+    scope: "local",
+    name,
+    fullRef: `refs/heads/${name}`,
+    sha: "0".repeat(40),
+    shortSha: "0000000",
+    committerDate,
+    worktreePath: null,
+    aheadCount: 0,
+    disposition,
+    reason: "fixture",
+  };
+}
+
+const NO_CANDIDATES: CleanupCandidates = {
+  pruneWorktrees: 0,
+  removeWorktrees: [],
+  deleteLocalBranches: [],
+  deleteRemoteBranches: [],
+};
+
+describe("report summary shape", () => {
+  test("every disposition key is present, so zero is never mistaken for missing", () => {
+    const summary = buildHygieneSummary({
+      worktrees: [worktreeRow("a", "keep:primary")],
+      localBranches: [branchRow("main", "protected:default")],
+      remoteBranches: [],
+      candidates: NO_CANDIDATES,
+    });
+    expect(Object.keys(summary.worktrees.byDisposition)).toEqual([
+      ...WORKTREE_DISPOSITIONS,
+    ]);
+    expect(Object.keys(summary.localBranches.byDisposition)).toEqual([
+      ...BRANCH_DISPOSITIONS,
+    ]);
+    expect(summary.worktrees.total).toBe(1);
+    expect(summary.worktrees.byDisposition["keep:primary"]).toBe(1);
+    expect(summary.worktrees.byDisposition["clean:merged"]).toBe(0);
+    expect(summary.localBranches.total).toBe(1);
+    expect(summary.remoteBranches.total).toBe(0);
+  });
+
+  test("dirty totals separate work from recoverable artifacts", () => {
+    const summary = buildHygieneSummary({
+      worktrees: [
+        worktreeRow("a", "keep:dirty", {
+          contentEdits: ["x.ts"],
+          modeOnly: [],
+          typeChanges: [],
+          untracked: ["u.ts"],
+        }),
+        worktreeRow("b", "keep:dirty-artifacts", {
+          contentEdits: [],
+          modeOnly: ["m1.ts", "m2.ts"],
+          typeChanges: ["t.ts"],
+          untracked: [],
+        }),
+      ],
+      localBranches: [],
+      remoteBranches: [],
+      candidates: NO_CANDIDATES,
+    });
+    expect(summary.dirty.worktreesDirty).toBe(2);
+    expect(summary.dirty.contentEdits).toBe(1);
+    expect(summary.dirty.untracked).toBe(1);
+    expect(summary.dirty.modeOnly).toBe(2);
+    expect(summary.dirty.typeChanges).toBe(1);
+    expect(summary.dirty.workPaths).toBe(2);
+    expect(summary.dirty.artifactPaths).toBe(3);
+  });
+
+  test("candidate counts are the array lengths, not a second tally", () => {
+    const summary = buildHygieneSummary({
+      worktrees: [],
+      localBranches: [],
+      remoteBranches: [],
+      candidates: {
+        pruneWorktrees: 2,
+        removeWorktrees: ["/a", "/b"],
+        deleteLocalBranches: ["x"],
+        deleteRemoteBranches: [],
+      },
+    });
+    expect(summary.candidates).toEqual({
+      pruneWorktrees: 2,
+      removeWorktrees: 2,
+      deleteLocalBranches: 1,
+      deleteRemoteBranches: 0,
+    });
+  });
+
+  test("only a tree with more than mode bits or symlink type counts as dirty", () => {
+    const totals = summarizeDirtyWorktrees([
+      worktreeRow("clean", "keep:primary"),
+      worktreeRow("artifacts", "keep:dirty-artifacts", {
+        contentEdits: [],
+        modeOnly: ["m.ts"],
+        typeChanges: [],
+        untracked: [],
+      }),
+      worktreeRow("work", "keep:dirty", {
+        contentEdits: ["a.ts"],
+        modeOnly: [],
+        typeChanges: [],
+        untracked: [],
+      }),
+    ]);
+    expect(totals.worktreesDirty).toBe(2);
+    expect(totals.workPaths).toBe(1);
+    expect(totals.artifactPaths).toBe(1);
+  });
+});
+
+describe("deterministic ordering", () => {
+  test("worktrees sort by label, whatever order they were audited in", () => {
+    const rows = [
+      worktreeRow("zeta", "keep:primary"),
+      worktreeRow("alpha", "keep:dirty"),
+      worktreeRow("middle", "clean:merged"),
+    ];
+    expect(sortWorktreeRows(rows).map((r) => r.label)).toEqual([
+      "alpha",
+      "middle",
+      "zeta",
+    ]);
+  });
+
+  test("branches sort newest first, breaking date ties by name", () => {
+    const rows = [
+      branchRow("b-old", "keep:unmerged", "2026-11-10"),
+      branchRow("c-new", "keep:unmerged", "2026-11-18"),
+      branchRow("a-tie", "keep:unmerged", "2026-11-18"),
+    ];
+    expect(sortBranchRows(rows).map((r) => r.name)).toEqual([
+      "a-tie",
+      "c-new",
+      "b-old",
+    ]);
   });
 });

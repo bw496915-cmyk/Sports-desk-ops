@@ -77,28 +77,85 @@ export interface DirtyWorkBreakdown {
 
 export type DirtyWorkKind = "clean" | "artifacts-only" | "has-work";
 
-export type WorktreeDisposition =
-  | "keep:primary"
-  | "keep:cwd"
-  | "keep:locked"
-  | "keep:orphan-dir"
-  | "keep:dirty"
-  | "keep:dirty-artifacts"
-  | "keep:ahead"
-  | "clean:missing-dir"
-  | "clean:merged"
-  | "clean:detached-anchored";
+/**
+ * The disposition vocabulary as data. The union type is derived from these
+ * tuples, so a new disposition cannot reach the type without also reaching the
+ * report's zero-filled count map.
+ */
+export const WORKTREE_DISPOSITIONS = [
+  "keep:primary",
+  "keep:cwd",
+  "keep:locked",
+  "keep:orphan-dir",
+  "keep:dirty",
+  "keep:dirty-artifacts",
+  "keep:ahead",
+  "clean:missing-dir",
+  "clean:merged",
+  "clean:detached-anchored",
+] as const;
 
-export type BranchDisposition =
-  | "protected:default"
-  | "protected:worktree"
-  | "clean:ancestor"
-  | "clean:patch-equivalent"
-  | "clean:squash-pr"
-  | "keep:post-pr-commits"
-  | "keep:open-pr"
-  | "keep:unmerged"
-  | "unknown:shallow-ancestry";
+export type WorktreeDisposition = (typeof WORKTREE_DISPOSITIONS)[number];
+
+export const BRANCH_DISPOSITIONS = [
+  "protected:default",
+  "protected:worktree",
+  "clean:ancestor",
+  "clean:patch-equivalent",
+  "clean:squash-pr",
+  "keep:post-pr-commits",
+  "keep:open-pr",
+  "keep:unmerged",
+  "unknown:shallow-ancestry",
+] as const;
+
+export type BranchDisposition = (typeof BRANCH_DISPOSITIONS)[number];
+
+/**
+ * Bumped only when a field is removed or changes meaning. Adding a key is
+ * additive, so a consumer must ignore keys it does not know.
+ */
+export const WORKTREE_REPORT_SCHEMA_VERSION = 1;
+
+/** Counts over a closed vocabulary: every key is present, including zeros. */
+export interface DispositionCounts<D extends string> {
+  readonly total: number;
+  readonly byDisposition: Readonly<Record<D, number>>;
+}
+
+/** What the uncommitted paths across every worktree add up to. */
+export interface DirtyWorkTotals {
+  /** Worktrees whose dirt is more than mode bits and symlink type. */
+  readonly worktreesDirty: number;
+  readonly contentEdits: number;
+  readonly modeOnly: number;
+  readonly typeChanges: number;
+  readonly untracked: number;
+  /** contentEdits + untracked: what a discard would actually lose. */
+  readonly workPaths: number;
+  /** modeOnly + typeChanges: recoverable without losing an edit. */
+  readonly artifactPaths: number;
+}
+
+/** How much provably-clean material the audit found, ready for --apply. */
+export interface HygieneCandidatesSummary {
+  readonly pruneWorktrees: number;
+  readonly removeWorktrees: number;
+  readonly deleteLocalBranches: number;
+  readonly deleteRemoteBranches: number;
+}
+
+/**
+ * Order-independent totals, so a consumer never has to re-derive them from the
+ * row arrays (and so a row-order change cannot change a headline number).
+ */
+export interface WorktreeHygieneSummary {
+  readonly worktrees: DispositionCounts<WorktreeDisposition>;
+  readonly localBranches: DispositionCounts<BranchDisposition>;
+  readonly remoteBranches: DispositionCounts<BranchDisposition>;
+  readonly dirty: DirtyWorkTotals;
+  readonly candidates: HygieneCandidatesSummary;
+}
 
 export interface WorktreeAuditRow {
   readonly path: string;
@@ -138,7 +195,26 @@ export interface AppliedCleanupSummary {
   readonly enabledDeleteBranchOnMerge: boolean;
 }
 
+/** The exact operations --apply would perform, derived from dispositions alone. */
+export interface CleanupCandidates {
+  readonly pruneWorktrees: number;
+  readonly removeWorktrees: readonly string[];
+  readonly deleteLocalBranches: readonly string[];
+  readonly deleteRemoteBranches: readonly string[];
+}
+
+/**
+ * The JSON/YAML contract for `dx worktrees`.
+ *
+ * Stability: `schemaVersion` changes only when a field is removed or changes
+ * meaning, so an added key is always safe to ignore. `summary` is the
+ * order-independent view — a consumer must not re-derive its totals from the
+ * rows. The row arrays carry a documented order (worktrees by label; branches
+ * newest-first, name as tie-break), so two runs over the same repository emit
+ * the same bytes and a diff shows only real change.
+ */
 export interface WorktreeHygieneReport {
+  readonly schemaVersion: number;
   readonly repoCommonRoot: string;
   readonly baseRef: string;
   readonly baseSha: string;
@@ -159,12 +235,8 @@ export interface WorktreeHygieneReport {
   readonly worktrees: readonly WorktreeAuditRow[];
   readonly localBranches: readonly BranchAuditRow[];
   readonly remoteBranches: readonly BranchAuditRow[];
-  readonly candidates: {
-    readonly pruneWorktrees: number;
-    readonly removeWorktrees: readonly string[];
-    readonly deleteLocalBranches: readonly string[];
-    readonly deleteRemoteBranches: readonly string[];
-  };
+  readonly candidates: CleanupCandidates;
+  readonly summary: WorktreeHygieneSummary;
   readonly applied: AppliedCleanupSummary | null;
 }
 
@@ -218,6 +290,116 @@ export function parseWorktreeListPorcelain(raw: string): ParsedWorktreeEntry[] {
   }
 
   return entries;
+}
+
+/** Locale-independent string order, so the report is byte-stable across hosts. */
+function compareText(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+/**
+ * Zero-filled counters over a closed vocabulary. The cast is earned: `keys` is
+ * the same `as const` tuple the disposition union derives from, and the report
+ * test pins the resulting key set.
+ */
+function zeroCounts<D extends string>(keys: readonly D[]): Record<D, number> {
+  const counts = {} as Record<D, number>;
+  for (const key of keys) counts[key] = 0;
+  return counts;
+}
+
+function countDispositions<D extends string>(
+  values: Iterable<D>,
+  keys: readonly D[],
+): DispositionCounts<D> {
+  const byDisposition = zeroCounts(keys);
+  let total = 0;
+  for (const value of values) {
+    byDisposition[value] += 1;
+    total += 1;
+  }
+  return { total, byDisposition };
+}
+
+/** Worktrees sort by label then path; both are stable for a given checkout. */
+export function sortWorktreeRows(
+  rows: readonly WorktreeAuditRow[],
+): WorktreeAuditRow[] {
+  return [...rows].sort(
+    (a, b) => compareText(a.label, b.label) || compareText(a.path, b.path),
+  );
+}
+
+/** Branches sort newest-first, with the name as a deterministic tie-break. */
+export function sortBranchRows(
+  rows: readonly BranchAuditRow[],
+): BranchAuditRow[] {
+  return [...rows].sort(
+    (a, b) =>
+      compareText(b.committerDate, a.committerDate) ||
+      compareText(a.name, b.name),
+  );
+}
+
+export function summarizeDirtyWorktrees(
+  rows: readonly WorktreeAuditRow[],
+): DirtyWorkTotals {
+  let worktreesDirty = 0;
+  let contentEdits = 0;
+  let modeOnly = 0;
+  let typeChanges = 0;
+  let untracked = 0;
+  for (const row of rows) {
+    if (row.dirtyKind !== "clean") worktreesDirty += 1;
+    contentEdits += row.dirty.contentEdits.length;
+    modeOnly += row.dirty.modeOnly.length;
+    typeChanges += row.dirty.typeChanges.length;
+    untracked += row.dirty.untracked.length;
+  }
+  return {
+    worktreesDirty,
+    contentEdits,
+    modeOnly,
+    typeChanges,
+    untracked,
+    workPaths: contentEdits + untracked,
+    artifactPaths: modeOnly + typeChanges,
+  };
+}
+
+export interface HygieneSummaryInput {
+  readonly worktrees: readonly WorktreeAuditRow[];
+  readonly localBranches: readonly BranchAuditRow[];
+  readonly remoteBranches: readonly BranchAuditRow[];
+  readonly candidates: CleanupCandidates;
+}
+
+/** Fold the rows into the order-independent totals the report publishes. */
+export function buildHygieneSummary(
+  input: HygieneSummaryInput,
+): WorktreeHygieneSummary {
+  return {
+    worktrees: countDispositions(
+      input.worktrees.map((row) => row.disposition),
+      WORKTREE_DISPOSITIONS,
+    ),
+    localBranches: countDispositions(
+      input.localBranches.map((row) => row.disposition),
+      BRANCH_DISPOSITIONS,
+    ),
+    remoteBranches: countDispositions(
+      input.remoteBranches.map((row) => row.disposition),
+      BRANCH_DISPOSITIONS,
+    ),
+    dirty: summarizeDirtyWorktrees(input.worktrees),
+    candidates: {
+      pruneWorktrees: input.candidates.pruneWorktrees,
+      removeWorktrees: input.candidates.removeWorktrees.length,
+      deleteLocalBranches: input.candidates.deleteLocalBranches.length,
+      deleteRemoteBranches: input.candidates.deleteRemoteBranches.length,
+    },
+  };
 }
 
 export interface MergeProofInput {
@@ -819,11 +1001,18 @@ export class InspectableWorktreeHygieneReport {
       ? "shallow — ancestry and cherry cannot prove a merge; deepen with 'git fetch --deepen=<n>' before trusting unknown:shallow-ancestry"
       : "complete";
 
+    const { dirty, candidates } = this.data.summary;
+    const dirtLine = `${dirty.worktreesDirty} worktree(s) · ${dirty.workPaths} work path(s) · ${dirty.artifactPaths} artifact path(s)`;
+    const cleanLine = `${candidates.removeWorktrees} worktree(s), ${candidates.deleteLocalBranches} local branch(es), ${candidates.deleteRemoteBranches} remote branch(es)${candidates.pruneWorktrees > 0 ? `, ${candidates.pruneWorktrees} prunable` : ""}`;
+
     const summaryLines = [
+      `${padDisplay("Schema", 24)}: v${this.data.schemaVersion}`,
       `${padDisplay("Repo Common Root", 24)}: ${this.data.repoCommonRoot}`,
       `${padDisplay("Base Reference", 24)}: ${this.data.baseRef} (${this.data.baseSha.slice(0, 7)})`,
       `${padDisplay("Clone History", 24)}: ${cloneLine}`,
       `${padDisplay("GitHub PR Metadata", 24)}: ${prLine}`,
+      `${padDisplay("Dirty Work", 24)}: ${dirtLine}`,
+      `${padDisplay("Provably Clean", 24)}: ${cleanLine}`,
       `${padDisplay("deleteBranchOnMerge", 24)}: ${autoDelLabel}`,
     ];
 
@@ -1329,22 +1518,35 @@ export async function runWorktreeHygiene(
     ),
   ]);
 
-  const pruneCount = worktreeRows.filter(
+  // Deterministic shape: sort once, then derive every candidate list from the
+  // sorted rows, so two runs over the same repository emit identical bytes.
+  const sortedWorktrees = sortWorktreeRows(worktreeRows);
+  const sortedLocalBranches = sortBranchRows(localBranches);
+  const sortedRemoteBranches = sortBranchRows(remoteBranches);
+
+  const pruneCount = sortedWorktrees.filter(
     (w) => w.disposition === "clean:missing-dir",
   ).length;
-  const removeWorktrees = worktreeRows
+  const removeWorktrees = sortedWorktrees
     .filter(
       (w) =>
         w.disposition === "clean:merged" ||
         w.disposition === "clean:detached-anchored",
     )
     .map((w) => w.path);
-  const deleteLocalBranches = localBranches
+  const deleteLocalBranches = sortedLocalBranches
     .filter((b) => isCleanBranchDisposition(b.disposition))
     .map((b) => b.name);
-  const deleteRemoteBranches = remoteBranches
+  const deleteRemoteBranches = sortedRemoteBranches
     .filter((b) => isCleanBranchDisposition(b.disposition))
     .map((b) => b.name);
+
+  const candidates: CleanupCandidates = {
+    pruneWorktrees: pruneCount,
+    removeWorktrees,
+    deleteLocalBranches,
+    deleteRemoteBranches,
+  };
 
   let applied: AppliedCleanupSummary | null = null;
   let finalDeleteBranchOnMerge = ghState.deleteBranchOnMerge;
@@ -1449,6 +1651,7 @@ export async function runWorktreeHygiene(
   }
 
   return {
+    schemaVersion: WORKTREE_REPORT_SCHEMA_VERSION,
     repoCommonRoot,
     baseRef,
     baseSha,
@@ -1457,15 +1660,16 @@ export async function runWorktreeHygiene(
     githubPrListTruncated: ghState.truncated,
     shallow,
     deleteBranchOnMerge: finalDeleteBranchOnMerge,
-    worktrees: worktreeRows,
-    localBranches,
-    remoteBranches,
-    candidates: {
-      pruneWorktrees: pruneCount,
-      removeWorktrees,
-      deleteLocalBranches,
-      deleteRemoteBranches,
-    },
+    worktrees: sortedWorktrees,
+    localBranches: sortedLocalBranches,
+    remoteBranches: sortedRemoteBranches,
+    candidates,
+    summary: buildHygieneSummary({
+      worktrees: sortedWorktrees,
+      localBranches: sortedLocalBranches,
+      remoteBranches: sortedRemoteBranches,
+      candidates,
+    }),
     applied,
   };
 }
