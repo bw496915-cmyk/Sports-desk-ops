@@ -51,7 +51,13 @@ describe("terminal formatting adoption", () => {
     const offenders: string[] = [];
     for (const path of sourceFiles()) {
       if (ALLOWED.has(path)) continue;
-      const text = await Bun.file(path).text();
+      let text: string;
+      try {
+        text = await Bun.file(path).text();
+      } catch {
+        // A fixture that vanished between the glob and the read is not a source file.
+        continue;
+      }
       // Comments that name the native (a doc line, a rationale) are not calls.
       const executable = text
         .split("\n")
