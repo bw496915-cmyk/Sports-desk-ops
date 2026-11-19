@@ -150,6 +150,9 @@ jobs:
         run: bun ci --no-env-file
       - name: Lockfile dedupe check
         run: bun dedupe --check
+      - name: Check for orphaned node_modules
+        timeout-minutes: 1
+        run: bun run pm:prune:check
       # Optional native packages differ by target even though bun.lock does not; resolve the two
       # targets the desk ships to (Linux musl containers and Apple-silicon operators) without
       # installing them.
@@ -166,6 +169,9 @@ jobs:
         run: bun run check:profile-code-mode-host-seal
       - name: Build workspace contracts dist
         run: bun run --filter '@sportsdesk-ops/contracts' build
+      - name: Production license gate
+        timeout-minutes: 1
+        run: bun run verify:licenses
       # Baseline green on 2026-11-14: 0 vulnerabilities (180 packages) after
       # `bun audit fix` bumped @hono/node-server to 2.1.6 and overrides carried
       # got to 11.8.5 and ws to 5.2.5 (both were pinned by @ganchrowsci/gs-sdk's
@@ -375,6 +381,9 @@ jobs:
         run: bun ci --no-env-file
       - name: Lockfile dedupe check
         run: bun dedupe --check
+      - name: Check for orphaned node_modules
+        timeout-minutes: 1
+        run: bun run pm:prune:check
       - name: Resolve optional natives for musl and Darwin
         timeout-minutes: 2
         run: |
@@ -382,6 +391,9 @@ jobs:
           bun ci --dry-run --os=darwin --cpu=arm64 --no-env-file
       - name: Build workspace contracts dist
         run: bun run --filter '@sportsdesk-ops/contracts' build
+      - name: Production license gate
+        timeout-minutes: 1
+        run: bun run verify:licenses
       - name: "Pinned CDN asset drift (live origins; scheduled/unattended runs)"
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         timeout-minutes: 4
