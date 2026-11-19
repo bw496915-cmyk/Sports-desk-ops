@@ -2148,14 +2148,15 @@ export function App(): React.ReactElement {
 
   return (
     <div style={styles.container}>
-      {/* Global Header */}
-      <header style={styles.header}>
+      {/* Global Sticky Header */}
+      <header style={styles.header} className="sd-top-header">
         <div style={styles.headerTopRow}>
           <a
             href="#risk-overview"
             style={styles.brandLockup}
             data-brand-lockup="true"
             aria-label="SportsDesk Ops Surveillance — Risk Overview"
+            onClick={() => setActiveTab("surveillance")}
           >
             <img
               src={logo}
@@ -2195,198 +2196,169 @@ export function App(): React.ReactElement {
               </a>
             ))}
           </nav>
+          <div className="sd-header-status">
+            <span
+              style={styles.badge(connected)}
+              title={connected ? "Live Hot-Reload Connected" : "Disconnected"}
+            >
+              {connected ? "● Live" : "○ Offline"}
+            </span>
+          </div>
         </div>
-        <div style={styles.headerLeft}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-            <div
+      </header>
+
+      {/* Secondary Workspace Telemetry Toolbar & Tab Bar */}
+      <section
+        aria-label="Workspace Telemetry and Tabs"
+        className="sd-ops-toolbar"
+      >
+        <div className="sd-ops-telemetry-row">
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "10px",
+              fontSize: "11px",
+              color: "#94a3b8",
+            }}
+          >
+            <span style={{ color: "#38bdf8", fontWeight: 600 }}>
+              ● Local :4022 SPA
+            </span>
+            <span>·</span>
+            <span
+              style={{
+                color: daemonPill.color,
+                fontWeight: 600,
+              }}
+              title={daemonPill.title}
+            >
+              {daemonPill.label}
+            </span>
+            <span>·</span>
+            <button
+              type="button"
+              onClick={() => setActiveTab("r2")}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontSize: "11px",
+                fontWeight: 600,
+                color:
+                  r2PipelineData?.overallStatus === "fresh"
+                    ? "#4ade80"
+                    : r2PipelineData?.overallStatus === "stale"
+                      ? "#fbbf24"
+                      : r2PipelineData
+                        ? "#f87171"
+                        : "#94a3b8",
+              }}
+              title="Open R2 Pipeline Monitor"
+            >
+              {r2PipelineData
+                ? `☁️ R2 ${r2PipelineData.freshCount}/${r2PipelineData.totalCount} Fresh`
+                : "☁️ R2 Probing..."}
+            </button>
+            <span>·</span>
+            <a
+              href="/live-bets"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                color: "#38bdf8",
+                textDecoration: "none",
+                fontWeight: 600,
+              }}
+            >
+              📈 Live Bets ↗
+            </a>
+            <a
+              href="/graph"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                color: "#38bdf8",
+                textDecoration: "none",
+                fontWeight: 600,
+              }}
+            >
+              🕸️ Graph ↗
+            </a>
+            <a
+              href="/status"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                color: "#38bdf8",
+                textDecoration: "none",
+                fontWeight: 600,
+              }}
+            >
+              🩺 Status ↗
+            </a>
+            <span>·</span>
+            <span style={{ color: "#f59e0b", fontWeight: 600 }}>
+              🛡️ autoExecute: false
+            </span>
+            {clockTime && (
+              <>
+                <span>·</span>
+                <span
+                  style={{
+                    fontFamily:
+                      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                    color: "#f1f5f9",
+                  }}
+                >
+                  🕒 {clockTime}
+                </span>
+              </>
+            )}
+          </div>
+          <div style={styles.headerLeft}>
+            {/* Live Alert Health Pill */}
+            <button
+              type="button"
+              onClick={() => {
+                void fetchShiftSummary();
+                setIsShiftModalOpen(true);
+              }}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
+                gap: "6px",
+                padding: "4px 10px",
+                borderRadius: "6px",
                 fontSize: "11px",
-                color: "#94a3b8",
+                fontWeight: 600,
+                cursor: "pointer",
+                border: `1px solid ${systemHealthUi.border}`,
+                background: systemHealthUi.bg,
+                color: systemHealthUi.color,
               }}
+              title={
+                degradedReasonSummary
+                  ? `Health probe: ${degradedReasonSummary} · Click to view Shift Handoff Summary`
+                  : "Surveillance Alert Health (O(1) in-memory probe) · Click to view Shift Handoff Summary"
+              }
             >
-              <span style={{ color: "#38bdf8", fontWeight: 600 }}>
-                ● Local :4022 SPA
-              </span>
-              <span>·</span>
-              <span
-                style={{
-                  color: daemonPill.color,
-                  fontWeight: 600,
-                }}
-                title={daemonPill.title}
-              >
-                {daemonPill.label}
-              </span>
-              <span>·</span>
-              <button
-                type="button"
-                onClick={() => setActiveTab("r2")}
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  color:
-                    r2PipelineData?.overallStatus === "fresh"
-                      ? "#4ade80"
-                      : r2PipelineData?.overallStatus === "stale"
-                        ? "#fbbf24"
-                        : r2PipelineData
-                          ? "#f87171"
-                          : "#94a3b8",
-                }}
-                title="Open R2 Pipeline Monitor"
-              >
-                {r2PipelineData
-                  ? `☁️ R2 ${r2PipelineData.freshCount}/${r2PipelineData.totalCount} Fresh`
-                  : "☁️ R2 Probing..."}
-              </button>
-              <span>·</span>
-              <a
-                href="/live-bets"
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  color: "#38bdf8",
-                  textDecoration: "none",
-                  fontWeight: 600,
-                }}
-              >
-                📈 Live Bets ↗
-              </a>
-              <a
-                href="/graph"
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  color: "#38bdf8",
-                  textDecoration: "none",
-                  fontWeight: 600,
-                }}
-              >
-                🕸️ Graph ↗
-              </a>
-              <a
-                href="/status"
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  color: "#38bdf8",
-                  textDecoration: "none",
-                  fontWeight: 600,
-                }}
-              >
-                🩺 Status ↗
-              </a>
-              <span>·</span>
-              <span style={{ color: "#f59e0b", fontWeight: 600 }}>
-                🛡️ autoExecute: false
-              </span>
-              {clockTime && (
-                <>
-                  <span>·</span>
-                  <span
-                    style={{
-                      fontFamily:
-                        "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                      color: "#f1f5f9",
-                    }}
-                  >
-                    🕒 {clockTime}
-                  </span>
-                </>
+              <span>{systemHealthUi.label}</span>
+              {healthData?.alerts && (
+                <span style={{ color: "#94a3b8", fontSize: "10px" }}>
+                  (DLQ: {healthData.alerts.dead} · Backlog:{" "}
+                  {healthData.alerts.backlog})
+                </span>
               )}
-            </div>
-          </div>
-          <span style={styles.badge(connected)}>
-            {connected ? "● Live Hot-Reload Connected" : "○ Disconnected"}
-          </span>
-          {/* Live Alert Health Pill */}
-          <button
-            type="button"
-            onClick={() => {
-              void fetchShiftSummary();
-              setIsShiftModalOpen(true);
-            }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "4px 10px",
-              borderRadius: "6px",
-              fontSize: "11px",
-              fontWeight: 600,
-              cursor: "pointer",
-              border: `1px solid ${systemHealthUi.border}`,
-              background: systemHealthUi.bg,
-              color: systemHealthUi.color,
-            }}
-            title={
-              degradedReasonSummary
-                ? `Health probe: ${degradedReasonSummary} · Click to view Shift Handoff Summary`
-                : "Surveillance Alert Health (O(1) in-memory probe) · Click to view Shift Handoff Summary"
-            }
-          >
-            <span>{systemHealthUi.label}</span>
-            {healthData?.alerts && (
-              <span style={{ color: "#94a3b8", fontSize: "10px" }}>
-                (DLQ: {healthData.alerts.dead} · Backlog:{" "}
-                {healthData.alerts.backlog})
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              void fetchShiftSummary();
-              setIsShiftModalOpen(true);
-            }}
-            style={{
-              padding: "4px 9px",
-              borderRadius: "6px",
-              fontSize: "11px",
-              fontWeight: 600,
-              background: "#1e293b",
-              color: "#94a3b8",
-              border: "1px solid #334155",
-              cursor: "pointer",
-            }}
-            title="Operator Shift Summary Handoff"
-          >
-            📋 Shift Handoff
-          </button>
-          <button
-            type="button"
-            data-copy-view-link="true"
-            onClick={handleCopyQuickLink}
-            style={{
-              padding: "4px 9px",
-              borderRadius: "6px",
-              fontSize: "11px",
-              fontWeight: 600,
-              background: "#1e293b",
-              color: quickLinkCopyState === "failed" ? "#fca5a5" : "#4ade80",
-              border: "1px solid #334155",
-              cursor: "pointer",
-            }}
-            title="Copy this exact view — tab, filters, sort and overlay — as a shareable link"
-          >
-            {quickLinkCopyState === "copied"
-              ? "✓ View link copied"
-              : quickLinkCopyState === "failed"
-                ? "⚠ Copy failed"
-                : "⧉ Copy view"}
-          </button>
-          {!viewIsDefault && (
+            </button>
             <button
               type="button"
-              data-reset-view="true"
-              onClick={handleResetView}
+              onClick={() => {
+                void fetchShiftSummary();
+                setIsShiftModalOpen(true);
+              }}
               style={{
                 padding: "4px 9px",
                 borderRadius: "6px",
@@ -2397,34 +2369,78 @@ export function App(): React.ReactElement {
                 border: "1px solid #334155",
                 cursor: "pointer",
               }}
-              title="Reset tab, filters, sort and overlays to defaults"
+              title="Operator Shift Summary Handoff"
             >
-              ↺ Reset view
+              📋 Shift Handoff
             </button>
-          )}
-          <button
-            type="button"
-            className="sd-pill sd-mono"
-            style={{ cursor: "pointer" }}
-            onClick={() => {
-              const next = !showBuildMatrix;
-              setShowBuildMatrix(next);
-              if (next && !buildMatrixRows && !buildMatrixLoading) {
-                fetchBuildMatrix();
-              }
-            }}
-            title="Inspect compile-time bun:bundle dead-code elimination & tokens.toml CSS Houdini registry"
-          >
-            🧬 Target: {runtimeFlags.target.toUpperCase()} (
-            {runtimeFlags.enabledFeatures.length > 0
-              ? runtimeFlags.enabledFeatures.join("+")
-              : "HMR"}
-            )
-          </button>
+            <button
+              type="button"
+              data-copy-view-link="true"
+              onClick={handleCopyQuickLink}
+              style={{
+                padding: "4px 9px",
+                borderRadius: "6px",
+                fontSize: "11px",
+                fontWeight: 600,
+                background: "#1e293b",
+                color: quickLinkCopyState === "failed" ? "#fca5a5" : "#4ade80",
+                border: "1px solid #334155",
+                cursor: "pointer",
+              }}
+              title="Copy this exact view — tab, filters, sort and overlay — as a shareable link"
+            >
+              {quickLinkCopyState === "copied"
+                ? "✓ View link copied"
+                : quickLinkCopyState === "failed"
+                  ? "⚠ Copy failed"
+                  : "⧉ Copy view"}
+            </button>
+            {!viewIsDefault && (
+              <button
+                type="button"
+                data-reset-view="true"
+                onClick={handleResetView}
+                style={{
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  background: "#1e293b",
+                  color: "#94a3b8",
+                  border: "1px solid #334155",
+                  cursor: "pointer",
+                }}
+                title="Reset tab, filters, sort and overlays to defaults"
+              >
+                ↺ Reset view
+              </button>
+            )}
+            <button
+              type="button"
+              className="sd-pill sd-mono"
+              style={{ cursor: "pointer" }}
+              onClick={() => {
+                const next = !showBuildMatrix;
+                setShowBuildMatrix(next);
+                if (next && !buildMatrixRows && !buildMatrixLoading) {
+                  fetchBuildMatrix();
+                }
+              }}
+              title="Inspect compile-time bun:bundle dead-code elimination & tokens.toml CSS Houdini registry"
+            >
+              🧬 Target: {runtimeFlags.target.toUpperCase()} (
+              {runtimeFlags.enabledFeatures.length > 0
+                ? runtimeFlags.enabledFeatures.join("+")
+                : "HMR"}
+              )
+            </button>
+          </div>
         </div>
         <div style={styles.tabNav}>
           <button
             type="button"
+            className="sd-tab-btn"
+            aria-pressed={activeTab === "customers"}
             style={styles.tabBtn(activeTab === "customers")}
             onClick={() => setActiveTab("customers")}
             title="Inspect individual sharp originators, sizing models, and risk (Ctrl+1)"
@@ -2437,6 +2453,8 @@ export function App(): React.ReactElement {
           </button>
           <button
             type="button"
+            className="sd-tab-btn"
+            aria-pressed={activeTab === "shadow"}
             style={styles.tabBtn(activeTab === "shadow")}
             onClick={() => setActiveTab("shadow")}
             title="Counterfactual Shadow Pricing & Slice Hold-Floor Cube (Ctrl+7)"
@@ -2446,6 +2464,8 @@ export function App(): React.ReactElement {
           </button>
           <button
             type="button"
+            className="sd-tab-btn"
+            aria-pressed={activeTab === "surveillance"}
             style={styles.tabBtn(activeTab === "surveillance")}
             onClick={() => setActiveTab("surveillance")}
             title="Bun.dns latency benchmarks and surveillance markdown (Ctrl+2)"
@@ -2455,6 +2475,8 @@ export function App(): React.ReactElement {
           </button>
           <button
             type="button"
+            className="sd-tab-btn"
+            aria-pressed={activeTab === "terminal"}
             style={styles.tabBtn(activeTab === "terminal")}
             onClick={() => setActiveTab("terminal")}
             title="Native Bun.Terminal PTY query engine (Ctrl+3 or Cmd+K)"
@@ -2464,6 +2486,8 @@ export function App(): React.ReactElement {
           </button>
           <button
             type="button"
+            className="sd-tab-btn"
+            aria-pressed={activeTab === "rankings"}
             style={styles.tabBtn(activeTab === "rankings")}
             onClick={() => setActiveTab("rankings")}
             title="Rolling 30-day handle rankings & proxy conduits (Ctrl+4)"
@@ -2473,6 +2497,8 @@ export function App(): React.ReactElement {
           </button>
           <button
             type="button"
+            className="sd-tab-btn"
+            aria-pressed={activeTab === "wagers"}
             style={{
               ...styles.tabBtn(activeTab === "wagers"),
               position: "relative",
@@ -2504,6 +2530,8 @@ export function App(): React.ReactElement {
           </button>
           <button
             type="button"
+            className="sd-tab-btn"
+            aria-pressed={activeTab === "alerts"}
             style={{
               ...styles.tabBtn(activeTab === "alerts"),
               position: "relative",
@@ -2534,6 +2562,8 @@ export function App(): React.ReactElement {
           </button>
           <button
             type="button"
+            className="sd-tab-btn"
+            aria-pressed={activeTab === "bet-ticker"}
             style={styles.tabBtn(activeTab === "bet-ticker")}
             onClick={() => setActiveTab("bet-ticker")}
           >
@@ -2543,6 +2573,8 @@ export function App(): React.ReactElement {
           </button>
           <button
             type="button"
+            className="sd-tab-btn"
+            aria-pressed={activeTab === "r2"}
             style={styles.tabBtn(activeTab === "r2")}
             onClick={() => setActiveTab("r2")}
           >
@@ -2567,6 +2599,8 @@ export function App(): React.ReactElement {
           </button>
           <button
             type="button"
+            className="sd-tab-btn"
+            aria-pressed={activeTab === "assets"}
             style={styles.tabBtn(activeTab === "assets")}
             onClick={() => setActiveTab("assets")}
             title="Bun.Image width, height, format and backend for the served dashboard assets (Ctrl+0)"
@@ -2575,7 +2609,7 @@ export function App(): React.ReactElement {
             <span style={styles.keyShortcutBadge}>Ctrl+0</span>
           </button>
         </div>
-      </header>
+      </section>
 
       {showBuildMatrix ? (
         <BuildMatrixDrawer

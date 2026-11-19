@@ -318,10 +318,20 @@ export function CustomersTabPanel({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flexWrap: "wrap",
+          gap: "8px 12px",
           marginBottom: "8px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "6px 8px",
+            minWidth: 0,
+          }}
+        >
           <span
             style={{
               fontSize: "11px",
@@ -341,11 +351,13 @@ export function CustomersTabPanel({
               style={{
                 fontSize: "10px",
                 fontWeight: 700,
-                padding: "2px 7px",
+                padding: "2px 8px",
                 borderRadius: "999px",
                 color: "#34d399",
                 backgroundColor: "rgba(16, 185, 129, 0.14)",
                 border: "1px solid rgba(52, 211, 153, 0.4)",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
               }}
               title="All 6 cohort cards are derived live from DOD6 CLV formulas, 30d JSONL point-buy regexes, multi-seat/conduit grouping, and BILLY666 hierarchy."
             >
@@ -357,11 +369,13 @@ export function CustomersTabPanel({
             style={{
               fontSize: "10px",
               fontWeight: 700,
-              padding: "2px 7px",
+              padding: "2px 8px",
               borderRadius: "999px",
               color: provenanceBadge.fg,
               backgroundColor: provenanceBadge.bg,
               border: `1px solid ${provenanceBadge.border}`,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
           >
             {provenanceBadge.badgeText}
@@ -374,16 +388,21 @@ export function CustomersTabPanel({
         </div>
         <button
           type="button"
+          className="sd-filter-pill"
           style={{
-            background: "none",
-            border: "none",
+            background: "rgba(56, 189, 248, 0.08)",
+            border: "1px solid rgba(56, 189, 248, 0.28)",
+            borderRadius: "6px",
             color: "#38bdf8",
             fontSize: "11px",
+            fontWeight: 600,
             cursor: "pointer",
-            display: "flex",
+            display: "inline-flex",
             alignItems: "center",
             gap: "4px",
-            padding: "2px 6px",
+            padding: "4px 10px",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
           onClick={onToggleKpis}
         >
@@ -476,6 +495,7 @@ export function CustomersTabPanel({
               <button
                 key={card.id}
                 type="button"
+                className="sd-kpi-card"
                 style={cardStyle}
                 onClick={() => {
                   if (card.filterTier) {
@@ -491,7 +511,7 @@ export function CustomersTabPanel({
                 {content}
               </button>
             ) : (
-              <div key={card.id} style={cardStyle}>
+              <div key={card.id} className="sd-kpi-card" style={cardStyle}>
                 {content}
               </div>
             );
@@ -502,14 +522,16 @@ export function CustomersTabPanel({
       {/* Filter and Search Bar */}
       <div style={styles.filterBar}>
         <input
+          className="sd-search-input"
           style={styles.searchInput}
           placeholder="🔍 Search by Customer ID, Name, Agent or Sport..."
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
         />
-        <div style={styles.filterPills}>
+        <div style={{ ...styles.filterPills, flexWrap: "wrap" }}>
           <button
             type="button"
+            className="sd-filter-pill"
             style={styles.pill(filterTier === "ALL")}
             onClick={() => onFilterTierChange("ALL")}
           >
@@ -517,6 +539,7 @@ export function CustomersTabPanel({
           </button>
           <button
             type="button"
+            className="sd-filter-pill"
             style={styles.pill(filterTier === "ELITE")}
             onClick={() => onFilterTierChange("ELITE")}
           >
@@ -524,6 +547,7 @@ export function CustomersTabPanel({
           </button>
           <button
             type="button"
+            className="sd-filter-pill"
             style={styles.pill(filterTier === "POSITIVE_CLV")}
             onClick={() => onFilterTierChange("POSITIVE_CLV")}
           >
@@ -533,6 +557,7 @@ export function CustomersTabPanel({
             <>
               <button
                 type="button"
+                className="sd-filter-pill"
                 data-customer-filter="POWERED_POS_CLV"
                 style={styles.pill(filterTier === "POWERED_POS_CLV")}
                 onClick={() => onFilterTierChange("POWERED_POS_CLV")}
@@ -542,6 +567,7 @@ export function CustomersTabPanel({
               </button>
               <button
                 type="button"
+                className="sd-filter-pill"
                 data-customer-filter="PROFITABLE_CLV"
                 style={styles.pill(filterTier === "PROFITABLE_CLV")}
                 onClick={() => onFilterTierChange("PROFITABLE_CLV")}
@@ -551,6 +577,7 @@ export function CustomersTabPanel({
               </button>
               <button
                 type="button"
+                className="sd-filter-pill"
                 data-customer-filter="KEY_NUMBER_BUYER"
                 style={styles.pill(filterTier === "KEY_NUMBER_BUYER")}
                 onClick={() => onFilterTierChange("KEY_NUMBER_BUYER")}
@@ -560,6 +587,7 @@ export function CustomersTabPanel({
               </button>
               <button
                 type="button"
+                className="sd-filter-pill"
                 data-customer-filter="HOOK_OR_SYNDICATE"
                 style={styles.pill(filterTier === "HOOK_OR_SYNDICATE")}
                 onClick={() => onFilterTierChange("HOOK_OR_SYNDICATE")}
@@ -571,6 +599,7 @@ export function CustomersTabPanel({
           ) : null}
           <button
             type="button"
+            className="sd-filter-pill"
             style={styles.pill(filterTier === "SYNDICATE")}
             onClick={() => onFilterTierChange("SYNDICATE")}
           >
@@ -578,6 +607,7 @@ export function CustomersTabPanel({
           </button>
           <button
             type="button"
+            className="sd-filter-pill"
             style={styles.pill(filterTier === "STEAM")}
             onClick={() => onFilterTierChange("STEAM")}
           >
@@ -585,6 +615,7 @@ export function CustomersTabPanel({
           </button>
           <button
             type="button"
+            className="sd-filter-pill"
             style={styles.pill(filterTier === "RECREATIONAL")}
             onClick={() => onFilterTierChange("RECREATIONAL")}
           >
@@ -718,6 +749,7 @@ export function CustomersTabPanel({
             <button
               key={pill.id}
               type="button"
+              className="sd-filter-pill"
               data-customer-scope={pill.id}
               style={styles.pill(customerScope === pill.id)}
               onClick={() => onCustomerScopeChange(pill.id)}
@@ -799,6 +831,7 @@ export function CustomersTabPanel({
             <button
               key={branch.id}
               type="button"
+              className="sd-filter-pill"
               data-billy666-branch={branch.id}
               style={styles.pill(masterBranchFilter === branch.id)}
               onClick={() => onMasterBranchFilterChange(branch.id)}
