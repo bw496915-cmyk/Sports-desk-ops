@@ -437,7 +437,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:tests/bun_formats_and_utilities.test.ts",
       "test:tests/token_automation.test.ts",
       "test:tests/token_theme_registry.test.ts",
-      "test:tests/verify_tokens.test.ts",
+      "test:tests/token_watch_theme_store.test.ts",
     ],
   },
   {
