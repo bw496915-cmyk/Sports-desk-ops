@@ -46,8 +46,9 @@ describe.each(PAGES)("$file head and landmarks", ({ file, slug }) => {
       attr(html, /property="og:description"\s+content="([^"]+)"/),
     ).toBeTruthy();
     expect(attr(html, /property="og:url"\s+content="([^"]+)"/)).toBe(canonical);
+    // An image card is the correct summary type once og:image is present.
     expect(attr(html, /name="twitter:card"\s+content="([^"]+)"/)).toBe(
-      "summary",
+      "summary_large_image",
     );
   });
 
@@ -73,5 +74,70 @@ describe("docs/index.html landmarks", () => {
     // The Scalar mount must stay the element Scalar looks for.
     expect(html).toMatch(/id="api-reference"/);
     expect(html).toMatch(/data-url="\.\/openapi\.json"/);
+  });
+});
+
+describe.each(PAGES)("$file social image", ({ file, slug }) => {
+  const assetPath = (html: string): string | null => {
+    const url = attr(html, /property="og:image"\s+content="([^"]+)"/);
+    if (url === null) return null;
+    return url.startsWith(`${ORIGIN}/assets/`)
+      ? url.slice(`${ORIGIN}/assets/`.length)
+      : null;
+  };
+
+  test("the card image is absolute, served from the portal origin, and exists", async () => {
+    const html = await Bun.file(join(ROOT, file)).text();
+    const asset = assetPath(html);
+    expect(asset).not.toBeNull();
+    expect(asset).toMatch(/\.png$/);
+    // The origin serves docs/assets/* at /assets/*; the file must exist to be published.
+    expect(await Bun.file(join(ROOT, "docs", "assets", asset!)).exists()).toBe(
+      true,
+    );
+    expect(attr(html, /name="twitter:image"\s+content="([^"]+)"/)).toBe(
+      `${ORIGIN}/assets/${asset}`,
+    );
+  });
+
+  test("the declared image dimensions are the file's real dimensions", async () => {
+    const html = await Bun.file(join(ROOT, file)).text();
+    const asset = assetPath(html)!;
+    const meta = await new Bun.Image(
+      await Bun.file(join(ROOT, "docs", "assets", asset)).bytes(),
+    ).metadata();
+    expect(Number(attr(html, /og:image:width"\s+content="(\d+)"/))).toBe(
+      meta.width,
+    );
+    expect(Number(attr(html, /og:image:height"\s+content="(\d+)"/))).toBe(
+      meta.height,
+    );
+  });
+
+  test("structured data parses and names the page it describes", async () => {
+    const html = await Bun.file(join(ROOT, file)).text();
+    const raw =
+      /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(
+        html,
+      )?.[1];
+    expect(raw).toBeTruthy();
+    const json = JSON.parse(raw!) as {
+      "@type": string;
+      url: string;
+      isPartOf?: { url?: string };
+    };
+    expect(json["@type"]).toBe("TechArticle");
+    expect(json.url).toBe(`${ORIGIN}/${slug}`);
+    // The portal origin's root is a 404, so the site node must name a real page.
+    expect(json.isPartOf?.url).toBe(`${ORIGIN}/index.html`);
+  });
+});
+
+describe("docs/index.html machine-readable alternate", () => {
+  test("declares the OpenAPI spec as an alternate representation", async () => {
+    const html = await Bun.file(join(ROOT, "docs/index.html")).text();
+    expect(html).toMatch(
+      /<link\s+rel="alternate"\s+type="application\/json"\s+href="\.\/openapi\.json"\s*\/?>/,
+    );
   });
 });
