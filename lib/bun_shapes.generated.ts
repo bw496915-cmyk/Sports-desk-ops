@@ -284,9 +284,9 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.spawn",
     evidence: [
       "surface:spawn",
+      "test:examples/bun-profiled-terminal/bun-profiled-terminal.test.ts",
       "test:lib/bun_terminal.test.ts",
       "test:scripts/r2_manifest_cas_promote.test.ts",
-      "test:scripts/wagers_by_state_history.test.ts",
     ],
   },
   {
@@ -482,10 +482,10 @@ export const BUN_SHAPES: readonly BunShape[] = [
     subsystem: "text",
     heading: "Bun.inspect",
     evidence: [
+      "test:examples/bun-profiled-terminal/bun-profiled-terminal.test.ts",
       "test:lib/f402_credentials_policy.test.ts",
       "test:lib/wager_soa.test.ts",
       "test:tests/bitwise_pattern_inspect.test.ts",
-      "test:tests/bun_capabilities.test.ts",
     ],
   },
   {
@@ -495,9 +495,9 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.markdown",
     evidence: [
       "surface:markdown",
+      "test:examples/bun-profiled-terminal/bun-profiled-terminal.test.ts",
       "test:scripts/diff-bun-docs-vs-types.test.ts",
       "test:tests/ansi_markdown_theme.test.ts",
-      "test:tests/bun_aspects_contract.test.ts",
     ],
   },
   {
@@ -530,9 +530,9 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.stripANSI",
     evidence: [
       "surface:stripANSI",
+      "test:examples/bun-profiled-terminal/bun-profiled-terminal.test.ts",
       "test:lib/wagers_capture_config.test.ts",
       "test:scripts/gslive_wagers_by_state.test.ts",
-      "test:tests/ansi_markdown_theme.test.ts",
     ],
   },
   {
