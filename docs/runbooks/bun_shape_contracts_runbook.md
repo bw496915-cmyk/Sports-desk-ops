@@ -215,7 +215,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.5` · [reference](https://bun.com/reference/bun/spawn)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `cli/sportsdesk_cli.ts`, `lib/bun_terminal.ts`
-- **Evidence:** `surface:spawn`, `test:lib/bun_terminal.test.ts`, `test:scripts/r2_manifest_cas_promote.test.ts`, `test:scripts/wagers_by_state_history.test.ts`
+- **Evidence:** `surface:spawn`, `test:examples/bun-profiled-terminal/bun-profiled-terminal.test.ts`, `test:lib/bun_terminal.test.ts`, `test:scripts/r2_manifest_cas_promote.test.ts`
 
 #### Bun.SpawnOptions (type)
 
@@ -347,7 +347,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `function` · writable true · enumerable true
 - **Members (2):** `custom`, `table`
 - **Here:** `lib/bitwise_pattern_inspect.ts`, `lib/cli_inspect.ts`
-- **Evidence:** `test:lib/f402_credentials_policy.test.ts`, `test:lib/wager_soa.test.ts`, `test:tests/bitwise_pattern_inspect.test.ts`, `test:tests/bun_capabilities.test.ts`
+- **Evidence:** `test:examples/bun-profiled-terminal/bun-profiled-terminal.test.ts`, `test:lib/f402_credentials_policy.test.ts`, `test:lib/wager_soa.test.ts`, `test:tests/bitwise_pattern_inspect.test.ts`
 
 #### Bun.markdown
 
@@ -355,7 +355,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (4):** `ansi`, `html`, `react`, `render`
 - **Here:** `lib/token_automation.ts`, `lib/cli_markdown_renderer.ts`
-- **Evidence:** `surface:markdown`, `test:scripts/diff-bun-docs-vs-types.test.ts`, `test:tests/ansi_markdown_theme.test.ts`, `test:tests/bun_aspects_contract.test.ts` · deep dive: [§12](./bun_server_runtime_shapes_runbook.md)
+- **Evidence:** `surface:markdown`, `test:examples/bun-profiled-terminal/bun-profiled-terminal.test.ts`, `test:scripts/diff-bun-docs-vs-types.test.ts`, `test:tests/ansi_markdown_theme.test.ts` · deep dive: [§12](./bun_server_runtime_shapes_runbook.md)
 
 #### Bun.sliceAnsi
 
@@ -376,7 +376,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.5` · [reference](https://bun.com/reference/bun/stripANSI)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `bin/bun_surface.ts`, `lib/terminal_format.ts`
-- **Evidence:** `surface:stripANSI`, `test:lib/wagers_capture_config.test.ts`, `test:scripts/gslive_wagers_by_state.test.ts`, `test:tests/ansi_markdown_theme.test.ts`
+- **Evidence:** `surface:stripANSI`, `test:examples/bun-profiled-terminal/bun-profiled-terminal.test.ts`, `test:lib/wagers_capture_config.test.ts`, `test:scripts/gslive_wagers_by_state.test.ts`
 
 #### Bun.wrapAnsi
 
