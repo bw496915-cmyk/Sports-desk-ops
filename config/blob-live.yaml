@@ -1,0 +1,8 @@
+# Blob & Live-Bets gateway boot config (Bun yaml loader, validated by lib/blob_live_config.ts).
+# R2 credentials and bucket never live here; the server builds its client with createScopedR2S3Client.
+# Each stream's latest pointer is read from manifests/<stream_id>/latest.
+port: 4021
+hostname: 127.0.0.1
+streams:
+  - f402-bet-ticker
+  - gslive-tally
