@@ -17,7 +17,7 @@
  */
 
 import { lstatSync, realpathSync } from "node:fs";
-import { basename, sep } from "node:path";
+import { basename, dirname, sep } from "node:path";
 
 export const BLEED_ERR = "ERR_CF_TOKEN_BLEED_10000";
 
@@ -205,6 +205,46 @@ function collectEnvFilePaths(
 }
 
 /**
+ * Picks the directory a `--env-file` is allowed to live in.
+ *
+ * Compiled binaries must NOT fall back to `process.cwd()`: a compiled term-profile is
+ * launched from wherever the operator happens to be, and `process.cwd()` is that directory.
+ * `import.meta.dir` is no help either — in a compiled build it is `/$bunfs/root`, Bun's
+ * virtual embed filesystem, so it only addresses `--asset`-embedded files and never a real
+ * `r2.env` on disk. `process.execPath` is the real binary path, and Bun reports it with the
+ * symlink already resolved: a `/usr/local/bin/term-profile -> /opt/desk/term-profile` link
+ * yields `/opt/desk/term-profile`, so the root is the real install directory.
+ *
+ * Under `bun run` (scripts, tests) `execPath` is the Bun runtime itself, whose directory is
+ * meaningless as a config root, so cwd is correct there.
+ */
+export interface GuardRootInput {
+  readonly isCompiled: boolean;
+  readonly execPath: string;
+  readonly cwd: string;
+}
+
+export function resolveGuardRoots(input: GuardRootInput): readonly string[] {
+  return [input.isCompiled ? dirname(input.execPath) : input.cwd];
+}
+
+/** True inside a `bun build --compile` binary; false under `bun run`. */
+export function isCompiledBinary(): boolean {
+  return (
+    import.meta.dir.startsWith("/$bunfs/") ||
+    (process.argv[1] ?? "").startsWith("/$bunfs/")
+  );
+}
+
+export function defaultGuardRoots(): readonly string[] {
+  return resolveGuardRoots({
+    isCompiled: isCompiledBinary(),
+    execPath: process.execPath,
+    cwd: process.cwd(),
+  });
+}
+
+/**
  * Full guard: argument contract plus filesystem provenance. This is the entry point a CLI
  * should call before spawning a PTY.
  */
@@ -217,7 +257,7 @@ export function assertSafeExecArgv(
   // Normalise roots through realpath too: on macOS /var is a symlink to /private/var, so an
   // un-resolved root would never prefix-match the resolved file path and would reject a file
   // that genuinely sits inside it.
-  const roots = (options.roots ?? [process.cwd()]).map((root) => {
+  const roots = (options.roots ?? defaultGuardRoots()).map((root) => {
     try {
       return realpathSync(root);
     } catch {

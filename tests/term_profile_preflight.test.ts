@@ -28,6 +28,8 @@ import {
   BLEED_ERR,
   assertSafeEnvFileArgs,
   assertSafeExecArgv,
+  defaultGuardRoots,
+  resolveGuardRoots,
 } from "../packages/sportsdesk-ops/src/lib/preflight_guard.ts";
 
 const BLEED = BLEED_ERR;
@@ -207,6 +209,49 @@ describe("path provenance (real filesystem)", () => {
         ["--no-env-file", `--env-file=${join(outside, "nested", "prod.env")}`],
         undefined,
         { roots: [outside] },
+      ),
+    ).toThrow(BLEED);
+  });
+});
+
+describe("root resolution", () => {
+  test("compiled builds root on the binary's directory, not the invocation cwd", () => {
+    expect(
+      resolveGuardRoots({
+        isCompiled: true,
+        execPath: "/opt/desk/term-profile",
+        cwd: "/Users/operator/somewhere",
+      }),
+    ).toEqual(["/opt/desk"]);
+  });
+
+  test("under bun run the runtime path is not a config root, so cwd wins", () => {
+    expect(
+      resolveGuardRoots({
+        isCompiled: false,
+        execPath: "/Users/operator/.bun/bin/bun",
+        cwd: "/work/repo",
+      }),
+    ).toEqual(["/work/repo"]);
+  });
+
+  test("defaultGuardRoots is cwd in a non-compiled runtime (the test runner)", () => {
+    expect(defaultGuardRoots()).toEqual([process.cwd()]);
+  });
+
+  test("a compiled root outside the invocation dir still blocks a cwd-relative env file", () => {
+    const binDir = mkdtempSync(join(tmpdir(), "pf-bindir-"));
+    const runDir = mkdtempSync(join(tmpdir(), "pf-rundir-"));
+    writeFileSync(join(runDir, "r2.env"), "TOKEN=attacker\n");
+    afterAll(() => {
+      rmSync(binDir, { recursive: true, force: true });
+      rmSync(runDir, { recursive: true, force: true });
+    });
+    expect(() =>
+      assertSafeExecArgv(
+        ["--no-env-file", `--env-file=${join(runDir, "r2.env")}`],
+        undefined,
+        { roots: [binDir] },
       ),
     ).toThrow(BLEED);
   });
