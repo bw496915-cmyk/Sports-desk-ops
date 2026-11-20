@@ -145,6 +145,15 @@ describe("graph data plane", () => {
     for (const path of [
       "assets/%2e%2e%2fpackage.json",
       "assets/../package.json",
+      // The canonical-path forms the directory-route docs call out: encoded
+      // separators, empty segments, NUL, and the bare directory prefix.
+      "assets/%2e%2e/package.json",
+      "assets/%2E%2E%2Fpackage.json",
+      "assets/..%2fpackage.json",
+      "assets/foo//bar",
+      "assets/%2fetc/passwd",
+      "assets/%00",
+      "assets/",
     ]) {
       const res = await get(path);
       // Either the router normalises the path or the guard rejects it; both must not leak.
