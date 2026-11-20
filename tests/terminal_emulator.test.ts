@@ -616,3 +616,40 @@ test.skipIf(!hasPty || Bun.which("sleep") === null)(
   },
   10_000,
 );
+
+test("profile --compare renders both profiles with deltas", async () => {
+  const result = await executeTerminalQuery("profile GP301 --compare BRT5229");
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toContain("PROFILE COMPARISON");
+  expect(result.stdout).toContain("GP301");
+  expect(result.stdout).toContain("BRT5229");
+  expect(result.stdout).toContain("Sharp score");
+  expect(result.stdout).toContain("Δ");
+});
+
+test("profile --compare supports the = form and --json", async () => {
+  const result = await executeTerminalQuery(
+    "profile GP301 --compare=BRT5229 --json",
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    left: { id: "GP301" },
+    right: { id: "BRT5229" },
+  });
+});
+
+test("profile --compare requires an id", async () => {
+  const result = await executeTerminalQuery("profile GP301 --compare");
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toContain("requires a customer id");
+});
+
+test("profile --compare rejects an unknown target", async () => {
+  const result = await executeTerminalQuery("profile GP301 --compare NOPE123");
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toContain("not found");
+});

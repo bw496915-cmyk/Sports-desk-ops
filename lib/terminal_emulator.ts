@@ -1147,7 +1147,7 @@ export function getTerminalWelcomeBanner(): string {
     "\x1b[90mEngine: Bun.spawn + Bun.Terminal PTY · Host: sportsdesk-ops · Invariant: autoExecute: false\x1b[0m",
     "",
     "\x1b[1;33mCommands & Canonical Shortcodes:\x1b[0m",
-    "  \x1b[1;32mprofile <id>\x1b[0m (aliases: \x1b[32mp, c\x1b[0m) Inspect multidimensional sharpness radar (flags: \x1b[36m--radar\x1b[0m, \x1b[36m--json\x1b[0m, \x1b[36m--wagers\x1b[0m)",
+    "  \x1b[1;32mprofile <id>\x1b[0m (aliases: \x1b[32mp, c\x1b[0m) Inspect multidimensional sharpness radar (flags: \x1b[36m--radar\x1b[0m, \x1b[36m--json\x1b[0m, \x1b[36m--wagers\x1b[0m, \x1b[36m--compare <id>\x1b[0m)",
     "  \x1b[1;32mfind <query>\x1b[0m (aliases: \x1b[32mf, s\x1b[0m) Search accounts (flags: \x1b[36m-t <tier>\x1b[0m, \x1b[36m-s <sport>\x1b[0m, \x1b[36m-a <action>\x1b[0m)",
     "  \x1b[1;32msharps\x1b[0m (aliases: \x1b[32msh, top\x1b[0m)    Top sharp originators ranked by Sharpness Composite Index",
     "  \x1b[1;32msyndicates\x1b[0m (aliases: \x1b[32msyn\x1b[0m)       Detected hook syndicate clusters & sub-accounts",
@@ -1251,6 +1251,109 @@ function renderWagersTable(cust: TerminalCustomerRecord): string {
     "└──────┴──────────┴─────────────┴──────────┴──────────┴──────────┴──────────────────────┘",
   );
   return rows.join("\n");
+}
+
+/**
+ * Renders a side-by-side comparison of two customer profiles with numeric deltas.
+ */
+function renderProfileComparison(
+  left: TerminalCustomerRecord,
+  right: TerminalCustomerRecord,
+): string {
+  const rule = "═".repeat(80);
+  const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  const fixed = (digits: number) => (n: number) => n.toFixed(digits);
+
+  const numericRows: ReadonlyArray<{
+    readonly label: string;
+    readonly pick: (c: TerminalCustomerRecord) => number;
+    readonly fmt: (n: number) => string;
+  }> = [
+    { label: "Sharp score", pick: (c) => c.score, fmt: fixed(2) },
+    { label: "CLV score", pick: (c) => c.clvScore, fmt: fixed(2) },
+    { label: "Skill score", pick: (c) => c.skillScore, fmt: fixed(2) },
+    { label: "Sizing score", pick: (c) => c.sizingScore, fmt: fixed(2) },
+    { label: "Signature score", pick: (c) => c.sigScore, fmt: fixed(2) },
+    { label: "Timing score", pick: (c) => c.timingScore, fmt: fixed(2) },
+    {
+      label: "Correlated score",
+      pick: (c) => c.correlatedScore,
+      fmt: fixed(2),
+    },
+    { label: "Stake Gini", pick: (c) => c.gini, fmt: fixed(3) },
+    { label: "Mean stake", pick: (c) => c.meanStake, fmt: usd },
+    { label: "Max/min ratio", pick: (c) => c.maxMinRatio, fmt: fixed(2) },
+    {
+      label: "Correlated exploit",
+      pick: (c) => c.correlatedExploitRate,
+      fmt: pct,
+    },
+    { label: "Syndicate probability", pick: (c) => c.syndicateProb, fmt: pct },
+    { label: "VaR 95", pick: (c) => c.var95Usd, fmt: usd },
+    { label: "CVaR 95", pick: (c) => c.cvar95Usd, fmt: usd },
+    { label: "Hold %", pick: (c) => c.holdPct, fmt: (n) => `${n.toFixed(1)}%` },
+    { label: "LTV", pick: (c) => c.ltvUsd, fmt: usd },
+    {
+      label: "Recommended limit",
+      pick: (c) => c.recommendedLimitUsd,
+      fmt: usd,
+    },
+    {
+      label: "In-play delay",
+      pick: (c) => c.inPlayDelaySec,
+      fmt: (n) => `${n}s`,
+    },
+    { label: "Line shade", pick: (c) => c.lineShadeCents, fmt: (n) => `${n}¢` },
+  ];
+
+  const textRows: ReadonlyArray<{
+    readonly label: string;
+    readonly pick: (c: TerminalCustomerRecord) => string;
+  }> = [
+    { label: "Tier", pick: (c) => c.tier },
+    { label: "Sizing strategy", pick: (c) => c.sizingStrategy },
+    { label: "Specialization", pick: (c) => c.specialization },
+    { label: "Timing archetype", pick: (c) => c.timingArchetype },
+    { label: "Correlated risk", pick: (c) => c.correlatedRisk },
+    { label: "Syndicate risk", pick: (c) => c.syndicateRisk },
+    { label: "Action", pick: (c) => c.action },
+  ];
+
+  const cell = (text: string, width: number) =>
+    text.length > width ? `${text.slice(0, width - 1)}…` : text.padEnd(width);
+
+  const lines = [
+    "\x1b[1;36m⚖️  PROFILE COMPARISON\x1b[0m",
+    rule,
+    `  ${cell("Metric", 22)}${cell(left.id, 20)}${cell(right.id, 20)}Δ`,
+    `  ${"-".repeat(22)}${"-".repeat(20)}${"-".repeat(20)}${"-".repeat(12)}`,
+  ];
+
+  for (const row of numericRows) {
+    const l = row.pick(left);
+    const r = row.pick(right);
+    const delta = r - l;
+    const deltaText =
+      delta === 0 ? "0" : `${delta > 0 ? "+" : "-"}${row.fmt(Math.abs(delta))}`;
+    lines.push(
+      `  ${cell(row.label, 22)}${cell(row.fmt(l), 20)}${cell(row.fmt(r), 20)}\x1b[90m${deltaText}\x1b[0m`,
+    );
+  }
+
+  for (const row of textRows) {
+    const l = row.pick(left);
+    const r = row.pick(right);
+    lines.push(
+      `  ${cell(row.label, 22)}${cell(l, 20)}${cell(r, 20)}\x1b[90m${l === r ? "=" : "≠"}\x1b[0m`,
+    );
+  }
+
+  lines.push(
+    rule,
+    `\x1b[90mLeft:  ${left.id} (${left.agentId}) · Right: ${right.id} (${right.agentId})\x1b[0m`,
+  );
+  return lines.join("\n");
 }
 
 /**
@@ -1964,7 +2067,37 @@ async function executeTerminalQueryInner(
   // Quick Command: Profile Inspector
   if (canonicalCmd === "profile") {
     const flags = new Set(cmdArgs.filter((a) => a.startsWith("-")));
-    const idArg = cmdArgs.find((a) => !a.startsWith("-")) || "GP301";
+    const compareIndex = cmdArgs.findIndex(
+      (a) => a === "--compare" || a.startsWith("--compare="),
+    );
+    let compareId: string | undefined;
+    let compareValueIndex = -1;
+    if (compareIndex !== -1) {
+      const token = cmdArgs[compareIndex] ?? "";
+      compareId = token.includes("=")
+        ? token.slice(token.indexOf("=") + 1)
+        : cmdArgs[compareIndex + 1];
+      if (!token.includes("=")) compareValueIndex = compareIndex + 1;
+      if (
+        compareId === undefined ||
+        compareId.trim() === "" ||
+        compareId.startsWith("-")
+      ) {
+        return {
+          command: trimmed,
+          stdout:
+            "\x1b[31mprofile --compare requires a customer id\x1b[0m\n\x1b[90mExample: profile GP301 --compare BRT5229\x1b[0m",
+          exitCode: 1,
+          durationMs: Date.now() - startedAt,
+          timestamp: startedAt,
+        };
+      }
+      compareId = compareId.toUpperCase();
+    }
+    const idArg =
+      cmdArgs.find(
+        (a, index) => !a.startsWith("-") && index !== compareValueIndex,
+      ) || "GP301";
     const upperId = idArg.toUpperCase();
 
     let cust = KNOWN_CUSTOMER_MAP.get(upperId);
@@ -2002,6 +2135,39 @@ async function executeTerminalQueryInner(
         command: trimmed,
         stdout: `\x1b[33mCustomer '${idArg}' not found in local active profile matrix.\x1b[0m\n\x1b[90mTry: profile GP301, profile BRT5229, or type 'harvest' / 'find <query>'\x1b[0m`,
         exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    // Flag: --compare <id>
+    if (compareId !== undefined) {
+      const target =
+        KNOWN_CUSTOMER_MAP.get(compareId) ??
+        (await resolveTerminalCustomer(compareId)) ??
+        undefined;
+      if (!target) {
+        return {
+          command: trimmed,
+          stdout: `\x1b[31mCompare target '${compareId}' not found in the local profile matrix.\x1b[0m`,
+          exitCode: 1,
+          durationMs: Date.now() - startedAt,
+          timestamp: startedAt,
+        };
+      }
+      if (flags.has("--json")) {
+        return {
+          command: trimmed,
+          stdout: JSON.stringify({ left: cust, right: target }, null, 2),
+          exitCode: 0,
+          durationMs: Date.now() - startedAt,
+          timestamp: startedAt,
+        };
+      }
+      return {
+        command: trimmed,
+        stdout: renderProfileComparison(cust, target),
+        exitCode: 0,
         durationMs: Date.now() - startedAt,
         timestamp: startedAt,
       };
