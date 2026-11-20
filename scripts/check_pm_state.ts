@@ -15,6 +15,7 @@
  */
 
 import { lstatSync, realpathSync, statSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { join, resolve } from "node:path";
 
 export type NodeModulesState =
@@ -79,7 +80,7 @@ function run(): never {
     process.exit(1);
   }
 
-  const prune = Bun.spawnSync([process.execPath, "prune", "--check"], {
+  const prune = spawnSyncBounded([process.execPath, "prune", "--check"], {
     cwd: root,
     stdout: "inherit",
     stderr: "inherit",

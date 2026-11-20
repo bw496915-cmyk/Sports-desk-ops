@@ -18,6 +18,7 @@
  */
 
 import { resolve } from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { GsSdk, ValidKinds } from "@ganchrowsci/gs-sdk";
 
 import {
@@ -134,7 +135,7 @@ if (apply && verified.length > 0) {
   merge = mergeLogoFilesIntoRegistryFile(registryPath, verified, {
     leagues: [...PRO_LEAGUES],
   });
-  const formatted = Bun.spawnSync(["bun", "fmt", registryPath], {
+  const formatted = spawnSyncBounded(["bun", "fmt", registryPath], {
     stdout: "inherit",
     stderr: "inherit",
   });

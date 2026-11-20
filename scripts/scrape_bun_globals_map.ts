@@ -6,6 +6,7 @@
  * script fetches both, then writes JSON, a colour-coded Markdown table, and a colour-coded HTML map.
  */
 import { join } from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import {
   mergeGeneratedMeta,
   preserveHandAnnotations,
@@ -367,7 +368,7 @@ await Bun.write(META_PATH, `${JSON.stringify(mergedMeta, null, 2)}\n`);
 // The committed artifacts are `bun fmt` output; without this a scrape leaves format:check red.
 let formattedOk = true;
 try {
-  const formatted = Bun.spawnSync(
+  const formatted = spawnSyncBounded(
     [process.execPath, "fmt", ROWS_PATH, META_PATH],
     { cwd: ROOT, stdout: "ignore", stderr: "pipe" },
   );

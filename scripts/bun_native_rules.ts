@@ -22,6 +22,7 @@ import {
   readdirSync,
   statSync,
 } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { join } from "node:path";
 
 export type RuleResult = {
@@ -394,7 +395,7 @@ export function checkGitattributes(root: string): RuleResult[] {
 
 /** Zero tracked SQLite/database artifacts. JSON is not checked: 196 tracked `.json` files. */
 export function checkTrackedDatabases(root: string): RuleResult[] {
-  const git = Bun.spawnSync({
+  const git = spawnSyncBounded({
     cmd: ["git", "ls-files", "-z", "*.sqlite", "*.sqlite3", "*.db"],
     cwd: root,
     stdout: "pipe",
@@ -427,7 +428,7 @@ export function checkTrackedDatabases(root: string): RuleResult[] {
 
 /** No documented or scripted global install (`bun i -g`, `bun install -g`). */
 export function checkGlobalInstalls(root: string): RuleResult[] {
-  const git = Bun.spawnSync({
+  const git = spawnSyncBounded({
     cmd: ["git", "ls-files", "-z"],
     cwd: root,
     stdout: "pipe",

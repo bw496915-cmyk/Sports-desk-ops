@@ -23,6 +23,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { renderGSLiveDocsMarkdown } from "../lib/gslive_api_docs.ts";
 
@@ -1776,7 +1777,7 @@ function assertOutput(context: RenderContext, markdown: string): void {
  * freshness gate re-runs this whole generator (write + format) and byte-compares.
  */
 function formatMarkdown(outPath: string, root: string): void {
-  const result = Bun.spawnSync([process.execPath, "fmt", outPath], {
+  const result = spawnSyncBounded([process.execPath, "fmt", outPath], {
     cwd: root,
   });
   if (result.exitCode !== 0) {

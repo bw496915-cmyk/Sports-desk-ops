@@ -6,11 +6,12 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { join } from "node:path";
 
 export function hasNativeBunLint(bin: string, probeDir = "/tmp"): boolean {
   try {
-    const res = Bun.spawnSync([bin, "lint", "--help"], {
+    const res = spawnSyncBounded([bin, "lint", "--help"], {
       cwd: probeDir,
       stdin: "ignore",
       stdout: "pipe",
@@ -75,7 +76,7 @@ if (import.meta.main) {
     process.exit(2);
   }
 
-  const child = Bun.spawnSync(
+  const child = spawnSyncBounded(
     [bin, "lint", "--no-script", ...Bun.argv.slice(2)],
     {
       stdin: "inherit",

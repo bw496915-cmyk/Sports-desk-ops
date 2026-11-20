@@ -8,6 +8,7 @@
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { resolve } from "node:path";
 import {
   DASHBOARD_TEMPLATES,
@@ -325,7 +326,7 @@ for (const template of DASHBOARD_TEMPLATES) {
 
 const bunBin = process.execPath || "bun";
 const fmtPaths = emittedThisRun.map((p) => resolve(rootDir, p));
-Bun.spawnSync([bunBin, "fmt", ...fmtPaths], {
+spawnSyncBounded([bunBin, "fmt", ...fmtPaths], {
   cwd: rootDir,
 });
 console.log(

@@ -16,6 +16,7 @@
  * commit once. CI sees the same set, because nothing is untracked there.
  */
 import { readFileSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 
 import { HOME_PATH_ALLOWLIST, scanHomePaths } from "../lib/home_paths.ts";
 
@@ -27,7 +28,7 @@ const ROOT = (() => {
 })();
 const JSON_MODE = argv.includes("--json");
 
-const listed = Bun.spawnSync(
+const listed = spawnSyncBounded(
   ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
   {
     cwd: ROOT,

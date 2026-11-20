@@ -14,6 +14,7 @@
  * catalog can be regenerated or verified from a clean checkout without touching bun.com.
  */
 import path from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import {
   ABSENT_DOM_GLOBALS,
   BUN_SHAPES,
@@ -54,7 +55,7 @@ const sectionInvariants: Record<string, string[]> = {
     "`Bun.argv` is an array, `Bun.env` an object, `Bun.main` a string — `proc.shell`.",
     "`Bun.stdin` / `Bun.stdout` are Blob-like with `text()`; nothing here reads them — `proc.stdio`.",
     "`Bun.nanoseconds()` is a monotonic, process-relative counter (within 50 ms of `process.uptime()`), and `Bun.sleepSync(5)` blocks for at least 5 ms — `proc.timing`.",
-    '`Bun.spawnSync(["echo","ok"])` returns `stdout` + `exitCode`; `Bun.gc(false)` returns a value that is `undefined` — `proc.spawn`.',
+    '`spawnSyncBounded(["echo","ok"])` returns `stdout` + `exitCode`; `Bun.gc(false)` returns a value that is `undefined` — `proc.spawn`.',
     '`Bun.which` honours a `PATH` override; `Bun.resolveSync` resolves against a directory; `Bun.fileURLToPath("file:///tmp/x.ts")` → `/tmp/x.ts`; `Bun.openInEditor` is a 1-arity function — `proc.paths`.',
     "`Bun.Terminal` is a constructor; `Bun.FileSink` has no runtime value — `proc.terminal`.",
   ],

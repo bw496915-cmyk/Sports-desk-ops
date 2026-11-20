@@ -15,6 +15,7 @@
  */
 
 import fs from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import os from "node:os";
 import path from "node:path";
 
@@ -79,7 +80,7 @@ function record(value: unknown): Record<string, unknown> | null {
 
 function spawnText(command: readonly string[], cwd: string): string | null {
   try {
-    const result = Bun.spawnSync([...command], {
+    const result = spawnSyncBounded([...command], {
       cwd,
       stdout: "pipe",
       stderr: "ignore",

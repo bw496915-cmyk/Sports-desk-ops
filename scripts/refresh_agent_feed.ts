@@ -7,6 +7,7 @@
  * no network work. An expired session exits non-zero with the remediation, not a partial success.
  */
 import { mkdir } from "node:fs/promises";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { buildHierarchyFormBody } from "../lib/f402_hierarchy_envelope.ts";
@@ -132,7 +133,7 @@ const accountOut = join(outDir, "account.json");
 const webReportsOut = join(outDir, "web-reports.json");
 const webReportsPendingOut = join(outDir, "web-reports-pending.json");
 
-const fetched = Bun.spawnSync({
+const fetched = spawnSyncBounded({
   cmd: [
     "bun",
     "run",

@@ -24,6 +24,7 @@
  */
 
 import { YAML } from "bun";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { inspectReport } from "../lib/cli_inspect.ts";
@@ -1128,7 +1129,7 @@ export async function linkWorkspaces(
     raw[group] = sortedGroup;
     await Bun.write(pkgPath, `${JSON.stringify(raw, null, 2)}\n`);
 
-    const proc = Bun.spawnSync(installArgv, {
+    const proc = spawnSyncBounded(installArgv, {
       cwd: root,
       env: { ...Bun.env, ...options.env },
       stdout: "inherit",
@@ -1533,7 +1534,7 @@ export async function runWorkspacesCli(
 
     let finalCode = 0;
     for (const step of plan.commands) {
-      const proc = Bun.spawnSync(step.argv as string[], {
+      const proc = spawnSyncBounded(step.argv as string[], {
         cwd: step.cwd,
         stdout: "inherit",
         stderr: "inherit",
@@ -1621,7 +1622,7 @@ export async function runWorkspacesCli(
       return 2;
     }
 
-    const proc = Bun.spawnSync(plan.argv as string[], {
+    const proc = spawnSyncBounded(plan.argv as string[], {
       cwd: plan.cwd,
       stdout: "inherit",
       stderr: "inherit",
@@ -1769,7 +1770,7 @@ export async function runWorkspacesCli(
       }
       if (!noInstall) {
         const installer = detectUnfrozenInstaller(Bun.env);
-        const proc = Bun.spawnSync(
+        const proc = spawnSyncBounded(
           [...installer.prefix, "install", DEFAULT_PM_ENV_FILE_FLAG],
           {
             cwd: root,
@@ -1859,7 +1860,7 @@ export async function runWorkspacesCli(
       return 2;
     }
 
-    const proc = Bun.spawnSync(plan.argv as string[], {
+    const proc = spawnSyncBounded(plan.argv as string[], {
       cwd: plan.cwd,
       stdout: "inherit",
       stderr: "inherit",
@@ -1976,7 +1977,7 @@ export async function runWorkspacesCli(
       return 2;
     }
 
-    const proc = Bun.spawnSync(plan.argv as string[], {
+    const proc = spawnSyncBounded(plan.argv as string[], {
       cwd: root,
       stdout: "inherit",
       stderr: "inherit",
@@ -2023,7 +2024,7 @@ export async function runWorkspacesCli(
       return 0;
     }
 
-    const proc = Bun.spawnSync(plan.argv as string[], {
+    const proc = spawnSyncBounded(plan.argv as string[], {
       cwd: plan.cwd,
       stdout: "inherit",
       stderr: "inherit",

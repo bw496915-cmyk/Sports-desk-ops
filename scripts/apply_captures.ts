@@ -43,6 +43,7 @@
  */
 
 import { canonicalJson, sha256Hex } from "./capture/json.ts";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { parseCaptureProvenance } from "./capture/parse_capture_provenance.ts";
 import { normalizeProvenance } from "./capture/recorder.ts";
 import { deriveTierWithReason } from "./capture/tier.ts";
@@ -1363,7 +1364,7 @@ export function applyPlanToLedger(
 /* -------------------------------------------------------------------------- */
 
 function spawnStep(cmd: readonly string[], cwd: string): StepResult {
-  const result = Bun.spawnSync({
+  const result = spawnSyncBounded({
     cmd: [...cmd],
     cwd,
     stdout: "pipe",

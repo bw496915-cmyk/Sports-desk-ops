@@ -8,6 +8,7 @@
  * catalog are gated separately.
  */
 import { resolve } from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { requiredCliBins } from "../lib/cli_catalog.ts";
 
 export interface VerifiedCliBin {
@@ -25,10 +26,13 @@ export interface VerifyCliBinsResult {
 }
 
 function resolveRepoRootFromGit(): string {
-  const repoRootProc = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  const repoRootProc = spawnSyncBounded(
+    ["git", "rev-parse", "--show-toplevel"],
+    {
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
   if (repoRootProc.exitCode !== 0) {
     throw new Error("ERR_OPS_GIT_TOPLEVEL_UNRESOLVED");
   }

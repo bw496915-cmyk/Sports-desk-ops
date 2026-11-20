@@ -4,7 +4,7 @@
  *
  * A blocking spawn buffers every byte of output in memory, and without a timeout it
  * can hang the caller forever. `Bun.spawnSync` supports `timeout` and `maxBuffer`,
- * but no call site sets either, so the defaults live here: 60 s and 8 MiB, with
+ * but few call sites set either, so the defaults live here: 10 min and 16 MiB, with
  * SIGKILL on expiry. These are guardrails, not budgets — a known-slow command
  * (full CI, network upload) should pass a larger `timeout`/`maxBuffer` explicitly.
  *
@@ -12,8 +12,8 @@
  * `stdout: "pipe"` -> `Buffer` narrowing.
  */
 
-export const SPAWN_SYNC_TIMEOUT_MS = 60_000;
-export const SPAWN_SYNC_MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
+export const SPAWN_SYNC_TIMEOUT_MS = 600_000;
+export const SPAWN_SYNC_MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
 
 type SyncOptions = Bun.SpawnOptions.SpawnSyncOptions<"ignore", "pipe", "pipe">;
 

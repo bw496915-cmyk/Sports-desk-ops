@@ -8,6 +8,7 @@
  * `ReportingSchedulerService`.
  */
 import { existsSync, statSync } from "node:fs";
+import { spawnSyncBounded } from "./spawn_sync_bounded.ts";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
@@ -141,7 +142,7 @@ export function computeRankingInputStamp(
 async function defaultRunGenerator(
   cwd: string,
 ): Promise<{ readonly exitCode: number; readonly stderr?: string }> {
-  const proc = Bun.spawnSync(
+  const proc = spawnSyncBounded(
     [
       process.execPath,
       "--no-orphans",
