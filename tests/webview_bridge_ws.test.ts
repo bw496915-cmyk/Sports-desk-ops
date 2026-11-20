@@ -536,6 +536,25 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     });
     expect(ranged.status).toBe(206);
     expect((await ranged.text()).length).toBe(10);
+
+    const ifRangeMatch = await fetch(`http://127.0.0.1:${hub.port}/live-bets`, {
+      headers: {
+        ...identity,
+        range: "bytes=0-9",
+        "if-range": lastModified,
+      },
+    });
+    expect(ifRangeMatch.status).toBe(206);
+
+    const ifRangeStale = await fetch(`http://127.0.0.1:${hub.port}/live-bets`, {
+      headers: {
+        ...identity,
+        range: "bytes=0-9",
+        "if-range": "Wed, 21 Oct 2015 07:28:00 GMT",
+      },
+    });
+    expect(ifRangeStale.status).toBe(200);
+    expect((await ifRangeStale.text()).length).toBeGreaterThan(10);
   });
 
   test("the buffered /status route revalidates with an ETag", async () => {
