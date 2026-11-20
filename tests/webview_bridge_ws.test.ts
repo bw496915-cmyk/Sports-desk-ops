@@ -508,4 +508,24 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     });
     socket.close();
   }, 20_000);
+  test("admin reload refreshes static routes and requires the token", async () => {
+    const denied = await fetch(
+      `http://127.0.0.1:${hub.port}/api/admin/reload-static`,
+      { method: "POST" },
+    );
+    expect(denied.status).toBe(401);
+
+    const allowed = await fetch(
+      `http://127.0.0.1:${hub.port}/api/admin/reload-static`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+      },
+    );
+    expect(allowed.status).toBe(200);
+    expect(await allowed.json()).toMatchObject({ success: true });
+
+    const version = await fetch(`http://127.0.0.1:${hub.port}/api/version`);
+    expect(version.status).toBe(200);
+  });
 });

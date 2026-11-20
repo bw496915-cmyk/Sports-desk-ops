@@ -798,6 +798,44 @@ export function resolveAllowedOrigins(
   return allowedOrigins;
 }
 
+interface PackageMeta {
+  readonly name?: string;
+  readonly version?: string;
+}
+
+/** Read once per call; an unreadable manifest falls back instead of failing the server. */
+function readPackageMeta(): PackageMeta {
+  try {
+    const parsed: unknown = JSON.parse(
+      readFileSync(resolve(import.meta.dir, "../package.json"), "utf8"),
+    );
+    if (typeof parsed === "object" && parsed !== null) {
+      return parsed as PackageMeta;
+    }
+  } catch {
+    // A missing or unreadable manifest must not stop the server.
+  }
+  return {};
+}
+
+/**
+ * The static route table. Bun caches these Response objects for the server's
+ * lifetime; update them with `server.reload({ routes })`, never by mutating them.
+ */
+function buildStaticRoutes(meta: PackageMeta): Record<string, Response> {
+  return {
+    "/healthz": new Response("ok\n", {
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    }),
+    "/api/version": Response.json({
+      name: meta.name ?? "sportsdesk-ops",
+      version: meta.version ?? "unknown",
+      bun: Bun.version,
+      env: Bun.env.NODE_ENV ?? "development",
+    }),
+  };
+}
+
 export function startServer(options?: ServerOptions) {
   const telegramService = new SportsDeskTelegramService();
   const scheduler = new ReportingSchedulerService(telegramService);
@@ -1130,19 +1168,7 @@ export function startServer(options?: ServerOptions) {
   }
 
   // Static route metadata: read once at startup, then served from memory.
-  const packageMeta = (() => {
-    try {
-      const parsed: unknown = JSON.parse(
-        readFileSync(resolve(import.meta.dir, "../package.json"), "utf8"),
-      );
-      if (typeof parsed === "object" && parsed !== null) {
-        return parsed as { name?: string; version?: string };
-      }
-    } catch {
-      // A missing/unreadable manifest must not stop the server.
-    }
-    return {};
-  })();
+  const packageMeta = readPackageMeta();
 
   // The console live runtimes start after Bun.serve; the status route reads this
   // request-time view so it can report which channels are running.
@@ -1157,17 +1183,7 @@ export function startServer(options?: ServerOptions) {
 
     // Static route: zero-allocation dispatch for a liveness probe that, unlike
     // /health, does not run the KPI/auth probes.
-    routes: {
-      "/healthz": new Response("ok\n", {
-        headers: { "content-type": "text/plain; charset=utf-8" },
-      }),
-      "/api/version": Response.json({
-        name: packageMeta.name ?? "sportsdesk-ops",
-        version: packageMeta.version ?? "unknown",
-        bun: Bun.version,
-        env: Bun.env.NODE_ENV ?? "development",
-      }),
-    },
+    routes: buildStaticRoutes(packageMeta),
 
     async fetch(req) {
       const url = new URL(req.url);
@@ -1746,6 +1762,23 @@ export function startServer(options?: ServerOptions) {
               "removed: use /api/live-bets (games + agents) or pass --body to build:live-bets",
           },
           { status: 410, headers: cors },
+        );
+      }
+
+      // Admin: refresh the cached static routes from the current manifest.
+      if (pathname === "/api/admin/reload-static" && req.method === "POST") {
+        const rejected = adminRejection(req);
+        if (rejected !== null) {
+          return Response.json(
+            { success: false, ...rejected },
+            { status: rejected.status, headers: cors },
+          );
+        }
+        const refreshed = readPackageMeta();
+        server.reload({ routes: buildStaticRoutes(refreshed) });
+        return Response.json(
+          { success: true, version: refreshed.version ?? "unknown" },
+          { headers: cors },
         );
       }
 
