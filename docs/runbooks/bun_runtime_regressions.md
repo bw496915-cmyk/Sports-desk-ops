@@ -90,7 +90,8 @@ frozen Bun install on Alpine. The measured command runs offline.
 For 30 days, the `alpine-catalog-trace-<commit>-<attempt>` artifact retains the GC log,
 per-file progress markers, Linux perf data, symbolized user-mode samples and
 the summary. The runner resolves three native entry points from the matching
-release symbols and attaches events to a private copy of the Alpine Bun binary.
+release symbols and counts their execution in the measured process using x86
+instruction breakpoints. The runner checks the Alpine executable type and build ID.
 Perf timestamps these events on one monotonic clock. The reader counts a background
 CodeBlock visitor only after concurrent-phase dispatch and before the next
 phase-transition check in the same process. Even a transition check that leaves

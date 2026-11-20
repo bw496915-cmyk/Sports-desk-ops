@@ -19,6 +19,10 @@ def summarize(directory):
     # runConcurrentPhase is dispatched after the phase is committed. Stop counting
     # at the first finishChangingPhase entry, even when it turns out to be a no-op.
     # This bounds the witness strictly inside the phase and can undercount visits.
+    addresses = {int(address, 16): name for name, address in
+                 (line.split() for line in (directory / "events.txt").read_text().splitlines())}
+    if set(addresses.values()) != {"concurrent", "transition", "visit"}:
+        raise ValueError("Missing GC entry point metadata")
     first = None
     visits = []
     witness = None
@@ -35,16 +39,17 @@ def summarize(directory):
         if instant < previous_ns:
             raise ValueError("Events are not ordered on the perf clock")
         previous_ns = instant
-        event = re.fullmatch(r"catalog_gc_\d+:(concurrent|transition|visit):?", sample[5].strip())
-        if not event:
-            if re.match(r"[0-9a-f]+\s", sample[5]):
+        breakpoint = re.match(r"mem:(0x[0-9a-f]+)(?:/1)?:x:", sample[5].lstrip())
+        if not breakpoint:
+            if sample[5].lstrip().startswith("cpu-clock"):
                 cpu_samples += 1
             continue
-        if event[1] == "concurrent":
+        event = addresses[int(breakpoint[1], 16)]
+        if event == "concurrent":
             phases += 1
             if first is None:
                 first = instant
-        elif event[1] == "transition":
+        elif event == "transition":
             transitions += 1
             if first is not None:
                 for timestamp, worker in visits:
