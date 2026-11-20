@@ -526,6 +526,39 @@ else
   fail publish-prerelease "code=$pre_code/$pre_tag_code refused=$refused tagBypassed=$tag_bypassed"
 fi
 
+# ---- P29: npm/Yarn/pnpm flag translation (and ignored unknowns) ------------
+mkproj "$ROOT/p29" '{"name":"p29","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+run bash -c "cd '$ROOT/p29' && bun install"
+set +e
+immutable_out="$(cd "$ROOT/p29" && bun install --immutable 2>&1)"; immutable_code=$?
+no_lock_out="$(cd "$ROOT/p29" && bun install --no-package-lock 2>&1)"; no_lock_code=$?
+save_dev_out="$(cd "$ROOT/p29" && bun add --save-dev lodash 2>&1)"; save_dev_code=$?
+group_dev="$(cd "$ROOT/p29" && bun -e 'const p = await Bun.file("package.json").json(); console.log(JSON.stringify({ dep: p.dependencies?.lodash ?? null, dev: p.devDependencies?.lodash ?? null }))')"
+save_prod_out="$(cd "$ROOT/p29" && bun add --save-prod lodash 2>&1)"; save_prod_code=$?
+group_prod="$(cd "$ROOT/p29" && bun -e 'const p = await Bun.file("package.json").json(); console.log(JSON.stringify({ dep: p.dependencies?.lodash ?? null, dev: p.devDependencies?.lodash ?? null }))')"
+set -e
+if [ "$immutable_code" -eq 0 ] && [ "$no_lock_code" -eq 0 ] \
+   && printf '%s' "$group_dev" | grep -q '"dep":null' && printf '%s' "$group_dev" | grep -q '"dev":"' \
+   && [ "$save_prod_code" -eq 0 ] && printf '%s' "$group_prod" | grep -q '"dep":"' && printf '%s' "$group_prod" | grep -q '"dev":null'; then
+  pass flag-translation "--immutable, --no-package-lock, --save-dev/--save-prod map to Bun's groups"
+else
+  fail flag-translation "immutable=$immutable_code no-lock=$no_lock_code dev=$save_dev_code/$group_dev prod=$save_prod_code/$group_prod"
+fi
+
+# ---- P30: minimum-release-age accepts units and exclusions as CLI flags -----
+mkproj "$ROOT/p30a" '{"name":"p30a","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+set +e
+mra_units_out="$(cd "$ROOT/p30a" && bun install --minimum-release-age 3d --minimum-release-age-excludes lodash@4.17.21 2>&1)"; mra_units_code=$?
+mkproj "$ROOT/p30b" '{"name":"p30b","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+mra_blocked_out="$(cd "$ROOT/p30b" && bun install --minimum-release-age 87600h 2>&1)"; mra_blocked_code=$?
+set -e
+if [ "$mra_units_code" -eq 0 ] && [ "$mra_blocked_code" -ne 0 ] \
+   && printf '%s' "$mra_blocked_out" | grep -q "minimum-release-age"; then
+  pass release-age-cli "\"3d\" + per-version exclude install; a fresh 10-year window blocks and names the reason"
+else
+  fail release-age-cli "units exit $mra_units_code; blocked exit $mra_blocked_code; output did not name minimum-release-age"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
 skip publish-registry "publish fails at auth/packing before any registry contact can be observed; needs a real registry"
