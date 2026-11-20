@@ -1777,6 +1777,16 @@ export function startServer(options?: ServerOptions) {
               consoleLiveStatusReader === null
                 ? null
                 : consoleLiveStatusReader(),
+            server: {
+              pendingRequests: server.pendingRequests,
+              pendingWebSockets: server.pendingWebSockets,
+              subscriberCounts: Object.fromEntries(
+                BRIDGE_WS_TOPICS.map((topic) => [
+                  topic,
+                  server.subscriberCount(topic),
+                ]),
+              ),
+            },
             health: {
               // process.cpuUsage() is cumulative CPU time since start, not utilisation; the old
               // `cpu` label invited reading it as load.

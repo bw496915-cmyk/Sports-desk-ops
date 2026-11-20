@@ -349,6 +349,11 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
         wagerTelemetry?: unknown;
         thresholdAlerts?: unknown;
       } | null;
+      server?: {
+        pendingRequests?: number;
+        pendingWebSockets?: number;
+        subscriberCounts?: Record<string, number>;
+      } | null;
     };
     expect(payload.consoleLive).not.toBeNull();
     expect(payload.consoleLive?.started).toEqual([]);
@@ -358,6 +363,11 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     ]);
     expect(payload.consoleLive?.wagerTelemetry).toBeNull();
     expect(payload.consoleLive?.thresholdAlerts).toBeNull();
+    expect(typeof payload.server?.pendingRequests).toBe("number");
+    expect(typeof payload.server?.pendingWebSockets).toBe("number");
+    expect(Object.keys(payload.server?.subscriberCounts ?? {})).toEqual([
+      ...BRIDGE_WS_TOPICS,
+    ]);
   });
 
   test("a telemetry client gets binary ticks only for its subscribed topic", async () => {
@@ -391,6 +401,15 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
       JSON.stringify({ type: "SUBSCRIBE", channel: "f402-bet-ticker" }),
     );
     await subscribed;
+
+    const status = (await (
+      await fetch(`http://127.0.0.1:${hub.port}/api/status`)
+    ).json()) as {
+      server?: { subscriberCounts?: Record<string, number> } | null;
+    };
+    expect(
+      status.server?.subscriberCounts?.["f402-bet-ticker"] ?? 0,
+    ).toBeGreaterThan(0);
 
     const routeWord32 = encodeBridgeChannelPackedWord32(
       "BRIDGE_01_F402_BET_TICKER_STREAM",
