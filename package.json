@@ -143,7 +143,7 @@
     "format": "bun fmt",
     "format:check": "bun fmt --check",
     "format:debug-check": "bun fmt --debug-check",
-    "format:changed": "bun fmt --check --changed",
+    "format:changed": "bun fmt --check --changed && bun fmt --debug-check --changed",
     "format:doctor": "bun fmt --doctor",
     "ensure:deep-tsconfig": "bun run scripts/ensure_deep_tsconfig.ts",
     "typecheck:ui": "bun check --no-script -p packages/ui/tsconfig.json && bun check --no-script -p src/dashboard/tsconfig.json",
