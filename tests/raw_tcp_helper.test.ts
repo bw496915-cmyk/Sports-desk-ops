@@ -6,7 +6,13 @@
 
 import { expect, test } from "bun:test";
 
-import { buildRequestPayload } from "./support/raw_tcp.ts";
+import {
+  buildRequestPayload,
+  decodeChunkedBody,
+  formatHostHeader,
+  parseResponseHead,
+  rawTcp,
+} from "./support/raw_tcp.ts";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -131,4 +137,131 @@ test("rejects an empty or control-character hostname", () => {
   expect(() =>
     buildRequestPayload("/x", "GET", "bad host", 4020, {}, null),
   ).toThrow(/ERR_RAW_TCP_INVALID_HEADER/);
+});
+
+test("formats valid hosts and rejects malformed or port-embedding hosts", () => {
+  expect(formatHostHeader("example.test", 4020)).toBe("example.test:4020");
+  expect(formatHostHeader("example.test", 80)).toBe("example.test");
+  expect(formatHostHeader("::1", 4020)).toBe("[::1]:4020");
+  expect(formatHostHeader("[::1]", 4020)).toBe("[::1]:4020");
+  expect(formatHostHeader("::1", 80)).toBe("[::1]");
+
+  expect(() => formatHostHeader("[::1", 4020)).toThrow(/Malformed IPv6/);
+  expect(() => formatHostHeader("[::1]x", 4020)).toThrow(/Malformed IPv6/);
+  expect(() => formatHostHeader("example.test:4020", 4020)).toThrow(
+    /must not embed port/,
+  );
+  expect(() => formatHostHeader("bad host", 4020)).toThrow(/Invalid hostname/);
+  expect(() => formatHostHeader("example.test", 0)).toThrow(/Invalid TCP port/);
+});
+
+test("rejects a Content-Length that disagrees with the body", () => {
+  const body = encoder.encode("hi");
+
+  expect(() => build({ "content-length": "3" }, body)).toThrow(
+    /does not match body length/,
+  );
+  expect(() => build({ "content-length": "x" }, body)).toThrow(
+    /Invalid Content-Length/,
+  );
+  expect(() =>
+    build({ "content-length": "2", "transfer-encoding": "chunked" }, body),
+  ).toThrow(/Conflicting Content-Length and Transfer-Encoding/);
+});
+
+test("supports caller-selected defaultPort and connection defaults", () => {
+  const payload = decoder.decode(
+    buildRequestPayload("/x", "GET", "example.test", 8080, {}, null, {
+      defaultPort: 8080,
+      connection: "keep-alive",
+    }),
+  );
+  const lines = payload.split("\r\n");
+
+  expect(lines).toContain("Host: example.test");
+  expect(lines).toContain("Connection: keep-alive");
+});
+
+test("parses response framing and rejects conflicting framing", () => {
+  const cl = parseResponseHead("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n");
+  expect(cl).toMatchObject({
+    version: "HTTP/1.1",
+    status: 200,
+    reason: "OK",
+    framing: "content-length",
+    contentLength: 5,
+  });
+
+  expect(
+    parseResponseHead(
+      "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nContent-Length: 5\r\n\r\n",
+    ).contentLength,
+  ).toBe(5);
+
+  expect(() =>
+    parseResponseHead(
+      "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nContent-Length: 6\r\n\r\n",
+    ),
+  ).toThrow(/Invalid or conflicting Content-Length/);
+
+  expect(() =>
+    parseResponseHead(
+      "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nTransfer-Encoding: chunked\r\n\r\n",
+    ),
+  ).toThrow(/Conflicting Content-Length and Transfer-Encoding/);
+
+  expect(
+    parseResponseHead("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n")
+      .framing,
+  ).toBe("chunked");
+
+  expect(() =>
+    parseResponseHead("HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip\r\n\r\n"),
+  ).toThrow(/Unsupported Transfer-Encoding/);
+
+  expect(() => parseResponseHead("not a status line\r\n\r\n")).toThrow(
+    /Malformed HTTP status line/,
+  );
+});
+
+test("decodes chunked bodies, extensions included", () => {
+  const decoded = decoder.decode(
+    decodeChunkedBody(
+      encoder.encode("5;name=value\r\nhello\r\n6\r\n world\r\n0\r\n\r\n"),
+    ),
+  );
+  expect(decoded).toBe("hello world");
+
+  expect(() => decodeChunkedBody(encoder.encode("5\r\nhello"))).toThrow(
+    /Truncated chunk payload/,
+  );
+  expect(() => decodeChunkedBody(encoder.encode("z\r\n"))).toThrow(
+    /Invalid chunk size/,
+  );
+});
+
+test("stops at the zero chunk without waiting for connection close", async () => {
+  const listener = Bun.listen<undefined>({
+    hostname: "127.0.0.1",
+    port: 0,
+    socket: {
+      data(socket) {
+        socket.end(
+          "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n" +
+            "3\r\none\r\n3\r\ntwo\r\n0\r\n\r\n",
+        );
+      },
+    },
+  });
+
+  try {
+    const response = await rawTcp("/", {
+      port: listener.port,
+      readBody: true,
+    });
+    expect(response.framing).toBe("chunked");
+    expect(decoder.decode(response.body)).toBe("onetwo");
+  } finally {
+    listener.stop(true);
+  }
 });

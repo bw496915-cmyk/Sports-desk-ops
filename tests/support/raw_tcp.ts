@@ -2,7 +2,7 @@
  * @file tests/support/raw_tcp.ts
  * @description Minimal HTTP/1.1-over-TCP client for wire-level tests. `fetch`
  * normalizes methods, headers and bodies; these tests need the actual status
- * line, header casing and empty-304 body.
+ * line, header casing, framing and empty 304 body.
  */
 
 export interface RawTcpOptions {
@@ -15,6 +15,10 @@ export interface RawTcpOptions {
   readonly maxBytes?: number;
   /** When false, resolves as soon as the header block arrives. */
   readonly readBody?: boolean;
+  /** Port omitted from the default Host header. Default 80. */
+  readonly defaultPort?: number;
+  /** Default Connection header. Default "close". */
+  readonly connection?: "close" | "keep-alive";
 }
 
 export interface RawTcpResponse {
@@ -25,13 +29,402 @@ export interface RawTcpResponse {
   readonly headers: ReadonlyMap<string, readonly string[]>;
   readonly rawHead: string;
   readonly body: Uint8Array;
+  readonly framing: "chunked" | "content-length" | "eof";
+  readonly contentLength: number | null;
 }
 
+export interface ParsedResponseHead {
+  readonly version: string;
+  readonly status: number;
+  readonly reason: string;
+  readonly headers: Record<string, string[]>;
+  readonly framing: "chunked" | "content-length" | "eof";
+  readonly contentLength: number | null;
+}
+
+export interface BuildRequestOptions {
+  readonly defaultPort?: number;
+  readonly connection?: "close" | "keep-alive";
+}
+
+const CRLF_RE = /[\r\n]/;
+const TOKEN_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+// RFC 9110 VCHAR (0x21-0x7e): rejects NUL, CTLs, SP, DEL and non-ASCII.
+const NON_VCHAR_RE = /[^\x21-\x7e]/;
+// RFC 9110 field-content (ASCII-strict): HTAB + SP/VCHAR.
+const INVALID_HEADER_VALUE_RE = /[^\x09\x20-\x7e]/;
+const HOST_FORBIDDEN_CHARS_RE = /[/@?#]/;
+const CONTENT_LENGTH_RE = /^\d+$/;
+const STATUS_LINE_RE = /^(HTTP\/1\.[01]) (\d{3})(?: ([^\r\n]*))?$/;
 const HEADER_END = new Uint8Array([13, 10, 13, 10]);
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
+
+const TEXT_ENCODER = new TextEncoder();
+const TEXT_DECODER = new TextDecoder("latin1");
 
 type RawTcpSocket = Awaited<ReturnType<typeof Bun.connect>>;
+
+function assertNoCrlf(value: string, label: string): void {
+  if (CRLF_RE.test(value)) {
+    throw new Error(`[ERR_RAW_TCP_INVALID_HEADER] CR/LF forbidden in ${label}`);
+  }
+}
+
+export function formatHostHeader(
+  hostname: string,
+  port: number,
+  defaultPort = 80,
+): string {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`[ERR_RAW_TCP_INVALID_PORT] Invalid TCP port ${port}`);
+  }
+
+  const normalizedHost = hostname.trim();
+  if (
+    normalizedHost.length === 0 ||
+    NON_VCHAR_RE.test(normalizedHost) ||
+    HOST_FORBIDDEN_CHARS_RE.test(normalizedHost)
+  ) {
+    throw new Error(
+      `[ERR_RAW_TCP_INVALID_HEADER] Invalid hostname "${hostname}"`,
+    );
+  }
+
+  let host: string;
+  if (normalizedHost.startsWith("[")) {
+    const inner = normalizedHost.slice(1, -1);
+    if (
+      !normalizedHost.endsWith("]") ||
+      inner.includes("[") ||
+      inner.includes("]")
+    ) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Malformed IPv6 host "${hostname}"`,
+      );
+    }
+    host = normalizedHost;
+  } else {
+    const colonCount = normalizedHost.split(":").length - 1;
+    if (colonCount === 1) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Hostname must not embed port "${hostname}"`,
+      );
+    }
+    host = colonCount >= 2 ? `[${normalizedHost}]` : normalizedHost;
+  }
+
+  return port === defaultPort ? host : `${host}:${port}`;
+}
+
+export function buildRequestPayload(
+  rawTarget: string,
+  method: string,
+  hostname: string,
+  port: number,
+  headers: Readonly<Record<string, string>>,
+  bodyBytes: Uint8Array | null,
+  options: BuildRequestOptions = {},
+): Uint8Array {
+  assertNoCrlf(method, "method");
+  assertNoCrlf(rawTarget, "rawTarget");
+
+  if (!TOKEN_RE.test(method)) {
+    throw new Error(
+      `[ERR_RAW_TCP_INVALID_METHOD] Invalid HTTP method "${method}"`,
+    );
+  }
+  if (
+    rawTarget.length === 0 ||
+    NON_VCHAR_RE.test(rawTarget) ||
+    rawTarget.includes("#")
+  ) {
+    throw new Error(
+      `[ERR_RAW_TCP_INVALID_TARGET] Invalid request target "${rawTarget}"`,
+    );
+  }
+
+  const seenLower = new Set<string>();
+  const customLines: string[] = [];
+  let explicitContentLength: string | undefined;
+
+  for (const [rawKey, rawValue] of Object.entries(headers)) {
+    assertNoCrlf(rawKey, "header key");
+    assertNoCrlf(rawValue, `header value for "${rawKey}"`);
+    if (INVALID_HEADER_VALUE_RE.test(rawValue)) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Invalid character in header value for "${rawKey}"`,
+      );
+    }
+
+    const key = rawKey.trim();
+    if (!TOKEN_RE.test(key)) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Invalid header name "${rawKey}"`,
+      );
+    }
+
+    const lower = key.toLowerCase();
+    // Keep the first occurrence to prevent duplicate-header smuggling.
+    if (seenLower.has(lower)) continue;
+    seenLower.add(lower);
+
+    const trimmedValue = rawValue.trim();
+    if (lower === "content-length") explicitContentLength = trimmedValue;
+    customLines.push(`${key}: ${trimmedValue}`);
+  }
+
+  if (seenLower.has("content-length") && seenLower.has("transfer-encoding")) {
+    throw new Error(
+      "[ERR_RAW_TCP_INVALID_HEADER] Conflicting Content-Length and Transfer-Encoding headers",
+    );
+  }
+
+  if (explicitContentLength !== undefined) {
+    if (!CONTENT_LENGTH_RE.test(explicitContentLength)) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Invalid Content-Length "${explicitContentLength}"`,
+      );
+    }
+    const declared = Number(explicitContentLength);
+    const actual = bodyBytes?.byteLength ?? 0;
+    if (declared !== actual) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Content-Length (${declared}) does not match body length (${actual})`,
+      );
+    }
+  }
+
+  const lines = [`${method} ${rawTarget} HTTP/1.1`];
+
+  if (!seenLower.has("host")) {
+    const hostValue = formatHostHeader(
+      hostname,
+      port,
+      options.defaultPort ?? 80,
+    );
+    assertNoCrlf(hostValue, "Host");
+    lines.push(`Host: ${hostValue}`);
+  }
+
+  if (!seenLower.has("connection")) {
+    lines.push(`Connection: ${options.connection ?? "close"}`);
+  }
+
+  lines.push(...customLines);
+
+  if (
+    bodyBytes !== null &&
+    bodyBytes.byteLength > 0 &&
+    !seenLower.has("content-length") &&
+    !seenLower.has("transfer-encoding")
+  ) {
+    lines.push(`Content-Length: ${bodyBytes.byteLength}`);
+  }
+
+  const headPayload = TEXT_ENCODER.encode(`${lines.join("\r\n")}\r\n\r\n`);
+  if (bodyBytes === null || bodyBytes.byteLength === 0) return headPayload;
+
+  const out = new Uint8Array(headPayload.byteLength + bodyBytes.byteLength);
+  out.set(headPayload, 0);
+  out.set(bodyBytes, headPayload.byteLength);
+  return out;
+}
+
+export function parseResponseHead(
+  rawHead: Uint8Array | string,
+): ParsedResponseHead {
+  const text =
+    typeof rawHead === "string" ? rawHead : TEXT_DECODER.decode(rawHead);
+  const lines = text.split("\r\n");
+  const statusLine = lines[0] ?? "";
+  const statusMatch = STATUS_LINE_RE.exec(statusLine);
+  if (statusMatch === null) {
+    throw new Error(
+      `[ERR_RAW_TCP_INVALID_STATUS] Malformed HTTP status line "${statusLine}"`,
+    );
+  }
+
+  const version = statusMatch[1] ?? "";
+  const status = Number(statusMatch[2] ?? "");
+  const reason = statusMatch[3] ?? "";
+  const headers: Record<string, string[]> = {};
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    if (line === "") break;
+    const colonIndex = line.indexOf(":");
+    if (colonIndex <= 0) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Malformed response header "${line}"`,
+      );
+    }
+
+    const name = line.slice(0, colonIndex);
+    const value = line.slice(colonIndex + 1).trim();
+    if (!TOKEN_RE.test(name)) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Invalid response header name "${name}"`,
+      );
+    }
+    if (INVALID_HEADER_VALUE_RE.test(value)) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Invalid response header value for "${name}"`,
+      );
+    }
+
+    const lower = name.toLowerCase();
+    (headers[lower] ??= []).push(value);
+  }
+
+  const transferEncoding = headers["transfer-encoding"];
+  const contentLengths = headers["content-length"];
+
+  if (transferEncoding !== undefined && contentLengths !== undefined) {
+    throw new Error(
+      "[ERR_RAW_TCP_INVALID_HEADER] Conflicting Content-Length and Transfer-Encoding in response",
+    );
+  }
+
+  if (transferEncoding !== undefined) {
+    const tokens = transferEncoding
+      .join(",")
+      .split(",")
+      .map((token) => token.trim().toLowerCase())
+      .filter(Boolean);
+    if (tokens[tokens.length - 1] !== "chunked") {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Unsupported Transfer-Encoding "${transferEncoding.join(", ")}"`,
+      );
+    }
+    return {
+      version,
+      status,
+      reason,
+      headers,
+      framing: "chunked",
+      contentLength: null,
+    };
+  }
+
+  if (contentLengths !== undefined) {
+    const first = contentLengths[0];
+    if (
+      first === undefined ||
+      new Set(contentLengths).size !== 1 ||
+      !CONTENT_LENGTH_RE.test(first)
+    ) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Invalid or conflicting Content-Length "${contentLengths.join(", ")}"`,
+      );
+    }
+    return {
+      version,
+      status,
+      reason,
+      headers,
+      framing: "content-length",
+      contentLength: Number(first),
+    };
+  }
+
+  return {
+    version,
+    status,
+    reason,
+    headers,
+    framing: "eof",
+    contentLength: null,
+  };
+}
+
+function findCrlf(buffer: Uint8Array, start: number): number {
+  for (let i = start; i + 1 < buffer.byteLength; i++) {
+    if (buffer[i] === 0x0d && buffer[i + 1] === 0x0a) return i;
+  }
+  return -1;
+}
+
+function parseChunkSize(line: string): number {
+  const semicolon = line.indexOf(";");
+  const hexPart = (semicolon === -1 ? line : line.slice(0, semicolon)).trim();
+  if (!/^[0-9a-fA-F]+$/.test(hexPart)) {
+    throw new Error(`[ERR_RAW_TCP_INVALID_CHUNK] Invalid chunk size "${line}"`);
+  }
+  const size = Number.parseInt(hexPart, 16);
+  if (!Number.isSafeInteger(size)) {
+    throw new Error(
+      `[ERR_RAW_TCP_INVALID_CHUNK] Chunk size overflow "${hexPart}"`,
+    );
+  }
+  return size;
+}
+
+/** Whether `raw` contains one complete chunked body (terminating zero chunk seen). */
+function chunkedBodyComplete(raw: Uint8Array): boolean {
+  let offset = 0;
+  while (offset < raw.byteLength) {
+    const lineEnd = findCrlf(raw, offset);
+    if (lineEnd === -1) return false;
+    const size = parseChunkSize(
+      TEXT_DECODER.decode(raw.subarray(offset, lineEnd)),
+    );
+    offset = lineEnd + 2;
+    if (size === 0) return true;
+    if (offset + size + 2 > raw.byteLength) return false;
+    if (raw[offset + size] !== 0x0d || raw[offset + size + 1] !== 0x0a) {
+      throw new Error(
+        "[ERR_RAW_TCP_INVALID_CHUNK] Missing CRLF after chunk payload",
+      );
+    }
+    offset += size + 2;
+  }
+  return false;
+}
+
+export function decodeChunkedBody(raw: Uint8Array): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
+  let offset = 0;
+
+  while (offset < raw.byteLength) {
+    const lineEnd = findCrlf(raw, offset);
+    if (lineEnd === -1) {
+      throw new Error(
+        "[ERR_RAW_TCP_INVALID_CHUNK] Unterminated chunk size line",
+      );
+    }
+
+    const size = parseChunkSize(
+      TEXT_DECODER.decode(raw.subarray(offset, lineEnd)),
+    );
+    offset = lineEnd + 2;
+    if (size === 0) {
+      const merged = new Uint8Array(totalLength);
+      let cursor = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, cursor);
+        cursor += chunk.byteLength;
+      }
+      return merged;
+    }
+
+    if (offset + size + 2 > raw.byteLength) {
+      throw new Error("[ERR_RAW_TCP_INVALID_CHUNK] Truncated chunk payload");
+    }
+    if (raw[offset + size] !== 0x0d || raw[offset + size + 1] !== 0x0a) {
+      throw new Error(
+        "[ERR_RAW_TCP_INVALID_CHUNK] Missing CRLF after chunk payload",
+      );
+    }
+
+    chunks.push(raw.subarray(offset, offset + size));
+    totalLength += size;
+    offset += size + 2;
+  }
+
+  throw new Error(
+    "[ERR_RAW_TCP_INVALID_CHUNK] Missing terminating zero-length chunk",
+  );
+}
 
 function indexOfSubarray(
   haystack: Uint8Array,
@@ -48,154 +441,32 @@ function indexOfSubarray(
   return -1;
 }
 
-function parseResponse(bytes: Uint8Array): RawTcpResponse {
-  const splitIdx = indexOfSubarray(bytes, HEADER_END);
-  const headBytes = splitIdx === -1 ? bytes : bytes.subarray(0, splitIdx);
-  const body =
-    splitIdx === -1 ? new Uint8Array(0) : bytes.subarray(splitIdx + 4);
-  const rawHead = decoder.decode(headBytes);
-  const lines = rawHead.split("\r\n");
-
-  const statusLine = lines[0] ?? "";
-  const match = /^(HTTP\/\d+\.\d+)\s+(\d{3})(?:\s+(.*))?$/.exec(statusLine);
-  const status = match ? Number(match[2]) : -1;
-
-  const headers = new Map<string, string[]>();
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    const colon = line.indexOf(":");
-    if (colon <= 0) continue;
-    const key = line.slice(0, colon).trim().toLowerCase();
-    const value = line.slice(colon + 1).trim();
-    const list = headers.get(key);
-    if (list !== undefined) list.push(value);
-    else headers.set(key, [value]);
-  }
+function toResponse(bytes: Uint8Array, includeBody = true): RawTcpResponse {
+  const splitIndex = indexOfSubarray(bytes, HEADER_END);
+  const headBytes = splitIndex === -1 ? bytes : bytes.subarray(0, splitIndex);
+  const rawHead = TEXT_DECODER.decode(headBytes);
+  const head = parseResponseHead(headBytes);
+  const rawBody =
+    splitIndex === -1 ? new Uint8Array(0) : bytes.subarray(splitIndex + 4);
+  const body = !includeBody
+    ? new Uint8Array(0)
+    : head.framing === "chunked"
+      ? decodeChunkedBody(rawBody)
+      : head.framing === "content-length"
+        ? rawBody.subarray(0, head.contentLength ?? 0)
+        : rawBody;
 
   return {
-    version: match?.[1] ?? "",
-    status,
-    statusText: match?.[3] ?? "",
-    loc: headers.get("location")?.[0] ?? null,
-    headers,
+    version: head.version,
+    status: head.status,
+    statusText: head.reason,
+    loc: head.headers["location"]?.[0] ?? null,
+    headers: new Map(Object.entries(head.headers)),
     rawHead,
     body,
+    framing: head.framing,
+    contentLength: head.contentLength,
   };
-}
-
-const CRLF_RE = /[\r\n]/;
-const CTL_OR_SPACE_RE = /[\x00-\x20\x7f]/;
-const TOKEN_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
-// RFC 9110 field-vchar + SP/HTAB, excluding NUL, CTLs 0x01-0x08/0x0a-0x1f and DEL 0x7f.
-const OBS_FOLD_OR_CTL_RE = /[\x00-\x08\x0a-\x1f\x7f]/;
-
-function assertNoCrlf(value: string, label: string): void {
-  if (CRLF_RE.test(value)) {
-    throw new Error(`[ERR_RAW_TCP_INVALID_HEADER] CR/LF forbidden in ${label}`);
-  }
-}
-
-function formatHostHeader(hostname: string, port: number): string {
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`[ERR_RAW_TCP_INVALID_PORT] Invalid TCP port ${port}`);
-  }
-  const normalizedHost = hostname.trim();
-  if (normalizedHost.length === 0 || CTL_OR_SPACE_RE.test(normalizedHost)) {
-    throw new Error(
-      `[ERR_RAW_TCP_INVALID_HEADER] Invalid hostname "${hostname}"`,
-    );
-  }
-  const host =
-    normalizedHost.includes(":") && !normalizedHost.startsWith("[")
-      ? `[${normalizedHost}]`
-      : normalizedHost;
-  return port === 80 ? host : `${host}:${port}`;
-}
-
-/**
- * Build the request head and optional body. Caller-controlled lines are
- * validated as HTTP tokens/values, so a test header cannot smuggle a second
- * request or a malformed method/target.
- */
-export function buildRequestPayload(
-  rawTarget: string,
-  method: string,
-  hostname: string,
-  port: number,
-  headers: Readonly<Record<string, string>>,
-  bodyBytes: Uint8Array | null,
-): Uint8Array {
-  assertNoCrlf(method, "method");
-  assertNoCrlf(rawTarget, "rawTarget");
-  if (!TOKEN_RE.test(method)) {
-    throw new Error(
-      `[ERR_RAW_TCP_INVALID_METHOD] Invalid HTTP method "${method}"`,
-    );
-  }
-  if (rawTarget.length === 0 || CTL_OR_SPACE_RE.test(rawTarget)) {
-    throw new Error(
-      `[ERR_RAW_TCP_INVALID_TARGET] Invalid request target "${rawTarget}"`,
-    );
-  }
-
-  const seenLower = new Set<string>();
-  const customLines: string[] = [];
-
-  for (const [rawKey, rawValue] of Object.entries(headers)) {
-    assertNoCrlf(rawKey, "header key");
-    assertNoCrlf(rawValue, `header value for "${rawKey}"`);
-    if (OBS_FOLD_OR_CTL_RE.test(rawValue)) {
-      throw new Error(
-        `[ERR_RAW_TCP_INVALID_HEADER] Control character forbidden in header value for "${rawKey}"`,
-      );
-    }
-    if (rawKey.trim() === "") {
-      throw new Error("[ERR_RAW_TCP_INVALID_HEADER] empty header name");
-    }
-    if (!TOKEN_RE.test(rawKey.trim())) {
-      throw new Error(
-        `[ERR_RAW_TCP_INVALID_HEADER] Invalid header name "${rawKey}"`,
-      );
-    }
-    const key = rawKey.trim();
-    const lower = key.toLowerCase();
-    // Deduplicate case-insensitively: keep the first occurrence so a caller
-    // cannot send two Host/Content-Length fields with conflicting values.
-    if (seenLower.has(lower)) continue;
-    seenLower.add(lower);
-    customLines.push(`${key}: ${rawValue.trim()}`);
-  }
-
-  const lines = [`${method} ${rawTarget} HTTP/1.1`];
-
-  if (!seenLower.has("host")) {
-    const hostValue = formatHostHeader(hostname, port);
-    assertNoCrlf(hostValue, "Host");
-    lines.push(`Host: ${hostValue}`);
-  }
-
-  if (!seenLower.has("connection")) {
-    lines.push("Connection: close");
-  }
-
-  lines.push(...customLines);
-
-  if (
-    bodyBytes !== null &&
-    bodyBytes.byteLength > 0 &&
-    !seenLower.has("content-length") &&
-    !seenLower.has("transfer-encoding")
-  ) {
-    lines.push(`Content-Length: ${bodyBytes.byteLength}`);
-  }
-
-  const headPayload = encoder.encode(`${lines.join("\r\n")}\r\n\r\n`);
-  if (bodyBytes === null) return headPayload;
-
-  const out = new Uint8Array(headPayload.byteLength + bodyBytes.byteLength);
-  out.set(headPayload, 0);
-  out.set(bodyBytes, headPayload.byteLength);
-  return out;
 }
 
 export async function rawTcp(
@@ -211,13 +482,15 @@ export async function rawTcp(
     timeoutMs = 5_000,
     maxBytes = 1024 * 1024,
     readBody = false,
+    defaultPort = 80,
+    connection = "close",
   } = options;
 
   const bodyBytes =
     body === undefined
       ? null
       : typeof body === "string"
-        ? encoder.encode(body)
+        ? TEXT_ENCODER.encode(body)
         : body;
 
   const payload = buildRequestPayload(
@@ -227,6 +500,7 @@ export async function rawTcp(
     port,
     headers,
     bodyBytes,
+    { defaultPort, connection },
   );
 
   return new Promise<RawTcpResponse>((resolve, reject) => {
@@ -302,16 +576,67 @@ export async function rawTcp(
           }
           chunks.push(new Uint8Array(chunk));
 
+          const combined = concat();
+          const headerEnd = indexOfSubarray(combined, HEADER_END);
+          if (headerEnd === -1) return;
+
           if (!readBody) {
-            const combined = concat();
-            if (indexOfSubarray(combined, HEADER_END) !== -1) {
-              socket.terminate();
-              finish(() => resolve(parseResponse(combined)));
+            socket.terminate();
+            try {
+              finish(() => resolve(toResponse(combined, false)));
+            } catch (error) {
+              fail(
+                "ERR_RAW_TCP_INVALID_RESPONSE",
+                error instanceof Error ? error.message : String(error),
+                error,
+              );
             }
+            return;
+          }
+
+          let head: ParsedResponseHead;
+          try {
+            head = parseResponseHead(combined.subarray(0, headerEnd));
+          } catch (error) {
+            fail(
+              "ERR_RAW_TCP_INVALID_RESPONSE",
+              error instanceof Error ? error.message : String(error),
+              error,
+            );
+            return;
+          }
+
+          const rawBody = combined.subarray(headerEnd + 4);
+          const complete =
+            head.framing === "content-length"
+              ? rawBody.byteLength >= (head.contentLength ?? 0)
+              : head.framing === "chunked"
+                ? chunkedBodyComplete(rawBody)
+                : false;
+          if (!complete) return;
+
+          socket.terminate();
+          try {
+            finish(() => resolve(toResponse(combined)));
+          } catch (error) {
+            fail(
+              "ERR_RAW_TCP_INVALID_RESPONSE",
+              error instanceof Error ? error.message : String(error),
+              error,
+            );
           }
         },
         close() {
-          finish(() => resolve(parseResponse(concat())));
+          if (settled) return;
+          try {
+            finish(() => resolve(toResponse(concat())));
+          } catch (error) {
+            fail(
+              "ERR_RAW_TCP_INVALID_RESPONSE",
+              error instanceof Error ? error.message : String(error),
+              error,
+            );
+          }
         },
         error(_socket, error) {
           fail("ERR_RAW_TCP_SOCKET", error.message, error);
