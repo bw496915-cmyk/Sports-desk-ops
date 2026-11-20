@@ -27,11 +27,35 @@ The collector has no runWithRbacScope API. The ALS test therefore exercises a re
 AsyncLocalStorage store directly. A test of a lexical object that was never stored
 in ALS would not establish ALS retention behavior.
 
-Remaining upstream surfaces include DurationFormat and platform-specific GC/epoll
-failure paths. These remain explicit coverage gaps. The links pin upstream
-evidence, not a passing verdict on those gaps.
-
 The overlapping-species checks exercise forward element-by-element copy semantics.
 When the destination starts later in the same buffer, earlier writes affect later
 reads. ALS immediate tests keep an async immediate callback suspended on a latch
 while checking collection, then release it and verify its inherited context.
+
+## Duration formatting and Linux runtime checks
+
+The Intl test uses the hidden-zero-minute case from the WebKit fix. It checks
+both the rendered seconds and their parts, plus separators when hours or minutes
+are visible. [WebKit change](https://github.com/WebKit/WebKit/commit/70a75461959a91b29395c03ce7ba494745c37c0a)
+
+The Bun Linux runtime regressions workflow runs the Intl and Linux tests in
+digest-pinned Alpine (musl) and Debian (glibc) images on x86-64. Each job checks
+the image's libc environment and Bun version. The Linux tests use a private FIFO
+and an in-memory object array. They also run in the normal Linux test suite.
+
+| Fix                                                                                                                                                                                                   | Runtime check                                                                                    | Patched source checked by CI                                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| [musl array GC](https://github.com/oven-sh/WebKit/commit/2e2aa2290fac856d6f451ceacb58f7f5b44dd057), [Bun integration](https://github.com/oven-sh/bun/commit/7e3744509ce9417b209b45d93419cebdc1123755) | Check object values after shift, splice, truncation and an explicit collection.                  | GC-safe clearing of live object slots in JSArray.cpp and the fence before publishing vector length in JSObject.cpp.                    |
+| [Linux FileSink ownership](https://github.com/oven-sh/bun/commit/3044dc6834e5449d20317ad7c41f04013d32e5b0)                                                                                            | End two successive writers to the same FIFO and check both payloads through the original reader. | The buffered and streaming writer registration-error branches in PipeWriter.rs and the descriptor-preserving poll cleanup in pipes.rs. |
+
+To verify source identity locally from the checkout root:
+
+```sh
+bash scripts/ci/verify_runtime_patches.sh "$(bun -p 'Bun.revision')"
+```
+
+The script fetches source at the running Bun revision, follows its WebKit dependency
+pin and checks Git blob IDs against the four reviewed files. A changed file requires
+review before updating its expected ID. The runtime checks establish sequential GC
+and FIFO behavior. Evidence for concurrent GC marking and failed epoll registration
+comes from the source check; neither condition is induced by the runtime suite.

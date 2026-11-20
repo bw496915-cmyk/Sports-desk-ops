@@ -27,6 +27,29 @@ describe("Contract #39: Bun v1.4.2+ runtime regression invariants", () => {
   });
 });
 
+// JavaScriptCore fix shipped by Bun's d296efbb4e5bfcd45cd0e93da312c793a1f5b701:
+// https://github.com/WebKit/WebKit/commit/70a75461959a91b29395c03ce7ba494745c37c0a
+test("Intl.DurationFormat omits the separator for hidden zero minutes", () => {
+  const formatter = new Intl.DurationFormat("en-US", {
+    style: "digital",
+    hoursDisplay: "auto",
+    minutesDisplay: "auto",
+  });
+
+  // Upstream's regression input: seconds remain visible by default.
+  expect(formatter.format({ minutes: 0 })).toBe("00");
+  expect(formatter.formatToParts({ minutes: 0 })).toEqual([
+    { type: "integer", value: "00", unit: "second" },
+  ]);
+  expect(formatter.format({ minutes: 0, seconds: 5 })).toBe("05");
+
+  // Visible minutes still separate seconds, including zero minutes between hours and seconds.
+  expect(formatter.format({ minutes: 1, seconds: 5 })).toBe("01:05");
+  expect(formatter.format({ hours: 1, minutes: 0, seconds: 5 })).toBe(
+    "1:00:05",
+  );
+});
+
 // JavaScriptCore changes shipped by Bun:
 // https://github.com/oven-sh/bun/commit/d296efbb4e5bfcd45cd0e93da312c793a1f5b701
 test("TypedArray constructor preserves iterable values when conversion shrinks the source", () => {

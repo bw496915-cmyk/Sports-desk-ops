@@ -1,0 +1,58 @@
+name: Bun Linux runtime regressions
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, dev]
+    paths: &inputs
+      - ".bun-version"
+      - ".github/workflows/bun-runtime-regressions.yml"
+      - "scripts/ci/verify_runtime_patches.sh"
+      - "tests/bun_runtime_regressions.test.ts"
+      - "tests/unit/contract_39_linux_runtime.test.ts"
+  pull_request:
+    paths: *inputs
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - libc: musl
+            image: oven/bun:1.4.4-alpine@sha256:4cf82f5686b196504fe119db3fcd9185b191f82ece82c40680e597228ec6070a
+          - libc: glibc
+            image: oven/bun:1.4.4-debian@sha256:93d5032fe06d163427822dc1598f420363759bb18155c9cc90eb1be05a64a19e
+    name: Bun on Linux (${{ matrix.libc }})
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify patched sources for the container runtime
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          revision=$(docker run --rm --entrypoint bun "$IMAGE" -e 'console.log(Bun.revision)')
+          bash scripts/ci/verify_runtime_patches.sh "$revision"
+      - name: Run Linux and Intl contracts
+        env:
+          IMAGE: ${{ matrix.image }}
+          EXPECTED_LIBC: ${{ matrix.libc }}
+        run: |
+          docker run --rm --network none -v "$PWD:/desk:ro" -w /desk \
+            -e EXPECTED_LIBC -e TZ=UTC -e NO_COLOR=1 --entrypoint sh "$IMAGE" -ec '
+              test "$(uname -s)" = Linux
+              test "$(bun --version)" = "$(cat .bun-version)"
+              case "$EXPECTED_LIBC" in
+                musl) test -e /lib/ld-musl-x86_64.so.1; cat /etc/alpine-release ;;
+                glibc) getconf GNU_LIBC_VERSION | grep "^glibc " ;;
+                *) exit 1 ;;
+              esac
+              bun --revision
+              exec bun test tests/bun_runtime_regressions.test.ts tests/unit/contract_39_linux_runtime.test.ts --bail=1
+            '
