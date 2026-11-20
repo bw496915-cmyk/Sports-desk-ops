@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { decodeRgbaPng } from "../support/decode_rgba_png.ts";
 
 // MIT-licensed Bun quadrant fixtures, pinned to the original regression fix:
 // https://github.com/oven-sh/bun/blob/7b0b70ece52704561a8f9ee36a2b6f10cd588acf/test/js/bun/image/image.test.ts
@@ -33,4 +34,42 @@ for (const encoding of ["cmyk", "ycck"] as const) {
       0,
     );
   });
+}
+
+// Upstream's CMYK/YCCK fixture quadrants include mixed ink and black to detect
+// omitted K-channel multiplication, as well as swapped/inverted color channels.
+for (const encoding of ["cmyk", "ycck"] as const) {
+  for (const webpRoundTrip of [false, true]) {
+    test(`${encoding} preserves quadrant colors (WebP round trip=${webpRoundTrip})`, async () => {
+      const input = new URL(
+        `../fixtures/image/${encoding}-quadrants.jpg`,
+        import.meta.url,
+      );
+      const image = new Bun.Image(input.pathname);
+      const pipeline = webpRoundTrip
+        ? new Bun.Image(
+            await image.resize(400, 400).webp({ quality: 95 }).bytes(),
+          )
+        : image;
+      const decoded = decodeRgbaPng(await pipeline.png().bytes());
+      const size = webpRoundTrip ? 400 : 64;
+      expect([decoded.width, decoded.height]).toEqual([size, size]);
+      const quadrants = [
+        { x: 0.25, y: 0.25, rgb: [0, 255, 255] },
+        { x: 0.75, y: 0.25, rgb: [255, 0, 255] },
+        { x: 0.25, y: 0.75, rgb: [95, 143, 191] },
+        { x: 0.75, y: 0.75, rgb: [0, 0, 0] },
+      ];
+      for (const { x, y, rgb } of quadrants) {
+        const offset = (Math.floor(y * size) * size + Math.floor(x * size)) * 4;
+        const actual = Array.from(decoded.pixels.subarray(offset, offset + 3));
+        expect(
+          Math.max(
+            ...actual.map((value, channel) => Math.abs(value - rgb[channel]!)),
+          ),
+        ).toBeLessThanOrEqual(8);
+        expect(decoded.pixels.readUInt8(offset + 3)).toBe(255);
+      }
+    });
+  }
 }

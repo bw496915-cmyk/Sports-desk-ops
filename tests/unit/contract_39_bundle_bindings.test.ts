@@ -17,7 +17,26 @@ for (const minify of [false, true]) {
           { let exports2 = { value: 17 }; var exports = exports2; }
           return exports;
         }
-        module.exports = foo();
+        function parameter(exports2) {
+          var exports;
+          return [exports2, exports];
+        }
+        function caught() {
+          try { throw "caught"; } catch (exports2) { var exports = "assigned"; }
+          return exports;
+        }
+        function lexical(exports) {
+          let exports2 = "body";
+          return [exports, exports2];
+        }
+        function catchLexical() {
+          try { throw "caught"; } catch (exports) {
+            let exports2 = "body";
+            return [exports, exports2];
+          }
+        }
+        module.exports = { value: foo().value, parameter: parameter("argument"),
+          caught: caught(), lexical: lexical("argument"), catchLexical: catchLexical() };
         console.log(JSON.stringify(module.exports));
       `,
       );
@@ -54,7 +73,13 @@ for (const minify of [false, true]) {
         new Response(execution.stderr).text(),
       ]);
       expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
-      expect(JSON.parse(stdout)).toEqual({ value: 17 });
+      expect(JSON.parse(stdout)).toEqual({
+        value: 17,
+        parameter: ["argument", null],
+        caught: "assigned",
+        lexical: ["argument", "body"],
+        catchLexical: ["caught", "body"],
+      });
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

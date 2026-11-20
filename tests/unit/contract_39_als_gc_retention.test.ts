@@ -37,3 +37,67 @@ describe("AsyncLocalStorage GC retention", () => {
     });
   }
 });
+
+for (const mode of ["nested-run", "exit"] as const) {
+  for (const resource of ["promise", "immediate"] as const) {
+    test(`${mode} releases outer ALS payload while ${resource} continuation is pending`, async () => {
+      const storage = new AsyncLocalStorage<{ payload: Uint8Array }>();
+      const inner = { payload: new Uint8Array(8) };
+      const expected = mode === "exit" ? undefined : inner;
+      const latch = Promise.withResolvers<void>();
+      const started = Promise.withResolvers<void>();
+      const completed = Promise.withResolvers<void>();
+      const observed: unknown[] = [];
+      let immediate: ReturnType<typeof setImmediate> | undefined;
+      let pending: Promise<void> | undefined;
+      // This function's lexical environment contains no outer payload.
+      function arm() {
+        if (resource === "promise") {
+          pending = latch.promise.then(() => {
+            observed.push(storage.getStore());
+            completed.resolve();
+          });
+          started.resolve();
+        } else {
+          immediate = setImmediate(async () => {
+            observed.push(storage.getStore());
+            started.resolve();
+            try {
+              await latch.promise;
+              observed.push(storage.getStore());
+              completed.resolve();
+            } catch (error) {
+              completed.reject(error);
+            }
+          });
+        }
+      }
+      function allocateOuter() {
+        const outer = { payload: new Uint8Array(64 * 1024) };
+        const reference = new WeakRef(outer);
+        storage.run(outer, () => {
+          if (mode === "exit") storage.exit(arm);
+          else storage.run(inner, arm);
+          expect(storage.getStore()).toBe(outer);
+        });
+        return reference;
+      }
+      const reference = allocateOuter();
+      try {
+        await started.promise;
+        expect(storage.getStore()).toBeUndefined();
+        expect(await waitForCollection(reference)).toBe(true);
+        latch.resolve();
+        await completed.promise;
+        expect(observed).toEqual(
+          resource === "promise" ? [expected] : [expected, expected],
+        );
+      } finally {
+        latch.resolve();
+        if (immediate !== undefined) clearImmediate(immediate);
+        await pending;
+        storage.disable();
+      }
+    });
+  }
+}

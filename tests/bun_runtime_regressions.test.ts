@@ -67,3 +67,30 @@ for (const bodyType of ["Response", "Blob"] as const) {
     }
   });
 }
+
+// The species constructor returns a view overlapping the source in both directions.
+// https://github.com/oven-sh/bun/commit/d296efbb4e5bfcd45cd0e93da312c793a1f5b701
+for (const offset of [0, 2]) {
+  test(`TypedArray slice preserves values in an overlapping species view at offset ${offset}`, () => {
+    const buffer = new ArrayBuffer(6 * Int32Array.BYTES_PER_ELEMENT);
+    const source = new Int32Array(buffer, Int32Array.BYTES_PER_ELEMENT, 4);
+    source.set([11, 22, 33, 44]);
+    function OverlappingSpecies(length: number) {
+      return new Int32Array(
+        buffer,
+        offset * Int32Array.BYTES_PER_ELEMENT,
+        length,
+      );
+    }
+    Object.defineProperty(source, "constructor", {
+      value: { [Symbol.species]: OverlappingSpecies },
+    });
+    const result = source.slice(0, 4);
+    expect(result.buffer).toBe(buffer);
+    expect(result.byteOffset).toBe(offset * Int32Array.BYTES_PER_ELEMENT);
+    // Forward element-by-element copy observes writes into the overlapping source.
+    expect([...result]).toEqual(
+      offset === 0 ? [11, 22, 33, 44] : [11, 11, 11, 11],
+    );
+  });
+}
