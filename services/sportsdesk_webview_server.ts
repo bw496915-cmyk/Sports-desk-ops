@@ -1140,6 +1140,14 @@ export function startServer(options?: ServerOptions) {
     // /api/telegram/alert was accepted), which is a memory DoS on an unauthenticated port.
     maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
 
+    // Static route: zero-allocation dispatch for a liveness probe that, unlike
+    // /health, does not run the KPI/auth probes.
+    routes: {
+      "/healthz": new Response("ok\n", {
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      }),
+    },
+
     async fetch(req) {
       const url = new URL(req.url);
       const pathname = url.pathname;

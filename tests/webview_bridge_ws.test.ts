@@ -338,6 +338,14 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     expect(frame).toEqual(rollup as unknown as Frame);
   }, 20_000);
 
+  test("the static /healthz route answers without health probes", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/healthz`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    expect((await response.text()).trim()).toBe("ok");
+  });
+
   test("status reports the env-gated console live runtimes", async () => {
     const response = await fetch(`http://127.0.0.1:${hub.port}/api/status`);
 
