@@ -1,9 +1,11 @@
-import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { expect, spyOn, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   AutomatedDualTokenStore,
+  bunfigConsoleDepthFromDocument,
+  readBunfigConsoleDepth,
   runCodegenSubcommand,
 } from "../lib/token_automation.ts";
 
@@ -184,5 +186,130 @@ test("upsertToken accepts the documented Bun.ColorInput forms", () => {
     ]);
   } finally {
     store.close();
+  }
+});
+
+test("parses [console].depth from bunfig and rejects non-integers", async () => {
+  expect(bunfigConsoleDepthFromDocument({ console: { depth: 8 } })).toBe(8);
+  expect(
+    bunfigConsoleDepthFromDocument({ console: { depth: "8" } }),
+  ).toBeNull();
+  expect(
+    bunfigConsoleDepthFromDocument({ console: { depth: 1.5 } }),
+  ).toBeNull();
+  expect(bunfigConsoleDepthFromDocument({ console: { depth: -1 } })).toBeNull();
+  expect(
+    bunfigConsoleDepthFromDocument({ console: { depth: 999_999 } }),
+  ).toBeNull();
+  expect(bunfigConsoleDepthFromDocument({})).toBeNull();
+  expect(bunfigConsoleDepthFromDocument(null)).toBeNull();
+
+  const dir = mkdtempSync(join(tmpdir(), "bunfig-depth-"));
+  try {
+    const path = join(dir, "bunfig.toml");
+    await Bun.write(path, "[console]\ndepth = 5\n");
+    expect(await readBunfigConsoleDepth(path)).toBe(5);
+    await Bun.write(path, "[console]\ndepth = many\n");
+    expect(await readBunfigConsoleDepth(path)).toBeNull();
+    expect(await readBunfigConsoleDepth(join(dir, "missing.toml"))).toBeNull();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("codegen falls back to bunfig depth and persists an explicit --depth", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "codegen-depth-"));
+  const dbPath = join(dir, "tokens.sqlite");
+  const bunfigPath = join(dir, "bunfig.toml");
+  const written = process.stdout.write.bind(process.stdout);
+  process.stdout.write = (() => true) as typeof process.stdout.write;
+  const warnings: string[] = [];
+  const errorSpy = spyOn(console, "error").mockImplementation(
+    (...args: unknown[]) => {
+      warnings.push(args.map(String).join(" "));
+    },
+  );
+  try {
+    await Bun.write(bunfigPath, "[console]\ndepth = 5\n");
+    expect(
+      await runCodegenSubcommand(
+        dbPath,
+        ["--profile", "default", "--out-dir", join(dir, "fallback")],
+        { bunfigPath },
+      ),
+    ).toBe(0);
+    const fallback = await Bun.file(
+      join(dir, "fallback", ".env.default"),
+    ).text();
+    expect(fallback).toContain('PTY_CONSOLE_DEPTH="5"');
+    expect(fallback).toContain('BUN_OPTIONS="--console-depth=5"');
+
+    expect(
+      await runCodegenSubcommand(
+        dbPath,
+        [
+          "--profile",
+          "default",
+          "--out-dir",
+          join(dir, "explicit"),
+          "--depth",
+          "7",
+        ],
+        { bunfigPath },
+      ),
+    ).toBe(0);
+    const explicit = await Bun.file(
+      join(dir, "explicit", ".env.default"),
+    ).text();
+    // The explicit depth is stored, but bunfig wins at runtime, so the artifact
+    // records 5 and the CLI warns.
+    expect(explicit).toContain('PTY_CONSOLE_DEPTH="5"');
+    expect(explicit).toContain('BUN_OPTIONS="--console-depth=5"');
+    expect(warnings.join("\n")).toContain("WARN_DEPTH_OVERRIDDEN");
+
+    const store = new AutomatedDualTokenStore(dbPath, true);
+    try {
+      expect(store.getInspect("default").consoleDepth).toBe(7);
+    } finally {
+      store.close();
+    }
+
+    // Without a bunfig depth the explicit value is effective.
+    expect(
+      await runCodegenSubcommand(dbPath, [
+        "--profile",
+        "default",
+        "--out-dir",
+        join(dir, "no-bunfig"),
+        "--depth",
+        "9",
+      ]),
+    ).toBe(0);
+    const noBunfig = await Bun.file(
+      join(dir, "no-bunfig", ".env.default"),
+    ).text();
+    expect(noBunfig).toContain('PTY_CONSOLE_DEPTH="9"');
+    expect(noBunfig).toContain('BUN_OPTIONS="--console-depth=9"');
+
+    // An invalid depth is rejected before the store is even opened: the profile
+    // file is byte-identical afterwards, not merely semantically unchanged.
+    const beforeInvalid = readFileSync(dbPath);
+    expect(
+      await runCodegenSubcommand(
+        dbPath,
+        ["--profile", "default", "--depth", "not-a-number"],
+        { bunfigPath },
+      ),
+    ).toBe(2);
+    expect(readFileSync(dbPath).equals(beforeInvalid)).toBe(true);
+    const afterInvalid = new AutomatedDualTokenStore(dbPath, true);
+    try {
+      expect(afterInvalid.getInspect("default").consoleDepth).toBe(9);
+    } finally {
+      afterInvalid.close();
+    }
+  } finally {
+    process.stdout.write = written;
+    rmSync(dir, { recursive: true, force: true });
   }
 });

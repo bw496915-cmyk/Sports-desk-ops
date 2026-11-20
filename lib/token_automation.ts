@@ -274,6 +274,25 @@ export class AutomatedDualTokenStore {
     };
   }
 
+  /**
+   * Persist one profile's console depth. Accepts 0..999998; 999999 is the stored
+   * sentinel for `Number.POSITIVE_INFINITY` and is not a settable depth here.
+   */
+  setConsoleDepth(profile: string, depth: number): void {
+    if (!Number.isInteger(depth) || depth < 0 || depth >= 999_999) {
+      throw new RangeError(`ERR_PTY_CONSOLE_DEPTH_INVALID: ${String(depth)}`);
+    }
+    this.db
+      .query(
+        `INSERT INTO profile_settings (profile, console_depth, sorted, compact, max_array_length, updated_at)
+         VALUES (?1, ?2, 0, 0, 100, unixepoch())
+         ON CONFLICT(profile) DO UPDATE SET
+           console_depth = excluded.console_depth,
+           updated_at = unixepoch()`,
+      )
+      .run(profile, depth);
+  }
+
   listProfiles(): string[] {
     return this.db
       .query("SELECT DISTINCT profile FROM dual_theme_tokens ORDER BY profile")
@@ -348,6 +367,8 @@ export class AutomatedDualTokenStore {
       env?: Record<string, string | undefined>;
       isTTY?: boolean;
       columns?: number;
+      /** Emit this depth instead of the profile's stored value (no DB write). */
+      consoleDepthOverride?: number;
     },
   ): GeneratedProfileBundle {
     const rows = this.getRows(profile);
@@ -368,7 +389,11 @@ export class AutomatedDualTokenStore {
     const isTTY = options?.isTTY ?? Boolean(process.stdout.isTTY);
     const depth = detectColorDepth(mergedEnv, isTTY);
     const ansiFormat = depthToAnsiFormat(depth);
-    const inspect = this.getInspect(profile);
+    const storedInspect = this.getInspect(profile);
+    const inspect =
+      options?.consoleDepthOverride === undefined
+        ? storedInspect
+        : { ...storedInspect, consoleDepth: options.consoleDepthOverride };
 
     const rowByRole = new Map(rows.map((row) => [row.role, row]));
     const tokens = {} as Record<ThemeRole, DerivedColorToken | null>;
@@ -494,7 +519,11 @@ export class AutomatedDualTokenStore {
   async emitArtifacts(
     profile: string,
     outDir: string,
-    options?: { env?: Record<string, string | undefined>; isTTY?: boolean },
+    options?: {
+      env?: Record<string, string | undefined>;
+      isTTY?: boolean;
+      consoleDepthOverride?: number;
+    },
   ): Promise<{
     envFile: string;
     tsFile: string;
@@ -534,21 +563,78 @@ export class AutomatedDualTokenStore {
   }
 }
 
+/** Parse one `--depth` value; integers only, below the Infinity sentinel. */
+function parseDepthFlag(raw: string | undefined): number | null {
+  if (raw === undefined || !/^\d+$/.test(raw.trim())) return null;
+  const value = Number(raw.trim());
+  if (!Number.isSafeInteger(value) || value < 0 || value >= 999_999)
+    return null;
+  return value;
+}
+
+/**
+ * `[console].depth` from a parsed bunfig document, or null when absent/invalid.
+ * The TOML is external data, so every level is checked before the number is used.
+ */
+export function bunfigConsoleDepthFromDocument(
+  document: unknown,
+): number | null {
+  if (typeof document !== "object" || document === null) return null;
+  if (!("console" in document)) return null;
+  const section = document.console;
+  if (typeof section !== "object" || section === null) return null;
+  if (!("depth" in section)) return null;
+  const depth = section.depth;
+  if (
+    typeof depth !== "number" ||
+    !Number.isInteger(depth) ||
+    depth < 0 ||
+    depth >= 999_999
+  ) {
+    return null;
+  }
+  return depth;
+}
+
+/** Read `[console].depth` from a bunfig.toml; a missing or malformed file is null. */
+export async function readBunfigConsoleDepth(
+  path: string,
+): Promise<number | null> {
+  try {
+    return bunfigConsoleDepthFromDocument(
+      Bun.TOML.parse(await Bun.file(path).text()),
+    );
+  } catch {
+    return null;
+  }
+}
+
+export interface CodegenSubcommandOptions {
+  /** bunfig.toml consulted for `[console].depth` when `--depth` is absent. */
+  readonly bunfigPath?: string | undefined;
+}
+
 /**
  * `codegen` subcommand body: emit both artifacts for one profile and print a short summary.
  *
- * Kept as a function because this repo has no `profile-cli.ts`; wire it into whatever CLI owns
- * profile management. Accepts flags (`--profile X --out-dir Y`) or the positional form.
+ * Accepts flags (`--profile X --out-dir Y --depth N`) or the positional form. An explicit
+ * `--depth` is persisted on the profile; otherwise `[console].depth` from the supplied bunfig
+ * is emitted (the runtime value that actually wins), and the stored profile depth is the last
+ * fallback.
  * @param dbPath - SQLite file the dual-token store lives in.
  * @param args - subcommand arguments after `codegen`.
- * @returns process exit code: 0 written, 2 unknown profile, 1 failure.
+ * @param options - `bunfigPath` enables the bunfig fallback.
+ * @returns process exit code: 0 written, 2 unknown profile or invalid depth, 1 failure.
  */
 export async function runCodegenSubcommand(
   dbPath: string,
   args: string[],
+  options?: CodegenSubcommandOptions,
 ): Promise<number> {
   let profileFlag: string | undefined;
   let outDirFlag: string | undefined;
+  let depthFlag: number | undefined;
+  let depthInvalid = false;
   const positional: string[] = [];
   for (let index = 0; index < args.length; index++) {
     const arg = args[index]!;
@@ -558,7 +644,19 @@ export async function runCodegenSubcommand(
     else if (arg === "--out-dir") outDirFlag = args[++index];
     else if (arg.startsWith("--out-dir="))
       outDirFlag = arg.slice("--out-dir=".length);
-    else if (!arg.startsWith("--")) positional.push(arg);
+    else if (arg === "--depth") {
+      const parsed = parseDepthFlag(args[++index]);
+      if (parsed === null) depthInvalid = true;
+      else depthFlag = parsed;
+    } else if (arg.startsWith("--depth=")) {
+      const parsed = parseDepthFlag(arg.slice("--depth=".length));
+      if (parsed === null) depthInvalid = true;
+      else depthFlag = parsed;
+    } else if (!arg.startsWith("--")) positional.push(arg);
+  }
+  if (depthInvalid) {
+    console.error("ERR_DEPTH_INVALID: --depth must be an integer in 0..999998");
+    return 2;
   }
   const profile =
     profileFlag ?? positional[0] ?? Bun.env.PTY_PROFILE ?? "default";
@@ -570,10 +668,32 @@ export async function runCodegenSubcommand(
       console.error(`ERR_PROFILE_NOT_FOUND: "${profile}"`);
       return 2;
     }
+    if (depthFlag !== undefined) store.setConsoleDepth(profile, depthFlag);
+    const bunfigDepth =
+      options?.bunfigPath === undefined
+        ? null
+        : await readBunfigConsoleDepth(options.bunfigPath);
+    // Measured on Bun 1.4.4: a bunfig [console].depth beats both a literal argv
+    // --console-depth and BUN_OPTIONS, so the artifact must record the config value.
+    if (
+      depthFlag !== undefined &&
+      bunfigDepth !== null &&
+      bunfigDepth !== depthFlag
+    ) {
+      console.error(
+        `WARN_DEPTH_OVERRIDDEN: --depth ${depthFlag} is stored on "${profile}", but bunfig [console].depth=${bunfigDepth} wins at runtime`,
+      );
+    }
+    const effectiveDepth = bunfigDepth ?? depthFlag ?? undefined;
     const { envFile, tsFile, bundle } = await store.emitArtifacts(
       profile,
       outDir,
-      { isTTY: true },
+      {
+        isTTY: true,
+        ...(effectiveDepth === undefined
+          ? {}
+          : { consoleDepthOverride: effectiveDepth }),
+      },
     );
     process.stdout.write(
       store.renderMarkdown(

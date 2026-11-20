@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { bunfigConsoleDepthFromDocument } from "../lib/token_automation.ts";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -63,6 +64,55 @@ describe("theme codegen CLI", () => {
     ]);
     expect(result.exitCode).toBe(2);
     expect(result.stderr.toString()).toContain("ERR_PROFILE_NOT_FOUND");
+  });
+
+  test("--depth is stored but emits the effective bunfig depth", async () => {
+    const dir = scratch();
+    const result = runCli([
+      "codegen",
+      "--profile",
+      "crimson-dry",
+      "--out-dir",
+      join(dir, "out"),
+      "--db",
+      join(dir, "tokens.sqlite"),
+      "--depth",
+      "6",
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    const bunfigDepth = bunfigConsoleDepthFromDocument(
+      Bun.TOML.parse(readFileSync(join(ROOT, "bunfig.toml"), "utf8")),
+    );
+    const env = readFileSync(join(dir, "out", ".env.crimson-dry"), "utf8");
+    if (bunfigDepth === null) {
+      expect(env).toContain('PTY_CONSOLE_DEPTH="6"');
+      expect(result.stderr.toString()).not.toContain("WARN_DEPTH_OVERRIDDEN");
+    } else {
+      // Measured on 1.4.4: bunfig wins over both argv and BUN_OPTIONS.
+      expect(env).toContain(`PTY_CONSOLE_DEPTH="${bunfigDepth}"`);
+      expect(env).toContain(`BUN_OPTIONS="--console-depth=${bunfigDepth}"`);
+      expect(result.stderr.toString()).toContain("WARN_DEPTH_OVERRIDDEN");
+    }
+  });
+
+  test("--depth rejects a non-integer before writing", () => {
+    const dir = scratch();
+    const result = runCli([
+      "codegen",
+      "--profile",
+      "default",
+      "--out-dir",
+      join(dir, "out"),
+      "--db",
+      join(dir, "tokens.sqlite"),
+      "--depth",
+      "6.5",
+    ]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.toString()).toContain("ERR_DEPTH_INVALID");
+    expect(existsSync(join(dir, "out", ".env.default"))).toBe(false);
   });
 
   test("exits 2 with usage when no subcommand is given", () => {
