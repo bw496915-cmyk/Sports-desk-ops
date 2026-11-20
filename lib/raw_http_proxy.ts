@@ -7,7 +7,7 @@
  * client send buffer is full.
  */
 
-import type { Server, ServerWebSocket } from "bun";
+import type { Server, ServerWebSocket, WebSocketOptions } from "bun";
 
 export interface RawHttpProxyOptions {
   readonly hostname: string;
@@ -23,6 +23,13 @@ export interface RawHttpProxyOptions {
   readonly maxWebSocketQueueBytes?: number;
   /** Forward the client address as a fresh X-Forwarded-For (default false). */
   readonly forwardClientIp?: boolean;
+  /**
+   * Outbound WebSocket client options: TLS (`ca`, client certs), an HTTP
+   * proxy (including `proxy.tls` for HTTPS proxies) and `perMessageDeflate`.
+   * `headers` is omitted because the proxy forwards the inbound request's
+   * headers itself.
+   */
+  readonly webSocketOptions?: Omit<WebSocketOptions, "headers">;
 }
 
 export interface ProxySession {
@@ -431,7 +438,11 @@ export function createRawHttpProxy(options: RawHttpProxyOptions): RawHttpProxy {
       headers.set("sec-websocket-protocol", protocols.join(", "));
     }
     const url = upstreamUrl(req, options.hostname, options.port, tls);
-    const upstream = new WebSocket(url, { headers });
+    const upstreamOptions: WebSocketOptions = {
+      ...(options.webSocketOptions ?? {}),
+      headers,
+    };
+    const upstream = new WebSocket(url, upstreamOptions);
     upstream.binaryType = "arraybuffer";
 
     try {

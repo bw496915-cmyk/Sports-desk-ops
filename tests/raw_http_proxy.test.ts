@@ -19,6 +19,11 @@ let proxy: ReturnType<typeof Bun.serve<ProxySession>>;
 let lastUpgradeHeaders: Headers | null = null;
 let upstreamClose: { code: number; reason: string } | null = null;
 
+/** Read through a function so a reset elsewhere does not narrow the type. */
+function currentUpgradeHeaders(): Headers | null {
+  return lastUpgradeHeaders;
+}
+
 beforeAll(() => {
   upstream = Bun.serve({
     port: 0,
@@ -204,6 +209,37 @@ test("times out a slow upstream", async () => {
     expect(response.status).toBe(504);
   } finally {
     slowProxy.stop(true);
+  }
+});
+
+test("passes perMessageDeflate: false through to the upstream handshake", async () => {
+  lastUpgradeHeaders = null;
+  const noDeflateProxy = Bun.serve<ProxySession>({
+    port: 0,
+    hostname: "127.0.0.1",
+    ...createRawHttpProxy({
+      hostname: "127.0.0.1",
+      port: upstreamPort,
+      webSocketOptions: { perMessageDeflate: false },
+    }),
+  });
+  const socket = new WebSocket(`ws://127.0.0.1:${noDeflateProxy.port}/ws`);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      socket.addEventListener("open", () => resolve(), { once: true });
+      socket.addEventListener(
+        "error",
+        () => reject(new Error("client error")),
+        {
+          once: true,
+        },
+      );
+    });
+    expect(currentUpgradeHeaders()?.get("sec-websocket-extensions")).toBeNull();
+  } finally {
+    socket.close();
+    noDeflateProxy.stop(true);
   }
 });
 
