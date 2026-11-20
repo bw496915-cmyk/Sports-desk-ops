@@ -815,6 +815,12 @@ export function resolveAllowedOrigins(
   return allowedOrigins;
 }
 
+/** The runtime's own truthy-flag vocabulary, mirrored from the console runtimes. */
+function envFlag(value: string | undefined): boolean {
+  if (value === undefined) return false;
+  return ["1", "true", "on", "yes"].includes(value.trim().toLowerCase());
+}
+
 interface PackageMeta {
   readonly name?: string;
   readonly version?: string;
@@ -873,6 +879,17 @@ function buildStaticRoutes(
         version: meta.version ?? "unknown",
         bun: Bun.version,
         env: Bun.env.NODE_ENV ?? "development",
+      }),
+    },
+    "/api/config": {
+      OPTIONS: preflight,
+      GET: Response.json({
+        env: Bun.env.NODE_ENV ?? "development",
+        runtime: `bun ${Bun.version}`,
+        features: {
+          wagerTelemetry: envFlag(Bun.env.SPORTSDESK_WAGER_TELEMETRY),
+          thresholdAlerts: envFlag(Bun.env.SPORTSDESK_THRESHOLD_ALERTS),
+        },
       }),
     },
   };

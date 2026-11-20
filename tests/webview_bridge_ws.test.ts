@@ -564,7 +564,13 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     expect(version.status).toBe(200);
   });
   test("routed endpoints preserve the global OPTIONS preflight", async () => {
-    for (const path of ["/health", "/healthz", "/api/version", "/status"]) {
+    for (const path of [
+      "/health",
+      "/healthz",
+      "/api/version",
+      "/api/config",
+      "/status",
+    ]) {
       const response = await fetch(`http://127.0.0.1:${hub.port}${path}`, {
         method: "OPTIONS",
         headers: {
@@ -575,6 +581,24 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
       expect(response.status).toBe(204);
       expect(await response.text()).toBe("");
     }
+  });
+
+  test("the static /api/config route reports non-secret features", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/api/config`);
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      env?: unknown;
+      runtime?: unknown;
+      features?: {
+        wagerTelemetry?: unknown;
+        thresholdAlerts?: unknown;
+      };
+    };
+    expect(body.env).toBe(Bun.env.NODE_ENV ?? "development");
+    expect(typeof body.runtime).toBe("string");
+    expect(typeof body.features?.wagerTelemetry).toBe("boolean");
+    expect(typeof body.features?.thresholdAlerts).toBe("boolean");
   });
 
   test("the async /health route survives a static-route reload", async () => {
