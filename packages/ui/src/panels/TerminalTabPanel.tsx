@@ -2,6 +2,7 @@ import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderAnsiReact } from "../ansi.tsx";
 import { styles } from "../dashboard_styles.ts";
+import { formatBytes } from "../format_bytes.ts";
 import { suggestTerminalCommands } from "../terminal_catalog.ts";
 import {
   formatTerminalTranscript,
@@ -500,6 +501,19 @@ export function TerminalTabPanel({
             </div>
             <div style={styles.terminalOutput}>
               {renderAnsiReact(visibleOutput(idx, item.stdout))}
+              {item.truncated === true && (
+                <div
+                  data-terminal-truncated="true"
+                  style={{
+                    marginTop: "6px",
+                    color: "#fbbf24",
+                    fontSize: "11px",
+                  }}
+                >
+                  ⚠ Output truncated — showing the tail of a{" "}
+                  {formatBytes(item.outputBytes)} run.
+                </div>
+              )}
               {!filterResult.active &&
                 item.stdout.split("\n").length >
                   TERMINAL_OUTPUT_PREVIEW_LINES && (
