@@ -15,6 +15,12 @@ beforeAll(() => {
     routes: {
       "/users/me": () => new Response("me"),
       "/users/:id": (req) => Response.json({ id: req.params.id }),
+      "/async/:id": async (req) =>
+        Response.json({ id: req.params.id, async: true }),
+      "/promised": () =>
+        new Promise<Response>((resolve) => {
+          setTimeout(() => resolve(new Response("promised")), 5);
+        }),
       "/files/*": (req) => new Response(new URL(req.url).pathname),
       "/healthz": new Response("ok\n", {
         headers: { "content-type": "text/plain; charset=utf-8" },
@@ -60,6 +66,20 @@ describe("Bun.serve routes", () => {
     expect(await response.text()).toContain("\uFFFD");
   });
 
+  test("an async handler returns a Promise<Response>", async () => {
+    const response = await fetch(url("/async/7"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ id: "7", async: true });
+  });
+
+  test("a handler may return a Promise<Response>", async () => {
+    const response = await fetch(url("/promised"));
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("promised");
+  });
+
   test("a wildcard route matches the remaining path", async () => {
     const response = await fetch(url("/files/a/b"));
 
@@ -81,4 +101,27 @@ describe("Bun.serve routes", () => {
     expect(response.status).toBe(404);
     expect(await response.text()).toBe("fallback");
   });
+});
+
+test("route precedence: exact, parameter, wildcard, catch-all", async () => {
+  const server = Bun.serve({
+    port: 0,
+    routes: {
+      "/api/users/me": () => new Response("exact"),
+      "/api/users/:id": (req) => new Response(`param:${req.params.id}`),
+      "/api/*": () => new Response("wildcard"),
+      "/*": () => new Response("catch-all"),
+    },
+  });
+  const url = (path: string): string =>
+    `http://127.0.0.1:${server.port}${path}`;
+
+  try {
+    expect(await (await fetch(url("/api/users/me"))).text()).toBe("exact");
+    expect(await (await fetch(url("/api/users/42"))).text()).toBe("param:42");
+    expect(await (await fetch(url("/api/other"))).text()).toBe("wildcard");
+    expect(await (await fetch(url("/elsewhere"))).text()).toBe("catch-all");
+  } finally {
+    server.stop(true);
+  }
 });
