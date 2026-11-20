@@ -124,6 +124,7 @@
     "bench:score-layout": "bun run scripts/bench_score_layout.ts",
     "bench:graded-wager": "bun run scripts/bench_graded_wager.ts",
     "bench:node-builtins": "bun run scripts/bench_node_builtins.ts",
+    "bench:telemetry": "bun run scripts/bench_telemetry_hub.ts",
     "graph:agent:views": "bun run scripts/build_agent_graph_views.ts",
     "theme:codegen": "bun cli/theme_codegen.ts codegen",
     "console:depth": "bun cli/console_depth.ts",
