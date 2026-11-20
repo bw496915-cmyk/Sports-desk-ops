@@ -22,7 +22,6 @@ import {
   type BridgeRollupJobId,
   type BridgeSpawnResult,
 } from "../lib/bridge_rollup_cron.ts";
-import { resolveBridgeWeblogCorpusFrom } from "../lib/f402_weblog_bridge_inputs.ts";
 
 type Artifacts = Partial<Record<BridgeRollupJobId, unknown>>;
 
@@ -561,8 +560,7 @@ describe("bridge rollup cycle", () => {
       "--no-env-file",
       "run",
       "scripts/f402_weblog_bridge.ts",
-      "--from",
-      resolveBridgeWeblogCorpusFrom(root, { now: () => new Date(NOW) }),
+      "--capture-pending",
       "--out",
       join(root, "scratch", "bridge-rollup", "weblog.json"),
     ]);
@@ -648,8 +646,7 @@ describe("bridge rollup cycle", () => {
       "--no-env-file",
       "run",
       "scripts/f402_weblog_bridge.ts",
-      "--from",
-      "{weblogFrom}",
+      "--capture-pending",
       "--out",
       "{root}/scratch/bridge-rollup/weblog.json",
     ]);

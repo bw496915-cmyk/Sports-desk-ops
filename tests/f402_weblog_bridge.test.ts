@@ -255,7 +255,25 @@ describe("f402_weblog_bridge Pass 1 guards & CAS", () => {
   });
 
   test("publishF402WeblogRollup verifies stat.size, stamps dual-clock lineage, and promotes manifests/f402-weblog/latest with If-Match CAS", async () => {
-    const rollup = sampleRollup();
+    const rollup: WebLogRollup = {
+      ...sampleRollup(),
+      coverage: {
+        scope: "live-pending-accounts",
+        wholeBookComplete: false,
+        snapshotCapturedAt: "2026-11-19T12:00:00Z",
+        capturedAt: "2026-11-19T12:05:00Z",
+        reportDate: "2026-11-19",
+        snapshotTicketRows: 50,
+        unidentifiedTicketRows: 5,
+        eligibleAccounts: 20,
+        requestedAccounts: 20,
+        completedAccounts: 20,
+        accountsWithActivity: 18,
+        emptyAccounts: 2,
+        failedAccounts: 0,
+        activityRows: 658,
+      },
+    };
     const writes: Array<{
       key: string;
       bytes: number;
@@ -311,6 +329,8 @@ describe("f402_weblog_bridge Pass 1 guards & CAS", () => {
     expect(res.manifestIfMatch).toBe('"etag-v1"');
     expect(res.manifestIfNoneMatch).toBeNull();
     expect(res.pointerOutcome).toBe("written");
+    for (const write of writes)
+      expect(JSON.parse(write.body).coverage).toEqual(rollup.coverage);
     expect(res.dataWindowMaxEpochMs).toBe(rollup.window.toMs);
     expect(res.r2PublishedAtEpochMs).toBe(nowMs);
 

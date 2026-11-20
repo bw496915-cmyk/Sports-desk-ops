@@ -327,7 +327,7 @@ export class ReportingSchedulerService {
         scheduleTime: "7 * * * *",
         reportType: "BRIDGE_ROLLUP_DIGEST",
         description:
-          "Runs the WebLog corpus rollup hourly at minute 7 and sends an on-change Mode 6 digest. Overlaps are skipped.",
+          "Captures Mode A for recent live pending accounts, then publishes the scoped WebLog rollup hourly at minute 7. On-change Mode 6 digest; overlaps are skipped.",
         tz: "America/Chicago",
         bridgeJobs: ["weblog"],
         enabled: true,

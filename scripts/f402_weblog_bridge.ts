@@ -23,6 +23,18 @@ import {
 } from "../lib/f402_weblog.ts";
 import { weblogPublishDataWindowLogLine } from "../lib/f402_weblog_publish_log.ts";
 
+import {
+  capturePendingAccountWeblog,
+  type WeblogAccountCoverage,
+} from "../lib/f402_weblog_capture.ts";
+import { createF402ReplayTransport } from "../lib/f402_replay_transport.ts";
+import {
+  F402_KEYCHAIN_NAMES,
+  readSecretCanonicalThenLegacy,
+} from "../lib/secrets.ts";
+import { persistWebLogCapture } from "../lib/f402_weblog_fetch.ts";
+import { defaultWeblogCapturePath } from "../lib/f402_weblog_bridge_inputs.ts";
+
 const MAX_WEBLOG_PUBLISH_BYTES = 256 * 1024;
 const WEBLOG_MANIFEST_KEY = "manifests/f402-weblog/latest";
 const WEBLOG_LATEST_KEY = "f402-weblog/latest.json";
@@ -295,6 +307,7 @@ export async function publishF402WeblogRollup(options: {
     data_window_max_epoch_ms: dataWindowMaxEpochMs,
     r2_published_at_epoch_ms: r2PublishedAtEpochMs,
     generatedAt: publishedAtIso,
+    ...(rollup.coverage === undefined ? {} : { coverage: rollup.coverage }),
   };
   const manifestBody = assertSanitizedF402Weblog(manifestPayload);
   // Zero rebases on HTTP 412: R2PreconditionFailedError propagates cleanly.
@@ -319,6 +332,7 @@ export async function publishF402WeblogRollup(options: {
     data_window_max_epoch_ms: dataWindowMaxEpochMs,
     r2_published_at_epoch_ms: r2PublishedAtEpochMs,
     generatedAt: publishedAtIso,
+    ...(rollup.coverage === undefined ? {} : { coverage: rollup.coverage }),
   };
   const pointerBody = assertSanitizedF402Weblog(pointerPayload);
   options.onStage?.("pointer");
@@ -350,11 +364,16 @@ export function formatWeblogBridgeHelp(): string {
 Capture + rollup (live getWebLog):
   bun run --filter sportsdesk-ops weblog:rollup --fetch-mode A [--date YYYY-MM-DD] [--save-capture path]
 
+Scheduled account-scoped capture + rollup:
+  bun run --filter sportsdesk-ops weblog:rollup --capture-pending
+
 Rollup only (existing JSONL corpus):
   bun run --filter sportsdesk-ops weblog:rollup --from out/f402/weblog/11-08-2026.jsonl
 
 Options:
-  --from           Comma-separated JSONL paths (required without --fetch-mode)
+  --capture-pending Capture Mode A for accounts in a recent live pending snapshot (scheduled mode)
+  --pending-snapshot Snapshot path (default: data/live-bets.json; maximum age 1 hour)
+  --from           Comma-separated JSONL paths (offline/manual rollup)
   --fetch-mode     A|C — fetch getWebLog activity weblog, write JSONL, then roll up
   --save-capture   Capture path (default: out/f402/weblog/MM-DD-YYYY.jsonl)
   --date           Desk date YYYY-MM-DD for fetch (default: today UTC)
@@ -372,6 +391,8 @@ async function main(): Promise<void> {
     args: Bun.argv.slice(2),
     options: {
       from: { type: "string" },
+      "capture-pending": { type: "boolean", default: false },
+      "pending-snapshot": { type: "string" },
       bets: { type: "string" },
       out: { type: "string" },
       "fetch-mode": { type: "string" },
@@ -390,9 +411,68 @@ async function main(): Promise<void> {
     console.log(formatWeblogBridgeHelp());
     process.exit(0);
   }
-  const corpus = await resolveWeblogCorpusPaths(values, {
-    log: (line) => console.error(line),
-  });
+  let coverage: WeblogAccountCoverage | undefined;
+  let capturedPath: string | undefined;
+  if (values["capture-pending"]) {
+    if (
+      values.from ||
+      values["fetch-mode"] ||
+      values.date ||
+      values["customer-id"] ||
+      values.ip
+    )
+      throw new Error(
+        "--capture-pending cannot be combined with --from, --fetch-mode, --date, --customer-id or --ip",
+      );
+    const agentId =
+      Bun.env.F402_AGENT_ID?.trim() ||
+      (await readSecretCanonicalThenLegacy(F402_KEYCHAIN_NAMES.agentId));
+    if (!agentId) throw new Error("weblog capture requires F402_AGENT_ID");
+    const snapshotFile = Bun.file(
+      values["pending-snapshot"] ?? "data/live-bets.json",
+    );
+    if (snapshotFile.size > 8 * 1024 * 1024)
+      throw new Error("weblog pending snapshot exceeds 8 MiB");
+    const snapshot: unknown = await snapshotFile.json();
+    const transport = await createF402ReplayTransport();
+    try {
+      const capture = await capturePendingAccountWeblog({
+        snapshot,
+        agentId,
+        fetchActivity: (body) =>
+          transport.fetch(
+            "https://fantasy402.com/cloud/api/Manager/getWebLog",
+            {
+              method: "POST",
+              headers: {
+                "content-type":
+                  "application/x-www-form-urlencoded; charset=UTF-8",
+                accept: "application/json, text/plain, */*",
+                "x-requested-with": "XMLHttpRequest",
+              },
+              body,
+              signal: AbortSignal.timeout(10_000),
+            },
+          ),
+      });
+      coverage = capture.coverage;
+      capturedPath =
+        values["save-capture"] ??
+        defaultWeblogCapturePath(new Date().toISOString().slice(0, 10));
+      persistWebLogCapture(capturedPath, capture.rows);
+      console.error(
+        `[weblog] coverage=${coverage.completedAccounts}/${coverage.eligibleAccounts} pending accounts, active=${coverage.accountsWithActivity}, empty=${coverage.emptyAccounts}, unidentifiedTickets=${coverage.unidentifiedTicketRows}/${coverage.snapshotTicketRows}, wholeBookComplete=false`,
+      );
+    } finally {
+      await transport.close();
+    }
+  }
+  const corpus =
+    capturedPath === undefined
+      ? await resolveWeblogCorpusPaths(values, {
+          log: (line) => console.error(line),
+        })
+      : { ok: true as const, paths: [capturedPath] };
   if (!corpus.ok) {
     console.error(corpus.message);
     process.exit(corpus.exitCode);
@@ -424,7 +504,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const bets = await readBetsWindow(betsPath, fromMs, toMs);
-  const rollup = buildWeblogRollup(web, bets, fromMs, toMs);
+  const rollup = {
+    ...buildWeblogRollup(web, bets, fromMs, toMs),
+    ...(coverage === undefined ? {} : { coverage }),
+  };
   const failed = rollup.gates.filter((g) => g.status === "fail");
   console.error(
     `[weblog] rows=${rollup.rows.parsed}/${rollup.rows.total} malformed=${rollup.rows.malformed} wagers=${rollup.join.totalWindowWagers} matched=${rollup.join.matched} ${rollup.gates.map((g) => `${g.gate}:${g.status}`).join(" ")}`,
