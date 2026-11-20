@@ -85,7 +85,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.4` · [reference](https://bun.com/reference/bun/gc)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `scripts/bench_bridge3a_workload.ts`, `scripts/bench_bridge3b_workload.ts`
-- **Evidence:** `test:tests/bun_test_patterns.test.ts`, `test:tests/f402_bet_ticker_delta.test.ts`, `test:tests/nsh_frame_evidence.test.ts`, `probe:proc.spawn`
+- **Evidence:** `test:tests/bun_test_patterns.test.ts`, `test:tests/f402_bet_ticker_delta.test.ts`, `test:tests/nsh_frame_evidence.test.ts`, `test:tests/unit/contract_39_als_gc_retention.test.ts`
 
 #### Bun.generateHeapSnapshot
 
