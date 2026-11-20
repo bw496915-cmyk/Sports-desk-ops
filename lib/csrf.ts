@@ -23,22 +23,33 @@ export const CSRF_HEADER_NAME = "x-csrf-token";
 export interface CsrfOptions {
   secret?: string;
   maxAge?: number;
+  /** Bind the token to one session; verification with another id fails. */
+  sessionId?: string;
 }
 
 export const issueCsrf = (opts?: CsrfOptions): string => {
   const sec = opts?.secret ?? SECRET;
-  return sec !== undefined ? CSRF.generate(sec) : CSRF.generate();
+  const generateOptions =
+    opts?.sessionId === undefined ? undefined : { sessionId: opts.sessionId };
+  return sec !== undefined
+    ? CSRF.generate(sec, generateOptions)
+    : CSRF.generate(undefined, generateOptions);
 };
 
 export const verifyCsrf = (token: string, opts?: CsrfOptions): boolean => {
   if (!token) return false;
   try {
     const sec = opts?.secret ?? SECRET;
-    const verifyOpts: { secret?: string; maxAge?: number } = {
+    const verifyOpts: {
+      secret?: string;
+      maxAge?: number;
+      sessionId?: string;
+    } = {
       maxAge: opts?.maxAge ?? SESSION_IDLE_MS,
     };
-    if (sec !== undefined) {
-      verifyOpts.secret = sec;
+    if (sec !== undefined) verifyOpts.secret = sec;
+    if (opts?.sessionId !== undefined) {
+      verifyOpts.sessionId = opts.sessionId;
     }
     return CSRF.verify(token, verifyOpts);
   } catch {

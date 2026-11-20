@@ -220,7 +220,7 @@ export const handleLogin = async (
     details: { rehash: outcome.rehash, role: op.role },
   });
 
-  const csrf = issueCsrf();
+  const csrf = issueCsrf({ sessionId: token });
   const secure = !isLocal(new URL(req.url).hostname);
   const res = json(
     200,
@@ -309,11 +309,16 @@ export const requireCsrf = async (
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
     const cookieToken = requestCookieValue(req, CSRF_COOKIE_NAME);
     const headerToken = req.headers.get(CSRF_HEADER_NAME);
+    // Login-issued tokens are bound to the session token. A request with no
+    // session cookie keeps the legacy unbound check (in-process callers/tests);
+    // an attacker cannot obtain a bound token without the session.
+    const sessionId = requestCookieValue(req, SESSION_COOKIE_NAME);
+    const tokenOptions = sessionId === undefined ? undefined : { sessionId };
     if (
       !cookieToken ||
       !headerToken ||
       cookieToken !== headerToken ||
-      !verifyCsrfFn(headerToken)
+      !verifyCsrfFn(headerToken, tokenOptions)
     ) {
       return json(403, { error: "csrf_failed" });
     }

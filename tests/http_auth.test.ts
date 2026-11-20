@@ -325,6 +325,42 @@ describe("HTTP Auth Layer (lib/http_auth.ts)", () => {
       expect(await res.text()).toBe("ALLOWED");
     });
 
+    it("binds a token to a session and rejects other sessions", () => {
+      const token = issueCsrf({ sessionId: "session-a" });
+
+      expect(verifyCsrf(token, { sessionId: "session-a" })).toBe(true);
+      expect(verifyCsrf(token, { sessionId: "session-b" })).toBe(false);
+      expect(verifyCsrf(token)).toBe(false);
+    });
+
+    it("accepts a session-bound token when the session cookie matches", async () => {
+      const token = issueCsrf({ sessionId: "session-a" });
+      const req = new Request("http://localhost:4022/api/terminal/exec", {
+        method: "POST",
+        headers: {
+          cookie: `${SESSION_COOKIE_NAME}=session-a; ${CSRF_COOKIE_NAME}=${token}`,
+          [CSRF_HEADER_NAME]: token,
+        },
+      });
+
+      const res = await requireCsrf(req, async () => new Response("ALLOWED"));
+      expect(res.status).toBe(200);
+    });
+
+    it("rejects a session-bound token presented with another session", async () => {
+      const token = issueCsrf({ sessionId: "session-a" });
+      const req = new Request("http://localhost:4022/api/terminal/exec", {
+        method: "POST",
+        headers: {
+          cookie: `${SESSION_COOKIE_NAME}=session-b; ${CSRF_COOKIE_NAME}=${token}`,
+          [CSRF_HEADER_NAME]: token,
+        },
+      });
+
+      const res = await requireCsrf(req, async () => new Response("ALLOWED"));
+      expect(res.status).toBe(403);
+    });
+
     it("rejects token issued with a foreign secret (multi-process isolation check)", async () => {
       const foreignToken = issueCsrf({
         secret: "foreign_unshared_secret_123",
@@ -409,7 +445,7 @@ describe("HTTP Auth Layer (lib/http_auth.ts)", () => {
     });
 
     it("allows POST /api/alerts/:id/ack when authenticated and valid CSRF supplied", async () => {
-      const csrfToken = issueCsrf();
+      const csrfToken = issueCsrf({ sessionId: "valid-sess" });
       const req = new Request(
         "http://localhost:4022/api/alerts/deliv-12345/ack",
         {
