@@ -29,6 +29,7 @@ docker run "${mounts[@]}" --cap-add PERFMON -v "$symbol_dir/bun-profile:/symbols
 ' > "$trace_dir/catalog.log" 2>&1 || { tail -30 "$trace_dir/catalog.log"; exit 1; }
 # Resolve addresses with the matching release symbols only after the measured process exits.
 docker run "${mounts[@]}" -v "$symbol_dir/bun-profile:/usr/local/bin/bun:ro" sportsdesk-catalog-trace -ec '
-  perf script -i /trace/catalog.perf.data --ns --no-call-graph -F pid,tid,time,ip,sym,dso > /trace/samples.txt
-  chmod a+r /trace/catalog.perf.data /trace/samples.txt
+  chmod a+r /trace/catalog.perf.data
+  perf script -i /trace/catalog.perf.data --ns --hide-call-graph -F pid,tid,time,ip,sym,dso > /trace/samples.txt
+  chmod a+r /trace/samples.txt
 '
