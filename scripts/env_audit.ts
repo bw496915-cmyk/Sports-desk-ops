@@ -16,6 +16,7 @@ import {
   printHelp,
   wantsHelp,
 } from "../lib/cli_args.ts";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import {
   type TrackedFile,
   auditEnv,
@@ -53,7 +54,7 @@ const entries = parseEnvFile(await envFile.text());
 const stat = await envFile.stat();
 
 const tracked: TrackedFile[] = [];
-const list = Bun.spawnSync(["git", "ls-files", "-z"], {
+const list = spawnSyncBounded(["git", "ls-files", "-z"], {
   env: {
     ...Bun.env,
     GIT_CONFIG_GLOBAL: Bun.env.GIT_CONFIG_GLOBAL ?? "/dev/null",

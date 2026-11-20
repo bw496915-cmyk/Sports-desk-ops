@@ -290,3 +290,94 @@ export function sanitizeDiagnosticUrl(
   }
   return out;
 }
+
+/** Bearer/Basic credentials that were not replaced with the redaction sentinel. */
+const UNREDACTED_AUTH_RE =
+  /\b(?:Bearer|Basic)\s+(?!\[REDACTED_SECRET\]|REDACTED\b)[A-Za-z0-9._~+/=-]{6,}/;
+/** Session cookies that must never survive into an inspect surface. */
+const UNREDACTED_SESSION_RE =
+  /(?:GSLIVE_SESSION_ID|sd_session|dash_session)=(?!\[REDACTED_SECRET\]|REDACTED\b)[^\s\]"';]+/i;
+
+/**
+ * Fail-closed canary for strings that are about to be printed or serialized.
+ *
+ * Checks every env name in the secret manifest (including aliases), not a
+ * hand-picked list, and rejects unredacted Bearer/Basic and session-cookie
+ * forms. A leaked value is never included in the thrown error.
+ */
+export function assertNoSecretLeak(
+  surface: string,
+  env: Readonly<Record<string, string | undefined>> = Bun.env,
+): void {
+  for (const name of manifestNames()) {
+    const value = env[name];
+    // Short values are not credentials and would make this a false-positive guard.
+    if (typeof value !== "string" || value.length < 8) continue;
+    if (surface.includes(value)) {
+      throw new Error(
+        "ERR_INSP_SECRET_REDACTION_LEAK: Raw secret leaked into inspect surface",
+      );
+    }
+  }
+  if (UNREDACTED_AUTH_RE.test(surface) || UNREDACTED_SESSION_RE.test(surface)) {
+    throw new Error(
+      "ERR_INSP_SECRET_REDACTION_LEAK: Unredacted Bearer/session token detected",
+    );
+  }
+  assertNoPatternLeaks(surface);
+}
+
+/** Provider-shaped credentials detectable without knowing the env value. */
+const AWS_ACCESS_KEY_ID_RE = /\b(?:AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16}\b/;
+const PRIVATE_KEY_PEM_RE = /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/;
+const JWT_LEAK_RE =
+  /\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b/;
+const URL_SECRET_LEAK_RE =
+  /[?&](?:x-amz-signature|x-amz-credential|token|api[_-]?key|secret|auth|jwt|key|sig|signature|password|passwd|pwd|cookie|gslive_session_id|session[_-]?id|phpsessid|cf_clearance)=([^&\s#]+)/gi;
+const DSN_PASSWORD_LEAK_RE =
+  /\b(?:postgres(?:ql)?|mysql|redis(?:s)?|https?):\/\/[^:\s/@]+:([^@\s]+)@/gi;
+const SESSION_COOKIE_LEAK_RE =
+  /\b(?:gslive_session_id|sd_session|dash_session|phpsessid|cf_clearance)=(\[[^\]]*\]|[^\s\]"';]+)/gi;
+
+function isRedacted(value: string): boolean {
+  return value.includes("[REDACTED_SECRET]") || /^REDACTED\b/.test(value);
+}
+
+function assertNoPatternLeaks(surface: string): void {
+  if (
+    AWS_ACCESS_KEY_ID_RE.test(surface) ||
+    PRIVATE_KEY_PEM_RE.test(surface) ||
+    JWT_LEAK_RE.test(surface)
+  ) {
+    throw new Error(
+      "ERR_INSP_SECRET_REDACTION_LEAK: Provider-shaped credential detected",
+    );
+  }
+
+  URL_SECRET_LEAK_RE.lastIndex = 0;
+  for (const match of surface.matchAll(URL_SECRET_LEAK_RE)) {
+    if (!isRedacted(match[1] ?? "")) {
+      throw new Error(
+        "ERR_INSP_SECRET_REDACTION_LEAK: Unredacted URL secret detected",
+      );
+    }
+  }
+
+  DSN_PASSWORD_LEAK_RE.lastIndex = 0;
+  for (const match of surface.matchAll(DSN_PASSWORD_LEAK_RE)) {
+    if (!isRedacted(match[1] ?? "")) {
+      throw new Error(
+        "ERR_INSP_SECRET_REDACTION_LEAK: Unredacted DSN password detected",
+      );
+    }
+  }
+
+  SESSION_COOKIE_LEAK_RE.lastIndex = 0;
+  for (const match of surface.matchAll(SESSION_COOKIE_LEAK_RE)) {
+    if (!isRedacted(match[1] ?? "")) {
+      throw new Error(
+        "ERR_INSP_SECRET_REDACTION_LEAK: Unredacted session cookie detected",
+      );
+    }
+  }
+}

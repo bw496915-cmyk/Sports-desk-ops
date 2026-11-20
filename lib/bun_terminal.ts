@@ -19,6 +19,10 @@ import {
   type BuildTarget,
   BUILD_FEATURES,
 } from "../types/features.ts";
+import {
+  createKillEscalation,
+  type KillEscalation,
+} from "./kill_escalation.ts";
 
 export const BUN_TERMINAL_DOCS = bunUrl(
   "/docs/runtime/child-process#terminal-pty-support",
@@ -94,6 +98,8 @@ export interface SpawnInPtyOptions {
   readonly cwd?: SpawnBaseOptions["cwd"];
   readonly cols?: Bun.TerminalOptions["cols"];
   readonly rows?: Bun.TerminalOptions["rows"];
+  /** Extra child environment; merged over Bun.env by TerminalSession. */
+  readonly env?: SpawnBaseOptions["env"];
 }
 
 export interface PtyRunResult {
@@ -339,6 +345,16 @@ export type TerminalAuditEvent =
       readonly type: "timeout";
       readonly timeoutMs: number;
       readonly timestamp: number;
+    }
+  | {
+      readonly type: "kill_escalation";
+      readonly graceMs: number;
+      readonly timestamp: number;
+    }
+  | {
+      readonly type: "output_limit";
+      readonly maxOutputBytes: number;
+      readonly timestamp: number;
     };
 
 /** Options for configuring a TerminalSession instance. */
@@ -353,6 +369,15 @@ export interface TerminalSessionOptions extends NativeSpawnPassThrough {
   readonly env?: SpawnBaseOptions["env"];
   /** Overall session timeout in milliseconds (0 or undefined for no timeout). */
   readonly timeoutMs?: SpawnBaseOptions["timeout"];
+  /**
+   * Retain at most this many output bytes, keeping the tail (default unlimited).
+   * Reading continues so the retained bytes are the END of the stream; the cap
+   * bounds memory only. `timeoutMs` (with SIGTERM->SIGKILL escalation) bounds a
+   * runaway producer's CPU.
+   */
+  readonly maxOutputBytes?: number;
+  /** Grace between SIGTERM and SIGKILL in milliseconds (default 2000). */
+  readonly killGraceMs?: number;
   /** Compile-time feature flags to forward when executing bun. */
   readonly features?: readonly Feature[];
   /** Compile-time build target to forward when executing bun. */
@@ -384,6 +409,12 @@ export class TerminalSession implements AsyncDisposable {
   private _proc: ReturnType<typeof Bun.spawn> | null = null;
   private _term: Bun.Terminal | null = null;
   private _raw: string = "";
+  private readonly _retainedChunks: Uint8Array[] = [];
+  private _retainedBytes = 0;
+  private _totalOutputBytes = 0;
+  private _truncated = false;
+  private readonly _maxOutputBytes: number;
+  private _killEscalation: KillEscalation | null = null;
   private readonly _decoder = new TextDecoder();
   private _exitCode: number | null = null;
   private _ptyExitCode: number | null = null;
@@ -400,7 +431,18 @@ export class TerminalSession implements AsyncDisposable {
   private _ptyClosedPromise: Promise<void> | null = null;
   private _resolvePtyClosed: (() => void) | null = null;
 
-  constructor(private readonly _options: TerminalSessionOptions = {}) {}
+  constructor(private readonly _options: TerminalSessionOptions = {}) {
+    const cap = _options.maxOutputBytes ?? Number.POSITIVE_INFINITY;
+    if (
+      cap !== Number.POSITIVE_INFINITY &&
+      (!Number.isFinite(cap) || cap <= 0)
+    ) {
+      throw new RangeError(
+        `ERR_PTY_OUTPUT_LIMIT_INVALID: expected a positive finite byte count, got ${String(cap)}`,
+      );
+    }
+    this._maxOutputBytes = cap;
+  }
 
   /** Static factory to create and start a terminal session in one step. */
   static async start(
@@ -463,11 +505,43 @@ export class TerminalSession implements AsyncDisposable {
       rows: this._options.rows ?? 24,
       name: terminalName,
       data: (_terminal, chunk) => {
-        const text = this._decoder.decode(chunk, { stream: true });
-        this._raw += text;
-        this._options.onData?.(text, chunk);
+        const bytes =
+          chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+        this._totalOutputBytes += bytes.byteLength;
+        const text = this._decoder.decode(bytes, { stream: true });
+        this._options.onData?.(text, bytes);
         for (const listener of this._listeners) {
           listener(text);
+        }
+
+        if (this._maxOutputBytes === Number.POSITIVE_INFINITY) {
+          this._raw += text;
+          return;
+        }
+        // Keep a byte-accurate tail: the ring must never exceed the cap.
+        // Reading continues after the cap so the retained bytes are the stream's end.
+        this._retainedChunks.push(bytes.slice());
+        this._retainedBytes += bytes.byteLength;
+        while (this._retainedBytes > this._maxOutputBytes) {
+          const first = this._retainedChunks[0];
+          if (first === undefined) break;
+          const excess = this._retainedBytes - this._maxOutputBytes;
+          if (first.byteLength <= excess) {
+            this._retainedChunks.shift();
+            this._retainedBytes -= first.byteLength;
+          } else {
+            this._retainedChunks[0] = first.subarray(excess);
+            this._retainedBytes -= excess;
+          }
+        }
+
+        if (!this._truncated && this._totalOutputBytes > this._maxOutputBytes) {
+          this._truncated = true;
+          this._emitAudit({
+            type: "output_limit",
+            maxOutputBytes: this._maxOutputBytes,
+            timestamp: Date.now(),
+          });
         }
       },
       exit: (_terminal, ptyCode, signal) => {
@@ -539,6 +613,16 @@ export class TerminalSession implements AsyncDisposable {
 
     this._proc = proc;
     this._term = term;
+    this._killEscalation = createKillEscalation(proc, {
+      graceMs: this._options.killGraceMs ?? 2_000,
+      onEscalate: (graceMs) => {
+        this._emitAudit({
+          type: "kill_escalation",
+          graceMs,
+          timestamp: Date.now(),
+        });
+      },
+    });
 
     this._emitAudit({
       type: "start",
@@ -548,13 +632,14 @@ export class TerminalSession implements AsyncDisposable {
     });
 
     proc.exited.then((code) => {
+      this._killEscalation?.markExited();
       this._cleanupTimeout();
       this._exitCode = code;
       this._signalCode = proc.signalCode;
       this._resourceUsage = proc.resourceUsage();
       this._exitedAt = Date.now();
       const final = this._decoder.decode();
-      if (final) {
+      if (final && this._maxOutputBytes === Number.POSITIVE_INFINITY) {
         this._raw += final;
       }
       this._emitAudit({
@@ -573,7 +658,7 @@ export class TerminalSession implements AsyncDisposable {
             timeoutMs: this._options.timeoutMs!,
             timestamp: Date.now(),
           });
-          this.stop("SIGTERM");
+          this._killEscalation?.terminate();
         }
       }, this._options.timeoutMs);
     }
@@ -639,7 +724,7 @@ export class TerminalSession implements AsyncDisposable {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
-        this.stop("SIGTERM");
+        this._killEscalation?.terminate();
         reject(
           new TerminalTimeoutError(
             `Terminal session timed out after ${effectiveTimeout}ms waiting for process exit`,
@@ -791,17 +876,32 @@ export class TerminalSession implements AsyncDisposable {
 
   /** Combined raw ANSI output (stdout + stderr multiplexed) preserved for accurate terminal replay. */
   get raw(): string {
-    return this._raw;
+    if (this._maxOutputBytes === Number.POSITIVE_INFINITY) return this._raw;
+    return Buffer.concat(this._retainedChunks, this._retainedBytes).toString(
+      "utf8",
+    );
   }
 
   /** Plain text output with ANSI escapes and CRs stripped for assertions and log ingestion. */
   get text(): string {
-    return stripPtyCapture(this._raw);
+    return stripPtyCapture(this.raw);
   }
 
-  /** Total raw characters captured from the terminal stream. */
+  /** Retained output bytes: the byte-accurate length of `.raw` under a cap. */
   get rawBytes(): number {
-    return this._raw.length;
+    return this._maxOutputBytes === Number.POSITIVE_INFINITY
+      ? Buffer.byteLength(this._raw, "utf8")
+      : this._retainedBytes;
+  }
+
+  /** True when the output cap was hit and the tail was retained. */
+  get truncated(): boolean {
+    return this._truncated;
+  }
+
+  /** Total bytes produced by the child (before any cap), byte-accurate. */
+  get totalOutputBytes(): number {
+    return this._totalOutputBytes;
   }
 
   /** Subprocess exit code from `proc.exited`, or null if still running. */

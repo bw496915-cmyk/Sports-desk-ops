@@ -526,6 +526,193 @@ else
   fail publish-prerelease "code=$pre_code/$pre_tag_code refused=$refused tagBypassed=$tag_bypassed"
 fi
 
+# ---- P29: npm/Yarn/pnpm flag translation (and ignored unknowns) ------------
+mkproj "$ROOT/p29" '{"name":"p29","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+run bash -c "cd '$ROOT/p29' && bun install"
+set +e
+immutable_out="$(cd "$ROOT/p29" && bun install --immutable 2>&1)"; immutable_code=$?
+no_lock_out="$(cd "$ROOT/p29" && bun install --no-package-lock 2>&1)"; no_lock_code=$?
+save_dev_out="$(cd "$ROOT/p29" && bun add --save-dev lodash 2>&1)"; save_dev_code=$?
+group_dev="$(cd "$ROOT/p29" && bun -e 'const p = await Bun.file("package.json").json(); console.log(JSON.stringify({ dep: p.dependencies?.lodash ?? null, dev: p.devDependencies?.lodash ?? null }))')"
+save_prod_out="$(cd "$ROOT/p29" && bun add --save-prod lodash 2>&1)"; save_prod_code=$?
+group_prod="$(cd "$ROOT/p29" && bun -e 'const p = await Bun.file("package.json").json(); console.log(JSON.stringify({ dep: p.dependencies?.lodash ?? null, dev: p.devDependencies?.lodash ?? null }))')"
+set -e
+if [ "$immutable_code" -eq 0 ] && [ "$no_lock_code" -eq 0 ] \
+   && printf '%s' "$group_dev" | grep -q '"dep":null' && printf '%s' "$group_dev" | grep -q '"dev":"' \
+   && [ "$save_prod_code" -eq 0 ] && printf '%s' "$group_prod" | grep -q '"dep":"' && printf '%s' "$group_prod" | grep -q '"dev":null'; then
+  pass flag-translation "--immutable, --no-package-lock, --save-dev/--save-prod map to Bun's groups"
+else
+  fail flag-translation "immutable=$immutable_code no-lock=$no_lock_code dev=$save_dev_code/$group_dev prod=$save_prod_code/$group_prod"
+fi
+
+# ---- P30: minimum-release-age accepts units and exclusions as CLI flags -----
+mkproj "$ROOT/p30a" '{"name":"p30a","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+set +e
+mra_units_out="$(cd "$ROOT/p30a" && bun install --minimum-release-age 3d --minimum-release-age-excludes lodash@4.17.21 2>&1)"; mra_units_code=$?
+mkproj "$ROOT/p30b" '{"name":"p30b","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+mra_blocked_out="$(cd "$ROOT/p30b" && bun install --minimum-release-age 87600h 2>&1)"; mra_blocked_code=$?
+set -e
+if [ "$mra_units_code" -eq 0 ] && [ "$mra_blocked_code" -ne 0 ] \
+   && printf '%s' "$mra_blocked_out" | grep -q "minimum-release-age"; then
+  pass release-age-cli "\"3d\" + per-version exclude install; a fresh 10-year window blocks and names the reason"
+else
+  fail release-age-cli "units exit $mra_units_code; blocked exit $mra_blocked_code; output did not name minimum-release-age"
+fi
+
+# ---- P31: peer dependencies resolve like pnpm ------------------------------
+# The notes' canonical case: @remix-run/express peers express@^4.20.0 while the
+# MCP SDK depends on express@5. Before 1.4.4 remix got express@5.
+mkproj "$ROOT/p31" '{"name":"p31","version":"1.0.0","dependencies":{"@modelcontextprotocol/sdk":"1.20.0","@remix-run/express":"2.17.1"}}'
+if run bash -c "cd '$ROOT/p31' && bun install"; then
+  pm_ls="$(cd "$ROOT/p31" && bun pm ls --all 2>&1)"
+  remix_peer="$(printf '%s\n' "$pm_ls" | grep -A1 '@remix-run/express@' | grep -o 'express@4\.[0-9.]*' | head -1)"
+  top_peer="$(printf '%s\n' "$pm_ls" | grep -E '^[├└]── express@5\.' | grep -oE 'express@5\.[0-9.]+' | head -1)"
+  if [ -n "$remix_peer" ] && [ -n "$top_peer" ]; then
+    pass peer-resolution "remix nested $remix_peer; MCP top-level $top_peer"
+  else
+    fail peer-resolution "remix peer '$remix_peer', top-level '$top_peer' (expected 4.x and 5.x)"
+  fi
+else
+  fail peer-resolution "install failed"
+fi
+
+# ---- P32: --verbose names peers that ended up out of range -----------------
+mkproj "$ROOT/p32" '{"name":"p32","version":"1.0.0","dependencies":{"express":"5.3.0","@remix-run/express":"2.17.1"}}'
+set +e
+peer_verbose_out="$(cd "$ROOT/p32" && bun install --verbose 2>&1)"; peer_verbose_code=$?
+set -e
+if [ "$peer_verbose_code" -eq 0 ] \
+   && printf '%s' "$peer_verbose_out" | grep -q "incorrect peer dependency" \
+   && printf '%s' "$peer_verbose_out" | grep -qF 'express@^4.20.0'; then
+  pass verbose-peer-warning "warned express@5.3.0 is outside remix's ^4.20.0 range"
+else
+  fail verbose-peer-warning "exit $peer_verbose_code; out-of-range peer warning not found"
+fi
+
+# ---- P33: bun update --latest refreshes a peer in one run ------------------
+# react is installed only as react-dom@17's peer; --latest must move both to 19
+# in one invocation (1.4.3 left react on 17 until a second run).
+mkproj "$ROOT/p33" '{"name":"p33","version":"1.0.0","dependencies":{"react-dom":"17.0.2"}}'
+if run bash -c "cd '$ROOT/p33' && bun install"; then
+  before_react="$(cd "$ROOT/p33" && bun pm ls --all 2>&1 | grep -E '^[├└]── react@' | grep -oE 'react@[0-9]+' | head -1 | cut -d@ -f2)"
+  if run bash -c "cd '$ROOT/p33' && bun update --latest"; then
+    after_ls="$(cd "$ROOT/p33" && bun pm ls --all 2>&1)"
+    react_major="$(printf '%s\n' "$after_ls" | grep -E '^[├└]── react@' | grep -oE 'react@[0-9]+' | head -1 | cut -d@ -f2)"
+    dom_major="$(printf '%s\n' "$after_ls" | grep -E '^[├└]── react-dom@' | grep -oE 'react-dom@[0-9]+' | head -1 | cut -d@ -f2)"
+    if [ -n "$react_major" ] && [ -n "$dom_major" ] \
+       && [ "$react_major" = "$dom_major" ] && [ "$react_major" -gt 17 ]; then
+      pass update-latest-peer "react-dom 17 -> $dom_major and peer react -> $react_major in one run (was $before_react)"
+    else
+      fail update-latest-peer "react=$react_major react-dom=$dom_major (expected equal majors > 17)"
+    fi
+  else
+    fail update-latest-peer "bun update --latest failed"
+  fi
+else
+  fail update-latest-peer "install failed"
+fi
+
+# ---- P34: pm cache pack/unpack/prune roundtrip -----------------------------
+# Use a dedicated cache dir: the global one can contain the bun executable,
+# which prune deliberately refuses.
+mkproj "$ROOT/p34" '{"name":"p34","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+mkdir -p "$ROOT/p34/cache"
+run bash -c "cd '$ROOT/p34' && BUN_INSTALL_CACHE_DIR='$ROOT/p34/cache' bun install"
+set +e
+(cd "$ROOT/p34" && BUN_INSTALL_CACHE_DIR="$ROOT/p34/cache" bun pm cache pack "$ROOT/p34/cache.pack") >/dev/null 2>&1; pack_code=$?
+pack_bytes=$(stat -c%s "$ROOT/p34/cache.pack" 2>/dev/null || stat -f%z "$ROOT/p34/cache.pack" 2>/dev/null || echo 0)
+(cd "$ROOT/p34" && BUN_INSTALL_CACHE_DIR="$ROOT/p34/cache" bun pm cache unpack "$ROOT/p34/cache.pack") >/dev/null 2>&1; unpack_code=$?
+(cd "$ROOT/p34" && BUN_INSTALL_CACHE_DIR="$ROOT/p34/cache" bun pm cache prune --dry-run) >/dev/null 2>&1; prune_code=$?
+set -e
+if [ "$pack_code" -eq 0 ] && [ "${pack_bytes:-0}" -gt 0 ] && [ "$unpack_code" -eq 0 ] && [ "$prune_code" -eq 0 ]; then
+  pass pm-cache-roundtrip "packed ${pack_bytes}B, unpacked, prune --dry-run clean"
+else
+  fail pm-cache-roundtrip "pack=$pack_code/${pack_bytes}B unpack=$unpack_code prune=$prune_code"
+fi
+
+# ---- P35: bunx --cwd/--env-file and its flags ------------------------------
+mkdir -p "$ROOT/p35/work"
+printf 'PROBE_BUNX=yes\n' > "$ROOT/p35/work/ci.env"
+set +e
+bunx_out="$(cd "$ROOT/p35" && bunx --cwd "$ROOT/p35/work" --env-file "$ROOT/p35/work/ci.env" bun -e 'console.log(process.cwd()); console.log(process.env.PROBE_BUNX)' 2>&1)"; bunx_code=$?
+bunx_mra_code=0; (cd "$ROOT/p35" && bunx --minimum-release-age 3d bun --version) >/dev/null 2>&1 || bunx_mra_code=$?
+bunx_trust_code=0; (cd "$ROOT/p35" && bunx --trust bun --version) >/dev/null 2>&1 || bunx_trust_code=$?
+set -e
+if [ "$bunx_code" -eq 0 ] && printf '%s' "$bunx_out" | grep -qF "p35/work" \
+   && printf '%s' "$bunx_out" | grep -q "yes" \
+   && [ "$bunx_mra_code" -eq 0 ] && [ "$bunx_trust_code" -eq 0 ]; then
+  pass bunx-flags "--cwd changed directory, --env-file loaded, --minimum-release-age/--trust accepted"
+else
+  fail bunx-flags "run=$bunx_code mra=$bunx_mra_code trust=$bunx_trust_code output=$bunx_out"
+fi
+
+# ---- P36: bun pm pack substitutes catalog: without a lockfile --------------
+# The contracts publish uses catalog: ranges. v1.4.4 resolves them from
+# package.json (not bun.lock) and packs even when the lockfile is absent.
+mkdir -p "$ROOT/p36/packages/child"
+printf '{"name":"p36-root","version":"1.0.0","workspaces":["packages/*"],"catalog":{"is-odd":"3.0.1"}}' > "$ROOT/p36/package.json"
+printf '{"name":"child","version":"1.0.0","dependencies":{"is-odd":"catalog:"}}' > "$ROOT/p36/packages/child/package.json"
+run bash -c "cd '$ROOT/p36' && bun install"
+rm -rf "$ROOT/p36/bun.lock" "$ROOT/p36/node_modules" "$ROOT/p36/packages/child/node_modules"
+set +e
+(cd "$ROOT/p36/packages/child" && bun pm pack) >/dev/null 2>&1; catalog_pack_code=$?
+set -e
+child_tgz="$(find "$ROOT/p36/packages/child" -maxdepth 1 -name '*.tgz' | head -1)"
+packed_catalog=""
+if [ -n "$child_tgz" ]; then
+  packed_catalog="$(tar -xOf "$child_tgz" package/package.json 2>/dev/null | grep -o '"is-odd": *"[^"]*"' | head -1)"
+fi
+if [ "$catalog_pack_code" -eq 0 ] && [ -n "$child_tgz" ] \
+   && printf '%s' "$packed_catalog" | grep -q "3.0.1" \
+   && ! printf '%s' "$packed_catalog" | grep -q "catalog:"; then
+  pass pack-catalog "packed without a lockfile; catalog range -> \"3.0.1\""
+else
+  fail pack-catalog "pack=$catalog_pack_code tgz=${child_tgz:-missing} field='$packed_catalog'"
+fi
+
+# ---- P37: Yarn Berry (v2+) lockfile migration ------------------------------
+# A real Yarn 4 lockfile (metadata version 10); lodash is pinned at 4.17.20
+# while the registry's current 4.18.x must not replace it.
+mkdir -p "$ROOT/p37"
+printf '{"name":"berry","version":"1.0.0","dependencies":{"lodash":"4.17.20"}}' > "$ROOT/p37/package.json"
+cat > "$ROOT/p37/yarn.lock" <<'YARNLOCK'
+# This file is generated by running "yarn install" inside your project.
+# Manual changes might be lost - proceed with caution!
+
+__metadata:
+  version: 10
+  cacheKey: 10c0
+
+"berry@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "berry@workspace:."
+  dependencies:
+    lodash: "npm:4.17.20"
+  languageName: unknown
+  linkType: soft
+
+"lodash@npm:4.17.20":
+  version: 4.17.20
+  resolution: "lodash@npm:4.17.20"
+  checksum: 10c0/faec37cb9f161b766bdc078a1356a07b9eaaa867796dd2520a407fe0a6a6d7be031e8f228f0cf3d305095703ee40258616c870b8d17dcdcb16f745bf31e8c3c2
+  languageName: node
+  linkType: hard
+YARNLOCK
+set +e
+berry_out="$(cd "$ROOT/p37" && bun install 2>&1)"; berry_code=$?
+set -e
+berry_pinned=""
+[ -f "$ROOT/p37/bun.lock" ] && berry_pinned="$(grep -o 'lodash@4.17.20' "$ROOT/p37/bun.lock" | head -1)"
+berry_latest=""
+[ -f "$ROOT/p37/bun.lock" ] && berry_latest="$(grep -o 'lodash@4.18\.[0-9.]*' "$ROOT/p37/bun.lock" | head -1)"
+if [ "$berry_code" -eq 0 ] \
+   && printf '%s' "$berry_out" | grep -q "migrated lockfile from yarn.lock" \
+   && [ -n "$berry_pinned" ] && [ -z "$berry_latest" ]; then
+  pass yarn-berry-migration "metadata v10 migrated; lodash stayed pinned at 4.17.20"
+else
+  fail yarn-berry-migration "exit $berry_code pinned='$berry_pinned' latest='$berry_latest'"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
 skip publish-registry "publish fails at auth/packing before any registry contact can be observed; needs a real registry"

@@ -22,6 +22,7 @@
  */
 
 import { existsSync, lstatSync, statSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { analyzeWorkspaceGraph, inspectWorkspaces } from "../lib/pm_policy.ts";
@@ -109,7 +110,7 @@ export function importedSpecifierPaths(
     // POSIX ERE (git grep -E): no `(?:…)` and no `\s`.
     const ws = "[[:space:]]";
     const pattern = `(from${ws}*|import${ws}*\\(${ws}*|import${ws}+)["'][^"']*${escaped}["']`;
-    const result = Bun.spawnSync(
+    const result = spawnSyncBounded(
       [
         "git",
         "-C",
@@ -205,7 +206,7 @@ export function dataPathPattern(file: string): string {
  * found wherever it lives (`tests/`, `lib/`, `scripts/`, `packages/`).
  */
 function gitGrepReaders(file: string, root: string): string[] {
-  const result = Bun.spawnSync(
+  const result = spawnSyncBounded(
     [
       "git",
       "-C",
@@ -661,7 +662,7 @@ export function inferTestsForFiles(
 }
 
 function gitQuery(args: string[]): { ok: boolean; lines: string[] } {
-  const res = Bun.spawnSync(["git", ...args], {
+  const res = spawnSyncBounded(["git", ...args], {
     cwd: ROOT,
     env: {
       ...Bun.env,

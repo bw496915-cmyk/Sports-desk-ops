@@ -160,11 +160,14 @@ describe("identity clients", () => {
     expect(response.headers["content-encoding"]).toBeUndefined();
   });
 
-  test("compressed responses decline ranges instead of lying about them", async () => {
+  test("Range requests bypass compression and return identity bytes", async () => {
     const response = await rawGet("/graph", {
       "Accept-Encoding": "gzip",
       Range: "bytes=0-99",
     });
-    expect(response.headers["accept-ranges"]).toBe("none");
+    expect(response.status).toBe(206);
+    expect(response.headers["accept-ranges"]).toBe("bytes");
+    expect(response.headers["content-encoding"]).toBeUndefined();
+    expect(response.headers["content-range"]).toMatch(/^bytes 0-99\//);
   });
 });

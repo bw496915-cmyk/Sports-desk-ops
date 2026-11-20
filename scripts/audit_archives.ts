@@ -12,6 +12,7 @@
  */
 
 import { basename } from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import {
   type ArchiveFact,
   type ArchiveProvenance,
@@ -27,7 +28,7 @@ function flag(args: readonly string[], name: string): string {
 }
 
 function gitList(listArgs: readonly string[]): string[] {
-  const result = Bun.spawnSync(["git", "ls-files", ...listArgs], {
+  const result = spawnSyncBounded(["git", "ls-files", ...listArgs], {
     env: {
       ...Bun.env,
       GIT_CONFIG_GLOBAL: Bun.env.GIT_CONFIG_GLOBAL ?? "/dev/null",

@@ -10,6 +10,7 @@
  *   bun run ci:local --event schedule replay the scheduled workflow (live CDN pin included)
  */
 import path from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { parseArgs } from "node:util";
 
 import workflowYaml from "../.github/workflows/ci.yml" with { type: "yaml" };
@@ -109,13 +110,16 @@ for (const [index, step] of steps.entries()) {
   );
   const t0 = Bun.nanoseconds();
   // GitHub's default `shell: bash` is `bash --noprofile --norc -eo pipefail`.
-  const proc = Bun.spawnSync(
+  const proc = spawnSyncBounded(
     ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", step.run],
     {
       cwd: ROOT,
       env: { ...Bun.env, CI: "true" },
       stdout: "inherit",
       stderr: "inherit",
+      // Full CI steps are the one known long runner; keep a real bound, not 10 min.
+      timeout: 3_600_000,
+      maxBuffer: 64 * 1024 * 1024,
     },
   );
   const seconds = ((Bun.nanoseconds() - t0) / 1e9).toFixed(1);

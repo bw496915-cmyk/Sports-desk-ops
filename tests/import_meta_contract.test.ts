@@ -131,8 +131,12 @@ describe("import.meta contract", () => {
 
   test("source files do not use Node's __dirname or __filename", async () => {
     const offenders: string[] = [];
+    // This script intentionally lists the Node module-wrapper globals as strings.
+    const dataOnly = new Set(["scripts/diff-bun-globals.ts"]);
     for (const path of trackedSourceFiles()) {
-      if (path === "tests/import_meta_contract.test.ts") continue;
+      if (path === "tests/import_meta_contract.test.ts" || dataOnly.has(path)) {
+        continue;
+      }
       const text = await Bun.file(join(ROOT, path)).text();
       if (NODE_PATH_GLOBALS.test(text)) offenders.push(path);
     }

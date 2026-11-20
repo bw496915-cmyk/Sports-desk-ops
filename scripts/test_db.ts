@@ -9,6 +9,7 @@
  */
 
 import { SQL } from "bun";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 
 const args = process.argv.slice(2);
 const keep = args.includes("--keep");
@@ -71,7 +72,7 @@ const env: Record<string, string> = {
 
 // 1. Run migrations
 console.log(`[test_db] running migrations...`);
-const migrateProc = Bun.spawnSync(["bun", "scripts/migrate.ts"], {
+const migrateProc = spawnSyncBounded(["bun", "scripts/migrate.ts"], {
   env,
   stdout: "inherit",
   stderr: "inherit",
@@ -86,7 +87,7 @@ if (migrateProc.exitCode !== 0) {
 console.log(
   `[test_db] running integration suite tests/db_integration.test.ts...`,
 );
-const testProc = Bun.spawnSync(
+const testProc = spawnSyncBounded(
   ["bun", "test", "tests/db_integration.test.ts"],
   {
     env,

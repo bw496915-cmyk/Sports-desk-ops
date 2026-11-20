@@ -18,6 +18,7 @@
  * - Heap snapshots past ~2 GiB: needs a runner with the memory. Reported upstream, not verified.
  */
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -263,7 +264,7 @@ const probes: Probe[] = [
     note: "spawnSync returns stdout/exitCode and gc returns undefined",
     argv: [
       "-p",
-      '(function(){const r=Bun.spawnSync(["echo","ok"]);const g=Bun.gc(false);return JSON.stringify({out:r.stdout.toString().trim(),code:r.exitCode,gc:g===undefined})})()',
+      '(function(){const r=spawnSyncBounded(["echo","ok"]);const g=Bun.gc(false);return JSON.stringify({out:r.stdout.toString().trim(),code:r.exitCode,gc:g===undefined})})()',
     ],
   },
   {
@@ -405,7 +406,7 @@ async function prepareScratch(): Promise<string> {
 function run(probe: Probe, cwd: string): Result {
   if (probe.crash)
     writeFileSync(path.join(cwd, "mapped.bin"), Buffer.alloc(65_536, 0x61));
-  const p = Bun.spawnSync([SELF, ...probe.argv], {
+  const p = spawnSyncBounded([SELF, ...probe.argv], {
     cwd,
     env: {
       PATH: Bun.env.PATH ?? "",

@@ -15,6 +15,7 @@ import type {
 } from "bun";
 import type { BunSecretSetOptions } from "../types/bun-api.ts";
 import { getSecretBounded, KeychainTimeoutError } from "./secrets.ts";
+import { assertNoSecretLeak } from "./inspect_redactor.ts";
 
 export type R2S3Env = Readonly<Record<string, string | undefined>>;
 
@@ -50,6 +51,8 @@ export function isS3Error(error: unknown): error is S3LikeError {
       isS3ErrorCode((error as { code?: unknown }).code))
   );
 }
+
+type InspectOptions = NonNullable<Parameters<typeof Bun.inspect>[1]>;
 
 export interface R2S3Options {
   readonly bucket: string;
@@ -542,6 +545,41 @@ export class R2S3Client {
     const resolved = await resolveSecretBackedEnv(env, secrets);
     const options = resolveR2S3Options(resolved);
     return options === null ? null : R2S3Client.fromOptions(options);
+  }
+
+  /**
+   * Safe view for logs and `Bun.inspect`: the backend already redacts its own
+   * key fields, but the wrapper's runtime `auth` property (and the public
+   * backend) would otherwise expose the raw access key and secret to
+   * `{ showHidden: true }`.
+   */
+  toJSON(): {
+    readonly bucket: string;
+    readonly publicBase: string;
+    readonly endpointHost: string | null;
+    readonly credentials: "[REDACTED]";
+  } {
+    let endpointHost: string | null = null;
+    if (this.auth !== undefined) {
+      try {
+        endpointHost = new URL(this.auth.endpoint).host;
+      } catch {
+        endpointHost = null;
+      }
+    }
+    return {
+      bucket: this.bucket,
+      publicBase: this.publicBase,
+      endpointHost,
+      credentials: "[REDACTED]",
+    };
+  }
+
+  [Bun.inspect.custom](depth: number, options: InspectOptions): string {
+    if (depth < 0) return `[R2S3Client ${this.bucket}]`;
+    const rendered = Bun.inspect(this.toJSON(), options);
+    assertNoSecretLeak(rendered);
+    return rendered;
   }
 
   file(key: string, options?: Bun.S3Options): S3File {

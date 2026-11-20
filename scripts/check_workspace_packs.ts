@@ -7,6 +7,7 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { inspectWorkspaces } from "../lib/pm_policy.ts";
@@ -213,7 +214,7 @@ export async function checkWorkspacePacks(
       if (val !== undefined) packEnv[key] = val;
     }
 
-    const packProc = Bun.spawnSync(
+    const packProc = spawnSyncBounded(
       [process.execPath, "--no-env-file", "pm", "pack", "--dry-run"],
       {
         cwd: absDir,

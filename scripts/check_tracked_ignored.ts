@@ -20,6 +20,7 @@ import {
   parseTrackedIgnored,
   unexpectedTrackedIgnored,
 } from "../lib/tracked_ignored.ts";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 
 const argv = Bun.argv.slice(2);
 const rootIndex = argv.indexOf("--root");
@@ -27,7 +28,7 @@ const ROOT =
   rootIndex === -1 ? `${import.meta.dir}/..` : (argv[rootIndex + 1] ?? ".");
 const JSON_MODE = argv.includes("--json");
 
-const listed = Bun.spawnSync(
+const listed = spawnSyncBounded(
   ["git", "ls-files", "-z", "-i", "-c", "--exclude-standard"],
   { cwd: ROOT, stdout: "pipe", stderr: "pipe" },
 );

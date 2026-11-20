@@ -13,6 +13,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { join } from "node:path";
 import {
   buildCaptureRecord,
@@ -479,8 +480,8 @@ export async function runCatalogProbe(
     });
     await write(REPORT_RELATIVE_PATH, report);
     // Keep committed probe artifacts formatter-clean (CI runs format:check).
-    Bun.spawnSync([process.execPath, "fmt", args.out], { cwd: args.out });
-    Bun.spawnSync([process.execPath, "fmt", REPORT_RELATIVE_PATH]);
+    spawnSyncBounded([process.execPath, "fmt", args.out], { cwd: args.out });
+    spawnSyncBounded([process.execPath, "fmt", REPORT_RELATIVE_PATH]);
     const summary = {
       ok: true,
       command: CLI_NAME,

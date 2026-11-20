@@ -43,6 +43,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import {
   existsSync,
   readFileSync,
@@ -5060,7 +5061,7 @@ function selfGate(
  * `--out` temp path as it does for docs/openapi.json.
  */
 function formatWithRepoFormatter(outputPath: string): void {
-  const result = Bun.spawnSync({
+  const result = spawnSyncBounded({
     cmd: [process.execPath, "fmt", outputPath],
     cwd: SCRIPT_ROOT,
     stdout: "pipe",

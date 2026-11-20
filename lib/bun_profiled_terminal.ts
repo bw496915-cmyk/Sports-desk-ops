@@ -142,6 +142,7 @@ export function formatProfileDotEnv(
     `PTY_ACCENT="${colors.accent}"`,
     `PTY_WARN=${reference(colors.warn)}`,
     `PTY_ERROR=${reference(colors.error)}`,
+    `PTY_CONSOLE_DEPTH="${consoleDepth}"`,
     `BUN_OPTIONS="--console-depth=${consoleDepth}"`,
   ];
   if (options.disableTelemetryAndClear === true) lines.push("DO_NOT_TRACK=1");

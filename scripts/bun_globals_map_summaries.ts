@@ -16,6 +16,7 @@
  * 2 usage error, 3 bun-types declarations unavailable (fail closed).
  */
 import { join } from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { applySummaryFixes } from "../lib/bun_globals_map_apply.ts";
 import { loadBunTypesDeclarations } from "../lib/bun_globals_map_summaries.ts";
 
@@ -36,7 +37,7 @@ const jsonOnly = argv.includes("--json");
 /** Real formatter: the running binary, repository cwd, and a reported failure. */
 function formatArtifacts(paths: readonly string[]): boolean {
   try {
-    const formatted = Bun.spawnSync([process.execPath, "fmt", ...paths], {
+    const formatted = spawnSyncBounded([process.execPath, "fmt", ...paths], {
       cwd: ROOT,
       stdout: "ignore",
       stderr: "pipe",

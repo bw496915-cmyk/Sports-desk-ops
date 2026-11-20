@@ -5,18 +5,22 @@
  *   bun run theme:codegen --profile crimson-dry --out-dir scratch/generated
  *   bun run cli/theme_codegen.ts codegen --profile incident-red --out-dir /tmp/themes
  *   bun run cli/theme_codegen.ts codegen --profile default --db scratch/theme-tokens.sqlite
+ *   bun run theme:codegen --profile crimson-dry --depth 6
  *
  * Built-in profiles (`default`, `crimson-dry`, `incident-red`) are seeded into a fresh database,
  * so the first run needs no input file. Exit codes: 0 written, 2 unknown command or profile,
  * 1 unexpected failure.
  */
 import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { runCodegenSubcommand } from "../lib/token_automation.ts";
 
-const USAGE = `usage: bun cli/theme_codegen.ts codegen [--profile <name>] [--out-dir <dir>] [--db <path>]
+const USAGE = `usage: bun cli/theme_codegen.ts codegen [--profile <name>] [--out-dir <dir>] [--db <path>] [--depth <n>]
 
 Defaults: --profile default, --out-dir ./generated, --db scratch/theme-tokens.sqlite
+--depth is stored on the profile. At runtime, a numeric [console].depth in bunfig.toml
+wins over it on Bun 1.4.4, so the emitted env records bunfig's value and warns on a
+conflict. Without that key, the flag or the stored profile depth is emitted.
 Built-in profiles: ${"default, crimson-dry, incident-red"}`;
 
 /** Repository root, so a relative default database path does not depend on the caller's cwd. */
@@ -66,7 +70,9 @@ async function main(): Promise<number> {
 
   // SQLite creates the database file but not its directory.
   mkdirSync(dirname(parsed.db), { recursive: true });
-  return await runCodegenSubcommand(parsed.db, parsed.args);
+  return await runCodegenSubcommand(parsed.db, parsed.args, {
+    bunfigPath: join(ROOT, "bunfig.toml"),
+  });
 }
 
 if (import.meta.main) process.exit(await main());

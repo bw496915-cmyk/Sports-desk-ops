@@ -323,6 +323,7 @@ the graph data plane's companion JSON and `docs/assets/*`, and the blocked GS CL
 | `surface.manager-getHistory`           | D    | Wired settlement-history poll: `POST {base}/cloud/api/Manager/getHistory`                                     |
 | `surface.manager-getGrading`           | D    | Declared settlement feed; no fetch client exists ("wired" is a type/config claim only)                        |
 | `surface.daemon-dashboard`             | D    | `GET /` and `GET /dashboard` dashboard HTML                                                                   |
+| `surface.daemon-static-routes`         | D    | `/healthz`, `/ready`, `/api/version`, `/api/config`, `POST /api/admin/reload-static`                          |
 | `surface.daemon-miniapp`               | D    | `GET /miniapp` Telegram Mini App HTML                                                                         |
 | `surface.daemon-telegram-admin-routes` | D    | Webhook, telegram status/activity, preflight, error trigger                                                   |
 | `surface.daemon-live-bets`             | D    | `GET /api/live-bets` + `/summary`; derives games and aggregates from captured rows (PII stripped)             |

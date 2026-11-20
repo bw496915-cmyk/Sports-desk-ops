@@ -15,6 +15,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { resolve } from "node:path";
 
 import type { League } from "../lib/watchlist_signal_engine.ts";
@@ -75,7 +76,7 @@ const result = mergeLogoFilesIntoRegistryFile(registryPath, logoFiles, {
 // The registry's canonical layout is the formatter's output (inline short arrays), while
 // JSON.stringify expands everything; format after every write so the diff stays minimal.
 if (!dryRun && (result.updated > 0 || result.aliased > 0)) {
-  const formatted = Bun.spawnSync(["bun", "fmt", registryPath], {
+  const formatted = spawnSyncBounded(["bun", "fmt", registryPath], {
     stdout: "inherit",
     stderr: "inherit",
   });

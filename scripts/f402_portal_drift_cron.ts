@@ -7,6 +7,7 @@
  *   F402_PORTAL_DRIFT_CRON_TZ=America/Chicago bun run portal:drift:cron --watch
  */
 import { join } from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 
 import {
   previewCronSchedule,
@@ -25,7 +26,7 @@ const tz = Bun.env.F402_PORTAL_DRIFT_CRON_TZ?.trim();
 async function runDriftCheck(): Promise<void> {
   const manifest = await loadManifestWithRuntime();
   const bunPath = manifest.runtime?.bunExecutablePath ?? process.execPath;
-  const proc = Bun.spawnSync(
+  const proc = spawnSyncBounded(
     [bunPath, join(import.meta.dir, "verify/f402_portal_drift_once.ts")],
     { stdout: "inherit", stderr: "inherit" },
   );

@@ -7,6 +7,7 @@
  */
 
 import { mkdirSync, readdirSync, statSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { basename, join, resolve } from "node:path";
 import {
   extractCpuHotspots,
@@ -520,7 +521,7 @@ export async function collectMonitorSnapshot(options: {
   readonly maxFiles: number;
 }): Promise<MonitorSnapshot> {
   const measuredAt = new Date().toISOString();
-  const psRes = Bun.spawnSync(
+  const psRes = spawnSyncBounded(
     ["ps", "-axo", "pid=,ppid=,rss=,%cpu=,etime=,command="],
     { stdout: "pipe", stderr: "pipe" },
   );

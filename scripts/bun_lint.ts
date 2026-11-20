@@ -7,6 +7,7 @@
  * Run: bun run lint:bun [files ...]
  */
 
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { resolveNativeBunLintBin } from "./lint_native.ts";
 
 export interface LintCommand {
@@ -45,7 +46,7 @@ if (import.meta.main) {
     process.exit(2);
   }
   for (const command of nativeLintCommands(nativeBin, files)) {
-    const result = Bun.spawnSync([command.bin, ...command.argv], {
+    const result = spawnSyncBounded([command.bin, ...command.argv], {
       stdout: "inherit",
       stderr: "inherit",
     });

@@ -375,6 +375,10 @@
       "documented": true,
       "link": "https://bun.com/docs/test/writing-tests#fixtures"
     },
+    "ServerWebSocket": {
+      "documented": true,
+      "link": "https://bun.com/reference/bun/ServerWebSocket"
+    },
     "sha": {
       "documented": true,
       "link": "https://bun.com/docs/runtime/sql#authentication"
@@ -494,6 +498,10 @@
     "WebSocket": {
       "documented": true,
       "link": "https://bun.com/docs/runtime/http/websockets"
+    },
+    "WebSocketOptions": {
+      "documented": true,
+      "link": "https://bun.com/reference/bun/WebSocketOptions"
     },
     "WebView": {
       "documented": true,

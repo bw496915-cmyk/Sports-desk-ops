@@ -73,6 +73,17 @@ export function servedPathsFromSource(source: string): Set<string> {
     if (value.startsWith("/")) paths.add(value.split("?")[0] ?? value);
   }
 
+  // Route-table object keys (`"/healthz": {`) and assignments
+  // (`routes["/status"] = {`) are served paths too, not just `pathname` arms.
+  for (const match of source.matchAll(/^\s*"(\/[^"\n]+)":/gm)) {
+    const value = match[1] ?? "";
+    if (value.startsWith("/")) paths.add(value.split("?")[0] ?? value);
+  }
+  for (const match of source.matchAll(/routes\["(\/[^"]+)"\]\s*=/g)) {
+    const value = match[1] ?? "";
+    if (value.startsWith("/")) paths.add(value.split("?")[0] ?? value);
+  }
+
   const setLiteral =
     /const\s+([A-Za-z_$][\w$]*)\s*=\s*new Set\(\s*\[([^\]]*)\]\s*\)/g;
   for (const match of source.matchAll(setLiteral)) {
@@ -127,6 +138,8 @@ export type DeclaredPath = {
   readonly surface: string;
   /** `local-route` paths are served by this daemon; `upstream-route` ones are proxied elsewhere. */
   readonly category: SurfaceCategory;
+  /** The surface documents that its operations are deliberately absent from the spec. */
+  readonly missingFromSpec?: boolean;
 };
 
 /** One ledger surface, parsed rather than cast: the JSON is external data at this boundary. */
@@ -134,6 +147,7 @@ export type ParsedSurface = {
   readonly id: string;
   readonly category: SurfaceCategory;
   readonly members: readonly unknown[];
+  readonly missingFromSpec: boolean;
 };
 
 /** The three files this module reads, each parsed once here and trusted afterwards. */
@@ -144,6 +158,7 @@ const LedgerSchema = z.object({
         id: z.string().optional(),
         category: z.unknown(),
         members: z.array(z.unknown()).optional(),
+        missingFromSpec: z.boolean().optional(),
       }),
     )
     .optional(),
@@ -157,6 +172,7 @@ const SurfaceSchema = z.object({
   id: z.string().optional(),
   category: z.unknown(),
   members: z.array(z.unknown()).optional(),
+  missingFromSpec: z.boolean().optional(),
 });
 
 export function parseLedgerSurface(value: unknown): ParsedSurface | null {
@@ -166,6 +182,7 @@ export function parseLedgerSurface(value: unknown): ParsedSurface | null {
     id: parsed.data.id ?? "surface",
     category: parseSurfaceCategory(parsed.data.category),
     members: parsed.data.members ?? [],
+    missingFromSpec: parsed.data.missingFromSpec === true,
   };
 }
 
@@ -182,7 +199,11 @@ export function declaredPathsFromLedger(
     for (const member of surface.members) {
       const path = memberPath(member);
       if (path !== undefined) {
-        declared.set(path, { surface: surface.id, category: surface.category });
+        declared.set(path, {
+          surface: surface.id,
+          category: surface.category,
+          ...(surface.missingFromSpec ? { missingFromSpec: true } : {}),
+        });
       }
     }
   }
@@ -336,7 +357,12 @@ export function compareRouteSurfaces(input: {
   for (const path of [...input.declared.keys()].sort()) {
     if (!isApi(path)) continue;
     const served = servedByCanonical.has(canonicalRoutePath(path));
-    if (served && !specCanonical.has(canonicalRoutePath(path))) {
+    const declared = input.declared.get(path);
+    if (
+      served &&
+      declared?.missingFromSpec !== true &&
+      !specCanonical.has(canonicalRoutePath(path))
+    ) {
       findings.push({
         kind: "spec-missing",
         path,

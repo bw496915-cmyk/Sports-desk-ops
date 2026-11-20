@@ -114,10 +114,12 @@ describe("manifest", () => {
       "S3Stats",
       "Serve",
       "Server",
+      "ServerWebSocket",
       "SpawnOptions",
       "Subprocess",
       "TerminalOptions",
       "WebSocket",
+      "WebSocketOptions",
       "Worker",
     ]);
   });

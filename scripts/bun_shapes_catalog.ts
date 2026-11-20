@@ -26,6 +26,7 @@
  */
 
 import { resolve } from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { tmpdir } from "node:os";
 import { rmSync } from "node:fs";
 
@@ -96,7 +97,7 @@ export async function renderBunShapeCatalog(
   );
   // Tracked tests only: a scratch or vendored file is not evidence the gate can
   // resolve in CI, and a ref to one would be a broken citation.
-  const tracked = Bun.spawnSync(
+  const tracked = spawnSyncBounded(
     ["git", "-C", root, "ls-files", "-z", "*.test.ts", "*.test-d.ts"],
     {
       stdout: "pipe",
@@ -349,7 +350,7 @@ async function formatted(source: string): Promise<string> {
   const tmp = `${tmpdir()}/bun-shapes-${crypto.randomUUID()}.ts`;
   await Bun.write(tmp, source);
   try {
-    const proc = Bun.spawnSync(["bun", "fmt", tmp], {
+    const proc = spawnSyncBounded(["bun", "fmt", tmp], {
       stdout: "ignore",
       stderr: "pipe",
     });

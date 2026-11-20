@@ -3,7 +3,7 @@
  * @description HTTP authentication layer tests: login, logout, cookie handling, requireSession middleware.
  */
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import {
   clientIp,
   CSRF_COOKIE_NAME,
@@ -18,6 +18,7 @@ import {
   SESSION_COOKIE_NAME,
   verifyCsrf,
   type AuthedContext,
+  requestCookieValue,
 } from "../lib/http_auth.ts";
 
 describe("HTTP Auth Layer (lib/http_auth.ts)", () => {
@@ -324,6 +325,84 @@ describe("HTTP Auth Layer (lib/http_auth.ts)", () => {
       expect(await res.text()).toBe("ALLOWED");
     });
 
+    it("round-trips every algorithm and encoding combination", () => {
+      const algorithms = [
+        "blake2b256",
+        "blake2b512",
+        "sha256",
+        "sha384",
+        "sha512",
+        "sha512-256",
+      ] as const;
+      const encodings = ["base64", "base64url", "hex"] as const;
+
+      for (const algorithm of algorithms) {
+        for (const encoding of encodings) {
+          const token = issueCsrf({ algorithm, encoding });
+          expect(verifyCsrf(token, { algorithm, encoding })).toBe(true);
+        }
+      }
+
+      const sha256 = issueCsrf({ algorithm: "sha256" });
+      expect(verifyCsrf(sha256, { algorithm: "sha512" })).toBe(false);
+      const hex = issueCsrf({ encoding: "hex" });
+      expect(verifyCsrf(hex, { encoding: "base64" })).toBe(false);
+    });
+
+    it("passes a custom algorithm and encoding through to Bun.CSRF", () => {
+      const token = issueCsrf({ algorithm: "sha512", encoding: "hex" });
+
+      expect(/^[0-9a-f]+$/.test(token)).toBe(true);
+      expect(verifyCsrf(token, { algorithm: "sha512", encoding: "hex" })).toBe(
+        true,
+      );
+      expect(verifyCsrf(token)).toBe(false);
+    });
+
+    it("honors an explicit expiry", async () => {
+      const token = issueCsrf({ expiresIn: 5 });
+
+      expect(verifyCsrf(token)).toBe(true);
+      await Bun.sleep(20);
+      expect(verifyCsrf(token)).toBe(false);
+    });
+
+    it("binds a token to a session and rejects other sessions", () => {
+      const token = issueCsrf({ sessionId: "session-a" });
+
+      expect(verifyCsrf(token, { sessionId: "session-a" })).toBe(true);
+      expect(verifyCsrf(token, { sessionId: "session-b" })).toBe(false);
+      expect(verifyCsrf(token)).toBe(false);
+    });
+
+    it("accepts a session-bound token when the session cookie matches", async () => {
+      const token = issueCsrf({ sessionId: "session-a" });
+      const req = new Request("http://localhost:4022/api/terminal/exec", {
+        method: "POST",
+        headers: {
+          cookie: `${SESSION_COOKIE_NAME}=session-a; ${CSRF_COOKIE_NAME}=${token}`,
+          [CSRF_HEADER_NAME]: token,
+        },
+      });
+
+      const res = await requireCsrf(req, async () => new Response("ALLOWED"));
+      expect(res.status).toBe(200);
+    });
+
+    it("rejects a session-bound token presented with another session", async () => {
+      const token = issueCsrf({ sessionId: "session-a" });
+      const req = new Request("http://localhost:4022/api/terminal/exec", {
+        method: "POST",
+        headers: {
+          cookie: `${SESSION_COOKIE_NAME}=session-b; ${CSRF_COOKIE_NAME}=${token}`,
+          [CSRF_HEADER_NAME]: token,
+        },
+      });
+
+      const res = await requireCsrf(req, async () => new Response("ALLOWED"));
+      expect(res.status).toBe(403);
+    });
+
     it("rejects token issued with a foreign secret (multi-process isolation check)", async () => {
       const foreignToken = issueCsrf({
         secret: "foreign_unshared_secret_123",
@@ -408,7 +487,7 @@ describe("HTTP Auth Layer (lib/http_auth.ts)", () => {
     });
 
     it("allows POST /api/alerts/:id/ack when authenticated and valid CSRF supplied", async () => {
-      const csrfToken = issueCsrf();
+      const csrfToken = issueCsrf({ sessionId: "valid-sess" });
       const req = new Request(
         "http://localhost:4022/api/alerts/deliv-12345/ack",
         {
@@ -468,5 +547,33 @@ describe("HTTP Auth Layer (lib/http_auth.ts)", () => {
       );
       expect(csrfRes.status).toBe(403);
     });
+  });
+});
+
+describe("requestCookieValue", () => {
+  function withCookie(cookie: string): Request {
+    return new Request("http://localhost/", { headers: { cookie } });
+  }
+
+  test("reads and decodes cookies from a plain Request", () => {
+    const req = withCookie("sd_session=a%20b; other=2");
+
+    expect(requestCookieValue(req, "sd_session")).toBe("a b");
+    expect(requestCookieValue(req, "other")).toBe("2");
+    expect(requestCookieValue(req, "missing")).toBeUndefined();
+  });
+
+  test("does not throw on a malformed escape", () => {
+    const req = withCookie("sd_session=%ZZ");
+
+    expect(() => requestCookieValue(req, "sd_session")).not.toThrow();
+    expect(requestCookieValue(req, "sd_session")).toBe("\uFFFD");
+  });
+
+  test("an empty or absent Cookie header has no values", () => {
+    expect(
+      requestCookieValue(new Request("http://localhost/"), "sd_session"),
+    ).toBeUndefined();
+    expect(requestCookieValue(withCookie(""), "sd_session")).toBeUndefined();
   });
 });

@@ -1087,6 +1087,17 @@ export const DESK_ENDPOINT_CATALOG: readonly DeskEndpointCatalogEntry[] = [
     summary: "Execute paper-fill pass (auto / maker / taker)",
   },
 
+  {
+    id: "admin-reload-static",
+    method: "POST",
+    path: "/api/admin/reload-static",
+    aliases: [],
+    plane: "ops",
+    auth: "admin-bearer",
+    autoSweep: false,
+    sweepPath: "",
+    summary: "Refresh cached static routes from the current manifest",
+  },
   // Board, Sports & Live Bets Plane
   {
     id: "game-admin-board",

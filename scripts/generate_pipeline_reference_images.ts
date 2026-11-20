@@ -18,6 +18,7 @@
  */
 
 import fs from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
@@ -522,7 +523,7 @@ function runRasterizer(
   command: readonly string[],
   timeoutMs = 30_000,
 ): { status: number; stderr: string } {
-  const result = Bun.spawnSync({
+  const result = spawnSyncBounded({
     cmd: [...command],
     stdout: "pipe",
     stderr: "pipe",

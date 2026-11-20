@@ -23,6 +23,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { renderGSLiveDocsMarkdown } from "../lib/gslive_api_docs.ts";
 
@@ -1067,11 +1068,11 @@ const HEADER_EVIDENCE: Readonly<Record<string, string>> = {
 
 const RESPONSE_HEADER_EVIDENCE: Readonly<Record<string, string>> = {
   "content-security-policy":
-    "Implemented for local daemon responses (`services/sportsdesk_webview_server.ts:845-859`). Upstream cloud response headers were not captured.",
+    "Implemented for local daemon responses (`services/sportsdesk_webview_server.ts:847-861`). Upstream cloud response headers were not captured.",
   "x-content-type-options":
-    "Implemented for local daemon responses (`services/sportsdesk_webview_server.ts:845-859`). Upstream cloud response headers were not captured.",
+    "Implemented for local daemon responses (`services/sportsdesk_webview_server.ts:847-861`). Upstream cloud response headers were not captured.",
   "referrer-policy":
-    "Implemented for local daemon responses (`services/sportsdesk_webview_server.ts:845-859`). Upstream cloud response headers were not captured.",
+    "Implemented for local daemon responses (`services/sportsdesk_webview_server.ts:847-861`). Upstream cloud response headers were not captured.",
 };
 
 function renderHeadersMatrix(context: RenderContext): string[] {
@@ -1180,7 +1181,7 @@ function renderHeadersMatrix(context: RenderContext): string[] {
   if (responseHeaders.size === 0) {
     lines.push("### Inbound response security headers", "");
     lines.push(
-      "No response headers are declared in the spec. The local daemon implements `Content-Security-Policy`, `X-Content-Type-Options` and `Referrer-Policy` (`services/sportsdesk_webview_server.ts:845-859`); upstream cloud response headers were not captured.",
+      "No response headers are declared in the spec. The local daemon implements `Content-Security-Policy`, `X-Content-Type-Options` and `Referrer-Policy` (`services/sportsdesk_webview_server.ts:847-861`); upstream cloud response headers were not captured.",
     );
     lines.push("");
   } else {
@@ -1776,7 +1777,7 @@ function assertOutput(context: RenderContext, markdown: string): void {
  * freshness gate re-runs this whole generator (write + format) and byte-compares.
  */
 function formatMarkdown(outPath: string, root: string): void {
-  const result = Bun.spawnSync([process.execPath, "fmt", outPath], {
+  const result = spawnSyncBounded([process.execPath, "fmt", outPath], {
     cwd: root,
   });
   if (result.exitCode !== 0) {

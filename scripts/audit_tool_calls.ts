@@ -17,6 +17,7 @@
  */
 
 import fs from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import os from "node:os";
 import path from "node:path";
 
@@ -85,7 +86,7 @@ function parseArgs(argv: readonly string[]): {
 
 function mainCheckoutRoot(): string | null {
   try {
-    const result = Bun.spawnSync(["git", "rev-parse", "--git-common-dir"], {
+    const result = spawnSyncBounded(["git", "rev-parse", "--git-common-dir"], {
       stdout: "pipe",
       stderr: "ignore",
     });

@@ -20,6 +20,10 @@
 import { resolve } from "node:path";
 import { TerminalSession, type SpawnInPtyOptions } from "./bun_terminal.ts";
 import { auditPty } from "./audit_log.ts";
+import {
+  renderConsoleDepthReport,
+  resolveConsoleDepthChain,
+} from "./console_depth.ts";
 import { benchmarkResolverLatency, classifyIpAddress } from "./bun_dns.ts";
 import {
   buildReverseDnsForensicsView,
@@ -142,6 +146,24 @@ function getCachedRanking(): Promise<BatchedRankingResult> {
 
 export interface TerminalQueryOptions extends SpawnInPtyOptions {
   readonly timeoutMs?: number;
+  /**
+   * Resolved profile console depth. When absent, `PTY_CONSOLE_DEPTH` from the profile
+   * env (or the parent process) is used. Depth is a profile property, not a per-query
+   * UI knob: callers only pass this when they already resolved the profile.
+   */
+  readonly consoleDepth?: number;
+  /**
+   * Cancel the child. Bun kills it with `killSignal`; the session's SIGTERM->SIGKILL
+   * escalation still applies if the child ignores the signal.
+   */
+  readonly signal?: AbortSignal;
+  /**
+   * Linux only: cgroup directory path (or open fd) applied to the child and everything
+   * it spawns. Falls back to `SPORTSDESK_TERMINAL_CGROUP`; ignored on other platforms.
+   */
+  readonly cgroup?: string | number;
+  /** Signal Bun sends on timeout/abort (default SIGTERM). */
+  readonly killSignal?: string | number;
 }
 
 export interface TerminalQueryResult {
@@ -150,6 +172,10 @@ export interface TerminalQueryResult {
   readonly exitCode: number;
   readonly durationMs: number;
   readonly timestamp: number;
+  /** True when the 4 MiB executor cap was hit; stdout holds the retained tail. */
+  readonly truncated?: boolean;
+  /** Total bytes the child produced before the cap (byte-accurate). */
+  readonly outputBytes?: number;
 }
 
 export interface AnsiSegment {
@@ -300,6 +326,8 @@ export const COMMAND_ALIASES: Readonly<Record<string, string>> = {
   capabilities: "capabilities",
   caps: "capabilities",
   features: "capabilities",
+  depth: "depth",
+  "console-depth": "depth",
   harvest: "harvest",
   hv: "harvest",
   anomalies: "harvest",
@@ -310,6 +338,7 @@ export const COMMAND_ALIASES: Readonly<Record<string, string>> = {
  */
 export const AUTOCOMPLETE_COMMANDS: readonly string[] = [
   "profile",
+  "profiles",
   "find",
   "harvest",
   "sharps",
@@ -332,6 +361,7 @@ export const AUTOCOMPLETE_COMMANDS: readonly string[] = [
   "cron",
   "markdown",
   "capabilities",
+  "depth",
   "clear",
   "help",
   "--help",
@@ -1118,7 +1148,7 @@ export function getTerminalWelcomeBanner(): string {
     "\x1b[90mEngine: Bun.spawn + Bun.Terminal PTY · Host: sportsdesk-ops · Invariant: autoExecute: false\x1b[0m",
     "",
     "\x1b[1;33mCommands & Canonical Shortcodes:\x1b[0m",
-    "  \x1b[1;32mprofile <id>\x1b[0m (aliases: \x1b[32mp, c\x1b[0m) Inspect multidimensional sharpness radar (flags: \x1b[36m--radar\x1b[0m, \x1b[36m--json\x1b[0m, \x1b[36m--wagers\x1b[0m)",
+    "  \x1b[1;32mprofile <id>\x1b[0m (aliases: \x1b[32mp, c\x1b[0m) Inspect multidimensional sharpness radar (flags: \x1b[36m--radar\x1b[0m, \x1b[36m--json\x1b[0m, \x1b[36m--wagers\x1b[0m, \x1b[36m--compare <id>\x1b[0m, \x1b[36m--timeline\x1b[0m)\n  \x1b[1;32mprofiles\x1b[0m              Known profile matrix (flags: \x1b[36m--sort score|gini|stake|ratio|id\x1b[0m, \x1b[36m--limit N\x1b[0m, \x1b[36m--min-score N\x1b[0m, \x1b[36m--action A\x1b[0m, \x1b[36m--tier T\x1b[0m, \x1b[36m--agent A\x1b[0m, \x1b[36m--asc\x1b[0m, \x1b[36m--json\x1b[0m)",
     "  \x1b[1;32mfind <query>\x1b[0m (aliases: \x1b[32mf, s\x1b[0m) Search accounts (flags: \x1b[36m-t <tier>\x1b[0m, \x1b[36m-s <sport>\x1b[0m, \x1b[36m-a <action>\x1b[0m)",
     "  \x1b[1;32msharps\x1b[0m (aliases: \x1b[32msh, top\x1b[0m)    Top sharp originators ranked by Sharpness Composite Index",
     "  \x1b[1;32msyndicates\x1b[0m (aliases: \x1b[32msyn\x1b[0m)       Detected hook syndicate clusters & sub-accounts",
@@ -1132,6 +1162,7 @@ export function getTerminalWelcomeBanner(): string {
     "  \x1b[1;32mbursts\x1b[0m (alias: \x1b[32mb, steam\x1b[0m)       Detected multi-account steam bursts (≤ 180s coordinated window)",
     "  \x1b[1;32mquarantine\x1b[0m (aliases: \x1b[32mq, guard\x1b[0m)   Real-time sliding window syndicate burst quarantine directives",
     "  \x1b[1;32mws\x1b[0m (alias: \x1b[32msubscriptions\x1b[0m)         Inspect connected WebSocket clients and active topic channels",
+    "  \x1b[1;32mdepth\x1b[0m (alias: \x1b[32mconsole-depth\x1b[0m)     Console depth chain: profile env → bunfig → effective winner",
     "  \x1b[1;32mtrunks\x1b[0m (alias: \x1b[32mt, trees\x1b[0m)        Two-trunk forest rollup (live corpus · detail · trackthis/nolapph)",
     "  \x1b[1;32mdns <host>\x1b[0m (alias: \x1b[32md\x1b[0m)         Benchmark c-ares vs system DNS resolver latency",
     "  \x1b[1;32mreverse <ip>\x1b[0m (alias: \x1b[32mr, ip\x1b[0m)     Reverse DNS forensics & datacenter/residential IP lookup",
@@ -1221,6 +1252,195 @@ function renderWagersTable(cust: TerminalCustomerRecord): string {
     "└──────┴──────────┴─────────────┴──────────┴──────────┴──────────┴──────────────────────┘",
   );
   return rows.join("\n");
+}
+
+/**
+ * Renders a side-by-side comparison of two customer profiles with numeric deltas.
+ */
+function renderProfileComparison(
+  left: TerminalCustomerRecord,
+  right: TerminalCustomerRecord,
+): string {
+  const rule = "═".repeat(80);
+  const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  const fixed = (digits: number) => (n: number) => n.toFixed(digits);
+
+  const numericRows: ReadonlyArray<{
+    readonly label: string;
+    readonly pick: (c: TerminalCustomerRecord) => number;
+    readonly fmt: (n: number) => string;
+  }> = [
+    { label: "Sharp score", pick: (c) => c.score, fmt: fixed(2) },
+    { label: "CLV score", pick: (c) => c.clvScore, fmt: fixed(2) },
+    { label: "Skill score", pick: (c) => c.skillScore, fmt: fixed(2) },
+    { label: "Sizing score", pick: (c) => c.sizingScore, fmt: fixed(2) },
+    { label: "Signature score", pick: (c) => c.sigScore, fmt: fixed(2) },
+    { label: "Timing score", pick: (c) => c.timingScore, fmt: fixed(2) },
+    {
+      label: "Correlated score",
+      pick: (c) => c.correlatedScore,
+      fmt: fixed(2),
+    },
+    { label: "Stake Gini", pick: (c) => c.gini, fmt: fixed(3) },
+    { label: "Mean stake", pick: (c) => c.meanStake, fmt: usd },
+    { label: "Max/min ratio", pick: (c) => c.maxMinRatio, fmt: fixed(2) },
+    {
+      label: "Correlated exploit",
+      pick: (c) => c.correlatedExploitRate,
+      fmt: pct,
+    },
+    { label: "Syndicate probability", pick: (c) => c.syndicateProb, fmt: pct },
+    { label: "VaR 95", pick: (c) => c.var95Usd, fmt: usd },
+    { label: "CVaR 95", pick: (c) => c.cvar95Usd, fmt: usd },
+    { label: "Hold %", pick: (c) => c.holdPct, fmt: (n) => `${n.toFixed(1)}%` },
+    { label: "LTV", pick: (c) => c.ltvUsd, fmt: usd },
+    {
+      label: "Recommended limit",
+      pick: (c) => c.recommendedLimitUsd,
+      fmt: usd,
+    },
+    {
+      label: "In-play delay",
+      pick: (c) => c.inPlayDelaySec,
+      fmt: (n) => `${n}s`,
+    },
+    { label: "Line shade", pick: (c) => c.lineShadeCents, fmt: (n) => `${n}¢` },
+  ];
+
+  const textRows: ReadonlyArray<{
+    readonly label: string;
+    readonly pick: (c: TerminalCustomerRecord) => string;
+  }> = [
+    { label: "Tier", pick: (c) => c.tier },
+    { label: "Sizing strategy", pick: (c) => c.sizingStrategy },
+    { label: "Specialization", pick: (c) => c.specialization },
+    { label: "Timing archetype", pick: (c) => c.timingArchetype },
+    { label: "Correlated risk", pick: (c) => c.correlatedRisk },
+    { label: "Syndicate risk", pick: (c) => c.syndicateRisk },
+    { label: "Action", pick: (c) => c.action },
+  ];
+
+  const cell = (text: string, width: number) =>
+    text.length > width ? `${text.slice(0, width - 1)}…` : text.padEnd(width);
+
+  const lines = [
+    "\x1b[1;36m⚖️  PROFILE COMPARISON\x1b[0m",
+    rule,
+    `  ${cell("Metric", 22)}${cell(left.id, 20)}${cell(right.id, 20)}Δ`,
+    `  ${"-".repeat(22)}${"-".repeat(20)}${"-".repeat(20)}${"-".repeat(12)}`,
+  ];
+
+  for (const row of numericRows) {
+    const l = row.pick(left);
+    const r = row.pick(right);
+    const delta = r - l;
+    const deltaText =
+      delta === 0 ? "0" : `${delta > 0 ? "+" : "-"}${row.fmt(Math.abs(delta))}`;
+    lines.push(
+      `  ${cell(row.label, 22)}${cell(row.fmt(l), 20)}${cell(row.fmt(r), 20)}\x1b[90m${deltaText}\x1b[0m`,
+    );
+  }
+
+  for (const row of textRows) {
+    const l = row.pick(left);
+    const r = row.pick(right);
+    lines.push(
+      `  ${cell(row.label, 22)}${cell(l, 20)}${cell(r, 20)}\x1b[90m${l === r ? "=" : "≠"}\x1b[0m`,
+    );
+  }
+
+  lines.push(
+    rule,
+    `\x1b[90mLeft:  ${left.id} (${left.agentId}) · Right: ${right.id} (${right.agentId})\x1b[0m`,
+  );
+  return lines.join("\n");
+}
+
+/**
+ * Renders the known profile matrix with a sortable score/gini/stake/ratio view.
+ */
+function renderProfilesTable(
+  records: readonly TerminalCustomerRecord[],
+  sortKey: string,
+  limit: number,
+  options: {
+    readonly ascending: boolean;
+    readonly filters: readonly string[];
+  } = { ascending: false, filters: [] },
+): string {
+  const shown = records.slice(0, limit);
+  const direction = options.ascending ? "↑" : "↓";
+  const filterNote =
+    options.filters.length > 0 ? ` · ${options.filters.join(" · ")}` : "";
+  const lines = [
+    `\x1b[1;36m👥 KNOWN CUSTOMER PROFILES (${shown.length}/${records.length}) — sort: ${sortKey} ${direction}${filterNote}\x1b[0m`,
+    "┌──────────────┬────────────┬──────────────────────────┬───────┬───────┬────────────┬─────────┬─────────────────┐",
+    "│ Customer     │ Agent      │ Tier                     │ Score │ Gini  │ Mean Stake │ Max/Min │ Action          │",
+    "├──────────────┼────────────┼──────────────────────────┼───────┼───────┼────────────┼─────────┼─────────────────┤",
+  ];
+
+  for (const c of shown) {
+    const score = c.score.toFixed(2).padStart(5);
+    const scoreColored =
+      c.score >= 8
+        ? `\x1b[1;31m${score}\x1b[0m`
+        : c.score >= 6
+          ? `\x1b[33m${score}\x1b[0m`
+          : score;
+    lines.push(
+      `│ ${padDisplay(c.id, 12)} │ ${padDisplay(c.agentId, 10)} │ ${padDisplay(c.tier, 24)} │ ${scoreColored} │ ${c.gini.toFixed(3)} │ ${padDisplay(`$${Math.round(c.meanStake).toLocaleString("en-US")}`, 10, "right")} │ ${padDisplay(`${c.maxMinRatio.toFixed(1)}x`, 7, "right")} │ ${padDisplay(c.action, 15)} │`,
+    );
+  }
+
+  lines.push(
+    "└──────────────┴────────────┴──────────────────────────┴───────┴───────┴────────────┴─────────┴─────────────────┘",
+    "\x1b[90mTip: profile <id> for detail, profile <id> --compare <id> to compare, or --json for machine output.\x1b[0m",
+  );
+  return lines.join("\n");
+}
+
+/**
+ * Renders the sampled ticket timeline newest-first with totals.
+ */
+function renderProfileTimeline(cust: TerminalCustomerRecord): string {
+  const wagers = [...(cust.sampleWagers ?? [])].sort((a, b) =>
+    b.time.localeCompare(a.time),
+  );
+  if (wagers.length === 0) {
+    return `\x1b[33mNo recent ticket samples available for ${cust.id}\x1b[0m`;
+  }
+
+  const totalStake = wagers.reduce((sum, w) => sum + w.stakeUsd, 0);
+  const totalNet = wagers.reduce((sum, w) => sum + w.netUsd, 0);
+  const avgClv = wagers.reduce((sum, w) => sum + w.clvBps, 0) / wagers.length;
+
+  const lines = [
+    `\x1b[1;36m📈 TICKET TIMELINE: ${cust.id} (${wagers.length} sampled tickets, newest first)\x1b[0m`,
+    "┌──────────────────────┬───────┬────────────┬──────────────┬───────────┬─────────┬───────────┐",
+    "│ Submitted            │ Sport │ Market     │ Selection    │ Stake     │ CLV bps │ Net USD   │",
+    "├──────────────────────┼───────┼────────────┼──────────────┼───────────┼─────────┼───────────┤",
+  ];
+
+  for (const w of wagers) {
+    const net = `${w.netUsd >= 0 ? "+" : "-"}$${Math.abs(w.netUsd).toLocaleString("en-US")}`;
+    const netColored =
+      w.netUsd > 0
+        ? `\x1b[32m${net}\x1b[0m`
+        : w.netUsd < 0
+          ? `\x1b[31m${net}\x1b[0m`
+          : net;
+    lines.push(
+      `│ ${padDisplay(w.time, 20)} │ ${padDisplay(w.sport, 5)} │ ${padDisplay(w.market, 10)} │ ${padDisplay(formatHalfPointLine(w.line), 12)} │ ${padDisplay(`$${w.stakeUsd.toLocaleString("en-US")}`, 9, "right")} │ ${padDisplay(`${w.clvBps >= 0 ? "+" : ""}${w.clvBps}`, 7, "right")} │ ${netColored.padEnd(9)} │`,
+    );
+  }
+
+  lines.push(
+    "├──────────────────────┼───────┼────────────┼──────────────┼───────────┼─────────┼───────────┤",
+    `│ TOTAL                │       │            │              │ ${padDisplay(`$${totalStake.toLocaleString("en-US")}`, 9, "right")} │ ${padDisplay(avgClv.toFixed(0), 7, "right")} │ ${padDisplay(`${totalNet >= 0 ? "+" : "-"}$${Math.abs(totalNet).toLocaleString("en-US")}`, 9, "right")} │`,
+    "└──────────────────────┴───────┴────────────┴──────────────┴───────────┴─────────┴───────────┘",
+  );
+  return lines.join("\n");
 }
 
 /**
@@ -1932,9 +2152,241 @@ async function executeTerminalQueryInner(
   }
 
   // Quick Command: Profile Inspector
+  // Quick Command: Known profile matrix (sortable)
+  if (canonicalCmd === "profiles") {
+    const valueFlags = new Set([
+      "--sort",
+      "--limit",
+      "--min-score",
+      "--action",
+      "--tier",
+      "--agent",
+    ]);
+    const booleanFlags = new Set(["--json", "--asc"]);
+    const knownFlags = new Set([...valueFlags, ...booleanFlags]);
+
+    for (let index = 0; index < cmdArgs.length; index += 1) {
+      const arg = cmdArgs[index] ?? "";
+      if (!arg.startsWith("-")) continue;
+      const name = arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
+      if (!knownFlags.has(name)) {
+        return {
+          command: trimmed,
+          stdout: `\x1b[31mUnknown profiles flag '${name}'. Allowed: ${[...knownFlags].join(", ")}\x1b[0m`,
+          exitCode: 1,
+          durationMs: Date.now() - startedAt,
+          timestamp: startedAt,
+        };
+      }
+      if (valueFlags.has(name) && !arg.includes("=")) index += 1;
+    }
+
+    const readFlag = (
+      name: string,
+    ): { readonly present: boolean; readonly value: string | undefined } => {
+      const index = cmdArgs.findIndex(
+        (a) => a === name || a.startsWith(`${name}=`),
+      );
+      if (index === -1) return { present: false, value: undefined };
+      const token = cmdArgs[index] ?? "";
+      if (token.includes("=")) {
+        return {
+          present: true,
+          value: token.slice(token.indexOf("=") + 1),
+        };
+      }
+      return { present: true, value: cmdArgs[index + 1] };
+    };
+
+    const requireValue = (name: string): string | undefined => {
+      const flag = readFlag(name);
+      if (!flag.present) return undefined;
+      if (
+        flag.value === undefined ||
+        flag.value.trim() === "" ||
+        flag.value.startsWith("-")
+      ) {
+        return undefined;
+      }
+      return flag.value;
+    };
+
+    const sortRaw = readFlag("--sort");
+    const sortKey = sortRaw.value ?? "score";
+    const sorts = ["score", "gini", "stake", "ratio", "id"] as const;
+    if (sortRaw.present && requireValue("--sort") === undefined) {
+      return {
+        command: trimmed,
+        stdout: "\x1b[31m--sort requires a value\x1b[0m",
+        exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+    if (!(sorts as readonly string[]).includes(sortKey)) {
+      return {
+        command: trimmed,
+        stdout: `\x1b[31m--sort must be one of: ${sorts.join(", ")}\x1b[0m`,
+        exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    const limitRaw = requireValue("--limit") ?? "25";
+    const limit = Number(limitRaw);
+    if (!Number.isInteger(limit) || limit < 1) {
+      return {
+        command: trimmed,
+        stdout: "\x1b[31m--limit must be a positive integer\x1b[0m",
+        exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    const minScoreRaw = requireValue("--min-score");
+    const minScore =
+      minScoreRaw === undefined ? undefined : Number(minScoreRaw);
+    if (
+      minScore !== undefined &&
+      (!Number.isFinite(minScore) || minScore < 0 || minScore > 10)
+    ) {
+      return {
+        command: trimmed,
+        stdout: "\x1b[31m--min-score must be a number between 0 and 10\x1b[0m",
+        exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    let records = [...KNOWN_CUSTOMER_MAP.values()];
+    const filters: string[] = [];
+    const actions = new Set(records.map((c) => c.action.toUpperCase()));
+    const actionFilter = requireValue("--action")?.toUpperCase();
+    if (actionFilter !== undefined) {
+      if (!actions.has(actionFilter)) {
+        return {
+          command: trimmed,
+          stdout: `\x1b[31m--action must be one of: ${[...actions].join(", ")}\x1b[0m`,
+          exitCode: 1,
+          durationMs: Date.now() - startedAt,
+          timestamp: startedAt,
+        };
+      }
+      records = records.filter((c) => c.action.toUpperCase() === actionFilter);
+      filters.push(`action=${actionFilter}`);
+    }
+
+    const tierFilter = requireValue("--tier")?.toUpperCase();
+    if (tierFilter !== undefined) {
+      records = records.filter((c) =>
+        c.tier.toUpperCase().includes(tierFilter),
+      );
+      filters.push(`tier~${tierFilter}`);
+    }
+
+    const agentFilter = requireValue("--agent")?.toUpperCase();
+    if (agentFilter !== undefined) {
+      records = records.filter((c) => c.agentId.toUpperCase() === agentFilter);
+      filters.push(`agent=${agentFilter}`);
+    }
+
+    if (minScore !== undefined) {
+      records = records.filter((c) => c.score >= minScore);
+      filters.push(`min-score≥${minScore}`);
+    }
+
+    const ascending = cmdArgs.includes("--asc");
+    if (sortKey === "id") {
+      records.sort((a, b) =>
+        ascending ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id),
+      );
+    } else {
+      const pick =
+        sortKey === "gini"
+          ? (c: TerminalCustomerRecord) => c.gini
+          : sortKey === "stake"
+            ? (c: TerminalCustomerRecord) => c.meanStake
+            : sortKey === "ratio"
+              ? (c: TerminalCustomerRecord) => c.maxMinRatio
+              : (c: TerminalCustomerRecord) => c.score;
+      records.sort((a, b) =>
+        ascending ? pick(a) - pick(b) : pick(b) - pick(a),
+      );
+    }
+    const limited = records.slice(0, limit);
+
+    if (cmdArgs.includes("--json")) {
+      return {
+        command: trimmed,
+        stdout: JSON.stringify(
+          limited.map((c) => ({
+            id: c.id,
+            agentId: c.agentId,
+            masterAgent: c.masterAgent,
+            tier: c.tier,
+            score: c.score,
+            gini: c.gini,
+            meanStake: c.meanStake,
+            maxMinRatio: c.maxMinRatio,
+            action: c.action,
+          })),
+          null,
+          2,
+        ),
+        exitCode: 0,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    return {
+      command: trimmed,
+      stdout: renderProfilesTable(records, sortKey, limit, {
+        ascending,
+        filters,
+      }),
+      exitCode: 0,
+      durationMs: Date.now() - startedAt,
+      timestamp: startedAt,
+    };
+  }
+
   if (canonicalCmd === "profile") {
     const flags = new Set(cmdArgs.filter((a) => a.startsWith("-")));
-    const idArg = cmdArgs.find((a) => !a.startsWith("-")) || "GP301";
+    const compareIndex = cmdArgs.findIndex(
+      (a) => a === "--compare" || a.startsWith("--compare="),
+    );
+    let compareId: string | undefined;
+    let compareValueIndex = -1;
+    if (compareIndex !== -1) {
+      const token = cmdArgs[compareIndex] ?? "";
+      compareId = token.includes("=")
+        ? token.slice(token.indexOf("=") + 1)
+        : cmdArgs[compareIndex + 1];
+      if (!token.includes("=")) compareValueIndex = compareIndex + 1;
+      if (
+        compareId === undefined ||
+        compareId.trim() === "" ||
+        compareId.startsWith("-")
+      ) {
+        return {
+          command: trimmed,
+          stdout:
+            "\x1b[31mprofile --compare requires a customer id\x1b[0m\n\x1b[90mExample: profile GP301 --compare BRT5229\x1b[0m",
+          exitCode: 1,
+          durationMs: Date.now() - startedAt,
+          timestamp: startedAt,
+        };
+      }
+      compareId = compareId.toUpperCase();
+    }
+    const idArg =
+      cmdArgs.find(
+        (a, index) => !a.startsWith("-") && index !== compareValueIndex,
+      ) || "GP301";
     const upperId = idArg.toUpperCase();
 
     let cust = KNOWN_CUSTOMER_MAP.get(upperId);
@@ -1972,6 +2424,50 @@ async function executeTerminalQueryInner(
         command: trimmed,
         stdout: `\x1b[33mCustomer '${idArg}' not found in local active profile matrix.\x1b[0m\n\x1b[90mTry: profile GP301, profile BRT5229, or type 'harvest' / 'find <query>'\x1b[0m`,
         exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    // Flag: --compare <id>
+    if (compareId !== undefined) {
+      const target =
+        KNOWN_CUSTOMER_MAP.get(compareId) ??
+        (await resolveTerminalCustomer(compareId)) ??
+        undefined;
+      if (!target) {
+        return {
+          command: trimmed,
+          stdout: `\x1b[31mCompare target '${compareId}' not found in the local profile matrix.\x1b[0m`,
+          exitCode: 1,
+          durationMs: Date.now() - startedAt,
+          timestamp: startedAt,
+        };
+      }
+      if (flags.has("--json")) {
+        return {
+          command: trimmed,
+          stdout: JSON.stringify({ left: cust, right: target }, null, 2),
+          exitCode: 0,
+          durationMs: Date.now() - startedAt,
+          timestamp: startedAt,
+        };
+      }
+      return {
+        command: trimmed,
+        stdout: renderProfileComparison(cust, target),
+        exitCode: 0,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    // Flag: --timeline
+    if (flags.has("--timeline")) {
+      return {
+        command: trimmed,
+        stdout: renderProfileTimeline(cust),
+        exitCode: 0,
         durationMs: Date.now() - startedAt,
         timestamp: startedAt,
       };
@@ -2659,6 +3155,17 @@ async function executeTerminalQueryInner(
     };
   }
 
+  // Quick Command: Console depth resolution chain
+  if (canonicalCmd === "depth") {
+    return {
+      command: trimmed,
+      stdout: renderConsoleDepthReport(await resolveConsoleDepthChain(options)),
+      exitCode: 0,
+      durationMs: Date.now() - startedAt,
+      timestamp: startedAt,
+    };
+  }
+
   // Default: Execute command in a native Bun.Terminal PTY using TerminalSession
   const cmdParts = trimmed.split(/\s+/);
   let executable = cmdParts[0] ?? "";
@@ -2675,11 +3182,20 @@ async function executeTerminalQueryInner(
   }
 
   try {
+    const consoleDepth = resolveConsoleDepth(options);
+    const cgroup = options.cgroup ?? Bun.env.SPORTSDESK_TERMINAL_CGROUP;
     const session = new TerminalSession({
       cols: options.cols ?? 100,
       rows: options.rows ?? 30,
       timeoutMs: options.timeoutMs ?? 10_000,
+      maxOutputBytes: TERMINAL_MAX_OUTPUT_BYTES,
       cwd: options.cwd ?? process.cwd(),
+      env: consoleDepthEnv(options, consoleDepth),
+      ...(options.signal !== undefined ? { signal: options.signal } : {}),
+      ...(options.killSignal !== undefined
+        ? { killSignal: options.killSignal }
+        : {}),
+      ...(cgroup !== undefined && cgroup !== "" ? { cgroup } : {}),
     });
 
     await session.start([executable, ...args]);
@@ -2696,6 +3212,8 @@ async function executeTerminalQueryInner(
       exitCode,
       durationMs: Date.now() - startedAt,
       timestamp: startedAt,
+      truncated: session.truncated,
+      outputBytes: session.totalOutputBytes,
     };
   } catch (err) {
     return {
@@ -2706,6 +3224,73 @@ async function executeTerminalQueryInner(
       timestamp: startedAt,
     };
   }
+}
+
+/** `999999` is the registry's stored Infinity sentinel, never a runnable depth. */
+const MAX_CONSOLE_DEPTH = 999_999;
+
+/** Executor-only output cap: keep the tail, bound a runaway command's memory/CPU. */
+const TERMINAL_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+
+function asConsoleDepth(value: unknown): number | null {
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value < MAX_CONSOLE_DEPTH
+    ? value
+    : null;
+}
+
+/** Explicit resolved depth wins; otherwise the registry-emitted env is the source. */
+function resolveConsoleDepth(options: TerminalQueryOptions): number | null {
+  const explicit = asConsoleDepth(options.consoleDepth);
+  if (explicit !== null) return explicit;
+  const raw = options.env?.PTY_CONSOLE_DEPTH ?? process.env.PTY_CONSOLE_DEPTH;
+  if (raw === undefined || raw.trim() === "") return null;
+  return asConsoleDepth(Number(raw));
+}
+
+/**
+ * One depth flag only: strip any inherited `--console-depth` (the profile dotenv
+ * already carries one, and a parent env may carry a different value) before adding
+ * the resolved value. Other BUN_OPTIONS flags are preserved.
+ */
+const CONSOLE_DEPTH_FLAG_RE =
+  /(?:^|\s)--console-depth(?==|\s|$)(?:=\S+|\s+\S+)?/g;
+
+function sanitizeBunOptions(value: string | undefined): string {
+  if (value === undefined) return "";
+  return value.replace(CONSOLE_DEPTH_FLAG_RE, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Build the child env for the resolved depth. `depth === null` still sanitizes: an
+ * inherited `PTY_CONSOLE_DEPTH=999999` or a malformed value is cleared, so the
+ * sentinel is removed rather than passed through. A cleared depth falls back to
+ * bunfig/the Bun default; `999999` is not translated into "unlimited".
+ *
+ * This is the env boundary, not the rendered effect: a bunfig `[console].depth`
+ * still wins inside this repo, while PTY_CONSOLE_DEPTH stays readable.
+ */
+function consoleDepthEnv(
+  options: TerminalQueryOptions,
+  depth: number | null,
+): NonNullable<SpawnInPtyOptions["env"]> {
+  const base = options.env ?? {};
+  const stripped = sanitizeBunOptions(
+    base.BUN_OPTIONS ?? process.env.BUN_OPTIONS,
+  );
+  const flags =
+    depth === null
+      ? stripped
+      : stripped === ""
+        ? `--console-depth=${depth}`
+        : `${stripped} --console-depth=${depth}`;
+  return {
+    ...base,
+    PTY_CONSOLE_DEPTH: depth === null ? "" : String(depth),
+    BUN_OPTIONS: flags,
+  };
 }
 
 /**

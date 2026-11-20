@@ -3,7 +3,7 @@
  * Stage 1 of two: prove DSH can LOAD this plugin under Bun, and that its tools REFUSE
  * input they do not understand.
  *
- * WHAT THIS PROVES: the module imports, `apply` registers exactly the thirteen tools, every tool
+ * WHAT THIS PROVES: the module imports, `apply` registers exactly the fifteen tools, every tool
  * declaration is complete (description, parameters, output schema/render, execute), and the
  * closed sets reject unknown names — including prototype keys such as `toString` and
  * `__proto__`, which a plain `in` check would let through.
@@ -572,6 +572,7 @@ function assertLosslessJson(label, value) {
 }
 
 const EXPECTED = [
+  "sportsdesk_console_depth",
   "sportsdesk_customer",
   "sportsdesk_data",
   "sportsdesk_dev",
@@ -582,6 +583,7 @@ const EXPECTED = [
   "sportsdesk_security",
   "sportsdesk_sharp",
   "sportsdesk_status",
+  "sportsdesk_terminal_profile",
   "sportsdesk_ticker",
   "sportsdesk_wagers",
   "sportsdesk_weblogs",
@@ -607,7 +609,7 @@ check("module exports the cordis apply/name/inject contract", () => {
   }
 });
 
-check("registers exactly the thirteen read-only tools", () => {
+check("registers exactly the fifteen read-only tools", () => {
   assert(
     registered.length === EXPECTED.length,
     `registered ${registered.length} tools`,
@@ -932,6 +934,21 @@ await checkAsync(
 );
 
 console.log("\nverify-load: read-only tools answer against the real repo");
+
+await checkAsync(
+  "sportsdesk_status skipped service is not reported as down",
+  async () => {
+    const result = await byName.get("sportsdesk_status").execute({
+      service: false,
+    });
+    assert(result.service?.skipped === true, "service was not marked skipped");
+    assert(
+      !/Start the local webview service/.test(result.nextStep),
+      `skipped service advised: ${result.nextStep}`,
+    );
+    assert(Number.isInteger(result.probeDurationMs), "probeDurationMs missing");
+  },
+);
 
 await checkAsync("sportsdesk_status reads the checkout", async () => {
   const result = await byName.get("sportsdesk_status").execute({
@@ -2982,7 +2999,7 @@ await checkAsync(
 
 console.log(
   failed === 0
-    ? "\nverify-load: PASS — 13 tools load and refuse invalid input (stage 1/2)."
+    ? "\nverify-load: PASS — 15 tools load and refuse invalid input (stage 1/2)."
     : `\nverify-load: ${failed} FAILURE(S) (stage 1/2).`,
 );
 process.exit(failed === 0 ? 0 : 1);

@@ -28,6 +28,14 @@ export const TERMINAL_COMMAND_SPECS: readonly TerminalCommandSpec[] = [
     aliases: ["p", "c", "cust", "lookup"],
   },
   {
+    command: "profiles",
+    usage:
+      "profiles [--sort score|volume|net] [--limit N] [--min-score N] [--json]",
+    description: "Sortable profile matrix with score/action/tier/agent filters",
+    group: "SHARPS",
+    aliases: [],
+  },
+  {
     command: "find",
     usage: "find <query>",
     description: "Search accounts (-t tier, -s sport, -a action)",
@@ -148,6 +156,14 @@ export const TERMINAL_COMMAND_SPECS: readonly TerminalCommandSpec[] = [
     description: "WebSocket subscriptions and live channel counts",
     group: "NET",
     aliases: ["subscriptions"],
+  },
+  {
+    command: "depth",
+    usage: "depth",
+    description:
+      "Console depth chain: profile env, bunfig, and the effective winner",
+    group: "NET",
+    aliases: ["console-depth"],
   },
   {
     command: "dns",

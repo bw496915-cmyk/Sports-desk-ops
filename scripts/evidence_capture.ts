@@ -21,6 +21,7 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { join } from "node:path";
 import {
   AllowlistError,
@@ -689,7 +690,7 @@ async function persistRecords(
   const manifest = await store.finalize();
   // Keep committed capture records formatter-clean (repo CI runs
   // `format:check` over docs/evidence/captures when the store is committed).
-  Bun.spawnSync([process.execPath, "fmt", outDir], { cwd: outDir });
+  spawnSyncBounded([process.execPath, "fmt", outDir], { cwd: outDir });
   return {
     outDir,
     manifestPath: join(outDir, "manifest.json"),

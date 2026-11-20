@@ -11,6 +11,7 @@ import {
   packNshBinaryFrame,
   type NshMatchFrameInput,
 } from "../lib/nsh_frame_codec.ts";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { OriginDomainWireId, WriterLaneWireId } from "../lib/domain-enums.ts";
 
 const FRAME_COUNT = Number(process.argv[2] ?? 500);
@@ -74,7 +75,7 @@ if (import.meta.main) {
     ),
   );
 
-  const proc = Bun.spawnSync({
+  const proc = spawnSyncBounded({
     cmd: ["python3", decoder],
     stdin: Buffer.from(`${hexLines.join("\n")}\n`),
     stdout: "pipe",
