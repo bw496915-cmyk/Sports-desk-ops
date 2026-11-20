@@ -3,7 +3,7 @@
  * @description HTTP authentication layer tests: login, logout, cookie handling, requireSession middleware.
  */
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import {
   clientIp,
   CSRF_COOKIE_NAME,
@@ -18,6 +18,7 @@ import {
   SESSION_COOKIE_NAME,
   verifyCsrf,
   type AuthedContext,
+  requestCookieValue,
 } from "../lib/http_auth.ts";
 
 describe("HTTP Auth Layer (lib/http_auth.ts)", () => {
@@ -468,5 +469,33 @@ describe("HTTP Auth Layer (lib/http_auth.ts)", () => {
       );
       expect(csrfRes.status).toBe(403);
     });
+  });
+});
+
+describe("requestCookieValue", () => {
+  function withCookie(cookie: string): Request {
+    return new Request("http://localhost/", { headers: { cookie } });
+  }
+
+  test("reads and decodes cookies from a plain Request", () => {
+    const req = withCookie("sd_session=a%20b; other=2");
+
+    expect(requestCookieValue(req, "sd_session")).toBe("a b");
+    expect(requestCookieValue(req, "other")).toBe("2");
+    expect(requestCookieValue(req, "missing")).toBeUndefined();
+  });
+
+  test("does not throw on a malformed escape", () => {
+    const req = withCookie("sd_session=%ZZ");
+
+    expect(() => requestCookieValue(req, "sd_session")).not.toThrow();
+    expect(requestCookieValue(req, "sd_session")).toBe("\uFFFD");
+  });
+
+  test("an empty or absent Cookie header has no values", () => {
+    expect(
+      requestCookieValue(new Request("http://localhost/"), "sd_session"),
+    ).toBeUndefined();
+    expect(requestCookieValue(withCookie(""), "sd_session")).toBeUndefined();
   });
 });
