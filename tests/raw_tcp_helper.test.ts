@@ -265,3 +265,69 @@ test("stops at the zero chunk without waiting for connection close", async () =>
     listener.stop(true);
   }
 });
+
+test("parses 204 and 304 as bodyless", () => {
+  expect(
+    parseResponseHead('HTTP/1.1 304 Not Modified\r\nETag: "x"\r\n\r\n'),
+  ).toMatchObject({
+    status: 304,
+    framing: "none",
+    contentLength: null,
+  });
+  expect(parseResponseHead("HTTP/1.1 204 No Content\r\n\r\n")).toMatchObject({
+    status: 204,
+    framing: "none",
+  });
+});
+
+test("resolves a bodyless status without waiting for connection close", async () => {
+  const listener = Bun.listen<undefined>({
+    hostname: "127.0.0.1",
+    port: 0,
+    socket: {
+      data(socket) {
+        // Deliberately leave the connection open: 304 has no body.
+        socket.write('HTTP/1.1 304 Not Modified\r\nETag: "x"\r\n\r\n');
+      },
+    },
+  });
+
+  try {
+    const response = await rawTcp("/", {
+      port: listener.port,
+      readBody: true,
+      timeoutMs: 1_000,
+    });
+    expect(response.status).toBe(304);
+    expect(response.framing).toBe("none");
+    expect(response.body.byteLength).toBe(0);
+  } finally {
+    listener.stop(true);
+  }
+});
+
+test("does not wait for a HEAD body even with Content-Length", async () => {
+  const listener = Bun.listen<undefined>({
+    hostname: "127.0.0.1",
+    port: 0,
+    socket: {
+      data(socket) {
+        socket.write("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n");
+      },
+    },
+  });
+
+  try {
+    const response = await rawTcp("/", {
+      port: listener.port,
+      method: "HEAD",
+      readBody: true,
+      timeoutMs: 1_000,
+    });
+    expect(response.status).toBe(200);
+    expect(response.contentLength).toBe(10);
+    expect(response.body.byteLength).toBe(0);
+  } finally {
+    listener.stop(true);
+  }
+});

@@ -29,7 +29,7 @@ export interface RawTcpResponse {
   readonly headers: ReadonlyMap<string, readonly string[]>;
   readonly rawHead: string;
   readonly body: Uint8Array;
-  readonly framing: "chunked" | "content-length" | "eof";
+  readonly framing: "chunked" | "content-length" | "eof" | "none";
   readonly contentLength: number | null;
 }
 
@@ -38,7 +38,7 @@ export interface ParsedResponseHead {
   readonly status: number;
   readonly reason: string;
   readonly headers: Record<string, string[]>;
-  readonly framing: "chunked" | "content-length" | "eof";
+  readonly framing: "chunked" | "content-length" | "eof" | "none";
   readonly contentLength: number | null;
 }
 
@@ -275,6 +275,19 @@ export function parseResponseHead(
     (headers[lower] ??= []).push(value);
   }
 
+  const bodyless =
+    (status >= 100 && status < 200) || status === 204 || status === 304;
+  if (bodyless) {
+    return {
+      version,
+      status,
+      reason,
+      headers,
+      framing: "none",
+      contentLength: null,
+    };
+  }
+
   const transferEncoding = headers["transfer-encoding"];
   const contentLengths = headers["content-length"];
 
@@ -441,20 +454,23 @@ function indexOfSubarray(
   return -1;
 }
 
-function toResponse(bytes: Uint8Array, includeBody = true): RawTcpResponse {
-  const splitIndex = indexOfSubarray(bytes, HEADER_END);
-  const headBytes = splitIndex === -1 ? bytes : bytes.subarray(0, splitIndex);
-  const rawHead = TEXT_DECODER.decode(headBytes);
-  const head = parseResponseHead(headBytes);
+function responseFromHead(
+  bytes: Uint8Array,
+  headerEnd: number,
+  head: ParsedResponseHead,
+  includeBody: boolean,
+): RawTcpResponse {
+  const rawHead = TEXT_DECODER.decode(bytes.subarray(0, headerEnd));
   const rawBody =
-    splitIndex === -1 ? new Uint8Array(0) : bytes.subarray(splitIndex + 4);
-  const body = !includeBody
-    ? new Uint8Array(0)
-    : head.framing === "chunked"
-      ? decodeChunkedBody(rawBody)
-      : head.framing === "content-length"
-        ? rawBody.subarray(0, head.contentLength ?? 0)
-        : rawBody;
+    headerEnd === -1 ? new Uint8Array(0) : bytes.subarray(headerEnd + 4);
+  const body =
+    !includeBody || head.framing === "none"
+      ? new Uint8Array(0)
+      : head.framing === "chunked"
+        ? decodeChunkedBody(rawBody)
+        : head.framing === "content-length"
+          ? rawBody.subarray(0, head.contentLength ?? 0)
+          : rawBody;
 
   return {
     version: head.version,
@@ -467,6 +483,17 @@ function toResponse(bytes: Uint8Array, includeBody = true): RawTcpResponse {
     framing: head.framing,
     contentLength: head.contentLength,
   };
+}
+
+function toResponse(bytes: Uint8Array, includeBody = true): RawTcpResponse {
+  const headerEnd = indexOfSubarray(bytes, HEADER_END);
+  const headBytes = headerEnd === -1 ? bytes : bytes.subarray(0, headerEnd);
+  return responseFromHead(
+    bytes,
+    headerEnd,
+    parseResponseHead(headBytes),
+    includeBody,
+  );
 }
 
 export async function rawTcp(
@@ -608,16 +635,27 @@ export async function rawTcp(
 
           const rawBody = combined.subarray(headerEnd + 4);
           const complete =
-            head.framing === "content-length"
-              ? rawBody.byteLength >= (head.contentLength ?? 0)
-              : head.framing === "chunked"
-                ? chunkedBodyComplete(rawBody)
-                : false;
+            head.framing === "none" || method === "HEAD"
+              ? true
+              : head.framing === "content-length"
+                ? rawBody.byteLength >= (head.contentLength ?? 0)
+                : head.framing === "chunked"
+                  ? chunkedBodyComplete(rawBody)
+                  : false;
           if (!complete) return;
 
           socket.terminate();
           try {
-            finish(() => resolve(toResponse(combined)));
+            finish(() =>
+              resolve(
+                responseFromHead(
+                  combined,
+                  headerEnd,
+                  head,
+                  readBody && method !== "HEAD",
+                ),
+              ),
+            );
           } catch (error) {
             fail(
               "ERR_RAW_TCP_INVALID_RESPONSE",
