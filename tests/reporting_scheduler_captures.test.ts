@@ -186,7 +186,7 @@ describe("SHELL_CAPTURE schedule definitions", () => {
   });
 });
 
-test("retained history schedule projects configured exports without upstream credentials", () => {
+test("retained history schedule gates on projection configuration", () => {
   const definition = new ReportingSchedulerService(fakeTelegram())
     .getSchedules()
     .find((schedule) => schedule.id === "sched_customer_history_15m");

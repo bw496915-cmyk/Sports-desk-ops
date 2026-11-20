@@ -3,6 +3,7 @@
 import { chmod, mkdir, open, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { z } from "zod";
+import { refreshGradedWagerExport } from "./capture_graded_wagers.ts";
 
 const absolutePath = z
   .string()
@@ -13,6 +14,7 @@ const configurationSchema = z.object({
   projector: absolutePath,
   sources: z.array(absolutePath).min(1).max(16),
   output: absolutePath,
+  capture: absolutePath.optional(),
 });
 export function parseCustomerHistoryConfiguration(
   env: Readonly<Record<string, string | undefined>>,
@@ -21,6 +23,7 @@ export function parseCustomerHistoryConfiguration(
     projector: env.SPORTSDESK_CUSTOMER_HISTORY_PROJECTOR,
     sources: JSON.parse(env.SPORTSDESK_CUSTOMER_HISTORY_SOURCES ?? "null"),
     output: env.SPORTSDESK_CUSTOMER_HISTORY_JSON,
+    capture: env.SPORTSDESK_GRADED_WAGER_EXPORT?.trim() || undefined,
   });
   if (!configuration.projector.endsWith("/scripts/project_customer_history.ts"))
     throw new Error(
@@ -32,6 +35,17 @@ export function parseCustomerHistoryConfiguration(
     )
   )
     throw new Error("History output cannot overwrite an export");
+  const capture = configuration.capture;
+  if (
+    capture &&
+    (configuration.sources.length >= 16 ||
+      [configuration.output, ...configuration.sources].some(
+        (path) => resolve(path) === resolve(capture),
+      ))
+  )
+    throw new Error(
+      "Graded capture requires a separate export path and room for an extra source",
+    );
   return configuration;
 }
 
@@ -39,7 +53,7 @@ export async function refreshCustomerHistory(
   env: Readonly<Record<string, string | undefined>> = Bun.env,
 ) {
   const configuration = parseCustomerHistoryConfiguration(env);
-  const { output, sources, projector } = configuration;
+  const { output, sources, projector, capture } = configuration;
   await mkdir(dirname(output), { recursive: true, mode: 0o700 });
   const lockPath = `${output}.refresh-lock`;
   let lock;
@@ -52,6 +66,9 @@ export async function refreshCustomerHistory(
   }
   const attemptedAt = new Date().toISOString();
   const statusPath = `${output}.status.json`;
+  let coverage:
+    Awaited<ReturnType<typeof refreshGradedWagerExport>> | undefined;
+  let stage = capture ? "capture" : "projection";
   async function writeReceipt(receipt: object) {
     const temp = `${statusPath}.tmp-${process.pid}`;
     await Bun.write(
@@ -59,7 +76,8 @@ export async function refreshCustomerHistory(
       JSON.stringify({
         schemaVersion: 1,
         attemptedAt,
-        upstreamCapturePerformed: false,
+        upstreamCapturePerformed: coverage !== undefined,
+        ...(coverage ? { gradedCapture: coverage } : {}),
         ...receipt,
       }),
       { mode: 0o600 },
@@ -68,6 +86,13 @@ export async function refreshCustomerHistory(
     await rename(temp, statusPath);
   }
   try {
+    if (capture)
+      coverage = await refreshGradedWagerExport(
+        capture,
+        env.SPORTSDESK_GRADED_PENDING_SNAPSHOT?.trim() || "data/live-bets.json",
+      );
+    stage = "projection";
+    const projectionSources = capture ? [...sources, capture] : sources;
     const child = Bun.spawn(
       [
         process.execPath,
@@ -75,7 +100,7 @@ export async function refreshCustomerHistory(
         "--no-env-file",
         "run",
         projector,
-        ...sources.flatMap((source) => ["--source", source]),
+        ...projectionSources.flatMap((source) => ["--source", source]),
         "--out",
         output,
         "--if-changed",
@@ -108,8 +133,11 @@ export async function refreshCustomerHistory(
   } catch {
     await writeReceipt({
       status: "failed",
+      stage,
       reason:
-        "Projection failed; inspect source availability and dashboard projector checks",
+        stage === "capture"
+          ? "Fantasy402 graded capture failed"
+          : "Projection failed",
     });
     throw new Error(
       "Customer history refresh failed; see the private projection status receipt",
@@ -122,7 +150,7 @@ export async function refreshCustomerHistory(
 if (import.meta.main) {
   if (Bun.argv.includes("--help")) {
     console.log(
-      "Usage: bun --no-env-file run scripts/refresh_customer_history.ts\nRequires SPORTSDESK_CUSTOMER_HISTORY_PROJECTOR (dashboard entrypoint), SPORTSDESK_CUSTOMER_HISTORY_SOURCES (JSON array of absolute export paths), SPORTSDESK_CUSTOMER_HISTORY_JSON (private output). No network, login or messages; unchanged source hashes preserve projection time. Remove a stale .refresh-lock only after verifying no refresh is running.",
+      "Usage: bun --no-env-file run scripts/refresh_customer_history.ts\nRequires SPORTSDESK_CUSTOMER_HISTORY_PROJECTOR (dashboard entrypoint), SPORTSDESK_CUSTOMER_HISTORY_SOURCES (JSON array of absolute export paths), SPORTSDESK_CUSTOMER_HISTORY_JSON (private output). Set SPORTSDESK_GRADED_WAGER_EXPORT to capture recent graded reports for live pending accounts before projection. Remove a stale .refresh-lock only after verifying no refresh is running.",
     );
   } else {
     try {

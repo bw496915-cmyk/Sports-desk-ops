@@ -379,7 +379,7 @@ export class ReportingSchedulerService {
         scheduleTime: "12,27,42,57 * * * *",
         reportType: "SHELL_CAPTURE",
         description:
-          "Refreshes the dashboard-owned private retained wager projection when export hashes change; no upstream capture or GSLive authentication. Missing configuration skips the job; failures preserve the last good projection.",
+          "Captures scoped Fantasy402 graded wagers when configured, then refreshes the private dashboard projection. Missing configuration skips the job; failures preserve the last good projection.",
         tz: "America/Chicago",
         shellJob: {
           bin: "bun",
@@ -394,7 +394,7 @@ export class ReportingSchedulerService {
             "SPORTSDESK_CUSTOMER_HISTORY_SOURCES",
             "SPORTSDESK_CUSTOMER_HISTORY_JSON",
           ],
-          timeoutSeconds: 150,
+          timeoutSeconds: 240,
         },
         enabled: true,
       },
