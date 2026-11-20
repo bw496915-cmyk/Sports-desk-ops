@@ -600,3 +600,19 @@ test.skipIf(!hasPty || Bun.which("seq") === null)(
   },
   20_000,
 );
+test.skipIf(!hasPty || Bun.which("sleep") === null)(
+  "an AbortSignal cancels a running PTY child",
+  async () => {
+    const controller = new AbortController();
+    const pending = executeTerminalQuery("sleep 5", {
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(), 50);
+
+    const result = await pending;
+
+    expect(result.durationMs).toBeLessThan(3_000);
+    expect(result.exitCode).not.toBe(0);
+  },
+  10_000,
+);

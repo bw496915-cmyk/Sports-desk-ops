@@ -152,6 +152,18 @@ export interface TerminalQueryOptions extends SpawnInPtyOptions {
    * UI knob: callers only pass this when they already resolved the profile.
    */
   readonly consoleDepth?: number;
+  /**
+   * Cancel the child. Bun kills it with `killSignal`; the session's SIGTERM->SIGKILL
+   * escalation still applies if the child ignores the signal.
+   */
+  readonly signal?: AbortSignal;
+  /**
+   * Linux only: cgroup directory path (or open fd) applied to the child and everything
+   * it spawns. Falls back to `SPORTSDESK_TERMINAL_CGROUP`; ignored on other platforms.
+   */
+  readonly cgroup?: string | number;
+  /** Signal Bun sends on timeout/abort (default SIGTERM). */
+  readonly killSignal?: string | number;
 }
 
 export interface TerminalQueryResult {
@@ -2705,6 +2717,7 @@ async function executeTerminalQueryInner(
 
   try {
     const consoleDepth = resolveConsoleDepth(options);
+    const cgroup = options.cgroup ?? Bun.env.SPORTSDESK_TERMINAL_CGROUP;
     const session = new TerminalSession({
       cols: options.cols ?? 100,
       rows: options.rows ?? 30,
@@ -2712,6 +2725,11 @@ async function executeTerminalQueryInner(
       maxOutputBytes: TERMINAL_MAX_OUTPUT_BYTES,
       cwd: options.cwd ?? process.cwd(),
       env: consoleDepthEnv(options, consoleDepth),
+      ...(options.signal !== undefined ? { signal: options.signal } : {}),
+      ...(options.killSignal !== undefined
+        ? { killSignal: options.killSignal }
+        : {}),
+      ...(cgroup !== undefined && cgroup !== "" ? { cgroup } : {}),
     });
 
     await session.start([executable, ...args]);
