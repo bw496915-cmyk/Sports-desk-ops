@@ -325,6 +325,30 @@ describe("HTTP Auth Layer (lib/http_auth.ts)", () => {
       expect(await res.text()).toBe("ALLOWED");
     });
 
+    it("round-trips every algorithm and encoding combination", () => {
+      const algorithms = [
+        "blake2b256",
+        "blake2b512",
+        "sha256",
+        "sha384",
+        "sha512",
+        "sha512-256",
+      ] as const;
+      const encodings = ["base64", "base64url", "hex"] as const;
+
+      for (const algorithm of algorithms) {
+        for (const encoding of encodings) {
+          const token = issueCsrf({ algorithm, encoding });
+          expect(verifyCsrf(token, { algorithm, encoding })).toBe(true);
+        }
+      }
+
+      const sha256 = issueCsrf({ algorithm: "sha256" });
+      expect(verifyCsrf(sha256, { algorithm: "sha512" })).toBe(false);
+      const hex = issueCsrf({ encoding: "hex" });
+      expect(verifyCsrf(hex, { encoding: "base64" })).toBe(false);
+    });
+
     it("passes a custom algorithm and encoding through to Bun.CSRF", () => {
       const token = issueCsrf({ algorithm: "sha512", encoding: "hex" });
 

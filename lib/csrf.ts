@@ -20,13 +20,17 @@ if (!SECRET && Bun.env.NODE_ENV === "production") {
 export const CSRF_COOKIE_NAME = "sd_csrf";
 export const CSRF_HEADER_NAME = "x-csrf-token";
 
-type GenerateOptions = NonNullable<Parameters<typeof CSRF.generate>[1]>;
-type VerifyOptions = NonNullable<Parameters<typeof CSRF.verify>[1]>;
+/** Bun.CSRF's generate options, derived from the platform signature. */
+export type CsrfGenerateOptions = NonNullable<
+  Parameters<typeof CSRF.generate>[1]
+>;
+/** Bun.CSRF's verify options, derived from the platform signature. */
+export type CsrfVerifyOptions = NonNullable<Parameters<typeof CSRF.verify>[1]>;
 
 /** Bun.CSRF's algorithm union, derived from the platform signature. */
-export type CsrfAlgorithm = NonNullable<GenerateOptions["algorithm"]>;
+export type CsrfAlgorithm = NonNullable<CsrfGenerateOptions["algorithm"]>;
 /** Bun.CSRF's token-encoding union, derived from the platform signature. */
-export type CsrfEncoding = NonNullable<GenerateOptions["encoding"]>;
+export type CsrfEncoding = NonNullable<CsrfGenerateOptions["encoding"]>;
 
 export interface CsrfOptions {
   secret?: string;
@@ -43,7 +47,7 @@ export interface CsrfOptions {
 
 export const issueCsrf = (opts?: CsrfOptions): string => {
   const sec = opts?.secret ?? SECRET;
-  const generateOptions: GenerateOptions = {
+  const generateOptions: CsrfGenerateOptions = {
     expiresIn: opts?.expiresIn ?? SESSION_IDLE_MS,
   };
   if (opts?.sessionId !== undefined) {
@@ -64,7 +68,7 @@ export const verifyCsrf = (token: string, opts?: CsrfOptions): boolean => {
   if (!token) return false;
   try {
     const sec = opts?.secret ?? SECRET;
-    const verifyOpts: VerifyOptions = {
+    const verifyOpts: CsrfVerifyOptions = {
       maxAge: opts?.maxAge ?? SESSION_IDLE_MS,
     };
     if (sec !== undefined) verifyOpts.secret = sec;
