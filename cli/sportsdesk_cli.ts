@@ -1852,6 +1852,9 @@ export async function handleDashboardCli(args: string[] = []): Promise<void> {
       for (const cmdLine of commands) {
         console.log(`\x1b[36m$ ${cmdLine}\x1b[0m`);
         try {
+          // Explicit trust boundary: only the operator's --exec reaches a shell, and
+          // the source is the local dashboard.md. Never generate that file from
+          // network/model input, and never expose --exec as a service endpoint.
           const proc = Bun.spawn(["sh", "-c", cmdLine], {
             stdout: "inherit",
             stderr: "inherit",

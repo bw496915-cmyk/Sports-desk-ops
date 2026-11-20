@@ -42,6 +42,21 @@ end of the stream; `timeout` + escalation, not the cap, bounds CPU.
 - There is no cgroup equivalent in this stack on macOS.
 - `AbortSignal`, `timeout`, and terminal close are portable.
 
+## CLI shell boundary
+
+The one intentional shell in this repo is `sportsdesk_cli.ts dashboard --exec`: it
+extracts fenced `sh` commands from the local `dashboard.md` and runs each through
+`sh -c`. That is an explicit operator opt-in and the file is trusted input. Do not
+generate `dashboard.md` from network or model output, and do not expose `--exec` as a
+service endpoint.
+
+The other `bash -c` uses are fixed literals (the TTY password read) or tests. There is
+no Bun Shell (`$`) usage and no `shell: true`. The dashboard terminal executor
+(`executeTerminalQuery`) never invokes a shell; it splits the typed line into an argv
+array. Bun Shell's escaping protects interpolated _arguments_, but not argument
+injection: an untrusted value that reaches an external command can still be read as a
+flag, which is why the terminal is an operator surface, not an API.
+
 ## Non-goals
 
 No seccomp, namespaces, filesystem sandbox, or network isolation. A `Bun.Terminal`
