@@ -76,3 +76,59 @@ test("an empty body is not framed with Content-Length", () => {
     .filter((line) => /^content-length:/i.test(line));
   expect(framing).toEqual([]);
 });
+
+test("rejects a non-token method and a bad request target", () => {
+  expect(() => buildRequestPayload("/x", "GE T", "h", 80, {}, null)).toThrow(
+    /ERR_RAW_TCP_INVALID_METHOD/,
+  );
+  expect(() => buildRequestPayload("/x", "", "h", 80, {}, null)).toThrow(
+    /ERR_RAW_TCP_INVALID_METHOD/,
+  );
+  expect(() => buildRequestPayload("/x y", "GET", "h", 80, {}, null)).toThrow(
+    /ERR_RAW_TCP_INVALID_TARGET/,
+  );
+  expect(() => buildRequestPayload("", "GET", "h", 80, {}, null)).toThrow(
+    /ERR_RAW_TCP_INVALID_TARGET/,
+  );
+});
+
+test("rejects invalid header names and control characters in values", () => {
+  expect(() => build({ "X Y": "v" })).toThrow(/ERR_RAW_TCP_INVALID_HEADER/);
+  expect(() => build({ X: "v\x01" })).toThrow(/ERR_RAW_TCP_INVALID_HEADER/);
+  expect(() => build({ "": "v" })).toThrow(/ERR_RAW_TCP_INVALID_HEADER/);
+});
+
+test("deduplicates headers case-insensitively, keeping the first", () => {
+  const lines = build({ "X-A": "1", "x-a": "2" }).split("\r\n");
+  const values = lines.filter((line) => /^x-a:/i.test(line));
+
+  expect(values).toEqual(["X-A: 1"]);
+});
+
+test("validates the port and brackets an IPv6 Host", () => {
+  expect(() => buildRequestPayload("/x", "GET", "h", 0, {}, null)).toThrow(
+    /ERR_RAW_TCP_INVALID_PORT/,
+  );
+  expect(() => buildRequestPayload("/x", "GET", "h", 70000, {}, null)).toThrow(
+    /ERR_RAW_TCP_INVALID_PORT/,
+  );
+
+  const ipv6 = decoder.decode(
+    buildRequestPayload("/x", "GET", "::1", 4020, {}, null),
+  );
+  expect(ipv6).toContain("\r\nHost: [::1]:4020\r\n");
+
+  const ipv6Default = decoder.decode(
+    buildRequestPayload("/x", "GET", "::1", 80, {}, null),
+  );
+  expect(ipv6Default).toContain("\r\nHost: [::1]\r\n");
+});
+
+test("rejects an empty or control-character hostname", () => {
+  expect(() => buildRequestPayload("/x", "GET", "  ", 4020, {}, null)).toThrow(
+    /ERR_RAW_TCP_INVALID_HEADER/,
+  );
+  expect(() =>
+    buildRequestPayload("/x", "GET", "bad host", 4020, {}, null),
+  ).toThrow(/ERR_RAW_TCP_INVALID_HEADER/);
+});

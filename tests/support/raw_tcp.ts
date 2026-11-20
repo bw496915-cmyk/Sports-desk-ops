@@ -84,6 +84,10 @@ function parseResponse(bytes: Uint8Array): RawTcpResponse {
 }
 
 const CRLF_RE = /[\r\n]/;
+const CTL_OR_SPACE_RE = /[\x00-\x20\x7f]/;
+const TOKEN_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+// RFC 9110 field-vchar + SP/HTAB, excluding NUL, CTLs 0x01-0x08/0x0a-0x1f and DEL 0x7f.
+const OBS_FOLD_OR_CTL_RE = /[\x00-\x08\x0a-\x1f\x7f]/;
 
 function assertNoCrlf(value: string, label: string): void {
   if (CRLF_RE.test(value)) {
@@ -91,9 +95,27 @@ function assertNoCrlf(value: string, label: string): void {
   }
 }
 
+function formatHostHeader(hostname: string, port: number): string {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`[ERR_RAW_TCP_INVALID_PORT] Invalid TCP port ${port}`);
+  }
+  const normalizedHost = hostname.trim();
+  if (normalizedHost.length === 0 || CTL_OR_SPACE_RE.test(normalizedHost)) {
+    throw new Error(
+      `[ERR_RAW_TCP_INVALID_HEADER] Invalid hostname "${hostname}"`,
+    );
+  }
+  const host =
+    normalizedHost.includes(":") && !normalizedHost.startsWith("[")
+      ? `[${normalizedHost}]`
+      : normalizedHost;
+  return port === 80 ? host : `${host}:${port}`;
+}
+
 /**
- * Build the request head and optional body. Every caller-controlled line is
- * checked for CR/LF so a test header cannot smuggle a second request.
+ * Build the request head and optional body. Caller-controlled lines are
+ * validated as HTTP tokens/values, so a test header cannot smuggle a second
+ * request or a malformed method/target.
  */
 export function buildRequestPayload(
   rawTarget: string,
@@ -105,6 +127,16 @@ export function buildRequestPayload(
 ): Uint8Array {
   assertNoCrlf(method, "method");
   assertNoCrlf(rawTarget, "rawTarget");
+  if (!TOKEN_RE.test(method)) {
+    throw new Error(
+      `[ERR_RAW_TCP_INVALID_METHOD] Invalid HTTP method "${method}"`,
+    );
+  }
+  if (rawTarget.length === 0 || CTL_OR_SPACE_RE.test(rawTarget)) {
+    throw new Error(
+      `[ERR_RAW_TCP_INVALID_TARGET] Invalid request target "${rawTarget}"`,
+    );
+  }
 
   const seenLower = new Set<string>();
   const customLines: string[] = [];
@@ -112,18 +144,32 @@ export function buildRequestPayload(
   for (const [rawKey, rawValue] of Object.entries(headers)) {
     assertNoCrlf(rawKey, "header key");
     assertNoCrlf(rawValue, `header value for "${rawKey}"`);
-    const key = rawKey.trim();
-    if (key === "") {
+    if (OBS_FOLD_OR_CTL_RE.test(rawValue)) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Control character forbidden in header value for "${rawKey}"`,
+      );
+    }
+    if (rawKey.trim() === "") {
       throw new Error("[ERR_RAW_TCP_INVALID_HEADER] empty header name");
     }
-    seenLower.add(key.toLowerCase());
+    if (!TOKEN_RE.test(rawKey.trim())) {
+      throw new Error(
+        `[ERR_RAW_TCP_INVALID_HEADER] Invalid header name "${rawKey}"`,
+      );
+    }
+    const key = rawKey.trim();
+    const lower = key.toLowerCase();
+    // Deduplicate case-insensitively: keep the first occurrence so a caller
+    // cannot send two Host/Content-Length fields with conflicting values.
+    if (seenLower.has(lower)) continue;
+    seenLower.add(lower);
     customLines.push(`${key}: ${rawValue.trim()}`);
   }
 
   const lines = [`${method} ${rawTarget} HTTP/1.1`];
 
   if (!seenLower.has("host")) {
-    const hostValue = port === 80 ? hostname : `${hostname}:${port}`;
+    const hostValue = formatHostHeader(hostname, port);
     assertNoCrlf(hostValue, "Host");
     lines.push(`Host: ${hostValue}`);
   }
