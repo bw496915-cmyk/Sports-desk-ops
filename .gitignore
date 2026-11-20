@@ -106,6 +106,8 @@ cloudflare.env
 **/.nsh/*
 !packages/nsh-desk/.nsh/tsconfig.json
 pages.env
+# Raw Fantasy402 puller output (passwords stripped; may contain IPs). Never commit.
+/f402-pull/
 
 # Stryker mutation scratch (restored files + backups).
 .stryker-tmp/
