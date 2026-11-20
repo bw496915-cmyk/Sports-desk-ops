@@ -563,4 +563,11 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     const version = await fetch(`http://127.0.0.1:${hub.port}/api/version`);
     expect(version.status).toBe(200);
   });
+  test("the async /health route survives a static-route reload", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/health`);
+
+    expect([200, 503]).toContain(response.status);
+    const body = (await response.json()) as { status?: unknown };
+    expect(typeof body.status).toBe("string");
+  });
 });

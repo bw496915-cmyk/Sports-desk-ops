@@ -1217,6 +1217,30 @@ export function startServer(options?: ServerOptions) {
   // request-time view so it can report which channels are running.
   let consoleLiveStatusReader: (() => ConsoleLiveRuntimeStatus) | null = null;
 
+  const healthRoute = async (req: Request): Promise<Response> => {
+    const nodeEnv = Bun.env.NODE_ENV || "development";
+    const health = await buildDeskEnhancedHealth({
+      port: server.port ?? Number(Bun.env.PORT ?? 4020),
+      hostname: server.hostname ?? "127.0.0.1",
+      url: server.url ? server.url.toString() : "unix://socket",
+      uptimeSeconds: Math.floor(process.uptime()),
+      runtime: `Bun v${Bun.version} (${process.arch}-${process.platform})`,
+      ingress,
+      nodeEnv,
+      readGsliveHealth: () => gsliveSessionMonitor.read(false),
+    });
+    return Response.json(health, {
+      status: health.httpStatus,
+      headers: corsHeadersFor(req),
+    });
+  };
+  // The full route table: static routes plus the async health probe. Reload must
+  // rebuild this whole table, not just the static subset, or `/health` would 404.
+  const buildRoutes = (meta: PackageMeta) => ({
+    ...buildStaticRoutes(meta, repoRoot),
+    "/health": healthRoute,
+  });
+
   const serveConfig = {
     development: isDevelopment ? { hmr: false } : false,
     // Bodies here are small JSON documents and one 1 MiB form probe. Without a cap a chunked
@@ -1226,7 +1250,7 @@ export function startServer(options?: ServerOptions) {
 
     // Static route: zero-allocation dispatch for a liveness probe that, unlike
     // /health, does not run the KPI/auth probes.
-    routes: buildStaticRoutes(packageMeta, repoRoot),
+    routes: buildRoutes(packageMeta),
 
     async fetch(req) {
       const url = new URL(req.url);
@@ -1818,30 +1842,11 @@ export function startServer(options?: ServerOptions) {
           );
         }
         const refreshed = readPackageMeta();
-        server.reload({ routes: buildStaticRoutes(refreshed, repoRoot) });
+        server.reload({ routes: buildRoutes(refreshed) });
         return Response.json(
           { success: true, version: refreshed.version ?? "unknown" },
           { headers: cors },
         );
-      }
-
-      // 6. Health & Telemetry Probe
-      if (pathname === "/health") {
-        const nodeEnv = Bun.env.NODE_ENV || "development";
-        const health = await buildDeskEnhancedHealth({
-          port: server.port ?? Number(Bun.env.PORT ?? 4020),
-          hostname: server.hostname ?? "127.0.0.1",
-          url: server.url ? server.url.toString() : "unix://socket",
-          uptimeSeconds: Math.floor(process.uptime()),
-          runtime: `Bun v${Bun.version} (${process.arch}-${process.platform})`,
-          ingress,
-          nodeEnv,
-          readGsliveHealth: () => gsliveSessionMonitor.read(false),
-        });
-        return Response.json(health, {
-          status: health.httpStatus,
-          headers: cors,
-        });
       }
 
       if (
