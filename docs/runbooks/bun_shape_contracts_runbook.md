@@ -487,7 +487,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (2):** `parse`, `stringify`
 - **Here:** `bin/bun_surface.ts`, `lib/config_file.ts`
-- **Evidence:** `surface:TOML`, `test:tests/bun_builtin_replacements.test.ts`, `test:tests/bun_runtime_contracts.test.ts`, `test:tests/bun_toml.test.ts`
+- **Evidence:** `surface:TOML`, `test:tests/bun_builtin_replacements.test.ts`, `test:tests/bun_config_policy.test.ts`, `test:tests/bun_lazy_file_arg_type.test.ts`
 
 #### Bun.Transpiler
 
@@ -510,7 +510,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `object` · writable true · enumerable true
 - **Members (2):** `parse`, `stringify`
 - **Here:** `bin/bun_surface.ts`, `bin/desk-provenance.ts`
-- **Evidence:** `surface:YAML`, `test:tests/bun_loaders_and_import_attributes.test.ts`, `test:tests/bun_runtime.test.ts`, `test:tests/bun_runtime_contracts.test.ts`
+- **Evidence:** `surface:YAML`, `test:tests/bun_lazy_file_arg_type.test.ts`, `test:tests/bun_loaders_and_import_attributes.test.ts`, `test:tests/bun_runtime.test.ts`
 
 ## Storage and scheduling
 
@@ -671,7 +671,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Shape:** value: `function` · writable true · enumerable true
 - **Members (2):** `algorithms`, `hash`
 - **Here:** `lib/gslive_users_report.ts`, `lib/r2_manifest_cas.ts`
-- **Evidence:** `test:lib/live_provenance.test.ts`, `test:scripts/r2_manifest_cas_promote.test.ts`, `test:tests/bun_runtime_contracts.test.ts`, `test:tests/bun_urls.test.ts`
+- **Evidence:** `test:lib/live_provenance.test.ts`, `test:scripts/r2_manifest_cas_promote.test.ts`, `test:tests/bun_lazy_file_arg_type.test.ts`, `test:tests/bun_runtime_contracts.test.ts`
 
 #### Bun.CryptoHashInterface (type, declared-only)
 

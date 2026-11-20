@@ -34,6 +34,18 @@ export const MACHINE_OWNED_INSTALL_KEYS = [
   "minimumReleaseAgeExcludes",
 ] as const;
 
+export type MachineOwnedInstallKey =
+  (typeof MACHINE_OWNED_INSTALL_KEYS)[number];
+
+/** Machine-owned keys a project bunfig `[install]` table sets; any hit fails `pm:doctor`. */
+export function machineOwnedInstallOverrides(
+  install: Readonly<Record<string, unknown>> | undefined,
+): MachineOwnedInstallKey[] {
+  return MACHINE_OWNED_INSTALL_KEYS.filter(
+    (key) => install?.[key] !== undefined,
+  );
+}
+
 export const FOREIGN_LOCKFILES = [
   "package-lock.json",
   "yarn.lock",
