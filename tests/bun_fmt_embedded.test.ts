@@ -61,4 +61,17 @@ describe("bun fmt embedded code", () => {
     expect(formatted).toContain("<style>\n  body {\n    color: red;");
     expect(formatted).toContain("background: white;");
   });
+  test("formats a css`...` template in JavaScript", () => {
+    const dir = scratch();
+    const file = join(dir, "styles.js");
+    writeFileSync(
+      file,
+      "const sheet = css`body{color:red;background:white}`;\n",
+    );
+
+    expect(runFmt(dir)).toBe(0);
+    const formatted = readFileSync(file, "utf8");
+    expect(formatted).toContain("css`\n  body {\n    color: red;");
+    expect(formatted).toContain("background: white;");
+  });
 });
