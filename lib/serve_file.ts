@@ -49,6 +49,8 @@ export interface ServeFileOptions {
    * as a download. Naming the disposition keeps playback in the tab.
    */
   readonly disposition?: "inline" | "attachment" | "none";
+  /** Extra headers merged into every response (e.g. the caller's CORS policy). */
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 export type ServeFile = (
@@ -184,6 +186,7 @@ export function createServeFile(options: ServeFileOptions): ServeFile {
   const cacheControl = options.cacheControl ?? "public, max-age=60";
   const types = options.types ?? {};
   const disposition = options.disposition ?? "inline";
+  const extraHeaders = options.headers ?? {};
   // A fixed boundary can occur inside binary payloads, so the default is unique per response;
   // RFC 9110 §14.6 only requires that it not appear in the body.
   const boundary = options.boundary ?? null;
@@ -192,7 +195,7 @@ export function createServeFile(options: ServeFileOptions): ServeFile {
     if (req.method !== "GET" && req.method !== "HEAD") {
       return new Response("method not allowed", {
         status: 405,
-        headers: { Allow: "GET, HEAD" },
+        headers: { ...extraHeaders, Allow: "GET, HEAD" },
       });
     }
 
@@ -201,14 +204,20 @@ export function createServeFile(options: ServeFileOptions): ServeFile {
     try {
       decoded = decodeURIComponent(raw);
     } catch {
-      return new Response("bad request", { status: 400 });
+      return new Response("bad request", {
+        status: 400,
+        headers: extraHeaders,
+      });
     }
     if (
       decoded === "" ||
       decoded.includes("\0") ||
       decoded.split("/").some((part) => part === "" || part.startsWith("."))
     ) {
-      return new Response("not found", { status: 404 });
+      return new Response("not found", {
+        status: 404,
+        headers: extraHeaders,
+      });
     }
 
     const absolute = containedAssetPath(options.root, raw);
@@ -225,11 +234,15 @@ export function createServeFile(options: ServeFileOptions): ServeFile {
       size = stats.size;
       mtimeMs = stats.mtimeMs;
     } catch {
-      return new Response("not found", { status: 404 });
+      return new Response("not found", {
+        status: 404,
+        headers: extraHeaders,
+      });
     }
 
     const etag = entityTag(size, mtimeMs);
     const headers: Record<string, string> = {
+      ...extraHeaders,
       "Content-Type": mimeFor(absolute, types),
       "Cache-Control": cacheControl,
       ETag: etag,

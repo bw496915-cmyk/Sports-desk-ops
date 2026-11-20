@@ -17,7 +17,14 @@ import { writeAuditEntry } from "../lib/audit_log.ts";
 import crypto from "node:crypto";
 import { readFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import {
+  basename,
+  dirname,
+  extname,
+  isAbsolute,
+  relative,
+  resolve,
+} from "node:path";
 import {
   LIVE_FILTER,
   SPORT_CATEGORIES,
@@ -180,6 +187,7 @@ import {
   type RawHierarchyTree,
 } from "../lib/hierarchy_view.ts";
 import { encodedResponse, negotiateEncoding } from "../lib/http_compression.ts";
+import { createServeFile } from "../lib/serve_file.ts";
 import { imageErrorCode, type ImageErrorCode } from "../lib/image_errors.ts";
 import {
   contentTypeFor,
@@ -304,14 +312,42 @@ const repoRoot = resolve(
  * The version is the path plus the file's mtime/size: two files can share a timestamp, and a
  * rewritten artifact must not reuse the previous body.
  */
+/** Serve one known file through the slice-based range handler. */
+async function serveFileRange(
+  req: Request,
+  path: string,
+  contentType: string,
+  headers: Record<string, string>,
+): Promise<Response> {
+  const root = dirname(path);
+  const url = new URL(req.url);
+  url.pathname = `/${basename(path)}`;
+  return createServeFile({
+    root,
+    cacheControl:
+      headers["Cache-Control"] ??
+      headers["cache-control"] ??
+      "public, max-age=60",
+    types: { [extname(path).toLowerCase()]: contentType },
+    headers,
+    disposition: "none",
+  })(req, url);
+}
+
 async function fileResponse(
   req: Request,
   path: string,
   contentType: string,
   headers: Record<string, string>,
 ): Promise<Response> {
-  // A client that accepts no encoding gets the file streamed by Bun, which keeps byte ranges and
-  // does no work in this process. Only the compressed path needs the bytes in memory.
+  // A Range request is answered by the slice-based handler in lib/serve_file.ts: it owns
+  // single/multipart ranges, If-Range and 416, and buffering a compressed body would otherwise
+  // turn the range into a full 200.
+  if (req.headers.get("range") !== null) {
+    return serveFileRange(req, path, contentType, headers);
+  }
+  // A client that accepts no encoding gets the file streamed by Bun. Only the compressed path
+  // needs the bytes in memory.
   if (negotiateEncoding(req.headers.get("accept-encoding")) === null) {
     const file = Bun.file(path);
     if (!(await file.exists())) {
@@ -5705,6 +5741,7 @@ async function serveContainedAsset(
   const textMime = ASSET_TEXT_MIMES[ext];
   if (
     textMime !== undefined &&
+    req.headers.get("range") === null &&
     negotiateEncoding(req.headers.get("accept-encoding")) !== null
   ) {
     const raw = await readFileBytes(contained);

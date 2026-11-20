@@ -555,6 +555,25 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     });
     expect(ifRangeStale.status).toBe(200);
     expect((await ifRangeStale.text()).length).toBeGreaterThan(10);
+
+    // A Range request must win over compression: it asks for bytes on the
+    // wire, not for the full compressed representation.
+    const compressedRange = await fetch(
+      `http://127.0.0.1:${hub.port}/live-bets`,
+      { headers: { "accept-encoding": "gzip", range: "bytes=0-9" } },
+    );
+    expect(compressedRange.status).toBe(206);
+    expect(compressedRange.headers.get("content-encoding")).toBeNull();
+    expect(compressedRange.headers.get("content-range")).toStartWith(
+      "bytes 0-9/",
+    );
+
+    const assetRange = await fetch(
+      `http://127.0.0.1:${hub.port}/assets/pipeline-6-layer-data-cleaning.svg`,
+      { headers: { "accept-encoding": "gzip", range: "bytes=0-9" } },
+    );
+    expect(assetRange.status).toBe(206);
+    expect(assetRange.headers.get("content-range")).toStartWith("bytes 0-9/");
   });
 
   test("the buffered /status route revalidates with an ETag", async () => {
