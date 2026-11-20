@@ -83,6 +83,75 @@ function parseResponse(bytes: Uint8Array): RawTcpResponse {
   };
 }
 
+const CRLF_RE = /[\r\n]/;
+
+function assertNoCrlf(value: string, label: string): void {
+  if (CRLF_RE.test(value)) {
+    throw new Error(`[ERR_RAW_TCP_INVALID_HEADER] CR/LF forbidden in ${label}`);
+  }
+}
+
+/**
+ * Build the request head and optional body. Every caller-controlled line is
+ * checked for CR/LF so a test header cannot smuggle a second request.
+ */
+export function buildRequestPayload(
+  rawTarget: string,
+  method: string,
+  hostname: string,
+  port: number,
+  headers: Readonly<Record<string, string>>,
+  bodyBytes: Uint8Array | null,
+): Uint8Array {
+  assertNoCrlf(method, "method");
+  assertNoCrlf(rawTarget, "rawTarget");
+
+  const seenLower = new Set<string>();
+  const customLines: string[] = [];
+
+  for (const [rawKey, rawValue] of Object.entries(headers)) {
+    assertNoCrlf(rawKey, "header key");
+    assertNoCrlf(rawValue, `header value for "${rawKey}"`);
+    const key = rawKey.trim();
+    if (key === "") {
+      throw new Error("[ERR_RAW_TCP_INVALID_HEADER] empty header name");
+    }
+    seenLower.add(key.toLowerCase());
+    customLines.push(`${key}: ${rawValue.trim()}`);
+  }
+
+  const lines = [`${method} ${rawTarget} HTTP/1.1`];
+
+  if (!seenLower.has("host")) {
+    const hostValue = port === 80 ? hostname : `${hostname}:${port}`;
+    assertNoCrlf(hostValue, "Host");
+    lines.push(`Host: ${hostValue}`);
+  }
+
+  if (!seenLower.has("connection")) {
+    lines.push("Connection: close");
+  }
+
+  lines.push(...customLines);
+
+  if (
+    bodyBytes !== null &&
+    bodyBytes.byteLength > 0 &&
+    !seenLower.has("content-length") &&
+    !seenLower.has("transfer-encoding")
+  ) {
+    lines.push(`Content-Length: ${bodyBytes.byteLength}`);
+  }
+
+  const headPayload = encoder.encode(`${lines.join("\r\n")}\r\n\r\n`);
+  if (bodyBytes === null) return headPayload;
+
+  const out = new Uint8Array(headPayload.byteLength + bodyBytes.byteLength);
+  out.set(headPayload, 0);
+  out.set(bodyBytes, headPayload.byteLength);
+  return out;
+}
+
 export async function rawTcp(
   rawTarget: string,
   options: RawTcpOptions,
@@ -105,27 +174,14 @@ export async function rawTcp(
         ? encoder.encode(body)
         : body;
 
-  const headerLines = [
-    `${method} ${rawTarget} HTTP/1.1`,
-    `Host: ${hostname}:${port}`,
-    "Connection: close",
-  ];
-  for (const [key, value] of Object.entries(headers)) {
-    headerLines.push(`${key}: ${value}`);
-  }
-  const hasContentLength = Object.keys(headers).some(
-    (key) => key.toLowerCase() === "content-length",
+  const payload = buildRequestPayload(
+    rawTarget,
+    method,
+    hostname,
+    port,
+    headers,
+    bodyBytes,
   );
-  if (bodyBytes !== null && !hasContentLength) {
-    headerLines.push(`Content-Length: ${bodyBytes.byteLength}`);
-  }
-
-  const headPayload = encoder.encode(`${headerLines.join("\r\n")}\r\n\r\n`);
-  const payload = new Uint8Array(
-    headPayload.byteLength + (bodyBytes?.byteLength ?? 0),
-  );
-  payload.set(headPayload, 0);
-  if (bodyBytes !== null) payload.set(bodyBytes, headPayload.byteLength);
 
   return new Promise<RawTcpResponse>((resolve, reject) => {
     const chunks: Uint8Array[] = [];
