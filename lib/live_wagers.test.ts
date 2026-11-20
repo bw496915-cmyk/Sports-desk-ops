@@ -5,6 +5,7 @@ import {
   betTickerFile,
   isTickerNoise,
   parseBetTickerXml,
+  countShortDescLegs,
   parseShortDesc,
   readWagerList,
   readWagerListArtifact,
@@ -118,6 +119,27 @@ describe("writerOf", () => {
   test("anything else is other, not a guess", () => {
     expect(writerOf("")).toBe("other");
     expect(writerOf("KIOSK")).toBe("other");
+  });
+});
+
+describe("countShortDescLegs", () => {
+  const cases: unknown[] = [
+    null,
+    "",
+    "S:Basketball #540 Warriors -2 -110 - For Game ",
+    "P.G319747616\r\nFootball - Los Angeles Rams vs Los Angeles Chargers / Game / Winner (2 way) / Los Angeles Rams -140&#x0D;\nFootball - Miami Dolphins vs New England Patriots / Game / Winner (2 way) / New England Patriots -252&#x0D;\n",
+    "P.Basketball #503 76ers +115 - For Game Tennis #8103 T Paul -305 - For Game Tennis #8097 L Musetti -1½ +100 - For Game Tennis #8106 C Ruud -190 - For Game Tennis #18109 A Fils Games/T Fritz Games O 24½ -115 - For Game Tennis #8838 Z Sonmez -370 - For Game Tennis #8741 M Hontama -1½ -155 - For Game ",
+    "M.G1\r\nFootball - A vs B / Game / Market / Over 11.5 / and more",
+  ];
+
+  test("matches parseShortDesc for line and compact shapes", () => {
+    for (const value of cases) {
+      expect(countShortDescLegs(value)).toBe(parseShortDesc(value).legs.length);
+    }
+  });
+
+  test("does not undercount a single-line compact parlay", () => {
+    expect(countShortDescLegs(cases[4])).toBe(7);
   });
 });
 
