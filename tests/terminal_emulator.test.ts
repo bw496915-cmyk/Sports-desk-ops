@@ -686,3 +686,36 @@ test("profile --timeline renders samples and totals", async () => {
   expect(result.stdout).toContain("TICKET TIMELINE");
   expect(result.stdout).toContain("TOTAL");
 });
+
+test("profiles filters by agent, minimum score and ascending order", async () => {
+  const byAgent = await executeTerminalQuery("profiles --agent AG99 --json");
+  const agentRows = JSON.parse(byAgent.stdout) as Array<{ agentId: string }>;
+  expect(agentRows.length).toBeGreaterThan(0);
+  expect(agentRows.every((row) => row.agentId === "AG99")).toBe(true);
+
+  const byScore = await executeTerminalQuery("profiles --min-score 9 --json");
+  const scoreRows = JSON.parse(byScore.stdout) as Array<{ score: number }>;
+  expect(scoreRows.length).toBeGreaterThan(0);
+  expect(scoreRows.every((row) => row.score >= 9)).toBe(true);
+
+  const ascending = await executeTerminalQuery(
+    "profiles --sort score --asc --limit 1 --json",
+  );
+  const ascRows = JSON.parse(ascending.stdout) as Array<{ score: number }>;
+  expect(ascRows).toHaveLength(1);
+  expect(ascRows[0]?.score).toBe(1.2);
+});
+
+test("profiles rejects unknown flags and invalid filters", async () => {
+  const unknown = await executeTerminalQuery("profiles --bogus");
+  expect(unknown.exitCode).toBe(1);
+  expect(unknown.stdout).toContain("Unknown profiles flag");
+
+  const badScore = await executeTerminalQuery("profiles --min-score 99");
+  expect(badScore.exitCode).toBe(1);
+  expect(badScore.stdout).toContain("--min-score must be a number");
+
+  const badAction = await executeTerminalQuery("profiles --action HOLD");
+  expect(badAction.exitCode).toBe(1);
+  expect(badAction.stdout).toContain("--action must be one of");
+});

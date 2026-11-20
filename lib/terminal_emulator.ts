@@ -1148,7 +1148,7 @@ export function getTerminalWelcomeBanner(): string {
     "\x1b[90mEngine: Bun.spawn + Bun.Terminal PTY · Host: sportsdesk-ops · Invariant: autoExecute: false\x1b[0m",
     "",
     "\x1b[1;33mCommands & Canonical Shortcodes:\x1b[0m",
-    "  \x1b[1;32mprofile <id>\x1b[0m (aliases: \x1b[32mp, c\x1b[0m) Inspect multidimensional sharpness radar (flags: \x1b[36m--radar\x1b[0m, \x1b[36m--json\x1b[0m, \x1b[36m--wagers\x1b[0m, \x1b[36m--compare <id>\x1b[0m, \x1b[36m--timeline\x1b[0m)\n  \x1b[1;32mprofiles\x1b[0m              Known profile matrix (flags: \x1b[36m--sort score|gini|stake|ratio|id\x1b[0m, \x1b[36m--limit N\x1b[0m, \x1b[36m--json\x1b[0m)",
+    "  \x1b[1;32mprofile <id>\x1b[0m (aliases: \x1b[32mp, c\x1b[0m) Inspect multidimensional sharpness radar (flags: \x1b[36m--radar\x1b[0m, \x1b[36m--json\x1b[0m, \x1b[36m--wagers\x1b[0m, \x1b[36m--compare <id>\x1b[0m, \x1b[36m--timeline\x1b[0m)\n  \x1b[1;32mprofiles\x1b[0m              Known profile matrix (flags: \x1b[36m--sort score|gini|stake|ratio|id\x1b[0m, \x1b[36m--limit N\x1b[0m, \x1b[36m--min-score N\x1b[0m, \x1b[36m--action A\x1b[0m, \x1b[36m--tier T\x1b[0m, \x1b[36m--agent A\x1b[0m, \x1b[36m--asc\x1b[0m, \x1b[36m--json\x1b[0m)",
     "  \x1b[1;32mfind <query>\x1b[0m (aliases: \x1b[32mf, s\x1b[0m) Search accounts (flags: \x1b[36m-t <tier>\x1b[0m, \x1b[36m-s <sport>\x1b[0m, \x1b[36m-a <action>\x1b[0m)",
     "  \x1b[1;32msharps\x1b[0m (aliases: \x1b[32msh, top\x1b[0m)    Top sharp originators ranked by Sharpness Composite Index",
     "  \x1b[1;32msyndicates\x1b[0m (aliases: \x1b[32msyn\x1b[0m)       Detected hook syndicate clusters & sub-accounts",
@@ -1364,10 +1364,17 @@ function renderProfilesTable(
   records: readonly TerminalCustomerRecord[],
   sortKey: string,
   limit: number,
+  options: {
+    readonly ascending: boolean;
+    readonly filters: readonly string[];
+  } = { ascending: false, filters: [] },
 ): string {
   const shown = records.slice(0, limit);
+  const direction = options.ascending ? "↑" : "↓";
+  const filterNote =
+    options.filters.length > 0 ? ` · ${options.filters.join(" · ")}` : "";
   const lines = [
-    `\x1b[1;36m👥 KNOWN CUSTOMER PROFILES (${shown.length}/${records.length}) — sort: ${sortKey}\x1b[0m`,
+    `\x1b[1;36m👥 KNOWN CUSTOMER PROFILES (${shown.length}/${records.length}) — sort: ${sortKey} ${direction}${filterNote}\x1b[0m`,
     "┌──────────────┬────────────┬──────────────────────────┬───────┬───────┬────────────┬─────────┬─────────────────┐",
     "│ Customer     │ Agent      │ Tier                     │ Score │ Gini  │ Mean Stake │ Max/Min │ Action          │",
     "├──────────────┼────────────┼──────────────────────────┼───────┼───────┼────────────┼─────────┼─────────────────┤",
@@ -2147,19 +2154,75 @@ async function executeTerminalQueryInner(
   // Quick Command: Profile Inspector
   // Quick Command: Known profile matrix (sortable)
   if (canonicalCmd === "profiles") {
-    const flagValue = (name: string): string | undefined => {
+    const valueFlags = new Set([
+      "--sort",
+      "--limit",
+      "--min-score",
+      "--action",
+      "--tier",
+      "--agent",
+    ]);
+    const booleanFlags = new Set(["--json", "--asc"]);
+    const knownFlags = new Set([...valueFlags, ...booleanFlags]);
+
+    for (let index = 0; index < cmdArgs.length; index += 1) {
+      const arg = cmdArgs[index] ?? "";
+      if (!arg.startsWith("-")) continue;
+      const name = arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
+      if (!knownFlags.has(name)) {
+        return {
+          command: trimmed,
+          stdout: `\x1b[31mUnknown profiles flag '${name}'. Allowed: ${[...knownFlags].join(", ")}\x1b[0m`,
+          exitCode: 1,
+          durationMs: Date.now() - startedAt,
+          timestamp: startedAt,
+        };
+      }
+      if (valueFlags.has(name) && !arg.includes("=")) index += 1;
+    }
+
+    const readFlag = (
+      name: string,
+    ): { readonly present: boolean; readonly value: string | undefined } => {
       const index = cmdArgs.findIndex(
         (a) => a === name || a.startsWith(`${name}=`),
       );
-      if (index === -1) return undefined;
+      if (index === -1) return { present: false, value: undefined };
       const token = cmdArgs[index] ?? "";
-      return token.includes("=")
-        ? token.slice(token.indexOf("=") + 1)
-        : cmdArgs[index + 1];
+      if (token.includes("=")) {
+        return {
+          present: true,
+          value: token.slice(token.indexOf("=") + 1),
+        };
+      }
+      return { present: true, value: cmdArgs[index + 1] };
     };
 
-    const sortKey = flagValue("--sort") ?? "score";
+    const requireValue = (name: string): string | undefined => {
+      const flag = readFlag(name);
+      if (!flag.present) return undefined;
+      if (
+        flag.value === undefined ||
+        flag.value.trim() === "" ||
+        flag.value.startsWith("-")
+      ) {
+        return undefined;
+      }
+      return flag.value;
+    };
+
+    const sortRaw = readFlag("--sort");
+    const sortKey = sortRaw.value ?? "score";
     const sorts = ["score", "gini", "stake", "ratio", "id"] as const;
+    if (sortRaw.present && requireValue("--sort") === undefined) {
+      return {
+        command: trimmed,
+        stdout: "\x1b[31m--sort requires a value\x1b[0m",
+        exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
     if (!(sorts as readonly string[]).includes(sortKey)) {
       return {
         command: trimmed,
@@ -2170,7 +2233,7 @@ async function executeTerminalQueryInner(
       };
     }
 
-    const limitRaw = flagValue("--limit") ?? "25";
+    const limitRaw = requireValue("--limit") ?? "25";
     const limit = Number(limitRaw);
     if (!Number.isInteger(limit) || limit < 1) {
       return {
@@ -2182,9 +2245,64 @@ async function executeTerminalQueryInner(
       };
     }
 
-    const records = [...KNOWN_CUSTOMER_MAP.values()];
+    const minScoreRaw = requireValue("--min-score");
+    const minScore =
+      minScoreRaw === undefined ? undefined : Number(minScoreRaw);
+    if (
+      minScore !== undefined &&
+      (!Number.isFinite(minScore) || minScore < 0 || minScore > 10)
+    ) {
+      return {
+        command: trimmed,
+        stdout: "\x1b[31m--min-score must be a number between 0 and 10\x1b[0m",
+        exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    let records = [...KNOWN_CUSTOMER_MAP.values()];
+    const filters: string[] = [];
+    const actions = new Set(records.map((c) => c.action.toUpperCase()));
+    const actionFilter = requireValue("--action")?.toUpperCase();
+    if (actionFilter !== undefined) {
+      if (!actions.has(actionFilter)) {
+        return {
+          command: trimmed,
+          stdout: `\x1b[31m--action must be one of: ${[...actions].join(", ")}\x1b[0m`,
+          exitCode: 1,
+          durationMs: Date.now() - startedAt,
+          timestamp: startedAt,
+        };
+      }
+      records = records.filter((c) => c.action.toUpperCase() === actionFilter);
+      filters.push(`action=${actionFilter}`);
+    }
+
+    const tierFilter = requireValue("--tier")?.toUpperCase();
+    if (tierFilter !== undefined) {
+      records = records.filter((c) =>
+        c.tier.toUpperCase().includes(tierFilter),
+      );
+      filters.push(`tier~${tierFilter}`);
+    }
+
+    const agentFilter = requireValue("--agent")?.toUpperCase();
+    if (agentFilter !== undefined) {
+      records = records.filter((c) => c.agentId.toUpperCase() === agentFilter);
+      filters.push(`agent=${agentFilter}`);
+    }
+
+    if (minScore !== undefined) {
+      records = records.filter((c) => c.score >= minScore);
+      filters.push(`min-score≥${minScore}`);
+    }
+
+    const ascending = cmdArgs.includes("--asc");
     if (sortKey === "id") {
-      records.sort((a, b) => a.id.localeCompare(b.id));
+      records.sort((a, b) =>
+        ascending ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id),
+      );
     } else {
       const pick =
         sortKey === "gini"
@@ -2194,7 +2312,9 @@ async function executeTerminalQueryInner(
             : sortKey === "ratio"
               ? (c: TerminalCustomerRecord) => c.maxMinRatio
               : (c: TerminalCustomerRecord) => c.score;
-      records.sort((a, b) => pick(b) - pick(a));
+      records.sort((a, b) =>
+        ascending ? pick(a) - pick(b) : pick(b) - pick(a),
+      );
     }
     const limited = records.slice(0, limit);
 
@@ -2224,7 +2344,10 @@ async function executeTerminalQueryInner(
 
     return {
       command: trimmed,
-      stdout: renderProfilesTable(records, sortKey, limit),
+      stdout: renderProfilesTable(records, sortKey, limit, {
+        ascending,
+        filters,
+      }),
       exitCode: 0,
       durationMs: Date.now() - startedAt,
       timestamp: startedAt,

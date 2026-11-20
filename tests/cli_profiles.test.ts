@@ -72,3 +72,12 @@ describe("sportsdesk CLI profiles", () => {
     expect(out).toContain("--sort must be one of");
   });
 });
+
+test("filters pass through to the matrix", () => {
+  const { code, out } = run(["profiles", "--agent", "AG99", "--json"]);
+
+  expect(code).toBe(0);
+  const rows = JSON.parse(out) as Array<{ agentId: string }>;
+  expect(rows.length).toBeGreaterThan(0);
+  expect(rows.every((row) => row.agentId === "AG99")).toBe(true);
+});

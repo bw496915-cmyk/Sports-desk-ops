@@ -228,7 +228,7 @@ Usage: \`bun sportsdesk_cli.ts [command|option] [parameters...]\`
 ### 9. OPERATOR SURFACES (GSLive, stale lines, screenshots):
 * **gslive** [LOGIN] [\`--date\` YYYY-MM-DD] [\`--state\` STATE] [\`--window\` 1-31] [\`--agent\` A] [\`--bet-id\` IDS] [\`--bet-group-id\` IDS] [\`--free-bet-id\` ID] [\`--kind\` KIND] [\`--group-name\` NAME] [\`--period\` P] [\`--sport\` SID] [\`--market\` IDS] [\`--json\`]: GSLive 7-param report + bet-history sidecar links
 * **profile** <0x|username> [\`--json\`]: Polymarket PnL, win rate, positions, categories, strategy
-* **profiles** [CUSTOMER_ID] [\`--sort\` score|gini|stake|ratio|id] [\`--limit\` N] [\`--compare\` ID] [\`--timeline\`] [\`--json\`]: Customer profile matrix, or one profile's timeline/comparison (terminal engine)
+* **profiles** [CUSTOMER_ID] [\`--sort\` score|gini|stake|ratio|id] [\`--limit\` N] [\`--min-score\` N] [\`--action\` A] [\`--tier\` T] [\`--agent\` A] [\`--asc\`] [\`--compare\` ID] [\`--timeline\`] [\`--json\`]: Customer profile matrix, or one profile's timeline/comparison (terminal engine)
 * **combo** legs|price|wallet: CFB combo legs, product-of-legs pricing, wallet combo positions
 * **bridge** coverage|value|match: cross-domain join between the customer book and Polymarket wallets
 * **stale** \`-i\` FILE [\`--window-min\` N] [\`--json\`]: Stale-line / post-move bet cohort
@@ -1874,7 +1874,15 @@ export async function handleDashboardCli(args: string[] = []): Promise<void> {
  * Delegates to the terminal engine so there is one implementation of the flags.
  */
 export async function handleProfilesCli(args: string[] = []): Promise<void> {
-  const valueFlags = new Set(["--compare", "--sort", "--limit"]);
+  const valueFlags = new Set([
+    "--compare",
+    "--sort",
+    "--limit",
+    "--min-score",
+    "--action",
+    "--tier",
+    "--agent",
+  ]);
   let customerId: string | undefined;
   let customerIndex = -1;
   for (let index = 0; index < args.length; index += 1) {
