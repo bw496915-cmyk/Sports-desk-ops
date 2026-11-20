@@ -559,6 +559,23 @@ else
   fail release-age-cli "units exit $mra_units_code; blocked exit $mra_blocked_code; output did not name minimum-release-age"
 fi
 
+# ---- P31: peer dependencies resolve like pnpm ------------------------------
+# The notes' canonical case: @remix-run/express peers express@^4.20.0 while the
+# MCP SDK depends on express@5. Before 1.4.4 remix got express@5.
+mkproj "$ROOT/p31" '{"name":"p31","version":"1.0.0","dependencies":{"@modelcontextprotocol/sdk":"1.20.0","@remix-run/express":"2.17.1"}}'
+if run bash -c "cd '$ROOT/p31' && bun install"; then
+  pm_ls="$(cd "$ROOT/p31" && bun pm ls --all 2>&1)"
+  remix_peer="$(printf '%s\n' "$pm_ls" | grep -A1 '@remix-run/express@' | grep -o 'express@4\.[0-9.]*' | head -1)"
+  top_peer="$(printf '%s\n' "$pm_ls" | grep -E '^[├└]── express@5\.' | grep -oE 'express@5\.[0-9.]+' | head -1)"
+  if [ -n "$remix_peer" ] && [ -n "$top_peer" ]; then
+    pass peer-resolution "remix nested $remix_peer; MCP top-level $top_peer"
+  else
+    fail peer-resolution "remix peer '$remix_peer', top-level '$top_peer' (expected 4.x and 5.x)"
+  fi
+else
+  fail peer-resolution "install failed"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
 skip publish-registry "publish fails at auth/packing before any registry contact can be observed; needs a real registry"
