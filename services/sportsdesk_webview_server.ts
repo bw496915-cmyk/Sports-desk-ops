@@ -881,6 +881,16 @@ function buildStaticRoutes(
         env: Bun.env.NODE_ENV ?? "development",
       }),
     },
+    "/ready": {
+      OPTIONS: preflight,
+      GET: new Response("Ready\n", {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "no-store",
+          "x-ready": "1",
+        },
+      }),
+    },
     "/api/config": {
       OPTIONS: preflight,
       GET: Response.json({

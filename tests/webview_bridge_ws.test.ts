@@ -338,6 +338,15 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     expect(frame).toEqual(rollup as unknown as Frame);
   }, 20_000);
 
+  test("the static /ready route advertises readiness with its header", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/ready`);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("Ready\n");
+    expect(response.headers.get("x-ready")).toBe("1");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
   test("the static /api/version route reports package metadata", async () => {
     const response = await fetch(`http://127.0.0.1:${hub.port}/api/version`);
 
@@ -567,6 +576,7 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     for (const path of [
       "/health",
       "/healthz",
+      "/ready",
       "/api/version",
       "/api/config",
       "/status",
