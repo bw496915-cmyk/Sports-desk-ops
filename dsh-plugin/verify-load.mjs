@@ -934,6 +934,21 @@ await checkAsync(
 
 console.log("\nverify-load: read-only tools answer against the real repo");
 
+await checkAsync(
+  "sportsdesk_status skipped service is not reported as down",
+  async () => {
+    const result = await byName.get("sportsdesk_status").execute({
+      service: false,
+    });
+    assert(result.service?.skipped === true, "service was not marked skipped");
+    assert(
+      !/Start the local webview service/.test(result.nextStep),
+      `skipped service advised: ${result.nextStep}`,
+    );
+    assert(Number.isInteger(result.probeDurationMs), "probeDurationMs missing");
+  },
+);
+
 await checkAsync("sportsdesk_status reads the checkout", async () => {
   const result = await byName.get("sportsdesk_status").execute({
     service: false,
