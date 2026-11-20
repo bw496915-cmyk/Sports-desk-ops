@@ -563,3 +563,24 @@ const brandedUnits: readonly [
 test("policy values keep their branded unit types", () => {
   expect(brandedUnits).toHaveLength(5);
 });
+
+test("a hung Telegram request times out instead of wedging the loop", async () => {
+  const sender = createTelegramThresholdSender({
+    botToken: "token",
+    chatId: "chat",
+    timeoutMs: 10,
+    fetchFn: (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+          reject(new Error("aborted by timeout"));
+        });
+      }),
+  });
+
+  const startedAt = Date.now();
+  const result = await sender("alert");
+
+  expect(result.ok).toBe(false);
+  expect(result.error).toBeTruthy();
+  expect(Date.now() - startedAt).toBeLessThan(2_000);
+});

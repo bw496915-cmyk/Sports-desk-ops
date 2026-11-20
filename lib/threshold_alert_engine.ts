@@ -331,7 +331,11 @@ export interface TelegramThresholdSenderOptions {
   readonly botToken: string;
   readonly chatId: string;
   readonly fetchFn?: ThresholdTelegramFetch | undefined;
+  /** Abort a hung Bot API request; defaults to 15s so the loop cannot wedge. */
+  readonly timeoutMs?: number | undefined;
 }
+
+const DEFAULT_TELEGRAM_TIMEOUT_MS = 15_000;
 
 /**
  * Bot API adapter. No retry loop: the caller owns re-offering a failed transition,
@@ -346,6 +350,10 @@ export function createTelegramThresholdSender(
     }
     const fetcher: ThresholdTelegramFetch =
       options.fetchFn ?? ((input, init) => fetch(input, init));
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TELEGRAM_TIMEOUT_MS;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      return { ok: false, error: `invalid_timeout: ${String(timeoutMs)}` };
+    }
     try {
       const response = await fetcher(
         `https://api.telegram.org/bot${options.botToken}/sendMessage`,
@@ -357,6 +365,7 @@ export function createTelegramThresholdSender(
             text,
             disable_web_page_preview: true,
           }),
+          signal: AbortSignal.timeout(timeoutMs),
         },
       );
       if (!response.ok) {
