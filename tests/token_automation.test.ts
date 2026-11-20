@@ -224,11 +224,9 @@ test("codegen falls back to bunfig depth and persists an explicit --depth", asyn
   const written = process.stdout.write.bind(process.stdout);
   process.stdout.write = (() => true) as typeof process.stdout.write;
   const warnings: string[] = [];
-  const errorSpy = spyOn(console, "error").mockImplementation(
-    (...args: unknown[]) => {
-      warnings.push(args.map(String).join(" "));
-    },
-  );
+  spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+    warnings.push(args.map(String).join(" "));
+  });
   try {
     await Bun.write(bunfigPath, "[console]\ndepth = 5\n");
     expect(

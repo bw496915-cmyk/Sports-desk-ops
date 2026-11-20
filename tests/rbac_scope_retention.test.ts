@@ -34,7 +34,7 @@ interface ScheduledTimer {
 function scheduleTimerInNestedScope(): ScheduledTimer {
   const payload = {
     marker: "outer-scope-metadata",
-    rows: new Array(256).fill(0),
+    rows: Array.from({ length: 256 }, () => 0),
   };
   const payloadRef = new WeakRef(payload);
   const outer: RbacScope = {
@@ -61,7 +61,7 @@ function scheduleTimerInNestedScope(): ScheduledTimer {
 }
 
 /** Module-level holder proving WeakRef can observe a retained payload. */
-let controlRetained: object | undefined;
+export let controlRetained: object | undefined;
 
 function retainPayload(): WeakRef<object> {
   const payload = { marker: "retained-on-purpose" };

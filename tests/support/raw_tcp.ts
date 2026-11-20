@@ -50,8 +50,10 @@ export interface BuildRequestOptions {
 const CRLF_RE = /[\r\n]/;
 const TOKEN_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 // RFC 9110 VCHAR (0x21-0x7e): rejects NUL, CTLs, SP, DEL and non-ASCII.
+// oxlint-disable-next-line no-control-regex -- ASCII header validation
 const NON_VCHAR_RE = /[^\x21-\x7e]/;
 // RFC 9110 field-content (ASCII-strict): HTAB + SP/VCHAR.
+// oxlint-disable-next-line no-control-regex -- ASCII header validation
 const INVALID_HEADER_VALUE_RE = /[^\x09\x20-\x7e]/;
 const HOST_FORBIDDEN_CHARS_RE = /[/@?#]/;
 const CONTENT_LENGTH_RE = /^\d+$/;

@@ -18,7 +18,6 @@ import {
 } from "../lib/wager_telemetry_hub.ts";
 import {
   createWagerTickProducer,
-  F402_BRIDGE_ROUTE_WORD32,
   GSLIVE_BRIDGE_ROUTE_WORD32,
   parseTickLineHundredths,
   wagerRowToTick,

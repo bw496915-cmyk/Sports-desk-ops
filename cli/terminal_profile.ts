@@ -17,9 +17,6 @@ import { resolveConsoleDepthChain } from "../lib/console_depth.ts";
 import { openSportsdeskSqliteReadonly } from "../lib/sportsdesk_sqlite.ts";
 
 const DEFAULT_DB = "scratch/theme-tokens.sqlite";
-const USAGE =
-  "usage: bun cli/terminal_profile.ts [--db <path>] [--profile <id>] [--options] [--json]";
-
 interface ProfileReport {
   readonly id: string;
   readonly consoleDepth: number | "Infinity";

@@ -14,7 +14,6 @@
  * catalog can be regenerated or verified from a clean checkout without touching bun.com.
  */
 import path from "node:path";
-import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import {
   ABSENT_DOM_GLOBALS,
   BUN_SHAPES,

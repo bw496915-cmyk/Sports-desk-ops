@@ -1697,7 +1697,7 @@ async function runProcess(bin, argv, options) {
     try {
       child = spawn(resolved, argv, {
         cwd: options.cwd,
-        env: { ...process.env, ...(options.env ?? {}) },
+        env: { ...process.env, ...options.env },
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch (error) {

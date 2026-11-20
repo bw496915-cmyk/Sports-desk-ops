@@ -2515,6 +2515,9 @@
     }
   ],
   "citationAnchors": {
+    "services/sportsdesk_webview_server.ts:259-278": "return isLoopbackAddress(address);",
+    "services/sportsdesk_webview_server.ts:847-861": "export function resolveAllowedOrigins(",
+    "services/sportsdesk_webview_server.ts:3246-3255": "sportFilter === \"\"",
     "services/blob_and_live_bets_server.ts:473-497": "\"/api/v1/ws-tickets\": {",
     "services/blob_and_live_bets_server.ts:498-544": "\"/api/v1/live-bets\": {",
     "services/blob_and_live_bets_server.ts:558-641": "\"/api/v1/blobs/:key\": {",
@@ -2532,7 +2535,6 @@
     "services/blob_and_live_bets_server.ts:498-544": "\"/api/v1/live-bets\": {",
     "services/blob_and_live_bets_server.ts:558-641": "\"/api/v1/blobs/:key\": {",
     "services/blob_and_live_bets_server.ts:749-778": "\"/ws/live-bets\": (request: Request",
-    "services/sportsdesk_webview_server.ts:3498-3507": "if (pathname === \"/api/agents/search\") {",
     "services/sportsdesk_telegram_bot.ts:80-84": "export const REPORT_TYPES = [",
     "catalog/fantasy402_sport_catalog.ts:133-140": "export type CatalogDigestSet = {",
     "catalog/fantasy402_sport_catalog.ts:229-245": "export function makeDeskLinkId(",
@@ -2625,7 +2627,6 @@
     "services/sportsdesk_webview_server.ts:3848-3868": "if (pathname === \"/api/telegram/report\" && req.method === \"POST\") {",
     "services/sportsdesk_webview_server.ts:4031-4039": "// 14. 404 Fallback",
     "services/sportsdesk_webview_server.ts:766-815": "async function fetchLogo(",
-    "services/sportsdesk_webview_server.ts:1040-1054": "const baseHeaders: Record<string, string> = {",
     "services/sportsdesk_webview_server.ts:1044-1045": "\"Content-Security-Policy\":",
     "services/sportsdesk_webview_server.ts:1365-3370": "async fetch(req) {",
     "services/sportsdesk_webview_server.ts:1374-1378": "pathname === \"/api/test/error\"",

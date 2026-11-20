@@ -439,7 +439,7 @@ export function createRawHttpProxy(options: RawHttpProxyOptions): RawHttpProxy {
     }
     const url = upstreamUrl(req, options.hostname, options.port, tls);
     const upstreamOptions: WebSocketOptions = {
-      ...(options.webSocketOptions ?? {}),
+      ...options.webSocketOptions,
       headers,
     };
     const upstream = new WebSocket(url, upstreamOptions);
