@@ -132,7 +132,9 @@ CI's lint gate is the required `lint-native` job; `bun run verify:fast` fails
 when it cannot lint changed files (`--no-lint` is an explicit opt-out).
 
 Run `bun run format` to format the repository or `bun run format:check` for a
-read-only check. `bunfig.toml` preserves the existing 80-column, two-space,
+read-only check; `bun run format:changed` checks only files changed against the
+default branch, and `bun run format:doctor` reports how Bun interprets the `[fmt]`
+config. `bunfig.toml` preserves the existing 80-column, two-space,
 double-quote style with semicolons. Run `bun run typecheck` for Bun's native
 strict, no-emit checker; `tsconfig.json` makes the previous inferred compiler
 defaults explicit and includes the repository's source, tests, and declarations.
