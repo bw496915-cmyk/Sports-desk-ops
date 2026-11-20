@@ -24,7 +24,7 @@ build_id() { readelf -n "$1" | awk '/Build ID:/ {print $3}'; }
 runtime_id=$(build_id "$symbol_dir/bun")
 test -n "$runtime_id"
 test "$runtime_id" = "$(build_id "$symbol_dir/bun-profile")"
-group="catalog_gc_${GITHUB_RUN_ID:?}_${GITHUB_RUN_ATTEMPT:?}"
+group="catalog_gc_$$"
 events=/sys/kernel/tracing/uprobe_events
 registered=()
 remove_events() {
@@ -34,13 +34,16 @@ remove_events() {
 }
 trap remove_events EXIT
 nm --defined-only "$symbol_dir/bun-profile" > "$symbol_dir/symbols"
-read -r vaddr fileoff < <(objdump -h "$symbol_dir/bun" | awk '$2 == ".text" {print $4, $6}')
+read -r vaddr fileoff < <(readelf -WS "$symbol_dir/bun" | awk '$2 == ".text" {print $4, $5}')
 register_event() {
   local name=$1 symbol=$2 address offset
   address=$(awk -v s="$symbol" '$3 == s {print $1}' "$symbol_dir/symbols")
   [[ $address =~ ^[[:xdigit:]]+$ ]]
   printf -v offset '%x' "$((16#$address - 16#$vaddr + 16#$fileoff))"
-  echo "p:$group/$name $symbol_dir/bun:0x$offset" | sudo tee -a "$events" >/dev/null
+  if ! echo "p:$group/$name $symbol_dir/bun:0x$offset" | sudo tee -a "$events"; then
+    sudo tail -8 /sys/kernel/tracing/error_log >&2
+    return 1
+  fi
   registered+=("$name")
 }
 register_event concurrent _ZN3JSC9Collector18runConcurrentPhaseENS_11GCConductorE

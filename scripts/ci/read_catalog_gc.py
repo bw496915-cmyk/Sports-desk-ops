@@ -35,7 +35,7 @@ def summarize(directory):
         if instant < previous_ns:
             raise ValueError("Events are not ordered on the perf clock")
         previous_ns = instant
-        event = re.fullmatch(r"catalog_gc_\d+_\d+:(concurrent|transition|visit):?", sample[5].strip())
+        event = re.fullmatch(r"catalog_gc_\d+:(concurrent|transition|visit):?", sample[5].strip())
         if not event:
             if re.match(r"[0-9a-f]+\s", sample[5]):
                 cpu_samples += 1

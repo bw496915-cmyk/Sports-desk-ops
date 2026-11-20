@@ -87,7 +87,7 @@ once against the checkout. TypeScript builds statement arrays as it parses each
 file, and the renderer appends and sorts catalog rows. Dependencies come from a
 frozen Bun install on Alpine. The measured command runs offline.
 
-The `alpine-catalog-trace-<commit>-<attempt>` artifact contains the GC log,
+For 30 days, the `alpine-catalog-trace-<commit>-<attempt>` artifact retains the GC log,
 per-file progress markers, Linux perf data, symbolized user-mode samples and
 the summary. The runner resolves three native entry points from the matching
 release symbols and attaches events to a private copy of the Alpine Bun binary.
