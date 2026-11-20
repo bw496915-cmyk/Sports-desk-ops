@@ -325,6 +325,24 @@ describe("HTTP Auth Layer (lib/http_auth.ts)", () => {
       expect(await res.text()).toBe("ALLOWED");
     });
 
+    it("passes a custom algorithm and encoding through to Bun.CSRF", () => {
+      const token = issueCsrf({ algorithm: "sha512", encoding: "hex" });
+
+      expect(/^[0-9a-f]+$/.test(token)).toBe(true);
+      expect(verifyCsrf(token, { algorithm: "sha512", encoding: "hex" })).toBe(
+        true,
+      );
+      expect(verifyCsrf(token)).toBe(false);
+    });
+
+    it("honors an explicit expiry", async () => {
+      const token = issueCsrf({ expiresIn: 5 });
+
+      expect(verifyCsrf(token)).toBe(true);
+      await Bun.sleep(20);
+      expect(verifyCsrf(token)).toBe(false);
+    });
+
     it("binds a token to a session and rejects other sessions", () => {
       const token = issueCsrf({ sessionId: "session-a" });
 
