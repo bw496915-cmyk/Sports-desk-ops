@@ -1,77 +1,75 @@
-"""Correlate user-mode marking samples with the catalog's normal parser progress."""
+"""Read a process-scoped catalog trace produced by trace_catalog_gc.sh."""
 from pathlib import Path
 import re
 import sys
 
 
-def read_phases(log, pid):
-    # Collector.cpp emits the pause suffix immediately before Concurrent and
-    # opens the next log record in runReloopPhase. Treat the transition edges
-    # as uncertain. Bound a witness by JS progress *inside* the phase.
-    pending = None
-    windows = []
-    phases = parsed = 0
-    last_ms = 0
-    for token in re.finditer(
-        r"\)\.\.\.\]|\[GC<0x[0-9a-f]+>: [CM] |"
-        r"catalog-parsed (\d+) pid=(\d+) wall_ms=(\d+)", log
-    ):
-        if token[1]:
-            index, marker_pid, wall_ms = map(int, token.groups())
-            if marker_pid != pid or index != parsed + 1 or wall_ms < last_ms:
-                raise ValueError("Ambiguous parser progress or clock ordering")
-            parsed, last_ms = index, wall_ms
-            if pending is not None:
-                pending.append(wall_ms)
-        elif token[0].startswith("[GC"):
-            if pending is None:
-                raise ValueError("GC reloop without a concurrent phase")
-            phases += 1
-            if len(pending) >= 3:
-                # The second clock read follows the first synchronous marker.
-                # Round inward to account for Date.now()'s millisecond precision.
-                windows.append(((pending[1] + 1) * 1_000_000, pending[-1] * 1_000_000))
-            pending = None
-        else:
-            if pending is not None:
-                raise ValueError("Nested concurrent phase")
-            pending = []
-    if pending is not None or not parsed:
-        raise ValueError("Incomplete catalog trace")
-    return parsed, phases, windows
-
-
 def summarize(directory):
     log = (directory / "catalog.log").read_text()
     launches = re.findall(r"^catalog-process pid=(\d+) revision=38afee6c84fcf48c0edb2466aa4b27d287a59c30$", log, re.M)
-    if len(launches) != 1 or "catalog fresh:" not in log or len(set(re.findall(r"\[GC<(0x[0-9a-f]+)>:", log))) != 1:
+    collectors = set(re.findall(r"\[GC<(0x[0-9a-f]+)>:", log))
+    if len(launches) != 1 or "catalog fresh:" not in log or len(collectors) != 1:
         raise ValueError("Expected one successfully completed catalog check on pinned Bun")
     pid = int(launches[0])
-    parsed, phases, windows = read_phases(log, pid)
-    samples = marking = concurrent = 0
+    progress = re.findall(r"^catalog-parsed (\d+) pid=(\d+) wall_ms=\d+$", log, re.M)
+    if not progress or any((int(index), int(process)) != (i, pid)
+                           for i, (index, process) in enumerate(progress, 1)):
+        raise ValueError("Missing or ambiguous parser progress")
+
+    # runConcurrentPhase is dispatched after the phase is committed. Stop counting
+    # at the first finishChangingPhase entry, even when it turns out to be a no-op.
+    # This bounds the witness strictly inside the phase and can undercount visits.
+    first = None
+    visits = []
     witness = None
+    confirmed = total_visits = phases = transitions = cpu_samples = 0
+    previous_ns = -1
     for line in (directory / "samples.txt").read_text().splitlines():
-        match = re.match(r"\s*(\d+)[/\s]+(\d+)\s+(\d+)\.(\d{9}):\s+\w+\s+(.+)", line)
-        if not match or int(match[1]) != pid:
+        if "PERF_RECORD_LOST" in line or "LOST_SAMPLES" in line:
+            raise ValueError("Lost events invalidate phase attribution")
+        sample = re.match(r"\s*(\d+)[/\s]+(\d+)\s+(\d+)\.(\d{9}):\s+(.+)", line)
+        if not sample or int(sample[1]) != pid:
             continue
-        samples += 1
-        symbol = match[5]
-        if (int(match[2]) == pid or "(/usr/local/bin/bun)" not in symbol or
-                not re.search(r"::visitChildren(?:Impl)?(?:<|\()|SlotVisitor::append\w*Slow\(", symbol)):
+        tid = int(sample[2])
+        instant = int(sample[3]) * 1_000_000_000 + int(sample[4])
+        if instant < previous_ns:
+            raise ValueError("Events are not ordered on the perf clock")
+        previous_ns = instant
+        event = re.fullmatch(r"catalog_gc_\d+_\d+:(concurrent|transition|visit):?", sample[5].strip())
+        if not event:
+            if re.match(r"[0-9a-f]+\s", sample[5]):
+                cpu_samples += 1
             continue
-        marking += 1
-        instant = int(match[3]) * 1_000_000_000 + int(match[4])
-        if any(start < instant < end for start, end in windows):
-            concurrent += 1
-            witness = witness or line.strip()
-    if not samples:
-        raise ValueError("No CPU samples matched the catalog PID")
-    print(f"PID {pid}: {parsed} files parsed, {phases} concurrent phases, {samples} process CPU samples.")
-    print(f"Background visitor samples: {marking}; inside JS-bounded concurrent intervals: {concurrent}.")
+        if event[1] == "concurrent":
+            phases += 1
+            if first is None:
+                first = instant
+        elif event[1] == "transition":
+            transitions += 1
+            if first is not None:
+                for timestamp, worker in visits:
+                    if first < timestamp < instant:
+                        confirmed += 1
+                        witness = witness or (first, timestamp, instant, worker)
+            first = None
+            visits.clear()
+        elif tid != pid:
+            total_visits += 1
+            if first is not None:
+                visits.append((instant, tid))
+
+    if not cpu_samples or not transitions or first is not None:
+        raise ValueError("Missing or incomplete process trace")
+    if log.count(")...]") and not phases:
+        raise ValueError("GC resumed but no native concurrent entry was recorded")
+    print(f"PID {pid}: {len(progress)} files parsed, {log.count(')...]')} GC resumes, "
+          f"{phases} concurrent-phase dispatches, {cpu_samples} user-mode CPU samples.")
+    print(f"Background CodeBlock visitor entries: {total_visits}; strictly inside a confirmed phase: {confirmed}.")
     if witness:
-        print(f"Concurrent marking observed. First witness: {witness}")
+        start, timestamp, stop, worker = witness
+        print(f"Concurrent marking observed. TID {worker}: {start} < {timestamp} < {stop} ns (CLOCK_MONOTONIC).")
     else:
-        print("Concurrent marking was not established by a sample inside a JS-bounded interval.")
+        print("No background CodeBlock visit was confirmed inside a concurrent interval.")
 
 
 if __name__ == "__main__":

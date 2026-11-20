@@ -89,10 +89,12 @@ frozen Bun install on Alpine. The measured command runs offline.
 
 The `alpine-catalog-trace-<commit>-<attempt>` artifact contains the GC log,
 per-file progress markers, Linux perf data, symbolized user-mode samples and
-the summary. Symbols come from the matching build ID for the measured release
-binary. The reader looks for a background thread visiting cells between parser
-checkpoints inside one JavaScriptCore concurrent phase. Its timestamps are
-rounded inward. A phase transition alone does not establish that a background
-thread actually marked cells, and sampled work does not identify an individual
-JavaScript array write. Run `python3 scripts/ci/read_catalog_gc.py DIRECTORY`
+the summary. The runner resolves three native entry points from the matching
+release symbols and attaches events to a private copy of the Alpine Bun binary.
+Perf timestamps these events on one monotonic clock. The reader counts a background
+CodeBlock visitor only after concurrent-phase dispatch and before the next
+phase-transition check in the same process. Even a transition check that leaves
+the phase unchanged ends the interval, so the count is a lower bound. This measures
+background marking during the catalog workload. Identifying a particular
+JavaScript array write would require separate evidence. Run `python3 scripts/ci/read_catalog_gc.py DIRECTORY`
 on the extracted artifact to repeat the analysis.
