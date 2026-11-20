@@ -576,6 +576,42 @@ else
   fail peer-resolution "install failed"
 fi
 
+# ---- P32: --verbose names peers that ended up out of range -----------------
+mkproj "$ROOT/p32" '{"name":"p32","version":"1.0.0","dependencies":{"express":"5.3.0","@remix-run/express":"2.17.1"}}'
+set +e
+peer_verbose_out="$(cd "$ROOT/p32" && bun install --verbose 2>&1)"; peer_verbose_code=$?
+set -e
+if [ "$peer_verbose_code" -eq 0 ] \
+   && printf '%s' "$peer_verbose_out" | grep -q "incorrect peer dependency" \
+   && printf '%s' "$peer_verbose_out" | grep -qF 'express@^4.20.0'; then
+  pass verbose-peer-warning "warned express@5.3.0 is outside remix's ^4.20.0 range"
+else
+  fail verbose-peer-warning "exit $peer_verbose_code; out-of-range peer warning not found"
+fi
+
+# ---- P33: bun update --latest refreshes a peer in one run ------------------
+# react is installed only as react-dom@17's peer; --latest must move both to 19
+# in one invocation (1.4.3 left react on 17 until a second run).
+mkproj "$ROOT/p33" '{"name":"p33","version":"1.0.0","dependencies":{"react-dom":"17.0.2"}}'
+if run bash -c "cd '$ROOT/p33' && bun install"; then
+  before_react="$(cd "$ROOT/p33" && bun pm ls --all 2>&1 | grep -E '^[├└]── react@' | grep -oE 'react@[0-9]+' | head -1 | cut -d@ -f2)"
+  if run bash -c "cd '$ROOT/p33' && bun update --latest"; then
+    after_ls="$(cd "$ROOT/p33" && bun pm ls --all 2>&1)"
+    react_major="$(printf '%s\n' "$after_ls" | grep -E '^[├└]── react@' | grep -oE 'react@[0-9]+' | head -1 | cut -d@ -f2)"
+    dom_major="$(printf '%s\n' "$after_ls" | grep -E '^[├└]── react-dom@' | grep -oE 'react-dom@[0-9]+' | head -1 | cut -d@ -f2)"
+    if [ -n "$react_major" ] && [ -n "$dom_major" ] \
+       && [ "$react_major" = "$dom_major" ] && [ "$react_major" -gt 17 ]; then
+      pass update-latest-peer "react-dom 17 -> $dom_major and peer react -> $react_major in one run (was $before_react)"
+    else
+      fail update-latest-peer "react=$react_major react-dom=$dom_major (expected equal majors > 17)"
+    fi
+  else
+    fail update-latest-peer "bun update --latest failed"
+  fi
+else
+  fail update-latest-peer "install failed"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
 skip publish-registry "publish fails at auth/packing before any registry contact can be observed; needs a real registry"
