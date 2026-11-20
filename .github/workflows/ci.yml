@@ -2,7 +2,7 @@ name: sportsdesk-ops-ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - "**.ts"
       - "**.tsx"
@@ -114,7 +114,9 @@ jobs:
         run: bash scripts/audit-plugins.sh
 
   verify-changed:
-    if: github.event_name == 'pull_request'
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -127,7 +129,7 @@ jobs:
           bun-version-file: .bun-version
       - name: Format check (changed files)
         env:
-          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_BASE_REF: ${{ github.base_ref || 'main' }}
         run: |
           rc=0
           bun fmt --check --changed="origin/${GITHUB_BASE_REF}" || rc=$?
@@ -232,7 +234,7 @@ jobs:
         run: bun run test:pm-contracts
       - name: Changed dsh-plugin bundles (verify-load)
         env:
-          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_BASE_REF: ${{ github.base_ref || 'main' }}
         run: bash scripts/ci/test-changed-plugins.sh
       - name: Cache NSH v0.5.0 toolchain & TypeScript 7 cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -244,7 +246,7 @@ jobs:
       - name: Changed NSH Desk package (pinned v0.5.0 check + build + headless test + web + signed .nshpkg)
         timeout-minutes: 5
         env:
-          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_BASE_REF: ${{ github.base_ref || 'main' }}
         run: bash scripts/ci/test-changed-nsh.sh
 
   lint-native:

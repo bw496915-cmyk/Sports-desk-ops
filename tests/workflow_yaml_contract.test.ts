@@ -61,3 +61,22 @@ describe("GitHub Actions YAML under YAML 1.2", () => {
     expect(runs).toContain("tests/dashboard_credentials.test.ts");
   });
 });
+
+test("dev pushes run changed verification against a valid main baseline", async () => {
+  const doc: unknown = Bun.YAML.parse(
+    await Bun.file(".github/workflows/ci.yml").text(),
+  );
+  expect(doc).toMatchObject({ on: { push: { branches: ["main", "dev"] } } });
+  const text = await Bun.file(".github/workflows/ci.yml").text();
+  const changed = text.slice(
+    text.indexOf("  verify-changed:"),
+    text.indexOf("  lint-native:"),
+  );
+  expect(changed).toContain("github.event_name == 'pull_request'");
+  expect(changed).toContain("github.ref == 'refs/heads/dev'");
+  expect(changed).not.toContain("${{ github.base_ref }}");
+  expect(changed).toContain("${{ github.base_ref || 'main' }}");
+  expect(text).toContain(
+    "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+  );
+});
