@@ -15,6 +15,7 @@ import type {
 } from "bun";
 import type { BunSecretSetOptions } from "../types/bun-api.ts";
 import { getSecretBounded, KeychainTimeoutError } from "./secrets.ts";
+import { assertNoSecretLeak } from "./inspect_redactor.ts";
 
 export type R2S3Env = Readonly<Record<string, string | undefined>>;
 
@@ -576,7 +577,9 @@ export class R2S3Client {
 
   [Bun.inspect.custom](depth: number, options: InspectOptions): string {
     if (depth < 0) return `[R2S3Client ${this.bucket}]`;
-    return Bun.inspect(this.toJSON(), options);
+    const rendered = Bun.inspect(this.toJSON(), options);
+    assertNoSecretLeak(rendered);
+    return rendered;
   }
 
   file(key: string, options?: Bun.S3Options): S3File {

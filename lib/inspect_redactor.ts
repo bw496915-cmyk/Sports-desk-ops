@@ -290,3 +290,38 @@ export function sanitizeDiagnosticUrl(
   }
   return out;
 }
+
+/** Bearer/Basic credentials that were not replaced with the redaction sentinel. */
+const UNREDACTED_AUTH_RE =
+  /\b(?:Bearer|Basic)\s+(?!\[REDACTED_SECRET\]|REDACTED\b)[A-Za-z0-9._~+/=-]{6,}/;
+/** Session cookies that must never survive into an inspect surface. */
+const UNREDACTED_SESSION_RE =
+  /(?:GSLIVE_SESSION_ID|sd_session|dash_session)=(?!\[REDACTED_SECRET\]|REDACTED\b)[^\s\]"';]+/i;
+
+/**
+ * Fail-closed canary for strings that are about to be printed or serialized.
+ *
+ * Checks every env name in the secret manifest (including aliases), not a
+ * hand-picked list, and rejects unredacted Bearer/Basic and session-cookie
+ * forms. A leaked value is never included in the thrown error.
+ */
+export function assertNoSecretLeak(
+  surface: string,
+  env: Readonly<Record<string, string | undefined>> = Bun.env,
+): void {
+  for (const name of manifestNames()) {
+    const value = env[name];
+    // Short values are not credentials and would make this a false-positive guard.
+    if (typeof value !== "string" || value.length < 8) continue;
+    if (surface.includes(value)) {
+      throw new Error(
+        "ERR_INSP_SECRET_REDACTION_LEAK: Raw secret leaked into inspect surface",
+      );
+    }
+  }
+  if (UNREDACTED_AUTH_RE.test(surface) || UNREDACTED_SESSION_RE.test(surface)) {
+    throw new Error(
+      "ERR_INSP_SECRET_REDACTION_LEAK: Unredacted Bearer/session token detected",
+    );
+  }
+}
