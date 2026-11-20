@@ -847,20 +847,34 @@ function readStaticBytes(path: string): Uint8Array | null {
   }
 }
 
+type StaticRouteValue =
+  | Response
+  | {
+      readonly OPTIONS: (req: Request) => Response;
+      readonly GET: Response;
+    };
+
 function buildStaticRoutes(
   meta: PackageMeta,
   repoRoot: string,
-): Record<string, Response> {
-  const routes: Record<string, Response> = {
-    "/healthz": new Response("ok\n", {
-      headers: { "content-type": "text/plain; charset=utf-8" },
-    }),
-    "/api/version": Response.json({
-      name: meta.name ?? "sportsdesk-ops",
-      version: meta.version ?? "unknown",
-      bun: Bun.version,
-      env: Bun.env.NODE_ENV ?? "development",
-    }),
+  preflight: (req: Request) => Response,
+): Record<string, StaticRouteValue> {
+  const routes: Record<string, StaticRouteValue> = {
+    "/healthz": {
+      OPTIONS: preflight,
+      GET: new Response("ok\n", {
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      }),
+    },
+    "/api/version": {
+      OPTIONS: preflight,
+      GET: Response.json({
+        name: meta.name ?? "sportsdesk-ops",
+        version: meta.version ?? "unknown",
+        bun: Bun.version,
+        env: Bun.env.NODE_ENV ?? "development",
+      }),
+    },
   };
 
   // Small, frequently viewed page: buffer it once and let Bun's static route cache
@@ -872,8 +886,14 @@ function buildStaticRoutes(
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-cache",
     } as const;
-    routes["/status"] = new Response(statusHtml.slice(), { headers });
-    routes["/status/"] = new Response(statusHtml.slice(), { headers });
+    routes["/status"] = {
+      OPTIONS: preflight,
+      GET: new Response(statusHtml.slice(), { headers }),
+    };
+    routes["/status/"] = {
+      OPTIONS: preflight,
+      GET: new Response(statusHtml.slice(), { headers }),
+    };
   }
 
   return routes;
@@ -1217,7 +1237,11 @@ export function startServer(options?: ServerOptions) {
   // request-time view so it can report which channels are running.
   let consoleLiveStatusReader: (() => ConsoleLiveRuntimeStatus) | null = null;
 
+  const preflightResponse = (req: Request): Response =>
+    new Response(null, { status: 204, headers: corsHeadersFor(req) });
+
   const healthRoute = async (req: Request): Promise<Response> => {
+    if (req.method === "OPTIONS") return preflightResponse(req);
     const nodeEnv = Bun.env.NODE_ENV || "development";
     const health = await buildDeskEnhancedHealth({
       port: server.port ?? Number(Bun.env.PORT ?? 4020),
@@ -1237,7 +1261,7 @@ export function startServer(options?: ServerOptions) {
   // The full route table: static routes plus the async health probe. Reload must
   // rebuild this whole table, not just the static subset, or `/health` would 404.
   const buildRoutes = (meta: PackageMeta) => ({
-    ...buildStaticRoutes(meta, repoRoot),
+    ...buildStaticRoutes(meta, repoRoot, preflightResponse),
     "/health": healthRoute,
   });
 

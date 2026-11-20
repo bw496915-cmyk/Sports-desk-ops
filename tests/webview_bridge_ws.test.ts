@@ -563,6 +563,20 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     const version = await fetch(`http://127.0.0.1:${hub.port}/api/version`);
     expect(version.status).toBe(200);
   });
+  test("routed endpoints preserve the global OPTIONS preflight", async () => {
+    for (const path of ["/health", "/healthz", "/api/version", "/status"]) {
+      const response = await fetch(`http://127.0.0.1:${hub.port}${path}`, {
+        method: "OPTIONS",
+        headers: {
+          origin: "http://127.0.0.1:58514",
+          "access-control-request-method": "GET",
+        },
+      });
+      expect(response.status).toBe(204);
+      expect(await response.text()).toBe("");
+    }
+  });
+
   test("the async /health route survives a static-route reload", async () => {
     const response = await fetch(`http://127.0.0.1:${hub.port}/health`);
 
