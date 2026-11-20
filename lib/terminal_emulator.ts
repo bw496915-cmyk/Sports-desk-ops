@@ -20,6 +20,7 @@
 import { resolve } from "node:path";
 import { TerminalSession, type SpawnInPtyOptions } from "./bun_terminal.ts";
 import { auditPty } from "./audit_log.ts";
+import { readBunfigConsoleDepth } from "./token_automation.ts";
 import { benchmarkResolverLatency, classifyIpAddress } from "./bun_dns.ts";
 import {
   buildReverseDnsForensicsView,
@@ -306,6 +307,8 @@ export const COMMAND_ALIASES: Readonly<Record<string, string>> = {
   capabilities: "capabilities",
   caps: "capabilities",
   features: "capabilities",
+  depth: "depth",
+  "console-depth": "depth",
   harvest: "harvest",
   hv: "harvest",
   anomalies: "harvest",
@@ -338,6 +341,7 @@ export const AUTOCOMPLETE_COMMANDS: readonly string[] = [
   "cron",
   "markdown",
   "capabilities",
+  "depth",
   "clear",
   "help",
   "--help",
@@ -1138,6 +1142,7 @@ export function getTerminalWelcomeBanner(): string {
     "  \x1b[1;32mbursts\x1b[0m (alias: \x1b[32mb, steam\x1b[0m)       Detected multi-account steam bursts (≤ 180s coordinated window)",
     "  \x1b[1;32mquarantine\x1b[0m (aliases: \x1b[32mq, guard\x1b[0m)   Real-time sliding window syndicate burst quarantine directives",
     "  \x1b[1;32mws\x1b[0m (alias: \x1b[32msubscriptions\x1b[0m)         Inspect connected WebSocket clients and active topic channels",
+    "  \x1b[1;32mdepth\x1b[0m (alias: \x1b[32mconsole-depth\x1b[0m)     Console depth chain: profile env → bunfig → effective winner",
     "  \x1b[1;32mtrunks\x1b[0m (alias: \x1b[32mt, trees\x1b[0m)        Two-trunk forest rollup (live corpus · detail · trackthis/nolapph)",
     "  \x1b[1;32mdns <host>\x1b[0m (alias: \x1b[32md\x1b[0m)         Benchmark c-ares vs system DNS resolver latency",
     "  \x1b[1;32mreverse <ip>\x1b[0m (alias: \x1b[32mr, ip\x1b[0m)     Reverse DNS forensics & datacenter/residential IP lookup",
@@ -2665,6 +2670,17 @@ async function executeTerminalQueryInner(
     };
   }
 
+  // Quick Command: Console depth resolution chain
+  if (canonicalCmd === "depth") {
+    return {
+      command: trimmed,
+      stdout: await renderConsoleDepthReport(options),
+      exitCode: 0,
+      durationMs: Date.now() - startedAt,
+      timestamp: startedAt,
+    };
+  }
+
   // Default: Execute command in a native Bun.Terminal PTY using TerminalSession
   const cmdParts = trimmed.split(/\s+/);
   let executable = cmdParts[0] ?? "";
@@ -2778,6 +2794,49 @@ function consoleDepthEnv(
     PTY_CONSOLE_DEPTH: depth === null ? "" : String(depth),
     BUN_OPTIONS: flags,
   };
+}
+
+const DEPTH_RULE = "═".repeat(72);
+
+/** Render the console-depth resolution chain for the `depth` command. */
+async function renderConsoleDepthReport(
+  options: TerminalQueryOptions,
+): Promise<string> {
+  const cwd = options.cwd ?? process.cwd();
+  const bunfigDepth = await readBunfigConsoleDepth(resolve(cwd, "bunfig.toml"));
+  const envRaw =
+    options.env?.PTY_CONSOLE_DEPTH ?? process.env.PTY_CONSOLE_DEPTH;
+  const envDepth =
+    envRaw === undefined || envRaw.trim() === ""
+      ? null
+      : asConsoleDepth(Number(envRaw));
+  const explicit = asConsoleDepth(options.consoleDepth);
+  const effective = bunfigDepth ?? explicit ?? envDepth ?? 2;
+  const winner =
+    bunfigDepth !== null
+      ? "bunfig [console].depth"
+      : explicit !== null
+        ? "resolved option"
+        : envDepth !== null
+          ? "PTY_CONSOLE_DEPTH"
+          : "Bun default";
+  const envReading =
+    envRaw !== undefined && envDepth === null
+      ? `invalid (${JSON.stringify(envRaw)})`
+      : envDepth === null
+        ? "unset"
+        : String(envDepth);
+  return [
+    "\x1b[1;36mCONSOLE DEPTH\x1b[0m",
+    DEPTH_RULE,
+    `  profile env PTY_CONSOLE_DEPTH : ${envReading}`,
+    `  resolved option              : ${explicit === null ? "unset" : String(explicit)}`,
+    `  bunfig [console].depth       : ${bunfigDepth === null ? "unset" : String(bunfigDepth)}`,
+    `  effective at runtime         : ${effective} (${winner})`,
+    DEPTH_RULE,
+    "  \x1b[90mBun 1.4.4: a numeric bunfig depth beats BUN_OPTIONS and argv.\x1b[0m",
+    "  \x1b[90mconsole.dir(v,{depth}) still overrides per call; node:console ignores bunfig.\x1b[0m",
+  ].join("\n");
 }
 
 /**

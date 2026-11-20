@@ -535,3 +535,53 @@ describe("profile console depth → PTY env", () => {
     expect(result.stdout.trim()).toBe("");
   });
 });
+
+describe("console depth diagnostic", () => {
+  test("reports the resolution chain and effective winner", async () => {
+    const result = await executeTerminalQuery("depth");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("CONSOLE DEPTH");
+    expect(result.stdout).toContain("profile env PTY_CONSOLE_DEPTH");
+    expect(result.stdout).toContain("bunfig [console].depth");
+    expect(result.stdout).toContain("effective at runtime");
+  });
+
+  test("a bunfig in the executor cwd beats the profile env", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "depth-command-"));
+    try {
+      writeFileSync(join(dir, "bunfig.toml"), "[console]\ndepth = 5\n");
+      const result = await executeTerminalQuery("depth", {
+        cwd: dir,
+        env: { PTY_CONSOLE_DEPTH: "3" },
+      });
+      expect(result.stdout).toContain("profile env PTY_CONSOLE_DEPTH : 3");
+      expect(result.stdout).toContain("bunfig [console].depth       : 5");
+      expect(result.stdout).toContain(
+        "effective at runtime         : 5 (bunfig [console].depth)",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("falls back to PTY_CONSOLE_DEPTH when no bunfig depth exists", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "depth-command-"));
+    try {
+      const result = await executeTerminalQuery("depth", {
+        cwd: dir,
+        env: { PTY_CONSOLE_DEPTH: "3" },
+      });
+      expect(result.stdout).toContain(
+        "effective at runtime         : 3 (PTY_CONSOLE_DEPTH)",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("the console-depth alias resolves to the same command", async () => {
+    const result = await executeTerminalQuery("console-depth");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("CONSOLE DEPTH");
+  });
+});

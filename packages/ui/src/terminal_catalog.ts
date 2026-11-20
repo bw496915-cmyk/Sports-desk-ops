@@ -150,6 +150,14 @@ export const TERMINAL_COMMAND_SPECS: readonly TerminalCommandSpec[] = [
     aliases: ["subscriptions"],
   },
   {
+    command: "depth",
+    usage: "depth",
+    description:
+      "Console depth chain: profile env, bunfig, and the effective winner",
+    group: "NET",
+    aliases: ["console-depth"],
+  },
+  {
     command: "dns",
     usage: "dns <host>",
     description: "Benchmark c-ares vs system DNS resolver latency",
