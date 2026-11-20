@@ -3,7 +3,7 @@
  * Stage 1 of two: prove DSH can LOAD this plugin under Bun, and that its tools REFUSE
  * input they do not understand.
  *
- * WHAT THIS PROVES: the module imports, `apply` registers exactly the fourteen tools, every tool
+ * WHAT THIS PROVES: the module imports, `apply` registers exactly the fifteen tools, every tool
  * declaration is complete (description, parameters, output schema/render, execute), and the
  * closed sets reject unknown names — including prototype keys such as `toString` and
  * `__proto__`, which a plain `in` check would let through.
@@ -583,6 +583,7 @@ const EXPECTED = [
   "sportsdesk_security",
   "sportsdesk_sharp",
   "sportsdesk_status",
+  "sportsdesk_terminal_profile",
   "sportsdesk_ticker",
   "sportsdesk_wagers",
   "sportsdesk_weblogs",
@@ -608,7 +609,7 @@ check("module exports the cordis apply/name/inject contract", () => {
   }
 });
 
-check("registers exactly the fourteen read-only tools", () => {
+check("registers exactly the fifteen read-only tools", () => {
   assert(
     registered.length === EXPECTED.length,
     `registered ${registered.length} tools`,
@@ -2998,7 +2999,7 @@ await checkAsync(
 
 console.log(
   failed === 0
-    ? "\nverify-load: PASS — 14 tools load and refuse invalid input (stage 1/2)."
+    ? "\nverify-load: PASS — 15 tools load and refuse invalid input (stage 1/2)."
     : `\nverify-load: ${failed} FAILURE(S) (stage 1/2).`,
 );
 process.exit(failed === 0 ? 0 : 1);

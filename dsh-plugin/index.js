@@ -5478,6 +5478,76 @@ export function apply(ctx, config) {
   );
 
   // ---------------------------------------------------------------------------
+  // sportsdesk_terminal_profile — persisted terminal profile store
+  // ---------------------------------------------------------------------------
+  register(
+    defineReadTool({
+      name: "sportsdesk_terminal_profile",
+      description:
+        "Inspect the persisted terminal profile store (default " +
+        "`scratch/theme-tokens.sqlite`): each profile's stored console depth, " +
+        "sorting/compact/max-array settings, token and theme counts, plus the " +
+        "runtime console-depth chain. Opens the store read-only; a missing " +
+        "database is reported as `db.exists=false`, never as zero profiles. " +
+        "Shells `bun cli/terminal_profile.ts --json`.",
+      parameters: {
+        type: "object",
+        properties: {
+          db: {
+            type: "string",
+            description:
+              "Profile store path; defaults to scratch/theme-tokens.sqlite.",
+          },
+          profile: {
+            type: "string",
+            description: "Only report this profile id.",
+          },
+        },
+        additionalProperties: false,
+      },
+      output: { ...TEXT_OUTPUT, presentationMeta: (_args, value) => value },
+      isConcurrencySafe: () => true,
+      async execute(args) {
+        const request = args ?? {};
+        for (const key of ["db", "profile"]) {
+          const value = request[key];
+          if (
+            value !== undefined &&
+            (typeof value !== "string" || value.trim() === "")
+          ) {
+            return invalidArguments(`${key} must be a non-empty string.`);
+          }
+        }
+
+        const argv = ["cli/terminal_profile.ts", "--json"];
+        if (typeof request.db === "string")
+          argv.push("--db", request.db.trim());
+        if (typeof request.profile === "string") {
+          argv.push("--profile", request.profile.trim());
+        }
+        const command = `bun ${argv.join(" ")}`;
+        const result = await runBun(argv, 15_000);
+        const parsed = parseJson(result.stdout.trim());
+        if (!result.ok || !parsed.ok) {
+          return {
+            available: false,
+            reason: result.timedOut ? "timed_out" : "cli_failed",
+            message:
+              result.spawnError === null
+                ? `\`${command}\` exited ${result.exitCode}${result.timedOut ? " (timed out)" : ""} without a JSON descriptor.`
+                : `Could not inspect the terminal profile store: ${result.spawnError}`,
+            command,
+            exitCode: result.exitCode,
+            durationMs: result.durationMs,
+            stderr: truncate(result.stderr, MAX_EXCERPT),
+          };
+        }
+        return { available: true, ok: true, command, ...parsed.value };
+      },
+    }),
+  );
+
+  // ---------------------------------------------------------------------------
   // sportsdesk_markets — staged combo / CLV / cross-domain reports
   // ---------------------------------------------------------------------------
   ctx.tools.register(

@@ -241,8 +241,8 @@ await check("the shim has Node globals the plugin relies on", () => {
   assert(typeof process.versions === "object", "process.versions is missing");
 });
 
-await check("the module loaded and registered fourteen tools", () => {
-  assert(registered.length === 14, `registered ${registered.length} tools`);
+await check("the module loaded and registered fifteen tools", () => {
+  assert(registered.length === 15, `registered ${registered.length} tools`);
 });
 
 await check(
@@ -279,6 +279,22 @@ await check("sportsdesk_downline executes (snapshot parse)", async () => {
   assert(result.available === true, "downline was unavailable");
   JSON.stringify(result);
 });
+
+await check(
+  "sportsdesk_terminal_profile executes (read-only store inspection)",
+  async () => {
+    const result = await byName.get("sportsdesk_terminal_profile").execute({});
+    assert(
+      result.available === true,
+      `tool unavailable: ${result.reason ?? "?"}`,
+    );
+    assert(
+      typeof result.db === "object" && result.db !== null,
+      "db report missing",
+    );
+    assert(Array.isArray(result.profiles), "profiles is not an array");
+  },
+);
 
 await check(
   "sportsdesk_console_depth executes (shared resolution chain)",

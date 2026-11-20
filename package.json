@@ -127,6 +127,7 @@
     "graph:agent:views": "bun run scripts/build_agent_graph_views.ts",
     "theme:codegen": "bun cli/theme_codegen.ts codegen",
     "console:depth": "bun cli/console_depth.ts",
+    "terminal:profile": "bun cli/terminal_profile.ts",
     "graph:agent:readability": "bun run scripts/agent_graph_readability.ts",
     "graph:agent:judge": "bun run scripts/agent_graph_judge.ts",
     "verify:agent-graph": "bun run scripts/verify_agent_graph_pipeline.ts",
