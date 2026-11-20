@@ -612,6 +612,40 @@ else
   fail update-latest-peer "install failed"
 fi
 
+# ---- P34: pm cache pack/unpack/prune roundtrip -----------------------------
+# Use a dedicated cache dir: the global one can contain the bun executable,
+# which prune deliberately refuses.
+mkproj "$ROOT/p34" '{"name":"p34","version":"1.0.0","dependencies":{"lodash":"4.17.21"}}'
+mkdir -p "$ROOT/p34/cache"
+run bash -c "cd '$ROOT/p34' && BUN_INSTALL_CACHE_DIR='$ROOT/p34/cache' bun install"
+set +e
+(cd "$ROOT/p34" && BUN_INSTALL_CACHE_DIR="$ROOT/p34/cache" bun pm cache pack "$ROOT/p34/cache.pack") >/dev/null 2>&1; pack_code=$?
+pack_bytes=$(stat -c%s "$ROOT/p34/cache.pack" 2>/dev/null || stat -f%z "$ROOT/p34/cache.pack" 2>/dev/null || echo 0)
+(cd "$ROOT/p34" && BUN_INSTALL_CACHE_DIR="$ROOT/p34/cache" bun pm cache unpack "$ROOT/p34/cache.pack") >/dev/null 2>&1; unpack_code=$?
+(cd "$ROOT/p34" && BUN_INSTALL_CACHE_DIR="$ROOT/p34/cache" bun pm cache prune --dry-run) >/dev/null 2>&1; prune_code=$?
+set -e
+if [ "$pack_code" -eq 0 ] && [ "${pack_bytes:-0}" -gt 0 ] && [ "$unpack_code" -eq 0 ] && [ "$prune_code" -eq 0 ]; then
+  pass pm-cache-roundtrip "packed ${pack_bytes}B, unpacked, prune --dry-run clean"
+else
+  fail pm-cache-roundtrip "pack=$pack_code/${pack_bytes}B unpack=$unpack_code prune=$prune_code"
+fi
+
+# ---- P35: bunx --cwd/--env-file and its flags ------------------------------
+mkdir -p "$ROOT/p35/work"
+printf 'PROBE_BUNX=yes\n' > "$ROOT/p35/work/ci.env"
+set +e
+bunx_out="$(cd "$ROOT/p35" && bunx --cwd "$ROOT/p35/work" --env-file "$ROOT/p35/work/ci.env" bun -e 'console.log(process.cwd()); console.log(process.env.PROBE_BUNX)' 2>&1)"; bunx_code=$?
+bunx_mra_code=0; (cd "$ROOT/p35" && bunx --minimum-release-age 3d bun --version) >/dev/null 2>&1 || bunx_mra_code=$?
+bunx_trust_code=0; (cd "$ROOT/p35" && bunx --trust bun --version) >/dev/null 2>&1 || bunx_trust_code=$?
+set -e
+if [ "$bunx_code" -eq 0 ] && printf '%s' "$bunx_out" | grep -qF "p35/work" \
+   && printf '%s' "$bunx_out" | grep -q "yes" \
+   && [ "$bunx_mra_code" -eq 0 ] && [ "$bunx_trust_code" -eq 0 ]; then
+  pass bunx-flags "--cwd changed directory, --env-file loaded, --minimum-release-age/--trust accepted"
+else
+  fail bunx-flags "run=$bunx_code mra=$bunx_mra_code trust=$bunx_trust_code output=$bunx_out"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
 skip publish-registry "publish fails at auth/packing before any registry contact can be observed; needs a real registry"
