@@ -1322,6 +1322,11 @@ export function startServer(options?: ServerOptions) {
 
   const healthRoute = async (req: Request): Promise<Response> => {
     if (req.method === "OPTIONS") return preflightResponse(req);
+    // The error-boundary test triggers a non-Error through this route; the guard
+    // used to live in `fetch`, which routes bypass.
+    if (new URL(req.url).searchParams.get("trigger_error") === "non_error") {
+      throw "Synthetic non-Error thrown in handler";
+    }
     const nodeEnv = Bun.env.NODE_ENV || "development";
     const health = await buildDeskEnhancedHealth({
       port: server.port ?? Number(Bun.env.PORT ?? 4020),

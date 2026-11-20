@@ -28,6 +28,14 @@ export const TERMINAL_COMMAND_SPECS: readonly TerminalCommandSpec[] = [
     aliases: ["p", "c", "cust", "lookup"],
   },
   {
+    command: "profiles",
+    usage:
+      "profiles [--sort score|volume|net] [--limit N] [--min-score N] [--json]",
+    description: "Sortable profile matrix with score/action/tier/agent filters",
+    group: "SHARPS",
+    aliases: [],
+  },
+  {
     command: "find",
     usage: "find <query>",
     description: "Search accounts (-t tier, -s sport, -a action)",
