@@ -400,10 +400,19 @@ async function fileResponse(
   });
 }
 
+/** Bun.serve's own TLS option (cert/key/CA and ALPNProtocols), passed through verbatim. */
+type ServeTlsOptions = Parameters<typeof Bun.serve>[0] extends {
+  readonly tls?: infer T;
+}
+  ? T
+  : never;
+
 export interface ServerOptions {
   readonly port?: number;
   readonly hostname?: string;
   readonly unix?: string;
+  /** Opt in to a TLS listener; omit for the existing plain-HTTP/unix behavior. */
+  readonly tls?: ServeTlsOptions;
   readonly development?: boolean | { readonly hmr?: boolean };
   /** Where `bet-ticker.json` and `live-wagers.json` live; defaults to the repo's `data/`. */
   readonly wagerListDir?: string;
@@ -1337,6 +1346,7 @@ export function startServer(options?: ServerOptions) {
   });
 
   const serveConfig = {
+    ...(options?.tls === undefined ? {} : { tls: options.tls }),
     development: isDevelopment ? { hmr: false } : false,
     // Bodies here are small JSON documents and one 1 MiB form probe. Without a cap a chunked
     // request is buffered in full by `req.json()` / `arrayBuffer()` (measured: a 6 MiB POST to
