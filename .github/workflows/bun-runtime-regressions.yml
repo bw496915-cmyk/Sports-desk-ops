@@ -9,6 +9,9 @@ on:
       - ".github/workflows/bun-runtime-regressions.yml"
       - "scripts/ci/verify_runtime_patches.sh"
       - "scripts/ci/read_gc_trace.py"
+      - "scripts/ci/trace_catalog_gc.sh"
+      - "scripts/ci/read_catalog_gc.py"
+      - "scripts/bun_shape_contracts.ts"
       - "tests/bun_runtime_regressions.test.ts"
       - "tests/unit/contract_39_linux_runtime.test.ts"
   pull_request:
@@ -96,5 +99,25 @@ jobs:
         with:
           name: alpine-gc-trace-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/linux-runtime.log
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Trace the normal catalog check on Alpine
+        if: matrix.libc == 'musl'
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: bash scripts/ci/trace_catalog_gc.sh
+      - name: Read catalog GC samples
+        if: matrix.libc == 'musl'
+        run: |
+          set -o pipefail
+          python3 scripts/ci/read_catalog_gc.py "$RUNNER_TEMP/catalog-trace" |
+            tee "$RUNNER_TEMP/catalog-trace/summary.txt" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain the Alpine catalog trace
+        if: always() && matrix.libc == 'musl'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: alpine-catalog-trace-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/catalog-trace
           retention-days: 30
           if-no-files-found: error

@@ -81,3 +81,18 @@ fall outside the mutation window, concurrent marking could not have overlapped
 those operations in that run. A collection intersecting the window leaves actual
 marking overlap unresolved, since a cycle includes other phases.
 [Collector logging in the pinned WebKit source](https://github.com/oven-sh/WebKit/blob/d6375c72affe0f70222cdcb45012b10f0bf3a9d5/Source/JavaScriptCore/heap/Collector.cpp)
+
+The Alpine catalog trace runs the existing `bun scripts/bun_shape_contracts.ts --check`
+once against the checkout. TypeScript builds statement arrays as it parses each
+file, and the renderer appends and sorts catalog rows. Dependencies come from a
+frozen Bun install on Alpine. The measured command runs offline.
+
+The `alpine-catalog-trace-<commit>-<attempt>` artifact contains the GC log,
+per-file progress markers, Linux perf data, symbolized user-mode samples and
+the summary. Symbols come from the matching build ID for the measured release
+binary. The reader looks for a background thread visiting cells between parser
+checkpoints inside one JavaScriptCore concurrent phase. Its timestamps are
+rounded inward. A phase transition alone does not establish that a background
+thread actually marked cells, and sampled work does not identify an individual
+JavaScript array write. Run `python3 scripts/ci/read_catalog_gc.py DIRECTORY`
+on the extracted artifact to repeat the analysis.
