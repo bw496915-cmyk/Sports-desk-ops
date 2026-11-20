@@ -5,6 +5,7 @@
  */
 
 import { stripDisplayAnsi } from "./terminal_format.ts";
+import { spawnSyncBounded } from "./spawn_sync_bounded.ts";
 
 /** Flags our tooling relies on; a runtime upgrade/downgrade must keep them. */
 export const REQUIRED_BUN_CLI_FLAGS = [
@@ -255,7 +256,7 @@ export function readBunHelpFlags(
   args: readonly string[],
   bunPath = process.execPath,
 ): ReadonlySet<string> {
-  const result = Bun.spawnSync([bunPath, ...args], {
+  const result = spawnSyncBounded([bunPath, ...args], {
     env: cleanSpawnEnv(),
     stdout: "pipe",
     stderr: "pipe",
@@ -270,7 +271,7 @@ export function readBunHelpFlags(
 
 /** Read the runtime's own help once; never hand-maintain the flag list. */
 export function readBunCliSurface(bunPath = process.execPath): BunCliSurface {
-  const result = Bun.spawnSync([bunPath, "--help"], {
+  const result = spawnSyncBounded([bunPath, "--help"], {
     env: cleanSpawnEnv(),
     stdout: "pipe",
     stderr: "pipe",
@@ -317,7 +318,7 @@ export function bunFlagsInScripts(
 export function readBunRunCliSurface(
   bunPath = process.execPath || "bun",
 ): BunRunCliSurface {
-  const result = Bun.spawnSync([bunPath, "run", "--help"], {
+  const result = spawnSyncBounded([bunPath, "run", "--help"], {
     env: cleanSpawnEnv(),
     stdout: "pipe",
     stderr: "pipe",

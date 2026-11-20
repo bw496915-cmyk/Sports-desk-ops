@@ -9,6 +9,7 @@
  * is a child process (skipped with `probe: false`) because `bun:bundle` cannot be inspected in-process.
  */
 import { join } from "node:path";
+import { spawnSyncBounded } from "./spawn_sync_bounded.ts";
 import { bunRevisionComposite } from "./bun_runtime.ts";
 import {
   contractSchema,
@@ -209,7 +210,7 @@ function runBundleProbe(flags: readonly string[]): {
 } {
   const runner = join(import.meta.dir, "bun_reference_probe_run.ts");
   try {
-    const result = Bun.spawnSync([process.execPath, ...flags, runner], {
+    const result = spawnSyncBounded([process.execPath, ...flags, runner], {
       stdout: "pipe",
       stderr: "pipe",
     });
