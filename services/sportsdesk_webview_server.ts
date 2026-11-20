@@ -15,7 +15,7 @@
 import type { TrackerState } from "../lib/tracker_dashboard.ts";
 import { writeAuditEntry } from "../lib/audit_log.ts";
 import crypto from "node:crypto";
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import {
@@ -1129,6 +1129,21 @@ export function startServer(options?: ServerOptions) {
     };
   }
 
+  // Static route metadata: read once at startup, then served from memory.
+  const packageMeta = (() => {
+    try {
+      const parsed: unknown = JSON.parse(
+        readFileSync(resolve(import.meta.dir, "../package.json"), "utf8"),
+      );
+      if (typeof parsed === "object" && parsed !== null) {
+        return parsed as { name?: string; version?: string };
+      }
+    } catch {
+      // A missing/unreadable manifest must not stop the server.
+    }
+    return {};
+  })();
+
   // The console live runtimes start after Bun.serve; the status route reads this
   // request-time view so it can report which channels are running.
   let consoleLiveStatusReader: (() => ConsoleLiveRuntimeStatus) | null = null;
@@ -1145,6 +1160,12 @@ export function startServer(options?: ServerOptions) {
     routes: {
       "/healthz": new Response("ok\n", {
         headers: { "content-type": "text/plain; charset=utf-8" },
+      }),
+      "/api/version": Response.json({
+        name: packageMeta.name ?? "sportsdesk-ops",
+        version: packageMeta.version ?? "unknown",
+        bun: Bun.version,
+        env: Bun.env.NODE_ENV ?? "development",
       }),
     },
 

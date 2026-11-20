@@ -338,6 +338,25 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     expect(frame).toEqual(rollup as unknown as Frame);
   }, 20_000);
 
+  test("the static /api/version route reports package metadata", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/api/version`);
+
+    expect(response.status).toBe(200);
+    const pkg = (await Bun.file(
+      new URL("../package.json", import.meta.url),
+    ).json()) as { name?: string; version?: string };
+    const payload = (await response.json()) as {
+      name?: string;
+      version?: string;
+      bun?: string;
+      env?: string;
+    };
+    expect(payload.name).toBe(pkg.name);
+    expect(payload.version).toBe(pkg.version);
+    expect(payload.bun).toBe(Bun.version);
+    expect(payload.env).toBe(Bun.env.NODE_ENV ?? "development");
+  });
+
   test("the static /healthz route answers without health probes", async () => {
     const response = await fetch(`http://127.0.0.1:${hub.port}/healthz`);
 
