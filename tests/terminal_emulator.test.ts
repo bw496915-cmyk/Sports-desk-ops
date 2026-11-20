@@ -653,3 +653,36 @@ test("profile --compare rejects an unknown target", async () => {
   expect(result.exitCode).toBe(1);
   expect(result.stdout).toContain("not found");
 });
+
+test("profiles lists the matrix with sort and limit", async () => {
+  const all = await executeTerminalQuery("profiles");
+  expect(all.exitCode).toBe(0);
+  expect(all.stdout).toContain("KNOWN CUSTOMER PROFILES");
+  expect(all.stdout).toContain("GP301");
+
+  const limited = await executeTerminalQuery("profiles --limit 3 --json");
+  expect(limited.exitCode).toBe(0);
+  expect(JSON.parse(limited.stdout)).toHaveLength(3);
+
+  const sorted = await executeTerminalQuery("profiles --sort gini");
+  expect(sorted.exitCode).toBe(0);
+  expect(sorted.stdout).toContain("sort: gini");
+});
+
+test("profiles rejects an invalid sort and limit", async () => {
+  const badSort = await executeTerminalQuery("profiles --sort profit");
+  expect(badSort.exitCode).toBe(1);
+  expect(badSort.stdout).toContain("--sort must be one of");
+
+  const badLimit = await executeTerminalQuery("profiles --limit 0");
+  expect(badLimit.exitCode).toBe(1);
+  expect(badLimit.stdout).toContain("--limit must be a positive integer");
+});
+
+test("profile --timeline renders samples and totals", async () => {
+  const result = await executeTerminalQuery("profile GP301 --timeline");
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toContain("TICKET TIMELINE");
+  expect(result.stdout).toContain("TOTAL");
+});

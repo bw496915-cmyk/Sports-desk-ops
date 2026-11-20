@@ -338,6 +338,7 @@ export const COMMAND_ALIASES: Readonly<Record<string, string>> = {
  */
 export const AUTOCOMPLETE_COMMANDS: readonly string[] = [
   "profile",
+  "profiles",
   "find",
   "harvest",
   "sharps",
@@ -1147,7 +1148,7 @@ export function getTerminalWelcomeBanner(): string {
     "\x1b[90mEngine: Bun.spawn + Bun.Terminal PTY · Host: sportsdesk-ops · Invariant: autoExecute: false\x1b[0m",
     "",
     "\x1b[1;33mCommands & Canonical Shortcodes:\x1b[0m",
-    "  \x1b[1;32mprofile <id>\x1b[0m (aliases: \x1b[32mp, c\x1b[0m) Inspect multidimensional sharpness radar (flags: \x1b[36m--radar\x1b[0m, \x1b[36m--json\x1b[0m, \x1b[36m--wagers\x1b[0m, \x1b[36m--compare <id>\x1b[0m)",
+    "  \x1b[1;32mprofile <id>\x1b[0m (aliases: \x1b[32mp, c\x1b[0m) Inspect multidimensional sharpness radar (flags: \x1b[36m--radar\x1b[0m, \x1b[36m--json\x1b[0m, \x1b[36m--wagers\x1b[0m, \x1b[36m--compare <id>\x1b[0m, \x1b[36m--timeline\x1b[0m)\n  \x1b[1;32mprofiles\x1b[0m              Known profile matrix (flags: \x1b[36m--sort score|gini|stake|ratio|id\x1b[0m, \x1b[36m--limit N\x1b[0m, \x1b[36m--json\x1b[0m)",
     "  \x1b[1;32mfind <query>\x1b[0m (aliases: \x1b[32mf, s\x1b[0m) Search accounts (flags: \x1b[36m-t <tier>\x1b[0m, \x1b[36m-s <sport>\x1b[0m, \x1b[36m-a <action>\x1b[0m)",
     "  \x1b[1;32msharps\x1b[0m (aliases: \x1b[32msh, top\x1b[0m)    Top sharp originators ranked by Sharpness Composite Index",
     "  \x1b[1;32msyndicates\x1b[0m (aliases: \x1b[32msyn\x1b[0m)       Detected hook syndicate clusters & sub-accounts",
@@ -1352,6 +1353,85 @@ function renderProfileComparison(
   lines.push(
     rule,
     `\x1b[90mLeft:  ${left.id} (${left.agentId}) · Right: ${right.id} (${right.agentId})\x1b[0m`,
+  );
+  return lines.join("\n");
+}
+
+/**
+ * Renders the known profile matrix with a sortable score/gini/stake/ratio view.
+ */
+function renderProfilesTable(
+  records: readonly TerminalCustomerRecord[],
+  sortKey: string,
+  limit: number,
+): string {
+  const shown = records.slice(0, limit);
+  const lines = [
+    `\x1b[1;36m👥 KNOWN CUSTOMER PROFILES (${shown.length}/${records.length}) — sort: ${sortKey}\x1b[0m`,
+    "┌──────────────┬────────────┬──────────────────────────┬───────┬───────┬────────────┬─────────┬─────────────────┐",
+    "│ Customer     │ Agent      │ Tier                     │ Score │ Gini  │ Mean Stake │ Max/Min │ Action          │",
+    "├──────────────┼────────────┼──────────────────────────┼───────┼───────┼────────────┼─────────┼─────────────────┤",
+  ];
+
+  for (const c of shown) {
+    const score = c.score.toFixed(2).padStart(5);
+    const scoreColored =
+      c.score >= 8
+        ? `\x1b[1;31m${score}\x1b[0m`
+        : c.score >= 6
+          ? `\x1b[33m${score}\x1b[0m`
+          : score;
+    lines.push(
+      `│ ${padDisplay(c.id, 12)} │ ${padDisplay(c.agentId, 10)} │ ${padDisplay(c.tier, 24)} │ ${scoreColored} │ ${c.gini.toFixed(3)} │ ${padDisplay(`$${Math.round(c.meanStake).toLocaleString("en-US")}`, 10, "right")} │ ${padDisplay(`${c.maxMinRatio.toFixed(1)}x`, 7, "right")} │ ${padDisplay(c.action, 15)} │`,
+    );
+  }
+
+  lines.push(
+    "└──────────────┴────────────┴──────────────────────────┴───────┴───────┴────────────┴─────────┴─────────────────┘",
+    "\x1b[90mTip: profile <id> for detail, profile <id> --compare <id> to compare, or --json for machine output.\x1b[0m",
+  );
+  return lines.join("\n");
+}
+
+/**
+ * Renders the sampled ticket timeline newest-first with totals.
+ */
+function renderProfileTimeline(cust: TerminalCustomerRecord): string {
+  const wagers = [...(cust.sampleWagers ?? [])].sort((a, b) =>
+    b.time.localeCompare(a.time),
+  );
+  if (wagers.length === 0) {
+    return `\x1b[33mNo recent ticket samples available for ${cust.id}\x1b[0m`;
+  }
+
+  const totalStake = wagers.reduce((sum, w) => sum + w.stakeUsd, 0);
+  const totalNet = wagers.reduce((sum, w) => sum + w.netUsd, 0);
+  const avgClv = wagers.reduce((sum, w) => sum + w.clvBps, 0) / wagers.length;
+
+  const lines = [
+    `\x1b[1;36m📈 TICKET TIMELINE: ${cust.id} (${wagers.length} sampled tickets, newest first)\x1b[0m`,
+    "┌──────────────────────┬───────┬────────────┬──────────────┬───────────┬─────────┬───────────┐",
+    "│ Submitted            │ Sport │ Market     │ Selection    │ Stake     │ CLV bps │ Net USD   │",
+    "├──────────────────────┼───────┼────────────┼──────────────┼───────────┼─────────┼───────────┤",
+  ];
+
+  for (const w of wagers) {
+    const net = `${w.netUsd >= 0 ? "+" : "-"}$${Math.abs(w.netUsd).toLocaleString("en-US")}`;
+    const netColored =
+      w.netUsd > 0
+        ? `\x1b[32m${net}\x1b[0m`
+        : w.netUsd < 0
+          ? `\x1b[31m${net}\x1b[0m`
+          : net;
+    lines.push(
+      `│ ${padDisplay(w.time, 20)} │ ${padDisplay(w.sport, 5)} │ ${padDisplay(w.market, 10)} │ ${padDisplay(formatHalfPointLine(w.line), 12)} │ ${padDisplay(`$${w.stakeUsd.toLocaleString("en-US")}`, 9, "right")} │ ${padDisplay(`${w.clvBps >= 0 ? "+" : ""}${w.clvBps}`, 7, "right")} │ ${netColored.padEnd(9)} │`,
+    );
+  }
+
+  lines.push(
+    "├──────────────────────┼───────┼────────────┼──────────────┼───────────┼─────────┼───────────┤",
+    `│ TOTAL                │       │            │              │ ${padDisplay(`$${totalStake.toLocaleString("en-US")}`, 9, "right")} │ ${padDisplay(avgClv.toFixed(0), 7, "right")} │ ${padDisplay(`${totalNet >= 0 ? "+" : "-"}$${Math.abs(totalNet).toLocaleString("en-US")}`, 9, "right")} │`,
+    "└──────────────────────┴───────┴────────────┴──────────────┴───────────┴─────────┴───────────┘",
   );
   return lines.join("\n");
 }
@@ -2065,6 +2145,92 @@ async function executeTerminalQueryInner(
   }
 
   // Quick Command: Profile Inspector
+  // Quick Command: Known profile matrix (sortable)
+  if (canonicalCmd === "profiles") {
+    const flagValue = (name: string): string | undefined => {
+      const index = cmdArgs.findIndex(
+        (a) => a === name || a.startsWith(`${name}=`),
+      );
+      if (index === -1) return undefined;
+      const token = cmdArgs[index] ?? "";
+      return token.includes("=")
+        ? token.slice(token.indexOf("=") + 1)
+        : cmdArgs[index + 1];
+    };
+
+    const sortKey = flagValue("--sort") ?? "score";
+    const sorts = ["score", "gini", "stake", "ratio", "id"] as const;
+    if (!(sorts as readonly string[]).includes(sortKey)) {
+      return {
+        command: trimmed,
+        stdout: `\x1b[31m--sort must be one of: ${sorts.join(", ")}\x1b[0m`,
+        exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    const limitRaw = flagValue("--limit") ?? "25";
+    const limit = Number(limitRaw);
+    if (!Number.isInteger(limit) || limit < 1) {
+      return {
+        command: trimmed,
+        stdout: "\x1b[31m--limit must be a positive integer\x1b[0m",
+        exitCode: 1,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    const records = [...KNOWN_CUSTOMER_MAP.values()];
+    if (sortKey === "id") {
+      records.sort((a, b) => a.id.localeCompare(b.id));
+    } else {
+      const pick =
+        sortKey === "gini"
+          ? (c: TerminalCustomerRecord) => c.gini
+          : sortKey === "stake"
+            ? (c: TerminalCustomerRecord) => c.meanStake
+            : sortKey === "ratio"
+              ? (c: TerminalCustomerRecord) => c.maxMinRatio
+              : (c: TerminalCustomerRecord) => c.score;
+      records.sort((a, b) => pick(b) - pick(a));
+    }
+    const limited = records.slice(0, limit);
+
+    if (cmdArgs.includes("--json")) {
+      return {
+        command: trimmed,
+        stdout: JSON.stringify(
+          limited.map((c) => ({
+            id: c.id,
+            agentId: c.agentId,
+            masterAgent: c.masterAgent,
+            tier: c.tier,
+            score: c.score,
+            gini: c.gini,
+            meanStake: c.meanStake,
+            maxMinRatio: c.maxMinRatio,
+            action: c.action,
+          })),
+          null,
+          2,
+        ),
+        exitCode: 0,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    return {
+      command: trimmed,
+      stdout: renderProfilesTable(records, sortKey, limit),
+      exitCode: 0,
+      durationMs: Date.now() - startedAt,
+      timestamp: startedAt,
+    };
+  }
+
   if (canonicalCmd === "profile") {
     const flags = new Set(cmdArgs.filter((a) => a.startsWith("-")));
     const compareIndex = cmdArgs.findIndex(
@@ -2167,6 +2333,17 @@ async function executeTerminalQueryInner(
       return {
         command: trimmed,
         stdout: renderProfileComparison(cust, target),
+        exitCode: 0,
+        durationMs: Date.now() - startedAt,
+        timestamp: startedAt,
+      };
+    }
+
+    // Flag: --timeline
+    if (flags.has("--timeline")) {
+      return {
+        command: trimmed,
+        stdout: renderProfileTimeline(cust),
         exitCode: 0,
         durationMs: Date.now() - startedAt,
         timestamp: startedAt,
