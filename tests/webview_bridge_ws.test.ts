@@ -338,6 +338,28 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     expect(frame).toEqual(rollup as unknown as Frame);
   }, 20_000);
 
+  test("status reports the env-gated console live runtimes", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/api/status`);
+
+    expect(response.ok).toBe(true);
+    const payload = (await response.json()) as {
+      consoleLive?: {
+        started?: string[];
+        skipped?: string[];
+        wagerTelemetry?: unknown;
+        thresholdAlerts?: unknown;
+      } | null;
+    };
+    expect(payload.consoleLive).not.toBeNull();
+    expect(payload.consoleLive?.started).toEqual([]);
+    expect(payload.consoleLive?.skipped).toEqual([
+      "wager-telemetry:disabled",
+      "threshold-alerts:disabled",
+    ]);
+    expect(payload.consoleLive?.wagerTelemetry).toBeNull();
+    expect(payload.consoleLive?.thresholdAlerts).toBeNull();
+  });
+
   test("a telemetry client gets binary ticks only for its subscribed topic", async () => {
     const socket = await openSocket(
       `ws://127.0.0.1:${hub.port}/api/live-bets`,

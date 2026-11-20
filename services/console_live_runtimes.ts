@@ -60,11 +60,25 @@ export interface ConsoleLiveRuntimeOptions {
     (() => Promise<readonly Record<string, unknown>[]>) | undefined;
 }
 
+export interface ConsoleLiveRuntimeStatus {
+  readonly started: readonly string[];
+  readonly skipped: readonly string[];
+  /** Present only when the wager poller is running. */
+  readonly wagerTelemetry: {
+    readonly intervalMs: number;
+    readonly lastPollAtEpochMs: number | null;
+  } | null;
+  /** Present only when the threshold alert loop is running. */
+  readonly thresholdAlerts: { readonly intervalMs: number } | null;
+}
+
 export interface ConsoleLiveRuntimes {
   readonly started: readonly string[];
   readonly skipped: readonly string[];
   /** Stops both loops; idempotent, and a late poll result is not published. */
   stop(): void;
+  /** Serializable operator view of which channels are running and when they last ran. */
+  statusBlock(): ConsoleLiveRuntimeStatus;
 }
 
 function enabled(value: string | undefined): boolean {
@@ -111,7 +125,11 @@ function startWagerTelemetry(
   env: Readonly<Record<string, string | undefined>>,
   isStopped: () => boolean,
   started: string[],
-): { readonly producer: WagerTickProducer; readonly stop: () => void } {
+): {
+  readonly producer: WagerTickProducer;
+  readonly intervalMs: number;
+  readonly stop: () => void;
+} {
   const intervalMs = intervalFrom(
     env.SPORTSDESK_WAGER_TELEMETRY_INTERVAL_MS,
     WAGER_POLL_INTERVAL_MS,
@@ -150,6 +168,7 @@ function startWagerTelemetry(
   poll();
   return {
     producer,
+    intervalMs,
     stop: () => clearInterval(timer),
   };
 }
@@ -159,7 +178,7 @@ function startThresholdAlerts(
   env: Readonly<Record<string, string | undefined>>,
   started: string[],
   skipped: string[],
-): ThresholdAlertLoop | null {
+): { readonly loop: ThresholdAlertLoop; readonly intervalMs: number } | null {
   const botToken = env.TELEGRAM_BOT_TOKEN?.trim() ?? "";
   const chatId = env.TELEGRAM_CHAT_ID?.trim() ?? "";
   if (botToken === "" || chatId === "") {
@@ -214,13 +233,14 @@ function startThresholdAlerts(
     };
   };
 
+  const intervalMs = intervalFrom(
+    env.SPORTSDESK_THRESHOLD_INTERVAL_MS,
+    ALERT_INTERVAL_MS,
+    MIN_INTERVAL_MS,
+    MAX_ALERT_INTERVAL_MS,
+  );
   const loop = createThresholdAlertLoop({
-    intervalMs: intervalFrom(
-      env.SPORTSDESK_THRESHOLD_INTERVAL_MS,
-      ALERT_INTERVAL_MS,
-      MIN_INTERVAL_MS,
-      MAX_ALERT_INTERVAL_MS,
-    ),
+    intervalMs,
     collect,
     policy,
     store: createJsonThresholdStateStore(statePath),
@@ -235,7 +255,7 @@ function startThresholdAlerts(
   loop.start();
   void loop.tickOnce();
   started.push("threshold-alerts");
-  return loop;
+  return { loop, intervalMs };
 }
 
 export function startConsoleLiveRuntimes(
@@ -247,16 +267,19 @@ export function startConsoleLiveRuntimes(
   const stops: Array<() => void> = [];
   let stopped = false;
   const isStopped = (): boolean => stopped;
+  let wagerTelemetry: ReturnType<typeof startWagerTelemetry> | null = null;
+  let thresholdAlerts: ReturnType<typeof startThresholdAlerts> = null;
 
   if (enabled(env.SPORTSDESK_WAGER_TELEMETRY)) {
-    stops.push(startWagerTelemetry(options, env, isStopped, started).stop);
+    wagerTelemetry = startWagerTelemetry(options, env, isStopped, started);
+    stops.push(wagerTelemetry.stop);
   } else {
     skipped.push("wager-telemetry:disabled");
   }
 
   if (enabled(env.SPORTSDESK_THRESHOLD_ALERTS)) {
-    const loop = startThresholdAlerts(options, env, started, skipped);
-    if (loop !== null) stops.push(() => loop.stop());
+    thresholdAlerts = startThresholdAlerts(options, env, started, skipped);
+    if (thresholdAlerts !== null) stops.push(thresholdAlerts.loop.stop);
   } else {
     skipped.push("threshold-alerts:disabled");
   }
@@ -264,6 +287,21 @@ export function startConsoleLiveRuntimes(
   return {
     started,
     skipped,
+    statusBlock: () => ({
+      started: [...started],
+      skipped: [...skipped],
+      wagerTelemetry:
+        wagerTelemetry === null
+          ? null
+          : {
+              intervalMs: wagerTelemetry.intervalMs,
+              lastPollAtEpochMs: wagerTelemetry.producer.lastPollAtEpochMs,
+            },
+      thresholdAlerts:
+        thresholdAlerts === null
+          ? null
+          : { intervalMs: thresholdAlerts.intervalMs },
+    }),
     stop: () => {
       if (stopped) return;
       stopped = true;

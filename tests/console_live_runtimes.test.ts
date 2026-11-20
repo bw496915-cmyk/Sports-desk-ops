@@ -39,6 +39,12 @@ describe("startConsoleLiveRuntimes", () => {
       "wager-telemetry:disabled",
       "threshold-alerts:disabled",
     ]);
+    expect(runtimes.statusBlock()).toEqual({
+      started: [],
+      skipped: ["wager-telemetry:disabled", "threshold-alerts:disabled"],
+      wagerTelemetry: null,
+      thresholdAlerts: null,
+    });
     runtimes.stop();
     runtimes.stop();
   });
@@ -64,6 +70,10 @@ describe("startConsoleLiveRuntimes", () => {
     expect(ticks[0]?.lineHundredths).toBe(asLineHundredths(-1_250));
     expect(ticks[0]?.stakeCents).toBe(asCents(5_000));
     expect(ticks[0]?.wagerId).toBe(769_483_646n);
+    const status = runtimes.statusBlock();
+    expect(status.wagerTelemetry?.intervalMs).toBe(1_000);
+    expect(typeof status.wagerTelemetry?.lastPollAtEpochMs).toBe("number");
+    expect(status.thresholdAlerts).toBeNull();
 
     runtimes.stop();
     const publishedAtStop = ticks.length;
@@ -82,6 +92,7 @@ describe("startConsoleLiveRuntimes", () => {
       "wager-telemetry:disabled",
       "threshold-alerts:telegram_not_configured",
     ]);
+    expect(runtimes.statusBlock().thresholdAlerts).toBeNull();
     runtimes.stop();
   });
 
@@ -103,6 +114,7 @@ describe("startConsoleLiveRuntimes", () => {
     });
 
     expect(runtimes.started).toEqual(["threshold-alerts"]);
+    expect(runtimes.statusBlock().thresholdAlerts?.intervalMs).toBe(60_000);
     await Bun.sleep(20);
     // No measured metric can breach, so the store is never written.
     expect(existsSync(statePath)).toBe(false);

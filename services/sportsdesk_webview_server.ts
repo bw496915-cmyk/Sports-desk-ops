@@ -103,7 +103,10 @@ import { buildDeskEnhancedHealth } from "../lib/desk_enhanced_health.ts";
 import { probeR2PipelineKpis } from "../lib/r2_pipeline_kpis.ts";
 import { probeCanonicalManifestKpis } from "../lib/r2_canonical_manifests.ts";
 import { ReportingSchedulerService } from "./reporting_scheduler_service.ts";
-import { startConsoleLiveRuntimes } from "./console_live_runtimes.ts";
+import {
+  startConsoleLiveRuntimes,
+  type ConsoleLiveRuntimeStatus,
+} from "./console_live_runtimes.ts";
 import {
   describeSource,
   resolveSecretEnv,
@@ -1126,6 +1129,10 @@ export function startServer(options?: ServerOptions) {
     };
   }
 
+  // The console live runtimes start after Bun.serve; the status route reads this
+  // request-time view so it can report which channels are running.
+  let consoleLiveStatusReader: (() => ConsoleLiveRuntimeStatus) | null = null;
+
   const serveConfig = {
     development: isDevelopment ? { hmr: false } : false,
     // Bodies here are small JSON documents and one 1 MiB form probe. Without a cap a chunked
@@ -1766,6 +1773,10 @@ export function startServer(options?: ServerOptions) {
             status: ok ? "serving" : "degraded",
             checks,
             live: deskLive.statusBlock(),
+            consoleLive:
+              consoleLiveStatusReader === null
+                ? null
+                : consoleLiveStatusReader(),
             health: {
               // process.cpuUsage() is cumulative CPU time since start, not utilisation; the old
               // `cpu` label invited reading it as load.
@@ -3844,7 +3855,7 @@ export function startServer(options?: ServerOptions) {
   attachBridgeHub(server);
   attachMcpServerStop(server, serveConfig);
   // Both channels are off unless their env flag is set (services/console_live_runtimes.ts).
-  const consoleLive = startConsoleLiveRuntimes({
+  const liveRuntime = startConsoleLiveRuntimes({
     cwd: repoRoot,
     publishTick: publishWagerTick,
     bridgeLagMs: () =>
@@ -3852,9 +3863,10 @@ export function startServer(options?: ServerOptions) {
         ? null
         : Date.now() - Date.parse(bridgeRelayLastFrameAtIso),
   });
+  consoleLiveStatusReader = () => liveRuntime.statusBlock();
   const stopWithConsoleLive = server.stop.bind(server);
   server.stop = (closeActiveConnections?: boolean) => {
-    consoleLive.stop();
+    liveRuntime.stop();
     return stopWithConsoleLive(closeActiveConnections);
   };
   return server;
