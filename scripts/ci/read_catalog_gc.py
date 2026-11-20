@@ -6,6 +6,8 @@ import sys
 
 def summarize(directory):
     log = (directory / "catalog.log").read_text()
+    if "Failure to open event" in log:
+        raise ValueError("Perf dropped a requested event")
     launches = re.findall(r"^catalog-process pid=(\d+) revision=38afee6c84fcf48c0edb2466aa4b27d287a59c30$", log, re.M)
     collectors = set(re.findall(r"\[GC<(0x[0-9a-f]+)>:", log))
     if len(launches) != 1 or "catalog fresh:" not in log or len(collectors) != 1:
@@ -39,7 +41,7 @@ def summarize(directory):
         if instant < previous_ns:
             raise ValueError("Events are not ordered on the perf clock")
         previous_ns = instant
-        breakpoint = re.match(r"mem:(0x[0-9a-f]+)(?:/1)?:x:", sample[5].lstrip())
+        breakpoint = re.match(r"mem:(0x[0-9a-f]+)\b", sample[5].lstrip())
         if not breakpoint:
             if sample[5].lstrip().startswith("cpu-clock"):
                 cpu_samples += 1

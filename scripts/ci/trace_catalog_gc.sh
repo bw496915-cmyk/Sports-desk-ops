@@ -44,7 +44,7 @@ docker run "${mounts[@]}" --cap-add PERFMON -e "BUILD_ID=$runtime_id" \
   git config --global --add safe.directory /desk
   export SPORTSDESK_TRACE_CATALOG=1 BUN_JSC_logGC=1 NO_COLOR=1
   exec perf record --clockid mono -c 1 -e cpu-clock/freq=499/u \
-    -e "mem:$CONCURRENT/1:x" -e "mem:$TRANSITION/1:x" -e "mem:$VISIT/1:x" \
+    -e "mem:$CONCURRENT:x" -e "mem:$TRANSITION:x" -e "mem:$VISIT:x" \
     -o /trace/catalog.perf.data -- bun scripts/bun_shape_contracts.ts --check
 ' > "$trace_dir/catalog.log" 2>&1 || { tail -30 "$trace_dir/catalog.log"; exit 1; }
 # Resolve addresses with the matching release symbols only after the measured process exits.

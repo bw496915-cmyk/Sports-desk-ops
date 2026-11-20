@@ -91,7 +91,8 @@ For 30 days, the `alpine-catalog-trace-<commit>-<attempt>` artifact retains the 
 per-file progress markers, Linux perf data, symbolized user-mode samples and
 the summary. The runner resolves three native entry points from the matching
 release symbols and counts their execution in the measured process using x86
-instruction breakpoints. The runner checks the Alpine executable type and build ID.
+instruction breakpoints. Perf selects the native instruction-breakpoint length.
+The reader requires all three counters to open.
 Perf timestamps these events on one monotonic clock. The reader counts a background
 CodeBlock visitor only after concurrent-phase dispatch and before the next
 phase-transition check in the same process. Even a transition check that leaves
