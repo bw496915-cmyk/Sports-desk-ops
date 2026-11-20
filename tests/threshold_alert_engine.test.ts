@@ -19,12 +19,16 @@ import {
 } from "../lib/bridge_and_channel_router.ts";
 import {
   ALERT_BIT,
+  buildMeasuredDispatchMetrics,
   createTelegramThresholdSender,
   dispatchThresholdAlert,
   evaluateAndDispatchThresholdAlert,
+  evaluateMeasuredAlerts,
   evaluateMonotonicAlerts,
   formatThresholdAlertLines,
   type DeskSnapshotMetrics,
+  type MeasuredDeskSnapshot,
+  type MetricReading,
   type ThresholdAlertSender,
   type ThresholdPolicy,
   type ThresholdTelegramFetch,
@@ -131,6 +135,193 @@ describe("evaluateMonotonicAlerts", () => {
     expect(evaluation.newlyTriggeredMask32).toBe(
       asBitSet32(ALERT_BIT.PARTNER_LIQUIDITY_LOW),
     );
+  });
+});
+
+describe("evaluateMeasuredAlerts", () => {
+  function measured<T>(value: T): MetricReading<T> {
+    return { kind: "measured", value };
+  }
+
+  function measuredReadings(
+    overrides: Partial<MeasuredDeskSnapshot> = {},
+  ): MeasuredDeskSnapshot {
+    return {
+      downlineExposureCents: measured(asCents(500_000)),
+      partnerLiquidityRatioBps: measured(asBasisPoints(3_000)),
+      churnTopDecileLiftBps: measured(asBasisPoints(100)),
+      bridgeLagMs: measured(asDurationMilliseconds(500)),
+      ...overrides,
+    };
+  }
+
+  function breachReadings(
+    overrides: Partial<MeasuredDeskSnapshot> = {},
+  ): MeasuredDeskSnapshot {
+    return measuredReadings({
+      downlineExposureCents: measured(asCents(1_250_000)),
+      partnerLiquidityRatioBps: measured(asBasisPoints(900)),
+      churnTopDecileLiftBps: measured(asBasisPoints(400)),
+      bridgeLagMs: measured(asDurationMilliseconds(5_000)),
+      ...overrides,
+    });
+  }
+
+  const allUnmeasured: MeasuredDeskSnapshot = {
+    downlineExposureCents: {
+      kind: "unmeasured",
+      reason: "downline_snapshot_missing",
+    },
+    partnerLiquidityRatioBps: {
+      kind: "unmeasured",
+      reason: "partner_endpoint_timeout",
+    },
+    churnTopDecileLiftBps: {
+      kind: "unmeasured",
+      reason: "churn_rollup_unavailable",
+    },
+    bridgeLagMs: { kind: "unmeasured", reason: "bridge_probe_not_sampled" },
+  };
+
+  test("matches the full-snapshot evaluation when every reading is measured", () => {
+    const breaches = evaluateMeasuredAlerts(
+      asBitSet32(0),
+      breachReadings(),
+      POLICY,
+    );
+    const fullyMeasured = evaluateMonotonicAlerts(
+      asBitSet32(0),
+      allBreaches(),
+      POLICY,
+    );
+    expect(breaches.nextMask32).toBe(fullyMeasured.nextMask32);
+    expect(breaches.newlyTriggeredMask32).toBe(
+      fullyMeasured.newlyTriggeredMask32,
+    );
+    expect(breaches.unmeasured).toEqual([]);
+
+    const healthy = evaluateMeasuredAlerts(
+      asBitSet32(0),
+      measuredReadings(),
+      POLICY,
+    );
+    expect(healthy.nextMask32).toBe(asBitSet32(0));
+    expect(healthy.newlyTriggeredMask32).toBe(asBitSet32(0));
+    expect(healthy.unmeasured).toEqual([]);
+  });
+
+  test("never triggers on an unmeasured reading, even when its value would breach", () => {
+    // As a measured reading this liquidity value (900 bps) would breach the 1,500 bps
+    // floor; unmeasured it must contribute no bit at all.
+    const readings = breachReadings({
+      partnerLiquidityRatioBps: {
+        kind: "unmeasured",
+        reason: "partner_endpoint_timeout",
+      },
+    });
+
+    const evaluation = evaluateMeasuredAlerts(asBitSet32(0), readings, POLICY);
+
+    expect(evaluation.nextMask32).toBe(
+      asBitSet32(
+        ALERT_BIT.DOWNLINE_EXPOSURE_BREACH |
+          ALERT_BIT.CHURN_DECILE_SPIKE |
+          ALERT_BIT.BRIDGE_LAG_SLA_BREACH,
+      ),
+    );
+    expect(evaluation.unmeasured).toEqual(["partnerLiquidityRatioBps"]);
+  });
+
+  test("lists every unmeasured field by name and triggers nothing", () => {
+    const evaluation = evaluateMeasuredAlerts(
+      asBitSet32(0),
+      allUnmeasured,
+      POLICY,
+    );
+
+    expect(evaluation.nextMask32).toBe(asBitSet32(0));
+    expect(evaluation.newlyTriggeredMask32).toBe(asBitSet32(0));
+    expect(evaluation.unmeasured).toEqual([
+      "downlineExposureCents",
+      "partnerLiquidityRatioBps",
+      "churnTopDecileLiftBps",
+      "bridgeLagMs",
+    ]);
+  });
+
+  test("treats a measured value exactly on the limit as inside policy", () => {
+    const onLimit = measuredReadings({
+      downlineExposureCents: measured(POLICY.maxDownlineExposureCents),
+      partnerLiquidityRatioBps: measured(POLICY.minPartnerLiquidityRatioBps),
+      churnTopDecileLiftBps: measured(POLICY.maxChurnTopDecileLiftBps),
+      bridgeLagMs: measured(POLICY.maxBridgeLagMs),
+    });
+
+    expect(
+      evaluateMeasuredAlerts(asBitSet32(0), onLimit, POLICY).nextMask32,
+    ).toBe(asBitSet32(0));
+  });
+
+  test("does not clear a latched bit whose metric became unmeasured", () => {
+    const latched = asBitSet32(ALERT_BIT.PARTNER_LIQUIDITY_LOW);
+    const readings = measuredReadings({
+      partnerLiquidityRatioBps: {
+        kind: "unmeasured",
+        reason: "collector_restart",
+      },
+    });
+
+    const evaluation = evaluateMeasuredAlerts(latched, readings, POLICY);
+
+    expect(evaluation.nextMask32).toBe(latched);
+    expect(evaluation.newlyTriggeredMask32).toBe(asBitSet32(0));
+    expect(evaluation.unmeasured).toEqual(["partnerLiquidityRatioBps"]);
+  });
+
+  test("formats only measured transitions, never a fabricated line", () => {
+    const readings = breachReadings({
+      partnerLiquidityRatioBps: {
+        kind: "unmeasured",
+        reason: "partner_endpoint_timeout",
+      },
+    });
+    const evaluation = evaluateMeasuredAlerts(asBitSet32(0), readings, POLICY);
+    const dispatchMetrics = buildMeasuredDispatchMetrics(
+      evaluation.newlyTriggeredMask32,
+      readings,
+      POLICY,
+    );
+
+    expect(dispatchMetrics.downlineExposureCents).toBe(asCents(1_250_000));
+    expect(dispatchMetrics.churnTopDecileLiftBps).toBe(asBasisPoints(400));
+    expect(
+      formatThresholdAlertLines(
+        evaluation.newlyTriggeredMask32,
+        dispatchMetrics,
+      ),
+    ).toEqual([
+      "[SportsDesk Ops] Threshold Breach",
+      "• Downline Exposure: $12500.00",
+      "• Churn Top-Decile Lift: 4.00%",
+      "• Bridge SLA Lag: 5000ms",
+    ]);
+  });
+
+  test("refuses to build dispatch metrics for a triggered unmeasured field", () => {
+    const readings = measuredReadings({
+      partnerLiquidityRatioBps: {
+        kind: "unmeasured",
+        reason: "partner_endpoint_timeout",
+      },
+    });
+
+    expect(() =>
+      buildMeasuredDispatchMetrics(
+        asBitSet32(ALERT_BIT.PARTNER_LIQUIDITY_LOW),
+        readings,
+        POLICY,
+      ),
+    ).toThrow(/partnerLiquidityRatioBps/);
   });
 });
 

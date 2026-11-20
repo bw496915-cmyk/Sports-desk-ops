@@ -15,6 +15,10 @@
  * mask the caller may commit (`committedMask32`), which stays on `prev` after a
  * failed delivery so the next evaluation retries the same transition.
  *
+ * `evaluateMeasuredAlerts` applies the same comparisons to a partially measured
+ * `MeasuredDeskSnapshot`: an unmeasured reading can neither trigger nor clear a bit,
+ * so one dead collector cannot silence or fabricate the other three metrics.
+ *
  * No `fetch` here: the transport is injected. `createTelegramThresholdSender` is
  * the thin Bot API adapter for callers that want one.
  */
@@ -50,6 +54,26 @@ export interface DeskSnapshotMetrics {
   readonly bridgeLagMs: DurationMilliseconds;
 }
 
+/**
+ * A `measured` reading carries the number; an `unmeasured` one carries why the
+ * collector could not produce it. A missing number is not a healthy number: an
+ * unmeasured reading never sets an alert bit.
+ */
+export type MetricReading<T> =
+  | { readonly kind: "measured"; readonly value: T }
+  | { readonly kind: "unmeasured"; readonly reason: string };
+
+/**
+ * The snapshot the collectors may only partly fill: each metric is independently
+ * measured or not, so one lost source does not suppress the other three.
+ */
+export interface MeasuredDeskSnapshot {
+  readonly downlineExposureCents: MetricReading<Cents>;
+  readonly partnerLiquidityRatioBps: MetricReading<BasisPoints>;
+  readonly churnTopDecileLiftBps: MetricReading<BasisPoints>;
+  readonly bridgeLagMs: MetricReading<DurationMilliseconds>;
+}
+
 export interface AlertEvaluation {
   readonly nextMask32: BitSet32;
   readonly newlyTriggeredMask32: BitSet32;
@@ -83,6 +107,70 @@ export function evaluateMonotonicAlerts(
   return { nextMask32, newlyTriggeredMask32 };
 }
 
+/**
+ * The policy boundary is the one value the strict comparison treats as inside policy,
+ * so substituting it for an unmeasured reading keeps that reading from triggering.
+ */
+function readingValueOr<T>(reading: MetricReading<T>, policyBoundary: T): T {
+  if (reading.kind === "measured") return reading.value;
+  return policyBoundary;
+}
+
+/** Field names in `MeasuredDeskSnapshot` declaration order. */
+function unmeasuredFieldNames(
+  readings: MeasuredDeskSnapshot,
+): readonly string[] {
+  const unmeasured: string[] = [];
+  if (readings.downlineExposureCents.kind === "unmeasured") {
+    unmeasured.push("downlineExposureCents");
+  }
+  if (readings.partnerLiquidityRatioBps.kind === "unmeasured") {
+    unmeasured.push("partnerLiquidityRatioBps");
+  }
+  if (readings.churnTopDecileLiftBps.kind === "unmeasured") {
+    unmeasured.push("churnTopDecileLiftBps");
+  }
+  if (readings.bridgeLagMs.kind === "unmeasured") {
+    unmeasured.push("bridgeLagMs");
+  }
+  return unmeasured;
+}
+
+/**
+ * Evaluates a partially measured snapshot with the same strict comparisons as
+ * `evaluateMonotonicAlerts`.
+ *
+ * Only measured readings can set a bit. An unmeasured reading is compared as its
+ * policy boundary (inside policy), so it can neither trigger nor clear a bit — the
+ * mask stays monotonic. `unmeasured` lists the field names the collector lost, so a
+ * caller can surface partial coverage instead of treating it as a clean snapshot.
+ */
+export function evaluateMeasuredAlerts(
+  prevAlertMask32: BitSet32,
+  readings: MeasuredDeskSnapshot,
+  policy: ThresholdPolicy,
+): AlertEvaluation & { unmeasured: readonly string[] } {
+  const comparableMetrics: DeskSnapshotMetrics = {
+    downlineExposureCents: readingValueOr(
+      readings.downlineExposureCents,
+      policy.maxDownlineExposureCents,
+    ),
+    partnerLiquidityRatioBps: readingValueOr(
+      readings.partnerLiquidityRatioBps,
+      policy.minPartnerLiquidityRatioBps,
+    ),
+    churnTopDecileLiftBps: readingValueOr(
+      readings.churnTopDecileLiftBps,
+      policy.maxChurnTopDecileLiftBps,
+    ),
+    bridgeLagMs: readingValueOr(readings.bridgeLagMs, policy.maxBridgeLagMs),
+  };
+  return {
+    ...evaluateMonotonicAlerts(prevAlertMask32, comparableMetrics, policy),
+    unmeasured: unmeasuredFieldNames(readings),
+  };
+}
+
 /** Human-readable lines for one dispatch; the first line is the heading. */
 export function formatThresholdAlertLines(
   newlyTriggeredMask32: BitSet32,
@@ -110,6 +198,58 @@ export function formatThresholdAlertLines(
     lines.push(`• Bridge SLA Lag: ${metrics.bridgeLagMs}ms`);
   }
   return lines;
+}
+
+function requireMeasured<T>(reading: MetricReading<T>, field: string): T {
+  if (reading.kind === "measured") return reading.value;
+  throw new Error(
+    `threshold_alert_engine: cannot format unmeasured field ${field} (${reading.reason})`,
+  );
+}
+
+/**
+ * The full `DeskSnapshotMetrics` shape `dispatchThresholdAlert` formats, built from a
+ * partial reading set.
+ *
+ * The formatter only reads the fields named by the mask it is given, and
+ * `evaluateMeasuredAlerts` only sets a bit for a measured field, so a triggered bit's
+ * field is always measured. A triggered bit over an unmeasured reading therefore means
+ * the invariant broke; this throws instead of printing a number nobody measured.
+ * Untriggered fields fall back to their policy boundary — unreachable by the formatter,
+ * and, by construction, not a breach.
+ */
+export function buildMeasuredDispatchMetrics(
+  newlyTriggeredMask32: BitSet32,
+  readings: MeasuredDeskSnapshot,
+  policy: ThresholdPolicy,
+): DeskSnapshotMetrics {
+  return {
+    downlineExposureCents:
+      (newlyTriggeredMask32 & ALERT_BIT.DOWNLINE_EXPOSURE_BREACH) !== 0
+        ? requireMeasured(
+            readings.downlineExposureCents,
+            "downlineExposureCents",
+          )
+        : policy.maxDownlineExposureCents,
+    partnerLiquidityRatioBps:
+      (newlyTriggeredMask32 & ALERT_BIT.PARTNER_LIQUIDITY_LOW) !== 0
+        ? requireMeasured(
+            readings.partnerLiquidityRatioBps,
+            "partnerLiquidityRatioBps",
+          )
+        : policy.minPartnerLiquidityRatioBps,
+    churnTopDecileLiftBps:
+      (newlyTriggeredMask32 & ALERT_BIT.CHURN_DECILE_SPIKE) !== 0
+        ? requireMeasured(
+            readings.churnTopDecileLiftBps,
+            "churnTopDecileLiftBps",
+          )
+        : policy.maxChurnTopDecileLiftBps,
+    bridgeLagMs:
+      (newlyTriggeredMask32 & ALERT_BIT.BRIDGE_LAG_SLA_BREACH) !== 0
+        ? requireMeasured(readings.bridgeLagMs, "bridgeLagMs")
+        : policy.maxBridgeLagMs,
+  };
 }
 
 export interface ThresholdAlertSenderResult {

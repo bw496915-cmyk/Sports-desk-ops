@@ -103,6 +103,7 @@ import { buildDeskEnhancedHealth } from "../lib/desk_enhanced_health.ts";
 import { probeR2PipelineKpis } from "../lib/r2_pipeline_kpis.ts";
 import { probeCanonicalManifestKpis } from "../lib/r2_canonical_manifests.ts";
 import { ReportingSchedulerService } from "./reporting_scheduler_service.ts";
+import { startConsoleLiveRuntimes } from "./console_live_runtimes.ts";
 import {
   describeSource,
   resolveSecretEnv,
@@ -3841,6 +3842,20 @@ export function startServer(options?: ServerOptions) {
   });
   attachBridgeHub(server);
   attachMcpServerStop(server, serveConfig);
+  // Both channels are off unless their env flag is set (services/console_live_runtimes.ts).
+  const consoleLive = startConsoleLiveRuntimes({
+    cwd: repoRoot,
+    publishTick: publishWagerTick,
+    bridgeLagMs: () =>
+      bridgeRelayLastFrameAtIso === null
+        ? null
+        : Date.now() - Date.parse(bridgeRelayLastFrameAtIso),
+  });
+  const stopWithConsoleLive = server.stop.bind(server);
+  server.stop = (closeActiveConnections?: boolean) => {
+    consoleLive.stop();
+    return stopWithConsoleLive(closeActiveConnections);
+  };
   return server;
 }
 
