@@ -646,6 +646,30 @@ else
   fail bunx-flags "run=$bunx_code mra=$bunx_mra_code trust=$bunx_trust_code output=$bunx_out"
 fi
 
+# ---- P36: bun pm pack substitutes catalog: without a lockfile --------------
+# The contracts publish uses catalog: ranges. v1.4.4 resolves them from
+# package.json (not bun.lock) and packs even when the lockfile is absent.
+mkdir -p "$ROOT/p36/packages/child"
+printf '{"name":"p36-root","version":"1.0.0","workspaces":["packages/*"],"catalog":{"is-odd":"3.0.1"}}' > "$ROOT/p36/package.json"
+printf '{"name":"child","version":"1.0.0","dependencies":{"is-odd":"catalog:"}}' > "$ROOT/p36/packages/child/package.json"
+run bash -c "cd '$ROOT/p36' && bun install"
+rm -rf "$ROOT/p36/bun.lock" "$ROOT/p36/node_modules" "$ROOT/p36/packages/child/node_modules"
+set +e
+(cd "$ROOT/p36/packages/child" && bun pm pack) >/dev/null 2>&1; catalog_pack_code=$?
+set -e
+child_tgz="$(find "$ROOT/p36/packages/child" -maxdepth 1 -name '*.tgz' | head -1)"
+packed_catalog=""
+if [ -n "$child_tgz" ]; then
+  packed_catalog="$(tar -xOf "$child_tgz" package/package.json 2>/dev/null | grep -o '"is-odd": *"[^"]*"' | head -1)"
+fi
+if [ "$catalog_pack_code" -eq 0 ] && [ -n "$child_tgz" ] \
+   && printf '%s' "$packed_catalog" | grep -q "3.0.1" \
+   && ! printf '%s' "$packed_catalog" | grep -q "catalog:"; then
+  pass pack-catalog "packed without a lockfile; catalog range -> \"3.0.1\""
+else
+  fail pack-catalog "pack=$catalog_pack_code tgz=${child_tgz:-missing} field='$packed_catalog'"
+fi
+
 # ---- Deliberately not automated ---------------------------------------------
 skip patch-quadratic "needs a 100k-line patched package; manual: time bun patch --commit …"
 skip publish-registry "publish fails at auth/packing before any registry contact can be observed; needs a real registry"
