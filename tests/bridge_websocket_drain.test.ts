@@ -15,7 +15,7 @@ test("drain resumes a paused bridge socket", () => {
     resume: (): void => {
       calls.push("resume");
     },
-  } as never;
+  };
 
   bridgeWebsocket.drain(ws);
 

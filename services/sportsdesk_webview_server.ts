@@ -833,7 +833,18 @@ function readPackageMeta(): PackageMeta {
       readFileSync(resolve(import.meta.dir, "../package.json"), "utf8"),
     );
     if (typeof parsed === "object" && parsed !== null) {
-      return parsed as PackageMeta;
+      const name =
+        "name" in parsed && typeof parsed.name === "string"
+          ? parsed.name
+          : undefined;
+      const version =
+        "version" in parsed && typeof parsed.version === "string"
+          ? parsed.version
+          : undefined;
+      return {
+        ...(name === undefined ? {} : { name }),
+        ...(version === undefined ? {} : { version }),
+      };
     }
   } catch {
     // A missing or unreadable manifest must not stop the server.
@@ -853,12 +864,10 @@ function readStaticBytes(path: string): Uint8Array | null {
   }
 }
 
-type StaticRouteValue =
-  | Response
-  | {
-      readonly OPTIONS: (req: Request) => Response;
-      readonly GET: Response;
-    };
+type StaticRouteValue = {
+  readonly OPTIONS: (req: Request) => Response;
+  readonly GET: Response;
+};
 
 function buildStaticRoutes(
   meta: PackageMeta,
@@ -5091,7 +5100,7 @@ export const bridgeWebsocket = {
       subscriptions: ws.subscriptions,
     });
   },
-  drain(ws: BridgeSocket): void {
+  drain(ws: Pick<BridgeSocket, "resume">): void {
     // The hub pauses a socket on send() === -1; without this the telemetry
     // stream stays paused until the socket closes.
     resumeNshSubscriber(ws);

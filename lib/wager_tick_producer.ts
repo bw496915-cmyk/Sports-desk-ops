@@ -291,7 +291,7 @@ const ROW_WITHOUT_LINE: WagerRowOutcome = { kind: "no-line" };
  */
 function classifyWagerRow(row: unknown): WagerRowOutcome {
   if (row === null || typeof row !== "object") return INVALID_ROW;
-  const wire = row as LiveWagerRow;
+  const wire: LiveWagerRow = row;
   const wagerNumber = parseWagerNumber(wire.WagerNumber);
   if (wagerNumber === null) return INVALID_ROW;
   const channel = resolveWriterChannel(wire.TicketWriter);

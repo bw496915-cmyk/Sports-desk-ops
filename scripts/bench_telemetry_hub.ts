@@ -36,10 +36,11 @@ const TICK: WagerTickInput = {
 
 function fakeSocket(): NshSubscriberSocket {
   return {
-    send: (frame: Uint8Array): number => frame.byteLength,
+    send: (frame: Uint8Array | ArrayBuffer, _compress?: boolean): number =>
+      frame.byteLength,
     pause: (): void => undefined,
     resume: (): void => undefined,
-  } as NshSubscriberSocket;
+  };
 }
 
 function hubWithSubscribers(count: number): WagerTelemetryHub {
