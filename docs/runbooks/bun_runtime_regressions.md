@@ -56,6 +56,17 @@ bash scripts/ci/verify_runtime_patches.sh "$(bun -p 'Bun.revision')"
 
 The script fetches source at the running Bun revision, follows its WebKit dependency
 pin and checks Git blob IDs against the four reviewed files. A changed file requires
-review before updating its expected ID. The runtime checks establish sequential GC
-and FIFO behavior. Evidence for concurrent GC marking and failed epoll registration
-comes from the source check; neither condition is induced by the runtime suite.
+review before updating its expected ID. The local tests exercise sequential GC
+and successful FIFO writes.
+
+Bun’s release CI also ran the failed-registration ownership test on Alpine 3.23
+x86-64 at the exact 1.4.4 revision. The FileSink JUnit case records one assertion,
+no skip and no failure. The Alpine workflow verifies the container revision,
+the SHA-256 of the original report and the individual case result. An unavailable
+report or runtime upgrade requires fresh evidence for this check.
+[Buildkite job](https://buildkite.com/bun/bun/builds/130816/list?jid=01a162c2-7220-497a-bff5-087f27bd98ca)
+· [JUnit report](https://buildkite.com/organizations/bun/pipelines/bun/builds/130816/jobs/01a162c2-7220-497a-bff5-087f27bd98ca/artifacts/01a162cb-f54f-4088-9447-274bc7054f93)
+
+Concurrent marking during array mutation remains unverified on the musl binary.
+The Alpine x86-64 release reports contain no identified case recording the overlap.
+The sequential array test and the reviewed WebKit sources are the available evidence.

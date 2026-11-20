@@ -39,6 +39,28 @@ jobs:
         run: |
           revision=$(docker run --rm --entrypoint bun "$IMAGE" -e 'console.log(Bun.revision)')
           bash scripts/ci/verify_runtime_patches.sh "$revision"
+      - name: Verify upstream Alpine FileSink test receipt
+        if: matrix.libc == 'musl'
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          test "$(docker run --rm --entrypoint bun "$IMAGE" -p 'Bun.revision')" = 38afee6c84fcf48c0edb2466aa4b27d287a59c30
+          report="$RUNNER_TEMP/bun-130816-alpine-x64-shard15.xml"
+          curl --fail --silent --show-error --location --retry 3 --max-time 30 \
+            'https://buildkite.com/organizations/bun/pipelines/bun/builds/130816/jobs/01a162c2-7220-497a-bff5-087f27bd98ca/artifacts/01a162cb-f54f-4088-9447-274bc7054f93' --output "$report"
+          echo "9313c55576ff069b3f1e923c0ba08e9fefbc4655997e00e078c53474e30e9ce4  $report" | sha256sum --check
+          python3 - "$report" <<'PYTHON'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          name = "Bun.file(fd).writer() whose registration fails closes the dup exactly once"
+          suite = "test/js/bun/util/filesink.test.ts"
+          cases = [case for case in ET.parse(sys.argv[1]).iter("testcase")
+                   if case.get("name") == name and case.get("file") == suite]
+          if len(cases) != 1 or len(cases[0]) or int(cases[0].get("assertions", 0)) < 1:
+              sys.exit("Upstream receipt must contain one passing, asserted FileSink ownership case")
+          print(f"Upstream build 130816 passed: {name} ({cases[0].get('assertions')} assertion)")
+          PYTHON
       - name: Run Linux and Intl contracts
         env:
           IMAGE: ${{ matrix.image }}
