@@ -407,3 +407,42 @@ describe("createWagerTickProducer", () => {
     expect(polledAt).toBeLessThanOrEqual(Date.now());
   });
 });
+
+describe("bounded, channel-scoped dedupe", () => {
+  test("the same WagerNumber on different bridges publishes both ticks", async () => {
+    const published: WagerTickInput[] = [];
+    const producer = createWagerTickProducer({
+      readRows: async () => [
+        liveRow({ TicketWriter: "Internet" }),
+        liveRow({ TicketWriter: " GSLIVE  " }),
+      ],
+      publish: (tick) => published.push(tick),
+    });
+
+    const result = await producer.pollOnce();
+
+    expect(result.published).toBe(2);
+    expect(published.map((tick) => tick.routeWord32)).toEqual([
+      F402_ROUTE,
+      GSLIVE_ROUTE,
+    ]);
+  });
+
+  test("remembers only the configured recent window", async () => {
+    let rows: LiveWagerRow[] = [liveRow({ WagerNumber: 1 })];
+    const published: number[] = [];
+    const producer = createWagerTickProducer({
+      readRows: async () => rows,
+      publish: (tick) => published.push(Number(tick.wagerId)),
+      maxRememberedWagers: 1,
+    });
+
+    expect((await producer.pollOnce()).published).toBe(1);
+    rows = [liveRow({ WagerNumber: 2 })];
+    expect((await producer.pollOnce()).published).toBe(1);
+    // Key 1 was evicted by the cap, so an old row can publish again.
+    rows = [liveRow({ WagerNumber: 1 })];
+    expect((await producer.pollOnce()).published).toBe(1);
+    expect(published).toEqual([1, 2, 1]);
+  });
+});

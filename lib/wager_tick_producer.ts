@@ -337,6 +337,8 @@ export interface WagerTickProducerOptions {
   readonly publish: (tick: WagerTickInput) => unknown;
   /** Clock, injectable for tests; defaults to `Date.now`. */
   readonly now?: () => number;
+  /** Recent published keys remembered for dedupe (default 100,000). */
+  readonly maxRememberedWagers?: number;
 }
 
 export interface WagerTickPollResult {
@@ -357,16 +359,24 @@ export interface WagerTickProducer {
 }
 
 /**
- * Polling producer over an injected row source. `WagerNumber` is the dedupe key, and only
- * a wager that was actually published enters the seen set, so the seen set cannot suppress
- * a tick that was never sent.
+ * Polling producer over an injected row source. The dedupe key is the bridge route plus
+ * `WagerNumber` (the two platforms can use overlapping numbers), kept in a bounded recent
+ * window so a long-running process does not grow one entry per wager forever. Only a wager
+ * that was actually published enters the window, so it cannot suppress a tick that was
+ * never sent.
  */
 export function createWagerTickProducer(
   options: WagerTickProducerOptions,
 ): WagerTickProducer {
   const { readRows, publish } = options;
   const now = options.now ?? Date.now;
-  const publishedWagerNumbers = new Set<number>();
+  const maxRememberedWagers = options.maxRememberedWagers ?? 100_000;
+  if (!Number.isInteger(maxRememberedWagers) || maxRememberedWagers < 1) {
+    throw new RangeError(
+      `maxRememberedWagers must be a positive integer, received ${String(maxRememberedWagers)}`,
+    );
+  }
+  const rememberedWagerKeys = new Set<string>();
   let lastPollAtEpochMs: number | null = null;
 
   return {
@@ -391,10 +401,15 @@ export function createWagerTickProducer(
           skippedNoLine++;
           continue;
         }
-        if (publishedWagerNumbers.has(outcome.wagerNumber)) continue;
+        const key = `${outcome.tick.routeWord32}:${outcome.wagerNumber}`;
+        if (rememberedWagerKeys.has(key)) continue;
         publish(outcome.tick);
-        publishedWagerNumbers.add(outcome.wagerNumber);
+        rememberedWagerKeys.add(key);
         published++;
+        if (rememberedWagerKeys.size > maxRememberedWagers) {
+          const oldest = rememberedWagerKeys.values().next().value;
+          if (oldest !== undefined) rememberedWagerKeys.delete(oldest);
+        }
       }
 
       return { read: rows.length, published, skippedNoLine, skippedInvalid };
