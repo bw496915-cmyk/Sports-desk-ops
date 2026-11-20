@@ -241,8 +241,8 @@ await check("the shim has Node globals the plugin relies on", () => {
   assert(typeof process.versions === "object", "process.versions is missing");
 });
 
-await check("the module loaded and registered thirteen tools", () => {
-  assert(registered.length === 13, `registered ${registered.length} tools`);
+await check("the module loaded and registered fourteen tools", () => {
+  assert(registered.length === 14, `registered ${registered.length} tools`);
 });
 
 await check(
@@ -279,6 +279,27 @@ await check("sportsdesk_downline executes (snapshot parse)", async () => {
   assert(result.available === true, "downline was unavailable");
   JSON.stringify(result);
 });
+
+await check(
+  "sportsdesk_console_depth executes (shared resolution chain)",
+  async () => {
+    const result = await byName.get("sportsdesk_console_depth").execute({});
+    assert(
+      result.available === true,
+      `tool unavailable: ${result.reason ?? "?"}`,
+    );
+    assert(
+      typeof result.effective === "number",
+      `effective ${result.effective}`,
+    );
+    assert(
+      result.bunfig === null
+        ? result.winner !== "bunfig [console].depth"
+        : result.winner === "bunfig [console].depth",
+      `winner ${result.winner} with bunfig ${result.bunfig}`,
+    );
+  },
+);
 
 await check(
   "sportsdesk_links executes (CLI spawn, canceled 7-day window)",

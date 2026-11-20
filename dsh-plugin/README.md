@@ -6,6 +6,7 @@ shelling out and scraping stdout.
 
 ```
 sportsdesk_status    the local desk stack: checkout state, webview service health AND build age
+sportsdesk_console_depth  console-depth chain: profile env, resolved option, bunfig, effective winner
 sportsdesk_data      what the desk has on disk: dataset inventory, record counts, ages
 sportsdesk_downline  questions over the downline snapshot: summary, one agent, top agents
 sportsdesk_customer  customer-book questions with every count DERIVED at call time

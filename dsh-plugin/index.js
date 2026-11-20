@@ -5258,6 +5258,51 @@ export function apply(ctx, config) {
   );
 
   // ---------------------------------------------------------------------------
+  // sportsdesk_console_depth — the depth chain the terminal resolves
+  // ---------------------------------------------------------------------------
+  register(
+    defineReadTool({
+      name: "sportsdesk_console_depth",
+      description:
+        "Resolve the console depth the desk's terminal will use: the profile " +
+        "PTY_CONSOLE_DEPTH, an explicit resolved option, bunfig " +
+        "[console].depth, and the effective winner. On Bun 1.4.4 a numeric " +
+        "bunfig depth beats both BUN_OPTIONS and a literal argv flag, so the " +
+        "winner is bunfig whenever that key is present. Shells " +
+        "`bun cli/console_depth.ts --json`, so the precedence has one " +
+        "implementation. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+      output: { ...TEXT_OUTPUT, presentationMeta: (_args, value) => value },
+      isConcurrencySafe: () => true,
+      async execute() {
+        const argv = ["cli/console_depth.ts", "--json"];
+        const command = `bun ${argv.join(" ")}`;
+        const result = await runBun(argv, 15_000);
+        const parsed = parseJson(result.stdout.trim());
+        if (!result.ok || !parsed.ok) {
+          return {
+            available: false,
+            reason: result.timedOut ? "timed_out" : "cli_failed",
+            message:
+              result.spawnError === null
+                ? `\`${command}\` exited ${result.exitCode}${result.timedOut ? " (timed out)" : ""} without a JSON descriptor.`
+                : `Could not resolve console depth: ${result.spawnError}`,
+            command,
+            exitCode: result.exitCode,
+            durationMs: result.durationMs,
+            stderr: truncate(result.stderr, MAX_EXCERPT),
+          };
+        }
+        return { available: true, ok: true, command, ...parsed.value };
+      },
+    }),
+  );
+
+  // ---------------------------------------------------------------------------
   // sportsdesk_markets — staged combo / CLV / cross-domain reports
   // ---------------------------------------------------------------------------
   ctx.tools.register(
