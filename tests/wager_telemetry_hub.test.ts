@@ -245,7 +245,8 @@ describe("WagerTelemetryHub", () => {
       backpressured: 1,
       dropped: 1,
     });
-    expect(slow.pauses).toBe(1);
+    // send() === -1 is outbound backpressure; pause() would stop inbound reads.
+    expect(slow.pauses).toBe(0);
     expect(full.pauses).toBe(0);
   });
 

@@ -281,9 +281,9 @@ export interface WagerTickBroadcastResult {
  *
  * A socket receives a tick only when the bit for the frame's bridge ordinal is set in
  * its mask, so a client authorized for Fantasy402 bridges never receives a Partner118
- * tick even though both share one hub. Backpressure and drop handling is delegated to
- * `sendNshFrameToSubscriber`, which pauses the socket on `-1`; pair that with
- * `resumeNshSubscriber(ws)` in `drain(ws)`.
+ * tick even though both share one hub. `sendNshFrameToSubscriber` reports those
+ * sends as BACKPRESSURED/DROPPED; `closeOnBackpressureLimit` terminates a socket
+ * that exceeds the transport's buffer cap.
  */
 export class WagerTelemetryHub {
   private readonly clients = new Map<

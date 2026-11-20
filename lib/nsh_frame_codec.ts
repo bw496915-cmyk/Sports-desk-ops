@@ -463,7 +463,11 @@ export function broadcastFrame(
 
 /**
  * Sends a 64-byte binary NSH frame to a subscriber with `compress = false`.
- * Calls `ws.pause()` when Bun signals backpressure (`-1`); pair with `resumeNshSubscriber(ws)` in `drain(ws)`.
+ *
+ * `-1` is outbound backpressure. Do NOT call `ws.pause()` here: Bun's
+ * `pause()` stops reading from the client, it does not drain the send
+ * buffer. The transport reports the frame as BACKPRESSURED and Bun's
+ * `closeOnBackpressureLimit` closes a socket that exceeds the buffer cap.
  */
 export function sendNshFrameToSubscriber(
   ws: NshSubscriberSocket,
@@ -471,17 +475,10 @@ export function sendNshFrameToSubscriber(
 ): BroadcastFrameResult {
   const result = ws.send(frame, false);
   if (result === -1) {
-    ws.pause();
     return { disposition: "BACKPRESSURED", bytesOrStatus: -1 };
   }
   if (result === 0) {
     return { disposition: "DROPPED", bytesOrStatus: 0 };
   }
   return { disposition: "PUBLISHED", bytesOrStatus: result };
-}
-
-export function resumeNshSubscriber(
-  ws: Pick<NshSubscriberSocket, "resume">,
-): void {
-  ws.resume();
 }

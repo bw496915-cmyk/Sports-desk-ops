@@ -34,7 +34,6 @@ import {
   readNshBinaryFrame,
   readNshBinaryFrameFromArrayBuffer,
   readNshBinaryFrameInto,
-  resumeNshSubscriber,
   sendNshFrameToSubscriber,
   type NshMatchFrameInput,
   type NshSubscriberSocket,
@@ -705,11 +704,10 @@ describe("NSH frame schema & BridgeChannelPackedWord32 integration", () => {
 });
 
 describe("NSH subscriber flow control", () => {
-  test("pauses subscriber socket on backpressure (-1) and resumes on drain", () => {
+  test("reports outbound backpressure (-1) without pausing inbound reads", () => {
     const frame = packNshBinaryFrame(BASE_FRAME);
     let nextReturn = -1;
     let pauses = 0;
-    let resumes = 0;
     let lastCompress: boolean | undefined;
     const ws: NshSubscriberSocket = {
       send: (_data, compress) => {
@@ -719,9 +717,7 @@ describe("NSH subscriber flow control", () => {
       pause: () => {
         pauses += 1;
       },
-      resume: () => {
-        resumes += 1;
-      },
+      resume: () => {},
     };
 
     expect(sendNshFrameToSubscriber(ws, frame)).toEqual({
@@ -729,23 +725,20 @@ describe("NSH subscriber flow control", () => {
       bytesOrStatus: -1,
     });
     expect(lastCompress).toBe(false);
-    expect(pauses).toBe(1);
+    expect(pauses).toBe(0);
 
     nextReturn = 0;
     expect(sendNshFrameToSubscriber(ws, frame)).toEqual({
       disposition: "DROPPED",
       bytesOrStatus: 0,
     });
-    expect(pauses).toBe(1);
+    expect(pauses).toBe(0);
 
     nextReturn = 64;
     expect(sendNshFrameToSubscriber(ws, frame)).toEqual({
       disposition: "PUBLISHED",
       bytesOrStatus: 64,
     });
-    expect(pauses).toBe(1);
-
-    resumeNshSubscriber(ws);
-    expect(resumes).toBe(1);
+    expect(pauses).toBe(0);
   });
 });

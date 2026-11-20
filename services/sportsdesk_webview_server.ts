@@ -200,7 +200,6 @@ import {
   sendFrameOrClose,
   WS_BACKPRESSURE_OPTIONS,
 } from "../lib/ws_backpressure.ts";
-import { resumeNshSubscriber } from "../lib/nsh_frame_codec.ts";
 import {
   asTransportBridgeBitMask32,
   TRANSPORT_BRIDGE_SPECIFICATION_TABLE,
@@ -5135,11 +5134,6 @@ export const bridgeWebsocket = {
       channels: ws.subscriptions,
       subscriptions: ws.subscriptions,
     });
-  },
-  drain(ws: Pick<BridgeSocket, "resume">): void {
-    // The hub pauses a socket on send() === -1; without this the telemetry
-    // stream stays paused until the socket closes.
-    resumeNshSubscriber(ws);
   },
   close(ws: BridgeSocket): void {
     wagerTelemetryHub.remove(ws);
