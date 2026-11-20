@@ -145,6 +145,7 @@
     "format:debug-check": "bun fmt --debug-check",
     "format:changed": "bun fmt --check --changed && bun fmt --debug-check --changed",
     "format:doctor": "bun fmt --doctor",
+    "format:files": "bun fmt --list-files",
     "ensure:deep-tsconfig": "bun run scripts/ensure_deep_tsconfig.ts",
     "typecheck:ui": "bun check --no-script -p packages/ui/tsconfig.json && bun check --no-script -p src/dashboard/tsconfig.json",
     "typecheck": "bun run ensure:deep-tsconfig && bun run typecheck:ws && bun check --no-script -p tsconfig.json",
