@@ -585,3 +585,18 @@ describe("console depth diagnostic", () => {
     expect(result.stdout).toContain("CONSOLE DEPTH");
   });
 });
+
+test.skipIf(!hasPty || Bun.which("seq") === null)(
+  "the executor caps output at 4 MiB and reports truncation",
+  async () => {
+    const result = await executeTerminalQuery("seq 1 700000");
+
+    expect(result.truncated).toBe(true);
+    expect(result.outputBytes).toBeGreaterThan(4 * 1024 * 1024);
+    expect(Buffer.byteLength(result.stdout, "utf8")).toBeLessThanOrEqual(
+      4 * 1024 * 1024,
+    );
+    expect(result.durationMs).toBeLessThan(5_000);
+  },
+  20_000,
+);

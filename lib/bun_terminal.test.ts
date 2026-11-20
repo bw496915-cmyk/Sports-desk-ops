@@ -10,6 +10,7 @@ import {
   runBlogTerminalWriteHelloExample,
   spawnInPty,
   stripPtyCapture,
+  TerminalSession,
 } from "./bun_terminal.ts";
 import { BUN_TERMINAL_PTY_TEST_NAME } from "./bun_terminal_test_names.ts";
 import {
@@ -145,5 +146,78 @@ test.skipIf(!hasPty || Bun.which("bash") === null)(
     expect(colorCode).toBe(0);
     expect(colorRaw).toContain("\x1b[31m");
     expect(stripPtyCapture(colorRaw)).toContain("red");
+  },
+);
+
+test.skipIf(!hasPty)(
+  "TerminalSession caps output by bytes, keeping the tail",
+  async () => {
+    const session = new TerminalSession({
+      maxOutputBytes: 150,
+      timeoutMs: 5_000,
+    });
+    try {
+      await session.start([
+        process.execPath,
+        "-e",
+        "process.stdout.write('é'.repeat(100))",
+      ]);
+      await session.wait();
+
+      expect(session.truncated).toBe(true);
+      expect(session.totalOutputBytes).toBe(200);
+      expect(session.rawBytes).toBeLessThanOrEqual(150);
+      expect(session.rawBytes).toBeGreaterThan(0);
+    } finally {
+      await session[Symbol.asyncDispose]();
+    }
+  },
+);
+
+test.skipIf(!hasPty || Bun.which("seq") === null)(
+  "TerminalSession retains the tail, not the head, under the cap",
+  async () => {
+    const session = new TerminalSession({
+      maxOutputBytes: 1_024,
+      timeoutMs: 5_000,
+    });
+    try {
+      await session.start(["seq", "1", "5000"]);
+      await session.wait();
+
+      expect(session.truncated).toBe(true);
+      expect(session.rawBytes).toBeLessThanOrEqual(1_024);
+      expect(session.raw.trimEnd().endsWith("5000")).toBe(true);
+    } finally {
+      await session[Symbol.asyncDispose]();
+    }
+  },
+);
+
+test.skipIf(!hasPty || Bun.which("bash") === null)(
+  "TerminalSession escalates SIGTERM to SIGKILL after the grace period",
+  async () => {
+    const startedAt = Date.now();
+    const session = new TerminalSession({
+      timeoutMs: 100,
+      killGraceMs: 50,
+    });
+    try {
+      await session.start(["bash", "-c", 'trap "" TERM; sleep 5']);
+      // The session timeout (100ms) drives the escalation; the wait window is
+      // longer so the SIGKILL can land before wait's own deadline.
+      await session.wait(2_000);
+
+      expect(Date.now() - startedAt).toBeLessThan(3_000);
+      expect(
+        session.auditEvents.some((event) => event.type === "timeout"),
+      ).toBe(true);
+      expect(
+        session.auditEvents.some((event) => event.type === "kill_escalation"),
+      ).toBe(true);
+      expect(session.signalCode).toBe("SIGKILL");
+    } finally {
+      await session[Symbol.asyncDispose]();
+    }
   },
 );

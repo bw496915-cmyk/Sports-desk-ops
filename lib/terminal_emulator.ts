@@ -160,6 +160,10 @@ export interface TerminalQueryResult {
   readonly exitCode: number;
   readonly durationMs: number;
   readonly timestamp: number;
+  /** True when the 4 MiB executor cap was hit; stdout holds the retained tail. */
+  readonly truncated?: boolean;
+  /** Total bytes the child produced before the cap (byte-accurate). */
+  readonly outputBytes?: number;
 }
 
 export interface AnsiSegment {
@@ -2705,6 +2709,7 @@ async function executeTerminalQueryInner(
       cols: options.cols ?? 100,
       rows: options.rows ?? 30,
       timeoutMs: options.timeoutMs ?? 10_000,
+      maxOutputBytes: TERMINAL_MAX_OUTPUT_BYTES,
       cwd: options.cwd ?? process.cwd(),
       env: consoleDepthEnv(options, consoleDepth),
     });
@@ -2723,6 +2728,8 @@ async function executeTerminalQueryInner(
       exitCode,
       durationMs: Date.now() - startedAt,
       timestamp: startedAt,
+      truncated: session.truncated,
+      outputBytes: session.totalOutputBytes,
     };
   } catch (err) {
     return {
@@ -2737,6 +2744,9 @@ async function executeTerminalQueryInner(
 
 /** `999999` is the registry's stored Infinity sentinel, never a runnable depth. */
 const MAX_CONSOLE_DEPTH = 999_999;
+
+/** Executor-only output cap: keep the tail, bound a runaway command's memory/CPU. */
+const TERMINAL_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 
 function asConsoleDepth(value: unknown): number | null {
   return typeof value === "number" &&
