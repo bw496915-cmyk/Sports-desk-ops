@@ -324,9 +324,26 @@ async function fileResponse(
         { status: 404, headers },
       );
     }
-    return new Response(file, {
-      headers: { ...headers, "Content-Type": contentType },
-    });
+    const lastModified = file.lastModified;
+    const responseHeaders = {
+      ...headers,
+      "Content-Type": contentType,
+      "Last-Modified": new Date(lastModified).toUTCString(),
+    };
+    // A Range request is a partial fetch, not a revalidation; let Bun answer it.
+    if (req.headers.get("range") === null) {
+      const ifModifiedSince = req.headers.get("if-modified-since");
+      if (ifModifiedSince !== null) {
+        const since = Date.parse(ifModifiedSince);
+        if (
+          Number.isFinite(since) &&
+          Math.floor(lastModified / 1_000) <= Math.floor(since / 1_000)
+        ) {
+          return new Response(null, { status: 304, headers: responseHeaders });
+        }
+      }
+    }
+    return new Response(file, { headers: responseHeaders });
   }
 
   const bytes = await readFileBytes(path);

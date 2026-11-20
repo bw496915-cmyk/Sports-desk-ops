@@ -508,6 +508,27 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     });
     socket.close();
   }, 20_000);
+  test("file routes revalidate with Last-Modified and keep Range", async () => {
+    const identity = { "accept-encoding": "identity" };
+    const first = await fetch(`http://127.0.0.1:${hub.port}/status`, {
+      headers: identity,
+    });
+    expect(first.status).toBe(200);
+    const lastModified = first.headers.get("last-modified");
+    if (lastModified === null) throw new Error("Last-Modified missing");
+
+    const revalidated = await fetch(`http://127.0.0.1:${hub.port}/status`, {
+      headers: { ...identity, "if-modified-since": lastModified },
+    });
+    expect(revalidated.status).toBe(304);
+
+    const ranged = await fetch(`http://127.0.0.1:${hub.port}/status`, {
+      headers: { ...identity, range: "bytes=0-9" },
+    });
+    expect(ranged.status).toBe(206);
+    expect((await ranged.text()).length).toBe(10);
+  });
+
   test("admin reload refreshes static routes and requires the token", async () => {
     const denied = await fetch(
       `http://127.0.0.1:${hub.port}/api/admin/reload-static`,
