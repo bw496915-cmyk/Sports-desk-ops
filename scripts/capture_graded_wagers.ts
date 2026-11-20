@@ -132,7 +132,63 @@ export async function refreshGradedWagerExport(
   const previous = Bun.file(target);
   if (input.size > 8 * 1024 * 1024 || previous.size > 64 * 1024 * 1024)
     throw new Error("Graded capture input exceeds its size limit");
-  const snapshot: unknown = await input.json();
+  let snapshot: unknown = Bun.env.SPORTSDESK_GRADED_ROSTER_JSON?.trim()
+    ? null
+    : await input.json();
+  let progress:
+    { rosterHash: string; deskDate: string; next: number } | undefined;
+  let coverage: object = {};
+  const rosterPath = Bun.env.SPORTSDESK_GRADED_ROSTER_JSON?.trim();
+  if (rosterPath) {
+    const rosterFile = Bun.file(rosterPath);
+    if (rosterFile.size > 32 * 1024 * 1024)
+      throw new Error("Roster exceeds size limit");
+    const roster = z
+      .object({
+        schemaVersion: z.literal(1),
+        players: z.array(z.object({ customerId: identity })),
+      })
+      .parse(await rosterFile.json());
+    const accounts = [
+      ...new Set(roster.players.map((row) => row.customerId.toUpperCase())),
+    ].sort();
+    if (!accounts.length) throw new Error("Roster is empty");
+    const rosterHash = new Bun.CryptoHasher("sha256")
+      .update(JSON.stringify(accounts))
+      .digest("hex");
+    const date = deskDate.format(Date.now());
+    const checkpoint = z.object({
+      rosterHash: z.string(),
+      deskDate: z.string(),
+      next: z.number().int().nonnegative(),
+    });
+    let offset = 0;
+    try {
+      const saved = checkpoint.parse(
+        await Bun.file(target + ".cursor.json").json(),
+      );
+      if (saved.rosterHash === rosterHash && saved.next < accounts.length)
+        offset = saved.next;
+    } catch {
+      /* A missing checkpoint starts a new roster sweep. */
+    }
+    const selected = accounts.slice(offset, offset + 50);
+    progress = { rosterHash, deskDate: date, next: offset + selected.length };
+    coverage = {
+      scope: "live-book-roster",
+      rosterAccounts: accounts.length,
+      batchStart: offset,
+      sweepCompletedAccounts: progress.next,
+      remainingAccounts: accounts.length - progress.next,
+      sweepComplete: progress.next === accounts.length,
+      rosterHash,
+    };
+    snapshot = {
+      capturedAt: new Date().toISOString(),
+      dataSource: "live:roster-selection",
+      games: selected.map((customerID) => ({ customerID })),
+    };
+  }
   const existed = await previous.exists();
   const prior: unknown = existed ? await previous.json() : [];
   const agentId =
@@ -168,7 +224,19 @@ export async function refreshGradedWagerExport(
       });
       await rename(temp, target);
     }
-    return { capturedAt: new Date().toISOString(), ...result.coverage };
+    if (progress) {
+      const temp = target + ".cursor.tmp-" + crypto.randomUUID();
+      await writeFile(temp, JSON.stringify(progress), {
+        mode: 0o600,
+        flag: "wx",
+      });
+      await rename(temp, target + ".cursor.json");
+    }
+    return {
+      capturedAt: new Date().toISOString(),
+      ...result.coverage,
+      ...coverage,
+    };
   } finally {
     await transport.close();
   }

@@ -56,3 +56,18 @@ time. It also explicitly marks whole-book coverage as false. Overlaps are logged
 stale lock after a crash, verify no refresh process is running. Configuration errors
 are reported by the scheduler/CLI; only attempts with valid configuration and an
 acquired lock write a receipt. No raw account records or credentials are logged.
+
+## Live roster coverage
+
+Set SPORTSDESK_GRADED_ROSTER_JSON to the private projected roster file to select
+rotating batches of 50 distinct customer IDs. The existing schedule runs each
+batch sequentially. A private export cursor advances only after the complete
+batch and export write succeed. Changed roster identity hashes restart the sweep.
+A completed sweep restarts at the next run. Each account receives the seven-day
+report window at the time of its request.
+
+Receipts report rosterAccounts, batchStart, sweepCompletedAccounts,
+remainingAccounts and sweepComplete. The cumulative sweep can span multiple
+days and does not represent a single synchronized book snapshot. At 58,017
+accounts and four batches per hour, one sweep takes about 12 days. Recent
+history outside each account's rolling request window remains uncovered.
