@@ -324,4 +324,60 @@ export function assertNoSecretLeak(
       "ERR_INSP_SECRET_REDACTION_LEAK: Unredacted Bearer/session token detected",
     );
   }
+  assertNoPatternLeaks(surface);
+}
+
+/** Provider-shaped credentials detectable without knowing the env value. */
+const AWS_ACCESS_KEY_ID_RE = /\b(?:AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16}\b/;
+const PRIVATE_KEY_PEM_RE = /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/;
+const JWT_LEAK_RE =
+  /\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b/;
+const URL_SECRET_LEAK_RE =
+  /[?&](?:x-amz-signature|x-amz-credential|token|api[_-]?key|secret|auth|jwt|key|sig|signature|password|passwd|pwd|cookie|gslive_session_id|session[_-]?id|phpsessid|cf_clearance)=([^&\s#]+)/gi;
+const DSN_PASSWORD_LEAK_RE =
+  /\b(?:postgres(?:ql)?|mysql|redis(?:s)?|https?):\/\/[^:\s/@]+:([^@\s]+)@/gi;
+const SESSION_COOKIE_LEAK_RE =
+  /\b(?:gslive_session_id|sd_session|dash_session|phpsessid|cf_clearance)=(\[[^\]]*\]|[^\s\]"';]+)/gi;
+
+function isRedacted(value: string): boolean {
+  return value.includes("[REDACTED_SECRET]") || /^REDACTED\b/.test(value);
+}
+
+function assertNoPatternLeaks(surface: string): void {
+  if (
+    AWS_ACCESS_KEY_ID_RE.test(surface) ||
+    PRIVATE_KEY_PEM_RE.test(surface) ||
+    JWT_LEAK_RE.test(surface)
+  ) {
+    throw new Error(
+      "ERR_INSP_SECRET_REDACTION_LEAK: Provider-shaped credential detected",
+    );
+  }
+
+  URL_SECRET_LEAK_RE.lastIndex = 0;
+  for (const match of surface.matchAll(URL_SECRET_LEAK_RE)) {
+    if (!isRedacted(match[1] ?? "")) {
+      throw new Error(
+        "ERR_INSP_SECRET_REDACTION_LEAK: Unredacted URL secret detected",
+      );
+    }
+  }
+
+  DSN_PASSWORD_LEAK_RE.lastIndex = 0;
+  for (const match of surface.matchAll(DSN_PASSWORD_LEAK_RE)) {
+    if (!isRedacted(match[1] ?? "")) {
+      throw new Error(
+        "ERR_INSP_SECRET_REDACTION_LEAK: Unredacted DSN password detected",
+      );
+    }
+  }
+
+  SESSION_COOKIE_LEAK_RE.lastIndex = 0;
+  for (const match of surface.matchAll(SESSION_COOKIE_LEAK_RE)) {
+    if (!isRedacted(match[1] ?? "")) {
+      throw new Error(
+        "ERR_INSP_SECRET_REDACTION_LEAK: Unredacted session cookie detected",
+      );
+    }
+  }
 }

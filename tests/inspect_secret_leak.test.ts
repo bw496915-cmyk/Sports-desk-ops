@@ -41,3 +41,43 @@ test("throws on an unredacted session cookie", () => {
     assertNoSecretLeak("Cookie: GSLIVE_SESSION_ID=[REDACTED_SECRET]", ENV),
   ).not.toThrow();
 });
+
+test("rejects provider-shaped credentials without an env value", () => {
+  expect(() => assertNoSecretLeak("key AKIAABCDEFGHIJKLMNOP", {})).toThrow(
+    /Provider-shaped credential/,
+  );
+  expect(() =>
+    assertNoSecretLeak(
+      "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJl",
+      {},
+    ),
+  ).toThrow(/Provider-shaped credential/);
+  expect(() =>
+    assertNoSecretLeak("-----BEGIN RSA PRIVATE KEY-----", {}),
+  ).toThrow(/Provider-shaped credential/);
+});
+
+test("rejects unredacted URL secrets and DSN passwords", () => {
+  expect(() =>
+    assertNoSecretLeak("https://x.test/?token=abcdef123456", {}),
+  ).toThrow(/URL secret/);
+  expect(() =>
+    assertNoSecretLeak("https://x.test/?token=[REDACTED_SECRET]", {}),
+  ).not.toThrow();
+  expect(() =>
+    assertNoSecretLeak("postgres://user:password123@db.test/x", {}),
+  ).toThrow(/DSN password/);
+  expect(() =>
+    assertNoSecretLeak("postgres://user:[REDACTED_SECRET]@db.test/x", {}),
+  ).not.toThrow();
+});
+
+test("rejects an unredacted session cookie but allows ordinary cookies", () => {
+  expect(() =>
+    assertNoSecretLeak("Cookie: sd_session=abcdef123456", {}),
+  ).toThrow(/Unredacted Bearer\/session token/);
+  expect(() =>
+    assertNoSecretLeak("Cookie: sd_session=[REDACTED_SECRET]", {}),
+  ).not.toThrow();
+  expect(() => assertNoSecretLeak("Cookie: theme=dark", {})).not.toThrow();
+});
