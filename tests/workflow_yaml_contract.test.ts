@@ -75,7 +75,9 @@ test("dev pushes run changed verification against a valid main baseline", async 
   expect(changed).toContain("github.event_name == 'pull_request'");
   expect(changed).toContain("github.ref == 'refs/heads/dev'");
   expect(changed).not.toContain("${{ github.base_ref }}");
-  expect(changed).toContain("${{ github.base_ref || 'main' }}");
+  expect(changed).toContain("CI_BASE_BRANCH: ${{ github.base_ref || 'main' }}");
+  expect(changed).toContain('--changed="origin/${CI_BASE_BRANCH}"');
+  expect(changed).not.toContain('--changed="origin/${GITHUB_BASE_REF}"');
   expect(text).toContain(
     "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
   );
