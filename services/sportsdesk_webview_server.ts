@@ -839,8 +839,19 @@ function readPackageMeta(): PackageMeta {
  * The static route table. Bun caches these Response objects for the server's
  * lifetime; update them with `server.reload({ routes })`, never by mutating them.
  */
-function buildStaticRoutes(meta: PackageMeta): Record<string, Response> {
-  return {
+function readStaticBytes(path: string): Uint8Array | null {
+  try {
+    return new Uint8Array(readFileSync(path));
+  } catch {
+    return null;
+  }
+}
+
+function buildStaticRoutes(
+  meta: PackageMeta,
+  repoRoot: string,
+): Record<string, Response> {
+  const routes: Record<string, Response> = {
     "/healthz": new Response("ok\n", {
       headers: { "content-type": "text/plain; charset=utf-8" },
     }),
@@ -851,6 +862,21 @@ function buildStaticRoutes(meta: PackageMeta): Record<string, Response> {
       env: Bun.env.NODE_ENV ?? "development",
     }),
   };
+
+  // Small, frequently viewed page: buffer it once and let Bun's static route cache
+  // it for the process lifetime (ETag + If-None-Match 304 included). A missing file
+  // falls back to the fetch/file route instead of failing startup.
+  const statusHtml = readStaticBytes(resolve(repoRoot, "static/status.html"));
+  if (statusHtml !== null) {
+    const headers = {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-cache",
+    } as const;
+    routes["/status"] = new Response(statusHtml.slice(), { headers });
+    routes["/status/"] = new Response(statusHtml.slice(), { headers });
+  }
+
+  return routes;
 }
 
 export function startServer(options?: ServerOptions) {
@@ -1200,7 +1226,7 @@ export function startServer(options?: ServerOptions) {
 
     // Static route: zero-allocation dispatch for a liveness probe that, unlike
     // /health, does not run the KPI/auth probes.
-    routes: buildStaticRoutes(packageMeta),
+    routes: buildStaticRoutes(packageMeta, repoRoot),
 
     async fetch(req) {
       const url = new URL(req.url);
@@ -1792,7 +1818,7 @@ export function startServer(options?: ServerOptions) {
           );
         }
         const refreshed = readPackageMeta();
-        server.reload({ routes: buildStaticRoutes(refreshed) });
+        server.reload({ routes: buildStaticRoutes(refreshed, repoRoot) });
         return Response.json(
           { success: true, version: refreshed.version ?? "unknown" },
           { headers: cors },
