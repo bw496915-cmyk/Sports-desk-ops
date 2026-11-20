@@ -7,7 +7,7 @@
  * The store is opened read-only: inspecting must never create or migrate it.
  * A missing database is reported as `exists: false`, never as zero profiles.
  *
- *   bun cli/terminal_profile.ts [--db PATH] [--profile ID] [--json]
+ *   bun cli/terminal_profile.ts [--db PATH] [--profile ID] [--options] [--json]
  */
 
 import { existsSync } from "node:fs";
@@ -18,7 +18,7 @@ import { openSportsdeskSqliteReadonly } from "../lib/sportsdesk_sqlite.ts";
 
 const DEFAULT_DB = "scratch/theme-tokens.sqlite";
 const USAGE =
-  "usage: bun cli/terminal_profile.ts [--db <path>] [--profile <id>] [--json]";
+  "usage: bun cli/terminal_profile.ts [--db <path>] [--profile <id>] [--options] [--json]";
 
 interface ProfileReport {
   readonly id: string;
@@ -35,15 +35,21 @@ function parseArgs(argv: readonly string[]): {
   readonly db: string;
   readonly profile: string | undefined;
   readonly json: boolean;
+  readonly options: boolean;
 } {
   let db = DEFAULT_DB;
   let profile: string | undefined;
   let json = false;
+  let options = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index] ?? "";
     if (arg === "--json") {
       json = true;
+      continue;
+    }
+    if (arg === "--options") {
+      options = true;
       continue;
     }
     if (arg === "--db" || arg.startsWith("--db=")) {
@@ -68,7 +74,7 @@ function parseArgs(argv: readonly string[]): {
     throw new Error(`unexpected argument: ${arg}`);
   }
 
-  return { db, profile, json };
+  return { db, profile, json, options };
 }
 
 function readProfiles(
@@ -202,8 +208,24 @@ if (args.json) {
     "═".repeat(72),
   ];
   for (const profile of report.profiles) {
+    if (!args.options) {
+      lines.push(
+        `  ${profile.id.padEnd(16)} depth ${String(profile.consoleDepth).padEnd(8)} themes ${profile.themeCount} tokens ${profile.tokenCount}`,
+      );
+      continue;
+    }
     lines.push(
-      `  ${profile.id.padEnd(16)} depth ${String(profile.consoleDepth).padEnd(8)} themes ${profile.themeCount} tokens ${profile.tokenCount}`,
+      `  ${profile.id}`,
+      `    console depth   : ${profile.consoleDepth}`,
+      `    sorted          : ${profile.sorted ? "on" : "off"}`,
+      `    compact         : ${profile.compact ? "on" : "off"}`,
+      `    max array length: ${profile.maxArrayLength}`,
+      `    tokens/themes   : ${profile.tokenCount}/${profile.themeCount}`,
+      `    updated         : ${
+        profile.updatedAt === null
+          ? "not persisted"
+          : new Date(profile.updatedAt * 1000).toISOString()
+      }`,
     );
   }
   process.stdout.write(`${lines.join("\n")}\n`);

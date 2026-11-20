@@ -117,3 +117,23 @@ describe("terminal_profile CLI", () => {
     expect(err).toContain("unknown flag");
   });
 });
+
+test("--options prints the per-profile settings", () => {
+  const dbPath = seededDb();
+  const { code, out } = run(["--db", dbPath, "--options"]);
+
+  expect(code).toBe(0);
+  expect(out).toContain("console depth");
+  expect(out).toContain("sorted");
+  expect(out).toContain("max array length");
+  expect(out).toContain("tokens/themes");
+});
+
+test("the default summary omits the detailed options", () => {
+  const dbPath = seededDb();
+  const { code, out } = run(["--db", dbPath]);
+
+  expect(code).toBe(0);
+  expect(out).not.toContain("max array length");
+  expect(out).toContain("depth");
+});
