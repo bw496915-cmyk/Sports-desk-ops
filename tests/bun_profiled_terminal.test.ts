@@ -56,6 +56,7 @@ describe("formatProfileDotEnv", () => {
     expect(dotenvText).toContain('PTY_ACCENT="red"');
     expect(dotenvText).toContain("PTY_ERROR=$PTY_ACCENT");
     expect(dotenvText).toContain('PTY_WARN="gold"');
+    expect(dotenvText).toContain('PTY_CONSOLE_DEPTH="4"');
     expect(dotenvText).toContain('BUN_OPTIONS="--console-depth=4"');
     expect(dotenvText).toContain("DO_NOT_TRACK=1");
     store.close();

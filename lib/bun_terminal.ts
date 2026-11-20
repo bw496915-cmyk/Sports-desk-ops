@@ -94,6 +94,8 @@ export interface SpawnInPtyOptions {
   readonly cwd?: SpawnBaseOptions["cwd"];
   readonly cols?: Bun.TerminalOptions["cols"];
   readonly rows?: Bun.TerminalOptions["rows"];
+  /** Extra child environment; merged over Bun.env by TerminalSession. */
+  readonly env?: SpawnBaseOptions["env"];
 }
 
 export interface PtyRunResult {

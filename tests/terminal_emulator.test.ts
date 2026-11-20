@@ -462,3 +462,76 @@ describe("SportsDesk Terminal Emulator & Query Engine", () => {
     expect(result.stdout).toContain("syndicate-alerts");
   });
 });
+
+describe("profile console depth → PTY env", () => {
+  test("an explicit resolved depth is injected into the child env", async () => {
+    const depth = await executeTerminalQuery("printenv PTY_CONSOLE_DEPTH", {
+      consoleDepth: 6,
+    });
+    expect(depth.stdout).toContain("6");
+
+    const options = await executeTerminalQuery("printenv BUN_OPTIONS", {
+      consoleDepth: 6,
+      env: { BUN_OPTIONS: "--smol" },
+    });
+    expect(options.stdout).toContain("--smol --console-depth=6");
+  });
+
+  test("the registry-emitted PTY_CONSOLE_DEPTH is the fallback", async () => {
+    const depth = await executeTerminalQuery("printenv PTY_CONSOLE_DEPTH", {
+      env: { PTY_CONSOLE_DEPTH: "5" },
+    });
+    expect(depth.stdout).toContain("5");
+  });
+
+  test("an invalid explicit depth leaves the env fallback intact", async () => {
+    const fractional = await executeTerminalQuery(
+      "printenv PTY_CONSOLE_DEPTH",
+      { consoleDepth: 1.5, env: { PTY_CONSOLE_DEPTH: "3" } },
+    );
+    expect(fractional.stdout).toContain("3");
+  });
+
+  test("fractional, NaN and negative depths add no flag", async () => {
+    for (const invalid of [1.5, Number.NaN, -1]) {
+      const result = await executeTerminalQuery("printenv BUN_OPTIONS", {
+        consoleDepth: invalid,
+      });
+      expect(result.stdout).not.toContain("--console-depth");
+    }
+  });
+
+  test("a duplicate inherited depth flag is replaced, not appended", async () => {
+    const result = await executeTerminalQuery("printenv BUN_OPTIONS", {
+      consoleDepth: 6,
+      env: { BUN_OPTIONS: "--console-depth=8 --smol" },
+    });
+    const flags = result.stdout.trim();
+    expect(flags.match(/--console-depth/g)).toHaveLength(1);
+    expect(flags).toContain("--console-depth=6");
+    expect(flags).toContain("--smol");
+  });
+
+  test("the 999999 sentinel is stripped from the env, not translated to unlimited", async () => {
+    const options = await executeTerminalQuery("printenv BUN_OPTIONS", {
+      env: {
+        PTY_CONSOLE_DEPTH: "999999",
+        BUN_OPTIONS: "--console-depth=999999 --smol",
+      },
+    });
+    expect(options.stdout).not.toContain("999999");
+    expect(options.stdout).toContain("--smol");
+
+    const depth = await executeTerminalQuery("printenv PTY_CONSOLE_DEPTH", {
+      env: { PTY_CONSOLE_DEPTH: "999999" },
+    });
+    expect(depth.stdout).not.toContain("999999");
+  });
+
+  test("a malformed inherited PTY_CONSOLE_DEPTH is cleared", async () => {
+    const result = await executeTerminalQuery("printenv PTY_CONSOLE_DEPTH", {
+      env: { PTY_CONSOLE_DEPTH: "6.9" },
+    });
+    expect(result.stdout.trim()).toBe("");
+  });
+});

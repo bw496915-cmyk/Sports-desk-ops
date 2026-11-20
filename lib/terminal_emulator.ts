@@ -142,6 +142,12 @@ function getCachedRanking(): Promise<BatchedRankingResult> {
 
 export interface TerminalQueryOptions extends SpawnInPtyOptions {
   readonly timeoutMs?: number;
+  /**
+   * Resolved profile console depth. When absent, `PTY_CONSOLE_DEPTH` from the profile
+   * env (or the parent process) is used. Depth is a profile property, not a per-query
+   * UI knob: callers only pass this when they already resolved the profile.
+   */
+  readonly consoleDepth?: number;
 }
 
 export interface TerminalQueryResult {
@@ -2675,11 +2681,13 @@ async function executeTerminalQueryInner(
   }
 
   try {
+    const consoleDepth = resolveConsoleDepth(options);
     const session = new TerminalSession({
       cols: options.cols ?? 100,
       rows: options.rows ?? 30,
       timeoutMs: options.timeoutMs ?? 10_000,
       cwd: options.cwd ?? process.cwd(),
+      env: consoleDepthEnv(options, consoleDepth),
     });
 
     await session.start([executable, ...args]);
@@ -2706,6 +2714,70 @@ async function executeTerminalQueryInner(
       timestamp: startedAt,
     };
   }
+}
+
+/** `999999` is the registry's stored Infinity sentinel, never a runnable depth. */
+const MAX_CONSOLE_DEPTH = 999_999;
+
+function asConsoleDepth(value: unknown): number | null {
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value < MAX_CONSOLE_DEPTH
+    ? value
+    : null;
+}
+
+/** Explicit resolved depth wins; otherwise the registry-emitted env is the source. */
+function resolveConsoleDepth(options: TerminalQueryOptions): number | null {
+  const explicit = asConsoleDepth(options.consoleDepth);
+  if (explicit !== null) return explicit;
+  const raw = options.env?.PTY_CONSOLE_DEPTH ?? process.env.PTY_CONSOLE_DEPTH;
+  if (raw === undefined || raw.trim() === "") return null;
+  return asConsoleDepth(Number(raw));
+}
+
+/**
+ * One depth flag only: strip any inherited `--console-depth` (the profile dotenv
+ * already carries one, and a parent env may carry a different value) before adding
+ * the resolved value. Other BUN_OPTIONS flags are preserved.
+ */
+const CONSOLE_DEPTH_FLAG_RE =
+  /(?:^|\s)--console-depth(?==|\s|$)(?:=\S+|\s+\S+)?/g;
+
+function sanitizeBunOptions(value: string | undefined): string {
+  if (value === undefined) return "";
+  return value.replace(CONSOLE_DEPTH_FLAG_RE, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Build the child env for the resolved depth. `depth === null` still sanitizes: an
+ * inherited `PTY_CONSOLE_DEPTH=999999` or a malformed value is cleared, so the
+ * sentinel is removed rather than passed through. A cleared depth falls back to
+ * bunfig/the Bun default; `999999` is not translated into "unlimited".
+ *
+ * This is the env boundary, not the rendered effect: a bunfig `[console].depth`
+ * still wins inside this repo, while PTY_CONSOLE_DEPTH stays readable.
+ */
+function consoleDepthEnv(
+  options: TerminalQueryOptions,
+  depth: number | null,
+): NonNullable<SpawnInPtyOptions["env"]> {
+  const base = options.env ?? {};
+  const stripped = sanitizeBunOptions(
+    base.BUN_OPTIONS ?? process.env.BUN_OPTIONS,
+  );
+  const flags =
+    depth === null
+      ? stripped
+      : stripped === ""
+        ? `--console-depth=${depth}`
+        : `${stripped} --console-depth=${depth}`;
+  return {
+    ...base,
+    PTY_CONSOLE_DEPTH: depth === null ? "" : String(depth),
+    BUN_OPTIONS: flags,
+  };
 }
 
 /**
