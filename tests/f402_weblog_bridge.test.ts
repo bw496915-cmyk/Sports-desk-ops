@@ -291,7 +291,22 @@ describe("f402_weblog_bridge Pass 1 guards & CAS", () => {
     };
 
     const nowMs = rollup.window.toMs + 30_000;
-    const res = await publishF402WeblogRollup({ client, rollup, nowMs });
+    const stages: string[] = [];
+    const res = await publishF402WeblogRollup({
+      client,
+      rollup,
+      nowMs,
+      onStage: (stage) => {
+        stages.push(stage);
+      },
+    });
+    expect(stages).toEqual([
+      "sanitize",
+      "daily-upload",
+      "daily-stat",
+      "manifest",
+      "pointer",
+    ]);
     expect(res.manifestKey).toBe("manifests/f402-weblog/latest");
     expect(res.manifestIfMatch).toBe('"etag-v1"');
     expect(res.manifestIfNoneMatch).toBeNull();

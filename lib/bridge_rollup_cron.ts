@@ -481,7 +481,7 @@ function lastLogLine(stderr: string): string | null {
 const BUN_VERSION_LINE = /^Bun v\d+\.\d+/;
 
 const FAILURE_LINE =
-  /^(error:|fatal:|\[[^\]]+\] fatal:)|HTTP \d{3}|ENOENT:|cannot read /i;
+  /^(?:[\w.]*Error:|error:|fatal:|\[[^\]]+\] (?:fatal:|R2 publish failed\b))|HTTP \d{3}|ENOENT:|cannot read /i;
 
 function meaningfulLogLines(text: string): readonly string[] {
   return text

@@ -236,6 +236,9 @@ export async function publishF402WeblogRollup(options: {
   readonly client: WeblogR2PublishClient;
   readonly rollup: WebLogRollup;
   readonly nowMs?: number;
+  readonly onStage?: (
+    stage: "sanitize" | "daily-upload" | "daily-stat" | "manifest" | "pointer",
+  ) => void;
   readonly fetchImpl?: typeof fetch;
 }): Promise<PublishWeblogRollupResult> {
   const { client, rollup, fetchImpl } = options;
@@ -251,6 +254,7 @@ export async function publishF402WeblogRollup(options: {
     data_window_max_epoch_ms: dataWindowMaxEpochMs,
     r2_published_at_epoch_ms: r2PublishedAtEpochMs,
   };
+  options.onStage?.("sanitize");
   const body = assertSanitizedF402Weblog(stampedRollup);
   const metadata = {
     pii: "none",
@@ -262,11 +266,13 @@ export async function publishF402WeblogRollup(options: {
     sha256: rollup.sourceSha256,
     source: "f402-weblog",
   };
+  options.onStage?.("daily-upload");
   await client.writeWithMetadata(dailyKey, body, {
     type: "application/json",
     metadata,
     ...(fetchImpl === undefined ? {} : { fetchImpl }),
   });
+  options.onStage?.("daily-stat");
   const stat = await client.stat(dailyKey);
   if (stat.size !== body.byteLength) {
     throw new Error(
@@ -274,6 +280,7 @@ export async function publishF402WeblogRollup(options: {
     );
   }
 
+  options.onStage?.("manifest");
   const expectedEtag = await client.headEtag(
     WEBLOG_MANIFEST_KEY,
     fetchImpl === undefined ? {} : { fetchImpl },
@@ -314,6 +321,7 @@ export async function publishF402WeblogRollup(options: {
     generatedAt: publishedAtIso,
   };
   const pointerBody = assertSanitizedF402Weblog(pointerPayload);
+  options.onStage?.("pointer");
   const pointerOutcome = await promoteWeblogPointer({
     client,
     body: pointerBody,
@@ -441,12 +449,19 @@ async function main(): Promise<void> {
     if (client === null) {
       console.error("[weblog] R2 unavailable; local artifact only");
     } else {
+      let stage = "initialize";
       let published: Awaited<ReturnType<typeof publishF402WeblogRollup>>;
       try {
-        published = await publishF402WeblogRollup({ client, rollup });
+        published = await publishF402WeblogRollup({
+          client,
+          rollup,
+          onStage: (value) => {
+            stage = value;
+          },
+        });
       } catch (error) {
         console.error(
-          `[weblog] R2 publish failed: ${error instanceof Error ? error.message : String(error)}`,
+          `[weblog] R2 publish failed at ${stage}: ${error instanceof Error ? error.message : String(error)}`,
         );
         throw error;
       }
