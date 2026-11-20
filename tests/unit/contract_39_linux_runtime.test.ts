@@ -7,17 +7,30 @@ import {
   openSync,
   readSync,
   rmSync,
+  writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+// Keep mutation boundaries in the same stderr stream as JavaScriptCore's GC log.
+function recordMutationBoundary(boundary: "begin" | "end"): void {
+  if (process.env.BUN_JSC_logGC === "1") {
+    writeSync(
+      2,
+      `\narray-mutation ${boundary} pid=${process.pid} monotonic_ns=${process.hrtime.bigint()}\n`,
+    );
+  }
+}
 
 describe.skipIf(process.platform !== "linux")("Linux runtime contracts", () => {
   // https://github.com/oven-sh/WebKit/commit/2e2aa2290fac856d6f451ceacb58f7f5b44dd057
   test("surviving objects retain their values after shift, splice, truncation and collection", () => {
     const entries = Array.from({ length: 64 }, (_, id) => ({ id }));
+    recordMutationBoundary("begin");
     expect(entries.shift()?.id).toBe(0);
     expect(entries.splice(5, 3).map((entry) => entry.id)).toEqual([6, 7, 8]);
     entries.length = 8;
+    recordMutationBoundary("end");
     Bun.gc(true);
     expect(entries.map((entry) => entry.id)).toEqual([
       1, 2, 3, 4, 5, 9, 10, 11,

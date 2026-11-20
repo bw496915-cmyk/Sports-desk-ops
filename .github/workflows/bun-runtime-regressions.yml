@@ -8,6 +8,7 @@ on:
       - ".bun-version"
       - ".github/workflows/bun-runtime-regressions.yml"
       - "scripts/ci/verify_runtime_patches.sh"
+      - "scripts/ci/read_gc_trace.py"
       - "tests/bun_runtime_regressions.test.ts"
       - "tests/unit/contract_39_linux_runtime.test.ts"
   pull_request:
@@ -66,15 +67,34 @@ jobs:
           IMAGE: ${{ matrix.image }}
           EXPECTED_LIBC: ${{ matrix.libc }}
         run: |
+          set -o pipefail
           docker run --rm --network none -v "$PWD:/desk:ro" -w /desk \
             -e EXPECTED_LIBC -e TZ=UTC -e NO_COLOR=1 --entrypoint sh "$IMAGE" -ec '
               test "$(uname -s)" = Linux
               test "$(bun --version)" = "$(cat .bun-version)"
               case "$EXPECTED_LIBC" in
-                musl) test -e /lib/ld-musl-x86_64.so.1; cat /etc/alpine-release ;;
+                musl)
+                  test -e /lib/ld-musl-x86_64.so.1
+                  cat /etc/alpine-release
+                  ;;
                 glibc) getconf GNU_LIBC_VERSION | grep "^glibc " ;;
                 *) exit 1 ;;
               esac
               bun --revision
+              if [ "$EXPECTED_LIBC" = musl ]; then
+                echo "trace-process pid=$$ platform=$(uname -sm) bun=$(bun --revision)" >&2
+                export BUN_JSC_logGC=1
+              fi
               exec bun test tests/bun_runtime_regressions.test.ts tests/unit/contract_39_linux_runtime.test.ts --bail=1
-            '
+            ' 2>&1 | tee "$RUNNER_TEMP/linux-runtime.log"
+      - name: Read Alpine GC trace
+        if: matrix.libc == 'musl'
+        run: python3 scripts/ci/read_gc_trace.py "$RUNNER_TEMP/linux-runtime.log" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain Alpine GC trace
+        if: always() && matrix.libc == 'musl'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: alpine-gc-trace-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/linux-runtime.log
+          retention-days: 30
+          if-no-files-found: error

@@ -67,6 +67,17 @@ report or runtime upgrade requires fresh evidence for this check.
 [Buildkite job](https://buildkite.com/bun/bun/builds/130816/list?jid=01a162c2-7220-497a-bff5-087f27bd98ca)
 · [JUnit report](https://buildkite.com/organizations/bun/pipelines/bun/builds/130816/jobs/01a162c2-7220-497a-bff5-087f27bd98ca/artifacts/01a162cb-f54f-4088-9447-274bc7054f93)
 
-Concurrent marking during array mutation remains unverified on the musl binary.
-The Alpine x86-64 release reports contain no identified case recording the overlap.
-The sequential array test and the reviewed WebKit sources are the available evidence.
+The Alpine job captures the normal test run with JavaScriptCore GC logging enabled.
+The array test writes begin and end markers to stderr around its existing shift,
+splice and truncation operations. Each marker includes the test PID and a
+monotonic timestamp. The job retains the combined log for 30 days as
+`alpine-gc-trace-<commit>-<attempt>`. The job summary reports how many collection
+cycles intersected that window.
+
+To review a downloaded artifact, run
+`python3 scripts/ci/read_gc_trace.py linux-runtime.log`. The reader checks the
+runtime, PID, collector identity and balanced cycle boundaries. When all GC cycles
+fall outside the mutation window, concurrent marking could not have overlapped
+those operations in that run. A collection intersecting the window leaves actual
+marking overlap unresolved, since a cycle includes other phases.
+[Collector logging in the pinned WebKit source](https://github.com/oven-sh/WebKit/blob/d6375c72affe0f70222cdcb45012b10f0bf3a9d5/Source/JavaScriptCore/heap/Collector.cpp)
