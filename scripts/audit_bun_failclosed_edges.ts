@@ -621,10 +621,6 @@ const REPO_HAZARD_GLOB = new Bun.Glob("**/*.{ts,tsx,js,sh,json,css}");
 const IGNORED_HAZARD_DIRS =
   /^(node_modules|\.git|Scratch|dist|coverage|reports)\.?\//;
 
-function lineOf(text: string, index: number): number {
-  return text.slice(0, index).split("\n").length;
-}
-
 function addFileFinding(
   findings: Finding[],
   file: string,
