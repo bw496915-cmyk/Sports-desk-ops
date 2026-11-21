@@ -14,6 +14,12 @@ import type {
   S3Stats,
 } from "bun";
 import type { BunSecretSetOptions } from "../types/bun-api.ts";
+import {
+  fetchWithProxyPolicy,
+  type R2Proxy,
+  R2ProxyTunnelError,
+  resolveR2Proxy,
+} from "./desk_fetch_proxy.ts";
 import { getSecretBounded, KeychainTimeoutError } from "./secrets.ts";
 
 export type R2S3Env = Readonly<Record<string, string | undefined>>;
@@ -59,6 +65,10 @@ export interface R2S3Options {
   readonly sessionToken?: string;
   readonly region?: string;
   readonly publicBase: string;
+  /** Proxy for the signed PUT/HEAD fetches; caller-supplied only, default direct. */
+  readonly proxy?: R2Proxy;
+  /** Per-request timeout for the signed PUT/HEAD fetches (default {@link DEFAULT_R2_FETCH_TIMEOUT_MS}). */
+  readonly timeoutMs?: number;
 }
 
 /** The subset of Bun.S3Client this adapter delegates to (fake-able in tests). */
@@ -268,7 +278,7 @@ function byteLength(data: Uint8Array | string): number {
     : data.byteLength;
 }
 
-type R2S3Auth = Pick<
+export type R2S3Auth = Pick<
   R2S3Options,
   "endpoint" | "accessKeyId" | "secretAccessKey" | "sessionToken" | "region"
 >;
@@ -322,6 +332,208 @@ async function signingKey(
  */
 export const DEFAULT_METADATA_PUT_RETRIES = 3;
 export const DEFAULT_METADATA_PUT_RETRY_DELAY_MS = 150;
+export const DEFAULT_R2_FETCH_TIMEOUT_MS = 30_000;
+
+/** Connect-failure `.code`s on Bun's fetch `TypeError` that a PUT may retry. */
+export const R2_TRANSIENT_NETWORK_CODES = [
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "EPIPE",
+  "ECONNABORTED",
+  "EAI_AGAIN",
+] as const;
+
+export type R2SignedMethod = "PUT" | "HEAD" | "GET";
+
+/**
+ * Sent and signed on every signed R2 request, with `decompress: false`, so no hop may
+ * answer with a compressed representation whose ETag differs from the stored object's.
+ */
+export const R2_IDENTITY_ENCODING_HEADERS = {
+  "accept-encoding": "identity",
+} as const;
+
+/**
+ * Headers Bun's fetch appends on its own after ours. They stay out of SignedHeaders
+ * (SigV4 tolerates unsigned extras); every header this module sets is signed.
+ */
+export const R2_BUN_ADDED_UNSIGNED_HEADERS = [
+  "connection",
+  "user-agent",
+  "accept",
+] as const;
+
+export class R2WeakETagError extends Error {
+  readonly code = "ERR_R2_WEAK_ETAG" as const;
+  readonly exitCode = 74 as const;
+  readonly key: string;
+  readonly etag: string;
+  constructor(key: string, etag: string) {
+    super(
+      `ERR_R2_WEAK_ETAG: ${etag} for ${key} is weak; If-Match compares strong ETags only`,
+    );
+    this.name = "R2WeakETagError";
+    this.key = key;
+    this.etag = etag;
+  }
+}
+
+export class R2EncodedETagError extends Error {
+  readonly code = "ERR_R2_ENCODED_ETAG" as const;
+  readonly exitCode = 74 as const;
+  readonly key: string;
+  readonly method: R2SignedMethod;
+  readonly etag: string;
+  constructor(key: string, method: R2SignedMethod, etag: string) {
+    super(
+      `ERR_R2_ENCODED_ETAG: R2 ${method} ${key} returned ETag ${etag} for a content-encoded representation, not the stored object`,
+    );
+    this.name = "R2EncodedETagError";
+    this.key = key;
+    this.method = method;
+    this.etag = etag;
+  }
+}
+
+const WEAK_ETAG_PREFIX = /^W\//i;
+const ENCODED_ETAG_SUFFIX = /[-+;](?:x-)?(?:gzip|br|deflate|zstd|compress)"?$/i;
+
+export function isWeakETag(etag: string): boolean {
+  return WEAK_ETAG_PREFIX.test(etag.trim());
+}
+
+/** The trimmed ETag, or {@link R2WeakETagError} when it is weak and so unusable for If-Match. */
+export function assertStrongETag(key: string, etag: string): string {
+  const trimmed = etag.trim();
+  if (isWeakETag(trimmed)) throw new R2WeakETagError(key, trimmed);
+  return trimmed;
+}
+
+/**
+ * A response ETag, trimmed, or null when absent. A content-coding tag such as
+ * `"…-gzip"` / `"…+gzip"` names a transformed body; feeding it to If-Match would 412
+ * forever, so it is refused with {@link R2EncodedETagError}. Weak ETags pass through
+ * and are refused where they would be used for CAS.
+ */
+export function parseR2ETag(
+  raw: string | null | undefined,
+  key: string,
+  method: R2SignedMethod,
+): string | null {
+  const etag = raw?.trim() ?? "";
+  if (etag === "") return null;
+  if (ENCODED_ETAG_SUFFIX.test(etag)) {
+    throw new R2EncodedETagError(key, method, etag);
+  }
+  return etag;
+}
+
+export class R2TimeoutError extends Error {
+  readonly code = "ERR_R2_TIMEOUT" as const;
+  readonly key: string;
+  readonly method: R2SignedMethod;
+  readonly ms: number;
+  constructor(
+    key: string,
+    method: R2SignedMethod,
+    ms: number,
+    options: { readonly cause: unknown },
+  ) {
+    super(`R2 ${method} ${key} timed out after ${ms}ms`, {
+      cause: options.cause,
+    });
+    this.name = "R2TimeoutError";
+    this.key = key;
+    this.method = method;
+    this.ms = ms;
+  }
+}
+
+export class R2NetworkError extends Error {
+  readonly key: string;
+  readonly method: R2SignedMethod;
+  /** The fetch error's `.code` (e.g. `ECONNREFUSED`), or null when it had none. */
+  readonly code: string | null;
+  readonly transient: boolean;
+  constructor(
+    key: string,
+    method: R2SignedMethod,
+    code: string | null,
+    options: { readonly cause: unknown },
+  ) {
+    super(`R2 ${method} ${key} network error (${code ?? "no code"})`, {
+      cause: options.cause,
+    });
+    this.name = "R2NetworkError";
+    this.key = key;
+    this.method = method;
+    this.code = code;
+    this.transient =
+      code !== null &&
+      (R2_TRANSIENT_NETWORK_CODES as readonly string[]).includes(code);
+  }
+}
+
+export function resolveR2TimeoutMs(timeoutMs: number | undefined): number {
+  if (timeoutMs === undefined) return DEFAULT_R2_FETCH_TIMEOUT_MS;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new RangeError("R2 timeoutMs must be a positive finite number");
+  }
+  return Math.ceil(timeoutMs);
+}
+
+function errorCode(error: unknown): string | null {
+  const code =
+    typeof error === "object" && error !== null
+      ? (error as { readonly code?: unknown }).code
+      : undefined;
+  return typeof code === "string" && code !== "" ? code : null;
+}
+
+export interface R2SignedFetchOptions {
+  readonly fetchImpl: typeof fetch;
+  readonly url: string;
+  readonly init: BunFetchRequestInit;
+  readonly proxy: R2Proxy | undefined;
+  readonly key: string;
+  readonly method: R2SignedMethod;
+  readonly timeoutMs: number;
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * One signed fetch under the proxy policy with `AbortSignal.any([timeout, caller])`.
+ * Rejects with {@link R2TimeoutError} on our timeout, the caller's abort reason on
+ * theirs, {@link R2ProxyTunnelError} on a refused tunnel, else {@link R2NetworkError}.
+ */
+export async function fetchSignedR2(
+  options: R2SignedFetchOptions,
+): Promise<Response> {
+  const timeout = AbortSignal.timeout(options.timeoutMs);
+  const signal =
+    options.signal === undefined
+      ? timeout
+      : AbortSignal.any([timeout, options.signal]);
+  try {
+    return await fetchWithProxyPolicy(
+      options.fetchImpl,
+      options.url,
+      { ...options.init, decompress: false, signal },
+      options.proxy,
+    );
+  } catch (error) {
+    if (options.signal?.aborted === true) throw error;
+    if (timeout.aborted) {
+      throw new R2TimeoutError(options.key, options.method, options.timeoutMs, {
+        cause: error,
+      });
+    }
+    if (error instanceof R2ProxyTunnelError) throw error;
+    throw new R2NetworkError(options.key, options.method, errorCode(error), {
+      cause: error,
+    });
+  }
+}
 
 function isTransientPutStatus(status: number): boolean {
   return (
@@ -349,7 +561,7 @@ export class R2PreconditionFailedError extends Error {
 
 async function buildSignedR2Headers(options: {
   readonly auth: R2S3Auth;
-  readonly method: "PUT" | "HEAD";
+  readonly method: R2SignedMethod;
   readonly path: string;
   readonly host: string;
   readonly payloadHash: string;
@@ -420,8 +632,11 @@ async function putObjectWithMetadata(
     readonly retry?: number;
     readonly retryDelayMs?: number;
     readonly fetchImpl?: typeof fetch;
+    readonly proxy?: R2Proxy;
+    readonly timeoutMs?: number;
+    readonly signal?: AbortSignal;
   } = {},
-): Promise<void> {
+): Promise<string | null> {
   if (
     retryOptions.ifMatch !== undefined &&
     retryOptions.ifNoneMatch !== undefined
@@ -430,7 +645,7 @@ async function putObjectWithMetadata(
   }
   const endpoint = new URL(auth.endpoint);
   const host = endpoint.host;
-  const path = `/${encodeBucket(bucket)}/${key.split("/").map(encodeRfc3986).join("/")}`;
+  const path = r2ObjectPath(bucket, key);
   const payloadHash = new Bun.CryptoHasher("sha256")
     .update(payload)
     .digest("hex");
@@ -442,6 +657,15 @@ async function putObjectWithMetadata(
     ),
   );
   const doFetch = retryOptions.fetchImpl ?? fetch;
+  resolveR2Proxy(retryOptions.proxy);
+  const timeoutMs = resolveR2TimeoutMs(retryOptions.timeoutMs);
+  const ifMatch =
+    retryOptions.ifMatch === undefined
+      ? undefined
+      : assertStrongETag(key, retryOptions.ifMatch.replace(/[\r\n]+/g, " "));
+  const conditional =
+    retryOptions.ifMatch !== undefined ||
+    retryOptions.ifNoneMatch !== undefined;
 
   let lastError: Error | undefined;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -449,14 +673,11 @@ async function putObjectWithMetadata(
       await Bun.sleep(baseDelayMs * attempt);
     }
     const headers: Record<string, string> = {
+      ...R2_IDENTITY_ENCODING_HEADERS,
       "content-length": String(payload.byteLength),
       "content-type": type,
     };
-    if (retryOptions.ifMatch !== undefined) {
-      headers["if-match"] = retryOptions.ifMatch
-        .replace(/[\r\n]+/g, " ")
-        .trim();
-    }
+    if (ifMatch !== undefined) headers["if-match"] = ifMatch;
     if (retryOptions.ifNoneMatch !== undefined) {
       headers["if-none-match"] = retryOptions.ifNoneMatch
         .replace(/[\r\n]+/g, " ")
@@ -477,17 +698,30 @@ async function putObjectWithMetadata(
     });
     let response: Response;
     try {
-      response = await doFetch(`${endpoint.origin}${path}`, {
+      response = await fetchSignedR2({
+        fetchImpl: doFetch,
+        url: `${endpoint.origin}${path}`,
+        init: { method: "PUT", headers: requestHeaders, body: payload },
+        proxy: retryOptions.proxy,
+        key,
         method: "PUT",
-        headers: requestHeaders,
-        body: payload,
+        timeoutMs,
+        ...(retryOptions.signal === undefined
+          ? {}
+          : { signal: retryOptions.signal }),
       });
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (attempt < maxRetries) continue;
+      if (
+        attempt < maxRetries &&
+        isRetryablePutFailure(lastError, conditional)
+      ) {
+        continue;
+      }
       throw lastError;
     }
-    if (response.ok) return;
+    if (response.ok)
+      return parseR2ETag(response.headers.get("etag"), key, "PUT");
     if (response.status === 412) {
       throw new R2PreconditionFailedError(key);
     }
@@ -499,8 +733,89 @@ async function putObjectWithMetadata(
   throw lastError ?? new Error(`R2 PUT ${key} failed`);
 }
 
+/**
+ * A conditional (If-Match / If-None-Match) PUT never retries a timeout or connect
+ * failure: the write may have landed, so the caller re-reads the generation instead.
+ */
+function isRetryablePutFailure(error: Error, conditional: boolean): boolean {
+  if (error instanceof R2ProxyTunnelError) {
+    return error.status !== null && isTransientPutStatus(error.status);
+  }
+  if (conditional) return false;
+  if (error instanceof R2TimeoutError) return true;
+  return error instanceof R2NetworkError && error.transient;
+}
+
+export interface R2WriteWithMetadataOptions {
+  readonly type?: string;
+  readonly metadata?: Readonly<Record<string, string>>;
+  readonly ifMatch?: string;
+  readonly ifNoneMatch?: string;
+  readonly retry?: number;
+  readonly retryDelayMs?: number;
+  readonly fetchImpl?: typeof fetch;
+  readonly timeoutMs?: number;
+  readonly signal?: AbortSignal;
+}
+
+export interface R2WriteResult {
+  readonly bytes: number;
+  readonly etag: string | null;
+}
+
 function encodeBucket(bucket: string): string {
   return encodeRfc3986(bucket);
+}
+
+function r2ObjectPath(bucket: string, key: string): string {
+  return `/${encodeBucket(bucket)}/${key.split("/").map(encodeRfc3986).join("/")}`;
+}
+
+export interface R2SignedReadOptions {
+  readonly auth: R2S3Auth;
+  readonly bucket: string;
+  readonly key: string;
+  readonly method: "GET" | "HEAD";
+  readonly fetchImpl?: typeof fetch;
+  readonly proxy?: R2Proxy;
+  readonly timeoutMs?: number;
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * The one signed GET/HEAD path: signs {@link R2_IDENTITY_ENCODING_HEADERS}, sends
+ * `decompress: false`, and refuses a content-encoded ETag before the caller sees it.
+ */
+export async function fetchSignedR2Read(
+  options: R2SignedReadOptions,
+): Promise<Response> {
+  const endpoint = new URL(options.auth.endpoint);
+  const path = r2ObjectPath(options.bucket, options.key);
+  const headers = await buildSignedR2Headers({
+    auth: options.auth,
+    method: options.method,
+    path,
+    host: endpoint.host,
+    payloadHash: EMPTY_SHA256,
+    headers: R2_IDENTITY_ENCODING_HEADERS,
+  });
+  const response = await fetchSignedR2({
+    fetchImpl: options.fetchImpl ?? fetch,
+    url: `${endpoint.origin}${path}`,
+    init: { method: options.method, headers },
+    proxy: options.proxy ?? false,
+    key: options.key,
+    method: options.method,
+    timeoutMs: resolveR2TimeoutMs(options.timeoutMs),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+  });
+  try {
+    parseR2ETag(response.headers.get("etag"), options.key, options.method);
+  } catch (error) {
+    await response.body?.cancel();
+    throw error;
+  }
+  return response;
 }
 
 export class R2S3Client {
@@ -509,7 +824,12 @@ export class R2S3Client {
     readonly bucket: string,
     readonly publicBase: string,
     private readonly auth?: R2S3Auth,
-  ) {}
+    private readonly proxy: R2Proxy = false,
+    private readonly timeoutMs: number = DEFAULT_R2_FETCH_TIMEOUT_MS,
+  ) {
+    resolveR2Proxy(proxy);
+    resolveR2TimeoutMs(timeoutMs);
+  }
 
   static fromOptions(
     options: R2S3Options,
@@ -526,7 +846,14 @@ export class R2S3Client {
       ...(options.region === undefined ? {} : { region: options.region }),
     };
     const backend = client ?? new Bun.S3Client(credentials);
-    return new R2S3Client(backend, options.bucket, options.publicBase, options);
+    return new R2S3Client(
+      backend,
+      options.bucket,
+      options.publicBase,
+      options,
+      options.proxy ?? false,
+      resolveR2TimeoutMs(options.timeoutMs),
+    );
   }
 
   static fromEnv(env: R2S3Env = Bun.env): R2S3Client | null {
@@ -597,16 +924,21 @@ export class R2S3Client {
   async writeWithMetadata(
     key: string,
     data: Uint8Array | string,
-    options: {
-      readonly type?: string;
-      readonly metadata?: Readonly<Record<string, string>>;
-      readonly ifMatch?: string;
-      readonly ifNoneMatch?: string;
-      readonly retry?: number;
-      readonly retryDelayMs?: number;
-      readonly fetchImpl?: typeof fetch;
-    } = {},
+    options: R2WriteWithMetadataOptions = {},
   ): Promise<number> {
+    return (await this.writeWithMetadataResult(key, data, options)).bytes;
+  }
+
+  /**
+   * {@link writeWithMetadata} plus the ETag from the PUT response, so a caller never
+   * needs a follow-up HEAD that a racing writer could answer. `etag` is null when the
+   * write went through `Bun.S3Client.write` or the response carried no ETag.
+   */
+  async writeWithMetadataResult(
+    key: string,
+    data: Uint8Array | string,
+    options: R2WriteWithMetadataOptions = {},
+  ): Promise<R2WriteResult> {
     const type = options.type ?? "application/octet-stream";
     const metadata = options.metadata ?? {};
     if (
@@ -616,13 +948,13 @@ export class R2S3Client {
       options.retry === undefined &&
       options.fetchImpl === undefined
     ) {
-      return this.write(key, data, { type });
+      return { bytes: await this.write(key, data, { type }), etag: null };
     }
     if (this.auth === undefined) {
       throw new Error("R2S3Client: metadata upload requires auth options");
     }
     const payload = typeof data === "string" ? textEncoder.encode(data) : data;
-    await putObjectWithMetadata(
+    const etag = await putObjectWithMetadata(
       this.auth,
       this.bucket,
       key,
@@ -641,43 +973,49 @@ export class R2S3Client {
         ...(options.fetchImpl === undefined
           ? {}
           : { fetchImpl: options.fetchImpl }),
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
+        proxy: this.proxy,
+        timeoutMs: options.timeoutMs ?? this.timeoutMs,
       },
     );
-    return byteLength(data);
+    return { bytes: byteLength(data), etag };
   }
 
-  /** Read object ETag (returns null if the key does not exist). */
+  /**
+   * Read object ETag (returns null if the key does not exist) through
+   * {@link fetchSignedR2Read}, so it is the stored object's; a content-encoded ETag
+   * such as `"…+gzip"` throws {@link R2EncodedETagError}.
+   */
   async headEtag(
     key: string,
-    options: { readonly fetchImpl?: typeof fetch } = {},
+    options: {
+      readonly fetchImpl?: typeof fetch;
+      readonly timeoutMs?: number;
+      readonly signal?: AbortSignal;
+    } = {},
   ): Promise<string | null> {
     if (this.auth === undefined) {
       if (!(await this.client.exists(key))) return null;
       const stat = await this.client.stat(key);
-      const etag = stat.etag.trim();
-      return etag === "" ? null : etag;
+      return parseR2ETag(stat.etag, key, "HEAD");
     }
-    const endpoint = new URL(this.auth.endpoint);
-    const path = `/${encodeBucket(this.bucket)}/${key.split("/").map(encodeRfc3986).join("/")}`;
-    const requestHeaders = await buildSignedR2Headers({
+    const response = await fetchSignedR2Read({
       auth: this.auth,
+      bucket: this.bucket,
+      key,
       method: "HEAD",
-      path,
-      host: endpoint.host,
-      payloadHash: EMPTY_SHA256,
-      headers: {},
-    });
-    const doFetch = options.fetchImpl ?? fetch;
-    const response = await doFetch(`${endpoint.origin}${path}`, {
-      method: "HEAD",
-      headers: requestHeaders,
+      proxy: this.proxy,
+      timeoutMs: options.timeoutMs ?? this.timeoutMs,
+      ...(options.fetchImpl === undefined
+        ? {}
+        : { fetchImpl: options.fetchImpl }),
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
     if (response.status === 404) return null;
     if (!response.ok) {
       throw new Error(`R2 HEAD ${key} failed (${response.status})`);
     }
-    const etag = response.headers.get("etag")?.trim() ?? "";
-    return etag === "" ? null : etag;
+    return parseR2ETag(response.headers.get("etag"), key, "HEAD");
   }
 
   /** Back-compat alias for callers written before the writeWithMetadata rename. */
