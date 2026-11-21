@@ -277,9 +277,11 @@ export function startDashboardServer(
   options: DashboardServerOptions = {},
 ): DashboardServerHandle {
   const cwd = process.cwd();
-  const port =
-    options.port !== undefined ? options.port : Number(Bun.env.PORT) || 4022;
-  const hostname = options.hostname ?? "127.0.0.1";
+  // Boundary discipline: startDashboardServer trusts its options. Environment
+  // and CLI resolution belongs to the dev entrypoint; Bun.serve applies its own
+  // documented defaults when a library caller omits these.
+  const port = options.port;
+  const hostname = options.hostname;
   const apiOnly = options.apiOnly === true;
 
   const dashboardMdPath = resolve(cwd, "dashboard.md");
@@ -566,7 +568,7 @@ export function startDashboardServer(
       return sessionCleanup();
     },
     getAlertMetrics: () => alertDispatcher.getHealthMetrics(),
-    getPort: () => serverRef?.port ?? port,
+    getPort: () => serverRef?.port ?? port ?? 0,
   });
 
   let cachedDceMatrixProbe: {
@@ -927,7 +929,8 @@ export function startDashboardServer(
     "/": indexHtml,
     "/dashboard": indexHtml,
     // `/static/*` through the range-aware handler, not Bun's native `{ dir }` mount. The mount
-    // was chosen for its "symlink clamping", which it does not do: measured on 1.4.4, a symlink
+    // was chosen for its "symlink clamping", which it does not do: measured on 1.4.4 and re-measured
+    // on 1.4.5, a symlink
     // inside `static/` pointing at a file outside it was served with that file's content
     // (`/static/escape.txt` → 200 with the outside bytes). `containedAssetPath`, which the handler
     // uses, resolves the real path and refuses it. The same swap also replaces the directory
@@ -1259,9 +1262,27 @@ export function startDashboardServer(
       ),
   };
 
+  if (!apiOnly) {
+    const collisions = findRouteKeyCollisions({
+      ui: uiRoutes,
+      api: api.routes,
+      companion: companionApiRoutes,
+    });
+    if (collisions.length > 0) {
+      throw new Error(
+        `ERR_DASHBOARD_ROUTE_COLLISION: ${collisions
+          .map(
+            (collision) =>
+              `${collision.key} (${collision.tables.join(" + ")}; last table wins)`,
+          )
+          .join(", ")}`,
+      );
+    }
+  }
+
   const server: Server<undefined> = Bun.serve({
-    port,
-    hostname,
+    ...(port === undefined ? {} : { port }),
+    ...(hostname === undefined ? {} : { hostname }),
     development: serveDevelopment,
     routes: apiOnly
       ? api.routes
@@ -1478,7 +1499,7 @@ export function startDashboardServer(
   return {
     server,
     url: server.url,
-    port: server.port ?? port,
+    port: server.port ?? port ?? 0,
     development: server.development,
     stop(closeActiveConnections = true) {
       alertDispatcher.stop();
@@ -1491,6 +1512,195 @@ export function startDashboardServer(
       server.stop(closeActiveConnections);
     },
   };
+}
+
+export interface DashboardServerCliOptions {
+  readonly port: number | undefined;
+  readonly hostname: string | undefined;
+  readonly apiOnly: boolean;
+  readonly noDev: boolean;
+  readonly noHmr: boolean;
+  readonly noConsole: boolean;
+  readonly mcpStateless: boolean;
+  readonly help: boolean;
+}
+
+export const DASHBOARD_USAGE = `SportsDesk dev dashboard server
+
+Usage: bun run dev [options]
+
+Options:
+  --port <n>                    Listen port (default: $PORT, then 4022)
+  --host <host>                 Bind hostname (default: $HOST, then 127.0.0.1)
+  --api-only                    Serve the API/WebSocket router without the UI
+  --no-dev, --prod              Disable development mode (HMR, console, watchers)
+  --no-hmr                      Disable HMR only
+  --no-console                  Disable the dev console only
+  --stateless, --mcp-stateless  Run the MCP handler statelessly
+  -h, --help                    Show this help
+
+Values may be written as "--port 3000" or "--port=3000".`;
+
+/**
+ * Parse the dev entrypoint's argv. Supports both `--flag value` and `--flag=value`
+ * for `--port`/`--host`; non-flag argv entries (runtime and script path) are ignored.
+ */
+export function parseDashboardServerArgs(
+  argv: readonly string[],
+): DashboardServerCliOptions {
+  let port: number | undefined;
+  let hostname: string | undefined;
+  let apiOnly = false;
+  let noDev = false;
+  let noHmr = false;
+  let noConsole = false;
+  let mcpStateless = false;
+  let help = false;
+
+  let index = 0;
+  while (index < argv.length) {
+    const arg = argv[index] ?? "";
+    index += 1;
+    const equals = arg.indexOf("=");
+    const flag = equals === -1 ? arg : arg.slice(0, equals);
+    const inline = equals === -1 ? null : arg.slice(equals + 1);
+
+    const readValue = (): string => {
+      if (inline !== null) {
+        if (inline.length === 0) {
+          throw new Error(`${flag} requires a non-empty value`);
+        }
+        return inline;
+      }
+      const next = argv[index];
+      if (next === undefined || next.startsWith("--")) {
+        throw new Error(`${flag} requires a value`);
+      }
+      index += 1;
+      return next;
+    };
+
+    switch (flag) {
+      case "--port": {
+        const raw = readValue();
+        if (!/^\d+$/.test(raw)) {
+          throw new Error(`--port must be an integer (got "${raw}")`);
+        }
+        const value = Number(raw);
+        if (!Number.isInteger(value) || value < 0 || value > 65535) {
+          throw new Error(`--port must be between 0 and 65535 (got "${raw}")`);
+        }
+        port = value;
+        break;
+      }
+      case "--host":
+      case "--hostname": {
+        const value = readValue().trim();
+        if (value.length === 0) {
+          throw new Error(`${flag} requires a non-empty hostname`);
+        }
+        hostname = value;
+        break;
+      }
+      case "--api-only":
+        apiOnly = true;
+        break;
+      case "--no-dev":
+      case "--prod":
+        noDev = true;
+        break;
+      case "--no-hmr":
+        noHmr = true;
+        break;
+      case "--no-console":
+        noConsole = true;
+        break;
+      case "--stateless":
+      case "--mcp-stateless":
+        mcpStateless = true;
+        break;
+      case "-h":
+      case "--help":
+        help = true;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return {
+    port,
+    hostname,
+    apiOnly,
+    noDev,
+    noHmr,
+    noConsole,
+    mcpStateless,
+    help,
+  };
+}
+
+/**
+ * Port fallback order from Bun's `Bun.serve` docs: `$BUN_PORT`, `$PORT`, `$NODE_PORT`,
+ * then this repo's 4022 default. Invalid values fall through instead of becoming NaN.
+ */
+export function resolveDashboardDefaultPort(
+  env: Record<string, string | undefined>,
+  execArgv: readonly string[] = [],
+): number {
+  // Bun's runtime `--port=...` never reaches Bun.argv; it is visible in
+  // process.execArgv, and Bun.serve would apply it only if we omitted `port`.
+  for (let index = 0; index < execArgv.length; index += 1) {
+    const arg = execArgv[index] ?? "";
+    const raw = arg.startsWith("--port=")
+      ? arg.slice("--port=".length)
+      : arg === "--port"
+        ? (execArgv[index + 1] ?? "")
+        : null;
+    if (raw === null) continue;
+    const value = Number(raw);
+    if (raw !== "" && /^\d+$/.test(raw) && value >= 0 && value <= 65535) {
+      return value;
+    }
+  }
+
+  for (const key of ["BUN_PORT", "PORT", "NODE_PORT"]) {
+    const raw = env[key]?.trim();
+    if (!raw || !/^\d+$/.test(raw)) continue;
+    const value = Number(raw);
+    if (Number.isInteger(value) && value >= 0 && value <= 65535) return value;
+  }
+  return 4022;
+}
+
+/**
+ * Route tables are merged with object spreads, so a duplicate exact key silently
+ * replaces the earlier handler. Surface that at the boundary instead of relying on
+ * declaration order.
+ */
+export function findRouteKeyCollisions(
+  tables: Readonly<Record<string, Record<string, unknown>>>,
+): { key: string; tables: string[] }[] {
+  const owners = new Map<string, string[]>();
+  for (const [tableName, table] of Object.entries(tables)) {
+    for (const key of Object.keys(table)) {
+      const names = owners.get(key);
+      if (names === undefined) owners.set(key, [tableName]);
+      else names.push(tableName);
+    }
+  }
+  return [...owners.entries()]
+    .filter(([, names]) => names.length > 1)
+    .map(([key, names]) => ({ key, tables: names }));
+}
+
+/** CLI wins over `HOST`; `startDashboardServer` keeps 127.0.0.1 as the last default. */
+export function resolveDashboardHostname(
+  cli: Pick<DashboardServerCliOptions, "hostname">,
+  env: Record<string, string | undefined>,
+): string | undefined {
+  const host = cli.hostname ?? env.HOST?.trim();
+  return host === "" ? undefined : host;
 }
 
 if (import.meta.main) {
@@ -1506,31 +1716,53 @@ if (import.meta.main) {
     }
   }
 
-  const apiOnly = Bun.argv.includes("--api-only");
-  const noDev = Bun.argv.includes("--no-dev") || Bun.argv.includes("--prod");
-  const noHmr = Bun.argv.includes("--no-hmr");
-  const noConsole = Bun.argv.includes("--no-console");
-  const mcpStateless =
-    Bun.argv.includes("--stateless") || Bun.argv.includes("--mcp-stateless");
+  let cli: DashboardServerCliOptions;
+  try {
+    cli = parseDashboardServerArgs(Bun.argv);
+  } catch (error) {
+    console.error(
+      `error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exit(2);
+  }
+  if (cli.help) {
+    console.log(DASHBOARD_USAGE);
+    process.exit(0);
+  }
+
+  // The CLI is the boundary: resolve env/argv once, then pass typed options.
+  const hostname = resolveDashboardHostname(cli, Bun.env) ?? "127.0.0.1";
+  const port =
+    cli.port ?? resolveDashboardDefaultPort(Bun.env, process.execArgv);
   prefetchSportsDeskEndpoints();
-  const handle = startDashboardServer({
-    watchFiles: !noDev,
-    apiOnly,
-    development: noDev
-      ? false
-      : {
-          hmr: !noHmr,
-          console: !noConsole,
-        },
-    ...(mcpStateless ? { mcpStateless: true } : {}),
-  });
+  let handle: DashboardServerHandle;
+  try {
+    handle = startDashboardServer({
+      watchFiles: !cli.noDev,
+      apiOnly: cli.apiOnly,
+      development: cli.noDev
+        ? false
+        : {
+            hmr: !cli.noHmr,
+            console: !cli.noConsole,
+          },
+      port,
+      hostname,
+      ...(cli.mcpStateless ? { mcpStateless: true } : {}),
+    });
+  } catch (error) {
+    console.error(
+      `error: failed to start the dev server: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exit(1);
+  }
 
   console.log(
-    `\n⚡ SportsDesk ${apiOnly ? "API-Only" : "Enhanced Dashboard"} Server running!`,
+    `\n⚡ SportsDesk ${cli.apiOnly ? "API-Only" : "Enhanced Dashboard"} Server running!`,
   );
   console.log(`   ➜ Local URL:    ${handle.url.href}`);
   console.log(
-    `   ➜ Dev Overlay:  ${handle.development ? `enabled (hmr: ${!noHmr}, console: ${!noConsole} · Bun v${Bun.version})` : "disabled"}`,
+    `   ➜ Dev Overlay:  ${handle.development ? `enabled (hmr: ${!cli.noHmr}, console: ${!cli.noConsole} · Bun v${Bun.version})` : "disabled"}`,
   );
   console.log(`   ➜ Health Probe: ${handle.url.href}health`);
   console.log(`   ➜ Markdown API: ${handle.url.href}api/dashboard`);
