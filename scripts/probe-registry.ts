@@ -31,11 +31,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import {
-  type NpmrcConfig,
-  parseNpmrc,
-  registryHost,
-} from "../lib/npm_registry.ts";
+import { type NpmrcConfig, parseNpmrc } from "../lib/npm_registry.ts";
 import { R2S3Client } from "../lib/r2_s3_client.ts";
 
 export interface ProbeTarget {

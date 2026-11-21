@@ -3430,6 +3430,7 @@ export function apply(ctx, config) {
       health: health.body,
       uptimeSeconds: healthBody.uptimeSeconds ?? null,
       contract,
+      schedules,
       stale,
       message: stale
         ? "The service answers /health but does not match the current source " +

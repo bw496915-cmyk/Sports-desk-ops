@@ -284,9 +284,8 @@ export async function runDoctor(
   const tree = await readJson(at(TREE));
   const treeNodes = treeNodeCount(tree);
   const treeAgents = agentCountOf(tree);
-  const treeRoots = Array.isArray(record(tree)?.["roots"])
-    ? (record(tree)?.["roots"] as unknown[]).length
-    : null;
+  const rootsField = record(tree)?.["roots"];
+  const treeRoots = Array.isArray(rootsField) ? rootsField.length : null;
   const collisions = collisionsOf(tree);
   checks.push(
     tree === null
