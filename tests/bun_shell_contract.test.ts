@@ -123,6 +123,18 @@ describe("Bun Shell contract", () => {
     expect(bare).toContain("DONE");
   });
 
+  test("quoted text and ${} interpolations stay literal and ignore extglob/brace ranges", async () => {
+    const { $ } = await import("bun");
+    expect(await $`printf "%s|%s" "*(1).txt" "{1..3}"`.text()).toBe(
+      "*(1).txt|{1..3}",
+    );
+    const pat1 = "*(1).txt";
+    const pat2 = "{1..3}";
+    expect(await $`printf "%s|%s" ${pat1} ${pat2}`.text()).toBe(
+      "*(1).txt|{1..3}",
+    );
+  });
+
   test("the tag is tooling-only and always captures or quiets", async () => {
     const listed = Bun.spawnSync({
       cmd: ["git", "ls-files", ...ALL_ROOTS],
