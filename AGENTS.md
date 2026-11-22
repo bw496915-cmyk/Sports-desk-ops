@@ -235,6 +235,15 @@ flags).
 - Hot aggregation over roughly 10k+ rows uses fixed-capacity TypedArray arenas: no `Map`, `Set`,
   `boolean[]` or growing `T[]` on the aggregation path. Reference: `lib/gslive_tally_rollup.ts`;
   ratchet: `tests/tally_allocation_invariant.test.ts` (0 collection allocations).
+- Tick fanout (`lib/tick_wire.ts`, `tests/tick_wire.test.ts`):
+
+  | Mistake the nearest example used to teach                      | Rule                                                                                     | What fails                                                  |
+  | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+  | `for (const ws of clients)` and `ws.pause()` to stop publishes | Index walk. `unsubscribe` stops `server.publish`. `pause` stops reads.                   | `TickFanoutSocket` has no `pause`. `stallTickClients`       |
+  | `ca` alone treated as mTLS                                     | Client certificates are requested only with `requestCert: true`.                         | `TickServerTls` and `assertTickServerTls` (`ERR_TICK_MTLS`) |
+  | `proxy: "socks5://..."` or relying on `HTTPS_PROXY`            | `new WebSocket` takes an explicit `http:` or `https:` proxy and does not read proxy env. | `resolveTickProxy` (`ERR_TICK_PROXY_SCHEME`)                |
+  | A new `Uint32Array` and `Int32Array` on every frame            | One scratch buffer. Signed words are `\| 0`.                                             | `TickFrameScratch`                                          |
+
 - Dense flags are `Uint32Array` bitsets. Do not add `boolean[]` to runtime aggregation.
 - DOD6 reader: `lookupInto(login, target)` in per-row loops; `lookup()` allocates a result and a
   handle union per call. Handles are opaque; use `rowOfHandle`, never sort by handle.
