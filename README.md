@@ -105,9 +105,10 @@ enable native `bun lint`. Run `bun run lint:check` for a read-only gate that
 fails on warnings or errors, or `bun run lint` to apply safe fixes. CI runs lint
 alongside token regeneration, the fetch/innerHTML gates, and the full tests.
 
-Run `bun run format` to format the repository or `bun run format:check` for a
-read-only check. `bunfig.toml` preserves the existing 80-column, two-space,
-double-quote style with semicolons. Run `bun run typecheck` for Bun's native
+Run `bun fmt` to format the repository or `bun fmt --check` for a read-only
+check. `bunfig.toml` `[fmt]` is the 80-column, two-space, double-quote style
+with semicolons. `bun run format` and `bun run format:check` call those same
+commands. Run `bun run typecheck` for Bun's native
 strict, no-emit checker; `tsconfig.json` makes the previous inferred compiler
 defaults explicit and includes the repository's source, tests, and declarations.
 CI runs formatting and type checking before lint. Bun remains pinned to 1.4.4

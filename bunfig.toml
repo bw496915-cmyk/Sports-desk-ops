@@ -1,5 +1,4 @@
-# Preserve the repository's existing Prettier-compatible formatting.
-# https://bun.com/docs/runtime/bunfig#style-options
+# `bun fmt` reads this section. https://bun.com/docs/runtime/bunfig#style-options
 [fmt]
 printWidth = 80
 tabWidth = 2
@@ -34,6 +33,9 @@ ignorePatterns = [
 
 # Install keys (linker, globalStore, cache.dir, frozenLockfile, minimumReleaseAge) are owned by the
 # machine config at ~/.bunfig.toml. Setting them here would override that SSOT, so they stay out.
+# `security` is not one of those keys. Local keys override the same global key only.
+[install.security]
+scanner = "./scripts/install_security_scanner.ts"
 
 # Native Bun lint (Bun 1.5+). Bun 1.4.4 accepts but ignores this section; the enforced
 # gate is `bun run lint:check` (oxlint 1.90 + oxlint-tsgolint). Keep this block aligned
