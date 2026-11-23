@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
+  assertR2S3Endpoint,
   isS3Error,
   isS3ErrorCode,
   R2S3Client,
+  R2S3EndpointError,
   R2_SECRETS_SERVICE,
   resolveR2CredentialsAsync,
   secretSetOptions,
@@ -515,5 +517,123 @@ describe("R2S3Client uploads", () => {
     await client.delete("x");
     await client.unlink("y");
     expect(backend.deletes).toEqual(["x", "y"]);
+  });
+});
+
+describe("R2 CAS identity representation", () => {
+  test("reads a strong ETag over real fetch and preserves the conditional write", async () => {
+    let uploaded = false;
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch(request) {
+        if (request.method === "HEAD") {
+          const identity =
+            request.headers.get("accept-encoding") === "identity";
+          return new Response(null, {
+            headers: { etag: identity ? '"object-v1"' : 'W/"object-v1"' },
+          });
+        }
+        if (request.method === "PUT") {
+          uploaded = request.headers.get("if-match") === '"object-v1"';
+          return new Response(null, { status: uploaded ? 200 : 412 });
+        }
+        return new Response(null, { status: 405 });
+      },
+    });
+    try {
+      const client = R2S3Client.fromOptions(
+        {
+          bucket: "bucket",
+          endpoint: server.url.origin,
+          accessKeyId: "test",
+          secretAccessKey: "test",
+          publicBase: "https://public.test",
+        },
+        new FakeBackend(),
+      );
+      const etag = await client.headEtag("manifest");
+      expect(etag).toBe('"object-v1"');
+      if (etag === null) throw new Error("expected ETag");
+      await client.writeWithMetadata("manifest", "{}", { ifMatch: etag });
+      expect(uploaded).toBe(true);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("rejects a weak identity ETag instead of stripping its weakness marker", async () => {
+    const client = R2S3Client.fromOptions(
+      {
+        bucket: "bucket",
+        endpoint: "https://r2.test",
+        accessKeyId: "test",
+        secretAccessKey: "test",
+        publicBase: "https://public.test",
+      },
+      new FakeBackend(),
+    );
+    await expect(
+      client.headEtag("manifest", {
+        fetchImpl: Object.assign(
+          async () =>
+            new Response(null, { headers: { etag: 'W/"object-v1"' } }),
+          { preconnect: fetch.preconnect },
+        ),
+      }),
+    ).rejects.toThrow("weak ETag");
+  });
+});
+
+describe("R2 S3 endpoint validation", () => {
+  const options = (endpoint: string) => ({
+    bucket: "bucket",
+    endpoint,
+    accessKeyId: "a",
+    secretAccessKey: "s",
+    publicBase: "https://pub.test",
+  });
+
+  test.each([
+    "https://acct.r2.cloudflarestorage.com",
+    "http://127.0.0.1:8787",
+    "https://r2.test/prefix",
+    "https://r2.test/",
+  ])("accepts %s", (endpoint) => {
+    expect(() => assertR2S3Endpoint(endpoint)).not.toThrow();
+    expect(() =>
+      R2S3Client.fromOptions(options(endpoint), new FakeBackend()),
+    ).not.toThrow();
+  });
+
+  test.each([
+    "",
+    " not-a-url ",
+    "not-a-url",
+    "ftp://r2.test",
+    "https://r2.test:99999",
+    "https://user:pass@r2.test",
+    "https://r2.test?x=1",
+    "https://r2.test#h",
+  ])("rejects %j before a client is built", (endpoint) => {
+    expect(() => assertR2S3Endpoint(endpoint)).toThrow(R2S3EndpointError);
+    expect(() =>
+      R2S3Client.fromOptions(options(endpoint), new FakeBackend()),
+    ).toThrow(R2S3EndpointError);
+  });
+
+  test("the rejection carries Bun's documented endpoint code", () => {
+    let caught: unknown;
+    try {
+      R2S3Client.fromOptions(options("not-a-url"), new FakeBackend());
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(R2S3EndpointError);
+    if (!(caught instanceof R2S3EndpointError)) return;
+    expect(caught.code).toBe("ERR_S3_INVALID_ENDPOINT");
+    expect(isS3ErrorCode(caught.code)).toBe(true);
+    expect(isS3Error(caught)).toBe(true);
+    expect(caught.message).toContain("not-a-url");
   });
 });

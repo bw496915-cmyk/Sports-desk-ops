@@ -61,6 +61,53 @@ export interface R2S3Options {
   readonly publicBase: string;
 }
 
+/**
+ * Config-time rejection for an endpoint `Bun.S3Client` would otherwise accept
+ * at construction (measured on 1.4.5: `new Bun.S3Client({ endpoint: "not-a-url" })`
+ * does not throw, so the failure surfaces later as an opaque fetch error).
+ * Carries Bun's documented `ERR_S3_INVALID_ENDPOINT` code so `isS3Error` callers
+ * handle it like the runtime's own pre-flight rejection.
+ */
+export class R2S3EndpointError extends Error {
+  readonly code = "ERR_S3_INVALID_ENDPOINT" as const;
+
+  constructor(endpoint: string, reason: string) {
+    super(`ERR_S3_INVALID_ENDPOINT: ${reason}: ${JSON.stringify(endpoint)}`);
+    this.name = "R2S3EndpointError";
+  }
+}
+
+/** Validate an R2/S3 endpoint the way `new URL()` does, before a client is built. */
+export function assertR2S3Endpoint(endpoint: string): void {
+  if (endpoint.length === 0 || endpoint.trim() !== endpoint) {
+    throw new R2S3EndpointError(
+      endpoint,
+      "endpoint must be a non-empty, unpadded URL",
+    );
+  }
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new R2S3EndpointError(endpoint, "endpoint is not a URL");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new R2S3EndpointError(endpoint, "endpoint must be http(s)");
+  }
+  if (url.username !== "" || url.password !== "") {
+    throw new R2S3EndpointError(
+      endpoint,
+      "credentials belong in the dedicated fields",
+    );
+  }
+  if (url.search !== "" || url.hash !== "") {
+    throw new R2S3EndpointError(
+      endpoint,
+      "endpoint must not carry a query or fragment",
+    );
+  }
+}
+
 /** The subset of Bun.S3Client this adapter delegates to (fake-able in tests). */
 export interface R2S3ClientBackend {
   file(path: string, options?: Bun.S3Options): S3File;
@@ -515,6 +562,7 @@ export class R2S3Client {
     options: R2S3Options,
     client?: R2S3ClientBackend,
   ): R2S3Client {
+    assertR2S3Endpoint(options.endpoint);
     const credentials: Bun.S3Options = {
       bucket: options.bucket,
       endpoint: options.endpoint,
@@ -667,6 +715,9 @@ export class R2S3Client {
       payloadHash: EMPTY_SHA256,
       headers: {},
     });
+    // Compression can turn an object ETag into W/"...", which is never valid for
+    // If-Match's strong comparison. Read the identity representation for CAS.
+    requestHeaders.set("accept-encoding", "identity");
     const doFetch = options.fetchImpl ?? fetch;
     const response = await doFetch(`${endpoint.origin}${path}`, {
       method: "HEAD",
@@ -677,6 +728,11 @@ export class R2S3Client {
       throw new Error(`R2 HEAD ${key} failed (${response.status})`);
     }
     const etag = response.headers.get("etag")?.trim() ?? "";
+    if (etag.startsWith("W/")) {
+      throw new Error(
+        `R2 HEAD ${key} returned a weak ETag despite identity encoding; refusing unsafe CAS`,
+      );
+    }
     return etag === "" ? null : etag;
   }
 
