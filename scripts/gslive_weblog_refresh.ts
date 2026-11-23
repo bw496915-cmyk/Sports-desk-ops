@@ -17,8 +17,8 @@
 
 // Atomic temp-write + chmod: Bun.write has no mode/rename primitive for this journal.
 // ast-grep-ignore: node-fs-read-write-file
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { chmodSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
@@ -89,6 +89,66 @@ export interface RefreshPlan {
 function fail(message: string, exitCode: number): void {
   console.error(`gslive-weblogs: ${message}`);
   process.exitCode = exitCode;
+}
+
+export const GSLIVE_WEBLOG_REFRESH_JOURNAL = "refresh-journal.json";
+
+type RefreshOutcome =
+  "measured" | "auth_failed" | "fetch_failed" | "no_session" | "write_failed";
+
+interface RefreshJournalWrite {
+  readonly outcome: RefreshOutcome;
+  readonly httpStatus: number | null;
+  readonly error: string | null;
+  readonly account: string | null;
+  readonly artifactWritten: boolean;
+}
+
+/**
+ * Record the pass outcome beside the artifact.
+ *
+ * The reader (`lib/fraud_logs.ts`) is read-only and cannot probe GSLive, so this journal is the
+ * only way it can learn *why* the artifact is absent. A journal write must never mask the pass
+ * result, so a failure here is reported and swallowed.
+ */
+function writeRefreshJournal(
+  plan: RefreshPlan,
+  entry: RefreshJournalWrite,
+): void {
+  const path = join(dirname(plan.outPath), GSLIVE_WEBLOG_REFRESH_JOURNAL);
+  const payload = {
+    schemaVersion: 1,
+    source: "gslive_weblogs",
+    command: "bun run gslive:weblogs:refresh",
+    attemptedAt: new Date().toISOString(),
+    outcome: entry.outcome,
+    httpStatus: entry.httpStatus,
+    error: entry.error,
+    account: entry.account,
+    artifactWritten: entry.artifactWritten,
+    window: windowIso(plan),
+  };
+  try {
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    const temp = `${path}.tmp`;
+    writeFileSync(temp, `${JSON.stringify(payload, null, 2)}\n`, {
+      mode: 0o600,
+    });
+    renameSync(temp, path);
+    chmodSync(path, 0o600);
+  } catch (error) {
+    console.error(
+      `gslive-weblogs: could not write the refresh journal at ${path}: ` +
+        (error instanceof Error ? error.message : String(error)),
+    );
+  }
+}
+
+/** The HTTP status the fetch layer named, when it named one. */
+function httpStatusFrom(error: unknown): number | null {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = /HTTP\s+(\d{3})\b/.exec(message);
+  return match === null ? null : Number(match[1]);
 }
 
 function parseIntOption(
@@ -262,6 +322,13 @@ function printDryRun(plan: RefreshPlan): void {
 async function livePass(plan: RefreshPlan): Promise<void> {
   const resolvedSession = await resolveManagerSession(Bun.env);
   if (resolvedSession.source === "none") {
+    writeRefreshJournal(plan, {
+      outcome: "no_session",
+      httpStatus: null,
+      error: "no manager session was resolvable",
+      account: null,
+      artifactWritten: false,
+    });
     fail(
       "no manager session. Provision a GSID in the OS keychain via " +
         "`bun run secrets:gslive set` (service com.bookdeskops.sportsdesk, name GSID), or set " +
@@ -273,6 +340,13 @@ async function livePass(plan: RefreshPlan): Promise<void> {
   }
   const gsid = gsidFromCookieHeader(resolvedSession.cookieHeader);
   if (gsid === null) {
+    writeRefreshJournal(plan, {
+      outcome: "no_session",
+      httpStatus: null,
+      error: `resolved manager session source "${resolvedSession.source}" carries no GSID cookie`,
+      account: null,
+      artifactWritten: false,
+    });
     fail(
       `resolved manager session source "${resolvedSession.source}" carries no GSID cookie; nothing was written`,
       2,
@@ -317,7 +391,15 @@ async function livePass(plan: RefreshPlan): Promise<void> {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (isAuthFailure(error)) {
+      const authFailure = isAuthFailure(error);
+      writeRefreshJournal(plan, {
+        outcome: authFailure ? "auth_failed" : "fetch_failed",
+        httpStatus: httpStatusFrom(error),
+        error: message,
+        account: entry.customerLogin,
+        artifactWritten: false,
+      });
+      if (authFailure) {
         fail(
           `getBetReport for ${entry.customerLogin} failed with an auth error: ${message}. ` +
             "The GSID session is expired or invalid; re-provision it and retry. Nothing was written.",
@@ -405,11 +487,34 @@ async function livePass(plan: RefreshPlan): Promise<void> {
     now: new Date(),
   };
   const artifact = buildGsliveWeblogArtifact(input);
-  mkdirSync(dirname(plan.outPath), { recursive: true, mode: 0o700 });
-  writeFileSync(plan.outPath, `${JSON.stringify(artifact, null, 2)}\n`, {
-    mode: 0o600,
+  try {
+    mkdirSync(dirname(plan.outPath), { recursive: true, mode: 0o700 });
+    writeFileSync(plan.outPath, `${JSON.stringify(artifact, null, 2)}\n`, {
+      mode: 0o600,
+    });
+    chmodSync(plan.outPath, 0o600);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    writeRefreshJournal(plan, {
+      outcome: "write_failed",
+      httpStatus: null,
+      error: message,
+      account: null,
+      artifactWritten: false,
+    });
+    fail(
+      `could not write ${plan.outPath}: ${message}. Nothing was written.`,
+      1,
+    );
+    return;
+  }
+  writeRefreshJournal(plan, {
+    outcome: "measured",
+    httpStatus: null,
+    error: null,
+    account: null,
+    artifactWritten: true,
   });
-  chmodSync(plan.outPath, 0o600);
 
   const flags =
     Object.entries(artifact.summary.flagsByCode)
