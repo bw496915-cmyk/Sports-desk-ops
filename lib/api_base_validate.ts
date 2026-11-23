@@ -31,15 +31,23 @@
  *
  * Do not "simplify" this by moving the hostname into the pattern: on Bun 1.4.5
  * `:sub([a-z0-9-]+)` throws `Unable to create RegExp object`, hostname
- * alternation (`{localhost|127.0.0.1}`) throws `Name position ...`, and an IPv6
- * hostname literal throws `Name position ...`. A numeric port group is the one
- * exception: it works, and the development pattern uses it.
+ * alternation (`{localhost|127.0.0.1}`) throws `Invalid input to canonicalize a
+ * URL host string`, and an IPv6 hostname literal throws `Name position ...`.
+ * A numeric port group is the one exception: it compiles, and the development
+ * pattern uses it.
  *
- * Do not gate startup on `URLPattern#hasRegExpGroups` either: it is `false` for
- * these patterns by design (no regexp groups), so asserting it would disable the
- * validator. Do not pass `{ ignoreCase: true }`: `url.href` is already
- * canonical, and the option also makes pathname matching case-insensitive.
+ * Do not gate startup on `URLPattern#hasRegExpGroups`: it is `false` for the
+ * production pattern but `true` for the development one (the port group), so a
+ * blanket assertion would disable half the validator. Do not pass
+ * `{ ignoreCase: true }`: `url.href` is already canonical, and the option also
+ * makes pathname matching case-insensitive.
  */
+
+// Bun exposes URLPattern as a global at runtime, but the published globals
+// table does not list it and bun-types 1.4.5 does not declare it. The
+// documented node:url export is the same constructor (measured 1.4.5), and
+// @types/node 23.8+ supplies its type.
+import { URLPattern } from "node:url";
 
 export type ApiBaseMode = "production" | "development";
 
@@ -122,6 +130,14 @@ export interface ApiBaseValidator {
     path: string,
     mode?: ApiBaseMode,
   ) => ApiUrlResult;
+}
+
+export interface ApiBaseValidatorOptions {
+  /**
+   * Override the URLPattern constructor. Defaults to the `node:url` export;
+   * `null` forces `ERR_API_BASE_PATTERN_UNAVAILABLE`.
+   */
+  readonly patternCtor?: typeof URLPattern | null;
 }
 
 /** C0 controls, DEL and backslash: `URL` strips the first two and rewrites `\` to `/`. */
@@ -232,10 +248,16 @@ interface Patterns {
   readonly development: URLPattern | undefined;
 }
 
-function buildPatterns(policy: ApiBasePolicy): Patterns {
+function buildPatterns(
+  policy: ApiBasePolicy,
+  PatternCtor: typeof URLPattern | null,
+): Patterns {
+  if (PatternCtor === null) {
+    return { production: undefined, development: undefined };
+  }
   try {
     return {
-      production: new URLPattern({
+      production: new PatternCtor({
         protocol: "*",
         username: "",
         password: "",
@@ -249,7 +271,7 @@ function buildPatterns(policy: ApiBasePolicy): Patterns {
       // hostname pattern cannot enumerate localhost / 127.0.0.1 / [::1] on
       // Bun 1.4.5. The port group is safe, and it rejects `:0` and every value
       // above 65535 even if a future edit applies the pattern to raw input.
-      development: new URLPattern({
+      development: new PatternCtor({
         protocol: "*",
         username: "",
         password: "",
@@ -268,9 +290,29 @@ function buildPatterns(policy: ApiBasePolicy): Patterns {
   }
 }
 
+/** Dot-separated hostname labels; a pattern metacharacter would widen the match. */
+const SUFFIX_LABELS = /^(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/u;
+
 function assertPolicy(policy: ApiBasePolicy): void {
   if (!policy.production.suffix.startsWith(".")) {
     throw new Error("production.suffix must start with a dot");
+  }
+  if (!SUFFIX_LABELS.test(policy.production.suffix)) {
+    throw new Error(
+      "production.suffix must be lower-case dot-separated hostname labels",
+    );
+  }
+  // Both port rules are literals; a typo from a JavaScript caller must fail
+  // here rather than fall through to the permissive branch in `portAllowed`.
+  if (policy.production.port !== "default-only") {
+    throw new Error('production.port must be "default-only"');
+  }
+  if (policy.development.port !== "any-valid") {
+    throw new Error('development.port must be "any-valid"');
+  }
+  // A non-RegExp label would silently compile to `/(?:)/` and accept anything.
+  if (!(policy.production.label instanceof RegExp)) {
+    throw new Error("production.label must be a RegExp");
   }
   if (
     !Number.isSafeInteger(policy.maxInputLength) ||
@@ -287,8 +329,11 @@ function assertPolicy(policy: ApiBasePolicy): void {
  */
 export function createApiBaseValidator(
   policy: ApiBasePolicy = BOOKDESKOPS_API_BASE_POLICY,
+  options: ApiBaseValidatorOptions = {},
 ): ApiBaseValidator {
   assertPolicy(policy);
+  const PatternCtor =
+    options.patternCtor === undefined ? URLPattern : options.patternCtor;
   const label = new RegExp(
     policy.production.label.source,
     policy.production.label.flags.replace(/[gy]/gu, ""),
@@ -313,7 +358,7 @@ export function createApiBaseValidator(
   let cachedPatterns: Patterns | undefined;
 
   function patterns(): Patterns {
-    cachedPatterns ??= buildPatterns(rules);
+    cachedPatterns ??= buildPatterns(rules, PatternCtor);
     return cachedPatterns;
   }
 

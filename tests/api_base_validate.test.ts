@@ -9,6 +9,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import {
+  BOOKDESKOPS_API_BASE_POLICY,
   createApiBaseValidator,
   resolveApiUrl,
   validateApiBaseWithPattern,
@@ -87,20 +88,39 @@ const CUSTOM_POLICY: ApiBasePolicy = {
   maxInputLength: 2_048,
 };
 
-describe("validateApiBaseWithPattern", () => {
-  test.each(REJECTED)("rejects %j without throwing", (raw) => {
-    expect(() => validateApiBaseWithPattern(raw, false)).not.toThrow();
-    expect(validateApiBaseWithPattern(raw, false).ok).toBe(false);
-  });
+/** Short, stable test names; the length-cap fixture is 2 KB. */
+function labelOf(raw: string): string {
+  const shown = raw.length > 48 ? `${raw.slice(0, 45)}…` : raw;
+  return JSON.stringify(shown);
+}
 
-  test.each([
-    null,
-    undefined,
-    42 as unknown as string,
-    {} as unknown as string,
-  ])("rejects non-string %j without throwing", (raw) => {
-    expect(() => validateApiBaseWithPattern(raw, false)).not.toThrow();
-    expect(validateApiBaseWithPattern(raw, false).ok).toBe(false);
+describe("validateApiBaseWithPattern", () => {
+  for (const raw of REJECTED) {
+    test(`rejects ${labelOf(raw)} without throwing`, () => {
+      expect(() => validateApiBaseWithPattern(raw, false)).not.toThrow();
+      expect(validateApiBaseWithPattern(raw, false).ok).toBe(false);
+    });
+  }
+
+  const NON_STRINGS: readonly unknown[] = [null, undefined, 42, {}];
+  for (const raw of NON_STRINGS) {
+    const shown = JSON.stringify(raw) ?? String(raw);
+    test(`rejects non-string ${shown} without throwing`, () => {
+      // A boundary validator must survive a caller that bypassed the types.
+      const value = raw as string | null | undefined;
+      expect(() => validateApiBaseWithPattern(value, false)).not.toThrow();
+      expect(validateApiBaseWithPattern(value, false).ok).toBe(false);
+    });
+  }
+
+  test("trims surrounding whitespace before parsing", () => {
+    expect(
+      validateApiBaseWithPattern("  https://api.bookdeskops.com  ", false),
+    ).toEqual({
+      ok: true,
+      normalized: "https://api.bookdeskops.com",
+      sub: "api",
+    });
   });
 
   test("accepts a canonical production origin and extracts the subdomain", () => {
@@ -343,27 +363,19 @@ describe("validateApiBaseWithPattern", () => {
     expect(validateApiBaseWithPattern(once.normalized, false)).toEqual(once);
   });
 
-  test("reports PATTERN_UNAVAILABLE when the runtime has no URLPattern", () => {
-    const moduleHref = new URL("../lib/api_base_validate.ts", import.meta.url)
-      .href;
-    const script = `
-      delete globalThis.URLPattern;
-      const mod = await import(${JSON.stringify(moduleHref)});
-      process.stdout.write(JSON.stringify([
-        mod.validateApiBaseWithPattern("https://api.bookdeskops.com", false),
-        mod.validateApiBaseWithPattern("http://127.0.0.1:8787", true),
-      ]));
-    `;
-    const proc = Bun.spawnSync({
-      cmd: [process.execPath, "-e", script],
-      stdout: "pipe",
-      stderr: "pipe",
+  test("reports PATTERN_UNAVAILABLE when the URLPattern constructor is unavailable", () => {
+    const validator = createApiBaseValidator(BOOKDESKOPS_API_BASE_POLICY, {
+      patternCtor: null,
     });
-    expect(proc.exitCode).toBe(0);
-    expect(JSON.parse(proc.stdout.toString())).toEqual([
-      { ok: false, code: "ERR_API_BASE_PATTERN_UNAVAILABLE" },
-      { ok: false, code: "ERR_API_BASE_PATTERN_UNAVAILABLE" },
-    ]);
+    for (const [raw, mode] of [
+      ["https://api.bookdeskops.com", "production"],
+      ["http://127.0.0.1:8787", "development"],
+    ] as const) {
+      expect(validator.validate(raw, mode)).toEqual({
+        ok: false,
+        code: "ERR_API_BASE_PATTERN_UNAVAILABLE",
+      });
+    }
   });
 });
 
@@ -417,6 +429,20 @@ describe("resolveApiUrl", () => {
     // The base path this guards: `new URL("//evil.com", base).href` is evil.com.
     expect(new URL("//evil.com", base).origin).toBe("https://evil.com");
     expect(resolveApiUrl(base, "//evil.com").ok).toBe(false);
+  });
+
+  test("joins a loopback base in development mode", () => {
+    expect(resolveApiUrl("http://127.0.0.1:8787", "/items", true)).toEqual({
+      ok: true,
+      href: "http://127.0.0.1:8787/items",
+    });
+  });
+
+  test("rejects an over-long endpoint path", () => {
+    expect(resolveApiUrl(base, "/" + "a".repeat(2_048))).toEqual({
+      ok: false,
+      code: "ERR_API_BASE_INVALID_URL",
+    });
   });
 });
 
@@ -520,4 +546,55 @@ describe("createApiBaseValidator", () => {
       }),
     ).toThrow("production.suffix must start with a dot");
   });
+
+  test("rejects a port-policy typo instead of failing open", () => {
+    // Deliberately type-invalid: a JavaScript caller can pass this.
+    const policy = {
+      ...CUSTOM_POLICY,
+      production: { ...CUSTOM_POLICY.production, port: "any-valid" },
+    } as unknown as ApiBasePolicy;
+    expect(() => createApiBaseValidator(policy)).toThrow(
+      'production.port must be "default-only"',
+    );
+  });
+
+  test("rejects a development port-policy typo instead of failing open", () => {
+    const policy = {
+      ...CUSTOM_POLICY,
+      development: { ...CUSTOM_POLICY.development, port: "default-only" },
+    } as unknown as ApiBasePolicy;
+    expect(() => createApiBaseValidator(policy)).toThrow(
+      'development.port must be "any-valid"',
+    );
+  });
+
+  test("rejects a non-RegExp label instead of matching everything", () => {
+    const policy = {
+      ...CUSTOM_POLICY,
+      production: { ...CUSTOM_POLICY.production, label: "^[a-z]+$" },
+    } as unknown as ApiBasePolicy;
+    expect(() => createApiBaseValidator(policy)).toThrow(
+      "production.label must be a RegExp",
+    );
+  });
+
+  test("rejects a suffix containing pattern metacharacters", () => {
+    expect(() =>
+      createApiBaseValidator({
+        ...CUSTOM_POLICY,
+        production: { ...CUSTOM_POLICY.production, suffix: ".exa{mple.test" },
+      }),
+    ).toThrow(
+      "production.suffix must be lower-case dot-separated hostname labels",
+    );
+  });
+
+  test.each([0, -1, 1.5, Number.NaN] as const)(
+    "rejects maxInputLength %p",
+    (maxInputLength) => {
+      expect(() =>
+        createApiBaseValidator({ ...CUSTOM_POLICY, maxInputLength }),
+      ).toThrow("maxInputLength must be a positive safe integer");
+    },
+  );
 });
