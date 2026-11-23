@@ -10,6 +10,8 @@
  * executable: the documented set is data, and `globalsContract()` reports where
  * the runtime disagrees.
  *
+ * It also records the Node module-surface gaps measured against Node 26.11.1.
+ *
  * Measured on Bun 1.4.5 (the repo pin). The undocumented surface lists were
  * collected by diffing `Object.getOwnPropertyNames(globalThis)` against the
  * reference table, so they are a recorded observation, not a completeness claim:
@@ -207,3 +209,57 @@ export function typeOnlyExportsAtRuntime(
     (entry) => entry.name in (modules[entry.module] ?? {}),
   ).map((entry) => `${entry.module}#${entry.name}`);
 }
+
+/**
+ * Node APIs the reference surface declares but the pinned runtime does not
+ * export, measured by requiring every `builtinModules` id on Bun 1.4.5 and Node
+ * 26.11.1. `alternative` names the supported path, or null when none exists.
+ */
+export interface NodeModuleApiGap {
+  readonly module: string;
+  readonly name: string;
+  readonly alternative: string | null;
+}
+
+export const NODE_MODULE_API_GAPS: readonly NodeModuleApiGap[] = [
+  {
+    module: "node:module",
+    name: "registerHooks",
+    alternative: "node:module register()",
+  },
+  {
+    module: "node:module",
+    name: "stripTypeScriptTypes",
+    alternative: "Bun.Transpiler",
+  },
+  { module: "node:module", name: "findPackageJSON", alternative: null },
+  { module: "node:module", name: "getSourceMapsSupport", alternative: null },
+  { module: "node:module", name: "setSourceMapsSupport", alternative: null },
+];
+
+/** Recorded gaps a module namespace now exports; expected to stay empty. */
+export function closedApiGaps(
+  modules: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+): readonly string[] {
+  return NODE_MODULE_API_GAPS.filter(
+    (gap) => gap.name in (modules[gap.module] ?? {}),
+  ).map((gap) => `${gap.module}#${gap.name}`);
+}
+
+/**
+ * Bun-specific builtin ids. They are listed **unprefixed** and requireable under
+ * exactly these names — `require("node:bun")` is the wrong spelling, and tooling
+ * that mechanically prepends `node:` will report seven phantom modules.
+ */
+export const BUN_ONLY_BUILTIN_IDS: readonly string[] = [
+  "bun",
+  "bun:ffi",
+  "bun:jsc",
+  "bun:sqlite",
+  "bun:test",
+  "undici",
+  "ws",
+];
+
+/** Ids that are requireable but absent from `builtinModules`. */
+export const UNLISTED_BUILTIN_IDS: readonly string[] = ["node:test"];
