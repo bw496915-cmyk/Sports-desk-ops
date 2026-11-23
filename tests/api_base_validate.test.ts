@@ -13,6 +13,7 @@ import {
   createApiBaseValidator,
   resolveApiUrl,
   validateApiBaseWithPattern,
+  type ApiBaseMode,
   type ApiBasePolicy,
 } from "../lib/api_base_validate.ts";
 
@@ -123,6 +124,14 @@ describe("validateApiBaseWithPattern", () => {
     });
   });
 
+  test("applies the length budget to the raw input, before trimming", () => {
+    const padded = " ".repeat(2_049) + "https://api.bookdeskops.com";
+    expect(validateApiBaseWithPattern(padded, false)).toEqual({
+      ok: false,
+      code: "ERR_API_BASE_INVALID_URL",
+    });
+  });
+
   test("accepts a canonical production origin and extracts the subdomain", () => {
     expect(
       validateApiBaseWithPattern("https://api.bookdeskops.com", false),
@@ -160,6 +169,28 @@ describe("validateApiBaseWithPattern", () => {
     });
   });
 
+  test("rejects encoded separators and control bytes in the base path", () => {
+    for (const raw of [
+      "https://api.bookdeskops.com/v1%2f..%2fadmin",
+      "https://api.bookdeskops.com/%2e%2e/admin",
+      "https://api.bookdeskops.com/v1%5c..%5cadmin",
+      "https://api.bookdeskops.com/a%2fb",
+      "https://api.bookdeskops.com/%00",
+      "https://api.bookdeskops.com/%1f",
+      "https://api.bookdeskops.com/%7f",
+    ]) {
+      expect(validateApiBaseWithPattern(raw, false)).toEqual({
+        ok: false,
+        code: "ERR_API_BASE_INVALID_URL",
+      });
+    }
+    // A literal dot inside a segment is not a dot segment.
+    expect(
+      validateApiBaseWithPattern("https://api.bookdeskops.com/v1/a.b", false)
+        .ok,
+    ).toBe(true);
+  });
+
   test("scheme and host case is canonicalised, not rejected", () => {
     expect(
       validateApiBaseWithPattern("HTTPS://API.BOOKDESKOPS.COM", false),
@@ -192,6 +223,35 @@ describe("validateApiBaseWithPattern", () => {
     expect(validateApiBaseWithPattern("http://127.0.0.1:8787", false).ok).toBe(
       false,
     );
+  });
+
+  test("treats only boolean true as development", () => {
+    for (const flag of ["false", "0", 1, {}] as const) {
+      expect(
+        validateApiBaseWithPattern(
+          "http://127.0.0.1:8787",
+          flag as unknown as boolean,
+        ),
+      ).toEqual({
+        ok: false,
+        code: "ERR_API_BASE_ORIGIN_UNTRUSTED",
+      });
+    }
+  });
+
+  test("rejects an unknown runtime mode instead of falling back to development", () => {
+    const validator = createApiBaseValidator();
+    for (const mode of ["prod", "Production", "", null, 1, {}] as const) {
+      expect(
+        validator.validate(
+          "http://127.0.0.1:8787",
+          mode as unknown as ApiBaseMode,
+        ),
+      ).toEqual({
+        ok: false,
+        code: "ERR_API_BASE_INVALID_MODE",
+      });
+    }
   });
 
   test("allows dev HTTPS on loopback but not production", () => {
@@ -438,6 +498,18 @@ describe("resolveApiUrl", () => {
     });
   });
 
+  test("rejects a non-string path without throwing", () => {
+    for (const path of [null, undefined, 42, {}] as const) {
+      expect(() =>
+        resolveApiUrl(base, path as unknown as string),
+      ).not.toThrow();
+      expect(resolveApiUrl(base, path as unknown as string)).toEqual({
+        ok: false,
+        code: "ERR_API_BASE_INVALID_URL",
+      });
+    }
+  });
+
   test("rejects an over-long endpoint path", () => {
     expect(resolveApiUrl(base, "/" + "a".repeat(2_048))).toEqual({
       ok: false,
@@ -547,6 +619,50 @@ describe("createApiBaseValidator", () => {
     ).toThrow("production.suffix must start with a dot");
   });
 
+  test("rejects a null policy instead of throwing a TypeError", () => {
+    expect(() =>
+      createApiBaseValidator(null as unknown as ApiBasePolicy),
+    ).toThrow("policy must be an object");
+  });
+
+  test("rejects missing production and development blocks by name", () => {
+    expect(() =>
+      createApiBaseValidator({
+        ...CUSTOM_POLICY,
+        production: null,
+      } as unknown as ApiBasePolicy),
+    ).toThrow("production policy must be an object");
+    expect(() =>
+      createApiBaseValidator({
+        ...CUSTOM_POLICY,
+        development: null,
+      } as unknown as ApiBasePolicy),
+    ).toThrow("development policy must be an object");
+  });
+
+  test("rejects a non-string suffix by field name", () => {
+    expect(() =>
+      createApiBaseValidator({
+        ...CUSTOM_POLICY,
+        production: { ...CUSTOM_POLICY.production, suffix: 42 },
+      } as unknown as ApiBasePolicy),
+    ).toThrow("production.suffix must be a string");
+  });
+
+  test("treats a null options object as no overrides", () => {
+    const validator = createApiBaseValidator(
+      CUSTOM_POLICY,
+      null as unknown as Parameters<typeof createApiBaseValidator>[1],
+    );
+    expect(
+      validator.validate("https://api.example.test", "production"),
+    ).toEqual({
+      ok: true,
+      normalized: "https://api.example.test",
+      sub: "api",
+    });
+  });
+
   test("rejects a port-policy typo instead of failing open", () => {
     // Deliberately type-invalid: a JavaScript caller can pass this.
     const policy = {
@@ -575,6 +691,66 @@ describe("createApiBaseValidator", () => {
     } as unknown as ApiBasePolicy;
     expect(() => createApiBaseValidator(policy)).toThrow(
       "production.label must be a RegExp",
+    );
+  });
+
+  test("rejects a deny-list that is a string instead of a Set", () => {
+    // A string is iterable, so `new Set("staging")` would become character
+    // denials and let `staging.example.test` through.
+    const policy = {
+      ...CUSTOM_POLICY,
+      production: {
+        ...CUSTOM_POLICY.production,
+        deniedSubdomains: "staging",
+      },
+    } as unknown as ApiBasePolicy;
+    expect(() => createApiBaseValidator(policy)).toThrow(
+      "production.deniedSubdomains must be a Set of lower-case hostname labels",
+    );
+  });
+
+  test("rejects non-canonical policy host and deny entries", () => {
+    const upperDeny = {
+      ...CUSTOM_POLICY,
+      production: {
+        ...CUSTOM_POLICY.production,
+        deniedSubdomains: new Set(["STAGING"]),
+      },
+    } as ApiBasePolicy;
+    expect(() => createApiBaseValidator(upperDeny)).toThrow(
+      "production.deniedSubdomains entries must be lower-case single hostname labels",
+    );
+
+    const upperHost = {
+      ...CUSTOM_POLICY,
+      development: {
+        ...CUSTOM_POLICY.development,
+        hosts: new Set(["LOCALHOST"]),
+      },
+    } as ApiBasePolicy;
+    expect(() => createApiBaseValidator(upperHost)).toThrow(
+      "development.hosts entries must be lower-case canonical URL hostnames",
+    );
+
+    const aliasHost = {
+      ...CUSTOM_POLICY,
+      development: {
+        ...CUSTOM_POLICY.development,
+        hosts: new Set(["[0:0:0:0:0:0:0:1]"]),
+      },
+    } as ApiBasePolicy;
+    expect(() => createApiBaseValidator(aliasHost)).toThrow(
+      "development.hosts entries must be canonical URL hostnames",
+    );
+  });
+
+  test("rejects a protocol entry that is not lower-case with its colon", () => {
+    const policy = {
+      ...CUSTOM_POLICY,
+      production: { ...CUSTOM_POLICY.production, protocols: ["HTTPS"] },
+    } as unknown as ApiBasePolicy;
+    expect(() => createApiBaseValidator(policy)).toThrow(
+      "production.protocols entries must be lower-case protocol strings including the colon",
     );
   });
 
