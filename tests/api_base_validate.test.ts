@@ -9,8 +9,10 @@
  */
 import { describe, expect, test } from "bun:test";
 import {
+  createApiBaseValidator,
   resolveApiUrl,
   validateApiBaseWithPattern,
+  type ApiBasePolicy,
 } from "../lib/api_base_validate.ts";
 
 const REJECTED = [
@@ -68,6 +70,22 @@ const REJECTED = [
   "",
   "   ",
 ] as const;
+
+const CUSTOM_POLICY: ApiBasePolicy = {
+  production: {
+    protocols: ["https:"],
+    suffix: ".example.test",
+    label: /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u,
+    deniedSubdomains: new Set(["staging"]),
+    port: "default-only",
+  },
+  development: {
+    protocols: ["http:", "https:"],
+    hosts: new Set(["dev.internal", "localhost"]),
+    port: "any-valid",
+  },
+  maxInputLength: 2_048,
+};
 
 describe("validateApiBaseWithPattern", () => {
   test.each(REJECTED)("rejects %j without throwing", (raw) => {
@@ -154,6 +172,31 @@ describe("validateApiBaseWithPattern", () => {
     expect(validateApiBaseWithPattern("http://127.0.0.1:8787", false).ok).toBe(
       false,
     );
+  });
+
+  test("allows dev HTTPS on loopback but not production", () => {
+    expect(validateApiBaseWithPattern("https://localhost:8787", true)).toEqual({
+      ok: true,
+      normalized: "https://localhost:8787",
+    });
+    expect(validateApiBaseWithPattern("https://127.0.0.1:8787", true).ok).toBe(
+      true,
+    );
+    expect(
+      validateApiBaseWithPattern("https://api.bookdeskops.com", true),
+    ).toEqual({
+      ok: false,
+      code: "ERR_API_BASE_ORIGIN_UNTRUSTED",
+    });
+  });
+
+  test("rejects HTTP on a production host", () => {
+    expect(
+      validateApiBaseWithPattern("http://api.bookdeskops.com", false),
+    ).toEqual({
+      ok: false,
+      code: "ERR_API_BASE_ORIGIN_UNTRUSTED",
+    });
   });
 
   test.each([
@@ -374,5 +417,107 @@ describe("resolveApiUrl", () => {
     // The base path this guards: `new URL("//evil.com", base).href` is evil.com.
     expect(new URL("//evil.com", base).origin).toBe("https://evil.com");
     expect(resolveApiUrl(base, "//evil.com").ok).toBe(false);
+  });
+});
+
+describe("createApiBaseValidator", () => {
+  const validator = createApiBaseValidator(CUSTOM_POLICY);
+
+  test("uses the configured production suffix and deny-list", () => {
+    expect(
+      validator.validate("https://api.example.test", "production"),
+    ).toEqual({
+      ok: true,
+      normalized: "https://api.example.test",
+      sub: "api",
+    });
+    expect(
+      validator.validate("https://api.bookdeskops.com", "production"),
+    ).toEqual({
+      ok: false,
+      code: "ERR_API_BASE_ORIGIN_UNTRUSTED",
+    });
+    expect(
+      validator.validate("https://staging.example.test", "production"),
+    ).toEqual({
+      ok: false,
+      code: "ERR_API_BASE_ORIGIN_UNTRUSTED",
+    });
+  });
+
+  test("uses the configured development hosts and protocols", () => {
+    expect(
+      validator.validate("http://dev.internal:8787", "development"),
+    ).toEqual({
+      ok: true,
+      normalized: "http://dev.internal:8787",
+    });
+    expect(
+      validator.validate("https://dev.internal:8787", "development"),
+    ).toEqual({
+      ok: true,
+      normalized: "https://dev.internal:8787",
+    });
+    expect(validator.validate("http://127.0.0.1:8787", "development")).toEqual({
+      ok: false,
+      code: "ERR_API_BASE_ORIGIN_UNTRUSTED",
+    });
+  });
+
+  test("separates protocol policy from hostname policy", () => {
+    expect(validator.validate("http://api.example.test", "production")).toEqual(
+      {
+        ok: false,
+        code: "ERR_API_BASE_ORIGIN_UNTRUSTED",
+      },
+    );
+    expect(validator.validate("ftp://dev.internal", "development")).toEqual({
+      ok: false,
+      code: "ERR_API_BASE_ORIGIN_UNTRUSTED",
+    });
+  });
+
+  test("keeps production on the default port and development open", () => {
+    expect(
+      validator.validate("https://api.example.test:8443", "production"),
+    ).toEqual({
+      ok: false,
+      code: "ERR_API_BASE_ORIGIN_UNTRUSTED",
+    });
+    expect(
+      validator.validate("https://dev.internal:8443", "development"),
+    ).toEqual({
+      ok: true,
+      normalized: "https://dev.internal:8443",
+    });
+  });
+
+  test("snapshots the policy at construction", () => {
+    const denied = new Set(["staging"]);
+    const hosts = new Set(["dev.internal"]);
+    const policy: ApiBasePolicy = {
+      ...CUSTOM_POLICY,
+      production: { ...CUSTOM_POLICY.production, deniedSubdomains: denied },
+      development: { ...CUSTOM_POLICY.development, hosts },
+    };
+    const frozen = createApiBaseValidator(policy);
+    denied.add("api");
+    hosts.delete("dev.internal");
+
+    expect(frozen.validate("https://api.example.test", "production").ok).toBe(
+      true,
+    );
+    expect(frozen.validate("http://dev.internal:8787", "development").ok).toBe(
+      true,
+    );
+  });
+
+  test("rejects a malformed policy at construction", () => {
+    expect(() =>
+      createApiBaseValidator({
+        ...CUSTOM_POLICY,
+        production: { ...CUSTOM_POLICY.production, suffix: "example.test" },
+      }),
+    ).toThrow("production.suffix must start with a dot");
   });
 });
