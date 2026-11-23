@@ -20,7 +20,7 @@
  */
 
 import { readdir, stat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { sha256Hex } from "./f402_bet_ticker_delta.ts";
 import { classifyIp, parseAccessMs } from "./f402_weblog.ts";
@@ -2391,6 +2391,68 @@ async function loadLiveSource(
   };
 }
 
+/** One recorded outcome of `bun run gslive:weblogs:refresh` (written by the refresh script). */
+export interface GsliveWeblogRefreshJournal {
+  readonly schemaVersion: number;
+  readonly source: "gslive_weblogs";
+  readonly command: string;
+  readonly attemptedAt: string;
+  readonly outcome:
+    "measured" | "auth_failed" | "fetch_failed" | "no_session" | "write_failed";
+  readonly httpStatus: number | null;
+  readonly error: string | null;
+  readonly account: string | null;
+  readonly artifactWritten: boolean;
+}
+
+export const GSLIVE_WEBLOG_REFRESH_JOURNAL_FILENAME = "refresh-journal.json";
+
+function isRefreshJournal(value: unknown): value is GsliveWeblogRefreshJournal {
+  if (typeof value !== "object" || value === null) return false;
+  const entry = value as Record<string, unknown>;
+  return (
+    entry["source"] === "gslive_weblogs" &&
+    typeof entry["attemptedAt"] === "string" &&
+    Number.isFinite(Date.parse(entry["attemptedAt"])) &&
+    typeof entry["outcome"] === "string" &&
+    (entry["httpStatus"] === null || typeof entry["httpStatus"] === "number") &&
+    (entry["error"] === null || typeof entry["error"] === "string")
+  );
+}
+
+/**
+ * Read the refresh journal that sits beside the activity artifact.
+ *
+ * The journal is the only evidence of *why* a pass produced no artifact: without it this module
+ * cannot tell an expired GSID from a run that never happened, and hardcoding either one asserts a
+ * cause that was never measured. Returns the newest valid journal across the candidate paths.
+ */
+async function readGsliveWeblogRefreshJournal(
+  candidates: readonly string[],
+): Promise<{ journal: GsliveWeblogRefreshJournal; path: string } | null> {
+  let best: { journal: GsliveWeblogRefreshJournal; path: string } | null = null;
+  let bestMs = Number.NEGATIVE_INFINITY;
+  for (const artifactPath of candidates) {
+    const journalPath = join(
+      dirname(artifactPath),
+      GSLIVE_WEBLOG_REFRESH_JOURNAL_FILENAME,
+    );
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await Bun.file(journalPath).text());
+    } catch {
+      continue;
+    }
+    if (!isRefreshJournal(parsed)) continue;
+    const attemptedMs = Date.parse(parsed.attemptedAt);
+    if (attemptedMs > bestMs) {
+      bestMs = attemptedMs;
+      best = { journal: parsed, path: journalPath };
+    }
+  }
+  return best;
+}
+
 async function loadWeblogsSource(
   root: string,
   config: FraudPluginConfig,
@@ -2412,24 +2474,77 @@ async function loadWeblogsSource(
     }
   }
   if (info === null) {
+    const recorded = await readGsliveWeblogRefreshJournal(candidates);
+    const base = {
+      id: "gslive_weblogs" as const,
+      root,
+      absolutePath: absolute,
+      now,
+      mtime: null,
+      bytes: null,
+      provenance: "api-log-rollup" as const,
+      ageSeconds: null,
+      staleAfterSeconds: config.sources.gslive_weblogs.staleAfterSeconds,
+      records: null,
+      sha256: null,
+    };
+    if (recorded === null) {
+      return {
+        activity,
+        state: buildSourceState({
+          ...base,
+          note:
+            "GSLive WebLog activity MISSING and no refresh journal exists beside it: " +
+            `no pass has recorded an outcome, so the cause is unknown. Run \`${GSLIVE_WEBLOG_ACTIVITY_COMMAND}\` — ` +
+            "do not read this as an expired session.",
+          reason:
+            "artifact missing and no refresh journal: no refresh pass has recorded an outcome",
+          state: "missing",
+        }),
+      };
+    }
+    const { journal } = recorded;
+    const journalPath = recorded.path;
+    const statusPart =
+      journal.httpStatus === null
+        ? "no HTTP status"
+        : `HTTP ${journal.httpStatus}`;
+    const detail = journal.error === null ? "no detail" : journal.error;
+    if (journal.outcome === "auth_failed") {
+      return {
+        activity,
+        state: buildSourceState({
+          ...base,
+          note:
+            `GSLive WebLog activity MISSING; the last recorded refresh (${journal.attemptedAt}) ` +
+            `failed auth with ${statusPart} — re-auth, then \`${GSLIVE_WEBLOG_ACTIVITY_COMMAND}\``,
+          reason: `last recorded refresh at ${journal.attemptedAt} failed with ${statusPart}: ${detail} (journal ${journalPath})`,
+          state: "session_expired",
+        }),
+      };
+    }
+    if (journal.outcome === "measured") {
+      return {
+        activity,
+        state: buildSourceState({
+          ...base,
+          note:
+            `GSLive WebLog activity artifact is absent, but the last recorded refresh (${journal.attemptedAt}) ` +
+            "reported a written artifact: it was removed after the pass.",
+          reason: `journal records a measured pass at ${journal.attemptedAt} (artifactWritten=${journal.artifactWritten}) but the artifact is absent (journal ${journalPath})`,
+          state: "missing",
+        }),
+      };
+    }
     return {
       activity,
       state: buildSourceState({
-        id: "gslive_weblogs",
-        root,
-        absolutePath: absolute,
-        now,
-        mtime: null,
-        bytes: null,
-        provenance: "api-log-rollup",
-        ageSeconds: null,
-        staleAfterSeconds: config.sources.gslive_weblogs.staleAfterSeconds,
-        records: null,
-        sha256: null,
-        note: `GSLive WebLog activity MISSING; session expired (HTTP 401) — re-auth, then \`${GSLIVE_WEBLOG_ACTIVITY_COMMAND}\``,
-        reason:
-          "artifact missing; last known refresh blocked by session expiry (HTTP 401)",
-        state: "session_expired",
+        ...base,
+        note:
+          `GSLive WebLog activity MISSING; the last recorded refresh (${journal.attemptedAt}) ` +
+          `ended as ${journal.outcome} with ${statusPart}: ${detail}`,
+        reason: `last recorded refresh at ${journal.attemptedAt} ended as ${journal.outcome} (${statusPart}): ${detail} (journal ${journalPath})`,
+        state: "missing",
       }),
     };
   }

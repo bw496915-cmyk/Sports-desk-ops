@@ -338,9 +338,11 @@ describe("source discovery and provenance", () => {
     const weblogs = perception.sources.find(
       (source) => source.id === "gslive_weblogs",
     );
-    expect(weblogs?.state).toBe("session_expired");
+    // The fixture root has no refresh journal, so the cause is unknown - not "401".
+    expect(weblogs?.state).toBe("missing");
     expect(weblogs?.exists).toBe(false);
-    expect(weblogs?.reason).toContain("session expiry");
+    expect(weblogs?.reason).toContain("no refresh journal");
+    expect(weblogs?.note).not.toContain("401");
     const customerBook = perception.sources.find(
       (source) => source.id === "customer_book",
     );
@@ -399,19 +401,148 @@ describe("source discovery and provenance", () => {
       expect(source.exists).toBe(false);
       expect(source.records).toBeNull();
       expect(source.reason).not.toBeNull();
-      // The GSLive WebLog artifact is the one source with a state-specific absence reason.
-      if (source.id === "gslive_weblogs") {
-        expect(source.state).toBe("session_expired");
-      } else {
-        expect(source.state).toBe("missing");
-      }
+      // Absence alone is not evidence of an expired session: every source is `missing`.
+      expect(source.state).toBe("missing");
     }
-    // The GSLive WebLog artifact is state-specific even when every artifact is absent.
-    expect(
-      perception.sources.find((source) => source.id === "gslive_weblogs")
-        ?.state,
-    ).toBe("session_expired");
+    const missingBlogs = perception.sources.find(
+      (source) => source.id === "gslive_weblogs",
+    );
+    expect(missingBlogs?.state).toBe("missing");
+    expect(missingBlogs?.note).not.toContain("401");
     expect(perception.sources).toHaveLength(11);
+  });
+
+  test("a journal recording an auth failure drives session_expired with the measured status", async () => {
+    const root = track(makeRoot());
+    writeAt(
+      root,
+      "Scratch/gslive-weblogs/refresh-journal.json",
+      JSON.stringify({
+        schemaVersion: 1,
+        source: "gslive_weblogs",
+        command: "bun run gslive:weblogs:refresh",
+        attemptedAt: "2026-11-23T02:44:16.000Z",
+        outcome: "auth_failed",
+        httpStatus: 401,
+        error: "getBetReport returned HTTP 401 (text/html); login page",
+        account: "BGD101",
+        artifactWritten: false,
+        window: {
+          fromIso: "2026-11-22T02:44:16.000Z",
+          toIso: "2026-11-23T02:44:16.000Z",
+        },
+      }),
+    );
+    const perception = await loadFraudPerception({
+      root,
+      now: new Date(FIXED_NOW_ISO),
+    });
+    const weblogs = perception.sources.find(
+      (source) => source.id === "gslive_weblogs",
+    );
+    expect(weblogs?.state).toBe("session_expired");
+    expect(weblogs?.reason).toContain("HTTP 401");
+    expect(weblogs?.reason).toContain("2026-11-23T02:44:16.000Z");
+  });
+
+  test("a journal recording a non-auth failure never claims 401", async () => {
+    const root = track(makeRoot());
+    writeAt(
+      root,
+      "Scratch/gslive-weblogs/refresh-journal.json",
+      JSON.stringify({
+        schemaVersion: 1,
+        source: "gslive_weblogs",
+        command: "bun run gslive:weblogs:refresh",
+        attemptedAt: "2026-11-23T02:44:16.000Z",
+        outcome: "fetch_failed",
+        httpStatus: 502,
+        error: "getBetReport returned HTTP 502 from the gateway",
+        account: "BGD101",
+        artifactWritten: false,
+        window: {
+          fromIso: "2026-11-22T02:44:16.000Z",
+          toIso: "2026-11-23T02:44:16.000Z",
+        },
+      }),
+    );
+    const perception = await loadFraudPerception({
+      root,
+      now: new Date(FIXED_NOW_ISO),
+    });
+    const weblogs = perception.sources.find(
+      (source) => source.id === "gslive_weblogs",
+    );
+    expect(weblogs?.state).toBe("missing");
+    expect(weblogs?.reason).toContain("fetch_failed");
+    expect(weblogs?.reason).toContain("HTTP 502");
+    expect(weblogs?.note).not.toContain("401");
+  });
+
+  test("a journal that measured an artifact explains its absence as removal", async () => {
+    const root = track(makeRoot());
+    writeAt(
+      root,
+      "Scratch/gslive-weblogs/refresh-journal.json",
+      JSON.stringify({
+        schemaVersion: 1,
+        source: "gslive_weblogs",
+        command: "bun run gslive:weblogs:refresh",
+        attemptedAt: "2026-11-20T01:29:48.598Z",
+        outcome: "measured",
+        httpStatus: null,
+        error: null,
+        account: null,
+        artifactWritten: true,
+        window: {
+          fromIso: "2026-11-19T01:29:48.598Z",
+          toIso: "2026-11-20T01:29:48.598Z",
+        },
+      }),
+    );
+    const perception = await loadFraudPerception({
+      root,
+      now: new Date(FIXED_NOW_ISO),
+    });
+    const weblogs = perception.sources.find(
+      (source) => source.id === "gslive_weblogs",
+    );
+    expect(weblogs?.state).toBe("missing");
+    expect(weblogs?.reason).toContain("measured pass");
+    expect(weblogs?.note).toContain("removed after the pass");
+  });
+
+  test("a non-auth journal reason is not rewritten into a 401 claim", async () => {
+    const root = track(makeRoot());
+    writeAt(
+      root,
+      "Scratch/gslive-weblogs/refresh-journal.json",
+      JSON.stringify({
+        schemaVersion: 1,
+        source: "gslive_weblogs",
+        command: "bun run gslive:weblogs:refresh",
+        attemptedAt: "2026-11-23T02:44:16.000Z",
+        outcome: "no_session",
+        httpStatus: null,
+        error: "no manager session was resolvable",
+        account: null,
+        artifactWritten: false,
+        window: {
+          fromIso: "2026-11-22T02:44:16.000Z",
+          toIso: "2026-11-23T02:44:16.000Z",
+        },
+      }),
+    );
+    const perception = await loadFraudPerception({
+      root,
+      now: new Date(FIXED_NOW_ISO),
+    });
+    const weblogs = perception.sources.find(
+      (source) => source.id === "gslive_weblogs",
+    );
+    expect(weblogs?.state).toBe("missing");
+    expect(weblogs?.reason).toContain("no_session");
+    expect(weblogs?.note).not.toContain("401");
   });
 
   test("staleness is measured against the pinned clock", async () => {
