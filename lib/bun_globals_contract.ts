@@ -182,3 +182,28 @@ export function globalsContract(scope: object = globalThis): GlobalsContract {
     undocumentedWeb: UNDOCUMENTED_WEB_SURFACE.filter(present),
   };
 }
+
+/**
+ * Node reference entries that are declaration-only. The docs page exists, but
+ * neither the pinned Bun nor the local Node exports a value, so `new ModuleSource(...)`
+ * fails at the call site rather than at import (a named ESM import silently yields
+ * `undefined`). Keep this list small and measured: the contract test fails the day
+ * the runtime ships one.
+ */
+export interface NodeTypeOnlyExport {
+  readonly module: string;
+  readonly name: string;
+}
+
+export const NODE_TYPE_ONLY_EXPORTS: readonly NodeTypeOnlyExport[] = [
+  { module: "node:module", name: "ModuleSource" },
+];
+
+/** Recorded declaration-only names that a module namespace actually exposes. */
+export function typeOnlyExportsAtRuntime(
+  modules: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+): readonly string[] {
+  return NODE_TYPE_ONLY_EXPORTS.filter(
+    (entry) => entry.name in (modules[entry.module] ?? {}),
+  ).map((entry) => `${entry.module}#${entry.name}`);
+}
