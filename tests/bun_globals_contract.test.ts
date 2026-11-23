@@ -10,9 +10,12 @@ import { describe, expect, test } from "bun:test";
 import {
   DOCUMENTED_GLOBALS,
   MODULE_SCOPED_GLOBALS,
+  NODE_TYPE_ONLY_EXPORTS,
   UNDOCUMENTED_WEB_SURFACE,
   globalsContract,
+  typeOnlyExportsAtRuntime,
 } from "../lib/bun_globals_contract.ts";
+import * as nodeModule from "node:module";
 
 describe("globalsContract", () => {
   const report = globalsContract();
@@ -94,5 +97,32 @@ describe("globalsContract", () => {
       dirname: "string",
       filename: "string",
     });
+  });
+});
+
+describe("Node reference type-only entries", () => {
+  test("ModuleSource is a type-only page, not a runtime export", () => {
+    expect("ModuleSource" in nodeModule).toBe(false);
+    expect(Object.hasOwn(nodeModule, "ModuleSource")).toBe(false);
+    expect(
+      typeOnlyExportsAtRuntime({
+        "node:module": nodeModule as unknown as Record<string, unknown>,
+      }),
+    ).toEqual([]);
+    expect(NODE_TYPE_ONLY_EXPORTS).toContainEqual({
+      module: "node:module",
+      name: "ModuleSource",
+    });
+  });
+
+  test("the supported custom-loader paths are still present", () => {
+    expect(typeof nodeModule.register).toBe("function");
+    expect(typeof nodeModule.SourceMap).toBe("function");
+  });
+
+  test("a namespace that does export the name fails the check", () => {
+    expect(
+      typeOnlyExportsAtRuntime({ "node:module": { ModuleSource: class {} } }),
+    ).toEqual(["node:module#ModuleSource"]);
   });
 });
