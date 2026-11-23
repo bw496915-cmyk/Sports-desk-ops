@@ -16,13 +16,15 @@
  *      `ERR_API_BASE_INVALID_PORT` before `new URL()` can collapse it into a
  *      generic parse error,
  *   5. exactly one `new URL()` parse, the only step that can throw,
- *   6. explicit trailing-dot hostname rejection,
- *   7. percent-encoded separators, dot segments and control bytes in the path,
- *   8. protocol and port policy,
- *   9. `URLPattern` over the canonical serialisation for the origin-wide fields
+ *   6. protocol-relative pathname rejection (`//` would re-read as an origin),
+ *   7. percent-encoded separators, dot segments and control bytes, checked on
+ *      both the parsed pathname and the raw path,
+ *   8. explicit trailing-dot hostname rejection,
+ *   9. protocol and port policy,
+ *  10. `URLPattern` over the canonical serialisation for the origin-wide fields
  *      (credentials, port, path, query, fragment), plus a canonical hostname
  *      identity check,
- *  10. hostname policy — production label/deny-list or development host set.
+ *  11. hostname policy — production label/deny-list or development host set.
  *
  * Parsing before matching is not cosmetic. Measured on Bun 1.4.5, the repo pin:
  * `URLPattern#exec` returns `null` (never throws) for relative or unparseable
@@ -400,31 +402,28 @@ function assertPolicy(policy: ApiBasePolicy): void {
     throw new Error("production.suffix must be a string");
   }
 
-  assertProtocols(policy.production.protocols, "production.protocols");
-  assertProtocols(policy.development.protocols, "development.protocols");
-  assertLabelSet(
-    policy.production.deniedSubdomains,
-    "production.deniedSubdomains",
-  );
-  assertHostSet(policy.development.hosts, "development.hosts");
-  if (!policy.production.suffix.startsWith(".")) {
+  assertProtocols(production.protocols, "production.protocols");
+  assertProtocols(development.protocols, "development.protocols");
+  assertLabelSet(production.deniedSubdomains, "production.deniedSubdomains");
+  assertHostSet(development.hosts, "development.hosts");
+  if (!production.suffix.startsWith(".")) {
     throw new Error("production.suffix must start with a dot");
   }
-  if (!SUFFIX_LABELS.test(policy.production.suffix)) {
+  if (!SUFFIX_LABELS.test(production.suffix)) {
     throw new Error(
       "production.suffix must be lower-case dot-separated hostname labels",
     );
   }
   // Both port rules are literals; a typo from a JavaScript caller must fail
   // here rather than fall through to the permissive branch in `portAllowed`.
-  if (policy.production.port !== "default-only") {
+  if (production.port !== "default-only") {
     throw new Error('production.port must be "default-only"');
   }
-  if (policy.development.port !== "any-valid") {
+  if (development.port !== "any-valid") {
     throw new Error('development.port must be "any-valid"');
   }
   // A non-RegExp label would silently compile to `/(?:)/` and accept anything.
-  if (!(policy.production.label instanceof RegExp)) {
+  if (!(production.label instanceof RegExp)) {
     throw new Error("production.label must be a RegExp");
   }
   if (
@@ -494,11 +493,7 @@ export function createApiBaseValidator(
       return reject("ERR_API_BASE_INVALID_URL");
     }
     const trimmed = raw.trim();
-    if (
-      trimmed.length === 0 ||
-      trimmed.length > rules.maxInputLength ||
-      UNSAFE_INPUT.test(trimmed)
-    ) {
+    if (trimmed.length === 0 || UNSAFE_INPUT.test(trimmed)) {
       return reject("ERR_API_BASE_INVALID_URL");
     }
 

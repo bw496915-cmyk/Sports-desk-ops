@@ -15,6 +15,7 @@ import {
   validateApiBaseWithPattern,
   type ApiBaseMode,
   type ApiBasePolicy,
+  type ApiBaseValidatorOptions,
 } from "../lib/api_base_validate.ts";
 
 const REJECTED = [
@@ -661,6 +662,30 @@ describe("createApiBaseValidator", () => {
       normalized: "https://api.example.test",
       sub: "api",
     });
+  });
+
+  test("reports PATTERN_UNAVAILABLE when the constructor itself throws", () => {
+    // Engine-specific pattern failures must disable the pair, not surface as a
+    // raw exception from `validate`.
+    class BrokenPattern {
+      constructor() {
+        throw new Error("pattern failure");
+      }
+    }
+    const validator = createApiBaseValidator(CUSTOM_POLICY, {
+      patternCtor: BrokenPattern as unknown as NonNullable<
+        ApiBaseValidatorOptions["patternCtor"]
+      >,
+    });
+    for (const [raw, mode] of [
+      ["https://api.example.test", "production"],
+      ["http://dev.internal:8787", "development"],
+    ] as const) {
+      expect(validator.validate(raw, mode)).toEqual({
+        ok: false,
+        code: "ERR_API_BASE_PATTERN_UNAVAILABLE",
+      });
+    }
   });
 
   test("rejects a port-policy typo instead of failing open", () => {
