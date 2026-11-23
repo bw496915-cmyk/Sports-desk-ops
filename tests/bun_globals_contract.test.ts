@@ -10,8 +10,12 @@ import { describe, expect, test } from "bun:test";
 import {
   DOCUMENTED_GLOBALS,
   MODULE_SCOPED_GLOBALS,
+  NODE_MODULE_API_GAPS,
+  BUN_ONLY_BUILTIN_IDS,
   NODE_TYPE_ONLY_EXPORTS,
+  UNLISTED_BUILTIN_IDS,
   UNDOCUMENTED_WEB_SURFACE,
+  closedApiGaps,
   globalsContract,
   typeOnlyExportsAtRuntime,
 } from "../lib/bun_globals_contract.ts";
@@ -124,5 +128,44 @@ describe("Node reference type-only entries", () => {
     expect(
       typeOnlyExportsAtRuntime({ "node:module": { ModuleSource: class {} } }),
     ).toEqual(["node:module#ModuleSource"]);
+  });
+});
+
+describe("Node module surface gaps", () => {
+  test("the recorded node:module gaps are still absent", () => {
+    for (const gap of NODE_MODULE_API_GAPS) {
+      expect(gap.name in nodeModule, gap.name).toBe(false);
+    }
+    expect(
+      closedApiGaps({
+        "node:module": nodeModule as unknown as Record<string, unknown>,
+      }),
+    ).toEqual([]);
+  });
+
+  test("a namespace that closed a gap fails the check", () => {
+    expect(
+      closedApiGaps({ "node:module": { registerHooks: () => {} } }),
+    ).toEqual(["node:module#registerHooks"]);
+  });
+
+  test("Bun-only builtin ids are unprefixed and requireable", () => {
+    for (const id of BUN_ONLY_BUILTIN_IDS) {
+      expect(nodeModule.builtinModules, id).toContain(id);
+      expect(() => require(id), id).not.toThrow();
+    }
+    // The `node:` spelling is the trap: it resolves to nothing.
+    expect(nodeModule.builtinModules).not.toContain("node:bun:ffi");
+  });
+
+  test("unlisted ids are requireable even though builtinModules omits them", () => {
+    for (const id of UNLISTED_BUILTIN_IDS) {
+      expect(nodeModule.builtinModules, id).not.toContain(id);
+      // Node's list spells these with the `node:` prefix; Bun omits both spellings.
+      expect(nodeModule.builtinModules, id).not.toContain(
+        id.replace("node:", ""),
+      );
+      expect(() => require(id), id).not.toThrow();
+    }
   });
 });
