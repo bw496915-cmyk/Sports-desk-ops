@@ -405,6 +405,24 @@ not encoded: a probe with `await new Promise(() => {})` did not exit within 120 
 bounded failure to assert. Timers, watch/hot mode, signal handling, and the `vitest` unhandled-error
 listener difference are also not re-measured here.
 
+<!-- bun-behavior: bun-test-isolate -->
+
+## `bun test --isolate` file isolation (measured 2026-11-23)
+
+A file that sets `process.env.TZ` or leaves `monitorEventLoopDelay()` enabled must not affect the
+next file. Measured on the 1.4.5 pin with two throwaway files: file A set
+`TZ=Pacific/Kiritimati` and started a monitor without disabling it, file B asserted
+`process.env.TZ === undefined` and that A's sentinel file existed.
+
+| Invocation                                     | Measured                                  |
+| :--------------------------------------------- | :---------------------------------------- |
+| `bun test --isolate 01-a.test.ts 02-b.test.ts` | 2 pass, exit 0, no hang                   |
+| `bun test 01-a.test.ts 02-b.test.ts` (no flag) | 2 pass; the leak is also gone on this pin |
+
+Only the documented `--isolate` run is pinned: the repo runs `bun test --parallel`, which implies
+`--isolate`, so a regression would leak state between unrelated suites. `tests/bun_test_isolation.test.ts`
+owns the row.
+
 <!-- bun-behavior: bunx-minimum-release-age -->
 
 ## `bunx --minimum-release-age` (measured 2026-11-18)

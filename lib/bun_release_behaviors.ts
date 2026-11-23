@@ -92,6 +92,11 @@ const BEHAVIOR_METADATA: Readonly<Record<string, BehaviorMetadata>> = {
     docsPage: "/docs/test/runtime",
     shapes: [],
   },
+  "bun-test-isolate": {
+    title: "bun test --isolate per-file isolation",
+    docsPage: "/docs/test",
+    shapes: [],
+  },
   "publish-recursive": {
     title: "bun publish --recursive workspace publishing",
     docsPage: "/docs/cli/publish",
