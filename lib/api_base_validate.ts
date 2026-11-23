@@ -9,18 +9,20 @@
  *   - development: allowed protocols, an explicit host set, any valid port.
  *
  * Check order is deliberate:
- *   1. cheap input hygiene — type, length, C0 controls, backslash,
- *   2. pattern availability,
- *   3. raw authority port range and leading-zero check, so a bad port returns
+ *   1. mode guard, so a typo cannot silently select the development policy,
+ *   2. cheap input hygiene — type, raw length, C0 controls, backslash,
+ *   3. pattern availability,
+ *   4. raw authority port range and leading-zero check, so a bad port returns
  *      `ERR_API_BASE_INVALID_PORT` before `new URL()` can collapse it into a
  *      generic parse error,
- *   4. exactly one `new URL()` parse, the only step that can throw,
- *   5. explicit trailing-dot hostname rejection,
- *   6. protocol and port policy,
- *   7. `URLPattern` over the canonical serialisation for the origin-wide fields
+ *   5. exactly one `new URL()` parse, the only step that can throw,
+ *   6. explicit trailing-dot hostname rejection,
+ *   7. percent-encoded separators, dot segments and control bytes in the path,
+ *   8. protocol and port policy,
+ *   9. `URLPattern` over the canonical serialisation for the origin-wide fields
  *      (credentials, port, path, query, fragment), plus a canonical hostname
  *      identity check,
- *   8. hostname policy — production label/deny-list or development host set.
+ *  10. hostname policy — production label/deny-list or development host set.
  *
  * Parsing before matching is not cosmetic. Measured on Bun 1.4.5, the repo pin:
  * `URLPattern#exec` returns `null` (never throws) for relative or unparseable
@@ -46,8 +48,14 @@
 // Bun exposes URLPattern as a global at runtime, but the published globals
 // table does not list it and bun-types 1.4.5 does not declare it. The
 // documented node:url export is the same constructor (measured 1.4.5), and
-// @types/node 23.8+ supplies its type.
-import { URLPattern } from "node:url";
+// @types/node 23.8+ supplies its type. A static named import would turn a
+// missing export into a module-load crash, so read it off the namespace and
+// let `buildPatterns` report `ERR_API_BASE_PATTERN_UNAVAILABLE` instead.
+import * as nodeUrl from "node:url";
+
+type URLPatternCtor = typeof nodeUrl.URLPattern;
+
+const NODE_URL_PATTERN: URLPatternCtor | null = nodeUrl.URLPattern ?? null;
 
 export type ApiBaseMode = "production" | "development";
 
@@ -55,6 +63,7 @@ export type ApiBaseMode = "production" | "development";
 export type ApiBaseRejectCode =
   | "ERR_API_BASE_INVALID_URL"
   | "ERR_API_BASE_INVALID_PORT"
+  | "ERR_API_BASE_INVALID_MODE"
   | "ERR_API_BASE_ORIGIN_UNTRUSTED"
   | "ERR_API_BASE_PATTERN_UNAVAILABLE";
 
@@ -137,7 +146,7 @@ export interface ApiBaseValidatorOptions {
    * Override the URLPattern constructor. Defaults to the `node:url` export;
    * `null` forces `ERR_API_BASE_PATTERN_UNAVAILABLE`.
    */
-  readonly patternCtor?: typeof URLPattern | null;
+  readonly patternCtor?: URLPatternCtor | null;
 }
 
 /** C0 controls, DEL and backslash: `URL` strips the first two and rewrites `\` to `/`. */
@@ -146,8 +155,16 @@ const UNSAFE_INPUT = /[\u0000-\u001f\u007f\\]/u;
 /** Path characters that would change request semantics if passed through. */
 const UNSAFE_PATH = /[\u0000-\u001f\u007f\\#]/u;
 
-/** Dot segments and percent-encoded separators: traversal / prefix escape. */
-const UNSAFE_PATH_ENCODING = /(?:^|\/)\.{1,2}(?:\/|$)|%(?:2e|2f|5c)/iu;
+/**
+ * Dot segments plus percent-encoded separators, dot bytes and C0/DEL bytes.
+ * `new URL()` preserves `%2f`, `%5c` and `%00` in `pathname` but normalises
+ * `%2e%2e` away, so callers check both the parsed pathname and the raw path.
+ */
+const UNSAFE_PATH_ENCODING =
+  /(?:^|\/)\.{1,2}(?:\/|$)|%(?:2e|2f|5c|0[0-9a-f]|1[0-9a-f]|7f)/iu;
+
+/** Path portion of the raw input, without authority, query or fragment. */
+const RAW_PATH = /^[a-z][a-z0-9+.-]*:\/\/[^/?#]*(\/[^?#]*)?/iu;
 
 /**
  * 1–65535, no leading zero. Measured on Bun 1.4.5: a numeric `port` group is
@@ -201,6 +218,14 @@ function isCanonicalPort(text: string): boolean {
   return Number.isSafeInteger(port) && port <= 65_535;
 }
 
+function isMode(value: unknown): value is ApiBaseMode {
+  return value === "production" || value === "development";
+}
+
+function rawPathOf(raw: string): string {
+  return RAW_PATH.exec(raw)?.[1] ?? "";
+}
+
 function protocolAllowed(
   url: URL,
   policy: ApiBasePolicy,
@@ -243,14 +268,16 @@ function productionSubdomain(
   return sub;
 }
 
+type URLPatternInstance = InstanceType<URLPatternCtor>;
+
 interface Patterns {
-  readonly production: URLPattern | undefined;
-  readonly development: URLPattern | undefined;
+  readonly production: URLPatternInstance | undefined;
+  readonly development: URLPatternInstance | undefined;
 }
 
 function buildPatterns(
   policy: ApiBasePolicy,
-  PatternCtor: typeof URLPattern | null,
+  PatternCtor: URLPatternCtor | null,
 ): Patterns {
   if (PatternCtor === null) {
     return { production: undefined, development: undefined };
@@ -293,7 +320,93 @@ function buildPatterns(
 /** Dot-separated hostname labels; a pattern metacharacter would widen the match. */
 const SUFFIX_LABELS = /^(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/u;
 
+const PROTOCOL_SHAPE = /^[a-z][a-z0-9+.-]*:$/u;
+const LABEL_SHAPE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u;
+
+function assertProtocols(protocols: unknown, name: string): void {
+  if (!Array.isArray(protocols) || protocols.length === 0) {
+    throw new Error(`${name} must be a non-empty array of URL protocols`);
+  }
+  for (const protocol of protocols) {
+    if (typeof protocol !== "string" || !PROTOCOL_SHAPE.test(protocol)) {
+      throw new Error(
+        `${name} entries must be lower-case protocol strings including the colon`,
+      );
+    }
+  }
+}
+
+function assertLabelSet(entries: unknown, name: string): void {
+  if (!(entries instanceof Set)) {
+    throw new Error(`${name} must be a Set of lower-case hostname labels`);
+  }
+  // A string is iterable; without the Set check it becomes a character set.
+  for (const entry of entries) {
+    if (typeof entry !== "string" || !LABEL_SHAPE.test(entry)) {
+      throw new Error(
+        `${name} entries must be lower-case single hostname labels`,
+      );
+    }
+  }
+}
+
+function assertHostSet(entries: unknown, name: string): void {
+  if (!(entries instanceof Set)) {
+    throw new Error(`${name} must be a Set of canonical URL hostnames`);
+  }
+  for (const host of entries) {
+    if (typeof host !== "string" || host.length === 0) {
+      throw new Error(`${name} entries must be non-empty strings`);
+    }
+    // `URL.hostname` lower-cases, keeps IPv6 brackets and strips default ports,
+    // so a round trip catches every non-canonical spelling the host set could
+    // otherwise never match.
+    if (
+      host !== host.toLowerCase() ||
+      host.includes("*") ||
+      host.endsWith(".")
+    ) {
+      throw new Error(
+        `${name} entries must be lower-case canonical URL hostnames`,
+      );
+    }
+    let canonical: string;
+    try {
+      canonical = new URL(`http://${host}`).hostname;
+    } catch {
+      throw new Error(`${name} entries must be canonical URL hostnames`);
+    }
+    if (canonical !== host) {
+      throw new Error(`${name} entries must be canonical URL hostnames`);
+    }
+  }
+}
+
 function assertPolicy(policy: ApiBasePolicy): void {
+  // The signature is TypeScript-only; a JavaScript caller can still pass null
+  // or a partial object. Check the container shapes first so the error names
+  // the bad field instead of surfacing as a `TypeError` on a property read.
+  if (policy === null || typeof policy !== "object") {
+    throw new Error("policy must be an object");
+  }
+  const { production, development } = policy;
+  if (production === null || typeof production !== "object") {
+    throw new Error("production policy must be an object");
+  }
+  if (development === null || typeof development !== "object") {
+    throw new Error("development policy must be an object");
+  }
+  if (typeof production.suffix !== "string") {
+    throw new Error("production.suffix must be a string");
+  }
+
+  assertProtocols(policy.production.protocols, "production.protocols");
+  assertProtocols(policy.development.protocols, "development.protocols");
+  assertLabelSet(
+    policy.production.deniedSubdomains,
+    "production.deniedSubdomains",
+  );
+  assertHostSet(policy.development.hosts, "development.hosts");
   if (!policy.production.suffix.startsWith(".")) {
     throw new Error("production.suffix must start with a dot");
   }
@@ -332,8 +445,11 @@ export function createApiBaseValidator(
   options: ApiBaseValidatorOptions = {},
 ): ApiBaseValidator {
   assertPolicy(policy);
+  // `options` is typed non-null, but a JavaScript caller may pass null; there
+  // is no override to apply, so treat it as the default rather than throwing.
+  const configuredPattern = options?.patternCtor;
   const PatternCtor =
-    options.patternCtor === undefined ? URLPattern : options.patternCtor;
+    configuredPattern === undefined ? NODE_URL_PATTERN : configuredPattern;
   const label = new RegExp(
     policy.production.label.source,
     policy.production.label.flags.replace(/[gy]/gu, ""),
@@ -366,7 +482,18 @@ export function createApiBaseValidator(
     raw: string | null | undefined,
     mode: ApiBaseMode,
   ): ApiBaseValidation {
-    const trimmed = typeof raw === "string" ? raw.trim() : "";
+    // Fail closed on a mode typo. The permissive development policy must be
+    // selected explicitly, never by a string that merely fails `=== "production"`.
+    if (!isMode(mode)) {
+      return reject("ERR_API_BASE_INVALID_MODE");
+    }
+
+    // The length budget applies to the raw input: trimming first would let an
+    // oversized, whitespace-padded string consume work before the bound.
+    if (typeof raw !== "string" || raw.length > rules.maxInputLength) {
+      return reject("ERR_API_BASE_INVALID_URL");
+    }
+    const trimmed = raw.trim();
     if (
       trimmed.length === 0 ||
       trimmed.length > rules.maxInputLength ||
@@ -396,6 +523,16 @@ export function createApiBaseValidator(
     // A `//`-prefixed path re-reads as protocol-relative for any consumer that
     // later treats the stored base as a URL string.
     if (url.pathname.startsWith("//")) {
+      return reject("ERR_API_BASE_INVALID_URL");
+    }
+
+    // `new URL()` normalises `%2e%2e` away but keeps `%2f`, `%5c` and `%00`,
+    // so check the parsed pathname and the raw path. Without this, a prefix
+    // such as `/v1%2f..%2fadmin` is stored and later resolved verbatim.
+    if (
+      UNSAFE_PATH_ENCODING.test(url.pathname) ||
+      UNSAFE_PATH_ENCODING.test(rawPathOf(trimmed))
+    ) {
       return reject("ERR_API_BASE_INVALID_URL");
     }
 
@@ -455,6 +592,7 @@ export function createApiBaseValidator(
     if (!validated.ok) return validated;
 
     if (
+      typeof path !== "string" ||
       path.length === 0 ||
       path.length > rules.maxInputLength ||
       UNSAFE_PATH.test(path) ||
@@ -493,7 +631,8 @@ const defaultValidator = createApiBaseValidator(BOOKDESKOPS_API_BASE_POLICY);
 /**
  * Validate with the BookDeskOps policy. `isLocalDev` must come from build-time
  * configuration, never from a request header (`Host`), the page `location`, or a
- * query parameter.
+ * query parameter. Only the boolean `true` selects development: a truthy string,
+ * number or object must not enable the loopback policy.
  */
 export function validateApiBaseWithPattern(
   raw: string | null | undefined,
@@ -501,7 +640,7 @@ export function validateApiBaseWithPattern(
 ): ApiBaseValidation {
   return defaultValidator.validate(
     raw,
-    isLocalDev ? "development" : "production",
+    isLocalDev === true ? "development" : "production",
   );
 }
 
@@ -520,6 +659,6 @@ export function resolveApiUrl(
   return defaultValidator.resolve(
     base,
     path,
-    isLocalDev ? "development" : "production",
+    isLocalDev === true ? "development" : "production",
   );
 }
