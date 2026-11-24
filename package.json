@@ -428,7 +428,7 @@
   "author": "bw496915-cmyk",
   "license": "MIT",
   "devDependencies": {
-    "@deepseek-ai/dsh-plugin-market-index": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-plugin-market-index": "0.2.2-rc.5",
     "@hughescr/stryker-bun-runner": "1.6.0",
     "@sportsdesk-ops/api": "workspace:*",
     "@sportsdesk-ops/backend": "workspace:*",
@@ -438,7 +438,7 @@
     "@types/bun": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "fast-check": "4.10.2",
+    "fast-check": "4.10.3",
     "pele": "1.13.0",
     "semver": "7.8.6",
     "sportsdesk-ops": "workspace:packages/sportsdesk-ops",
