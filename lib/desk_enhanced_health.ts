@@ -157,6 +157,16 @@ const R2_PUBLISH_ACTION: Readonly<Record<string, string>> = {
 const R2_UNREADABLE_ACTION =
   "Enable r2.dev public access for the bucket, or give the probe R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY";
 
+/**
+ * A stale *data* window is not fixed by republishing it. `wagers:publish-snapshot` publishes
+ * whatever `wagers:by-state --live` last wrote, so for wagers-by-state the desk points at the live
+ * re-derive first (it needs the GSLive session) and only then at the publish.
+ */
+const R2_DATA_ACTION: Readonly<Record<string, string>> = {
+  "wagers-by-state":
+    "bun run wagers:by-state --live && bun run wagers:publish-snapshot",
+};
+
 function pushDegradedReason(
   out: DegradedReason[],
   message: string,
@@ -695,7 +705,7 @@ export async function buildDeskEnhancedHealth(
     );
   }
   for (const key of pipelines.dataStaleKeys) {
-    const action = R2_PUBLISH_ACTION[key];
+    const action = R2_DATA_ACTION[key] ?? R2_PUBLISH_ACTION[key];
     pushDegradedReason(
       degradedReasons,
       `R2 sink '${key}' has stale data (>24h)`,

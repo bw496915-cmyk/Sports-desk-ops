@@ -129,6 +129,47 @@ describe("buildDeskEnhancedHealth", () => {
     expect(payload.operationalStatus).toBe("degraded");
   });
 
+  test("points stale wagers data at the live re-derive, not just the publisher", async () => {
+    const kpis: R2PipelineKpis = {
+      "wagers-by-state": {
+        lastModified: "2026-11-24T17:45:11.000Z",
+        ageSeconds: 300,
+        stale: false,
+        state: "fresh",
+        reason: "5m old (SLA 1h)",
+        dataAgeSeconds: 1_336_083,
+        dataStale: true,
+        dataWindowToMs: Date.parse("2026-11-09T06:42:33Z"),
+      },
+    };
+    const payload = await buildDeskEnhancedHealth({
+      port: 4020,
+      hostname: "localhost",
+      url: "http://localhost:4020/",
+      runtime: "Bun",
+      ingress: { proxied: false },
+      nodeEnv: "test",
+      uptimeSeconds: 10,
+      now: new Date("2026-11-09T00:00:00.000Z"),
+      resolveGitSha: () => "abc1234",
+      readF402: () => ({
+        cookieHeader: "x",
+        cookieNames: ["a"],
+        obtainedAtIso: "2026-11-09T00:00:00.000Z",
+        expiresAtIso: "2026-11-10T00:00:00.000Z",
+      }),
+      readGsliveHealth: async () => gsliveOk(),
+      probeR2: async () => kpis,
+    });
+
+    const reason = payload.degradedReasons.find((r) =>
+      r.message.includes("wagers-by-state"),
+    );
+    expect(reason?.message).toContain("stale data");
+    expect(reason?.action).toContain("wagers:by-state --live");
+    expect(reason?.action).toContain("wagers:publish-snapshot");
+  });
+
   test("returns 503 when both auth planes are missing", async () => {
     const payload = await buildDeskEnhancedHealth({
       port: 4020,
