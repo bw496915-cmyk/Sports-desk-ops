@@ -32,6 +32,7 @@ import {
   parseLastModified,
   publicUrlFor,
   R2_PUBLIC_BASE,
+  shouldNotify,
   type StalenessProbe,
   type StalenessTarget,
 } from "../lib/r2_staleness.ts";
@@ -141,6 +142,27 @@ describe("evaluateProbe", () => {
     const v = evaluateProbe(probe, NOW);
     expect(v.state).toBe("error");
     expect(v.reason).toContain("HTTP 503");
+  });
+
+  test("401 → unreadable, not error: the probe was refused, the key may be fine", () => {
+    const probe: StalenessProbe = {
+      target: SAMPLE_TARGET,
+      status: 401,
+      lastModifiedMs: null,
+    };
+    const v = evaluateProbe(probe, NOW);
+    expect(v.state).toBe("unreadable");
+    expect(v.reason).toContain("HTTP 401");
+    expect(v.reason).toMatch(/refused the read/);
+  });
+
+  test("403 → unreadable", () => {
+    const probe: StalenessProbe = {
+      target: SAMPLE_TARGET,
+      status: 403,
+      lastModifiedMs: null,
+    };
+    expect(evaluateProbe(probe, NOW).state).toBe("unreadable");
   });
 
   test("status 0 (fetch threw) → error with the message", () => {
@@ -386,6 +408,52 @@ describe("ALERTER_EXIT", () => {
     ]);
     expect(codes.size).toBe(3);
     expect(ALERTER_EXIT.allFresh).toBe(0);
+  });
+});
+
+describe("shouldNotify", () => {
+  const probesWith = (status: number, lastModifiedMs: number | null) =>
+    BRIDGE_STALENESS_TARGETS.map((target) => ({
+      target,
+      status,
+      lastModifiedMs,
+    }));
+
+  test("all fresh never posts", () => {
+    const nowMs = Date.parse("2026-11-24T20:00:00Z");
+    const report = buildReport(probesWith(200, nowMs - 60_000), nowMs);
+    expect(shouldNotify(report, nowMs)).toBe(false);
+  });
+
+  test("unreadable-only posts inside the top-of-hour window", () => {
+    const nowMs = Date.parse("2026-11-24T20:00:00Z");
+    const report = buildReport(probesWith(401, null), nowMs);
+    expect(shouldNotify(report, nowMs)).toBe(true);
+  });
+
+  test("unreadable-only is suppressed later in the hour", () => {
+    const nowMs = Date.parse("2026-11-24T20:15:00Z");
+    const report = buildReport(probesWith(401, null), nowMs);
+    expect(shouldNotify(report, nowMs)).toBe(false);
+  });
+
+  test("a real staleness report still posts outside the window", () => {
+    const nowMs = Date.parse("2026-11-24T20:45:00Z");
+    const report = buildReport(
+      BRIDGE_STALENESS_TARGETS.map((target) => ({
+        target,
+        status: 200,
+        lastModifiedMs: nowMs - target.slaMs - 60_000,
+      })),
+      nowMs,
+    );
+    expect(shouldNotify(report, nowMs)).toBe(true);
+  });
+
+  test("force bypasses the window", () => {
+    const nowMs = Date.parse("2026-11-24T20:45:00Z");
+    const report = buildReport(probesWith(401, null), nowMs);
+    expect(shouldNotify(report, nowMs, { force: true })).toBe(true);
   });
 });
 

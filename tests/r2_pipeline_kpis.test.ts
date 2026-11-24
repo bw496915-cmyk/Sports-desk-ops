@@ -38,7 +38,7 @@ describe("probeR2PipelineKpis", () => {
     const now = new Date("2026-11-09T04:00:00.000Z");
     const last = new Date("2026-11-04T04:37:28.000Z");
     const fetchImpl: R2PipelineFetcher = async (url, init) => {
-      if (init.method === "GET") {
+      if (init?.method === "GET") {
         return new Response(null, { status: 404 });
       }
       const key = url.split("/").slice(-2).join("/");
@@ -69,7 +69,7 @@ describe("probeR2PipelineKpis", () => {
     const publishLast = new Date("2026-11-09T03:00:00.000Z");
     const toMs = Date.parse("2026-11-04T23:59:59.000Z");
     const fetchImpl: R2PipelineFetcher = async (url, init) => {
-      if (init.method === "HEAD") {
+      if (init?.method === "HEAD") {
         if (url.endsWith("f402-weblog/latest.json")) {
           return new Response(null, {
             status: 200,
@@ -117,7 +117,7 @@ test("weblog KPI exposes scoped account coverage and marks legacy coverage unmea
   const result = await probeR2PipelineKpis(
     new Date("2026-11-19T12:10:00Z"),
     async (url, init) =>
-      init.method === "HEAD"
+      init?.method === "HEAD"
         ? new Response(null, {
             headers: { "last-modified": "Thu, 19 Nov 2026 12:05:00 GMT" },
           })
@@ -259,7 +259,7 @@ describe("probeR2PipelineKpis transport", () => {
     );
     try {
       const kpis = await probeR2PipelineKpis(new Date("2026-11-24T16:30:00Z"));
-      expect(kpis["gslive-tally"]?.state).toBe("error");
+      expect(kpis["gslive-tally"]?.state).toBe("unreadable");
       expect(fetched.length).toBeGreaterThan(0);
       for (const url of fetched) {
         expect(url.startsWith(R2_PUBLIC_BASE)).toBe(true);

@@ -6,6 +6,11 @@ name: r2-staleness-alert
 # is the inverse: GitHub-hosted, no laptop dependency, no R2 credentials, only the two Telegram
 # secrets. If the operator Mac is dead, this still fires.
 #
+# Transport: the probe signs when R2 credentials resolve (env, then keychain) and falls back to the
+# anonymous HEAD otherwise; a refused read is reported `unreadable`, never `stale`. Hosted runs carry
+# only the Telegram secrets today, so they probe anonymously and report the refusal honestly. An
+# unreadable-only report pages at most once an hour; real staleness pages every run.
+#
 # Scheduling caveat: GitHub Actions free-tier cron is not guaranteed on-time; 5-10 min skew is
 # normal at peak. At `*/15 * * * *` cadence with the per-key SLAs in `lib/r2_staleness.ts` that is well within budget. If we
 # ever need tighter guarantees, migrate the runner to a Cloudflare Worker cron trigger (same

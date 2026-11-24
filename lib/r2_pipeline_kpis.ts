@@ -7,7 +7,10 @@ import {
   parseWeblogAccountCoverage,
   type WeblogAccountCoverage,
 } from "./f402_weblog_capture.ts";
-import { R2S3Client } from "./r2_s3_client.ts";
+import {
+  resolveR2ProbeTransport,
+  type R2ProbeFetcher,
+} from "./r2_probe_fetch.ts";
 import {
   BRIDGE_STALENESS_TARGETS,
   evaluateProbe,
@@ -18,6 +21,12 @@ import {
   type StalenessState,
   type StalenessTarget,
 } from "./r2_staleness.ts";
+
+/**
+ * The transport moved to `lib/r2_probe_fetch.ts` so the alerter and the live-feed reader use the
+ * same one; the name stays for callers and tests written against this module.
+ */
+export { createR2S3ProbeFetcher as createR2PipelineS3Fetcher } from "./r2_probe_fetch.ts";
 
 /** Data older than this is surfaced as `dataStale` (distinct from publish SLA stale). */
 export const R2_DATA_STALE_SECONDS = 86_400;
@@ -39,10 +48,7 @@ export interface R2PipelineSinkKpi {
 export type R2PipelineKpis = Readonly<Record<string, R2PipelineSinkKpi>>;
 
 /** Injectable for tests (avoids requiring full Bun `fetch` surface). */
-export type R2PipelineFetcher = (
-  url: string,
-  init: { readonly method: "HEAD" | "GET" },
-) => Promise<Response>;
+export type R2PipelineFetcher = R2ProbeFetcher;
 
 /** @deprecated Use {@link R2PipelineFetcher}. */
 export type R2HeadFetcher = R2PipelineFetcher;
@@ -162,66 +168,11 @@ function applyDataAge(
   };
 }
 
-const DEFAULT_R2_PROBE_TIMEOUT_MS = 5_000;
-const PUBLIC_R2_PREFIX = `${R2_PUBLIC_BASE.replace(/\/+$/, "")}/`;
-
-const defaultPlainFetch: R2PipelineFetcher = (url, init) =>
-  fetch(url, {
-    ...init,
-    signal: AbortSignal.timeout(DEFAULT_R2_PROBE_TIMEOUT_MS),
-  });
-
-/**
- * Route `R2_PUBLIC_BASE` requests through `R2S3Client.presign` (HEAD/GET) so probes keep working
- * when public `*.r2.dev` hosting is disabled, while unrelated URLs pass through unchanged.
- *
- * A presigned URL carries a short-lived signature in its query string, and a failed fetch can quote
- * the URL it could not reach. The wrapper replaces such an error with a message naming only the
- * key, so the signature cannot reach `/api/kpis`, a log line, or an alert body.
- */
-export function createR2PipelineS3Fetcher(
-  client: Pick<R2S3Client, "presign">,
-  baseFetch: R2PipelineFetcher = defaultPlainFetch,
-): R2PipelineFetcher {
-  return async (url, init) => {
-    if (!url.startsWith(PUBLIC_R2_PREFIX)) {
-      return baseFetch(url, init);
-    }
-    const key = url.slice(PUBLIC_R2_PREFIX.length).replace(/^\/+/, "");
-    const signedUrl = client.presign(key, {
-      method: init.method,
-      expiresIn: 60,
-    });
-    try {
-      return await baseFetch(signedUrl, init);
-    } catch (err) {
-      const name = err instanceof Error ? err.name : "unknown";
-      // The caught error can quote the presigned URL, so only its sanitized
-      // name is attached; leaking the signature is worse than a bare cause.
-      // oxlint-disable-next-line preserve-caught-error -- see the note above.
-      throw new Error(`R2 signed probe failed for ${key} (${name})`, {
-        cause: name,
-      });
-    }
-  };
-}
-
-/** Resolve the probe transport once: injected fetch, presigned client, else anonymous fetch. */
-async function resolveR2ProbeFetch(
-  fetchImpl: R2PipelineFetcher | undefined,
-): Promise<R2PipelineFetcher> {
-  if (fetchImpl !== undefined) return fetchImpl;
-  const client = await R2S3Client.fromEnvOrSecrets().catch(() => null);
-  return client === null
-    ? defaultPlainFetch
-    : createR2PipelineS3Fetcher(client);
-}
-
 export async function probeR2PipelineKpis(
   now: Date = new Date(),
   fetchImpl?: R2PipelineFetcher,
 ): Promise<R2PipelineKpis> {
-  const resolvedFetch = await resolveR2ProbeFetch(fetchImpl);
+  const { fetch: resolvedFetch } = await resolveR2ProbeTransport(fetchImpl);
   const nowMs = now.getTime();
   const out: Record<string, R2PipelineSinkKpi> = {};
   await Promise.all(
@@ -259,10 +210,9 @@ export async function probeR2PipelineKpis(
             : new Date(probe.lastModifiedMs).toISOString(),
         ageSeconds:
           verdict.ageMs === null ? null : Math.round(verdict.ageMs / 1000),
-        stale:
-          verdict.state === "stale" ||
-          verdict.state === "missing" ||
-          verdict.state === "error",
+        // Any non-fresh state means the pointer is not trustworthy; deriving it this way
+        // keeps a future state from silently reading as healthy.
+        stale: verdict.state !== "fresh",
         state: verdict.state,
         reason: verdict.reason,
         dataAgeSeconds: null,
