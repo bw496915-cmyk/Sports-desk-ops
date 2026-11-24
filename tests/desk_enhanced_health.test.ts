@@ -78,6 +78,57 @@ describe("buildDeskEnhancedHealth", () => {
     expect(payload.degradedReasons[0]?.action).toBeDefined();
   });
 
+  test("labels a refused R2 read as unreadable, not a stale publish", async () => {
+    const kpis: R2PipelineKpis = {
+      "wagers-by-state": {
+        lastModified: null,
+        ageSeconds: null,
+        stale: true,
+        state: "unreadable",
+        reason: "HTTP 401 — the bucket refused the read",
+        dataAgeSeconds: null,
+        dataStale: false,
+        dataWindowToMs: null,
+      },
+    };
+    const payload = await buildDeskEnhancedHealth({
+      port: 4020,
+      hostname: "localhost",
+      url: "http://localhost:4020/",
+      runtime: "Bun",
+      ingress: { proxied: false },
+      nodeEnv: "test",
+      uptimeSeconds: 10,
+      now: new Date("2026-11-09T00:00:00.000Z"),
+      resolveGitSha: () => "abc1234",
+      readF402: () => ({
+        cookieHeader: "x",
+        cookieNames: ["a"],
+        obtainedAtIso: "2026-11-09T00:00:00.000Z",
+        expiresAtIso: "2026-11-10T00:00:00.000Z",
+      }),
+      readGsliveHealth: async () => gsliveOk(),
+      probeR2: async () => kpis,
+    });
+
+    expect(payload.checks.pipelines.checks.wagers).toBe("unreadable");
+    expect(payload.checks.pipelines.r2UnreadableKeys).toEqual([
+      "wagers-by-state",
+    ]);
+    const reason = payload.degradedReasons.find((r) =>
+      r.message.includes("wagers-by-state"),
+    );
+    expect(reason?.message).toContain("unreadable");
+    expect(reason?.message).not.toContain("publish is stale");
+    expect(reason?.action).toContain("public access");
+    expect(
+      payload.degradedReasons.some((r) =>
+        r.message.includes("publish is stale"),
+      ),
+    ).toBe(false);
+    expect(payload.operationalStatus).toBe("degraded");
+  });
+
   test("returns 503 when both auth planes are missing", async () => {
     const payload = await buildDeskEnhancedHealth({
       port: 4020,

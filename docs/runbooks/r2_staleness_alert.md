@@ -92,9 +92,10 @@ observed frequency:
 
 ## Limitations (v1)
 
-- **Partial dedup.** An `unreadable`-only report posts at most once an hour (top-of-hour window) so
-  a permanent access problem does not page every 15 min; real staleness still pages immediately. A
-  4-hour _stale_ outage still yields ~16 messages. Migrate to edge-triggered when the SNR warrants it.
+- **Partial dedup.** An `unreadable`-only report posts to Telegram at most once an hour (top-of-hour
+  window) so a permanent access problem does not post every 15 min; the run still fails and the
+  summary still records every run. Real staleness posts immediately. A 4-hour _stale_ outage still
+  yields ~16 messages. Migrate to edge-triggered when the SNR warrants it.
 - **GitHub Actions cron is not guaranteed on-time.** 5–10 min skew is normal at peak. Still well
   within budget at 15m cadence against 1h SLAs. Migrate to Cloudflare Workers cron triggers if
   tighter is needed.
