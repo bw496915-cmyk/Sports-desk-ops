@@ -152,9 +152,11 @@ export interface ApiBaseValidatorOptions {
 }
 
 /** C0 controls, DEL and backslash: `URL` strips the first two and rewrites `\` to `/`. */
+// oxlint-disable-next-line no-control-regex -- rejecting control bytes is the point.
 const UNSAFE_INPUT = /[\u0000-\u001f\u007f\\]/u;
 
 /** Path characters that would change request semantics if passed through. */
+// oxlint-disable-next-line no-control-regex -- rejecting control bytes is the point.
 const UNSAFE_PATH = /[\u0000-\u001f\u007f\\#]/u;
 
 /**
