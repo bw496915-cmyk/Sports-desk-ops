@@ -8,6 +8,10 @@ import {
   type WeblogAccountCoverage,
 } from "./f402_weblog_capture.ts";
 import {
+  resolveR2ProbeTransport,
+  type R2ProbeFetcher,
+} from "./r2_probe_fetch.ts";
+import {
   BRIDGE_STALENESS_TARGETS,
   evaluateProbe,
   parseLastModified,
@@ -17,6 +21,12 @@ import {
   type StalenessState,
   type StalenessTarget,
 } from "./r2_staleness.ts";
+
+/**
+ * The transport moved to `lib/r2_probe_fetch.ts` so the alerter and the live-feed reader use the
+ * same one; the name stays for callers and tests written against this module.
+ */
+export { createR2S3ProbeFetcher as createR2PipelineS3Fetcher } from "./r2_probe_fetch.ts";
 
 /** Data older than this is surfaced as `dataStale` (distinct from publish SLA stale). */
 export const R2_DATA_STALE_SECONDS = 86_400;
@@ -38,10 +48,7 @@ export interface R2PipelineSinkKpi {
 export type R2PipelineKpis = Readonly<Record<string, R2PipelineSinkKpi>>;
 
 /** Injectable for tests (avoids requiring full Bun `fetch` surface). */
-export type R2PipelineFetcher = (
-  url: string,
-  init: { readonly method: "HEAD" | "GET" },
-) => Promise<Response>;
+export type R2PipelineFetcher = R2ProbeFetcher;
 
 /** @deprecated Use {@link R2PipelineFetcher}. */
 export type R2HeadFetcher = R2PipelineFetcher;
@@ -161,16 +168,11 @@ function applyDataAge(
   };
 }
 
-const DEFAULT_R2_PROBE_TIMEOUT_MS = 5_000;
-
 export async function probeR2PipelineKpis(
   now: Date = new Date(),
-  fetchImpl: R2PipelineFetcher = (url, init) =>
-    fetch(url, {
-      ...init,
-      signal: AbortSignal.timeout(DEFAULT_R2_PROBE_TIMEOUT_MS),
-    }),
+  fetchImpl?: R2PipelineFetcher,
 ): Promise<R2PipelineKpis> {
+  const { fetch: resolvedFetch } = await resolveR2ProbeTransport(fetchImpl);
   const nowMs = now.getTime();
   const out: Record<string, R2PipelineSinkKpi> = {};
   await Promise.all(
@@ -179,7 +181,9 @@ export async function probeR2PipelineKpis(
       const [probe, evidence] = await Promise.all([
         (async (): Promise<StalenessProbe> => {
           try {
-            const response = await fetchImpl(url, { method: "HEAD" as const });
+            const response = await resolvedFetch(url, {
+              method: "HEAD" as const,
+            });
             return {
               target,
               status: response.status,
@@ -196,7 +200,7 @@ export async function probeR2PipelineKpis(
             };
           }
         })(),
-        resolvePipelineDataEvidence(target, fetchImpl),
+        resolvePipelineDataEvidence(target, resolvedFetch),
       ]);
       const verdict = evaluateProbe(probe, nowMs);
       const base: R2PipelineSinkKpi = {
@@ -206,10 +210,9 @@ export async function probeR2PipelineKpis(
             : new Date(probe.lastModifiedMs).toISOString(),
         ageSeconds:
           verdict.ageMs === null ? null : Math.round(verdict.ageMs / 1000),
-        stale:
-          verdict.state === "stale" ||
-          verdict.state === "missing" ||
-          verdict.state === "error",
+        // Any non-fresh state means the pointer is not trustworthy; deriving it this way
+        // keeps a future state from silently reading as healthy.
+        stale: verdict.state !== "fresh",
         state: verdict.state,
         reason: verdict.reason,
         dataAgeSeconds: null,
