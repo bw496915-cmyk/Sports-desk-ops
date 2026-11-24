@@ -2,6 +2,7 @@ import { Glob } from "bun";
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readBunRuntimePin } from "../lib/bun_runtime_pin.ts";
 
 const root = join(import.meta.dir, "..");
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
@@ -9,10 +10,13 @@ const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
 };
 
 describe("PM state invariants", () => {
-  test("the runtime pin is 1.4.4", () => {
-    expect(readFileSync(join(root, ".bun-version"), "utf8").trim()).toBe(
-      "1.4.4",
-    );
+  test("the checkout runtime pin resolves from the manifests", () => {
+    // The version lives in .bun-version, engines.bun, packageManager, and
+    // @types/bun. A second literal here is what left `bun run dev` unable to
+    // start after the pin moved.
+    const pin = readBunRuntimePin(root);
+    expect(pin).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(readFileSync(join(root, ".bun-version"), "utf8").trim()).toBe(pin);
   });
 
   test("predev and test:pm-contracts are wired", () => {
