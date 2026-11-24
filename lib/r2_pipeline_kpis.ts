@@ -7,6 +7,7 @@ import {
   parseWeblogAccountCoverage,
   type WeblogAccountCoverage,
 } from "./f402_weblog_capture.ts";
+import { R2S3Client } from "./r2_s3_client.ts";
 import {
   BRIDGE_STALENESS_TARGETS,
   evaluateProbe,
@@ -162,15 +163,65 @@ function applyDataAge(
 }
 
 const DEFAULT_R2_PROBE_TIMEOUT_MS = 5_000;
+const PUBLIC_R2_PREFIX = `${R2_PUBLIC_BASE.replace(/\/+$/, "")}/`;
+
+const defaultPlainFetch: R2PipelineFetcher = (url, init) =>
+  fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(DEFAULT_R2_PROBE_TIMEOUT_MS),
+  });
+
+/**
+ * Route `R2_PUBLIC_BASE` requests through `R2S3Client.presign` (HEAD/GET) so probes keep working
+ * when public `*.r2.dev` hosting is disabled, while unrelated URLs pass through unchanged.
+ *
+ * A presigned URL carries a short-lived signature in its query string, and a failed fetch can quote
+ * the URL it could not reach. The wrapper replaces such an error with a message naming only the
+ * key, so the signature cannot reach `/api/kpis`, a log line, or an alert body.
+ */
+export function createR2PipelineS3Fetcher(
+  client: Pick<R2S3Client, "presign">,
+  baseFetch: R2PipelineFetcher = defaultPlainFetch,
+): R2PipelineFetcher {
+  return async (url, init) => {
+    if (!url.startsWith(PUBLIC_R2_PREFIX)) {
+      return baseFetch(url, init);
+    }
+    const key = url.slice(PUBLIC_R2_PREFIX.length).replace(/^\/+/, "");
+    const signedUrl = client.presign(key, {
+      method: init.method,
+      expiresIn: 60,
+    });
+    try {
+      return await baseFetch(signedUrl, init);
+    } catch (err) {
+      const name = err instanceof Error ? err.name : "unknown";
+      // The caught error can quote the presigned URL, so only its sanitized
+      // name is attached; leaking the signature is worse than a bare cause.
+      // oxlint-disable-next-line preserve-caught-error -- see the note above.
+      throw new Error(`R2 signed probe failed for ${key} (${name})`, {
+        cause: name,
+      });
+    }
+  };
+}
+
+/** Resolve the probe transport once: injected fetch, presigned client, else anonymous fetch. */
+async function resolveR2ProbeFetch(
+  fetchImpl: R2PipelineFetcher | undefined,
+): Promise<R2PipelineFetcher> {
+  if (fetchImpl !== undefined) return fetchImpl;
+  const client = await R2S3Client.fromEnvOrSecrets().catch(() => null);
+  return client === null
+    ? defaultPlainFetch
+    : createR2PipelineS3Fetcher(client);
+}
 
 export async function probeR2PipelineKpis(
   now: Date = new Date(),
-  fetchImpl: R2PipelineFetcher = (url, init) =>
-    fetch(url, {
-      ...init,
-      signal: AbortSignal.timeout(DEFAULT_R2_PROBE_TIMEOUT_MS),
-    }),
+  fetchImpl?: R2PipelineFetcher,
 ): Promise<R2PipelineKpis> {
+  const resolvedFetch = await resolveR2ProbeFetch(fetchImpl);
   const nowMs = now.getTime();
   const out: Record<string, R2PipelineSinkKpi> = {};
   await Promise.all(
@@ -179,7 +230,9 @@ export async function probeR2PipelineKpis(
       const [probe, evidence] = await Promise.all([
         (async (): Promise<StalenessProbe> => {
           try {
-            const response = await fetchImpl(url, { method: "HEAD" as const });
+            const response = await resolvedFetch(url, {
+              method: "HEAD" as const,
+            });
             return {
               target,
               status: response.status,
@@ -196,7 +249,7 @@ export async function probeR2PipelineKpis(
             };
           }
         })(),
-        resolvePipelineDataEvidence(target, fetchImpl),
+        resolvePipelineDataEvidence(target, resolvedFetch),
       ]);
       const verdict = evaluateProbe(probe, nowMs);
       const base: R2PipelineSinkKpi = {
