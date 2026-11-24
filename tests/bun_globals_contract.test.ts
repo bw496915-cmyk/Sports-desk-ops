@@ -21,6 +21,8 @@ import {
 } from "../lib/bun_globals_contract.ts";
 import * as nodeModule from "node:module";
 
+const requireBuiltin = nodeModule.createRequire(import.meta.url);
+
 describe("globalsContract", () => {
   const report = globalsContract();
 
@@ -152,7 +154,7 @@ describe("Node module surface gaps", () => {
   test("Bun-only builtin ids are unprefixed and requireable", () => {
     for (const id of BUN_ONLY_BUILTIN_IDS) {
       expect(nodeModule.builtinModules, id).toContain(id);
-      expect(() => require(id), id).not.toThrow();
+      expect(() => requireBuiltin(id), id).not.toThrow();
     }
     // The `node:` spelling is the trap: it resolves to nothing.
     expect(nodeModule.builtinModules).not.toContain("node:bun:ffi");
@@ -165,7 +167,7 @@ describe("Node module surface gaps", () => {
       expect(nodeModule.builtinModules, id).not.toContain(
         id.replace("node:", ""),
       );
-      expect(() => require(id), id).not.toThrow();
+      expect(() => requireBuiltin(id), id).not.toThrow();
     }
   });
 });
