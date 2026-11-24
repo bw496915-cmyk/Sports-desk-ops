@@ -1,15 +1,19 @@
 #!/usr/bin/env bun
 /**
  * @file r2_staleness_alerter.ts
- * @description Thin runner for `lib/r2_staleness.ts`: HEAD each v1 bridge key on the public R2
- * URL, build a report, post one Telegram summary when anything is degraded, stay silent when
- * everything is fresh. Designed to run from a GitHub Actions scheduled workflow (every 15 min)
- * so the operator Mac being dead does not take the monitoring with it.
+ * @description Thin runner for `lib/r2_staleness.ts`: HEAD each v1 bridge key, build a report,
+ * post one Telegram summary when anything is degraded, stay silent when everything is fresh.
+ * Designed to run from a GitHub Actions scheduled workflow (every 15 min) so the operator Mac
+ * being dead does not take the monitoring with it.
  *
  * The runner is the only I/O boundary — all SLA evaluation and formatting lives in the library
- * and is covered by unit tests. The runner only needs two secrets (`TELEGRAM_BOT_TOKEN`,
- * `TELEGRAM_CHAT_ID`); no R2 credentials are required because public-URL freshness is exactly
- * what every consumer sees anyway.
+ * and is covered by unit tests. Reads go through `lib/r2_probe_fetch.ts`, the same transport the
+ * desk uses: presigned when R2 credentials resolve, anonymous otherwise. The runner itself still
+ * needs only the two Telegram secrets; without R2 credentials it reports every key `unreadable`
+ * instead of pretending the key itself is stale.
+ *
+ * An unreadable-only report posts at most once an hour (the run summary and the exit code still
+ * report every run), so a permanent access problem cannot page every 15 minutes.
  *
  * Exit contract (deliberately NOT the same as "did we post a message"):
  *   0 — all targets fresh (no post)
@@ -17,15 +21,20 @@
  *   2 — at least one target degraded (post may or may not have been attempted, see logs)
  *
  * Usage:
- *   bun run scripts/r2_staleness_alerter.ts [--dry-run]
+ *   bun run scripts/r2_staleness_alerter.ts [--dry-run] [--force-notify]
  *   bun run scripts/r2_staleness_alerter.ts --probe-only > probes.jsonl
  *
  * `--dry-run` skips the Telegram POST and prints the rendered message to stdout.
+ * `--force-notify` pages even an unreadable-only report outside the hourly window.
  * `--probe-only` emits one JSONL line per probe and exits 0; no SLA evaluation.
  */
 
 import { appendFile } from "node:fs/promises";
 
+import {
+  resolveR2ProbeTransport,
+  type R2ProbeFetcher,
+} from "../lib/r2_probe_fetch.ts";
 import {
   ALERTER_EXIT,
   BRIDGE_STALENESS_TARGETS,
@@ -35,6 +44,7 @@ import {
   formatStepSummaryTable,
   parseLastModified,
   publicUrlFor,
+  shouldNotify,
   type AlerterExit,
   type StalenessProbe,
   type StalenessTarget,
@@ -44,6 +54,7 @@ interface RunnerOptions {
   readonly dryRun: boolean;
   readonly probeOnly: boolean;
   readonly perRequestTimeoutMs: number;
+  readonly forceNotify: boolean;
 }
 
 /** 10s per HEAD matches `agent-doctor` timeouts elsewhere in the repo. */
@@ -54,6 +65,7 @@ function parseArgs(argv: readonly string[]): RunnerOptions {
     dryRun: argv.includes("--dry-run"),
     probeOnly: argv.includes("--probe-only"),
     perRequestTimeoutMs: DEFAULT_TIMEOUT_MS,
+    forceNotify: argv.includes("--force-notify"),
   };
 }
 
@@ -64,12 +76,13 @@ function parseArgs(argv: readonly string[]): RunnerOptions {
 async function probeOne(
   target: StalenessTarget,
   timeoutMs: number,
+  fetchImpl: R2ProbeFetcher,
 ): Promise<StalenessProbe> {
   const url = publicUrlFor(target);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, {
+    const response = await fetchImpl(url, {
       method: "HEAD",
       signal: controller.signal,
     });
@@ -98,8 +111,9 @@ async function probeOne(
 async function probeAll(
   targets: readonly StalenessTarget[],
   timeoutMs: number,
+  fetchImpl: R2ProbeFetcher,
 ): Promise<readonly StalenessProbe[]> {
-  return Promise.all(targets.map((t) => probeOne(t, timeoutMs)));
+  return Promise.all(targets.map((t) => probeOne(t, timeoutMs, fetchImpl)));
 }
 
 /**
@@ -165,16 +179,19 @@ async function appendSummary(markdown: string): Promise<void> {
 async function main(): Promise<AlerterExit> {
   const options = parseArgs(Bun.argv.slice(2));
   const nowMs = Date.now();
+  const transport = await resolveR2ProbeTransport();
 
   const probes = await probeAll(
     BRIDGE_STALENESS_TARGETS,
     options.perRequestTimeoutMs,
+    transport.fetch,
   );
 
   if (options.probeOnly) {
     for (const probe of probes) {
       logRunLine({
         kind: "probe",
+        transport: transport.kind,
         key: probe.target.key,
         status: probe.status,
         lastModifiedMs: probe.lastModifiedMs,
@@ -189,6 +206,7 @@ async function main(): Promise<AlerterExit> {
 
   logRunLine({
     kind: "report",
+    transport: transport.kind,
     observedAtMs: report.observedAtMs,
     degradedCount: report.degradedCount,
     verdicts: report.verdicts.map((v) => ({
@@ -221,6 +239,17 @@ async function main(): Promise<AlerterExit> {
     logRunLine({ kind: "alerter-error", detail });
     await appendSummary(formatDeliveryLine({ state: "not-attempted", detail }));
     return ALERTER_EXIT.alerterError;
+  }
+
+  // A permanently unreadable probe is a configuration state, not a fresh incident. Post at most
+  // once an hour; the run summary above and the exit code below still report every run. Checked
+  // after the secrets so a misconfigured runner still fails as `alerterError`, not `degraded`.
+  if (!shouldNotify(report, nowMs, { force: options.forceNotify })) {
+    const detail =
+      "unreadable-only report outside the hourly window; run summary still written";
+    logRunLine({ kind: "notify-suppressed", detail });
+    await appendSummary(formatDeliveryLine({ state: "not-attempted", detail }));
+    return ALERTER_EXIT.degraded;
   }
 
   const send = await sendTelegram(botToken, chatId, message);
