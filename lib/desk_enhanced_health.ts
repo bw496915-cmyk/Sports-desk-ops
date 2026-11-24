@@ -77,6 +77,8 @@ export interface DeskPipelinesSummary {
   readonly r2Fresh: number;
   readonly r2Total: number;
   readonly r2StaleKeys: readonly string[];
+  /** Sinks whose probe was refused (401/403) — age unknown, not a publish failure. */
+  readonly r2UnreadableKeys: readonly string[];
   readonly dataStaleKeys: readonly string[];
   readonly checks: DeskPipelineChecks;
 }
@@ -146,6 +148,23 @@ const R2_PUBLISH_ACTION: Readonly<Record<string, string>> = {
   "gslive-tally": "bun run bridge3c:rollup --fetch-open",
   "f402-weblog": "bun run scripts/f402_weblog_bridge.ts",
   "wagers-by-state": "bun run wagers:publish-snapshot",
+};
+
+/**
+ * A refused probe is an authorization state, not a publish command. Re-running the publisher
+ * would rewrite the pointer and leave the read refused, so the desk points at access instead.
+ */
+const R2_UNREADABLE_ACTION =
+  "Enable r2.dev public access for the bucket, or give the probe R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY";
+
+/**
+ * A stale *data* window is not fixed by republishing it. `wagers:publish-snapshot` publishes
+ * whatever `wagers:by-state --live` last wrote, so for wagers-by-state the desk points at the live
+ * re-derive first (it needs the GSLive session) and only then at the publish.
+ */
+const R2_DATA_ACTION: Readonly<Record<string, string>> = {
+  "wagers-by-state":
+    "bun run wagers:by-state --live && bun run wagers:publish-snapshot",
 };
 
 function pushDegradedReason(
@@ -302,6 +321,8 @@ function gsliveAuthFromHealth(health: GsliveSessionHealth): GsliveAuthCore {
 
 function sinkCheckLabel(sink: R2PipelineSinkKpi | undefined): string {
   if (sink === undefined) return "missing";
+  // A refused read says nothing about the key's age; do not dress it as a publish failure.
+  if (sink.state === "unreadable") return "unreadable";
   const publishStale = sink.stale;
   const dataStale = sink.dataStale;
   if (publishStale && dataStale) return "stale-publish-and-data";
@@ -312,6 +333,7 @@ function sinkCheckLabel(sink: R2PipelineSinkKpi | undefined): string {
 
 function summarizePipelines(kpis: R2PipelineKpis): DeskPipelinesSummary {
   const r2StaleKeys: string[] = [];
+  const r2UnreadableKeys: string[] = [];
   const dataStaleKeys: string[] = [];
   const checksMutable: Record<keyof DeskPipelineChecks, string> = {
     ticker: "missing",
@@ -325,6 +347,7 @@ function summarizePipelines(kpis: R2PipelineKpis): DeskPipelinesSummary {
     r2Total += 1;
     if (!sink.stale) r2Fresh += 1;
     if (sink.stale) r2StaleKeys.push(id);
+    if (sink.state === "unreadable") r2UnreadableKeys.push(id);
     if (sink.dataStale) dataStaleKeys.push(id);
     const short = SINK_SHORT[id];
     if (short !== undefined) checksMutable[short] = sinkCheckLabel(sink);
@@ -334,6 +357,7 @@ function summarizePipelines(kpis: R2PipelineKpis): DeskPipelinesSummary {
     r2Fresh,
     r2Total,
     r2StaleKeys,
+    r2UnreadableKeys,
     dataStaleKeys,
     checks,
   };
@@ -663,6 +687,7 @@ export async function buildDeskEnhancedHealth(
   }
 
   for (const key of pipelines.r2StaleKeys) {
+    if (pipelines.r2UnreadableKeys.includes(key)) continue;
     const action = R2_PUBLISH_ACTION[key];
     pushDegradedReason(
       degradedReasons,
@@ -671,8 +696,16 @@ export async function buildDeskEnhancedHealth(
       action === undefined ? {} : { action },
     );
   }
+  for (const key of pipelines.r2UnreadableKeys) {
+    pushDegradedReason(
+      degradedReasons,
+      `R2 sink '${key}' is unreadable: the probe was refused (public hosting off or no R2 credentials)`,
+      "publish",
+      { action: R2_UNREADABLE_ACTION },
+    );
+  }
   for (const key of pipelines.dataStaleKeys) {
-    const action = R2_PUBLISH_ACTION[key];
+    const action = R2_DATA_ACTION[key] ?? R2_PUBLISH_ACTION[key];
     pushDegradedReason(
       degradedReasons,
       `R2 sink '${key}' has stale data (>24h)`,

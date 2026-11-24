@@ -9,16 +9,23 @@
  * public R2 URL without any R2 credentials.
  *
  * Pure by design: no `fetch`, no `console`, no process state. The runner HEADs the URL and feeds
- * in `{ status, lastModified }`; this module decides fresh/stale/missing/error and formats the
- * Telegram summary. Tests cover the library exhaustively; the runner is trivial.
+ * in `{ status, lastModified }`; this module decides fresh/stale/missing/unreadable/error and
+ * formats the Telegram summary. Tests cover the library exhaustively; the runner is trivial.
  */
 
 /** Public R2 base for the `sportsdesk-ops-reports` bucket. Matches `R2S3Options.publicBase`. */
 export const R2_PUBLIC_BASE =
   "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev";
 
-/** How a key can relate to its SLA. */
-export type StalenessState = "fresh" | "stale" | "missing" | "error";
+/**
+ * How a key can relate to its SLA.
+ *
+ * `unreadable` is the 401/403 arm: the bucket refused the read itself (public hosting off, no
+ * credentials), which says nothing about the key's age. It is deliberately distinct from `error`
+ * so an alert cannot blame a key for the probe's own authorization.
+ */
+export type StalenessState =
+  "fresh" | "stale" | "missing" | "unreadable" | "error";
 
 /** One monitored R2 key: its name, the SLA, and a short human label for the alert. */
 export interface StalenessTarget {
@@ -135,6 +142,14 @@ export function evaluateProbe(
       reason: "404 (key does not exist)",
     };
   }
+  if (status === 401 || status === 403) {
+    return {
+      target,
+      state: "unreadable",
+      ageMs: null,
+      reason: `HTTP ${status} — the bucket refused the read (public hosting off, or no R2 credentials)`,
+    };
+  }
   if (status !== 200) {
     return {
       target,
@@ -187,10 +202,40 @@ export function buildReport(
   nowMs: number,
 ): StalenessReport {
   const verdicts = probes.map((probe) => evaluateProbe(probe, nowMs));
-  const degradedCount = verdicts.filter(
-    (v) => v.state === "stale" || v.state === "missing" || v.state === "error",
-  ).length;
+  const degradedCount = verdicts.filter((v) => v.state !== "fresh").length;
   return { observedAtMs: nowMs, verdicts, degradedCount };
+}
+
+/** How the runner decides whether a report should reach Telegram. */
+export interface NotifyPolicy {
+  /** Minute-of-hour (UTC) window in which an unreadable-only report may post. Default 15. */
+  readonly unreadableWindowMinutes?: number;
+  /** A manual run (`workflow_dispatch`, `--force-notify`) bypasses the window. */
+  readonly force?: boolean;
+}
+
+/**
+ * Whether this report warrants a Telegram post.
+ *
+ * A permanently unreadable probe is a configuration state, not a fresh incident: at the 15-minute
+ * scheduled cadence it produced roughly 250 identical messages over 15 days (measured 2026-11-24)
+ * and the monitor became background noise. Real staleness still pages immediately; an
+ * unreadable-only report posts at most once per hour. The run summary and the non-zero exit are
+ * unaffected — a blind monitor stays loud on the workflow page and still fails closed.
+ */
+export function shouldNotify(
+  report: StalenessReport,
+  nowMs: number,
+  policy: NotifyPolicy = {},
+): boolean {
+  if (report.degradedCount === 0) return false;
+  if (policy.force === true) return true;
+  const hardDegraded = report.verdicts.some(
+    (v) => v.state === "stale" || v.state === "missing" || v.state === "error",
+  );
+  if (hardDegraded) return true;
+  const windowMinutes = policy.unreadableWindowMinutes ?? 15;
+  return new Date(nowMs).getUTCMinutes() < windowMinutes;
 }
 
 /**
@@ -216,6 +261,7 @@ const STATE_PREFIX: Record<StalenessState, string> = {
   fresh: "OK",
   stale: "STALE",
   missing: "MISSING",
+  unreadable: "UNREADABLE",
   error: "ERROR",
 };
 
