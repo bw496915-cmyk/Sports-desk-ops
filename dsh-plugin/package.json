@@ -13,6 +13,7 @@
   },
   "files": [
     "index.js",
+    "repo_path_resolve.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
