@@ -1063,7 +1063,8 @@ function weblogsActivityDetectors(perception: FraudPerception): FraudFinding[] {
     }
     const missingReason = measured
       ? null
-      : `the GSLive WebLog activity artifact is MISSING and its session expired (HTTP 401): operator re-auth then ${activity.command}`;
+      : (sourceState?.reason ??
+        `the GSLive WebLog activity artifact is MISSING and no refresh journal recorded an outcome: run ${activity.command}`);
     return finding({
       id: detector.id,
       title: detector.title,
