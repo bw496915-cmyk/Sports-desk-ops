@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-18T21:56:06.521Z",
-  "runtime": "Bun 1.4.4",
+  "generatedAt": "2026-11-25T22:09:57.555Z",
+  "runtime": "Bun 1.4.5",
   "shapes": {
     "$": {
       "documented": true,
@@ -22,6 +22,14 @@
     "ArrayBufferSink": {
       "documented": true,
       "link": "https://bun.com/docs/runtime/streams#bun-arraybuffersink"
+    },
+    "BinaryType": {
+      "documented": true,
+      "link": "https://bun.com/blog/bun-v0.7.0#nodebuffer-is-now-the-default-binarytype"
+    },
+    "BinaryTypeList": {
+      "documented": false,
+      "link": null
     },
     "build": {
       "documented": true,
@@ -375,6 +383,10 @@
       "documented": true,
       "link": "https://bun.com/docs/test/writing-tests#fixtures"
     },
+    "ServerWebSocket": {
+      "documented": true,
+      "link": "https://bun.com/docs/runtime/http/websockets#reference"
+    },
     "sha": {
       "documented": true,
       "link": "https://bun.com/docs/runtime/sql#authentication"
@@ -414,6 +426,10 @@
     "sliceAnsi": {
       "documented": true,
       "link": "https://bun.com/blog/bun-v1.3.11#bun-sliceansi-ansi-grapheme-aware-string-slicing"
+    },
+    "SocketHandler": {
+      "documented": false,
+      "link": null
     },
     "spawn": {
       "documented": true,
@@ -474,6 +490,10 @@
     "Transpiler": {
       "documented": true,
       "link": "https://bun.com/docs/runtime/transpiler"
+    },
+    "udp": {
+      "documented": true,
+      "link": "https://bun.com/docs/runtime/networking/udp"
     },
     "udpSocket": {
       "documented": true,

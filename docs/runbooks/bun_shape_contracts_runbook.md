@@ -915,7 +915,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.BinaryType (type)
 
-- **Source:** declared in `bun-types@1.4.5` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.5` · no reference page (see [docs](https://bun.com/blog/bun-v0.7.0#nodebuffer-is-now-the-default-binarytype))
 - **Shape:** type-only: declared, no runtime value
 - **Here:** `src/lib/binary_type.ts`
 - **Evidence:** `test:scripts/diff-bun-docs-vs-types.test.ts`, `test:tests/binary_type.test.ts`, `test:tests/bun_shapes_manifest.test.ts`, `test:tests/bun_socket_contracts.test.ts`
@@ -1033,7 +1033,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.ServerWebSocket (type)
 
-- **Source:** declared in `bun-types@1.4.5` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.5` · no reference page (see [docs](https://bun.com/docs/runtime/http/websockets#reference))
 - **Shape:** type-only: declared, no runtime value
 - **Here:** `packages/api/src/ws.ts`, `src/lib/binary_type.ts`
 - **Evidence:** `test:tests/binary_type.test.ts`, `test:tests/blob_and_live_bets_server.test.ts`, `test:tests/bun_reference_symbols.test.ts`, `test:tests/bun_shapes_manifest.test.ts`
@@ -1047,7 +1047,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 
 #### Bun.udp (type)
 
-- **Source:** declared in `bun-types@1.4.5` · no reference page (declaration only)
+- **Source:** declared in `bun-types@1.4.5` · no reference page (see [docs](https://bun.com/docs/runtime/networking/udp))
 - **Shape:** type-only: declared, no runtime value
 - **Here:** `src/lib/udp_telemetry.ts`
 - **Evidence:** `test:scripts/diff-bun-docs-vs-types.test.ts`, `test:tests/binary_type.test.ts`, `test:tests/bun_shapes_manifest.test.ts`, `test:tests/bun_surface_cli.test.ts`
