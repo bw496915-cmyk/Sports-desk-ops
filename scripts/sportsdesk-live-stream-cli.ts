@@ -20,6 +20,8 @@
  */
 import { parseArgs } from "node:util";
 
+import { decodeWsEventText } from "../src/lib/binary_type.ts";
+
 import {
   F402_BET_TICKER_LIVE_CHANNEL,
   type F402TickerDeltaEvent,
@@ -427,6 +429,7 @@ async function runBridgeWakePoll(options: {
       ? [BRIDGE_WS_PROTOCOL]
       : [BRIDGE_WS_PROTOCOL, `bearer-${options.bridgeToken}`];
   const socket = new WebSocket(options.bridgeUrl, protocols);
+  socket.binaryType = "arraybuffer";
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error("bridge ws open timeout")),
@@ -476,7 +479,9 @@ async function runBridgeWakePoll(options: {
       void (async () => {
         let frame: unknown;
         try {
-          frame = JSON.parse(String(event.data));
+          const text = await decodeWsEventText(event.data);
+          if (text === null) return;
+          frame = JSON.parse(text);
         } catch {
           return;
         }

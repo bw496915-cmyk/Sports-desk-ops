@@ -22,29 +22,18 @@
 
 import { describe, expect, test } from "bun:test";
 
-type Delivered = {
-  readonly ctor: string;
-  readonly isBuffer: boolean;
-  readonly isUint8Array: boolean;
-  readonly isArrayBuffer: boolean;
-};
-
-function classify(value: unknown): Delivered {
-  return {
-    ctor:
-      (value as { constructor?: { name?: string } })?.constructor?.name ??
-      typeof value,
-    isBuffer: Buffer.isBuffer(value),
-    isUint8Array: value instanceof Uint8Array,
-    isArrayBuffer: value instanceof ArrayBuffer,
-  };
-}
+import {
+  type BinaryType,
+  type ClassifiedBinaryPayload,
+  classifyBinaryPayload,
+  createSocketBinaryHandler,
+} from "../src/lib/binary_type.ts";
 
 /** Connects, sends three bytes, and returns what the server's handler received. */
 async function deliveredFor(
-  binaryType: "arraybuffer" | "buffer" | "uint8array" | undefined,
-): Promise<Delivered> {
-  let received: Delivered | undefined;
+  binaryType: BinaryType | undefined,
+): Promise<ClassifiedBinaryPayload> {
+  let received: ClassifiedBinaryPayload | undefined;
   let settle: (() => void) | undefined;
   const arrived = new Promise<void>((resolve) => {
     settle = resolve;
@@ -53,15 +42,20 @@ async function deliveredFor(
   const server = Bun.listen({
     hostname: "127.0.0.1",
     port: 0,
-    // The handler is generic over binaryType, which a union parameter cannot
-    // thread through; the value is narrowed by `classify` instead.
-    socket: {
-      ...(binaryType === undefined ? {} : { binaryType }),
-      data(_socket: unknown, data: unknown) {
-        received = classify(data);
-        settle?.();
-      },
-    } as never,
+    socket:
+      binaryType === undefined
+        ? {
+            data(_socket, data) {
+              received = classifyBinaryPayload(data);
+              settle?.();
+            },
+          }
+        : createSocketBinaryHandler(binaryType, {
+            data(_socket, data) {
+              received = classifyBinaryPayload(data);
+              settle?.();
+            },
+          }),
   });
 
   const client = await Bun.connect({
@@ -183,5 +177,419 @@ describe("Bun TCP socket contracts", () => {
     const delivered = await deliveredFor("arraybuffer");
     expect(delivered.isArrayBuffer).toBe(true);
     expect(delivered.isUint8Array).toBe(false);
+    expect(delivered.byteLength).toBe(3);
+  });
+});
+
+async function udpDeliveredFor(
+  binaryType: BinaryType | undefined,
+): Promise<ClassifiedBinaryPayload> {
+  let received: ClassifiedBinaryPayload | undefined;
+  let settle: (() => void) | undefined;
+  const arrived = new Promise<void>((resolve) => {
+    settle = resolve;
+  });
+
+  const receiver = await (binaryType === undefined
+    ? Bun.udpSocket({
+        hostname: "127.0.0.1",
+        port: 0,
+        socket: {
+          data(_socket, data) {
+            received = classifyBinaryPayload(data);
+            settle?.();
+          },
+        },
+      })
+    : Bun.udpSocket({
+        hostname: "127.0.0.1",
+        port: 0,
+        binaryType,
+        socket: {
+          data(_socket, data) {
+            received = classifyBinaryPayload(data);
+            settle?.();
+          },
+        },
+      }));
+
+  const sender = await Bun.udpSocket({
+    hostname: "127.0.0.1",
+    port: 0,
+  });
+
+  try {
+    sender.send(new Uint8Array([4, 5, 6]), receiver.port, "127.0.0.1");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `no UDP data delivered (binaryType=${String(binaryType)})`,
+            ),
+          ),
+        2_000,
+      );
+    });
+    try {
+      await Promise.race([arrived, timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (received === undefined) {
+      throw new Error("UDP handler ran without recording a payload");
+    }
+    return received;
+  } finally {
+    sender.close();
+    receiver.close();
+  }
+}
+
+describe("Bun UDP socket BinaryType contracts", () => {
+  test("UDP binaryType default delivers Buffer", async () => {
+    const delivered = await udpDeliveredFor(undefined);
+    expect(delivered.kind).toBe("buffer");
+    expect(delivered.isBuffer).toBe(true);
+    expect(delivered.byteLength).toBe(3);
+  });
+
+  test("UDP binaryType uint8array delivers bare Uint8Array, not Buffer", async () => {
+    const delivered = await udpDeliveredFor("uint8array");
+    expect(delivered.kind).toBe("uint8array");
+    expect(delivered.isUint8Array).toBe(true);
+    expect(delivered.isBuffer).toBe(false);
+    expect(delivered.byteLength).toBe(3);
+  });
+
+  test("UDP binaryType arraybuffer delivers ArrayBuffer", async () => {
+    const delivered = await udpDeliveredFor("arraybuffer");
+    expect(delivered.kind).toBe("arraybuffer");
+    expect(delivered.isArrayBuffer).toBe(true);
+    expect(delivered.isUint8Array).toBe(false);
+    expect(delivered.byteLength).toBe(3);
+  });
+
+  test("connected UDP socket exposes remoteAddress, ReceiveFlags, and connected sendMany()", async () => {
+    const received: Array<{
+      readonly text: string;
+      readonly truncated: boolean;
+      readonly ipv6: boolean;
+    }> = [];
+    let settle: (() => void) | undefined;
+    const allArrived = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+
+    const server = await Bun.udpSocket({
+      hostname: "127.0.0.1",
+      port: 0,
+      binaryType: "uint8array",
+      socket: {
+        data(_sock, data, _port, _addr, flags) {
+          received.push({
+            text: new TextDecoder().decode(data),
+            truncated: flags.truncated,
+            ipv6: flags.ipv6,
+          });
+          if (received.length === 3) settle?.();
+        },
+      },
+    });
+
+    const client = await Bun.udpSocket({
+      hostname: "127.0.0.1",
+      port: 0,
+      binaryType: "uint8array",
+      connect: {
+        hostname: "127.0.0.1",
+        port: server.port,
+      },
+    });
+
+    try {
+      expect(server.binaryType).toBe("uint8array");
+      // Bun 1.4.5 quirk: `binaryType` is only applied when a `socket` handler is provided.
+      expect(client.binaryType).toBe("buffer");
+      expect(client.remoteAddress.port).toBe(server.port);
+      expect(client.remoteAddress.address).toBe("127.0.0.1");
+
+      const sentCount = client.sendMany(["alpha", "beta", "gamma"]);
+      expect(sentCount).toBe(3);
+
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("UDP sendMany timeout")),
+          2_000,
+        );
+      });
+      try {
+        await Promise.race([allArrived, timeout]);
+      } finally {
+        clearTimeout(timer);
+      }
+
+      expect(received.map((r) => r.text).sort()).toEqual([
+        "alpha",
+        "beta",
+        "gamma",
+      ]);
+      for (const item of received) {
+        expect(item.truncated).toBe(false);
+        expect(item.ipv6).toBe(false);
+      }
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  test("unconnected sendMany() uses flat [data, port, ip] triplets and returns packet count", async () => {
+    const received: string[] = [];
+    let settle: (() => void) | undefined;
+    const bothArrived = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+
+    const server = await Bun.udpSocket({
+      hostname: "127.0.0.1",
+      port: 0,
+      binaryType: "uint8array",
+      socket: {
+        data(_sock, data) {
+          received.push(new TextDecoder().decode(data));
+          if (received.length === 2) settle?.();
+        },
+      },
+    });
+
+    const sender = await Bun.udpSocket({
+      hostname: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const sentPackets = sender.sendMany([
+        "pkt-1",
+        server.port,
+        "127.0.0.1",
+        "pkt-2",
+        server.port,
+        "127.0.0.1",
+      ]);
+      expect(sentPackets).toBe(2);
+
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("unconnected sendMany timeout")),
+          2_000,
+        );
+      });
+      try {
+        await Promise.race([bothArrived, timeout]);
+      } finally {
+        clearTimeout(timer);
+      }
+      expect(received.sort()).toEqual(["pkt-1", "pkt-2"]);
+    } finally {
+      sender.close();
+      server.close();
+    }
+  });
+
+  test("UDP socket.reload() requires nested { socket } shape (direct handler is a no-op) and setBroadcast/setTTL work", async () => {
+    const events: string[] = [];
+    let resolveFirst: (() => void) | undefined;
+    let resolveDirect: (() => void) | undefined;
+    let resolveNested: (() => void) | undefined;
+    const first = new Promise<void>((r) => {
+      resolveFirst = r;
+    });
+    const direct = new Promise<void>((r) => {
+      resolveDirect = r;
+    });
+    const nested = new Promise<void>((r) => {
+      resolveNested = r;
+    });
+
+    const receiver = await Bun.udpSocket({
+      hostname: "127.0.0.1",
+      port: 0,
+      binaryType: "uint8array",
+      socket: {
+        data(_sock, data) {
+          const text = new TextDecoder().decode(data);
+          events.push(`v1:${text}`);
+          if (text === "one") resolveFirst?.();
+          if (text === "direct") resolveDirect?.();
+        },
+      },
+    });
+    const sender = await Bun.udpSocket({
+      hostname: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      expect(sender.setTTL(64)).toBe(64);
+      expect(sender.setBroadcast(true)).toBe(true);
+      expect(sender.setBroadcast(false)).toBe(false);
+
+      sender.send("one", receiver.port, "127.0.0.1");
+      await first;
+
+      // Direct shape matches bun-types@1.4.5, but runtime silently keeps v1.
+      receiver.reload({
+        data(_sock, data) {
+          events.push(`direct:${new TextDecoder().decode(data)}`);
+        },
+      });
+      sender.send("direct", receiver.port, "127.0.0.1");
+      await direct;
+
+      // Nested `{ socket: handler }` actually swaps the UDP handler on Bun 1.4.5.
+      receiver.reload({
+        socket: {
+          data(_sock: unknown, data: Uint8Array) {
+            events.push(`v2:${new TextDecoder().decode(data)}`);
+            resolveNested?.();
+          },
+        },
+      } as never);
+      sender.send("two", receiver.port, "127.0.0.1");
+      await nested;
+
+      expect(events).toEqual(["v1:one", "v1:direct", "v2:two"]);
+    } finally {
+      sender.close();
+      receiver.close();
+    }
+  });
+
+  test("TCP vs UDP invalid binaryType validation contract (Bun 1.4.5)", async () => {
+    for (const invalid of ["dataview", "nodebuffer", "blob"] as const) {
+      expect(() =>
+        Bun.listen({
+          hostname: "127.0.0.1",
+          port: 0,
+          socket: { binaryType: invalid as never, data() {} },
+        }),
+      ).toThrow(/SocketHandler\.binaryType/);
+    }
+
+    for (const invalid of ["dataview", "blob"] as const) {
+      // Bun.udpSocket validates binaryType synchronously before returning a Promise.
+      expect(() =>
+        Bun.udpSocket({
+          hostname: "127.0.0.1",
+          port: 0,
+          binaryType: invalid as never,
+          socket: { data() {} },
+        }),
+      ).toThrow(/binaryType/);
+    }
+
+    // Bun 1.4.5 UDP quirk: "nodebuffer" is accepted and normalized to "buffer".
+    const normalized = await Bun.udpSocket({
+      hostname: "127.0.0.1",
+      port: 0,
+      binaryType: "nodebuffer" as never,
+      socket: { data() {} },
+    });
+    try {
+      expect(normalized.binaryType).toBe("buffer");
+    } finally {
+      normalized.close();
+    }
+  });
+
+  test("IPv6 loopback ::1 sets ReceiveFlags.ipv6=true and UDP send() after close() throws", async () => {
+    let observed:
+      | { readonly addr: string; readonly ipv6: boolean; readonly text: string }
+      | undefined;
+    let settle: (() => void) | undefined;
+    const arrived = new Promise<void>((r) => {
+      settle = r;
+    });
+
+    const rx = await Bun.udpSocket({
+      hostname: "::1",
+      port: 0,
+      binaryType: "uint8array",
+      socket: {
+        data(_sock, data, _port, addr, flags) {
+          observed = {
+            addr,
+            ipv6: flags.ipv6,
+            text: new TextDecoder().decode(data),
+          };
+          settle?.();
+        },
+      },
+    });
+    const tx = await Bun.udpSocket({ hostname: "::1", port: 0 });
+    try {
+      expect(tx.send("v6-ping", rx.port, "::1")).toBe(true);
+      await Promise.race([
+        arrived,
+        Bun.sleep(2_000).then(() => {
+          throw new Error("IPv6 UDP loopback timeout");
+        }),
+      ]);
+      expect(observed).toEqual({ addr: "::1", ipv6: true, text: "v6-ping" });
+    } finally {
+      tx.close();
+      rx.close();
+    }
+
+    // Unlike TCP write() (which returns -1), UDP send() on a closed socket throws.
+    expect(tx.closed).toBe(true);
+    expect(() => tx.send("after-close", rx.port, "::1")).toThrow(
+      /Socket is closed/,
+    );
+  });
+
+  test("UDP multicast loopback delivers datagrams on 239.255.77.77 via 127.0.0.1", async () => {
+    const group = "239.255.77.77";
+    let receivedText = "";
+    let settle: (() => void) | undefined;
+    const arrived = new Promise<void>((r) => {
+      settle = r;
+    });
+
+    const rx = await Bun.udpSocket({
+      hostname: "0.0.0.0",
+      port: 0,
+      binaryType: "uint8array",
+      socket: {
+        data(_sock, data) {
+          receivedText = new TextDecoder().decode(data);
+          settle?.();
+        },
+      },
+    });
+    const tx = await Bun.udpSocket({ hostname: "127.0.0.1", port: 0 });
+    try {
+      expect(rx.addMembership(group, "127.0.0.1")).toBe(true);
+      expect(tx.setMulticastTTL(1)).toBe(1);
+      expect(tx.setMulticastLoopback(true)).toBe(true);
+      expect(tx.setMulticastInterface("127.0.0.1")).toBe(true);
+
+      expect(tx.send("mcast-ping", rx.port, group)).toBe(true);
+      await Promise.race([
+        arrived,
+        Bun.sleep(2_000).then(() => {
+          throw new Error("UDP multicast loopback timeout");
+        }),
+      ]);
+      expect(receivedText).toBe("mcast-ping");
+      expect(rx.dropMembership(group, "127.0.0.1")).toBe(true);
+    } finally {
+      tx.close();
+      rx.close();
+    }
   });
 });

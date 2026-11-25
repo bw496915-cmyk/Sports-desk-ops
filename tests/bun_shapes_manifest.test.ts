@@ -91,6 +91,8 @@ describe("manifest", () => {
     const values = BUN_SHAPES.filter((s) => s.kind === "value");
     expect(values.length + types.length).toBe(BUN_SHAPES.length);
     expect(types.map((s) => s.name).sort()).toEqual([
+      "BinaryType",
+      "BinaryTypeList",
       "BunFile",
       "BunRequest",
       "ColorInput",
@@ -114,11 +116,14 @@ describe("manifest", () => {
       "S3Stats",
       "Serve",
       "Server",
+      "ServerWebSocket",
+      "SocketHandler",
       "SpawnOptions",
       "Subprocess",
       "TerminalOptions",
       "WebSocket",
       "Worker",
+      "udp",
     ]);
   });
 

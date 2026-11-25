@@ -740,9 +740,9 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.Archive",
     evidence: [
       "surface:Archive",
+      "test:scripts/diff-bun-docs-vs-types.test.ts",
       "test:tests/bun_archive_contract.test.ts",
       "test:tests/bun_builtin_replacements.test.ts",
-      "test:tests/bun_eval_patterns.test.ts",
     ],
   },
   {
@@ -1242,6 +1242,28 @@ export const BUN_SHAPES: readonly BunShape[] = [
     ],
   },
   {
+    name: "BinaryType",
+    kind: "type",
+    subsystem: "network",
+    heading: "Bun.BinaryType (type)",
+    evidence: [
+      "test:scripts/diff-bun-docs-vs-types.test.ts",
+      "test:tests/binary_type.test.ts",
+      "test:tests/bun_shapes_manifest.test.ts",
+      "test:tests/bun_socket_contracts.test.ts",
+    ],
+  },
+  {
+    name: "BinaryTypeList",
+    kind: "type",
+    subsystem: "network",
+    heading: "Bun.BinaryTypeList (type)",
+    evidence: [
+      "test:tests/binary_type.test.ts",
+      "test:tests/bun_shapes_manifest.test.ts",
+    ],
+  },
+  {
     name: "BunRequest",
     kind: "type",
     subsystem: "network",
@@ -1404,11 +1426,51 @@ export const BUN_SHAPES: readonly BunShape[] = [
     ],
   },
   {
+    name: "ServerWebSocket",
+    kind: "type",
+    subsystem: "network",
+    heading: "Bun.ServerWebSocket (type)",
+    evidence: [
+      "test:tests/binary_type.test.ts",
+      "test:tests/blob_and_live_bets_server.test.ts",
+      "test:tests/bun_reference_symbols.test.ts",
+      "test:tests/bun_shapes_manifest.test.ts",
+    ],
+  },
+  {
+    name: "SocketHandler",
+    kind: "type",
+    subsystem: "network",
+    heading: "Bun.SocketHandler (type)",
+    evidence: [
+      "test:tests/binary_type.test.ts",
+      "test:tests/bun_shapes_manifest.test.ts",
+      "test:tests/bun_socket_contracts.test.ts",
+    ],
+  },
+  {
+    name: "udp",
+    kind: "type",
+    subsystem: "network",
+    heading: "Bun.udp (type)",
+    evidence: [
+      "test:scripts/diff-bun-docs-vs-types.test.ts",
+      "test:tests/binary_type.test.ts",
+      "test:tests/bun_shapes_manifest.test.ts",
+      "test:tests/bun_surface_cli.test.ts",
+    ],
+  },
+  {
     name: "udpSocket",
     kind: "value",
     subsystem: "network",
     heading: "Bun.udpSocket",
-    evidence: ["surface:udpSocket", "test:tests/bun_capabilities.test.ts"],
+    evidence: [
+      "surface:udpSocket",
+      "test:scripts/diff-bun-docs-vs-types.test.ts",
+      "test:tests/bun_capabilities.test.ts",
+      "test:tests/bun_socket_contracts.test.ts",
+    ],
   },
   {
     name: "WebSocket",
@@ -1417,10 +1479,10 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.WebSocket (type, declared-only)",
     status: "declared-only",
     evidence: [
+      "test:tests/binary_type.test.ts",
       "test:tests/blob_and_live_bets_server.test.ts",
       "test:tests/blob_live_bets_trace.test.ts",
       "test:tests/bun_141_runtime.test.ts",
-      "test:tests/bun_aspects_contract.test.ts",
     ],
   },
   {
