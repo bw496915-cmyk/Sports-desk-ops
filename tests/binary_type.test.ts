@@ -4,7 +4,13 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type { ServerWebSocket } from "bun";
+import type {
+  BinaryType,
+  BinaryTypeList,
+  ServerWebSocket,
+  SocketHandler,
+  udp,
+} from "bun";
 
 import { createDashboardWebSocketHandler } from "../packages/api/src/ws.ts";
 import {
@@ -141,13 +147,21 @@ describe("Bun BinaryType guards and payload helpers", () => {
   });
 
   test("createSocketBinaryHandler preserves exact binaryType property", () => {
-    const handler = createSocketBinaryHandler("uint8array", {
+    const mode: BinaryType = "uint8array";
+    const handler: SocketHandler<unknown, "uint8array"> =
+      createSocketBinaryHandler(mode, {
+        data(_socket, data: BinaryTypeList["uint8array"]) {
+          const bytes: Uint8Array = data;
+          expect(bytes.byteLength).toBeGreaterThanOrEqual(0);
+        },
+      });
+    const udpHandler: udp.SocketHandler<"uint8array"> = {
       data(_socket, data) {
-        const bytes: Uint8Array = data;
-        expect(bytes.byteLength).toBeGreaterThanOrEqual(0);
+        expect(data.byteLength).toBeGreaterThanOrEqual(0);
       },
-    });
+    };
     expect(handler.binaryType).toBe("uint8array");
+    expect(typeof udpHandler.data).toBe("function");
   });
 
   test("toDataView, toBufferView, and toArrayBufferExact handle slices and SharedArrayBuffer safely", () => {
