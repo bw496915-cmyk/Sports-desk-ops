@@ -27,7 +27,7 @@ const REQUIRED: Record<string, unknown> = {
 };
 
 function main(): number {
-  const raw = JSON.parse(readFileSync(tsconfigPath, "utf8")) as {
+  const raw = Bun.JSONC.parse(readFileSync(tsconfigPath, "utf8")) as {
     compilerOptions?: CompilerOptions;
   };
   const opts = raw.compilerOptions ?? {};
