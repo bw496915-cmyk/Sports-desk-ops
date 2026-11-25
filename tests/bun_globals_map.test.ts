@@ -10,8 +10,10 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import {
+  classifyRuntimeSurface,
   findFalsifiedTypeOnlyClaims,
   findInheritedSummaries,
+  findNonBunValueSurfaceRows,
   loadBunTypesDeclarations,
 } from "../lib/bun_globals_map_summaries.ts";
 
@@ -195,5 +197,98 @@ describe("Bun global catalog map", () => {
     }
     expect(JSON.stringify(meta).includes("/Users/")).toBe(false);
     expect("bunTypesDeclaration" in meta).toBe(false);
+  });
+
+  test("classifies Bun vs globalThis vs type-only runtime placement for every value-space row", () => {
+    const surface = classifyRuntimeSurface(rows);
+    expect(surface.length).toBe(meta.signatureCounts.value);
+
+    // Every function and variable row must exist live on Bun.
+    const missingFnOrVar = surface.filter(
+      (entry) =>
+        (entry.kind === "function" || entry.kind === "variable") &&
+        entry.placement !== "bun" &&
+        entry.placement !== "both",
+    );
+    expect(missingFnOrVar).toEqual([]);
+
+    // Contrast Bun-only JSONC, dual-exposed fetch, and globalThis-only WebAssembly.
+    const byName = new Map(surface.map((entry) => [entry.name, entry]));
+    expect(byName.get("JSONC")).toMatchObject({
+      placement: "bun",
+      bunType: "object",
+      globalType: "undefined",
+    });
+    expect(byName.get("fetch")).toMatchObject({
+      placement: "both",
+      bunType: "function",
+      globalType: "function",
+    });
+    expect(byName.get("WebAssembly")).toMatchObject({
+      placement: "global-only",
+      bunType: "undefined",
+      globalType: "object",
+    });
+
+    // Pin exact non-Bun value-space catalog rows on Bun 1.4.5 so upstream runtime shifts surface in CI.
+    const nonBun = findNonBunValueSurfaceRows(rows);
+    expect(
+      nonBun
+        .filter((e) => e.placement === "global-only")
+        .map((e) => e.name)
+        .sort(),
+    ).toEqual(["WebAssembly", "WebSocket", "Worker"]);
+    expect(
+      nonBun
+        .filter((e) => e.placement === "type-only")
+        .map((e) => e.name)
+        .sort(),
+    ).toEqual([
+      "Build",
+      "CryptoHashInterface",
+      "EventSource",
+      "Password",
+      "Security",
+      "Serve",
+      "Spawn",
+      "udp",
+    ]);
+
+    // Deterministic synthetic check for all 4 placements.
+    const synthetic = classifyRuntimeSurface(
+      [
+        {
+          symbol: "globals.bun.OnlyBun",
+          kind: "namespace",
+          signature: "value",
+        },
+        { symbol: "globals.bun.Dual", kind: "namespace", signature: "value" },
+        {
+          symbol: "globals.bun.OnlyGlobal",
+          kind: "namespace",
+          signature: "value",
+        },
+        {
+          symbol: "globals.bun.OnlyType",
+          kind: "namespace",
+          signature: "value",
+        },
+        {
+          symbol: "globals.bun.IgnoredType",
+          kind: "interface",
+          signature: "type",
+        },
+      ],
+      {
+        bunRuntime: { OnlyBun: {}, Dual: {} },
+        globalRuntime: { Dual: {}, OnlyGlobal: {} },
+      },
+    );
+    expect(synthetic.map((e) => [e.name, e.placement])).toEqual([
+      ["OnlyBun", "bun"],
+      ["Dual", "both"],
+      ["OnlyGlobal", "global-only"],
+      ["OnlyType", "type-only"],
+    ]);
   });
 });
