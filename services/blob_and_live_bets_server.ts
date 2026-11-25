@@ -35,6 +35,14 @@ import {
   WS_BACKPRESSURE_OPTIONS,
   type WsFrameSocket,
 } from "../lib/ws_backpressure.ts";
+import { decodeBinaryFrameText } from "../src/lib/binary_type.ts";
+import {
+  MAX_UDP_DATAGRAM_BYTES,
+  UDP_TELEMETRY_OVERHEAD_BYTES,
+  type UdpTelemetryKind,
+  type UdpTelemetryPublisher,
+  type UdpTelemetryPublisherStats,
+} from "../src/lib/udp_telemetry.ts";
 
 export interface BlobStat {
   readonly size: number;
@@ -136,6 +144,11 @@ export interface BlobLiveBetsOptions {
   readonly nowSec?: () => number;
   /** Visibility tier applied by `GET ?attributes=1` and the PUT attribute block. Default RISK_MANAGER. */
   readonly diagnosticVisibility?: InspectVisibility;
+  /** Optional non-blocking UDP telemetry sink mirrored on every live-bets publish. */
+  readonly udpTelemetry?: Pick<
+    UdpTelemetryPublisher,
+    "enqueue" | "flush" | "getStats"
+  >;
 }
 
 export interface SocketData {
@@ -451,6 +464,36 @@ export function createBlobLiveBetsServer(options: BlobLiveBetsOptions): {
   const pendingTickets = new Map<string, number>();
   const maxActiveTickets = options.maxActiveTickets ?? MAX_ACTIVE_TICKETS;
   const maxWsSubscriptions = options.maxWsSubscriptions ?? 32;
+  const maxUdpPayloadBytes =
+    MAX_UDP_DATAGRAM_BYTES - UDP_TELEMETRY_OVERHEAD_BYTES;
+  const emitUdpTelemetry = (channel: string, serializedEvent: string): void => {
+    const sink = options.udpTelemetry;
+    if (sink === undefined) return;
+    try {
+      const kind: UdpTelemetryKind = /alert/i.test(channel)
+        ? "alert"
+        : /pending|volume/i.test(channel)
+          ? "volume_ping"
+          : "tick";
+      const prefix = `${channel}:`;
+      const budget = Math.max(
+        0,
+        maxUdpPayloadBytes - Buffer.byteLength(prefix),
+      );
+      let body = serializedEvent;
+      if (Buffer.byteLength(body) > budget) {
+        // Bound to safe MTU ceiling (ASCII slice conservative bound) so UDP never blocks WS publish.
+        body = body.slice(0, budget);
+        while (Buffer.byteLength(body) > budget && body.length > 0) {
+          body = body.slice(0, body.length - 1);
+        }
+      }
+      sink.enqueue({ kind, payload: `${prefix}${body}` });
+      sink.flush();
+    } catch {
+      // Telemetry is loss-tolerant and must never block WebSocket or HTTP publishing.
+    }
+  };
   /** uWebSockets is the only subscription store: Bun's `ServerWebSocket#subscriptions`. */
   const subscriptionsOf = (socket: {
     readonly subscriptions: readonly string[];
@@ -463,12 +506,19 @@ export function createBlobLiveBetsServer(options: BlobLiveBetsOptions): {
     hostname: options.hostname ?? "127.0.0.1",
     routes: {
       "/health": {
-        GET: () =>
-          Response.json({
+        GET: () => {
+          const healthPayload: Record<string, unknown> = {
             status: "ok",
             bunRevision: Bun.revision,
             uptimeNs: Bun.nanoseconds(),
-          }),
+          };
+          if (options.udpTelemetry !== undefined) {
+            const udpStats: UdpTelemetryPublisherStats =
+              options.udpTelemetry.getStats();
+            healthPayload.udpTelemetry = udpStats;
+          }
+          return Response.json(healthPayload);
+        },
       },
       "/api/v1/ws-tickets": {
         POST: (request: Request) => {
@@ -506,7 +556,7 @@ export function createBlobLiveBetsServer(options: BlobLiveBetsOptions): {
           }
           let body: unknown;
           try {
-            body = JSON.parse(new TextDecoder().decode(raw));
+            body = JSON.parse(decodeBinaryFrameText(raw));
           } catch {
             return jsonError(400, "invalid_json", "Body is not JSON");
           }
@@ -524,17 +574,19 @@ export function createBlobLiveBetsServer(options: BlobLiveBetsOptions): {
             return jsonError(400, "invalid_channel", "Invalid channel");
           }
           let published: number;
+          let serialized: string;
           try {
-            published = server.publish(
-              parsed.data.channel,
-              JSON.stringify(parsed.data.event),
-            );
+            serialized = JSON.stringify(parsed.data.event);
+            published = server.publish(parsed.data.channel, serialized);
           } catch {
             return jsonError(
               422,
               "publish_failed",
               "Event is not serializable",
             );
+          }
+          if (published !== -1) {
+            emitUdpTelemetry(parsed.data.channel, serialized);
           }
           const subscribers = server.subscriberCount(parsed.data.channel);
           if (published === -1) {
@@ -785,6 +837,7 @@ export function createBlobLiveBetsServer(options: BlobLiveBetsOptions): {
       ...WS_BACKPRESSURE_OPTIONS,
       open(ws) {
         // Bun auto-corks open/message; this stays synchronous on purpose.
+        ws.binaryType = "uint8array";
         ws.subscribe("live-bets");
       },
       error(error, ws) {
@@ -806,9 +859,7 @@ export function createBlobLiveBetsServer(options: BlobLiveBetsOptions): {
         }
         let parsed: unknown;
         try {
-          parsed = JSON.parse(
-            typeof message === "string" ? message : message.toString("utf8"),
-          );
+          parsed = JSON.parse(decodeBinaryFrameText(message));
         } catch {
           sendFrame(ws, { type: "ERROR", code: "invalid_json" });
           return;
@@ -885,7 +936,12 @@ export function createBlobLiveBetsServer(options: BlobLiveBetsOptions): {
       if (!CHANNEL_PATTERN.test(channel)) {
         throw new Error("invalid channel");
       }
-      return server.publish(channel, JSON.stringify(event));
+      const serialized = JSON.stringify(event);
+      const published = server.publish(channel, serialized);
+      if (published !== -1) {
+        emitUdpTelemetry(channel, serialized);
+      }
+      return published;
     },
   };
 }
