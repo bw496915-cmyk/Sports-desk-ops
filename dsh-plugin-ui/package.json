@@ -32,5 +32,6 @@
         "@deepseek-ai/dsh-client-locale"
       ]
     }
-  }
+  },
+  "license": "UNLICENSED"
 }

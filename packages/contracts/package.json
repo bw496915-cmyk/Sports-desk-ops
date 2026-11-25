@@ -2,6 +2,12 @@
   "name": "@sportsdesk-ops/contracts",
   "version": "0.1.0",
   "description": "Shared SportsDesk contracts: wager tokens, slice metrics/registry, shadow pricing, feature flags, dashboard hydration.",
+  "license": "MIT",
+  "author": "SportsDesk Engineering",
+  "homepage": "https://github.com/bw496915-cmyk/Sports-desk-ops/tree/main/packages/contracts#readme",
+  "bugs": {
+    "url": "https://github.com/bw496915-cmyk/Sports-desk-ops/issues"
+  },
   "keywords": [
     "sportsdesk",
     "contracts",
@@ -10,8 +16,10 @@
     "bun"
   ],
   "engines": {
+    "bun": ">=1.4.5",
     "node": ">=18"
   },
+  "sideEffects": false,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -69,18 +77,27 @@
       "types": "./src/dashboard_hydration.ts",
       "bun": "./src/dashboard_hydration.ts",
       "default": "./dist/dashboard_hydration.js"
+    },
+    "./weblog-detectors": {
+      "types": "./src/weblog_detectors.ts",
+      "bun": "./src/weblog_detectors.ts",
+      "default": "./dist/weblog_detectors.js"
     }
   },
   "files": [
     "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.spec.ts",
     "dist"
   ],
   "scripts": {
     "typecheck": "bun check --no-script -p tsconfig.json",
     "lint": "bun run --cwd ../.. lint:canary -- packages/contracts/src",
-    "test": "bun test --no-script --cwd ../.. tests/slice_metrics.test.ts tests/wager_tiers_toml.test.ts tests/dashboard_ui_hydration.test.tsx tests/workspace_packs.test.ts",
+    "test": "bun test --no-script --cwd ../.. tests/slice_metrics.test.ts tests/wager_tiers_toml.test.ts tests/dashboard_ui_hydration.test.tsx tests/workspace_packs.test.ts tests/contracts_channel_ssot.test.ts tests/contracts_package_boundary.test.ts tests/wager_channels.test.ts",
+    "sync:tokens": "bun scripts/sync_tokens.ts",
+    "check:pack": "bun scripts/check_pack.ts",
     "build": "bun scripts/build.ts",
-    "prepack": "bun run build"
+    "prepack": "bun run sync:tokens && bun run build"
   },
   "devDependencies": {
     "@types/bun": "catalog:",
