@@ -9,6 +9,10 @@ import type { Database } from "bun:sqlite";
 import { openSportsdeskSqlite } from "./sportsdesk_sqlite.ts";
 import type { CanonicalPeriod } from "./leg_taxonomy.ts";
 import {
+  DeskAggregateInputError,
+  registerDeskAggregates,
+} from "./desk_sqlite_aggregates.ts";
+import {
   type CanonicalLeg,
   type LineHundredths,
   type F402CustomerReportPendingRow,
@@ -104,6 +108,7 @@ export function createComboObservationsLegsStore(
       ON wallet_customer_attributions(agent_owner);
   `);
 
+  registerDeskAggregates(db);
   return new ComboObservationsLegsStore(db);
 }
 
@@ -268,6 +273,96 @@ export class ComboObservationsLegsStore {
       }
     }
     return insertedLegs;
+  }
+
+  /** Stake per ticket (legs repeat the ticket stake) placed in `[fromIso, toIso)`. */
+  stakeCentsInWindow(account: string, fromIso: string, toIso: string): number {
+    const row = this.db
+      .query(
+        `SELECT desk_stake_sum(stake_cents) AS total FROM (
+          SELECT MAX(stake_cents) AS stake_cents
+          FROM combo_observations_legs
+          WHERE UPPER(wallet_or_account) = UPPER(?1)
+            AND placed_at >= ?2 AND placed_at < ?3
+          GROUP BY source_venue, source_ticket
+        )`,
+      )
+      .get(account, fromIso, toIso) as { total: number | bigint };
+    return Number(row.total);
+  }
+
+  /**
+   * Stake-weighted CLV in basis points over the account's latest `lastN` priced legs that have a
+   * closing decimal price in `closingDecimalByLegId`; `null` when none qualify. Each leg weighs
+   * stake / legs-per-ticket, so an N-leg parlay carries its stake once, not N times.
+   */
+  rollingClvBps(
+    account: string,
+    lastN: number,
+    closingDecimalByLegId: ReadonlyMap<number, number>,
+  ): number | null {
+    if (!Number.isSafeInteger(lastN) || lastN < 1) {
+      throw new DeskAggregateInputError(
+        "rollingClvBps",
+        `lastN must be a positive integer, got ${lastN}`,
+      );
+    }
+    const row = this.db
+      .query(
+        `SELECT desk_clv_bps(stake_cents * 1.0 / ticket_legs, desk_decimal_odds(odds_american), close) AS clv FROM (
+          SELECT l.stake_cents, l.ticket_legs, l.odds_american, c.value AS close
+          FROM (
+            SELECT id, placed_at, stake_cents, odds_american,
+              COUNT(*) OVER (PARTITION BY source_venue, source_ticket) AS ticket_legs
+            FROM combo_observations_legs
+            WHERE UPPER(wallet_or_account) = UPPER(?1)
+          ) l
+          JOIN json_each(?2) c ON c.key = CAST(l.id AS TEXT)
+          WHERE l.odds_american IS NOT NULL
+          ORDER BY l.placed_at DESC, l.id DESC
+          LIMIT ?3
+        )`,
+      )
+      .get(
+        account,
+        JSON.stringify(Object.fromEntries(closingDecimalByLegId)),
+        lastN,
+      ) as { clv: number | null };
+    return row.clv === null ? null : Number(row.clv);
+  }
+
+  /**
+   * Max drawdown of cumulative P&L across the account's tickets, by placement time. P&L is keyed
+   * by venue then ticket, since ticket ids are only unique within a venue.
+   */
+  maxDrawdownCents(
+    account: string,
+    pnlCentsByVenueTicket: ReadonlyMap<
+      FlatLegRecord["sourceVenue"],
+      ReadonlyMap<string, number>
+    >,
+  ): number {
+    const pnlJson = JSON.stringify(
+      Object.fromEntries(
+        Array.from(pnlCentsByVenueTicket, ([venue, byTicket]) => [
+          venue,
+          Object.fromEntries(byTicket),
+        ]),
+      ),
+    );
+    const row = this.db
+      .query(
+        `SELECT desk_max_drawdown(order_key, pnl) AS drawdown FROM (
+          SELECT printf('%s|%012d', MIN(l.placed_at), MIN(l.id)) AS order_key, c.value AS pnl
+          FROM combo_observations_legs l
+          JOIN json_each(?2) v ON v.key = l.source_venue
+          JOIN json_each(v.value) c ON c.key = l.source_ticket
+          WHERE UPPER(l.wallet_or_account) = UPPER(?1)
+          GROUP BY l.source_venue, l.source_ticket
+        )`,
+      )
+      .get(account, pnlJson) as { drawdown: number | bigint };
+    return Number(row.drawdown);
   }
 
   countLegs(): number {
