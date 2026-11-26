@@ -279,6 +279,9 @@ jobs:
       - name: Native lint (type-aware)
         timeout-minutes: 5
         run: bun run lint:native:type-aware
+      - name: Verify lint surface (preflight)
+        timeout-minutes: 2
+        run: bun run lint:verify-surface
 
   code-mode:
     # Property-based + mutation gate for the Code Mode profile tools. Unlike the PR ratchet this
