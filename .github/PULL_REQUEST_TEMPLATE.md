@@ -2,6 +2,12 @@
 
 <!-- What changed and why (1–3 sentences). -->
 
+## Scope
+
+- [ ] Behaviour change is covered by a focused test in `tests/`
+- [ ] No credentials, tokens, or customer identifiers added
+- [ ] Unrelated working-tree changes left out of the commit
+
 ## Test plan
 
 - [ ] <!-- e.g. bun test path/to.test.ts -->
