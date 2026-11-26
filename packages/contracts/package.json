@@ -82,6 +82,11 @@
       "types": "./src/weblog_detectors.ts",
       "bun": "./src/weblog_detectors.ts",
       "default": "./dist/weblog_detectors.js"
+    },
+    "./bun-release-channel": {
+      "types": "./src/bun_release_channel.ts",
+      "bun": "./src/bun_release_channel.ts",
+      "default": "./dist/bun_release_channel.js"
     }
   },
   "files": [
