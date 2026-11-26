@@ -4,7 +4,7 @@
   "description": "Data-driven configuration for wagers-by-state reports",
   "default": {
     "days": 14,
-    "csvPath": "/Users/nolarose/code/turbo-cap/turbo-cap-valley-lion/.data/exports/bet-report.csv",
+    "csvPath": "~/code/turbo-cap/turbo-cap-valley-lion/.data/exports/bet-report.csv",
     "format": "table",
     "groupBy": "state"
   },

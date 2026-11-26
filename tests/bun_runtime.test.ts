@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { runDeskProvenanceCli } from "../bin/desk-provenance.ts";
 import {
@@ -199,6 +199,25 @@ describe("bun_runtime", () => {
       });
       expect(strict.ok).toBe(false);
       expect(strict.mismatches[0]).toContain("execPath:");
+
+      const homePrefix = `${homedir()}/`;
+      if (process.execPath.startsWith(homePrefix)) {
+        const tildeManifest = join(tmp, "manifest-tilde.json");
+        writeFileSync(
+          tildeManifest,
+          JSON.stringify({
+            runtime: {
+              bunVersion: Bun.version,
+              bunRevision: Bun.revision,
+              bunExecutablePath: `~/${process.execPath.slice(homePrefix.length)}`,
+            },
+          }),
+        );
+        expect(
+          compareBunToOracleManifest(tildeManifest, { strictExecPath: true })
+            .ok,
+        ).toBe(true);
+      }
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

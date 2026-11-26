@@ -7,6 +7,7 @@ import { join } from "node:path";
 import {
   HOME_PATH_ALLOWLIST,
   HOME_PATH_PLACEHOLDER_USERS,
+  expandHomePath,
   findForeignHomePaths,
   findHomePaths,
   homePathNeedles,
@@ -65,22 +66,43 @@ describe("findHomePaths", () => {
   });
 });
 
+describe("expandHomePath", () => {
+  test("expands leading tilde against the supplied home and leaves other paths alone", () => {
+    expect(expandHomePath("~", "/Users/me")).toBe("/Users/me");
+    expect(expandHomePath("~/code/app.csv", "/Users/me")).toBe(
+      "/Users/me/code/app.csv",
+    );
+    expect(expandHomePath("/var/tmp/x.csv", "/Users/me")).toBe(
+      "/var/tmp/x.csv",
+    );
+    expect(expandHomePath("relative/path.csv", "/Users/me")).toBe(
+      "relative/path.csv",
+    );
+  });
+});
+
 describe("scanHomePaths", () => {
   test("splits allowlisted hits from violations and skips unreadable files", () => {
     const contents: Record<string, string | null> = {
-      "config/wagers.json": "csvPath: /Users/me/x",
+      "config/example.json": "csvPath: /Users/me/x",
       "src/a.ts": "const p = '/Users/me/y';",
       "image.png": null,
     };
     const result = scanHomePaths(
-      ["config/wagers.json", "src/a.ts", "image.png"],
+      ["config/example.json", "src/a.ts", "image.png"],
       (file) => contents[file] ?? null,
       "/Users/me",
+      [
+        {
+          path: "config/example.json",
+          reason: "synthetic fixture allowlist entry for unit test",
+        },
+      ],
     );
     expect(result.scannedFiles).toBe(2);
     expect(result.violations.map((hit) => hit.file)).toEqual(["src/a.ts"]);
     expect(result.allowed.map((hit) => hit.file)).toEqual([
-      "config/wagers.json",
+      "config/example.json",
     ]);
   });
 });
@@ -113,14 +135,11 @@ describe("the tracked tree", () => {
     expect(result.violations).toEqual([]);
     // A real person's name in a fixture is a leak even though it resolves on their machine.
     expect(result.foreign).toEqual([]);
+    expect(result.allowed).toEqual([]);
   });
 
-  test("every allowlist entry states a reason and names a real file", async () => {
-    for (const entry of HOME_PATH_ALLOWLIST) {
-      expect(entry.reason.length).toBeGreaterThan(20);
-      expect(await Bun.file(join(ROOT, entry.path)).exists()).toBe(true);
-      expect(isHomePathAllowlisted(entry.path)).toBe(true);
-    }
+  test("HOME_PATH_ALLOWLIST stays empty (portable ~/ paths instead of exemptions)", () => {
+    expect(HOME_PATH_ALLOWLIST).toEqual([]);
   });
 });
 
@@ -225,22 +244,29 @@ describe("findForeignHomePaths", () => {
     );
   });
 
-  test("scanHomePaths respects HOME_PATH_ALLOWLIST for foreign runner homes", () => {
+  test("scanHomePaths respects an explicit allowlist for foreign runner homes", () => {
     const files: Record<string, string> = {
-      "config/wagers.json": `csvPath: /Users/${FOREIGN}/x`,
+      "config/example.json": `csvPath: /Users/${FOREIGN}/x`,
       "src/leak.ts": `const p = "/Users/${FOREIGN}/y";`,
     };
     const result = scanHomePaths(
       Object.keys(files),
       (file) => files[file] ?? null,
       "/home/ci",
+      [
+        {
+          path: "config/example.json",
+          reason: "synthetic fixture allowlist entry for unit test",
+        },
+      ],
     );
     expect(result.violations).toEqual([]);
     expect(result.allowed).toEqual([
-      { file: "config/wagers.json", line: 1, match: FOREIGN },
+      { file: "config/example.json", line: 1, match: FOREIGN },
     ]);
     expect(result.foreign).toEqual([
       { file: "src/leak.ts", line: 1, match: FOREIGN },
     ]);
+    expect(isHomePathAllowlisted("config/example.json")).toBe(false);
   });
 });
