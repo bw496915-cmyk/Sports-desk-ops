@@ -69,6 +69,11 @@
       "types": "./src/dashboard_hydration.ts",
       "bun": "./src/dashboard_hydration.ts",
       "default": "./dist/dashboard_hydration.js"
+    },
+    "./bun-release-channel": {
+      "types": "./src/bun_release_channel.ts",
+      "bun": "./src/bun_release_channel.ts",
+      "default": "./dist/bun_release_channel.js"
     }
   },
   "files": [
