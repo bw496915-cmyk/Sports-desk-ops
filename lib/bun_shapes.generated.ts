@@ -413,7 +413,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:tests/agent_diagnostics.test.ts",
       "test:tests/auth_and_rate_limit.test.ts",
       "test:tests/bun_capabilities.test.ts",
-      "test:tests/bun_globals_map_summaries.test.ts",
+      "test:tests/bun_globals_map.test.ts",
     ],
   },
   {
@@ -647,7 +647,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "surface:JSON5",
       "test:tests/bun_builtin_replacements.test.ts",
       "test:tests/bun_formats_and_utilities.test.ts",
-      "test:tests/language_coverage.test.ts",
+      "test:tests/bun_v144_hardened_surfaces.test.ts",
     ],
   },
   {
@@ -967,6 +967,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.CryptoHashInterface (type, declared-only)",
     status: "declared-only",
     evidence: [
+      "test:tests/bun_globals_map.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
       "test:tests/bun_surface_cli.test.ts",
     ],
@@ -1001,9 +1002,9 @@ export const BUN_SHAPES: readonly BunShape[] = [
     heading: "Bun.gunzipSync",
     evidence: [
       "test:tests/bun_compression_contract.test.ts",
+      "test:tests/bun_v144_hardened_surfaces.test.ts",
       "test:tests/eod_archive.test.ts",
       "test:tests/http_compression.test.ts",
-      "test:tests/language_coverage.test.ts",
     ],
   },
   {
@@ -1307,6 +1308,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
     status: "declared-only",
     evidence: [
       "test:tests/bun_capabilities.test.ts",
+      "test:tests/bun_globals_map.test.ts",
       "test:tests/bun_globals_map_summaries.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
     ],
@@ -1408,6 +1410,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
     subsystem: "network",
     heading: "Bun.Serve (type)",
     evidence: [
+      "test:tests/bun_globals_map.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
       "test:tests/bun_surface_cli.test.ts",
       "test:tests/live_bets_typed_server.test.ts",
@@ -1456,8 +1459,8 @@ export const BUN_SHAPES: readonly BunShape[] = [
     evidence: [
       "test:scripts/diff-bun-docs-vs-types.test.ts",
       "test:tests/binary_type.test.ts",
+      "test:tests/bun_globals_map.test.ts",
       "test:tests/bun_shapes_manifest.test.ts",
-      "test:tests/bun_surface_cli.test.ts",
     ],
   },
   {
@@ -1542,7 +1545,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:lib/f402_portal_runtime_pin.test.ts",
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_reference_cli.test.ts",
-      "test:tests/bun_runtime.test.ts",
+      "test:tests/bun_release_channel.test.ts",
     ],
   },
   {
