@@ -46,6 +46,8 @@ import {
   assertBunFloor,
   writeTextFileIfChanged,
 } from "../lib/manager_fetch.ts";
+import { expandHomePath } from "../lib/home_paths.ts";
+import { getDefaultCsvPath } from "../lib/wagers_config.ts";
 import type { GroupKey, ReportFormat } from "../types/wagers";
 
 /** Minimal RFC-4180 CSV parser (quoted fields, embedded commas/newlines). */
@@ -137,7 +139,9 @@ Exit codes:
   const fromArg = args.find((a) => a.startsWith("--from="));
   const toArg = args.find((a) => a.startsWith("--to="));
   const daysArg = args.find((a) => a.startsWith("--days="));
-  const csvPath = csvArg ? csvArg.slice("--csv=".length) : cfg.default.csvPath;
+  const csvPath = expandHomePath(
+    csvArg ? csvArg.slice("--csv=".length) : getDefaultCsvPath(cfg),
+  );
   const defaultDays = cfg.default.days;
 
   const filters = parseFilters(args, cfg);

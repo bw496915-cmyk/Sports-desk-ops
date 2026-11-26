@@ -8,14 +8,15 @@
  * (`/Users/someone`, `/Users/me`, `/home/ci`) are not anyone's real home and stay allowed by
  * construction — the rule is "do not hardcode the operator's home", not "never write `/Users/`".
  *
- * Two files are allowed to carry the real path, each for a stated reason: a recorded environment
- * fact and an operator config.
+ * The allowlist is empty by design: portable `~/` paths are expanded at runtime via
+ * `expandHomePath()`, so zero tracked files hardcode any operator's home directory.
  *
  * A second rule covers the other half: a *foreign* home — `/Users/<name>` for a name that is neither
  * this operator nor a documented synthetic placeholder. A real person's name in a fixture is a
  * privacy leak even though it resolves fine on their machine.
  */
 import { homedir } from "node:os";
+import { join } from "node:path";
 
 export interface HomePathHit {
   readonly file: string;
@@ -29,22 +30,29 @@ export interface HomePathAllowance {
   readonly reason: string;
 }
 
-/** Files that may keep a literal home path, with the reason the leak is not fixable. */
-export const HOME_PATH_ALLOWLIST: readonly HomePathAllowance[] = [
-  {
-    path: "config/wagers.json",
-    reason:
-      "operator config: csvPath points at an external checkout that has no portable form",
-  },
-  {
-    path: "verification/manager-boot-oracle/pinned/manifest.json",
-    reason:
-      "recorded environment fact: the bun executable path of the audited run",
-  },
-];
+/**
+ * Files that may keep a literal home path, with the reason the leak is not fixable.
+ * Empty by design: use portable `~/` paths expanded via `expandHomePath()` instead.
+ */
+export const HOME_PATH_ALLOWLIST: readonly HomePathAllowance[] = [];
 
-export function isHomePathAllowlisted(file: string): boolean {
-  return HOME_PATH_ALLOWLIST.some((entry) => entry.path === file);
+export function isHomePathAllowlisted(
+  file: string,
+  allowlist: readonly HomePathAllowance[] = HOME_PATH_ALLOWLIST,
+): boolean {
+  return allowlist.some((entry) => entry.path === file);
+}
+
+/** Expand a leading `~` or `~/` (or `~\`) against `home`, leaving all other paths untouched. */
+export function expandHomePath(
+  filePath: string,
+  home: string = homedir(),
+): string {
+  if (filePath === "~") return home;
+  if (filePath.startsWith("~/") || filePath.startsWith("~\\")) {
+    return join(home, filePath.slice(2));
+  }
+  return filePath;
 }
 
 /**
@@ -157,6 +165,7 @@ export function scanHomePaths(
   files: readonly string[],
   readFile: (file: string) => string | null,
   home: string = homedir(),
+  allowlist: readonly HomePathAllowance[] = HOME_PATH_ALLOWLIST,
 ): HomePathScanResult {
   const violations: HomePathHit[] = [];
   const foreign: HomePathHit[] = [];
@@ -168,7 +177,7 @@ export function scanHomePaths(
     scannedFiles++;
     const hits = findHomePaths(file, text, home);
     const foreignHits = findForeignHomePaths(file, text, home);
-    if (isHomePathAllowlisted(file)) {
+    if (isHomePathAllowlisted(file, allowlist)) {
       allowed.push(...hits, ...foreignHits);
       continue;
     }

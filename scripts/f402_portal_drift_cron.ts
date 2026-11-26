@@ -18,13 +18,23 @@ import {
   emitPortalArtifactDriftSignal,
 } from "../lib/f402_portal_drift_signal.ts";
 import { loadManifestWithRuntime } from "../lib/f402_portal_runtime_pin.ts";
+import { expandHomePath } from "../lib/home_paths.ts";
 
 const schedule = Bun.env.F402_PORTAL_DRIFT_CRON?.trim() || "0 */6 * * *";
 const tz = Bun.env.F402_PORTAL_DRIFT_CRON_TZ?.trim();
 
+function resolvePinnedBunPath(
+  manifest: Awaited<ReturnType<typeof loadManifestWithRuntime>>,
+): string {
+  const pinned = manifest.runtime?.bunExecutablePath;
+  return pinned !== undefined && pinned !== ""
+    ? expandHomePath(pinned)
+    : process.execPath;
+}
+
 async function runDriftCheck(): Promise<void> {
   const manifest = await loadManifestWithRuntime();
-  const bunPath = manifest.runtime?.bunExecutablePath ?? process.execPath;
+  const bunPath = resolvePinnedBunPath(manifest);
   const proc = Bun.spawnSync(
     [bunPath, join(import.meta.dir, "verify/f402_portal_drift_once.ts")],
     { stdout: "inherit", stderr: "inherit" },
@@ -57,7 +67,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const manifest = await loadManifestWithRuntime();
-const bunPath = manifest.runtime?.bunExecutablePath ?? process.execPath;
+const bunPath = resolvePinnedBunPath(manifest);
 
 const preview = previewCronSchedule(
   schedule,

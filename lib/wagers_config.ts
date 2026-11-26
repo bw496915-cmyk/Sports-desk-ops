@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { expandHomePath } from "./home_paths.ts";
 
 /** ------------------------------------------------------------------ */
 /* Config schema                                                        */
@@ -202,7 +203,7 @@ export function getDefaultDays(cfg: WagersConfig): number {
 }
 
 export function getDefaultCsvPath(cfg: WagersConfig): string {
-  return cfg.default.csvPath;
+  return expandHomePath(cfg.default.csvPath);
 }
 
 export function getUnknownStateLabel(cfg: WagersConfig): string {
