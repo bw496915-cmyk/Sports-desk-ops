@@ -149,6 +149,7 @@ describe("repo lint wiring", () => {
       "bun:test/prefer-snapshot-hint",
       "bun:test/no-large-snapshots",
       "bun:test/no-interpolation-in-snapshots",
+      "bun/no-literal-temp-dir",
     ]) {
       expect(bunfig).toContain(`"${rule}" = "error"`);
       expect(oxlint.rules?.[rule]).toBe("error");

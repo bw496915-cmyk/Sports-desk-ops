@@ -39,6 +39,10 @@ export function candidateBunLintBins(
 
   const home = env.HOME?.trim();
   if (home) {
+    const canaryInstallBin = join(home, ".bun-canary", "bin", "bun");
+    if (existsSync(canaryInstallBin)) {
+      candidates.push(canaryInstallBin);
+    }
     const binDir = join(home, ".bun", "bin");
     if (existsSync(binDir)) {
       try {

@@ -151,6 +151,7 @@
     "lint:check": "bun run scripts/lint_native.ts --type-aware --deny-warnings",
     "lint:native": "bun lint --no-script --deny-warnings",
     "lint:native:type-aware": "bun lint --no-script --type-aware -c .oxlintrc.type-aware.json --deny-warnings",
+    "lint:verify-surface": "bun run scripts/verify_lint_surface.ts",
     "lint:canary": "bun run scripts/lint_native.ts --deny-warnings",
     "lint:canary:type-aware": "bun run scripts/lint_native.ts --type-aware -c .oxlintrc.type-aware.json --deny-warnings",
     "gen:tokens": "bun run scripts/generate_tokens.ts",
