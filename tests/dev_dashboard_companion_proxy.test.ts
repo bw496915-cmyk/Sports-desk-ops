@@ -7,7 +7,9 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { Server } from "bun";
+import { readBunRuntimePin } from "../lib/bun_runtime_pin.ts";
 import {
   type DashboardServerHandle,
   startDashboardServer,
@@ -569,9 +571,10 @@ describe("dev_dashboard companion proxy, routing, and report surfaces", () => {
       readonly expectedBunVersion: string;
       readonly bunVersionDrift: boolean;
     };
+    const expectedBunPin = readBunRuntimePin(join(import.meta.dir, ".."));
     expect(build.bunVersion).toBe(Bun.version);
-    expect(build.expectedBunVersion).toBe("1.4.4");
-    expect(build.bunVersionDrift).toBe(Bun.version !== "1.4.4");
+    expect(build.expectedBunVersion).toBe(expectedBunPin);
+    expect(build.bunVersionDrift).toBe(Bun.version !== expectedBunPin);
 
     const runtime = onlineHealth.runtime as {
       readonly uptimeSeconds: number;

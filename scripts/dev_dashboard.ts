@@ -1139,7 +1139,10 @@ export function startDashboardServer(
       getR2PipelinePayload: (opts) => r2PipelineService.probeAll(opts),
       getR2PipelineHistoryPayload: (opts) => r2PipelineService.getHistory(opts),
       getR2ImageProvenancePayload: async ({ key }) => {
-        const publicUrl = `${DEFAULT_R2_PUBLIC_BASE}/${key}`;
+        const r2PublicBase = (
+          Bun.env.SPORTSDESK_R2_PUBLIC_BASE?.trim() || DEFAULT_R2_PUBLIC_BASE
+        ).replace(/\/+$/, "");
+        const publicUrl = `${r2PublicBase}/${key}`;
         const limit = 8 * 1024 * 1024;
         const response = await fetch(publicUrl, {
           signal: AbortSignal.timeout(8_000),

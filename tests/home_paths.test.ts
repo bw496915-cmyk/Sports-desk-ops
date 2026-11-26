@@ -224,4 +224,23 @@ describe("findForeignHomePaths", () => {
       [],
     );
   });
+
+  test("scanHomePaths respects HOME_PATH_ALLOWLIST for foreign runner homes", () => {
+    const files: Record<string, string> = {
+      "config/wagers.json": `csvPath: /Users/${FOREIGN}/x`,
+      "src/leak.ts": `const p = "/Users/${FOREIGN}/y";`,
+    };
+    const result = scanHomePaths(
+      Object.keys(files),
+      (file) => files[file] ?? null,
+      "/home/ci",
+    );
+    expect(result.violations).toEqual([]);
+    expect(result.allowed).toEqual([
+      { file: "config/wagers.json", line: 1, match: FOREIGN },
+    ]);
+    expect(result.foreign).toEqual([
+      { file: "src/leak.ts", line: 1, match: FOREIGN },
+    ]);
+  });
 });

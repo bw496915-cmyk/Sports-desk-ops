@@ -167,14 +167,13 @@ export function scanHomePaths(
     if (text === null) continue;
     scannedFiles++;
     const hits = findHomePaths(file, text, home);
-    if (hits.length === 0) {
-      // Foreign names are still a leak even when the file holds no path to this operator.
-      foreign.push(...findForeignHomePaths(file, text, home));
+    const foreignHits = findForeignHomePaths(file, text, home);
+    if (isHomePathAllowlisted(file)) {
+      allowed.push(...hits, ...foreignHits);
       continue;
     }
-    if (isHomePathAllowlisted(file)) allowed.push(...hits);
-    else violations.push(...hits);
-    foreign.push(...findForeignHomePaths(file, text, home));
+    violations.push(...hits);
+    foreign.push(...foreignHits);
   }
   return { violations, foreign, allowed, scannedFiles };
 }
