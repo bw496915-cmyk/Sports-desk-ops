@@ -1,7 +1,7 @@
 /**
  * Contract for the repo's `bun lint` plumbing.
  *
- * Stable Bun 1.4.4 has no native `bun lint`: the command dispatches to the project's `lint` script
+ * Stable Bun 1.4.5 has no native `bun lint`: the command dispatches to the project's `lint` script
  * and forwards every flag verbatim. Native lint exists in canary builds, which is why CI runs
  * `lint:native` in a separate `bun-version: canary` job and `scripts/lint_native.ts` resolves a
  * canary binary locally. These tests pin that split down:
@@ -13,6 +13,7 @@
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -24,8 +25,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  bunLintDoctorJson,
   candidateBunLintBins,
+  formatBunLintDoctor,
   hasNativeBunLint,
+  probeBunLintBin,
   resolveNativeBunLintBin,
 } from "../scripts/lint_native.ts";
 
@@ -43,8 +47,39 @@ afterAll(() => {
 
 const run = (bin: string, args: readonly string[], cwd: string) =>
   Bun.spawnSync([bin, ...args], { cwd, stdout: "pipe", stderr: "pipe" });
+const runWithEnv = (
+  bin: string,
+  args: readonly string[],
+  cwd: string,
+  env: Record<string, string | undefined>,
+) =>
+  Bun.spawnSync([bin, ...args], { cwd, env, stdout: "pipe", stderr: "pipe" });
 const output = (result: ReturnType<typeof run>) =>
   `${result.stdout.toString()}${result.stderr.toString()}`;
+
+function writeCanaryStub(
+  root: string,
+  options: { readonly stderrHelp?: boolean; readonly payload?: string } = {},
+): string {
+  const binDir = join(root, "bin");
+  mkdirSync(binDir, { recursive: true });
+  const bin = join(binDir, "bun");
+  const help = options.stderrHelp
+    ? 'echo "Usage: bun lint" >&2'
+    : 'echo "Usage: bun lint"';
+  const payload = options.payload ?? '["rule.a","rule.b"]';
+  writeFileSync(
+    bin,
+    `#!/bin/sh
+if [ "$1" = "lint" ] && [ "$2" = "--help" ]; then ${help}; exit 0; fi
+if [ "$1" = "lint" ]; then printf '%s' '${payload}'; exit 0; fi
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  chmodSync(bin, 0o755);
+  return bin;
+}
 const nativeTest = (name: string, fn: () => void | Promise<void>) => {
   if (nativeBin === null) test.skip(name, fn);
   else test(name, fn);
@@ -106,10 +141,144 @@ describe("native-lint resolver", () => {
     expect(candidates).toContain(process.execPath);
   });
 
-  test("a pinned 1.4.4 binary is not native-lint capable", () => {
-    // The pin under test in CI is stable 1.4.4; canary runtimes are gated by nativeBin.
+  test("a pinned 1.4.5 binary is not native-lint capable", () => {
+    // The pin under test in CI is stable 1.4.5; canary runtimes are gated by nativeBin.
     expect(hasNativeBunLint(process.execPath, probeDir)).toBe(false);
   });
+
+  test("includes isolated BUN_INSTALL and ~/.bun-canary paths", () => {
+    const candidates = candidateBunLintBins({
+      HOME: "/home/test",
+      BUN_INSTALL: "/opt/bun",
+      PATH: "/nonexistent",
+    });
+    expect(candidates).toContain("/opt/bun/bin/bun");
+    expect(candidates).toContain("/home/test/.bun-canary/bin/bun");
+  });
+
+  test.skipIf(process.platform === "win32")(
+    "auto-detects an isolated ~/.bun-canary/bun without BUN_LINT_BIN",
+    () => {
+      const home = makeTemp("bun-lint-isolated-home-");
+      const binDir = join(home, ".bun-canary", "bin");
+      mkdirSync(binDir, { recursive: true });
+      const bin = join(binDir, "bun");
+      writeFileSync(
+        bin,
+        '#!/bin/sh\nif [ "$1" = "lint" ] && [ "$2" = "--help" ]; then echo "Usage: bun lint"; exit 0; fi\nexit 0\n',
+        { mode: 0o755 },
+      );
+      chmodSync(bin, 0o755);
+      expect(
+        resolveNativeBunLintBin({
+          HOME: home,
+          PATH: "/nonexistent",
+          BUN_LINT_BIN: undefined,
+          BUN_INSTALL: undefined,
+        }),
+      ).toBe(bin);
+    },
+  );
+
+  test.skipIf(process.platform === "win32")(
+    "auto-detects BUN_INSTALL/bin/bun without BUN_LINT_BIN",
+    () => {
+      const install = makeTemp("bun-lint-isolated-install-");
+      const binDir = join(install, "bin");
+      mkdirSync(binDir, { recursive: true });
+      const bin = join(binDir, "bun");
+      writeFileSync(
+        bin,
+        '#!/bin/sh\nif [ "$1" = "lint" ] && [ "$2" = "--help" ]; then echo "Usage: bun lint"; exit 0; fi\nexit 0\n',
+        { mode: 0o755 },
+      );
+      chmodSync(bin, 0o755);
+      expect(
+        resolveNativeBunLintBin({
+          HOME: "/nonexistent",
+          PATH: "/nonexistent",
+          BUN_LINT_BIN: undefined,
+          BUN_INSTALL: install,
+        }),
+      ).toBe(bin);
+    },
+  );
+
+  test.skipIf(process.platform === "win32")(
+    "BUN_LINT_BIN wins over BUN_INSTALL and ~/.bun-canary",
+    () => {
+      const explicit = writeCanaryStub(makeTemp("bun-lint-explicit-"));
+      const installRoot = makeTemp("bun-lint-install-");
+      const install = writeCanaryStub(installRoot);
+      const home = makeTemp("bun-lint-home-");
+      writeCanaryStub(join(home, ".bun-canary"));
+      expect(
+        resolveNativeBunLintBin({
+          BUN_LINT_BIN: explicit,
+          BUN_INSTALL: installRoot,
+          HOME: home,
+          PATH: "/nonexistent",
+        }),
+      ).toBe(explicit);
+    },
+  );
+
+  test.skipIf(process.platform === "win32")(
+    "BUN_INSTALL wins over ~/.bun-canary when no explicit bin is set",
+    () => {
+      const installRoot = makeTemp("bun-lint-install-");
+      const install = writeCanaryStub(installRoot);
+      const home = makeTemp("bun-lint-home-");
+      writeCanaryStub(join(home, ".bun-canary"));
+      expect(
+        resolveNativeBunLintBin({
+          BUN_LINT_BIN: undefined,
+          BUN_INSTALL: installRoot,
+          HOME: home,
+          PATH: "/nonexistent",
+        }),
+      ).toBe(install);
+    },
+  );
+
+  test.skipIf(process.platform === "win32")(
+    "accepts native help printed on stderr",
+    () => {
+      const bin = writeCanaryStub(makeTemp("bun-lint-stderr-"), {
+        stderrHelp: true,
+      });
+      expect(hasNativeBunLint(bin, probeDir)).toBe(true);
+    },
+  );
+
+  test.skipIf(process.platform === "win32")(
+    "wrapper forwards --rules -f json through an isolated canary",
+    () => {
+      const home = makeTemp("bun-lint-forward-home-");
+      writeCanaryStub(join(home, ".bun-canary"), {
+        payload: '["rule.a","rule.b","rule.c"]',
+      });
+      const env: Record<string, string | undefined> = {
+        ...Bun.env,
+        HOME: home,
+        PATH: "/nonexistent",
+      };
+      delete env.BUN_LINT_BIN;
+      delete env.BUN_INSTALL;
+      const result = runWithEnv(
+        process.execPath,
+        ["scripts/lint_native.ts", "--rules", "-f", "json"],
+        ROOT,
+        env,
+      );
+      expect(result.exitCode).toBe(0);
+      expect(JSON.parse(result.stdout.toString())).toEqual([
+        "rule.a",
+        "rule.b",
+        "rule.c",
+      ]);
+    },
+  );
 
   test("resolved binary (when present) is executable and reports a version", () => {
     if (nativeBin === null) return;
@@ -118,6 +287,69 @@ describe("native-lint resolver", () => {
       .trim();
     expect(version.length).toBeGreaterThan(0);
   });
+});
+
+describe("native-lint diagnostics", () => {
+  test("classifies missing, stable, and native candidates", () => {
+    expect(
+      probeBunLintBin(join(makeTemp("bun-lint-missing-"), "missing-bun")),
+    ).toBe("missing");
+    expect(probeBunLintBin(process.execPath)).toBe("not-native");
+  });
+
+  test.skipIf(process.platform === "win32")(
+    "doctor and JSON report an isolated canary as available",
+    () => {
+      const home = makeTemp("bun-lint-doctor-home-");
+      const bin = writeCanaryStub(join(home, ".bun-canary"));
+      const env: Record<string, string | undefined> = {
+        HOME: home,
+        PATH: "/nonexistent",
+        BUN_LINT_BIN: undefined,
+        BUN_INSTALL: undefined,
+      };
+      const report = formatBunLintDoctor(env);
+      expect(report).toContain("native lint: available");
+      expect(report).toContain(`[native] ${bin}`);
+      const json = bunLintDoctorJson(env);
+      expect(json.native).toBe(true);
+      expect(json.resolved).toBe(bin);
+      expect(json.candidates.some((candidate) => candidate.bin === bin)).toBe(
+        true,
+      );
+    },
+  );
+
+  test.skipIf(process.platform === "win32")(
+    "CLI --doctor and --print-resolved use the isolated canary",
+    () => {
+      const home = makeTemp("bun-lint-doctor-cli-");
+      const bin = writeCanaryStub(join(home, ".bun-canary"));
+      const env: Record<string, string | undefined> = {
+        ...Bun.env,
+        HOME: home,
+        PATH: "/nonexistent",
+      };
+      delete env.BUN_LINT_BIN;
+      delete env.BUN_INSTALL;
+      const doctor = runWithEnv(
+        process.execPath,
+        ["scripts/lint_native.ts", "--doctor"],
+        ROOT,
+        env,
+      );
+      expect(doctor.exitCode).toBe(0);
+      expect(doctor.stdout.toString()).toContain("native lint: available");
+      const resolved = runWithEnv(
+        process.execPath,
+        ["scripts/lint_native.ts", "--print-resolved"],
+        ROOT,
+        env,
+      );
+      expect(resolved.exitCode).toBe(0);
+      expect(resolved.stdout.toString().trim()).toBe(bin);
+    },
+  );
 });
 
 describe("repo lint wiring", () => {

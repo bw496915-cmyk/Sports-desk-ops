@@ -271,6 +271,9 @@ jobs:
         run: bun ci --no-env-file
       - name: Lockfile dedupe check
         run: bun dedupe --check
+      - name: Verify native lint surface
+        timeout-minutes: 2
+        run: bun run verify:lint-surface
       - name: Native lint (oxlint config parity)
         timeout-minutes: 3
         run: bun run lint:native

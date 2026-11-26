@@ -155,6 +155,7 @@
     "lint:native:type-aware": "bun lint --no-script --type-aware -c .oxlintrc.type-aware.json --deny-warnings",
     "lint:native:doctor": "bun run scripts/lint_native.ts --doctor",
     "lint:canary": "bun run scripts/lint_native.ts --deny-warnings",
+    "verify:lint-surface": "bun run scripts/verify_lint_surface.ts",
     "lint:tables": "bun ~/.gemini/config/plugins/sportsdesk-cloudflare-ops/scripts/check_tables.ts bench/README.md bench/dod6/DOD6-AUDIT.md",
     "lint:tables:fmt": "bun ~/.gemini/config/plugins/sportsdesk-cloudflare-ops/scripts/check_tables.ts --fmt-check bench/README.md bench/dod6/DOD6-AUDIT.md",
     "lint:canary:type-aware": "bun run scripts/lint_native.ts --type-aware -c .oxlintrc.type-aware.json --deny-warnings",

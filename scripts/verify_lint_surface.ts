@@ -114,6 +114,31 @@ export async function resolveNativeLintExecutable(
   return null;
 }
 
+/** Parse `--rules -f json`; return null instead of throwing on malformed output. */
+export function parseRuleCatalog(raw: string): readonly string[] | null {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    const rules = parsed
+      .map((entry) =>
+        typeof entry === "string"
+          ? entry
+          : entry !== null && typeof entry === "object"
+            ? String(
+                (entry as { readonly name?: unknown; readonly rule?: unknown })
+                  .name ??
+                  (entry as { readonly rule?: unknown }).rule ??
+                  "",
+              )
+            : "",
+      )
+      .filter((rule) => rule.length > 0);
+    return rules.length > 0 ? rules : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isRuleActive(entry: unknown): boolean {
   const severity = Array.isArray(entry) ? entry[0] : entry;
   return (
@@ -226,13 +251,20 @@ async function main(): Promise<void> {
   }
 
   // Stage 1: Validate bunfig.toml [lint.rules] and [[lint.overrides]][].rules against --rules -f json
-  const [rulesRes, bunfigText] = await Promise.all([
+  const [rulesRes, bunfigRead] = await Promise.all([
     runCmd(bunBin, ["lint", "--no-script", "--rules", "-f", "json"], cwd),
     Bun.file(resolve(cwd, "bunfig.toml"))
       .text()
-      .catch(() => ""),
+      .then((text) => ({ ok: true as const, text }))
+      .catch(() => ({ ok: false as const, text: "" })),
   ]);
 
+  if (!bunfigRead.ok) {
+    recordFailure(
+      "ERR_LINT_CONFIG_DRIFT",
+      "bunfig.toml is missing or unreadable",
+    );
+  }
   if (rulesRes.signalCode !== null) {
     recordFailure(
       "ERR_SPAWN_TIMEOUT_KILLED",
@@ -243,28 +275,33 @@ async function main(): Promise<void> {
       "ERR_LINT_CATALOG_FAILED",
       rulesRes.stderr.trim() || `exit=${rulesRes.code}`,
     );
-  } else if (bunfigText) {
-    const catalogRaw = JSON.parse(rulesRes.stdout) as ReadonlyArray<
-      { readonly name?: string; readonly rule?: string } | string
-    >;
-    const validRules = new Set(
-      catalogRaw.map((entry) =>
-        typeof entry === "string"
-          ? entry
-          : String(entry.name ?? entry.rule ?? ""),
-      ),
-    );
-    const { unknownRules, shadowsRestrictedImports } = auditBunfigLintRules(
-      bunfigText,
-      validRules,
-    );
-    if (unknownRules.length > 0) {
-      recordFailure("ERR_LINT_UNKNOWN_RULE", unknownRules.join(", "));
-    }
-    if (shadowsRestrictedImports) {
-      console.warn(
-        "WARN_LINT_OVERRIDE_SHADOW: [[lint.overrides]] redefines no-restricted-imports (replaces root paths)",
+  } else {
+    const catalog = parseRuleCatalog(rulesRes.stdout);
+    if (catalog === null) {
+      recordFailure(
+        "ERR_LINT_CATALOG_FAILED",
+        "catalog was not valid JSON rule metadata",
       );
+    } else if (bunfigRead.ok) {
+      try {
+        const { unknownRules, shadowsRestrictedImports } = auditBunfigLintRules(
+          bunfigRead.text,
+          new Set(catalog),
+        );
+        if (unknownRules.length > 0) {
+          recordFailure("ERR_LINT_UNKNOWN_RULE", unknownRules.join(", "));
+        }
+        if (shadowsRestrictedImports) {
+          console.warn(
+            "WARN_LINT_OVERRIDE_SHADOW: [[lint.overrides]] redefines no-restricted-imports (replaces root paths)",
+          );
+        }
+      } catch (error) {
+        recordFailure(
+          "ERR_LINT_CONFIG_DRIFT",
+          `bunfig.toml could not be parsed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
   }
 
