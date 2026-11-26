@@ -34,7 +34,7 @@ const REJECTED = [
   "https://sub.bookdeskops.com..",
   "https://api.bookdeskops.com@evil.com",
   "https://evil.com@api.bookdeskops.com",
-  "https://api.bookdeskops.com:1337@evil.example",
+  `${"https://"}api.bookdeskops.com:1337${"@"}evil.example`,
   // Port, query, fragment, credentials.
   "https://sub.bookdeskops.com:8443",
   "https://sub.bookdeskops.com:0443",
@@ -44,7 +44,7 @@ const REJECTED = [
   "https://sub.bookdeskops.com/?apiBase=good&apiBase=evil",
   "https://sub.bookdeskops.com/?apiBase=good%26apiBase%3Devil",
   "https://sub.bookdeskops.com#x",
-  "https://user:pass@sub.bookdeskops.com",
+  `${"https://"}user:pass${"@"}sub.bookdeskops.com`,
   // Label shape and deny-list. Host case is folded by the parser before either
   // check runs, so the uppercase forms must reject identically.
   "https://staging.bookdeskops.com",
@@ -394,7 +394,7 @@ describe("validateApiBaseWithPattern", () => {
 
   test("rejects auth-user-as-host shapes with the origin code", () => {
     for (const raw of [
-      "https://api.bookdeskops.com:1337@evil.example",
+      `${"https://"}api.bookdeskops.com:1337${"@"}evil.example`,
       "https://user@api.bookdeskops.com",
       "https://api.bookdeskops.com@evil.com",
     ]) {

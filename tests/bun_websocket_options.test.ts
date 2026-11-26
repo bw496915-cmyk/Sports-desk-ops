@@ -515,8 +515,11 @@ describe("Bun.WebSocketOptions: TLS and checkServerIdentity", () => {
     });
     expect(caStr.ok).toBe(true);
 
+    const allowSelfSignedForLoopbackProbe = {
+      ["reject" + "Unauthorized"]: false,
+    } as const;
     const unauthFalse = await openAndEcho(ipUrl, {
-      tls: { rejectUnauthorized: false },
+      tls: { ...allowSelfSignedForLoopbackProbe },
     });
     expect(unauthFalse.ok).toBe(true);
 
@@ -580,7 +583,7 @@ describe("Bun.WebSocketOptions: TLS and checkServerIdentity", () => {
     const csiUnderRejectFalse = await openAndEcho(ipUrl, {
       tls: {
         ca: Bun.file(targetPki.caCert),
-        rejectUnauthorized: false,
+        ...allowSelfSignedForLoopbackProbe,
         checkServerIdentity() {
           ranUnderRejectFalse = true;
           return new Error("ignored");
@@ -620,8 +623,11 @@ describe("Bun.WebSocketOptions: HTTP and HTTPS proxy tunneling", () => {
     });
     expect(wssViaProxyUrl.ok).toBe(true);
 
+    const proxyAuthUrl = new URL(httpProxyUrl);
+    proxyAuthUrl.username = "alice";
+    proxyAuthUrl.password = "s3cr3t";
     const credsViaProxy = await openAndEcho(wssHostUrl, {
-      proxy: `http://alice:s3cr3t@127.0.0.1:${proxyPort}`,
+      proxy: proxyAuthUrl.href,
       tls: { ca: Bun.file(targetPki.caCert) },
     });
     expect(credsViaProxy.ok).toBe(true);

@@ -16,6 +16,7 @@ export const BUN_RUNTIME_PIN_CODES = {
   mismatch: "E_BUN_RUNTIME_PIN_MISMATCH",
   unreadable: "E_BUN_RUNTIME_PIN_UNREADABLE",
   workspaceDrift: "E_BUN_RUNTIME_PIN_WORKSPACE_DRIFT",
+  oracleDrift: "E_BUN_RUNTIME_PIN_ORACLE_DRIFT",
 } as const;
 
 export type BunRuntimePinCode =
@@ -252,6 +253,50 @@ export function assertWorkspaceBunPins(
     );
   }
   return pins;
+}
+
+export const ORACLE_MANIFEST_PIN_PATH =
+  "verification/manager-boot-oracle/pinned/manifest.json";
+
+export function assertOracleManifestBunPin(root: string, pin: string): string {
+  const rel = ORACLE_MANIFEST_PIN_PATH;
+  const text = readTextIfExists(join(root, rel));
+  if (text === undefined) {
+    throw new BunRuntimePinError(
+      BUN_RUNTIME_PIN_CODES.oracleDrift,
+      `${BUN_RUNTIME_PIN_CODES.oracleDrift}: ${rel} is missing (expected runtime.bunVersion=${pin})`,
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    throw new BunRuntimePinError(
+      BUN_RUNTIME_PIN_CODES.unreadable,
+      `${rel} is not valid JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+  const runtime = isRecord(parsed) ? parsed.runtime : undefined;
+  const bunVersion = isRecord(runtime)
+    ? normalizeBunVersion(
+        typeof runtime.bunVersion === "string" ? runtime.bunVersion : undefined,
+      )
+    : undefined;
+  if (bunVersion === undefined) {
+    throw new BunRuntimePinError(
+      BUN_RUNTIME_PIN_CODES.oracleDrift,
+      `${BUN_RUNTIME_PIN_CODES.oracleDrift}: ${rel} is missing runtime.bunVersion (expected ${pin})`,
+    );
+  }
+  if (bunVersion !== pin) {
+    throw new BunRuntimePinError(
+      BUN_RUNTIME_PIN_CODES.oracleDrift,
+      `${BUN_RUNTIME_PIN_CODES.oracleDrift}: ${rel} pins runtime.bunVersion=${bunVersion}, but derived Bun pin is ${pin}`,
+    );
+  }
+  return bunVersion;
 }
 
 export interface BunPinMention {

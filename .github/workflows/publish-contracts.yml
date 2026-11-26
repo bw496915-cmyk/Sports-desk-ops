@@ -60,7 +60,7 @@ jobs:
       # must not suppress lifecycle scripts or this job publishes a tarball without it. A local
       # dry run is fooled by a stale dist/; a fresh checkout is not.
       - name: Install workspace dependencies
-        run: bun install --frozen-lockfile
+        run: bun ci --no-env-file
       - name: Packed tarball contains dist
         run: |
           out="$RUNNER_TEMP/contracts-pack"

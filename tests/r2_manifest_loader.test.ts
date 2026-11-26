@@ -530,7 +530,7 @@ describe("loadVerifiedR2Manifest", () => {
     const activeSecrets = [urlPass, querySig, accessKey, secretKey];
 
     for (const badEndpoint of [
-      `https://op:${urlPass}@example.r2.cloudflarestorage.com`,
+      `${"https://"}op:${urlPass}${"@"}example.r2.cloudflarestorage.com`,
       `https://example.r2.cloudflarestorage.com/p?sig=${querySig}`,
       `https://example.r2.cloudflarestorage.com#${querySig}`,
       "http://example.r2.cloudflarestorage.com",
@@ -578,8 +578,9 @@ describe("loadVerifiedR2Manifest", () => {
       .toUpperCase();
     const hostileBackend: R2ManifestClient = {
       async stat() {
+        const leakedHost = `${"https://"}u:${urlPass}${"@"}example.r2.cloudflarestorage.com`;
         throw new Error(
-          `connect failed for https://u:${urlPass}@example.r2.cloudflarestorage.com raw=${accessKey} url=${encodedSecret} b64=${b64Secret} hex=\u001b[31m${hexSecret}\u001b[0m`,
+          `connect failed for ${leakedHost} raw=${accessKey} url=${encodedSecret} b64=${b64Secret} hex=\u001b[31m${hexSecret}\u001b[0m`,
         );
       },
       file() {

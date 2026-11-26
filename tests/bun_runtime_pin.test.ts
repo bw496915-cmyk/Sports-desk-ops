@@ -11,7 +11,9 @@ import { join } from "node:path";
 import {
   BUN_RUNTIME_PIN_CODES,
   BunRuntimePinError,
+  ORACLE_MANIFEST_PIN_PATH,
   RUNTIME_PIN_DOCS,
+  assertOracleManifestBunPin,
   assertWorkspaceBunPins,
   checkRuntimePinDocs,
   findBunVersionMentions,
@@ -29,6 +31,7 @@ describe("readBunRuntimePin", () => {
     const pin = readBunRuntimePin(ROOT);
     expect(pin).toMatch(/^\d+\.\d+\.\d+$/);
     expect(assertWorkspaceBunPins(ROOT, pin).length).toBeGreaterThan(0);
+    expect(assertOracleManifestBunPin(ROOT, pin)).toBe(pin);
   });
 
   test("present sources must agree; missing sources fail loudly", () => {
@@ -111,6 +114,33 @@ describe("readBunRuntimePin", () => {
         const pinError = error as BunRuntimePinError;
         expect(pinError.code).toBe(BUN_RUNTIME_PIN_CODES.workspaceDrift);
         expect(pinError.message).toContain("packages/example/package.json");
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("an oracle manifest runtime.bunVersion that drifts is E_BUN_RUNTIME_PIN_ORACLE_DRIFT", () => {
+    const root = tempRoot();
+    try {
+      const manifestPath = join(root, ORACLE_MANIFEST_PIN_PATH);
+      mkdirSync(join(root, "verification/manager-boot-oracle/pinned"), {
+        recursive: true,
+      });
+      writeFileSync(
+        manifestPath,
+        JSON.stringify({ runtime: { bunVersion: "1.4.4" } }),
+      );
+      expect(assertOracleManifestBunPin(root, "1.4.4")).toBe("1.4.4");
+      try {
+        assertOracleManifestBunPin(root, "1.4.5");
+        throw new Error("expected oracle drift");
+      } catch (error) {
+        expect(error).toBeInstanceOf(BunRuntimePinError);
+        const pinError = error as BunRuntimePinError;
+        expect(pinError.code).toBe(BUN_RUNTIME_PIN_CODES.oracleDrift);
+        expect(pinError.message).toContain(ORACLE_MANIFEST_PIN_PATH);
+        expect(pinError.message).toContain("1.4.4");
       }
     } finally {
       rmSync(root, { recursive: true, force: true });
