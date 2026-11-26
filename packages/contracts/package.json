@@ -74,6 +74,11 @@
       "types": "./src/bun_release_channel.ts",
       "bun": "./src/bun_release_channel.ts",
       "default": "./dist/bun_release_channel.js"
+    },
+    "./github-pr-state": {
+      "types": "./src/github_pr_state.ts",
+      "bun": "./src/github_pr_state.ts",
+      "default": "./dist/github_pr_state.js"
     }
   },
   "files": [
