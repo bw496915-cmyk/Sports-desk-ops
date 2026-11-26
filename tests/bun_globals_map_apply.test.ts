@@ -30,7 +30,7 @@ type Fixture = {
 
 const declarationsOf = (source: string): BunTypesDeclarations => ({
   package: "bun-types@test",
-  files: ["/tmp/bun-types-test/index.d.ts"],
+  files: ["/fixtures/bun-types-test/index.d.ts"],
   relativeFiles: [
     "node_modules/bun-types/index.d.ts",
     "node_modules/bun-types/s3.d.ts",
@@ -309,7 +309,7 @@ describe("applySummaryFixes", () => {
 describe("scraper merge helpers", () => {
   const declarations = (): BunTypesDeclarations => ({
     package: "bun-types@test",
-    files: ["/tmp/index.d.ts", "/tmp/s3.d.ts"],
+    files: ["/fixtures/index.d.ts", "/fixtures/s3.d.ts"],
     relativeFiles: [
       "node_modules/bun-types/index.d.ts",
       "node_modules/bun-types/s3.d.ts",

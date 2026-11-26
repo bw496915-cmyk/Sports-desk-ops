@@ -292,9 +292,9 @@ describe("Bun built-in Formats & 40+ Utilities", () => {
     expect(urlEncoded.get("a")).toBe("1");
     expect(urlEncoded.get("b")).toBe("two");
 
-    const fileUrl = Bun.pathToFileURL("/tmp/sportsdesk test.txt");
+    const fileUrl = Bun.pathToFileURL("/fixtures/sportsdesk test.txt");
     expect(fileUrl.href).toContain("sportsdesk%20test.txt");
-    expect(Bun.fileURLToPath(fileUrl)).toBe("/tmp/sportsdesk test.txt");
+    expect(Bun.fileURLToPath(fileUrl)).toBe("/fixtures/sportsdesk test.txt");
 
     const cookies = new Bun.CookieMap("a=1; b=two");
     expect(cookies.get("b")).toBe("two");

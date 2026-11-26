@@ -74,8 +74,8 @@ function writeRows(ledgerRoot: string, rows: unknown[]): void {
 
 describe("path and key helpers", () => {
   test("resolves the ledger under the given root", () => {
-    expect(resolveRebetLedgerPath("/tmp/x")).toBe(
-      join("/tmp/x", REBET_LEDGER_RELATIVE),
+    expect(resolveRebetLedgerPath("/fixtures/x")).toBe(
+      join("/fixtures/x", REBET_LEDGER_RELATIVE),
     );
     expect(REBET_LEDGER_RELATIVE).toBe("Scratch/rebet/ledger.jsonl");
   });

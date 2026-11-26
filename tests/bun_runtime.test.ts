@@ -225,7 +225,7 @@ describe("bun_runtime", () => {
 
   test("resolveFourcRoot prefers FOURC_ROOT override then existing candidate", () => {
     expect(
-      resolveFourcRoot({ FOURC_ROOT: "/custom/fourc", HOME: "/tmp" }),
+      resolveFourcRoot({ FOURC_ROOT: "/custom/fourc", HOME: "/fixtures/home" }),
     ).toBe("/custom/fourc");
     const fallback = resolveFourcRoot({
       HOME: "/nonexistent-home",

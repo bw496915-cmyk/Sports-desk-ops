@@ -105,13 +105,13 @@ describe("EOD archive safety guard", () => {
   });
 
   test("rejects absolute names", () => {
-    const bytes = tar([{ name: "/tmp/evil.txt", type: "0", data: "x" }]);
+    const bytes = tar([{ name: "/etc/evil.txt", type: "0", data: "x" }]);
     expect(() => assertSafeTar(bytes)).toThrow(/unsafe tar entry/);
   });
 
   test("rejects symlink and hardlink entries", () => {
     const symlink = tar([
-      { name: "link", type: "2", link: "/tmp/outside" },
+      { name: "link", type: "2", link: "/var/outside" },
       { name: "link/evil.txt", type: "0", data: "pwn" },
     ]);
     expect(() => assertSafeTar(symlink)).toThrow(/unsupported tar entry type/);

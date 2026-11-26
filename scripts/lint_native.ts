@@ -6,9 +6,10 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-export function hasNativeBunLint(bin: string, probeDir = "/tmp"): boolean {
+export function hasNativeBunLint(bin: string, probeDir = tmpdir()): boolean {
   try {
     const res = Bun.spawnSync([bin, "lint", "--help"], {
       cwd: probeDir,

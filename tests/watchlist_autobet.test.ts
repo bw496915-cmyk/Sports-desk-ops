@@ -618,7 +618,7 @@ describe("autobet config", () => {
   test("rejects unsafe ledger paths and unknown/duplicate leagues", () => {
     const parsed = parseAutobetConfig(
       validConfigRaw({
-        ledgerPath: "/tmp/ledger.jsonl",
+        ledgerPath: "/fixtures/ledger.jsonl",
         eligibleLeagues: ["NBA", "NBA", "XFL"],
       }),
     );

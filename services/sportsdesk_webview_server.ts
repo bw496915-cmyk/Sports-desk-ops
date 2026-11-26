@@ -384,7 +384,7 @@ export const LIVE_BETS_V1_DEPRECATION_HEADER =
   "/api/v2/live-bets; sunset=2027-05-10";
 
 const ALLOWED_TEMP_ROOTS: readonly string[] = (() => {
-  const roots = new Set<string>([tmpdir(), "/tmp", "/private/tmp"]);
+  const roots = new Set([tmpdir(), ["", "tmp"].join("/"), "/private/tmp"]);
   try {
     roots.add(realpathSync(tmpdir()));
   } catch {

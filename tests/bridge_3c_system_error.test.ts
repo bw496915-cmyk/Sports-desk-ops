@@ -9,7 +9,7 @@ function makeSystemError(): SystemError {
   return Object.assign(new Error("EIO while reading the corpus"), {
     code: "EIO",
     errno: 5,
-    path: "/tmp/corpus.jsonl",
+    path: "/fixtures/corpus.jsonl",
     syscall: "read",
   });
 }

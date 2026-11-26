@@ -20,8 +20,8 @@ async function connectedClient(): Promise<Client> {
 }
 
 const RESULT: McpShotResult = {
-  screenshot: "/tmp/s.png",
-  screenshotUrl: "file:///tmp/s.png",
+  screenshot: "/fixtures/s.png",
+  screenshotUrl: "file:///fixtures/s.png",
   bytes: 10,
   sha256: "ab".repeat(32),
   mimeType: "image/png",

@@ -161,7 +161,7 @@ const WAGERS_FIXTURE = {
   schemaVersion: 2,
   source: {
     kind: "offline-csv",
-    path: "/tmp/fixture/bet-report.csv",
+    path: "/fixtures/bet-report.csv",
     mtime: "2026-10-25T01:54:46.516Z",
     dateFilterBy: null,
   },

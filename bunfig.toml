@@ -134,6 +134,7 @@ correctness = "warn"
 "bun:test/prefer-snapshot-hint" = "error" # https://bun.com/docs/lint/rules/bun-test/prefer-snapshot-hint
 "bun:test/no-large-snapshots" = "error" # https://bun.com/docs/lint/rules/bun-test/no-large-snapshots
 "bun:test/no-interpolation-in-snapshots" = "error" # https://bun.com/docs/lint/rules/bun-test/no-interpolation-in-snapshots
+"bun/no-literal-temp-dir" = "error" # https://bun.com/docs/lint/rules/bun/no-literal-temp-dir
 
 # Type-aware gate: mirror .oxlintrc.type-aware.json, whose correctness category is off and
 # whose eight rules are the only type-aware errors. `bun lint --type-aware` turns on Bun's

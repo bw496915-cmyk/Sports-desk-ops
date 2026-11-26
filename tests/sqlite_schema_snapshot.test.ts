@@ -23,7 +23,7 @@ describe("sqlite_schema_snapshot", () => {
 
   test("schemaReportJsonDocument serializes docsUrl.href", () => {
     const report = buildSqliteSchemaReportForTable(MATCH_EVALUATIONS_TABLE)!;
-    const manifestUrl = Bun.pathToFileURL("/tmp/schema.manifest.bin");
+    const manifestUrl = Bun.pathToFileURL("/fixtures/schema.manifest.bin");
     const doc = schemaReportJsonDocument(report, manifestUrl);
     expect(doc.manifestUrl).toBe(manifestUrl.href);
     expect(doc.summary[0]?.docsUrl).toContain("sqlite_schema_registry.ts");

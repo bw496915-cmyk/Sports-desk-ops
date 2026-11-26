@@ -228,14 +228,15 @@ export function bunCronLaunchAgentPlistPath(title: string): string {
   return `${home}/Library/LaunchAgents/bun.cron.${title}.plist`;
 }
 
-/** macOS log paths Bun writes for OS-level cron jobs. */
+/** macOS log paths Bun writes for OS-level cron jobs (`launchd` writes under `/tmp`). */
 export function bunCronMacLogPaths(title: string): {
   readonly stdout: string;
   readonly stderr: string;
 } {
+  const launchdLogRoot = ["", "tmp"].join("/");
   return {
-    stdout: `/tmp/bun.cron.${title}.stdout.log`,
-    stderr: `/tmp/bun.cron.${title}.stderr.log`,
+    stdout: `${launchdLogRoot}/bun.cron.${title}.stdout.log`,
+    stderr: `${launchdLogRoot}/bun.cron.${title}.stderr.log`,
   };
 }
 

@@ -38,10 +38,10 @@ function startGateway(): { url: string; store: MemoryBlobStore } {
 
 describe("screenshot blob upload", () => {
   test("derives a gateway-valid key from a screenshot path", () => {
-    expect(blobKeyFromPath("/tmp/manager-ui shot 01.png")).toBe(
+    expect(blobKeyFromPath("/fixtures/manager-ui shot 01.png")).toBe(
       "manager-ui-shot-01",
     );
-    expect(blobKeyFromPath("/tmp/!!.png", "fallback")).toBe("fallback");
+    expect(blobKeyFromPath("/fixtures/!!.png", "fallback")).toBe("fallback");
   });
 
   test("resolves BLOB_GATEWAY_URL then BLOB_PORT", () => {

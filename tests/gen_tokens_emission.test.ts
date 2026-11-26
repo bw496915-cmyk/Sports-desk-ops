@@ -54,7 +54,7 @@ describe("emission manifest", () => {
 
   it("verifyManifestAgainstDisk rejects gateRunId mismatch", () => {
     const err = verifyManifestAgainstDisk(
-      "/tmp",
+      "/fixtures/out",
       { gateRunId: "expected", emitted: [] },
       "other",
     );

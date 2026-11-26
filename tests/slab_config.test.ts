@@ -139,7 +139,7 @@ describe("server slab config", () => {
   test("WAGERS_WIRE_CONTRACT_PATH is validated by the adapter", () => {
     const previous = process.env.WAGERS_WIRE_CONTRACT_PATH;
     try {
-      process.env.WAGERS_WIRE_CONTRACT_PATH = "/tmp/wagers.json";
+      process.env.WAGERS_WIRE_CONTRACT_PATH = "/fixtures/wagers.json";
       expect(() => wagersWireContractPath()).toThrow("must be relative");
 
       process.env.WAGERS_WIRE_CONTRACT_PATH =

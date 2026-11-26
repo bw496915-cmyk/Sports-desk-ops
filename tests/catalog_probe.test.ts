@@ -73,16 +73,16 @@ describe("catalog probe — pure helpers", () => {
       "--dry-run",
       "--json",
       "--out",
-      "/tmp/cat",
+      "/fixtures/cat",
       "--fixture",
-      "/tmp/f.json",
+      "/fixtures/f.json",
       "--timeout-ms",
       "5000",
     ]);
     expect(parsed.dryRun).toBe(true);
     expect(parsed.json).toBe(true);
-    expect(parsed.out).toBe("/tmp/cat");
-    expect(parsed.fixture).toBe("/tmp/f.json");
+    expect(parsed.out).toBe("/fixtures/cat");
+    expect(parsed.fixture).toBe("/fixtures/f.json");
     expect(parsed.timeoutMs).toBe(5000);
   });
 

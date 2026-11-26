@@ -153,7 +153,10 @@ describe("bridge3b: a bearer source only (Q2)", () => {
     const { probe } = keychain(
       {},
       {
-        env: { HOME: "/tmp", F402_TOKEN_FILE: "/tmp/sportsdesk/f402-token" },
+        env: {
+          HOME: "/fixtures/home",
+          F402_TOKEN_FILE: "/fixtures/sportsdesk/f402-token",
+        },
         readFile: () => token,
       },
     );

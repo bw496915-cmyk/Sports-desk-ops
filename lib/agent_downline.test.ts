@@ -32,7 +32,7 @@ describe("agent downline", () => {
 
   test("a missing file is null, not an empty index", async () => {
     expect(
-      await loadAgentDownline("/tmp/does-not-exist-downline.json"),
+      await loadAgentDownline("/nonexistent/does-not-exist-downline.json"),
     ).toBeNull();
   });
 

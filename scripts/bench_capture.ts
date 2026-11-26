@@ -11,6 +11,7 @@
  *
  * Serves capture.html from scratch/agent-graph.json on an ephemeral local port; no live API.
  */
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
@@ -152,7 +153,7 @@ async function stages(): Promise<StageReport> {
 const totals: number[] = [];
 const outputs: string[] = [];
 for (let i = 0; i < runs; i++) {
-  const out = `/tmp/bench-capture-${process.pid}-${i}.webp`;
+  const out = join(tmpdir(), `bench-capture-${process.pid}-${i}.webp`);
   outputs.push(out);
   const t = Bun.nanoseconds();
   const { bytes } = await writeAgentGraphWebp(out, {

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /**
  * `Bun.FetchSession` owns a connection pool and a bound `fetch`; the Telegram bot uses exactly
@@ -46,7 +48,7 @@ describe("Bun.FetchSession", () => {
   });
 
   test("supports FetchSessionInit unix domain socket connections", async () => {
-    const sockPath = `/tmp/sd-fs-${process.pid}-${Date.now()}.sock`;
+    const sockPath = join(tmpdir(), `sd-${process.pid}-${Date.now()}.sock`);
     const server = Bun.serve({
       unix: sockPath,
       fetch: () => new Response("unix-ok"),

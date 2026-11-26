@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import {
   buildCcc88412DecisionInstrument,
@@ -138,8 +139,8 @@ function main(): void {
     root,
     "scratch/f402-suspected-bots-raw-ledger-bundle.json",
   );
-  const octPath = "/tmp/graded-oct-window.json";
-  const todayPath = "/tmp/graded-today.json";
+  const octPath = resolve(tmpdir(), "graded-oct-window.json");
+  const todayPath = resolve(tmpdir(), "graded-today.json");
 
   const allSummaryJson = JSON.parse(readFileSync(allSummaryPath, "utf8")) as {
     LIST: ReportPlayerAnalysisRowRaw[];

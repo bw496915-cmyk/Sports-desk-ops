@@ -17,7 +17,7 @@ export type FetchSessionPreconnectForbidden =
   "preconnect" extends keyof Bun.FetchSession ? never : true;
 export const verifyNoFetchSessionPreconnect: FetchSessionPreconnectForbidden = true;
 export const verifyFetchSessionInitShape: Bun.FetchSessionInit = {
-  unix: "/tmp/example.sock",
+  unix: "/run/example.sock",
   tls: { rejectUnauthorized: true },
   keepAlive: { idleTimeout: 30, maxIdleSockets: 8 },
 };

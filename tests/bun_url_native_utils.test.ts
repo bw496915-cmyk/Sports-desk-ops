@@ -86,7 +86,7 @@ describe("source_location_url (pathToFileURL, fileURLToPath, openInEditor)", () 
   test("blocks forbidden local snapshot extensions with ERR_OPS_LOCAL_JSON_FORBIDDEN", () => {
     for (const ext of ["json", "jsonl", "sqlite", "dodbin"]) {
       expect(() =>
-        createSourceLocationUrl(`/tmp/sportsdesk/data.${ext}`, 10, 2),
+        createSourceLocationUrl(`/fixtures/sportsdesk/data.${ext}`, 10, 2),
       ).toThrow("ERR_OPS_LOCAL_JSON_FORBIDDEN");
     }
   });
