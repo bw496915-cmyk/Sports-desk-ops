@@ -273,8 +273,8 @@ export async function runLintCmd(
   });
   const [code, stdout, stderr] = await Promise.all([
     proc.exited,
-    Bun.readableStreamToText(proc.stdout),
-    Bun.readableStreamToText(proc.stderr),
+    proc.stdout.text(),
+    proc.stderr.text(),
   ]);
   return {
     code,
