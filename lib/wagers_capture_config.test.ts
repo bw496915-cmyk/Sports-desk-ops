@@ -87,7 +87,7 @@ describe("TOML capture config", () => {
         "[alerts]",
         "spikePct = 40",
         "[session]",
-        'webviewProfile = "/tmp/profile"',
+        'webviewProfile = "/fixtures/profile"',
         "",
       ].join("\n"),
     );
@@ -101,7 +101,7 @@ describe("TOML capture config", () => {
     expect(loaded.config.paths.archive).toBe("Scratch/bundle.tar");
     expect(loaded.config.alerts.spikePct).toBe(40);
     expect(loaded.config.alerts.spikeMin).toBe(DEFAULT_SPIKE_MIN);
-    expect(loaded.config.session.webviewProfile).toBe("/tmp/profile");
+    expect(loaded.config.session.webviewProfile).toBe("/fixtures/profile");
   });
 
   test("publish sinks default off and override from [publish]", async () => {

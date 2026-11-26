@@ -11,7 +11,7 @@ import { WebViewError } from "../scripts/capture/webview.ts";
 
 const REQUEST: ShotFileRequest = {
   url: "https://example.com",
-  out: "/tmp/never-written.png",
+  out: "/fixtures/never-written.png",
   width: 1440,
   height: 900,
   backend: "webkit",
@@ -62,7 +62,7 @@ describe("withView", () => {
       async () => slowView(events),
       (view) => captureShotFile(view, REQUEST),
     );
-    expect(result.screenshot).toBe("/tmp/never-written.png");
+    expect(result.screenshot).toBe("/fixtures/never-written.png");
     expect(events).toEqual(["shot-start", "shot-done", "dispose"]);
   });
 

@@ -18,6 +18,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /** `Bun.SHA256` ships at runtime but is absent from the 1.4.4 type surface. */
 const sha256 = (
@@ -90,7 +92,7 @@ describe("Bun runtime fail-closed contracts (measured on 1.4.4)", () => {
     );
     await expect(
       new Bun.Archive(localHandle as never).extract(
-        `${Bun.env.TMPDIR ?? "/tmp"}/unused-archive-extract`,
+        join(tmpdir(), "unused-archive-extract"),
       ),
     ).rejects.toThrow();
   });

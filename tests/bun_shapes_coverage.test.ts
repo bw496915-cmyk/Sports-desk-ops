@@ -238,12 +238,12 @@ describe("Bun shape coverage", () => {
       expect(typeof g[dom]).toBe("undefined");
     }
 
-    expect(URL.canParse("file:///tmp/desk.sqlite")).toBe(true);
-    const parsed = URL.parse("file:///tmp/desk.sqlite");
+    expect(URL.canParse("file:///fixtures/desk.sqlite")).toBe(true);
+    const parsed = URL.parse("file:///fixtures/desk.sqlite");
     expect(parsed?.protocol).toBe("file:");
-    expect(parsed?.pathname).toBe("/tmp/desk.sqlite");
+    expect(parsed?.pathname).toBe("/fixtures/desk.sqlite");
     parsed?.searchParams.set("mode", "ro");
-    expect(Bun.file(parsed!).name).toBe("/tmp/desk.sqlite");
+    expect(Bun.file(parsed!).name).toBe("/fixtures/desk.sqlite");
     expect(Bun.file("s3://bucket/key").name).toBe("bucket/key");
     expect(() => Bun.file(new URL("s3://bucket/key"))).toThrow(
       /ERR_INVALID_URL_SCHEME|file:/,

@@ -647,7 +647,7 @@ describe("portal tile crawler", () => {
       "--portal",
       "https://www.fantasy402.com/manager.html",
       "--out",
-      "/tmp/proofs",
+      "/fixtures/proofs",
       "--json",
     ]);
     expect(typeof live).toBe("object");

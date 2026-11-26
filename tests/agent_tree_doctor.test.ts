@@ -278,8 +278,8 @@ describe("flags", () => {
 
   test("parseRepoFlag reads both forms and refuses a missing value", () => {
     expect(parseRepoFlag([])).toBeNull();
-    expect(parseRepoFlag(["--repo", "/tmp/x"])).toBe("/tmp/x");
-    expect(parseRepoFlag(["--repo=/tmp/x"])).toBe("/tmp/x");
+    expect(parseRepoFlag(["--repo", "/workspace/x"])).toBe("/workspace/x");
+    expect(parseRepoFlag(["--repo=/workspace/x"])).toBe("/workspace/x");
     expect(parseRepoFlag(["--repo", "--json"])).toBe("");
   });
 });

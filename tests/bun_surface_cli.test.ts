@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /**
  * `dx bun` is the runtime-surface diagnostic. These assert the contract agents
@@ -175,7 +177,7 @@ describe("dx bun", () => {
   });
 
   test("reports removed members and changed typeof, and exits 1", async () => {
-    const path = `${Bun.env.TMPDIR ?? "/tmp"}/dx-bun-baseline-${Bun.randomUUIDv7()}.json`;
+    const path = join(tmpdir(), `dx-bun-baseline-${Bun.randomUUIDv7()}.json`);
     const rows = [
       { k: "Image", t: "object", own: ["backend"] },
       { k: "WebView", t: "function", own: ["closeAll", "nope"] },

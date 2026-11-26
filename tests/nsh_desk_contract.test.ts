@@ -367,12 +367,9 @@ describe("packages/nsh-desk model and capability contracts", () => {
       "-o",
       "/repo/packages/nsh-desk/.nsh/out",
     ]);
-    expect(buildNshArgv(appDir, ["build", "-o", "/tmp/custom-out"])).toEqual([
-      "build",
-      appDir,
-      "-o",
-      "/tmp/custom-out",
-    ]);
+    expect(
+      buildNshArgv(appDir, ["build", "-o", "/fixtures/custom-out"]),
+    ).toEqual(["build", appDir, "-o", "/fixtures/custom-out"]);
     expect(buildNshArgv(appDir, ["package-web"])).toEqual([
       "package",
       appDir,
@@ -382,8 +379,15 @@ describe("packages/nsh-desk model and capability contracts", () => {
       "/repo/packages/nsh-desk/.nsh/out/web",
     ]);
     expect(
-      buildNshArgv(appDir, ["package-web", "-o", "/tmp/web-dist"]),
-    ).toEqual(["package", appDir, "--target", "web", "-o", "/tmp/web-dist"]);
+      buildNshArgv(appDir, ["package-web", "-o", "/fixtures/web-dist"]),
+    ).toEqual([
+      "package",
+      appDir,
+      "--target",
+      "web",
+      "-o",
+      "/fixtures/web-dist",
+    ]);
     expect(
       buildNshArgv(appDir, [
         "publish",

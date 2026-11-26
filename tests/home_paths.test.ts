@@ -72,8 +72,8 @@ describe("expandHomePath", () => {
     expect(expandHomePath("~/code/app.csv", "/Users/me")).toBe(
       "/Users/me/code/app.csv",
     );
-    expect(expandHomePath("/var/tmp/x.csv", "/Users/me")).toBe(
-      "/var/tmp/x.csv",
+    expect(expandHomePath("/opt/data/x.csv", "/Users/me")).toBe(
+      "/opt/data/x.csv",
     );
     expect(expandHomePath("relative/path.csv", "/Users/me")).toBe(
       "relative/path.csv",

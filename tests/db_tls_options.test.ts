@@ -84,7 +84,7 @@ describe("resolveDbTlsConfig", () => {
 
   test("loads an explicit CA bundle", () => {
     const config = resolveDbTlsConfig(
-      { SPORTSDESK_DB_CA_FILE: "/tmp/desk-ca.pem" },
+      { SPORTSDESK_DB_CA_FILE: "/fixtures/desk-ca.pem" },
       { local: false, forceTls: false },
     );
     if (config === false) throw new Error("expected TLS config");

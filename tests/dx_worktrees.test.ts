@@ -78,12 +78,12 @@ describe("parseWorktreeListPorcelain", () => {
       "HEAD 1111111111111111111111111111111111111111",
       "branch refs/heads/main",
       "",
-      "worktree /tmp/wt-detached",
+      "worktree /repo/wt-detached",
       "HEAD 2222222222222222222222222222222222222222",
       "detached",
       "locked active experiment",
       "",
-      "worktree /tmp/wt-missing",
+      "worktree /repo/wt-missing",
       "HEAD 3333333333333333333333333333333333333333",
       "branch refs/heads/feat/gone",
       "prunable gitdir file points to non-existent location",
@@ -101,7 +101,7 @@ describe("parseWorktreeListPorcelain", () => {
       prunable: false,
     });
     expect(parsed[1]).toEqual({
-      path: "/tmp/wt-detached",
+      path: "/repo/wt-detached",
       headSha: "2222222222222222222222222222222222222222",
       branch: null,
       detached: true,
@@ -109,7 +109,7 @@ describe("parseWorktreeListPorcelain", () => {
       prunable: false,
     });
     expect(parsed[2]).toEqual({
-      path: "/tmp/wt-missing",
+      path: "/repo/wt-missing",
       headSha: "3333333333333333333333333333333333333333",
       branch: "feat/gone",
       detached: false,

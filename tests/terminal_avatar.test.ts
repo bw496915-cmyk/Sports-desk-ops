@@ -66,7 +66,7 @@ describe("terminal avatar pipeline", () => {
     const markdown = renderMarkdownWithAvatar("## Synced", {
       colors: false,
       columns: 0,
-      avatarPath: "/tmp/avatar.png",
+      avatarPath: "/fixtures/avatar.png",
     });
     expect(markdown).toContain("Synced");
     expect(markdown).toContain("avatar");

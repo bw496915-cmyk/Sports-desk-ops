@@ -20,16 +20,16 @@ test("configuration requires explicit absolute paths and rejects overwriting sou
     parseCustomerHistoryConfiguration({
       SPORTSDESK_CUSTOMER_HISTORY_PROJECTOR:
         "./scripts/project_customer_history.ts",
-      SPORTSDESK_CUSTOMER_HISTORY_SOURCES: '["/tmp/graded.json"]',
-      SPORTSDESK_CUSTOMER_HISTORY_JSON: "/tmp/history.json",
+      SPORTSDESK_CUSTOMER_HISTORY_SOURCES: '["/fixtures/graded.json"]',
+      SPORTSDESK_CUSTOMER_HISTORY_JSON: "/fixtures/history.json",
     }),
   ).toThrow();
   expect(() =>
     parseCustomerHistoryConfiguration({
       SPORTSDESK_CUSTOMER_HISTORY_PROJECTOR:
         "/dashboard/scripts/project_customer_history.ts",
-      SPORTSDESK_CUSTOMER_HISTORY_SOURCES: '["/tmp/graded.json"]',
-      SPORTSDESK_CUSTOMER_HISTORY_JSON: "/tmp/graded.json",
+      SPORTSDESK_CUSTOMER_HISTORY_SOURCES: '["/fixtures/graded.json"]',
+      SPORTSDESK_CUSTOMER_HISTORY_JSON: "/fixtures/graded.json",
     }),
   ).toThrow();
 });

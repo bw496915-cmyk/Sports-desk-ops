@@ -12,7 +12,8 @@
     "unicorn/prefer-array-flat-map": "error",
     "bun:test/prefer-snapshot-hint": "error",
     "bun:test/no-large-snapshots": "error",
-    "bun:test/no-interpolation-in-snapshots": "error"
+    "bun:test/no-interpolation-in-snapshots": "error",
+    "bun/no-literal-temp-dir": "error"
   },
   "ignorePatterns": [
     "**/node_modules/**",
