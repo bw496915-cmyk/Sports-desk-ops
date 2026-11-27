@@ -1,0 +1,1032 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import {
+  AllowlistError,
+  MUTATION_OPS,
+  PULL_READ_ONLY_OPS,
+  READ_ONLY_OPS,
+  assertAllowedRead,
+  assertPullReadOnly,
+  assertReadOnly,
+  isAllowedReadOp,
+  parseOpsArgument,
+} from "../scripts/capture/allowlist.ts";
+import {
+  F402_PULL_BASE_URL_ENV,
+  F402_PULL_DEFAULT_BASE_URL,
+  F402PullClient,
+  F402PullerError,
+  RequestPacer,
+  backoffDelayMs,
+  buildManagerUrl,
+  containsRawIp,
+  createPaceClock,
+  defaultTransactionStartDate,
+  eachUtcDateInclusive,
+  emptyCheckpoint,
+  loadCheckpoint,
+  normalizePullBaseUrl,
+  parseCheckpoint,
+  parseHierarchyList,
+  redactSecrets,
+  REDACTED,
+  redactSecretsAndIps,
+  SAFE_PATH_SEGMENT_MAX_LENGTH,
+  safePathSegment,
+  writeRawJson,
+  writeSummaryJson,
+  resolvePullBaseUrl,
+  resolvePullSession,
+  runCensus,
+  runContract,
+  formatGradedDate,
+  runTransactions,
+  runWagers,
+  runWeblog,
+  saveCheckpoint,
+  summarizeHierarchy,
+  type F402Session,
+  type SessionProvider,
+} from "../lib/f402_readonly_puller.ts";
+
+const FIX = join(import.meta.dir, "fixtures/f402-readonly-pull");
+
+function loadFixture(name: string): unknown {
+  return JSON.parse(readFileSync(join(FIX, name), "utf8")) as unknown;
+}
+
+function tempOut(): string {
+  return mkdtempSync(join(tmpdir(), "f402-pull-"));
+}
+
+const session: F402Session = {
+  cookieHeader: "session=fake",
+  cookieNames: ["session"],
+  authorizationHeader: "Bearer " + "a".repeat(32),
+  obtainedAtIso: "2026-11-14T18:00:00.000Z",
+  expiresAtIso: "2026-11-15T18:00:00.000Z",
+};
+
+function formOf(init?: RequestInit): URLSearchParams {
+  return new URLSearchParams(String(init?.body ?? ""));
+}
+
+describe("allowlist expansion", () => {
+  test("capture --ops all stays the original eight", () => {
+    expect(READ_ONLY_OPS).toEqual([
+      "getWebLog",
+      "getInfoPlayer",
+      "getBetTicker",
+      "getBetTickerConfig",
+      "getPending",
+      "getSportsVigSetup",
+      "getInfoManager",
+      "getCustomerNotes",
+    ]);
+    expect(parseOpsArgument("all")).toEqual([...READ_ONLY_OPS]);
+  });
+
+  test("puller reads are allowed and only the verified set", () => {
+    expect([...PULL_READ_ONLY_OPS]).toEqual([
+      "getHeriarchy",
+      "getListAgenstByAgent",
+      "getPlayers",
+      "getCustomerAdmin",
+      "getTransactionList",
+      "getDeletedTransactionHistory",
+      "getWebLog",
+      "getPending",
+      "getBetTicker",
+      "getGraded",
+      "getWagersByFigureDate",
+    ]);
+    for (const op of PULL_READ_ONLY_OPS) {
+      expect(assertPullReadOnly(op)).toBe(op);
+      expect(assertAllowedRead(op)).toBe(op);
+      expect(isAllowedReadOp(`/cloud/api/Manager/${op}`)).toBe(true);
+    }
+    expect(
+      assertPullReadOnly("POST /cloud/api/Manager/getTransactionList"),
+    ).toBe("getTransactionList");
+  });
+
+  test("capture-only reads are not puller ops (except shared reads)", () => {
+    expect(() => assertPullReadOnly("getInfoPlayer")).toThrow(AllowlistError);
+    expect(() => assertPullReadOnly("getBetTickerConfig")).toThrow(
+      AllowlistError,
+    );
+    expect(assertAllowedRead("getInfoPlayer")).toBe("getInfoPlayer");
+    expect(assertReadOnly("getInfoPlayer")).toBe("getInfoPlayer");
+    expect(assertPullReadOnly("getPending")).toBe("getPending");
+    expect(assertPullReadOnly("getBetTicker")).toBe("getBetTicker");
+  });
+
+  test("writes and unknown ops stay refused", () => {
+    const writes = [
+      ...MUTATION_OPS,
+      "authenticateCustomer",
+      "authenticateCustomerforAgent",
+      "OTPLoginWithCode",
+      "updateByColumn",
+      "insertTransaction",
+      "deleteTransaction",
+      "changeCarry",
+      "write",
+      "writeDetail",
+      "writeErr",
+      "renewToken",
+    ];
+    for (const op of writes) {
+      expect(() => assertPullReadOnly(op)).toThrow(AllowlistError);
+      expect(() => assertAllowedRead(op)).toThrow(AllowlistError);
+      expect(() => assertReadOnly(op)).toThrow(AllowlistError);
+      expect(isAllowedReadOp(op)).toBe(false);
+    }
+    expect(() => assertAllowedRead("getSomethingUndocumented")).toThrow(
+      AllowlistError,
+    );
+    try {
+      assertAllowedRead("insertTransaction");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AllowlistError);
+      expect((error as AllowlistError).code).toBe("mutation");
+    }
+    try {
+      assertAllowedRead("authenticateCustomer");
+    } catch (error) {
+      expect((error as AllowlistError).code).toBe("auth-exchange");
+    }
+  });
+});
+
+describe("redaction", () => {
+  test("strips passwords and phones but can keep or drop IPs", () => {
+    const raw = {
+      Password: "secret",
+      PhoneNumber: "555-0100",
+      IPAddress: "203.0.113.50",
+      nested: { pass: "x", Login: "CUST1" },
+    };
+    const secretsOnly = redactSecrets(raw) as Record<string, unknown>;
+    expect(secretsOnly.Password).toBe("<redacted>");
+    expect(secretsOnly.PhoneNumber).toBe("<redacted>");
+    expect(secretsOnly.IPAddress).toBe("203.0.113.50");
+    expect((secretsOnly.nested as { pass: string }).pass).toBe("<redacted>");
+    const noIps = redactSecretsAndIps(raw) as Record<string, unknown>;
+    expect(noIps.IPAddress).toBe("<redacted>");
+    expect(containsRawIp(secretsOnly)).toBe(true);
+    expect(containsRawIp(noIps)).toBe(false);
+  });
+});
+
+describe("secret key matching", () => {
+  test("strips password, phone and email variants by partial name, any case", () => {
+    const keys = [
+      "Password",
+      "NewPassword",
+      "PasswordHash",
+      "EncryptPassword",
+      "passwd",
+      "pass",
+      "HomePhone",
+      "Phone1",
+      "PhoneNumber",
+      "SMSPhoneNumber",
+      "smsNumber",
+      "EMail",
+      "Email",
+      "email_address",
+      "TelegramID",
+      "authToken",
+      "Authorization",
+      "Cookie",
+      "clientSecret",
+      "PIN",
+      "PinCode",
+    ];
+    const raw: Record<string, unknown> = {};
+    for (const key of keys) raw[key] = `value-of-${key}`;
+    const nested = redactSecrets({ rows: [raw] }) as {
+      rows: Record<string, unknown>[];
+    };
+    for (const key of keys) {
+      expect(nested.rows[0]![key]).toBe(REDACTED);
+    }
+    expect(JSON.stringify(nested)).not.toContain("value-of-");
+  });
+
+  test("keeps ordinary keys that only resemble secret names", () => {
+    const raw = {
+      Login: "CUST1",
+      CustomerID: "C1",
+      Bypass: "x",
+      Spin: "y",
+      Shipping: "z",
+      PinnedLine: "w",
+    };
+    expect(redactSecrets(raw)).toEqual(raw);
+  });
+});
+
+describe("redaction masks every IP", () => {
+  test("two or more IPs in one text field are all masked", () => {
+    const raw = {
+      Operation: "from 10.1.2.3 then 10.9.8.7 via 2600:380::1",
+      rows: ["a 198.51.100.1 b 198.51.100.2"],
+    };
+    const masked = redactSecretsAndIps(raw) as {
+      Operation: string;
+      rows: string[];
+    };
+    expect(masked.Operation).toBe(
+      "from <redacted> then <redacted> via <redacted>",
+    );
+    expect(masked.rows[0]).toBe("a <redacted> b <redacted>");
+    expect(containsRawIp(masked)).toBe(false);
+  });
+
+  test("containsRawIp sees a second IPv4 and a bare IPv6", () => {
+    expect(containsRawIp("ok <redacted> then 10.9.8.7")).toBe(true);
+    expect(containsRawIp({ note: "2607:fb90::5" })).toBe(true);
+    expect(containsRawIp({ at: "2026-11-01T10:00:00.000Z" })).toBe(false);
+  });
+
+  test("writeSummaryJson writes a summary with several IPs in one field", () => {
+    const dir = mkdtempSync(join(tmpdir(), "f402-multi-ip-"));
+    try {
+      const path = writeSummaryJson(dir, "s.json", {
+        note: "from 10.1.2.3 then 10.9.8.7",
+      });
+      const text = readFileSync(path, "utf8");
+      expect(text).not.toContain("10.1.2.3");
+      expect(text).not.toContain("10.9.8.7");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("raw file path safety", () => {
+  const unsafe = [
+    "../x",
+    "..",
+    "a/b",
+    "a\\b",
+    "/etc/passwd",
+    "C:\\x",
+    "",
+    " CUST1",
+    "CUST.1",
+  ];
+
+  test("safePathSegment accepts plain ids and refuses traversal and separators", () => {
+    for (const id of ["CUST1", "cust_2", "A-9", "2026-11-01"]) {
+      expect(safePathSegment(id, "test")).toBe(id);
+    }
+    for (const id of unsafe) {
+      let caught: unknown;
+      try {
+        safePathSegment(id, "test");
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(F402PullerError);
+      expect((caught as F402PullerError).code).toBe("unsafe-path");
+    }
+  });
+
+  test("safePathSegment refuses every dot form, odd characters and over-long ids", () => {
+    const max = "a".repeat(SAFE_PATH_SEGMENT_MAX_LENGTH);
+    expect(safePathSegment(max, "test")).toBe(max);
+    for (const id of [
+      ".",
+      "...",
+      ".hidden",
+      ".CUST1",
+      "CUST1.",
+      "CUST1.json",
+      "CUST1/.",
+      "CUST1\0",
+      "CUST 1",
+      "CUST1\n",
+      "ÇUST1",
+      "a".repeat(SAFE_PATH_SEGMENT_MAX_LENGTH + 1),
+    ]) {
+      let caught: unknown;
+      try {
+        safePathSegment(id, "test");
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(F402PullerError);
+      expect((caught as F402PullerError).code).toBe("unsafe-path");
+      expect((caught as F402PullerError).operation).toBe("test");
+    }
+  });
+
+  test("writeRawJson refuses dot, empty and hidden segments inside raw/", () => {
+    const dir = mkdtempSync(join(tmpdir(), "f402-raw-dots-"));
+    try {
+      for (const rel of [
+        ".hidden.json",
+        "contract/.CUST1.json",
+        "contract/./CUST1.json",
+        "contract//CUST1.json",
+        "contract/CUST1..json",
+        "contract/a/../CUST1.json",
+        "contract/",
+        "contract\\CUST1.json",
+      ]) {
+        let caught: unknown;
+        try {
+          writeRawJson(dir, rel, {});
+        } catch (error) {
+          caught = error;
+        }
+        expect(caught).toBeInstanceOf(F402PullerError);
+        expect((caught as F402PullerError).code).toBe("unsafe-path");
+      }
+      for (const rel of [
+        "census/getHeriarchy.json",
+        "contract/CUST1.empty-start.json",
+        "wagers/figure-date/CUST1/2026-11-01.json",
+      ]) {
+        expect(writeRawJson(dir, rel, {})).toBe(join(dir, "raw", rel));
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("writeRawJson refuses paths that leave raw/", () => {
+    const dir = mkdtempSync(join(tmpdir(), "f402-raw-path-"));
+    try {
+      for (const rel of [
+        "../escape.json",
+        "a/../../escape.json",
+        "/tmp/x.json",
+        "",
+      ]) {
+        expect(() => writeRawJson(dir, rel, {})).toThrow(F402PullerError);
+      }
+      expect(writeRawJson(dir, "contract/CUST1.json", {})).toBe(
+        join(dir, "raw", "contract/CUST1.json"),
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("phases refuse an unsafe customer id before any request", async () => {
+    const calls: string[] = [];
+    const client = new F402PullClient({
+      session,
+      intervalMs: 0,
+      fetchImpl: async (url) => {
+        calls.push(String(url));
+        return new Response(JSON.stringify({ LIST: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+    const outDir = tempOut();
+    const context = {
+      client,
+      outDir,
+      agentId: "ROOT1",
+      agentOwner: "ROOT1",
+      agentType: "M",
+    } as const;
+    try {
+      await expect(
+        runContract(context, { customerId: "../../etc" }),
+      ).rejects.toMatchObject({ code: "unsafe-path" });
+      saveCheckpoint(outDir, {
+        ...emptyCheckpoint("ROOT1", "2026-11-14T00:00:00.000Z"),
+        customerIds: ["CUST1", "../CUST2"],
+      });
+      await expect(
+        runTransactions(context, { start: "" }),
+      ).rejects.toMatchObject({ code: "unsafe-path" });
+      await expect(
+        runWagers(context, { from: "2026-11-01", to: "2026-11-01" }),
+      ).rejects.toMatchObject({ code: "unsafe-path" });
+      expect(calls).toEqual([]);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("pacing and backoff", () => {
+  test("waits out the interval between requests", async () => {
+    const sleeps: number[] = [];
+    let now = 1_000_000;
+    const clock = createPaceClock({
+      now: () => now,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        now += ms;
+      },
+    });
+    const pacer = new RequestPacer(1000, clock);
+    expect(await pacer.wait()).toBe(0);
+    expect(await pacer.wait()).toBe(1000);
+    expect(sleeps).toEqual([1000]);
+  });
+
+  test("backoff doubles and caps", () => {
+    expect(backoffDelayMs(1)).toBe(1000);
+    expect(backoffDelayMs(2)).toBe(2000);
+    expect(backoffDelayMs(3)).toBe(4000);
+    expect(backoffDelayMs(10, 30_000)).toBe(30_000);
+  });
+});
+
+describe("checkpoint resume", () => {
+  test("round-trips and rejects a bad version", () => {
+    const parsed = parseCheckpoint({
+      version: 1,
+      phase: "transactions",
+      agentId: "ROOT1",
+      customerIds: ["CUST1"],
+      completedCustomers: ["CUST1"],
+      completedWeblogDates: [],
+      updatedAtIso: "2026-11-14T00:00:00.000Z",
+    });
+    expect(parsed.completedCustomers).toEqual(["CUST1"]);
+    expect(() =>
+      parseCheckpoint({ version: 99, phase: "census", agentId: "X" }),
+    ).toThrow(F402PullerError);
+  });
+});
+
+describe("F402PullClient", () => {
+  test("refuses a write before fetch and posts only allowlisted reads", async () => {
+    const calls: string[] = [];
+    const client = new F402PullClient({
+      session,
+      intervalMs: 0,
+      fetchImpl: async (url, init) => {
+        calls.push(`${url} ${formOf(init).get("operation")}`);
+        return new Response(JSON.stringify({ LIST: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+    await expect(
+      client.post("insertTransaction" as never, { acc: "CUST1" }),
+    ).rejects.toBeInstanceOf(AllowlistError);
+    expect(calls).toEqual([]);
+    await client.post("getTransactionList", { acc: "CUST1", start: "" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("/cloud/api/Manager/getTransactionList");
+    expect(buildManagerUrl("https://fantasy402.com", "getHeriarchy")).toBe(
+      "https://fantasy402.com/cloud/api/Manager/getHeriarchy",
+    );
+    expect(() =>
+      buildManagerUrl("https://fantasy402.com", "deleteTransaction" as never),
+    ).toThrow(AllowlistError);
+  });
+
+  test("retries 429/5xx with backoff then succeeds", async () => {
+    const sleeps: number[] = [];
+    let now = 0;
+    const clock = createPaceClock({
+      now: () => now,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        now += ms;
+      },
+    });
+    let hits = 0;
+    const client = new F402PullClient({
+      session,
+      intervalMs: 0,
+      clock,
+      fetchImpl: async () => {
+        hits += 1;
+        if (hits === 1) return new Response("slow", { status: 429 });
+        if (hits === 2) return new Response("down", { status: 503 });
+        return new Response(JSON.stringify({ LIST: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+    const payload = await client.post("getPlayers", { agentID: "ROOT1" });
+    expect(payload).toEqual({ LIST: [] });
+    expect(hits).toBe(3);
+    expect(sleeps.some((ms) => ms >= 1000)).toBe(true);
+  });
+
+  test("401 is an auth error and is not retried", async () => {
+    let hits = 0;
+    const client = new F402PullClient({
+      session,
+      intervalMs: 0,
+      fetchImpl: async () => {
+        hits += 1;
+        return new Response("denied", { status: 401 });
+      },
+    });
+    await expect(
+      client.post("getPlayers", { agentID: "ROOT1" }),
+    ).rejects.toMatchObject({
+      code: "auth",
+      status: 401,
+    });
+    expect(hits).toBe(1);
+  });
+});
+
+describe("phases with synthetic fixtures", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0))
+      rmSync(dir, { recursive: true, force: true });
+  });
+
+  function fixtureFetch(): (
+    url: string,
+    init?: RequestInit,
+  ) => Promise<Response> {
+    return async (url, init) => {
+      const op = formOf(init).get("operation");
+      const body =
+        op === "getHeriarchy"
+          ? loadFixture("hierarchy.json")
+          : op === "getListAgenstByAgent"
+            ? loadFixture("list-agents.json")
+            : op === "getTransactionList"
+              ? loadFixture("transactions.json")
+              : op === "getDeletedTransactionHistory"
+                ? loadFixture("deleted.json")
+                : op === "getWebLog"
+                  ? loadFixture("weblog.json")
+                  : null;
+      if (body === null) {
+        return new Response("unexpected op", { status: 500 });
+      }
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+  }
+
+  function ctx(outDir: string) {
+    dirs.push(outDir);
+    return {
+      client: new F402PullClient({
+        session,
+        intervalMs: 0,
+        fetchImpl: fixtureFetch(),
+      }),
+      outDir,
+      agentId: "ROOT1",
+      agentOwner: "ROOT1",
+      agentType: "M",
+    };
+  }
+
+  test("census counts agents and players and redacts passwords", async () => {
+    const outDir = tempOut();
+    const result = await runCensus(ctx(outDir));
+    expect(result.agentCount).toBe(3);
+    expect(result.playerCount).toBe(2);
+    expect(result.maxLevel).toBe(2);
+    expect(result.roots).toBe(1);
+    expect(result.orphans).toBe(1);
+    expect(result.customerIds).toEqual(["CUST1", "CUST2"]);
+    const rawAgents = readFileSync(
+      join(outDir, "raw/census/getListAgenstByAgent.json"),
+      "utf8",
+    );
+    expect(rawAgents).not.toContain("plaintext-password");
+    expect(rawAgents).toContain("<redacted>");
+    const rawHierarchy = readFileSync(
+      join(outDir, "raw/census/getHeriarchy.json"),
+      "utf8",
+    );
+    expect(rawHierarchy).not.toContain("should-not-survive");
+    const summary = JSON.parse(
+      readFileSync(join(outDir, "census-summary.json"), "utf8"),
+    ) as { playerCount: number; customerIds?: unknown };
+    expect(summary.playerCount).toBe(2);
+    expect(summary.customerIds).toBeUndefined();
+    const checkpoint = loadCheckpoint(outDir);
+    expect(checkpoint?.customerIds).toEqual(["CUST1", "CUST2"]);
+  });
+
+  test("census refuses an unsafe downline agent id before any child request", async () => {
+    const outDir = tempOut();
+    dirs.push(outDir);
+    const childCalls: string[] = [];
+    const client = new F402PullClient({
+      session,
+      intervalMs: 0,
+      fetchImpl: async (_url, init) => {
+        const form = formOf(init);
+        const op = form.get("operation");
+        if (op === "getHeriarchy") {
+          return Response.json(loadFixture("hierarchy.json"));
+        }
+        if (form.get("agentID") !== "ROOT1") {
+          childCalls.push(String(form.get("agentID")));
+        }
+        return Response.json({
+          GENERAL: [
+            { AgentID: "ROOT1", Login: "ROOT1", Level: 0, AgentType: "M" },
+            { AgentID: "SUB1", Login: "SUB1", Level: 1, AgentType: "A" },
+            { AgentID: "../SUB2", Login: "x", Level: 1, AgentType: "A" },
+          ],
+          PLAYERS: [],
+        });
+      },
+    });
+    await expect(
+      runCensus(
+        {
+          client,
+          outDir,
+          agentId: "ROOT1",
+          agentOwner: "ROOT1",
+          agentType: "M",
+        },
+        { recurseDownline: true },
+      ),
+    ).rejects.toMatchObject({ code: "unsafe-path", operation: "census" });
+    expect(childCalls).toEqual([]);
+  });
+
+  test("contract hits dated start, empty start, and deleted history", async () => {
+    const outDir = tempOut();
+    const seen: string[] = [];
+    const client = new F402PullClient({
+      session,
+      intervalMs: 0,
+      fetchImpl: async (_url, init) => {
+        const form = formOf(init);
+        seen.push(
+          `${form.get("operation")}:${form.get("start") ?? form.get("customerID")}`,
+        );
+        const op = form.get("operation");
+        const body =
+          op === "getTransactionList"
+            ? loadFixture("transactions.json")
+            : loadFixture("deleted.json");
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+    dirs.push(outDir);
+    const result = await runContract(
+      { client, outDir, agentId: "ROOT1", agentOwner: "ROOT1", agentType: "M" },
+      { customerId: "CUST1", start: "2026-10-15" },
+    );
+    expect(seen).toEqual([
+      "getTransactionList:2026-10-15",
+      "getTransactionList:",
+      "getDeletedTransactionHistory:CUST1",
+    ]);
+    expect(result.datedCount).toBe(1);
+    expect(result.emptyStartCount).toBe(1);
+    expect(result.deletedCount).toBe(1);
+    expect(result.emptyStartAccepted).toBe(true);
+    expect(result.datedKeys).toContain("TranType");
+    const raw = readFileSync(
+      join(outDir, "raw/contract/CUST1.dated.json"),
+      "utf8",
+    );
+    expect(raw).not.toContain("nope");
+  });
+
+  test("transactions resume from the checkpoint", async () => {
+    const outDir = tempOut();
+    const context = ctx(outDir);
+    await runCensus(context);
+    const first = await runTransactions(context, { start: "" });
+    expect(first).toEqual({ attempted: 2, completed: 2, skipped: 0 });
+    const second = await runTransactions(context, { start: "" });
+    expect(second).toEqual({ attempted: 2, completed: 0, skipped: 2 });
+  });
+
+  test("weblog is day-unit, keeps IPs only in raw, and resumes", async () => {
+    const outDir = tempOut();
+    const context = ctx(outDir);
+    const first = await runWeblog(context, {
+      from: "2026-11-01",
+      to: "2026-11-02",
+      mode: "I",
+    });
+    expect(first.completed).toBe(2);
+    expect(first.rowCounts["2026-11-01"]).toBe(1);
+    const raw = readFileSync(
+      join(outDir, "raw/weblog/2026-11-01.json"),
+      "utf8",
+    );
+    expect(raw).toContain("203.0.113.50");
+    const summary = readFileSync(join(outDir, "weblog-summary.json"), "utf8");
+    expect(summary).not.toContain("203.0.113.50");
+    const second = await runWeblog(context, {
+      from: "2026-11-01",
+      to: "2026-11-02",
+      mode: "I",
+    });
+    expect(second).toMatchObject({ completed: 0, skipped: 2 });
+  });
+});
+
+describe("hierarchy parse", () => {
+  test("summarizes levels and orphans", () => {
+    const rows = parseHierarchyList(loadFixture("hierarchy.json"));
+    const summary = summarizeHierarchy(rows);
+    expect(summary).toMatchObject({
+      agentCount: 3,
+      maxLevel: 2,
+      roots: 1,
+      orphans: 1,
+    });
+  });
+});
+
+describe("session refresh window", () => {
+  test("reuses a fresh session and refreshes an old one", async () => {
+    const fresh: F402Session = {
+      ...session,
+      obtainedAtIso: "2026-11-14T19:50:00.000Z",
+      expiresAtIso: "2026-11-15T00:00:00.000Z",
+    };
+    const refreshed: F402Session = {
+      ...session,
+      obtainedAtIso: "2026-11-14T20:00:00.000Z",
+      authorizationHeader: "Bearer " + "b".repeat(32),
+    };
+    let refreshes = 0;
+    const provider: SessionProvider = {
+      read: () => fresh,
+      ensure: async () => fresh,
+      refresh: async () => {
+        refreshes += 1;
+        return refreshed;
+      },
+    };
+    const kept = await resolvePullSession({
+      provider,
+      now: Date.parse("2026-11-14T19:55:00.000Z"),
+      refreshAfterMs: 15 * 60_000,
+    });
+    expect(kept.authorizationHeader).toBe(fresh.authorizationHeader);
+    expect(refreshes).toBe(0);
+
+    const stale: F402Session = {
+      ...fresh,
+      obtainedAtIso: "2026-11-14T19:00:00.000Z",
+    };
+    const staleProvider: SessionProvider = {
+      read: () => stale,
+      ensure: async () => stale,
+      refresh: async () => {
+        refreshes += 1;
+        return refreshed;
+      },
+    };
+    const next = await resolvePullSession({
+      provider: staleProvider,
+      now: Date.parse("2026-11-14T19:20:00.000Z"),
+      refreshAfterMs: 15 * 60_000,
+    });
+    expect(next.authorizationHeader).toBe(refreshed.authorizationHeader);
+    expect(refreshes).toBe(1);
+  });
+});
+
+describe("date helpers", () => {
+  test("enumerates inclusive UTC days and default start is ISO", () => {
+    expect(eachUtcDateInclusive("2026-11-01", "2026-11-03")).toEqual([
+      "2026-11-01",
+      "2026-11-02",
+      "2026-11-03",
+    ]);
+    expect(defaultTransactionStartDate(new Date("2026-11-14T00:00:00Z"))).toBe(
+      "2026-10-15",
+    );
+    expect(() => eachUtcDateInclusive("2026-11-03", "2026-11-01")).toThrow(
+      F402PullerError,
+    );
+  });
+});
+
+describe("checkpoint file helpers", () => {
+  test("save and load", () => {
+    const outDir = tempOut();
+    try {
+      const checkpoint = emptyCheckpoint("ROOT1", "2026-11-14T00:00:00.000Z");
+      saveCheckpoint(outDir, {
+        ...checkpoint,
+        customerIds: ["CUST1"],
+        completedCustomers: ["CUST1"],
+      });
+      expect(loadCheckpoint(outDir)?.completedCustomers).toEqual(["CUST1"]);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("wagers phase", () => {
+  test("getGraded dates are MM-DD-YYYY and figure-date posts to Report", async () => {
+    expect(formatGradedDate("2026-11-01")).toBe("11-01-2026");
+    const urls: string[] = [];
+    const forms: string[] = [];
+    const client = new F402PullClient({
+      session,
+      intervalMs: 0,
+      fetchImpl: async (url, init) => {
+        urls.push(url);
+        forms.push(String(init?.body ?? ""));
+        return new Response(JSON.stringify({ LIST: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+    const outDir = tempOut();
+    saveCheckpoint(
+      outDir,
+      emptyCheckpoint("ROOT1", "2026-11-14T00:00:00.000Z"),
+    );
+    const prior = loadCheckpoint(outDir);
+    saveCheckpoint(outDir, {
+      ...prior!,
+      customerIds: ["CUST1"],
+    });
+    const result = await runWagers(
+      {
+        client,
+        outDir,
+        agentId: "ROOT1",
+        agentOwner: "ROOT1",
+        agentType: "M",
+      },
+      { from: "2026-11-01", to: "2026-11-01", resume: false },
+    );
+    expect(result.gradedCompleted).toBe(1);
+    expect(result.figureDateCompleted).toBe(1);
+    expect(urls.some((u) => u.endsWith("/cloud/api/Manager/getPending"))).toBe(
+      true,
+    );
+    expect(
+      urls.some((u) => u.endsWith("/cloud/api/Manager/getBetTicker")),
+    ).toBe(true);
+    expect(urls.some((u) => u.endsWith("/cloud/api/Manager/getGraded"))).toBe(
+      true,
+    );
+    expect(
+      urls.some((u) => u.endsWith("/cloud/api/Report/getWagersByFigureDate")),
+    ).toBe(true);
+    expect(forms.some((body) => body.includes("startDate=11-01-2026"))).toBe(
+      true,
+    );
+    expect(forms.some((body) => body.includes("endDate=11-01-2026"))).toBe(
+      true,
+    );
+  });
+
+  test("wagers resume skips completed pending, ticker, and graded days", async () => {
+    const urls: string[] = [];
+    const client = new F402PullClient({
+      session,
+      intervalMs: 0,
+      fetchImpl: async (url) => {
+        urls.push(url);
+        return new Response(JSON.stringify({ LIST: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+    const outDir = tempOut();
+    const base = emptyCheckpoint("ROOT1", "2026-11-14T00:00:00.000Z");
+    saveCheckpoint(outDir, {
+      ...base,
+      customerIds: ["CUST1"],
+      wagersPendingDone: true,
+      wagersTickerDone: true,
+      completedGradedDates: ["2026-11-01"],
+      completedFigureDateKeys: ["CUST1|2026-11-01"],
+    });
+    const result = await runWagers(
+      {
+        client,
+        outDir,
+        agentId: "ROOT1",
+        agentOwner: "ROOT1",
+        agentType: "M",
+      },
+      { from: "2026-11-01", to: "2026-11-01", resume: true },
+    );
+    expect(result.gradedSkipped).toBe(1);
+    expect(result.figureDateSkipped).toBe(1);
+    expect(urls).toEqual([]);
+  });
+});
+
+describe("base URL", () => {
+  function configError(fn: () => unknown): F402PullerError {
+    let caught: unknown;
+    try {
+      fn();
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(F402PullerError);
+    const error = caught as F402PullerError;
+    expect(error.code).toBe("config");
+    expect(error.operation).toBe("base-url");
+    return error;
+  }
+
+  test("defaults to the host sessions are minted on", () => {
+    expect(F402_PULL_DEFAULT_BASE_URL).toBe("https://www.fantasy402.com");
+    expect(F402_PULL_BASE_URL_ENV).toBe("F402_BASE_URL");
+    expect(resolvePullBaseUrl(undefined, {})).toBe(F402_PULL_DEFAULT_BASE_URL);
+    expect(resolvePullBaseUrl("  ", { F402_BASE_URL: " " })).toBe(
+      F402_PULL_DEFAULT_BASE_URL,
+    );
+  });
+
+  test("the env overrides the default and the flag overrides the env", () => {
+    const env = { F402_BASE_URL: "https://portal.example.test/" };
+    expect(resolvePullBaseUrl(undefined, env)).toBe(
+      "https://portal.example.test",
+    );
+    expect(resolvePullBaseUrl("https://flag.example.test:8443", env)).toBe(
+      "https://flag.example.test:8443",
+    );
+  });
+
+  test("accepts only a bare https origin", () => {
+    expect(normalizePullBaseUrl("https://WWW.Fantasy402.com/")).toBe(
+      "https://www.fantasy402.com",
+    );
+    expect(
+      configError(() => normalizePullBaseUrl("http://www.fantasy402.com"))
+        .message,
+    ).toContain("https:");
+    configError(() => normalizePullBaseUrl("www.fantasy402.com"));
+    configError(() => normalizePullBaseUrl(""));
+    const withUser = new URL(F402_PULL_DEFAULT_BASE_URL);
+    withUser.username = "user";
+    configError(() => normalizePullBaseUrl(withUser.href));
+    withUser.password = "pw";
+    configError(() => normalizePullBaseUrl(withUser.href));
+    configError(() => normalizePullBaseUrl("https://www.fantasy402.com/cloud"));
+    configError(() => normalizePullBaseUrl("https://www.fantasy402.com/?a=1"));
+    configError(() => normalizePullBaseUrl("https://www.fantasy402.com/#x"));
+    configError(() =>
+      resolvePullBaseUrl(undefined, { F402_BASE_URL: "http://x.test" }),
+    );
+  });
+
+  test("the client refuses a non-https base before any request", () => {
+    const calls: string[] = [];
+    configError(
+      () =>
+        new F402PullClient({
+          session,
+          baseUrl: "http://127.0.0.1:1",
+          intervalMs: 0,
+          fetchImpl: async (url) => {
+            calls.push(url);
+            return Response.json({});
+          },
+        }),
+    );
+    expect(calls).toEqual([]);
+  });
+
+  test("the client posts to the default host when no base is given", async () => {
+    const calls: string[] = [];
+    const client = new F402PullClient({
+      session,
+      intervalMs: 0,
+      fetchImpl: async (url) => {
+        calls.push(url);
+        return Response.json({ LIST: [] });
+      },
+    });
+    await client.post("getPlayers", {});
+    expect(calls[0]).toBe(
+      "https://www.fantasy402.com/cloud/api/Manager/getPlayers",
+    );
+  });
+});
