@@ -659,7 +659,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:tests/bun_builtin_replacements.test.ts",
       "test:tests/bun_formats_and_utilities.test.ts",
       "test:tests/bun_radix_literal_rounding.test.ts",
-      "test:tests/react_version_pairing.test.ts",
+      "test:tests/language_coverage.test.ts",
     ],
   },
   {
@@ -707,6 +707,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "surface:Transpiler",
       "test:tests/nsh_desk_contract.test.ts",
       "test:tests/status_page.test.ts",
+      "test:workers/ppm-live-ticks/tests/ppm_live_ticks_worker.test.ts",
     ],
   },
   {
@@ -1868,7 +1869,6 @@ export const BUN_WEB_GLOBAL_SHAPES: readonly BunWebGlobalShape[] = [
     category: "crypto",
     topic: "WebCrypto",
     expectedTypeof: "function",
-    status: "declared-only",
     note: "WebCrypto subtle operations (`SubtleCrypto.supports`).",
   },
   {
@@ -1960,7 +1960,6 @@ export const BUN_WEB_GLOBAL_SHAPES: readonly BunWebGlobalShape[] = [
     category: "events",
     topic: "DOM-free events",
     expectedTypeof: "function",
-    status: "declared-only",
     note: "WebSocket close event.",
   },
   {

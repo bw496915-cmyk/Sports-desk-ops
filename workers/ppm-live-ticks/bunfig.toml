@@ -1,0 +1,2 @@
+# Keep ambient dotenv disabled per SportsDesk Ops hygiene rules.
+env = false

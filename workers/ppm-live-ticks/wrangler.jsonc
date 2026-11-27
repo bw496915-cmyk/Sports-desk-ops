@@ -1,0 +1,75 @@
+/**
+ * Centralized Partner 118 GSLive (`ppm-live-ticks`) Cloudflare Worker + SQLite Durable Object.
+ *
+ * - Anonymous Pandora Socket.IO stream (`partnerId: "118"`, `flavor: "live"`) — ZERO manager creds.
+ * - SQLite Durable Object (`PpmLiveTicksCollectorDO`, `use_sqlite: true`) stores `(event_id, ts_ms)`.
+ * - Content-addressed R2 NDJSON chunks (`If-None-Match: *`) + strong-ETag CAS manifest flush.
+ * - Served exclusively via Custom Domain `ticks.bookdeskops.com` (`workers_dev: false`).
+ *
+ * Provision bearer token via: `wrangler secret put TICKS_API_TOKEN`
+ */
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/configuration/schema.json",
+  "name": "ppm-live-ticks",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "ticks.bookdeskops.com",
+      "custom_domain": true,
+    },
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.05,
+      "persist": true,
+    },
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PPM_TICKS_COLLECTOR",
+        "class_name": "PpmLiveTicksCollectorDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PpmLiveTicksCollectorDO"],
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "REPORTS_BUCKET",
+      "bucket_name": "sportsdesk-ops-reports",
+    },
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
+  "vars": {
+    "OFFICE": "buckeye",
+    "SUPPLIER": "ganchrow",
+    "PARTNER_ID": "118",
+    "ENDPOINT": "ppm-live-ticks",
+    "PROVENANCE": "live_api",
+    "PPM_FEED_URL": "wss://pandora.ganchrow.com/socket.io/?EIO=4&transport=websocket",
+    "PPM_LINE_SET": "U0VWU1NWUkJSMFU9",
+    "MAX_SUBSCRIBED_EVENTS": "120",
+    "RETENTION_HOURS": "24",
+    "FLUSH_INTERVAL_SEC": "60",
+  },
+}
