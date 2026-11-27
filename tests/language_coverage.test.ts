@@ -20,6 +20,7 @@ const COVERAGE: Readonly<Record<string, string>> = {
   mjs: "bun fmt + bun lint + bun check + tests",
   cjs: "bun fmt + bun lint + bun check + tests",
   json: "bun fmt + schema/docs gates + JSON5.parse",
+  jsonc: "bun fmt + Bun.JSONC.parse",
   json5: "Bun.JSON5.parse",
   jsonl: "Bun.JSONL.parseChunk",
   md: "bun fmt + test:docs + verify:docs",
@@ -167,8 +168,15 @@ describe("language coverage", () => {
     expect(failures).toEqual([]);
   });
 
-  test("JSON5, JSONL, XML/SVG, YAML and TOML files parse", async () => {
+  test("JSONC, JSON5, JSONL, XML/SVG, YAML and TOML files parse", async () => {
     const failures: string[] = [];
+    for (const path of filesWith("jsonc")) {
+      try {
+        Bun.JSONC.parse(await Bun.file(join(ROOT, path)).text());
+      } catch (error) {
+        failures.push(`${path}: ${String(error)}`);
+      }
+    }
     for (const path of filesWith("json5")) {
       try {
         Bun.JSON5.parse(await Bun.file(join(ROOT, path)).text());
