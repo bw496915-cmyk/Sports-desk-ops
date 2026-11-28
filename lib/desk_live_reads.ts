@@ -57,6 +57,46 @@ import {
   type LivePersistState,
 } from "./live_provenance.ts";
 import { freshness, STALE_AFTER_SECONDS, type KpiInput } from "./desk_kpis.ts";
+import { createStateMachine, defineStateGraph } from "./state_machine.ts";
+
+export const LIVE_FEED_CACHE_STATES = [
+  "cold",
+  "fetching",
+  "fresh",
+  "degraded",
+] as const;
+export type LiveFeedCacheStateKind = (typeof LIVE_FEED_CACHE_STATES)[number];
+
+export const LIVE_FEED_CACHE_GRAPH = defineStateGraph(
+  "DeskLiveFeedCache",
+  LIVE_FEED_CACHE_STATES,
+  {
+    cold: ["fetching"],
+    fetching: ["fetching", "fresh", "degraded"],
+    fresh: ["fetching"],
+    degraded: ["fetching"],
+  },
+);
+
+export const LIVE_REFRESH_LOOP_STATES = [
+  "disabled",
+  "idle",
+  "in_flight",
+  "stopped",
+] as const;
+export type LiveRefreshLoopStateKind =
+  (typeof LIVE_REFRESH_LOOP_STATES)[number];
+
+export const LIVE_REFRESH_LOOP_GRAPH = defineStateGraph(
+  "DeskLiveRefreshLoop",
+  LIVE_REFRESH_LOOP_STATES,
+  {
+    disabled: ["idle"],
+    idle: ["in_flight", "stopped"],
+    in_flight: ["idle", "stopped"],
+    stopped: ["idle"],
+  },
+);
 
 export type LiveSourceMode = "auto" | "live" | "file";
 
@@ -398,23 +438,71 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
   const persistRootKind: "repo" | "custom" =
     resolve(persistRoot) === resolve(options.repoRoot) ? "repo" : "custom";
 
-  let tickerCache: TickerCacheEntry | null = null;
-  let tickerCacheAt = 0;
-  let pendingCache: PendingCacheEntry | null = null;
-  let pendingCacheAt = 0;
   let tickerRowsForScope: readonly Record<string, unknown>[] = [];
-
   let persistTickerState: LivePersistState | null = null;
   let persistPendingState: LivePersistState | null = null;
 
-  let statusTicker: LiveTickerStatusBody | null = null;
-  let statusPending: LivePendingStatusBody | null = null;
+  type FeedCacheSnapshot<Entry> =
+    | { readonly kind: "cold" }
+    | {
+        readonly kind: "fetching";
+        readonly flight: Promise<Entry>;
+        readonly previous: {
+          readonly entry: Entry;
+          readonly atMs: number;
+        } | null;
+      }
+    | {
+        readonly kind: "fresh";
+        readonly entry: Entry;
+        readonly atMs: number;
+      }
+    | {
+        readonly kind: "degraded";
+        readonly entry: Entry;
+        readonly atMs: number;
+      };
 
-  let refreshTicks = 0;
-  let refreshLastAt: string | null = null;
-  let refreshLastOk: boolean | null = null;
-  let refreshLastError: string | null = null;
-  let refreshTimer: ReturnType<typeof setInterval> | null = null;
+  const tickerCacheMachine = createStateMachine<
+    FeedCacheSnapshot<TickerCacheEntry>
+  >({
+    graph: LIVE_FEED_CACHE_GRAPH,
+    initial: { kind: "cold" },
+  });
+  const pendingCacheMachine = createStateMachine<
+    FeedCacheSnapshot<PendingCacheEntry>
+  >({
+    graph: LIVE_FEED_CACHE_GRAPH,
+    initial: { kind: "cold" },
+  });
+
+  function latestFeedStatus<Entry extends { readonly status: unknown }>(
+    snap: FeedCacheSnapshot<Entry>,
+  ): Entry["status"] | null {
+    switch (snap.kind) {
+      case "cold":
+        return null;
+      case "fetching":
+        return snap.previous?.entry.status ?? null;
+      case "fresh":
+      case "degraded":
+        return snap.entry.status;
+    }
+  }
+
+  function cachedFeedRecord<Entry>(
+    snap: FeedCacheSnapshot<Entry>,
+  ): { readonly entry: Entry; readonly atMs: number } | null {
+    switch (snap.kind) {
+      case "cold":
+        return null;
+      case "fetching":
+        return snap.previous;
+      case "fresh":
+      case "degraded":
+        return { entry: snap.entry, atMs: snap.atMs };
+    }
+  }
 
   const refreshEnv: Readonly<Record<string, string | undefined>> = {
     ...Bun.env,
@@ -459,6 +547,38 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
   }
 
   const refreshIntervalMs = loopIntervalMs();
+
+  interface RefreshStats {
+    readonly ticks: number;
+    readonly lastAt: string | null;
+    readonly lastOk: boolean | null;
+    readonly lastError: string | null;
+  }
+
+  type RefreshLoopSnapshot =
+    | { readonly kind: "disabled"; readonly stats: RefreshStats }
+    | {
+        readonly kind: "idle";
+        readonly timer: ReturnType<typeof setInterval>;
+        readonly stats: RefreshStats;
+      }
+    | {
+        readonly kind: "in_flight";
+        readonly timer: ReturnType<typeof setInterval>;
+        readonly stats: RefreshStats;
+      }
+    | { readonly kind: "stopped"; readonly stats: RefreshStats };
+
+  const initialStats: RefreshStats = {
+    ticks: 0,
+    lastAt: null,
+    lastOk: null,
+    lastError: null,
+  };
+  const refreshMachine = createStateMachine<RefreshLoopSnapshot>({
+    graph: LIVE_REFRESH_LOOP_GRAPH,
+    initial: { kind: "disabled", stats: initialStats },
+  });
 
   function cacheFresh(at: number, ttlMs: number, nowMs: number): boolean {
     return ttlMs > 0 && nowMs - at < ttlMs;
@@ -577,62 +697,96 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
     mode: LiveSourceMode,
     force: boolean,
   ): Promise<TickerCacheEntry> {
-    const nowMs = tickerNow().getTime();
-    if (
-      !force &&
-      tickerCache !== null &&
-      cacheFresh(tickerCacheAt, tickerTtlMs, nowMs)
-    ) {
+    // Explicit `file` mode or disabled gate never poisons the live cache state machine.
+    if (!tickerGateOn || mode === "file") {
       return {
-        ...tickerCache,
-        status: { ...tickerCache.status, mode, servedFromCache: true },
+        status: disabledTickerStatus(mode, tickerTtlMs),
+        artifact: null,
+        rawPayload: null,
       };
     }
 
-    if (!tickerGateOn || mode === "file") {
-      const status = disabledTickerStatus(mode, tickerTtlMs);
-      const entry = { status, artifact: null, rawPayload: null };
-      tickerCache = entry;
-      tickerCacheAt = nowMs;
+    const nowMs = tickerNow().getTime();
+    const snap = tickerCacheMachine.state;
+    const existing = cachedFeedRecord(snap);
+    if (
+      !force &&
+      existing !== null &&
+      cacheFresh(existing.atMs, tickerTtlMs, nowMs)
+    ) {
+      return {
+        ...existing.entry,
+        status: { ...existing.entry.status, mode, servedFromCache: true },
+      };
+    }
+
+    if (!force && snap.kind === "fetching") {
+      const joined = await snap.flight;
+      return {
+        ...joined,
+        status: { ...joined.status, mode },
+      };
+    }
+
+    let flight!: Promise<TickerCacheEntry>;
+    flight = (async (): Promise<TickerCacheEntry> => {
+      const startedMs = tickerNow().getTime();
+      const result = await fetchLiveBetTicker({
+        ...(tickerOpt.fetch === undefined
+          ? {}
+          : { fetchImpl: tickerOpt.fetch }),
+        ...(tickerOpt.session === undefined
+          ? {}
+          : { session: tickerOpt.session }),
+        ...(tickerOpt.agentId === undefined
+          ? {}
+          : { agentId: tickerOpt.agentId }),
+        timeoutMs: tickerTimeoutMs,
+        now: tickerNow(),
+        env: tickerEnv,
+      });
+
+      const status = tickerStatusFromFetch(mode, false, result);
+      let artifact: WagerListArtifact | null = null;
+      let rawPayload: unknown = null;
+
+      if (result.ok) {
+        rawPayload = { LIST: result.rows };
+        tickerRowsForScope = result.rows;
+        artifact = readWagerListArtifact(
+          liveTickerFile(rawPayload, result.observedAt),
+        );
+        await persistTicker(
+          rawPayload,
+          result.observedAt,
+          result.transport,
+          result.rows.length,
+          false,
+        );
+      }
+
+      const entry: TickerCacheEntry = { status, artifact, rawPayload };
+      if (
+        tickerCacheMachine.state.kind === "fetching" &&
+        tickerCacheMachine.state.flight === flight
+      ) {
+        tickerCacheMachine.transition(
+          {
+            kind: result.ok ? "fresh" : "degraded",
+            entry,
+            atMs: startedMs,
+          },
+          result.ok ? "ticker_ok" : "ticker_failed",
+        );
+      }
       return entry;
-    }
+    })();
 
-    const result = await fetchLiveBetTicker({
-      ...(tickerOpt.fetch === undefined ? {} : { fetchImpl: tickerOpt.fetch }),
-      ...(tickerOpt.session === undefined
-        ? {}
-        : { session: tickerOpt.session }),
-      ...(tickerOpt.agentId === undefined
-        ? {}
-        : { agentId: tickerOpt.agentId }),
-      timeoutMs: tickerTimeoutMs,
-      now: tickerNow(),
-      env: tickerEnv,
-    });
-
-    const status = tickerStatusFromFetch(mode, false, result);
-    let artifact: WagerListArtifact | null = null;
-    let rawPayload: unknown = null;
-
-    if (result.ok) {
-      rawPayload = { LIST: result.rows };
-      tickerRowsForScope = result.rows;
-      artifact = readWagerListArtifact(
-        liveTickerFile(rawPayload, result.observedAt),
-      );
-      await persistTicker(
-        rawPayload,
-        result.observedAt,
-        result.transport,
-        result.rows.length,
-        false,
-      );
-    }
-
-    const entry: TickerCacheEntry = { status, artifact, rawPayload };
-    tickerCache = entry;
-    tickerCacheAt = nowMs;
-    return entry;
+    tickerCacheMachine.transition(
+      { kind: "fetching", flight, previous: existing },
+      "ticker_fetch",
+    );
+    return flight;
   }
 
   async function resolvePendingCustomers(): Promise<{
@@ -657,64 +811,95 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
     mode: LiveSourceMode,
     force: boolean,
   ): Promise<PendingCacheEntry> {
-    const nowMs = pendingNow().getTime();
-    if (
-      !force &&
-      pendingCache !== null &&
-      cacheFresh(pendingCacheAt, pendingTtlMs, nowMs)
-    ) {
+    // Explicit `file` mode or disabled gate never poisons the live cache state machine.
+    if (!pendingGateOn || mode === "file") {
       return {
-        ...pendingCache,
-        status: { ...pendingCache.status, mode, servedFromCache: true },
+        status: disabledPendingStatus(mode, pendingTtlMs),
+        artifact: null,
       };
     }
 
-    if (!pendingGateOn || mode === "file") {
-      const status = disabledPendingStatus(mode, pendingTtlMs);
-      const entry = { status, artifact: null };
-      pendingCache = entry;
-      pendingCacheAt = nowMs;
-      return entry;
-    }
-
+    const nowMs = pendingNow().getTime();
+    const snap = pendingCacheMachine.state;
+    const existing = cachedFeedRecord(snap);
     if (
-      pendingOpt.customers === undefined &&
-      parseCustomers(pendingEnv).length === 0 &&
-      tickerGateOn &&
-      tickerRowsForScope.length === 0
+      !force &&
+      existing !== null &&
+      cacheFresh(existing.atMs, pendingTtlMs, nowMs)
     ) {
-      await readTickerLive("auto", false);
+      return {
+        ...existing.entry,
+        status: { ...existing.entry.status, mode, servedFromCache: true },
+      };
     }
 
-    const scope = await resolvePendingCustomers();
-    const result = await fetchLivePending({
-      customers: scope.customers,
-      ...(pendingOpt.fetch === undefined
-        ? {}
-        : { fetchImpl: pendingOpt.fetch }),
-      ...(pendingOpt.session === undefined
-        ? {}
-        : { session: pendingOpt.session }),
-      maxCustomers: pendingMaxCustomers,
-      timeoutMs: pendingTimeoutMs,
-      now: pendingNow(),
-      env: pendingEnv,
-    });
+    if (!force && snap.kind === "fetching") {
+      const joined = await snap.flight;
+      return {
+        ...joined,
+        status: { ...joined.status, mode },
+      };
+    }
 
-    const status = pendingStatusFromFetch(mode, false, result, scope.source);
-    let artifact: LiveBetsArtifact | null = null;
-    if (result.ok) {
-      artifact = livePendingArtifact(result.rows, {
-        operation: REPORT_PENDING_OPERATION,
-        capturedAt: result.observedAt,
+    let flight!: Promise<PendingCacheEntry>;
+    flight = (async (): Promise<PendingCacheEntry> => {
+      if (
+        pendingOpt.customers === undefined &&
+        parseCustomers(pendingEnv).length === 0 &&
+        tickerGateOn &&
+        tickerRowsForScope.length === 0
+      ) {
+        await readTickerLive("auto", false);
+      }
+
+      const startedMs = pendingNow().getTime();
+      const scope = await resolvePendingCustomers();
+      const result = await fetchLivePending({
+        customers: scope.customers,
+        ...(pendingOpt.fetch === undefined
+          ? {}
+          : { fetchImpl: pendingOpt.fetch }),
+        ...(pendingOpt.session === undefined
+          ? {}
+          : { session: pendingOpt.session }),
+        maxCustomers: pendingMaxCustomers,
+        timeoutMs: pendingTimeoutMs,
+        now: pendingNow(),
+        env: pendingEnv,
       });
-      await persistPending(artifact, result.transport, false);
-    }
 
-    const entry: PendingCacheEntry = { status, artifact };
-    pendingCache = entry;
-    pendingCacheAt = nowMs;
-    return entry;
+      const status = pendingStatusFromFetch(mode, false, result, scope.source);
+      let artifact: LiveBetsArtifact | null = null;
+      if (result.ok) {
+        artifact = livePendingArtifact(result.rows, {
+          operation: REPORT_PENDING_OPERATION,
+          capturedAt: result.observedAt,
+        });
+        await persistPending(artifact, result.transport, false);
+      }
+
+      const entry: PendingCacheEntry = { status, artifact };
+      if (
+        pendingCacheMachine.state.kind === "fetching" &&
+        pendingCacheMachine.state.flight === flight
+      ) {
+        pendingCacheMachine.transition(
+          {
+            kind: result.ok ? "fresh" : "degraded",
+            entry,
+            atMs: startedMs,
+          },
+          result.ok ? "pending_ok" : "pending_failed",
+        );
+      }
+      return entry;
+    })();
+
+    pendingCacheMachine.transition(
+      { kind: "fetching", flight, previous: existing },
+      "pending_fetch",
+    );
+    return flight;
   }
 
   async function loadFileWagers(): Promise<{
@@ -733,16 +918,36 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
 
   async function refreshTick(): Promise<void> {
     if (!tickerGateOn && !pendingGateOn) return;
-    refreshTicks += 1;
-    refreshLastAt = pendingNow().toISOString();
-    refreshLastError = null;
+    const snap = refreshMachine.state;
+    // Skip overlapping ticks (`in_flight`) and refuse to run when `disabled` or `stopped`.
+    if (snap.kind !== "idle") return;
+
+    const tickStartedIso = pendingNow().toISOString();
+    const nextTicks = snap.stats.ticks + 1;
+    refreshMachine.transition(
+      {
+        kind: "in_flight",
+        timer: snap.timer,
+        stats: {
+          ticks: nextTicks,
+          lastAt: tickStartedIso,
+          lastOk: snap.stats.lastOk,
+          lastError: null,
+        },
+      },
+      "tick_start",
+    );
+    const tickGen = refreshMachine.generation;
+
+    let lastOk = false;
+    let lastError: string | null = null;
     try {
       const ticker = await readTickerLive("auto", true);
-      statusTicker = ticker.status;
+      if (!refreshMachine.isCurrent(tickGen)) return;
       const pending = await readPendingLive("auto", true);
-      statusPending = pending.status;
-      refreshLastOk = ticker.status.ok && pending.status.ok;
-      if (!refreshLastOk) {
+      if (!refreshMachine.isCurrent(tickGen)) return;
+      lastOk = ticker.status.ok && pending.status.ok;
+      if (!lastOk) {
         const parts: string[] = [];
         if (!ticker.status.ok && ticker.status.diagnostic?.code) {
           parts.push(ticker.status.diagnostic.code);
@@ -750,47 +955,87 @@ export function createDeskLiveReads(options: DeskLiveReadsOptions) {
         if (!pending.status.ok && pending.status.diagnostic?.code) {
           parts.push(pending.status.diagnostic.code);
         }
-        refreshLastError = parts.join("; ") || "live read failed";
+        lastError = parts.join("; ") || "live read failed";
       }
     } catch (error) {
-      refreshLastOk = false;
-      refreshLastError = error instanceof Error ? error.message : String(error);
+      lastOk = false;
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+
+    const after = refreshMachine.state;
+    if (refreshMachine.isCurrent(tickGen) && after.kind === "in_flight") {
+      refreshMachine.transition(
+        {
+          kind: "idle",
+          timer: after.timer,
+          stats: {
+            ticks: nextTicks,
+            lastAt: tickStartedIso,
+            lastOk,
+            lastError,
+          },
+        },
+        "tick_settled",
+      );
     }
   }
 
   function startRefreshLoop(): (() => void) | null {
-    if (!refreshEnabled() || refreshTimer !== null) return null;
+    const snap = refreshMachine.state;
+    if (
+      !refreshEnabled() ||
+      (snap.kind !== "disabled" && snap.kind !== "stopped")
+    ) {
+      return null;
+    }
     const jitter =
       options.liveRefresh?.jitterMs === undefined
         ? 0
         : Math.max(0, options.liveRefresh.jitterMs);
     const intervalMs = Math.max(1, refreshIntervalMs + jitter);
-    const stop = (): void => {
-      if (refreshTimer !== null) {
-        clearInterval(refreshTimer);
-        refreshTimer = null;
-      }
-    };
-    refreshTimer = setInterval(() => {
+    const timer = setInterval(() => {
       void refreshTick();
     }, intervalMs);
+    refreshMachine.transition(
+      { kind: "idle", timer, stats: snap.stats },
+      "loop_start",
+    );
+    const stop = (): void => {
+      const current = refreshMachine.state;
+      if (current.kind === "idle" || current.kind === "in_flight") {
+        clearInterval(current.timer);
+        refreshMachine.transition(
+          { kind: "stopped", stats: current.stats },
+          "loop_stop",
+        );
+      }
+    };
     options.liveRefresh?.onStarted?.(stop);
     return stop;
   }
 
   function statusBlock(options?: { exposeReads?: boolean }): LiveStatusBlock {
+    const stats = refreshMachine.state.stats;
     const expose =
-      options?.exposeReads === true || (refreshEnabled() && refreshTicks > 0);
+      options?.exposeReads === true || (refreshEnabled() && stats.ticks > 0);
+    const tickerStatus = expose
+      ? (latestFeedStatus(tickerCacheMachine.state) ??
+        (!tickerGateOn ? disabledTickerStatus("auto", tickerTtlMs) : null))
+      : null;
+    const pendingStatus = expose
+      ? (latestFeedStatus(pendingCacheMachine.state) ??
+        (!pendingGateOn ? disabledPendingStatus("auto", pendingTtlMs) : null))
+      : null;
     return {
-      ticker: expose ? statusTicker : null,
-      pending: expose ? statusPending : null,
+      ticker: tickerStatus,
+      pending: pendingStatus,
       refresh: {
         enabled: refreshEnabled(),
         intervalMs: statusRefreshIntervalMs,
-        ticks: refreshTicks,
-        lastTickAt: refreshLastAt,
-        lastTickOk: refreshLastOk,
-        lastError: refreshLastError,
+        ticks: stats.ticks,
+        lastTickAt: stats.lastAt,
+        lastTickOk: stats.lastOk,
+        lastError: stats.lastError,
       },
       persistence: {
         enabled: persistGateOn,

@@ -93,9 +93,47 @@ export function buildAuthenticateCustomerBody(
   };
 }
 
+import { createStateMachine, defineStateGraph } from "./state_machine.ts";
+
+export const F402_TOKEN_MANAGER_STATES = [
+  "idle",
+  "scheduled",
+  "reminting",
+  "disposed",
+] as const;
+export type F402TokenManagerStateKind =
+  (typeof F402_TOKEN_MANAGER_STATES)[number];
+
+export const F402_TOKEN_MANAGER_GRAPH = defineStateGraph(
+  "F402TokenManager",
+  F402_TOKEN_MANAGER_STATES,
+  {
+    idle: ["scheduled", "reminting", "disposed"],
+    scheduled: ["idle", "scheduled", "reminting", "disposed"],
+    reminting: ["reminting", "idle", "scheduled", "disposed"],
+    disposed: [],
+  },
+);
+
+type TokenManagerSnapshot =
+  | { readonly kind: "idle" }
+  | {
+      readonly kind: "scheduled";
+      readonly timer: ReturnType<typeof setTimeout>;
+      readonly dueAtMs: number;
+    }
+  | {
+      readonly kind: "reminting";
+      readonly flight: Promise<string>;
+      readonly autoSchedule: boolean;
+    }
+  | { readonly kind: "disposed" };
+
 export class F402TokenManager {
-  private inflight: Promise<string> | null = null;
-  private timer: ReturnType<typeof setTimeout> | undefined;
+  private readonly machine = createStateMachine<TokenManagerSnapshot>({
+    graph: F402_TOKEN_MANAGER_GRAPH,
+    initial: { kind: "idle" },
+  });
   readonly metrics: F402AuthMetrics = {
     mints: 0,
     failures: 0,
@@ -104,7 +142,27 @@ export class F402TokenManager {
 
   constructor(private readonly deps: F402TokenManagerDeps) {}
 
+  get state(): F402TokenManagerStateKind {
+    return this.machine.kind;
+  }
+
+  private clearActiveTimer(): void {
+    const snap = this.machine.state;
+    if (snap.kind === "scheduled") {
+      (this.deps.clearSchedule ?? clearTimeout)(snap.timer);
+    }
+  }
+
+  dispose(): void {
+    if (this.machine.kind === "disposed") return;
+    this.clearActiveTimer();
+    this.machine.transition({ kind: "disposed" }, "dispose");
+  }
+
   async get(force = false): Promise<string> {
+    if (this.machine.kind === "disposed") {
+      throw new Error("F402TokenManager is disposed");
+    }
     const tok = this.deps.storage.getItem("token");
     const exp =
       tok !== null && tok !== "" && tok !== "0" ? decodeJwtExp(tok) : null;
@@ -114,28 +172,68 @@ export class F402TokenManager {
   }
 
   remint(): Promise<string> {
-    this.inflight ??= this._remint().finally(() => {
-      this.inflight = null;
+    const snap = this.machine.state;
+    if (snap.kind === "disposed") {
+      return Promise.reject(new Error("F402TokenManager is disposed"));
+    }
+    if (snap.kind === "reminting") {
+      return snap.flight;
+    }
+    this.clearActiveTimer();
+    let flight!: Promise<string>;
+    flight = this._remint(() => flight).catch((error: unknown) => {
+      if (
+        this.machine.state.kind === "reminting" &&
+        this.machine.state.flight === flight
+      ) {
+        this.machine.transition({ kind: "idle" }, "remint_failed");
+      }
+      throw error;
     });
-    return this.inflight;
+    this.machine.transition(
+      { kind: "reminting", flight, autoSchedule: true },
+      "remint_start",
+    );
+    return flight;
   }
 
   schedule(token: string | null): void {
-    if (this.timer !== undefined) {
-      (this.deps.clearSchedule ?? clearTimeout)(this.timer);
-      this.timer = undefined;
+    const snap = this.machine.state;
+    if (snap.kind === "disposed") return;
+    this.clearActiveTimer();
+
+    if (token === null || token === "" || token === "0") {
+      if (snap.kind === "reminting") {
+        // Suppress post-remint timer re-arm when caller explicitly cleared scheduling mid-flight.
+        this.machine.transition(
+          { kind: "reminting", flight: snap.flight, autoSchedule: false },
+          "schedule_cleared",
+        );
+      } else if (snap.kind === "scheduled") {
+        this.machine.transition({ kind: "idle" }, "schedule_cleared");
+      }
+      return;
     }
-    if (token === null || token === "" || token === "0") return;
     const exp = decodeJwtExp(token);
-    if (exp === null) return;
+    if (exp === null) {
+      if (snap.kind === "scheduled") {
+        this.machine.transition({ kind: "idle" }, "unparseable_exp");
+      }
+      return;
+    }
+    const now = this.now();
     const delay = Math.max(
       F402_MIN_SCHEDULE_DELAY_MS,
-      exp - this.now() - F402_REMINT_MARGIN_MS,
+      exp - now - F402_REMINT_MARGIN_MS,
     );
     const schedule = this.deps.schedule ?? ((fn, ms) => setTimeout(fn, ms));
-    this.timer = schedule(() => {
+    const timer = schedule(() => {
       void this.remint().catch((error) => this.deps.onRemintError?.(error));
     }, delay);
+    this.machine.transition(
+      { kind: "scheduled", timer, dueAtMs: now + delay },
+      "schedule_armed",
+    );
   }
 
   private now(): number {
@@ -161,7 +259,7 @@ export class F402TokenManager {
    * `credentials` in memory), so a green suite is not evidence this works against a live
    * 1.0.287 session.
    */
-  private async _remint(): Promise<string> {
+  private async _remint(readFlight: () => Promise<string>): Promise<string> {
     const rawCreds = this.deps.storage.getItem("credentials");
     const creds =
       rawCreds === null
@@ -198,12 +296,34 @@ export class F402TokenManager {
       throw new Error("REMINT_BAD_RESPONSE");
     }
 
+    if (this.machine.kind === "disposed") {
+      throw new Error("F402TokenManager is disposed");
+    }
+
     this.deps.storage.setItem("token", data.code);
     this.metrics.mints += 1;
     const exp = decodeJwtExp(data.code);
     if (exp !== null) this.metrics.lastRemainingMs = exp - this.now();
     this.deps.onTokenMinted?.(data.code);
-    this.schedule(data.code);
+
+    const expectedFlight = readFlight();
+    const current = this.machine.state;
+    if (
+      current.kind === "reminting" &&
+      current.flight === expectedFlight &&
+      current.autoSchedule
+    ) {
+      this.schedule(data.code);
+      // If `data.code` had no valid JWT exp, `schedule` left us in `reminting` — return to `idle`.
+      if (this.machine.kind === "reminting") {
+        this.machine.transition({ kind: "idle" }, "remint_unscheduled");
+      }
+    } else if (
+      current.kind === "reminting" &&
+      current.flight === expectedFlight
+    ) {
+      this.machine.transition({ kind: "idle" }, "remint_schedule_suppressed");
+    }
     return data.code;
   }
 }

@@ -37,6 +37,40 @@ import {
   summarizeDod6V54SpineTotals,
   type Dod6V54SpineTotals,
 } from "../lib/dod6_v54_lifetime_reader.ts";
+import {
+  createStateMachine,
+  defineStateGraph,
+  type ExplicitStateMachine,
+} from "../lib/state_machine.ts";
+
+export const REPORTING_SCHEDULER_SERVICE_STATES = [
+  "stopped",
+  "running",
+] as const;
+export type ReportingSchedulerServiceStateKind =
+  (typeof REPORTING_SCHEDULER_SERVICE_STATES)[number];
+
+export const REPORTING_SCHEDULER_SERVICE_GRAPH = defineStateGraph(
+  "ReportingSchedulerService",
+  REPORTING_SCHEDULER_SERVICE_STATES,
+  {
+    stopped: ["running"],
+    running: ["stopped"],
+  },
+);
+
+export const SCHEDULE_EXECUTION_STATES = ["idle", "running"] as const;
+export type ScheduleExecutionStateKind =
+  (typeof SCHEDULE_EXECUTION_STATES)[number];
+
+export const SCHEDULE_EXECUTION_GRAPH = defineStateGraph(
+  "ScheduleExecution",
+  SCHEDULE_EXECUTION_STATES,
+  {
+    idle: ["running"],
+    running: ["idle"],
+  },
+);
 
 /**
  * Schedules the long-lived webview daemon owns. The bot daemon excludes them
@@ -208,15 +242,44 @@ function readLatestLiveSummary(): LivePositionsPulseSummary | null {
   }
 }
 
+type ReportingSchedulerSnapshot =
+  | { readonly kind: "stopped" }
+  | {
+      readonly kind: "running";
+      readonly jobs: ReadonlyArray<{ readonly stop: () => void }>;
+    };
+
+type ScheduleExecutionSnapshot =
+  | { readonly kind: "idle" }
+  | { readonly kind: "running"; readonly flight: Promise<void> };
+
 export class ReportingSchedulerService {
   private readonly telegramService: SportsDeskTelegramService;
   private readonly schedules: Map<string, ScheduleDefinition> = new Map();
+  private readonly executionMachines: Map<
+    string,
+    ExplicitStateMachine<ScheduleExecutionSnapshot>
+  > = new Map();
+  private readonly serviceMachine =
+    createStateMachine<ReportingSchedulerSnapshot>({
+      graph: REPORTING_SCHEDULER_SERVICE_GRAPH,
+      initial: { kind: "stopped" },
+    });
+
   constructor(telegramService?: SportsDeskTelegramService) {
     this.telegramService = telegramService || new SportsDeskTelegramService();
     this.telegramService.setReportGenerator((type) =>
       this.generateReport(type),
     );
     this.initDefaultSchedules();
+  }
+
+  public get state(): ReportingSchedulerServiceStateKind {
+    return this.serviceMachine.kind;
+  }
+
+  public getScheduleExecutionState(id: string): ScheduleExecutionStateKind {
+    return this.executionMachines.get(id)?.kind ?? "idle";
   }
 
   /**
@@ -230,6 +293,12 @@ export class ReportingSchedulerService {
       readonly exclude?: readonly string[];
     } = {},
   ): () => void {
+    const existing = this.serviceMachine.state;
+    if (existing.kind === "running") {
+      for (const job of existing.jobs) job.stop();
+      this.serviceMachine.transition({ kind: "stopped" }, "restart_cleanup");
+    }
+
     const only = options.only === undefined ? null : new Set(options.only);
     const exclude = new Set(options.exclude ?? []);
     const started: string[] = [];
@@ -247,15 +316,26 @@ export class ReportingSchedulerService {
         started.push(`${s.scheduleTime} (${s.tz ?? "America/New_York"})`);
         return startInProcessCron(
           cronExpr,
-          () => this.dispatchSchedule(s, cronExpr),
+          () => this.dispatchSchedule(s, cronExpr, true),
           { tz: s.tz ?? "America/New_York" },
         );
       });
+
+    this.serviceMachine.transition({ kind: "running", jobs }, "start");
+    const runGeneration = this.serviceMachine.generation;
+
     console.log(
       `[Reporting Scheduler] ${jobs.length} schedule(s) active: ${started.join(", ")}`,
     );
     return () => {
-      for (const job of jobs) job.stop();
+      const snap = this.serviceMachine.state;
+      if (
+        snap.kind === "running" &&
+        this.serviceMachine.isCurrent(runGeneration)
+      ) {
+        for (const job of snap.jobs) job.stop();
+        this.serviceMachine.transition({ kind: "stopped" }, "stop");
+      }
     };
   }
 
@@ -493,10 +573,52 @@ export class ReportingSchedulerService {
   public async runScheduleNow(id: string): Promise<void> {
     const schedule = this.schedules.get(id);
     if (schedule === undefined) throw new Error(`no schedule ${id}`);
-    await this.dispatchSchedule(schedule, schedule.scheduleTime);
+    await this.dispatchSchedule(schedule, schedule.scheduleTime, false);
+  }
+
+  private ensureExecutionMachine(
+    id: string,
+  ): ExplicitStateMachine<ScheduleExecutionSnapshot> {
+    let machine = this.executionMachines.get(id);
+    if (machine === undefined) {
+      machine = createStateMachine<ScheduleExecutionSnapshot>({
+        graph: SCHEDULE_EXECUTION_GRAPH,
+        initial: { kind: "idle" },
+      });
+      this.executionMachines.set(id, machine);
+    }
+    return machine;
   }
 
   private async dispatchSchedule(
+    schedule: ScheduleDefinition,
+    cronExpr: string,
+    fromCron: boolean,
+  ): Promise<void> {
+    const execMachine = this.ensureExecutionMachine(schedule.id);
+    const snap = execMachine.state;
+    if (snap.kind === "running") {
+      if (fromCron) {
+        console.log(
+          `[Reporting Scheduler] ${schedule.id}: skipped overlapping tick (already running)`,
+        );
+        return;
+      }
+      await snap.flight;
+      return;
+    }
+
+    let flight!: Promise<void>;
+    flight = this.executeScheduleOnce(schedule, cronExpr).finally(() => {
+      if (execMachine.state.kind === "running") {
+        execMachine.transition({ kind: "idle" }, "settled");
+      }
+    });
+    execMachine.transition({ kind: "running", flight }, "dispatch");
+    await flight;
+  }
+
+  private async executeScheduleOnce(
     schedule: ScheduleDefinition,
     cronExpr: string,
   ): Promise<void> {
@@ -577,6 +699,13 @@ export class ReportingSchedulerService {
   private initDefaultSchedules(): void {
     for (const item of ReportingSchedulerService.defaultSchedules()) {
       this.schedules.set(item.id, item);
+      this.executionMachines.set(
+        item.id,
+        createStateMachine<ScheduleExecutionSnapshot>({
+          graph: SCHEDULE_EXECUTION_GRAPH,
+          initial: { kind: "idle" },
+        }),
+      );
     }
   }
 

@@ -4088,10 +4088,10 @@ export function startServer(options?: ServerOptions) {
   const liveRuntime = startConsoleLiveRuntimes({
     cwd: repoRoot,
     publishTick: publishWagerTick,
-    bridgeLagMs: () =>
-      bridgeRelayLastFrameAtIso === null
-        ? null
-        : Date.now() - Date.parse(bridgeRelayLastFrameAtIso),
+    bridgeLagMs: () => {
+      const lastIso = lastRelayFrameIso(bridgeRelayMachine.state);
+      return lastIso === null ? null : Date.now() - Date.parse(lastIso);
+    },
   });
   consoleLiveStatusReader = () => liveRuntime.statusBlock();
   const stopWithConsoleLive = server.stop.bind(server);
@@ -4973,17 +4973,108 @@ const TOPIC_BRIDGE_BITS: ReadonlyMap<string, number> = new Map(
   ),
 );
 
-let bridgeHub: Bun.Server<BridgeSocketData> | null = null;
-let bridgeRelaySocket: WebSocket | null = null;
-let bridgeRelayTimer: ReturnType<typeof setTimeout> | null = null;
-let bridgeRelayBackoffMs = 1_000;
-let bridgeRelayStarted = false;
-/** When the gateway last delivered a publishable frame; read by the automation panel. */
-let bridgeRelayLastFrameAtIso: string | null = null;
+import { createStateMachine, defineStateGraph } from "../lib/state_machine.ts";
+
+export const BRIDGE_RELAY_STATES = [
+  "detached",
+  "attached_idle",
+  "acquiring_ticket",
+  "connecting_ws",
+  "connected",
+  "backoff",
+] as const;
+export type BridgeRelayStateKind = (typeof BRIDGE_RELAY_STATES)[number];
+
+export const BRIDGE_RELAY_GRAPH = defineStateGraph(
+  "BridgeWsRelay",
+  BRIDGE_RELAY_STATES,
+  {
+    detached: ["attached_idle", "detached"],
+    attached_idle: ["acquiring_ticket", "attached_idle", "detached"],
+    acquiring_ticket: ["connecting_ws", "backoff", "detached"],
+    connecting_ws: ["connected", "backoff", "detached"],
+    connected: ["connected", "backoff", "detached"],
+    backoff: ["acquiring_ticket", "detached"],
+  },
+);
+
+type BridgeRelaySnapshot =
+  | { readonly kind: "detached" }
+  | {
+      readonly kind: "attached_idle";
+      readonly hub: Bun.Server<BridgeSocketData>;
+    }
+  | {
+      readonly kind: "acquiring_ticket";
+      readonly hub: Bun.Server<BridgeSocketData>;
+      readonly backoffMs: number;
+      readonly lastFrameAtIso: string | null;
+    }
+  | {
+      readonly kind: "connecting_ws";
+      readonly hub: Bun.Server<BridgeSocketData>;
+      readonly socket: WebSocket;
+      readonly backoffMs: number;
+      readonly lastFrameAtIso: string | null;
+    }
+  | {
+      readonly kind: "connected";
+      readonly hub: Bun.Server<BridgeSocketData>;
+      readonly socket: WebSocket;
+      readonly lastFrameAtIso: string | null;
+    }
+  | {
+      readonly kind: "backoff";
+      readonly hub: Bun.Server<BridgeSocketData>;
+      readonly timer: ReturnType<typeof setTimeout>;
+      readonly backoffMs: number;
+      readonly lastFrameAtIso: string | null;
+    };
+
+const bridgeRelayMachine = createStateMachine<BridgeRelaySnapshot>({
+  graph: BRIDGE_RELAY_GRAPH,
+  initial: { kind: "detached" },
+});
+
+function activeBridgeHub(
+  snap: BridgeRelaySnapshot,
+): Bun.Server<BridgeSocketData> | null {
+  return snap.kind === "detached" ? null : snap.hub;
+}
+
+function isBridgeRelayStarted(snap: BridgeRelaySnapshot): boolean {
+  return (
+    snap.kind === "acquiring_ticket" ||
+    snap.kind === "connecting_ws" ||
+    snap.kind === "connected" ||
+    snap.kind === "backoff"
+  );
+}
+
+function lastRelayFrameIso(snap: BridgeRelaySnapshot): string | null {
+  switch (snap.kind) {
+    case "detached":
+    case "attached_idle":
+      return null;
+    case "acquiring_ticket":
+    case "connecting_ws":
+    case "connected":
+    case "backoff":
+      return snap.lastFrameAtIso;
+  }
+}
 
 /** Give the upgrade path the live server instance; `startServer` calls this after `Bun.serve`. */
 export function attachBridgeHub(server: Bun.Server<BridgeSocketData>): void {
-  bridgeHub = server;
+  const current = bridgeRelayMachine.state;
+  if (current.kind !== "detached" && current.hub === server) return;
+  if (current.kind !== "detached") {
+    stopBridgeHub();
+  }
+  bridgeRelayMachine.transition(
+    { kind: "attached_idle", hub: server },
+    "attach",
+  );
 }
 
 /** Whether this request is the dashboard's WebSocket upgrade for the reused guarded route. */
@@ -5044,7 +5135,7 @@ export function withBridgeUpgrade(
 ): (req: Request) => Promise<Response | undefined> {
   return async (req) => {
     if (!isBridgeUpgrade(req)) return inner(req);
-    const server = bridgeHub;
+    const server = activeBridgeHub(bridgeRelayMachine.state);
     if (server === null) return bridgeRefusal(503, "hub_not_ready");
     const rejected = bridgeUpgradeRejection(
       req,
@@ -5176,24 +5267,38 @@ export function publishWagerTick(
 
 /** Connect once to the blob gateway and republish its bridge frames onto the local hub. */
 function startBridgeRelay(): void {
-  if (bridgeRelayStarted) return;
-  bridgeRelayStarted = true;
-  void connectBridgeRelay();
+  const snap = bridgeRelayMachine.state;
+  if (snap.kind !== "attached_idle") return;
+  bridgeRelayMachine.transition(
+    {
+      kind: "acquiring_ticket",
+      hub: snap.hub,
+      backoffMs: 1_000,
+      lastFrameAtIso: null,
+    },
+    "start_relay",
+  );
+  void connectBridgeRelay(bridgeRelayMachine.generation);
 }
 
-async function connectBridgeRelay(): Promise<void> {
-  const server = bridgeHub;
-  if (server === null) {
-    scheduleBridgeRelay();
+async function connectBridgeRelay(expectedGen: number): Promise<void> {
+  const initial = bridgeRelayMachine.state;
+  if (
+    !bridgeRelayMachine.isCurrent(expectedGen) ||
+    initial.kind !== "acquiring_ticket"
+  ) {
     return;
   }
   try {
     const { resolveBlobApiToken, resolveBlobGatewayUrl } =
       await import("../lib/blob_upload.ts");
+    if (!bridgeRelayMachine.isCurrent(expectedGen)) return;
+
     const gateway = resolveBlobGatewayUrl();
     const token = await resolveBlobApiToken();
+    if (!bridgeRelayMachine.isCurrent(expectedGen)) return;
     if (token === "") {
-      scheduleBridgeRelay();
+      scheduleBridgeRelayFrom(expectedGen);
       return;
     }
     const ticketResponse = await fetch(`${gateway}/api/v1/ws-tickets`, {
@@ -5201,27 +5306,68 @@ async function connectBridgeRelay(): Promise<void> {
       headers: { authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(3_000),
     });
+    if (!bridgeRelayMachine.isCurrent(expectedGen)) return;
     if (!ticketResponse.ok) {
-      scheduleBridgeRelay();
+      scheduleBridgeRelayFrom(expectedGen);
       return;
     }
     const { ticket } = (await ticketResponse.json()) as { ticket?: unknown };
+    if (!bridgeRelayMachine.isCurrent(expectedGen)) return;
     if (typeof ticket !== "string" || ticket === "") {
-      scheduleBridgeRelay();
+      scheduleBridgeRelayFrom(expectedGen);
       return;
     }
+
+    const current = bridgeRelayMachine.state;
+    if (current.kind !== "acquiring_ticket") return;
+
     const url = new URL(`${gateway}/ws/live-bets`);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.searchParams.set("ticket", ticket);
     const socket = new WebSocket(url);
-    bridgeRelaySocket = socket;
+    bridgeRelayMachine.transition(
+      {
+        kind: "connecting_ws",
+        hub: current.hub,
+        socket,
+        backoffMs: current.backoffMs,
+        lastFrameAtIso: current.lastFrameAtIso,
+      },
+      "dial_ws",
+    );
+    const connectingGen = bridgeRelayMachine.generation;
+
     socket.addEventListener("open", () => {
-      bridgeRelayBackoffMs = 1_000;
+      const snap = bridgeRelayMachine.state;
+      if (
+        !bridgeRelayMachine.isCurrent(connectingGen) ||
+        snap.kind !== "connecting_ws" ||
+        snap.socket !== socket
+      ) {
+        try {
+          socket.close();
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      bridgeRelayMachine.transition(
+        {
+          kind: "connected",
+          hub: snap.hub,
+          socket,
+          lastFrameAtIso: snap.lastFrameAtIso,
+        },
+        "ws_open",
+      );
       for (const topic of BRIDGE_WS_TOPICS) {
         socket.send(JSON.stringify({ type: "SUBSCRIBE", channel: topic }));
       }
     });
+
     socket.addEventListener("message", (event) => {
+      const snap = bridgeRelayMachine.state;
+      if (snap.kind !== "connected" || snap.socket !== socket) return;
       if (typeof event.data !== "string") {
         // The gateway only sends text frames; a binary one is a protocol change worth seeing.
         console.warn(
@@ -5230,7 +5376,7 @@ async function connectBridgeRelay(): Promise<void> {
         return;
       }
       const raw = event.data;
-      if (raw === "" || bridgeHub === null) return;
+      if (raw === "") return;
       let kind: unknown;
       try {
         kind = (JSON.parse(raw) as { kind?: unknown }).kind;
@@ -5243,48 +5389,104 @@ async function connectBridgeRelay(): Promise<void> {
       ) {
         return;
       }
-      bridgeRelayLastFrameAtIso = new Date().toISOString();
-      bridgeHub.publish(kind, raw);
+      const frameIso = new Date().toISOString();
+      bridgeRelayMachine.transition(
+        {
+          kind: "connected",
+          hub: snap.hub,
+          socket: snap.socket,
+          lastFrameAtIso: frameIso,
+        },
+        "frame_relayed",
+      );
+      snap.hub.publish(kind, raw);
     });
+
     socket.addEventListener("close", () => {
-      if (bridgeRelaySocket !== socket) return;
-      bridgeRelaySocket = null;
-      scheduleBridgeRelay();
+      const snap = bridgeRelayMachine.state;
+      if (
+        (snap.kind !== "connecting_ws" && snap.kind !== "connected") ||
+        snap.socket !== socket
+      ) {
+        return;
+      }
+      scheduleBridgeRelayFrom(bridgeRelayMachine.generation);
     });
   } catch {
-    scheduleBridgeRelay();
+    if (bridgeRelayMachine.isCurrent(expectedGen)) {
+      scheduleBridgeRelayFrom(expectedGen);
+    }
   }
 }
 
-function scheduleBridgeRelay(): void {
-  if (bridgeRelayTimer !== null) return;
-  const delay = bridgeRelayBackoffMs;
-  bridgeRelayBackoffMs = Math.min(bridgeRelayBackoffMs * 2, 30_000);
-  bridgeRelayTimer = setTimeout(() => {
-    bridgeRelayTimer = null;
-    void connectBridgeRelay();
+function scheduleBridgeRelayFrom(expectedGen: number): void {
+  if (!bridgeRelayMachine.isCurrent(expectedGen)) return;
+  const snap = bridgeRelayMachine.state;
+  if (
+    snap.kind !== "acquiring_ticket" &&
+    snap.kind !== "connecting_ws" &&
+    snap.kind !== "connected"
+  ) {
+    return;
+  }
+  const delay = snap.kind === "connected" ? 1_000 : snap.backoffMs;
+  const nextBackoffMs = Math.min(delay * 2, 30_000);
+  let backoffGen = 0;
+  const timer = setTimeout(() => {
+    const active = bridgeRelayMachine.state;
+    if (
+      !bridgeRelayMachine.isCurrent(backoffGen) ||
+      active.kind !== "backoff"
+    ) {
+      return;
+    }
+    bridgeRelayMachine.transition(
+      {
+        kind: "acquiring_ticket",
+        hub: active.hub,
+        backoffMs: active.backoffMs,
+        lastFrameAtIso: active.lastFrameAtIso,
+      },
+      "backoff_elapsed",
+    );
+    void connectBridgeRelay(bridgeRelayMachine.generation);
   }, delay);
   // The relay retries in the background; it must not keep the process alive.
-  bridgeRelayTimer.unref?.();
+  timer.unref?.();
+  bridgeRelayMachine.transition(
+    {
+      kind: "backoff",
+      hub: snap.hub,
+      timer,
+      backoffMs: nextBackoffMs,
+      lastFrameAtIso: snap.lastFrameAtIso,
+    },
+    "schedule_backoff",
+  );
+  backoffGen = bridgeRelayMachine.generation;
 }
 
 /** Stop the relay and detach the hub; tests and shutdown use this. */
 export function stopBridgeHub(): void {
-  bridgeRelayStarted = false;
-  bridgeRelayBackoffMs = 1_000;
-  bridgeRelayLastFrameAtIso = null;
-  if (bridgeRelayTimer !== null) {
-    clearTimeout(bridgeRelayTimer);
-    bridgeRelayTimer = null;
+  const snap = bridgeRelayMachine.state;
+  if (snap.kind === "backoff") {
+    clearTimeout(snap.timer);
   }
-  const socket = bridgeRelaySocket;
-  bridgeRelaySocket = null;
-  bridgeHub = null;
-  socket?.close();
+  const socket =
+    snap.kind === "connecting_ws" || snap.kind === "connected"
+      ? snap.socket
+      : null;
+  bridgeRelayMachine.transition({ kind: "detached" }, "stop_hub");
+  try {
+    socket?.close();
+  } catch {
+    // ignore already-closed socket
+  }
 }
 
 export interface BridgeRelayStatus {
   readonly status: "connected" | "disconnected" | "no_token" | "unavailable";
+  readonly phase?: BridgeRelayStateKind;
   readonly started: boolean;
   readonly lastFrameAtIso: string | null;
   readonly lastFrameAgeSeconds: number | null;
@@ -5320,10 +5522,13 @@ export async function getBridgeRelayStatus(
   } catch {
     gatewayHost = null;
   }
+  const snap = bridgeRelayMachine.state;
+  const lastFrameIso = lastRelayFrameIso(snap);
   const base = {
-    started: bridgeRelayStarted,
-    lastFrameAtIso: bridgeRelayLastFrameAtIso,
-    lastFrameAgeSeconds: frameAgeSeconds(bridgeRelayLastFrameAtIso, now),
+    phase: snap.kind,
+    started: isBridgeRelayStarted(snap),
+    lastFrameAtIso: lastFrameIso,
+    lastFrameAgeSeconds: frameAgeSeconds(lastFrameIso, now),
     topics: [...BRIDGE_WS_TOPICS],
     gatewayHost,
   } as const;
@@ -5333,8 +5538,8 @@ export async function getBridgeRelayStatus(
   } catch {
     return { ...base, status: "unavailable" };
   }
-  const socket = bridgeRelaySocket;
-  const open = socket !== null && socket.readyState === WebSocket.OPEN;
+  const open =
+    snap.kind === "connected" && snap.socket.readyState === WebSocket.OPEN;
   const status: BridgeRelayStatus["status"] =
     token.trim() === "" ? "no_token" : open ? "connected" : "disconnected";
   return { ...base, status };

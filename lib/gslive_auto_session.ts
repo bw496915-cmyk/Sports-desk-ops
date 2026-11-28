@@ -54,32 +54,123 @@ function isCloudflareBlockedSignin(res: Response, text: string): boolean {
   }
   return false;
 }
-let cachedGsid: string | null = null;
-let onGsidRotated: (() => void) | null = null;
-/** Consecutive {@link mintGsid} failures from {@link ensureGsid} (reset on success). */
-let consecutiveMintFailures = 0;
+import type { SessionCircuitState } from "./onepassword_session_bridge.ts";
+import { createStateMachine, defineStateGraph } from "./state_machine.ts";
+
+export const GSLIVE_AUTO_SESSION_STATES = [
+  "uninitialized",
+  "probing",
+  "verified",
+  "minting",
+  "open_locked",
+] as const;
+export type GsliveAutoSessionStateKind =
+  (typeof GSLIVE_AUTO_SESSION_STATES)[number];
+
+export const GSLIVE_AUTO_SESSION_GRAPH = defineStateGraph(
+  "GsliveAutoSession",
+  GSLIVE_AUTO_SESSION_STATES,
+  {
+    uninitialized: ["probing", "minting", "verified", "uninitialized"],
+    probing: ["verified", "minting", "uninitialized"],
+    verified: ["probing", "minting", "verified", "uninitialized"],
+    minting: ["verified", "uninitialized", "open_locked"],
+    open_locked: ["uninitialized", "verified"],
+  },
+);
+
+type GsliveAutoSessionSnapshot =
+  | { readonly kind: "uninitialized"; readonly failures: number }
+  | {
+      readonly kind: "probing";
+      readonly candidateGsid: string;
+      readonly failures: number;
+      readonly flight: Promise<string>;
+    }
+  | { readonly kind: "verified"; readonly gsid: string }
+  | {
+      readonly kind: "minting";
+      readonly failures: number;
+      readonly flight: Promise<string>;
+    }
+  | {
+      readonly kind: "open_locked";
+      readonly failures: number;
+      readonly lockedError: Error;
+    };
+
+const sessionMachine = createStateMachine<GsliveAutoSessionSnapshot>({
+  graph: GSLIVE_AUTO_SESSION_GRAPH,
+  initial: { kind: "uninitialized", failures: 0 },
+});
+
+const gsidRotationHooks = new Set<() => void>();
+
+function currentFailures(snap: GsliveAutoSessionSnapshot): number {
+  switch (snap.kind) {
+    case "verified":
+      return 0;
+    case "uninitialized":
+    case "probing":
+    case "minting":
+    case "open_locked":
+      return snap.failures;
+  }
+}
+
+export function getGsliveSessionStateKind(): GsliveAutoSessionStateKind {
+  return sessionMachine.kind;
+}
+
+/** Maps the internal session machine onto the canonical GATE-AUTH-03 circuit state. */
+export function getGsliveSessionCircuitState(): SessionCircuitState {
+  const snap = sessionMachine.state;
+  switch (snap.kind) {
+    case "open_locked":
+      return "OPEN_LOCKED";
+    case "probing":
+    case "minting":
+      return "HALF_OPEN_PROBING";
+    case "uninitialized":
+      return snap.failures > 0 ? "HALF_OPEN_PROBING" : "CLOSED_HEALTHY";
+    case "verified":
+      return "CLOSED_HEALTHY";
+  }
+}
 
 export function gsliveConsecutiveMintFailures(): number {
-  return consecutiveMintFailures;
+  return currentFailures(sessionMachine.state);
 }
 
-/** Test-only reset for mint-failure streak accounting. */
+/** Test-only reset for mint-failure streak and circuit lock accounting. */
 export function resetGsliveMintFailureStreakForTests(): void {
-  consecutiveMintFailures = 0;
+  const snap = sessionMachine.state;
+  if (snap.kind === "verified") return;
+  sessionMachine.transition(
+    { kind: "uninitialized", failures: 0 },
+    "reset_failures",
+  );
 }
 
-/** Register a callback when a fresh GSID is persisted (e.g. clear daemon probe cache). */
-export function registerGsidRotationHook(fn: () => void): void {
-  onGsidRotated = fn;
+/** Register a callback when a fresh GSID is persisted; returns an unsubscribe function. */
+export function registerGsidRotationHook(fn: () => void): () => void {
+  gsidRotationHooks.add(fn);
+  return () => {
+    gsidRotationHooks.delete(fn);
+  };
 }
 
-/** Drop the in-process GSID memo (daemon cache after keychain rotation). */
+/** Drop the in-process GSID memo (daemon cache after keychain rotation) and reopen circuit if locked. */
 export function resetGsliveAutoSessionCache(): void {
-  cachedGsid = null;
+  const snap = sessionMachine.state;
+  const failures = snap.kind === "open_locked" ? 0 : currentFailures(snap);
+  sessionMachine.transition({ kind: "uninitialized", failures }, "reset_cache");
 }
 
 function notifyGsidRotated(): void {
-  onGsidRotated?.();
+  for (const hook of gsidRotationHooks) {
+    hook();
+  }
 }
 const SESSION_FILE = () => (Bun.env.GSLIVE_SESSION_FILE ?? "").trim();
 function readSessionFile(): string | null {
@@ -113,7 +204,8 @@ async function secret(name: string): Promise<string | null> {
   }
 }
 export async function getGsid(): Promise<string | null> {
-  if (cachedGsid !== null) return cachedGsid;
+  const snap = sessionMachine.state;
+  if (snap.kind === "verified") return snap.gsid;
   const fromFile = readSessionFile();
   if (fromFile !== null && fromFile !== "") return fromFile;
   const fromKeychain =
@@ -358,7 +450,7 @@ export async function mintGsid(
   );
   const gsid = verified.gsid;
   // Persist only after verification, so a failed login never overwrites a usable session.
-  cachedGsid = gsid;
+  sessionMachine.transition({ kind: "verified", gsid }, "mint_verified");
   try {
     await setSecretBounded(Bun.secrets, {
       service: "com.bookdeskops.sportsdesk",
@@ -381,47 +473,168 @@ export async function mintGsid(
   notifyGsidRotated();
   return gsid;
 }
+
+async function probeExistingGsid(
+  existing: string,
+  fetchImpl: typeof fetch,
+): Promise<boolean> {
+  const storedGate = await resolveManagerSessionGate();
+  if (storedGate !== "" && (await probe(existing, fetchImpl, storedGate))) {
+    return true;
+  }
+  try {
+    const gate = await bootstrapGanchrowSession({
+      cookieHeader: `GSID=${existing}`,
+      fetchImpl,
+    });
+    if (await probe(existing, fetchImpl, gate)) {
+      await writeManagerSessionGate(gate);
+      return true;
+    }
+  } catch {
+    // Expired or gate-less: caller will evict and fall through to credential mint.
+  }
+  return false;
+}
+
 export async function ensureGsid(
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
-  const existing = await getGsid();
-  if (existing !== null && existing !== "") {
-    const storedGate = await resolveManagerSessionGate();
-    if (storedGate !== "" && (await probe(existing, fetchImpl, storedGate))) {
-      consecutiveMintFailures = 0;
-      return existing;
+  const current = sessionMachine.state;
+  if (current.kind === "probing" || current.kind === "minting") {
+    return current.flight;
+  }
+
+  // When OPEN_LOCKED, refuse repeated credential sign-in POSTs unless an operator manually
+  // provisioned a working GSID into GSLIVE_SESSION_FILE or the keychain.
+  if (current.kind === "open_locked") {
+    const manualCandidate = await getGsid();
+    if (
+      manualCandidate !== null &&
+      manualCandidate !== "" &&
+      (await probeExistingGsid(manualCandidate, fetchImpl))
+    ) {
+      sessionMachine.transition(
+        { kind: "verified", gsid: manualCandidate },
+        "manual_recovery_verified",
+      );
+      return manualCandidate;
     }
-    try {
-      const gate = await bootstrapGanchrowSession({
-        cookieHeader: `GSID=${existing}`,
-        fetchImpl,
-      });
-      if (await probe(existing, fetchImpl, gate)) {
-        await writeManagerSessionGate(gate);
-        consecutiveMintFailures = 0;
+    throw current.lockedError;
+  }
+
+  const priorFailures = currentFailures(current);
+  const existing = await getGsid();
+
+  if (existing !== null && existing !== "") {
+    let probeFlight!: Promise<string>;
+    probeFlight = (async (): Promise<string> => {
+      const ok = await probeExistingGsid(existing, fetchImpl);
+      if (ok) {
+        if (sessionMachine.kind !== "verified") {
+          sessionMachine.transition(
+            { kind: "verified", gsid: existing },
+            "probe_verified",
+          );
+        }
         return existing;
       }
-    } catch {
-      // Expired or gate-less: fall through to a credential login.
-    }
+      // Evict stale memoized GSID immediately so external file/keychain rotations aren't shadowed.
+      if (
+        sessionMachine.kind === "probing" ||
+        sessionMachine.kind === "verified"
+      ) {
+        sessionMachine.transition(
+          { kind: "uninitialized", failures: priorFailures },
+          "probe_expired_evict",
+        );
+      }
+      // If we just evicted an in-memory verified GSID, check whether file/keychain already holds a newer rotated GSID.
+      if (current.kind === "verified") {
+        const rotated = await getGsid();
+        if (
+          rotated !== null &&
+          rotated !== "" &&
+          rotated !== existing &&
+          (await probeExistingGsid(rotated, fetchImpl))
+        ) {
+          sessionMachine.transition(
+            { kind: "verified", gsid: rotated },
+            "external_rotation_verified",
+          );
+          return rotated;
+        }
+      }
+      return runMintTransition(fetchImpl, priorFailures);
+    })();
+    sessionMachine.transition(
+      {
+        kind: "probing",
+        candidateGsid: existing,
+        failures: priorFailures,
+        flight: probeFlight,
+      },
+      "probe_start",
+    );
+    return probeFlight;
   }
-  try {
-    const gsid = await mintGsid(fetchImpl);
-    consecutiveMintFailures = 0;
-    return gsid;
-  } catch (err) {
-    if (isGsliveCloudflareBlockedError(err)) {
+
+  return runMintTransition(fetchImpl, priorFailures);
+}
+
+function runMintTransition(
+  fetchImpl: typeof fetch,
+  priorFailures: number,
+): Promise<string> {
+  let mintFlight!: Promise<string>;
+  mintFlight = (async (): Promise<string> => {
+    try {
+      const gsid = await mintGsid(fetchImpl);
+      if (sessionMachine.kind !== "verified") {
+        sessionMachine.transition({ kind: "verified", gsid }, "mint_ok");
+      }
+      return gsid;
+    } catch (err) {
+      if (isGsliveCloudflareBlockedError(err)) {
+        const cfErr = err instanceof Error ? err : new Error(String(err));
+        sessionMachine.transition(
+          {
+            kind: "open_locked",
+            failures: priorFailures + 1,
+            lockedError: cfErr,
+          },
+          "cloudflare_blocked",
+        );
+        throw cfErr;
+      }
+      const nextFailures = priorFailures + 1;
+      if (nextFailures >= 3) {
+        const loopErr = new Error(
+          `${GSLIVE_MINT_LOOP_PREFIX} Credentials rejected by portal. Rotate password.`,
+          { cause: err },
+        );
+        sessionMachine.transition(
+          {
+            kind: "open_locked",
+            failures: nextFailures,
+            lockedError: loopErr,
+          },
+          "mint_loop_tripped",
+        );
+        throw loopErr;
+      }
+      sessionMachine.transition(
+        { kind: "uninitialized", failures: nextFailures },
+        "mint_failed",
+      );
       throw err;
     }
-    consecutiveMintFailures += 1;
-    if (consecutiveMintFailures >= 3) {
-      throw new Error(
-        `${GSLIVE_MINT_LOOP_PREFIX} Credentials rejected by portal. Rotate password.`,
-        { cause: err },
-      );
-    }
-    throw err;
-  }
+  })();
+  sessionMachine.transition(
+    { kind: "minting", failures: priorFailures, flight: mintFlight },
+    "mint_start",
+  );
+  return mintFlight;
 }
 export async function fetchBetLog(
   betId: string,

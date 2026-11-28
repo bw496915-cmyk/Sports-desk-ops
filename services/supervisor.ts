@@ -123,12 +123,108 @@ export async function checkHealth(
   }
 }
 
-interface Child {
+import {
+  createStateMachine,
+  defineStateGraph,
+  type ExplicitStateMachine,
+} from "../lib/state_machine.ts";
+
+export const SUPERVISOR_STATES = ["running", "stopping", "stopped"] as const;
+export type SupervisorLifecycleKind = (typeof SUPERVISOR_STATES)[number];
+
+export const SUPERVISOR_STATE_GRAPH = defineStateGraph(
+  "SupervisorLifecycle",
+  SUPERVISOR_STATES,
+  {
+    running: ["stopping"],
+    stopping: ["stopped"],
+    stopped: [],
+  },
+);
+
+export type SupervisorLifecycleSnapshot =
+  | { readonly kind: "running" }
+  | { readonly kind: "stopping"; readonly signal: string }
+  | { readonly kind: "stopped"; readonly signal: string };
+
+export const SUPERVISED_CHILD_STATES = [
+  "starting",
+  "healthy",
+  "degraded",
+  "restarting_unhealthy",
+  "backoff",
+  "stopped",
+] as const;
+export type SupervisedChildStateKind = (typeof SUPERVISED_CHILD_STATES)[number];
+
+export const SUPERVISED_CHILD_GRAPH = defineStateGraph(
+  "SupervisedChild",
+  SUPERVISED_CHILD_STATES,
+  {
+    starting: ["healthy", "degraded", "backoff", "stopped"],
+    healthy: ["healthy", "degraded", "backoff", "stopped"],
+    degraded: [
+      "healthy",
+      "degraded",
+      "restarting_unhealthy",
+      "backoff",
+      "stopped",
+    ],
+    restarting_unhealthy: ["backoff", "stopped"],
+    backoff: ["starting", "stopped"],
+    stopped: [],
+  },
+);
+
+export type SupervisedChildSnapshot =
+  | {
+      readonly kind: "starting";
+      readonly process: SupervisorProcess;
+      readonly restarts: number;
+    }
+  | {
+      readonly kind: "healthy";
+      readonly process: SupervisorProcess;
+      readonly restarts: number;
+    }
+  | {
+      readonly kind: "degraded";
+      readonly process: SupervisorProcess;
+      readonly restarts: number;
+      readonly failures: number;
+    }
+  | {
+      readonly kind: "restarting_unhealthy";
+      readonly process: SupervisorProcess;
+      readonly restarts: number;
+    }
+  | {
+      readonly kind: "backoff";
+      readonly restarts: number;
+      readonly delayMs: number;
+    }
+  | {
+      readonly kind: "stopped";
+    };
+
+interface SupervisedChildEntry {
   readonly spec: ServiceSpec;
-  process: SupervisorProcess;
-  restarts: number;
-  unhealthy: number;
-  starting: boolean;
+  readonly machine: ExplicitStateMachine<SupervisedChildSnapshot>;
+}
+
+function activeChildProcess(
+  snapshot: SupervisedChildSnapshot,
+): SupervisorProcess | null {
+  switch (snapshot.kind) {
+    case "starting":
+    case "healthy":
+    case "degraded":
+    case "restarting_unhealthy":
+      return snapshot.process;
+    case "backoff":
+    case "stopped":
+      return null;
+  }
 }
 
 export async function supervise(
@@ -159,113 +255,212 @@ export async function supervise(
       return Bun.spawn(args, { stdout: "inherit", stderr: "inherit" });
     });
 
-  let stopping = false;
+  const supervisorMachine = createStateMachine<SupervisorLifecycleSnapshot>({
+    graph: SUPERVISOR_STATE_GRAPH,
+    initial: { kind: "running" },
+  });
   let resolveFinished: () => void = () => {};
   const finished = new Promise<void>((resolve) => {
     resolveFinished = resolve;
   });
-  const children: Child[] = [];
+  const children: SupervisedChildEntry[] = [];
   const timers: ReturnType<typeof setInterval>[] = [];
 
-  const start = (spec: ServiceSpec): Child => {
-    const child: Child = {
-      spec,
-      process: spawnImpl(spec.command),
-      restarts: 0,
-      unhealthy: 0,
-      starting: true,
-    };
-    log({
-      event: "start",
-      service: spec.name,
-      pid: child.process.pid,
-      command: spec.command.join(" "),
-    });
-    void child.process.exited.then((code: number) => {
-      if (stopping) return;
-      const delay = restartDelayMs(child.restarts);
-      child.restarts += 1;
+  const attachExitWatcher = (
+    entry: SupervisedChildEntry,
+    proc: SupervisorProcess,
+  ): void => {
+    void proc.exited.then((code: number) => {
+      if (supervisorMachine.kind !== "running") return;
+      const current = entry.machine.state;
+      if (current.kind === "stopped" || current.kind === "backoff") return;
+      if (activeChildProcess(current) !== proc) return;
+
+      const attempt = current.restarts;
+      const nextRestarts = attempt + 1;
+      const delay = restartDelayMs(attempt);
+      entry.machine.transition(
+        { kind: "backoff", restarts: nextRestarts, delayMs: delay },
+        "process_exit",
+      );
+      const backoffGen = entry.machine.generation;
       log({
         event: "exit",
-        service: spec.name,
+        service: entry.spec.name,
         code,
         restartInMs: delay,
       });
+
       void sleep(delay).then(() => {
-        if (!stopping) {
-          child.process = spawnImpl(spec.command);
-          log({
-            event: "restart",
-            service: spec.name,
-            pid: child.process.pid,
-          });
+        if (
+          supervisorMachine.kind !== "running" ||
+          !entry.machine.isCurrent(backoffGen)
+        ) {
+          return;
         }
+        const respawned = spawnImpl(entry.spec.command);
+        entry.machine.transition(
+          {
+            kind: "starting",
+            process: respawned,
+            restarts: nextRestarts,
+          },
+          "backoff_elapsed",
+        );
+        log({
+          event: "restart",
+          service: entry.spec.name,
+          pid: respawned.pid,
+        });
+        attachExitWatcher(entry, respawned);
       });
     });
-    return child;
+  };
+
+  const start = (spec: ServiceSpec): SupervisedChildEntry => {
+    const proc = spawnImpl(spec.command);
+    const machine = createStateMachine<SupervisedChildSnapshot>({
+      graph: SUPERVISED_CHILD_GRAPH,
+      initial: { kind: "starting", process: proc, restarts: 0 },
+    });
+    const entry: SupervisedChildEntry = { spec, machine };
+    log({
+      event: "start",
+      service: spec.name,
+      pid: proc.pid,
+      command: spec.command.join(" "),
+    });
+    attachExitWatcher(entry, proc);
+    return entry;
   };
 
   const stop = (signal: string) => {
-    if (stopping) return;
-    stopping = true;
+    if (supervisorMachine.kind !== "running") return;
+    supervisorMachine.transition({ kind: "stopping", signal }, "shutdown");
     log({ event: "shutdown", signal });
     for (const timer of timers) clearInterval(timer);
-    for (const child of children) {
-      try {
-        child.process.kill("SIGTERM");
-      } catch {
-        // already gone
+    for (const entry of children) {
+      const proc = activeChildProcess(entry.machine.state);
+      if (entry.machine.kind !== "stopped") {
+        entry.machine.transition({ kind: "stopped" }, "supervisor_stop");
+      }
+      if (proc !== null) {
+        try {
+          proc.kill("SIGTERM");
+        } catch {
+          // already gone
+        }
       }
     }
+    supervisorMachine.transition({ kind: "stopped", signal }, "stopped");
     resolveFinished();
   };
-  process.on("SIGINT", () => stop("SIGINT"));
-  process.on("SIGTERM", () => stop("SIGTERM"));
-  options.signal?.addEventListener("abort", () => stop("abort"));
+  const onSigInt = () => stop("SIGINT");
+  const onSigTerm = () => stop("SIGTERM");
+  process.on("SIGINT", onSigInt);
+  process.on("SIGTERM", onSigTerm);
+  options.signal?.addEventListener("abort", () => stop("abort"), {
+    once: true,
+  });
   if (options.signal?.aborted === true) stop("abort");
 
-  for (const spec of services) {
-    const child = start(spec);
-    children.push(child);
-    timers.push(
-      setInterval(() => {
-        if (stopping) return;
-        void checkHealth(spec.healthUrl, { fetchImpl }).then((healthy) => {
-          if (stopping) return;
-          if (healthy) {
-            child.unhealthy = 0;
-            child.starting = false;
-            return;
-          }
-          child.unhealthy += 1;
-          log({
-            event: "unhealthy",
-            service: spec.name,
-            failures: child.unhealthy,
-            healthUrl: spec.healthUrl,
-          });
-          if (child.unhealthy >= threshold) {
-            child.unhealthy = 0;
-            log({ event: "restart-unhealthy", service: spec.name });
-            try {
-              child.process.kill("SIGTERM");
-            } catch {
-              // already gone
+  try {
+    if (supervisorMachine.kind === "running") {
+      for (const spec of services) {
+        const entry = start(spec);
+        children.push(entry);
+        timers.push(
+          setInterval(() => {
+            if (supervisorMachine.kind !== "running") return;
+            const snapBefore = entry.machine.state;
+            // Only probe live running/starting/degraded processes; never probe during backoff or restart kill.
+            if (
+              snapBefore.kind !== "starting" &&
+              snapBefore.kind !== "healthy" &&
+              snapBefore.kind !== "degraded"
+            ) {
+              return;
             }
-          }
-        });
-      }, healthIntervalMs),
-    );
-  }
+            const probedProc = snapBefore.process;
+            const probeGen = entry.machine.generation;
+            void checkHealth(spec.healthUrl, { fetchImpl }).then((healthy) => {
+              if (
+                supervisorMachine.kind !== "running" ||
+                !entry.machine.isCurrent(probeGen)
+              ) {
+                return;
+              }
+              const current = entry.machine.state;
+              if (
+                (current.kind !== "starting" &&
+                  current.kind !== "healthy" &&
+                  current.kind !== "degraded") ||
+                current.process !== probedProc
+              ) {
+                return;
+              }
+              if (healthy) {
+                entry.machine.transition(
+                  {
+                    kind: "healthy",
+                    process: current.process,
+                    restarts: 0,
+                  },
+                  "health_ok",
+                );
+                return;
+              }
+              const failures =
+                current.kind === "degraded" ? current.failures + 1 : 1;
+              entry.machine.transition(
+                {
+                  kind: "degraded",
+                  process: current.process,
+                  restarts: current.restarts,
+                  failures,
+                },
+                "health_failed",
+              );
+              log({
+                event: "unhealthy",
+                service: spec.name,
+                failures,
+                healthUrl: spec.healthUrl,
+              });
+              if (failures >= threshold) {
+                entry.machine.transition(
+                  {
+                    kind: "restarting_unhealthy",
+                    process: current.process,
+                    restarts: current.restarts,
+                  },
+                  "threshold_exceeded",
+                );
+                log({ event: "restart-unhealthy", service: spec.name });
+                try {
+                  current.process.kill("SIGTERM");
+                } catch {
+                  // already gone
+                }
+              }
+            });
+          }, healthIntervalMs),
+        );
+      }
 
-  log({
-    event: "supervising",
-    services: services.map((spec) => ({
-      name: spec.name,
-      healthUrl: spec.healthUrl,
-    })),
-  });
-  await finished;
+      log({
+        event: "supervising",
+        services: services.map((spec) => ({
+          name: spec.name,
+          healthUrl: spec.healthUrl,
+        })),
+      });
+    }
+    await finished;
+  } finally {
+    process.off("SIGINT", onSigInt);
+    process.off("SIGTERM", onSigTerm);
+  }
 }
 
 if (import.meta.main) {

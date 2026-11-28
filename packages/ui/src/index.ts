@@ -29,3 +29,4 @@ export * from "./runtime_flags.ts";
 export * from "./dashboard_styles.ts";
 export * from "./terminal_catalog.ts";
 export * from "./types.ts";
+export * from "./ws_connection_machine.ts";

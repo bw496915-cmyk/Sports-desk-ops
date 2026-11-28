@@ -184,14 +184,45 @@ export function decodeCoefficientFrame(
   return { eventId: payload.id, coefficients, group };
 }
 
+import { createStateMachine, defineStateGraph } from "./state_machine.ts";
+
+export const PPM_HANDSHAKE_STATES = [
+  "awaiting_eio_open",
+  "awaiting_sio_connect",
+  "awaiting_metadata_ack",
+  "awaiting_subscribed",
+  "streaming",
+  "closed",
+] as const;
+export type PpmHandshakeState = (typeof PPM_HANDSHAKE_STATES)[number];
+
+export const PPM_HANDSHAKE_GRAPH = defineStateGraph(
+  "PpmSocketHandshake",
+  PPM_HANDSHAKE_STATES,
+  {
+    awaiting_eio_open: ["awaiting_sio_connect", "closed"],
+    awaiting_sio_connect: ["awaiting_metadata_ack", "closed"],
+    awaiting_metadata_ack: ["awaiting_subscribed", "closed"],
+    awaiting_subscribed: ["streaming", "closed"],
+    streaming: ["closed"],
+    closed: [],
+  },
+);
+
+type PpmHandshakeSnapshot = { readonly kind: PpmHandshakeState };
+
+export interface PpmFeedHandle {
+  readonly state: PpmHandshakeState;
+  close(): void;
+}
+
 /**
  * Connects, performs the handshake, and forwards decoded frames. Returns a
- * handle with `close()`. Incoming events are processed in order; a frame that
- * fails to decode is reported through `onError` and does not stop the feed.
+ * handle with `close()` and observable `state`. Incoming events are gated by
+ * the explicit protocol state machine; a frame that fails to decode is reported
+ * through `onError` and does not stop the feed.
  */
-export function connectPpmFeed(options: PpmSocketFeedOptions): {
-  close: () => void;
-} {
+export function connectPpmFeed(options: PpmSocketFeedOptions): PpmFeedHandle {
   const partnerId = options.partnerId ?? "118";
   const flavor = options.flavor ?? "prematch";
   const topics = options.topics ?? [PPM_HERITAGE_TOPIC];
@@ -201,15 +232,27 @@ export function connectPpmFeed(options: PpmSocketFeedOptions): {
     ((target: string) => new WebSocket(target) as PpmSocketLike);
   const report = (error: Error): void => options.onError?.(error);
 
+  const machine = createStateMachine<PpmHandshakeSnapshot>({
+    graph: PPM_HANDSHAKE_GRAPH,
+    initial: { kind: "awaiting_eio_open" },
+  });
+
   let socket: PpmSocketLike;
   try {
     socket = factory(url);
   } catch (error) {
+    machine.transition({ kind: "closed" }, "connect_failed");
     report(new PpmFeedError(`connect failed: ${(error as Error).message}`));
-    return { close: () => {} };
+    return {
+      get state() {
+        return machine.kind;
+      },
+      close: () => {},
+    };
   }
 
   const send = (data: string): void => {
+    if (machine.kind === "closed") return;
     try {
       socket.send(data);
     } catch (error) {
@@ -218,22 +261,59 @@ export function connectPpmFeed(options: PpmSocketFeedOptions): {
   };
 
   socket.addEventListener("message", (event) => {
+    const phase = machine.kind;
+    if (phase === "closed") return;
+
     const data = event.data;
     if (typeof data === "string") {
-      if (data.startsWith("0")) {
-        send("40");
-      } else if (data.startsWith("40{")) {
-        send(
-          `42["setSocketMetadata",${JSON.stringify({ partnerId, flavor })}]`,
-        );
-      } else if (data.includes("socketMetadataSet")) {
-        send(`42["subscribe",${JSON.stringify([...topics])}]`);
-      } else if (data.startsWith('42["subscribed"')) {
-        options.onReady?.();
+      // Engine.IO v4 heartbeat ping ("2") -> pong ("3") in any open phase.
+      if (data === "2") {
+        send("3");
+        return;
       }
-      return;
+      switch (phase) {
+        case "awaiting_eio_open":
+          if (data.startsWith("0")) {
+            machine.transition({ kind: "awaiting_sio_connect" }, "eio_open");
+            send("40");
+          }
+          return;
+        case "awaiting_sio_connect":
+          if (data.startsWith("40")) {
+            machine.transition(
+              { kind: "awaiting_metadata_ack" },
+              "sio_connect",
+            );
+            send(
+              `42["setSocketMetadata",${JSON.stringify({ partnerId, flavor })}]`,
+            );
+          }
+          return;
+        case "awaiting_metadata_ack":
+          if (
+            data.startsWith('42["setSocketMetadata"') &&
+            data.includes("socketMetadataSet")
+          ) {
+            machine.transition({ kind: "awaiting_subscribed" }, "metadata_set");
+            send(`42["subscribe",${JSON.stringify([...topics])}]`);
+          }
+          return;
+        case "awaiting_subscribed":
+          if (data.startsWith('42["subscribed"')) {
+            machine.transition({ kind: "streaming" }, "subscribed");
+            options.onReady?.();
+          }
+          return;
+        case "streaming":
+          return;
+      }
     }
-    if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
+
+    // Binary gzip attachments are only valid after `subscribe` has been sent.
+    if (
+      (phase === "awaiting_subscribed" || phase === "streaming") &&
+      (data instanceof ArrayBuffer || data instanceof Uint8Array)
+    ) {
       try {
         const bytes = new Uint8Array(data.byteLength);
         bytes.set(data instanceof ArrayBuffer ? new Uint8Array(data) : data);
@@ -245,6 +325,7 @@ export function connectPpmFeed(options: PpmSocketFeedOptions): {
   });
 
   socket.addEventListener("error", (event) => {
+    if (machine.kind === "closed") return;
     const code = event.error?.code;
     const typed = typeof code === "string" ? code : undefined;
     report(
@@ -256,7 +337,12 @@ export function connectPpmFeed(options: PpmSocketFeedOptions): {
   });
 
   return {
+    get state(): PpmHandshakeState {
+      return machine.kind;
+    },
     close: () => {
+      if (machine.kind === "closed") return;
+      machine.transition({ kind: "closed" }, "close");
       try {
         socket.close();
       } catch {
