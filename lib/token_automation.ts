@@ -529,6 +529,13 @@ export class AutomatedDualTokenStore {
     );
   }
 
+  /**
+   * Raw SQLite handle for deterministic UDFs and update hooks; closed by `close()`.
+   */
+  get database(): Database {
+    return this.db;
+  }
+
   close(): void {
     this.db.close();
   }
