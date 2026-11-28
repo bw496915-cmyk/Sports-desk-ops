@@ -10,3 +10,5 @@ export * from "./shadow_pricing.ts";
 export * from "./features.ts";
 export * from "./dashboard_hydration.ts";
 export * from "./markdown_telemetry.ts";
+export * from "./bun_release_channel.ts";
+export * from "./github_pr_state.ts";

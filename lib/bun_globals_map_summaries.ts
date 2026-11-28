@@ -538,3 +538,82 @@ export function suppressSummaryDefects<T extends SummaryRow>(
     suppressed: [...falsified.suppressed, ...inherited.suppressed],
   };
 }
+
+export type RuntimeSurfacePlacement =
+  "bun" | "both" | "global-only" | "type-only";
+
+export interface RuntimeSurfaceEntry {
+  readonly symbol: string;
+  readonly name: string;
+  readonly kind: string;
+  readonly placement: RuntimeSurfacePlacement;
+  readonly bunType: string;
+  readonly globalType: string;
+}
+
+interface ValueSurfaceRow extends SummaryRow {
+  readonly signature?: "type" | "value";
+}
+
+/**
+ * Classify every `signature: "value"` row in `docs/bun-globals-map.json` against the pinned `Bun`
+ * and `globalThis` objects so upstream docs mis-filings (`namespace Bun.WebAssembly`, type-only
+ * option namespaces `Bun.Build`/`Bun.Serve`, and `globalThis`-only `WebSocket`/`Worker`) stay
+ * mechanically distinguishable from true `Bun.*` runtime values like `Bun.JSONC`.
+ */
+export function classifyRuntimeSurface(
+  rows: readonly ValueSurfaceRow[],
+  options: {
+    readonly bunRuntime?: Record<string, unknown> | undefined;
+    readonly globalRuntime?: Record<string, unknown> | undefined;
+  } = {},
+): RuntimeSurfaceEntry[] {
+  const bunRuntime =
+    options.bunRuntime ?? (Bun as unknown as Record<string, unknown>);
+  const globalRuntime =
+    options.globalRuntime ?? (globalThis as unknown as Record<string, unknown>);
+  const entries: RuntimeSurfaceEntry[] = [];
+
+  for (const row of rows) {
+    if (row.signature !== "value") continue;
+    const name = runtimeNameOf(row.symbol);
+    if (name === "") continue;
+    const onBun = name in bunRuntime;
+    const onGlobal = name in globalRuntime;
+    const bunType = onBun ? typeof readRuntime(bunRuntime, name) : "undefined";
+    const globalType = onGlobal
+      ? typeof readRuntime(globalRuntime, name)
+      : "undefined";
+    const placement: RuntimeSurfacePlacement =
+      onBun && onGlobal
+        ? "both"
+        : onBun
+          ? "bun"
+          : onGlobal
+            ? "global-only"
+            : "type-only";
+    entries.push({
+      symbol: row.symbol,
+      name,
+      kind: row.kind ?? "unknown",
+      placement,
+      bunType,
+      globalType,
+    });
+  }
+  return entries;
+}
+
+/** Value-space catalog rows absent from `Bun` (`global-only` or `type-only` on the pinned runtime). */
+export function findNonBunValueSurfaceRows(
+  rows: readonly ValueSurfaceRow[],
+  options: {
+    readonly bunRuntime?: Record<string, unknown> | undefined;
+    readonly globalRuntime?: Record<string, unknown> | undefined;
+  } = {},
+): RuntimeSurfaceEntry[] {
+  return classifyRuntimeSurface(rows, options).filter(
+    (entry) =>
+      entry.placement === "global-only" || entry.placement === "type-only",
+  );
+}
