@@ -21,6 +21,7 @@
  */
 
 import { appendFile, mkdir } from "node:fs/promises";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { dirname } from "node:path";
 import {
   flagValue,
@@ -91,7 +92,7 @@ export async function runArtifactRebuild(
   const valueArgs = ["run", "scripts/generate_value_artifacts.ts"];
   if (runMode === "offline") valueArgs.push("--offline");
 
-  const value = Bun.spawnSync(["bun", ...valueArgs], {
+  const value = spawnSyncBounded(["bun", ...valueArgs], {
     stdout: "inherit",
     stderr: "inherit",
   });
@@ -99,7 +100,7 @@ export async function runArtifactRebuild(
   let ok = valueExitCode === 0;
   let exitCode = valueExitCode;
   if (valueExitCode === 0) {
-    const lock = Bun.spawnSync(
+    const lock = spawnSyncBounded(
       ["bun", "run", "scripts/artifacts_lock.ts", "--update"],
       {
         stdout: "inherit",

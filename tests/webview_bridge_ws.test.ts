@@ -12,13 +12,24 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
   BRIDGE_WS_PROTOCOL,
   BRIDGE_WS_TOPICS,
+  TELEMETRY_WS_PROTOCOL,
   bridgeProtocols,
   bridgeUpgradeRejection,
   bridgeUpgradeRequest,
   isBridgeUpgrade,
+  publishWagerTick,
   startServer,
   stopBridgeHub,
 } from "../services/sportsdesk_webview_server.ts";
+import {
+  asCents,
+  asLineHundredths,
+  encodeBridgeChannelPackedWord32,
+} from "../lib/bridge_and_channel_router.ts";
+import {
+  asWallEpochMs,
+  readWagerTickFrame,
+} from "../lib/wager_telemetry_hub.ts";
 
 const ADMIN_TOKEN = "bridge-test-admin-token";
 const BLOB_TOKEN = "bridge-test-blob-token";
@@ -79,6 +90,18 @@ describe("bridge handshake pieces", () => {
       bridgeProtocols(upgradeRequest("/api/live-bets", [BRIDGE_WS_PROTOCOL]))
         .token,
     ).toBeNull();
+    expect(
+      bridgeProtocols(upgradeRequest("/api/live-bets", [BRIDGE_WS_PROTOCOL]))
+        .telemetry,
+    ).toBe(false);
+    expect(
+      bridgeProtocols(
+        upgradeRequest("/api/live-bets", [
+          BRIDGE_WS_PROTOCOL,
+          TELEMETRY_WS_PROTOCOL,
+        ]),
+      ).telemetry,
+    ).toBe(true);
   });
 
   test("the synthetic request turns the token into a bearer header", () => {
@@ -212,7 +235,7 @@ function frameQueue(socket: WebSocket) {
 }
 
 describe("daemon hub relays the blob gateway's bridge frames", () => {
-  let hub: Bun.Server<undefined>;
+  let hub: ReturnType<typeof startServer>;
   let gateway: Bun.Server<undefined>;
   let gatewayUrl: string;
   let browser: WebSocket | undefined;
@@ -314,4 +337,323 @@ describe("daemon hub relays the blob gateway's bridge frames", () => {
     const frame = await delivered;
     expect(frame).toEqual(rollup as unknown as Frame);
   }, 20_000);
+
+  test("the static /ready route advertises readiness with its header", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/ready`);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("Ready\n");
+    expect(response.headers.get("x-ready")).toBe("1");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  test("the static /api/version route reports package metadata", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/api/version`);
+
+    expect(response.status).toBe(200);
+    const pkg = (await Bun.file(
+      new URL("../package.json", import.meta.url),
+    ).json()) as { name?: string; version?: string };
+    const payload = (await response.json()) as {
+      name?: string;
+      version?: string;
+      bun?: string;
+      env?: string;
+    };
+    expect(payload.name).toBe(pkg.name);
+    expect(payload.version).toBe(pkg.version);
+    expect(payload.bun).toBe(Bun.version);
+    expect(payload.env).toBe(Bun.env.NODE_ENV ?? "development");
+  });
+
+  test("the static /healthz route answers without health probes", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/healthz`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    expect((await response.text()).trim()).toBe("ok");
+  });
+
+  test("status reports the env-gated console live runtimes", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/api/status`);
+
+    expect(response.ok).toBe(true);
+    const payload = (await response.json()) as {
+      consoleLive?: {
+        started?: string[];
+        skipped?: string[];
+        wagerTelemetry?: unknown;
+        thresholdAlerts?: unknown;
+      } | null;
+      server?: {
+        pendingRequests?: number;
+        pendingWebSockets?: number;
+        subscriberCounts?: Record<string, number>;
+      } | null;
+    };
+    expect(payload.consoleLive).not.toBeNull();
+    expect(payload.consoleLive?.started).toEqual([]);
+    expect(payload.consoleLive?.skipped).toEqual([
+      "wager-telemetry:disabled",
+      "threshold-alerts:disabled",
+    ]);
+    expect(payload.consoleLive?.wagerTelemetry).toBeNull();
+    expect(payload.consoleLive?.thresholdAlerts).toBeNull();
+    expect(typeof payload.server?.pendingRequests).toBe("number");
+    expect(typeof payload.server?.pendingWebSockets).toBe("number");
+    expect(Object.keys(payload.server?.subscriberCounts ?? {})).toEqual([
+      ...BRIDGE_WS_TOPICS,
+    ]);
+  });
+
+  test("a telemetry client gets binary ticks only for its subscribed topic", async () => {
+    const socket = await openSocket(
+      `ws://127.0.0.1:${hub.port}/api/live-bets`,
+      [BRIDGE_WS_PROTOCOL, TELEMETRY_WS_PROTOCOL, `bearer-${ADMIN_TOKEN}`],
+    );
+    socket.binaryType = "arraybuffer";
+
+    const subscribed = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("subscribe ack timeout")),
+        5_000,
+      );
+      const onMessage = (event: MessageEvent) => {
+        if (typeof event.data !== "string") return;
+        const frame = JSON.parse(event.data) as Frame;
+        if (
+          frame.type === "SUBSCRIBED" &&
+          frame.channel === "f402-bet-ticker"
+        ) {
+          clearTimeout(timer);
+          socket.removeEventListener("message", onMessage);
+          resolve();
+        }
+      };
+      socket.addEventListener("message", onMessage);
+    });
+
+    socket.send(
+      JSON.stringify({ type: "SUBSCRIBE", channel: "f402-bet-ticker" }),
+    );
+    await subscribed;
+
+    const status = (await (
+      await fetch(`http://127.0.0.1:${hub.port}/api/status`)
+    ).json()) as {
+      server?: { subscriberCounts?: Record<string, number> } | null;
+    };
+    expect(
+      status.server?.subscriberCounts?.["f402-bet-ticker"] ?? 0,
+    ).toBeGreaterThan(0);
+
+    const routeWord32 = encodeBridgeChannelPackedWord32(
+      "BRIDGE_01_F402_BET_TICKER_STREAM",
+      "GSLIVE",
+    );
+    const tick = {
+      routeWord32,
+      lineHundredths: asLineHundredths(-450),
+      stakeCents: asCents(12_500),
+      wagerId: 987_654_321n,
+      wallEpochMs: asWallEpochMs(Date.UTC(2026, 10, 19, 23, 30)),
+    };
+
+    const binary = new Promise<Uint8Array>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("binary tick timeout")),
+        5_000,
+      );
+      const onMessage = (event: MessageEvent) => {
+        if (!(event.data instanceof ArrayBuffer)) return;
+        clearTimeout(timer);
+        socket.removeEventListener("message", onMessage);
+        resolve(new Uint8Array(event.data));
+      };
+      socket.addEventListener("message", onMessage);
+    });
+
+    expect(publishWagerTick(tick)).toMatchObject({
+      clients: 1,
+      delivered: 1,
+      skippedByBridgeMask: 0,
+    });
+    const bytes = await binary;
+    expect(bytes.byteLength).toBe(32);
+    const decoded = readWagerTickFrame(bytes);
+    expect(decoded.routeWord32).toBe(routeWord32);
+    expect(decoded.lineHundredths).toBe(asLineHundredths(-450));
+    expect(decoded.stakeCents).toBe(asCents(12_500));
+    expect(decoded.wagerId).toBe(987_654_321n);
+
+    const unsubscribed = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("unsubscribe ack timeout")),
+        5_000,
+      );
+      const onMessage = (event: MessageEvent) => {
+        if (typeof event.data !== "string") return;
+        const frame = JSON.parse(event.data) as Frame;
+        if (
+          frame.type === "UNSUBSCRIBED" &&
+          frame.channel === "f402-bet-ticker"
+        ) {
+          clearTimeout(timer);
+          socket.removeEventListener("message", onMessage);
+          resolve();
+        }
+      };
+      socket.addEventListener("message", onMessage);
+    });
+    socket.send(
+      JSON.stringify({ type: "UNSUBSCRIBE", channel: "f402-bet-ticker" }),
+    );
+    await unsubscribed;
+
+    expect(publishWagerTick(tick)).toMatchObject({
+      clients: 1,
+      delivered: 0,
+      skippedByBridgeMask: 1,
+    });
+    socket.close();
+  }, 20_000);
+  test("file routes revalidate with Last-Modified and keep Range", async () => {
+    const identity = { "accept-encoding": "identity" };
+    const first = await fetch(`http://127.0.0.1:${hub.port}/live-bets`, {
+      headers: identity,
+    });
+    expect(first.status).toBe(200);
+    const lastModified = first.headers.get("last-modified");
+    if (lastModified === null) throw new Error("Last-Modified missing");
+
+    const revalidated = await fetch(`http://127.0.0.1:${hub.port}/live-bets`, {
+      headers: { ...identity, "if-modified-since": lastModified },
+    });
+    expect(revalidated.status).toBe(304);
+
+    const ranged = await fetch(`http://127.0.0.1:${hub.port}/live-bets`, {
+      headers: { ...identity, range: "bytes=0-9" },
+    });
+    expect(ranged.status).toBe(206);
+    expect((await ranged.text()).length).toBe(10);
+
+    const ifRangeMatch = await fetch(`http://127.0.0.1:${hub.port}/live-bets`, {
+      headers: {
+        ...identity,
+        range: "bytes=0-9",
+        "if-range": lastModified,
+      },
+    });
+    expect(ifRangeMatch.status).toBe(206);
+
+    const ifRangeStale = await fetch(`http://127.0.0.1:${hub.port}/live-bets`, {
+      headers: {
+        ...identity,
+        range: "bytes=0-9",
+        "if-range": "Wed, 21 Oct 2015 07:28:00 GMT",
+      },
+    });
+    expect(ifRangeStale.status).toBe(200);
+    expect((await ifRangeStale.text()).length).toBeGreaterThan(10);
+
+    // A Range request must win over compression: it asks for bytes on the
+    // wire, not for the full compressed representation.
+    const compressedRange = await fetch(
+      `http://127.0.0.1:${hub.port}/live-bets`,
+      { headers: { "accept-encoding": "gzip", range: "bytes=0-9" } },
+    );
+    expect(compressedRange.status).toBe(206);
+    expect(compressedRange.headers.get("content-encoding")).toBeNull();
+    expect(compressedRange.headers.get("content-range")).toStartWith(
+      "bytes 0-9/",
+    );
+
+    const assetRange = await fetch(
+      `http://127.0.0.1:${hub.port}/assets/pipeline-6-layer-data-cleaning.svg`,
+      { headers: { "accept-encoding": "gzip", range: "bytes=0-9" } },
+    );
+    expect(assetRange.status).toBe(206);
+    expect(assetRange.headers.get("content-range")).toStartWith("bytes 0-9/");
+  });
+
+  test("the buffered /status route revalidates with an ETag", async () => {
+    const first = await fetch(`http://127.0.0.1:${hub.port}/status`);
+
+    expect(first.status).toBe(200);
+    expect(first.headers.get("content-type")).toContain("text/html");
+    const etag = first.headers.get("etag");
+    if (etag === null) throw new Error("ETag missing");
+
+    const revalidated = await fetch(`http://127.0.0.1:${hub.port}/status`, {
+      headers: { "if-none-match": etag },
+    });
+    expect(revalidated.status).toBe(304);
+  });
+
+  test("admin reload refreshes static routes and requires the token", async () => {
+    const denied = await fetch(
+      `http://127.0.0.1:${hub.port}/api/admin/reload-static`,
+      { method: "POST" },
+    );
+    expect(denied.status).toBe(401);
+
+    const allowed = await fetch(
+      `http://127.0.0.1:${hub.port}/api/admin/reload-static`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+      },
+    );
+    expect(allowed.status).toBe(200);
+    expect(await allowed.json()).toMatchObject({ success: true });
+
+    const version = await fetch(`http://127.0.0.1:${hub.port}/api/version`);
+    expect(version.status).toBe(200);
+  });
+  test("routed endpoints preserve the global OPTIONS preflight", async () => {
+    for (const path of [
+      "/health",
+      "/healthz",
+      "/ready",
+      "/api/version",
+      "/api/config",
+      "/status",
+    ]) {
+      const response = await fetch(`http://127.0.0.1:${hub.port}${path}`, {
+        method: "OPTIONS",
+        headers: {
+          origin: "http://127.0.0.1:58514",
+          "access-control-request-method": "GET",
+        },
+      });
+      expect(response.status).toBe(204);
+      expect(await response.text()).toBe("");
+    }
+  });
+
+  test("the static /api/config route reports non-secret features", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/api/config`);
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      env?: unknown;
+      runtime?: unknown;
+      features?: {
+        wagerTelemetry?: unknown;
+        thresholdAlerts?: unknown;
+      };
+    };
+    expect(body.env).toBe(Bun.env.NODE_ENV ?? "development");
+    expect(typeof body.runtime).toBe("string");
+    expect(typeof body.features?.wagerTelemetry).toBe("boolean");
+    expect(typeof body.features?.thresholdAlerts).toBe("boolean");
+  });
+
+  test("the async /health route survives a static-route reload", async () => {
+    const response = await fetch(`http://127.0.0.1:${hub.port}/health`);
+
+    expect([200, 503]).toContain(response.status);
+    const body = (await response.json()) as { status?: unknown };
+    expect(typeof body.status).toBe("string");
+  });
 });

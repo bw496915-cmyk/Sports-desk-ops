@@ -18,6 +18,7 @@
  *      bun run xml:status            bun run xml:ingest -- --dry-run
  */
 import { join } from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { R2S3Client } from "../lib/r2_s3_client.ts";
 import {
   PORTAL_TAXONOMY_MANIFEST_KEY,
@@ -271,7 +272,7 @@ export function describeStatus(outcome: ArtifactOutcome): StatusLine {
 }
 
 function forward(script: string, args: readonly string[]): number {
-  const result = Bun.spawnSync(
+  const result = spawnSyncBounded(
     [process.execPath, "run", join(ROOT, script), ...args],
     {
       cwd: ROOT,

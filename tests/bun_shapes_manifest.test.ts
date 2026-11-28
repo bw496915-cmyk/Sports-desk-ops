@@ -122,6 +122,7 @@ describe("manifest", () => {
       "Subprocess",
       "TerminalOptions",
       "WebSocket",
+      "WebSocketOptions",
       "Worker",
       "udp",
     ]);

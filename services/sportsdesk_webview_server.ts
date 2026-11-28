@@ -15,9 +15,16 @@
 import type { TrackerState } from "../lib/tracker_dashboard.ts";
 import { writeAuditEntry } from "../lib/audit_log.ts";
 import crypto from "node:crypto";
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import {
+  basename,
+  dirname,
+  extname,
+  isAbsolute,
+  relative,
+  resolve,
+} from "node:path";
 import {
   LIVE_FILTER,
   SPORT_CATEGORIES,
@@ -104,6 +111,10 @@ import { probeR2PipelineKpis } from "../lib/r2_pipeline_kpis.ts";
 import { probeCanonicalManifestKpis } from "../lib/r2_canonical_manifests.ts";
 import { ReportingSchedulerService } from "./reporting_scheduler_service.ts";
 import {
+  startConsoleLiveRuntimes,
+  type ConsoleLiveRuntimeStatus,
+} from "./console_live_runtimes.ts";
+import {
   describeSource,
   resolveSecretEnv,
   SECRET_ENV_GROUPS,
@@ -176,6 +187,7 @@ import {
   type RawHierarchyTree,
 } from "../lib/hierarchy_view.ts";
 import { encodedResponse, negotiateEncoding } from "../lib/http_compression.ts";
+import { createServeFile } from "../lib/serve_file.ts";
 import { imageErrorCode, type ImageErrorCode } from "../lib/image_errors.ts";
 import {
   contentTypeFor,
@@ -188,6 +200,15 @@ import {
   sendFrameOrClose,
   WS_BACKPRESSURE_OPTIONS,
 } from "../lib/ws_backpressure.ts";
+import {
+  asTransportBridgeBitMask32,
+  TRANSPORT_BRIDGE_SPECIFICATION_TABLE,
+} from "../lib/bridge_and_channel_router.ts";
+import {
+  WagerTelemetryHub,
+  type WagerTickBroadcastResult,
+  type WagerTickInput,
+} from "../lib/wager_telemetry_hub.ts";
 import {
   createDeskLiveReads,
   parseLiveSourceMode,
@@ -290,14 +311,42 @@ const repoRoot = resolve(
  * The version is the path plus the file's mtime/size: two files can share a timestamp, and a
  * rewritten artifact must not reuse the previous body.
  */
+/** Serve one known file through the slice-based range handler. */
+async function serveFileRange(
+  req: Request,
+  path: string,
+  contentType: string,
+  headers: Record<string, string>,
+): Promise<Response> {
+  const root = dirname(path);
+  const url = new URL(req.url);
+  url.pathname = `/${basename(path)}`;
+  return createServeFile({
+    root,
+    cacheControl:
+      headers["Cache-Control"] ??
+      headers["cache-control"] ??
+      "public, max-age=60",
+    types: { [extname(path).toLowerCase()]: contentType },
+    headers,
+    disposition: "none",
+  })(req, url);
+}
+
 async function fileResponse(
   req: Request,
   path: string,
   contentType: string,
   headers: Record<string, string>,
 ): Promise<Response> {
-  // A client that accepts no encoding gets the file streamed by Bun, which keeps byte ranges and
-  // does no work in this process. Only the compressed path needs the bytes in memory.
+  // A Range request is answered by the slice-based handler in lib/serve_file.ts: it owns
+  // single/multipart ranges, If-Range and 416, and buffering a compressed body would otherwise
+  // turn the range into a full 200.
+  if (req.headers.get("range") !== null) {
+    return serveFileRange(req, path, contentType, headers);
+  }
+  // A client that accepts no encoding gets the file streamed by Bun. Only the compressed path
+  // needs the bytes in memory.
   if (negotiateEncoding(req.headers.get("accept-encoding")) === null) {
     const file = Bun.file(path);
     if (!(await file.exists())) {
@@ -310,9 +359,26 @@ async function fileResponse(
         { status: 404, headers },
       );
     }
-    return new Response(file, {
-      headers: { ...headers, "Content-Type": contentType },
-    });
+    const lastModified = file.lastModified;
+    const responseHeaders = {
+      ...headers,
+      "Content-Type": contentType,
+      "Last-Modified": new Date(lastModified).toUTCString(),
+    };
+    // A Range request is a partial fetch, not a revalidation; let Bun answer it.
+    if (req.headers.get("range") === null) {
+      const ifModifiedSince = req.headers.get("if-modified-since");
+      if (ifModifiedSince !== null) {
+        const since = Date.parse(ifModifiedSince);
+        if (
+          Number.isFinite(since) &&
+          Math.floor(lastModified / 1_000) <= Math.floor(since / 1_000)
+        ) {
+          return new Response(null, { status: 304, headers: responseHeaders });
+        }
+      }
+    }
+    return new Response(file, { headers: responseHeaders });
   }
 
   const bytes = await readFileBytes(path);
@@ -334,10 +400,19 @@ async function fileResponse(
   });
 }
 
+/** Bun.serve's own TLS option (cert/key/CA and ALPNProtocols), passed through verbatim. */
+type ServeTlsOptions = Parameters<typeof Bun.serve>[0] extends {
+  readonly tls?: infer T;
+}
+  ? T
+  : never;
+
 export interface ServerOptions {
   readonly port?: number;
   readonly hostname?: string;
   readonly unix?: string;
+  /** Opt in to a TLS listener; omit for the existing plain-HTTP/unix behavior. */
+  readonly tls?: ServeTlsOptions;
   readonly development?: boolean | { readonly hmr?: boolean };
   /** Where `bet-ticker.json` and `live-wagers.json` live; defaults to the repo's `data/`. */
   readonly wagerListDir?: string;
@@ -784,6 +859,126 @@ export function resolveAllowedOrigins(
   return allowedOrigins;
 }
 
+/** The runtime's own truthy-flag vocabulary, mirrored from the console runtimes. */
+function envFlag(value: string | undefined): boolean {
+  if (value === undefined) return false;
+  return ["1", "true", "on", "yes"].includes(value.trim().toLowerCase());
+}
+
+interface PackageMeta {
+  readonly name?: string;
+  readonly version?: string;
+}
+
+/** Read once per call; an unreadable manifest falls back instead of failing the server. */
+function readPackageMeta(): PackageMeta {
+  try {
+    const parsed: unknown = JSON.parse(
+      readFileSync(resolve(import.meta.dir, "../package.json"), "utf8"),
+    );
+    if (typeof parsed === "object" && parsed !== null) {
+      const name =
+        "name" in parsed && typeof parsed.name === "string"
+          ? parsed.name
+          : undefined;
+      const version =
+        "version" in parsed && typeof parsed.version === "string"
+          ? parsed.version
+          : undefined;
+      return {
+        ...(name === undefined ? {} : { name }),
+        ...(version === undefined ? {} : { version }),
+      };
+    }
+  } catch {
+    // A missing or unreadable manifest must not stop the server.
+  }
+  return {};
+}
+
+/**
+ * The static route table. Bun caches these Response objects for the server's
+ * lifetime; update them with `server.reload({ routes })`, never by mutating them.
+ */
+function readStaticBytes(path: string): Uint8Array | null {
+  try {
+    return new Uint8Array(readFileSync(path));
+  } catch {
+    return null;
+  }
+}
+
+type StaticRouteValue = {
+  readonly OPTIONS: (req: Request) => Response;
+  readonly GET: Response;
+};
+
+function buildStaticRoutes(
+  meta: PackageMeta,
+  repoRoot: string,
+  preflight: (req: Request) => Response,
+): Record<string, StaticRouteValue> {
+  const routes: Record<string, StaticRouteValue> = {
+    "/healthz": {
+      OPTIONS: preflight,
+      GET: new Response("ok\n", {
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      }),
+    },
+    "/api/version": {
+      OPTIONS: preflight,
+      GET: Response.json({
+        name: meta.name ?? "sportsdesk-ops",
+        version: meta.version ?? "unknown",
+        bun: Bun.version,
+        env: Bun.env.NODE_ENV ?? "development",
+      }),
+    },
+    "/ready": {
+      OPTIONS: preflight,
+      GET: new Response("Ready\n", {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "no-store",
+          "x-ready": "1",
+        },
+      }),
+    },
+    "/api/config": {
+      OPTIONS: preflight,
+      GET: Response.json({
+        env: Bun.env.NODE_ENV ?? "development",
+        runtime: `bun ${Bun.version}`,
+        features: {
+          wagerTelemetry: envFlag(Bun.env.SPORTSDESK_WAGER_TELEMETRY),
+          thresholdAlerts: envFlag(Bun.env.SPORTSDESK_THRESHOLD_ALERTS),
+        },
+      }),
+    },
+  };
+
+  // Small, frequently viewed page: buffer it once and let Bun's static route cache
+  // it for the process lifetime (ETag + If-None-Match 304 included). A missing file
+  // falls back to the fetch/file route instead of failing startup.
+  const statusHtml = readStaticBytes(resolve(repoRoot, "static/status.html"));
+  if (statusHtml !== null) {
+    const headers = {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-cache",
+    } as const;
+    routes["/status"] = {
+      OPTIONS: preflight,
+      GET: new Response(statusHtml.slice(), { headers }),
+    };
+    routes["/status/"] = {
+      OPTIONS: preflight,
+      GET: new Response(statusHtml.slice(), { headers }),
+    };
+  }
+
+  return routes;
+}
+
 export function startServer(options?: ServerOptions) {
   const telegramService = new SportsDeskTelegramService();
   const scheduler = new ReportingSchedulerService(telegramService);
@@ -1115,12 +1310,57 @@ export function startServer(options?: ServerOptions) {
     };
   }
 
+  // Static route metadata: read once at startup, then served from memory.
+  const packageMeta = readPackageMeta();
+
+  // The console live runtimes start after Bun.serve; the status route reads this
+  // request-time view so it can report which channels are running.
+  let consoleLiveStatusReader: (() => ConsoleLiveRuntimeStatus) | null = null;
+
+  const preflightResponse = (req: Request): Response =>
+    new Response(null, { status: 204, headers: corsHeadersFor(req) });
+
+  const healthRoute = async (req: Request): Promise<Response> => {
+    if (req.method === "OPTIONS") return preflightResponse(req);
+    // The error-boundary test triggers a non-Error through this route; the guard
+    // used to live in `fetch`, which routes bypass.
+    if (new URL(req.url).searchParams.get("trigger_error") === "non_error") {
+      throw "Synthetic non-Error thrown in handler";
+    }
+    const nodeEnv = Bun.env.NODE_ENV || "development";
+    const health = await buildDeskEnhancedHealth({
+      port: server.port ?? Number(Bun.env.PORT ?? 4020),
+      hostname: server.hostname ?? "127.0.0.1",
+      url: server.url ? server.url.toString() : "unix://socket",
+      uptimeSeconds: Math.floor(process.uptime()),
+      runtime: `Bun v${Bun.version} (${process.arch}-${process.platform})`,
+      ingress,
+      nodeEnv,
+      readGsliveHealth: () => gsliveSessionMonitor.read(false),
+    });
+    return Response.json(health, {
+      status: health.httpStatus,
+      headers: corsHeadersFor(req),
+    });
+  };
+  // The full route table: static routes plus the async health probe. Reload must
+  // rebuild this whole table, not just the static subset, or `/health` would 404.
+  const buildRoutes = (meta: PackageMeta) => ({
+    ...buildStaticRoutes(meta, repoRoot, preflightResponse),
+    "/health": healthRoute,
+  });
+
   const serveConfig = {
+    ...(options?.tls === undefined ? {} : { tls: options.tls }),
     development: isDevelopment ? { hmr: false } : false,
     // Bodies here are small JSON documents and one 1 MiB form probe. Without a cap a chunked
     // request is buffered in full by `req.json()` / `arrayBuffer()` (measured: a 6 MiB POST to
     // /api/telegram/alert was accepted), which is a memory DoS on an unauthenticated port.
     maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
+
+    // Static route: zero-allocation dispatch for a liveness probe that, unlike
+    // /health, does not run the KPI/auth probes.
+    routes: buildRoutes(packageMeta),
 
     async fetch(req) {
       const url = new URL(req.url);
@@ -1702,23 +1942,21 @@ export function startServer(options?: ServerOptions) {
         );
       }
 
-      // 6. Health & Telemetry Probe
-      if (pathname === "/health") {
-        const nodeEnv = Bun.env.NODE_ENV || "development";
-        const health = await buildDeskEnhancedHealth({
-          port: server.port ?? Number(Bun.env.PORT ?? 4020),
-          hostname: server.hostname ?? "127.0.0.1",
-          url: server.url ? server.url.toString() : "unix://socket",
-          uptimeSeconds: Math.floor(process.uptime()),
-          runtime: `Bun v${Bun.version} (${process.arch}-${process.platform})`,
-          ingress,
-          nodeEnv,
-          readGsliveHealth: () => gsliveSessionMonitor.read(false),
-        });
-        return Response.json(health, {
-          status: health.httpStatus,
-          headers: cors,
-        });
+      // Admin: refresh the cached static routes from the current manifest.
+      if (pathname === "/api/admin/reload-static" && req.method === "POST") {
+        const rejected = adminRejection(req);
+        if (rejected !== null) {
+          return Response.json(
+            { success: false, ...rejected },
+            { status: rejected.status, headers: cors },
+          );
+        }
+        const refreshed = readPackageMeta();
+        server.reload({ routes: buildRoutes(refreshed) });
+        return Response.json(
+          { success: true, version: refreshed.version ?? "unknown" },
+          { headers: cors },
+        );
       }
 
       if (
@@ -1755,6 +1993,20 @@ export function startServer(options?: ServerOptions) {
             status: ok ? "serving" : "degraded",
             checks,
             live: deskLive.statusBlock(),
+            consoleLive:
+              consoleLiveStatusReader === null
+                ? null
+                : consoleLiveStatusReader(),
+            server: {
+              pendingRequests: server.pendingRequests,
+              pendingWebSockets: server.pendingWebSockets,
+              subscriberCounts: Object.fromEntries(
+                BRIDGE_WS_TOPICS.map((topic) => [
+                  topic,
+                  server.subscriberCount(topic),
+                ]),
+              ),
+            },
             health: {
               // process.cpuUsage() is cumulative CPU time since start, not utilisation; the old
               // `cpu` label invited reading it as load.
@@ -3805,9 +4057,9 @@ export function startServer(options?: ServerOptions) {
         { status: 500, headers: baseHeaders },
       );
     },
-  } satisfies Parameters<typeof Bun.serve>[0];
+  } satisfies BridgeServeConfig;
 
-  const server: Bun.Server<undefined> = Bun.serve({
+  const server: Bun.Server<BridgeSocketData> = Bun.serve<BridgeSocketData>({
     ...serveConfig,
     // The dashboard's live bridge upgrades a guarded route that is already in DAEMON_ROUTES.
     fetch: withBridgeUpgrade(
@@ -3832,6 +4084,21 @@ export function startServer(options?: ServerOptions) {
   });
   attachBridgeHub(server);
   attachMcpServerStop(server, serveConfig);
+  // Both channels are off unless their env flag is set (services/console_live_runtimes.ts).
+  const liveRuntime = startConsoleLiveRuntimes({
+    cwd: repoRoot,
+    publishTick: publishWagerTick,
+    bridgeLagMs: () =>
+      bridgeRelayLastFrameAtIso === null
+        ? null
+        : Date.now() - Date.parse(bridgeRelayLastFrameAtIso),
+  });
+  consoleLiveStatusReader = () => liveRuntime.statusBlock();
+  const stopWithConsoleLive = server.stop.bind(server);
+  server.stop = (closeActiveConnections?: boolean) => {
+    liveRuntime.stop();
+    return stopWithConsoleLive(closeActiveConnections);
+  };
   return server;
 }
 
@@ -4657,6 +4924,9 @@ export const BRIDGE_WS_TOPICS = [
 /** Offered first by the dashboard; the server echoes it so the browser accepts the upgrade. */
 export const BRIDGE_WS_PROTOCOL = "sportsdesk.bridge.v1";
 
+/** Opt-in subprotocol for binary wager ticks; without it a socket only ever receives text. */
+export const TELEMETRY_WS_PROTOCOL = "sportsdesk.telemetry.v1";
+
 /** Browsers cannot set headers on a WebSocket, so the bearer rides in the subprotocol list. */
 const BRIDGE_WS_TOKEN_PREFIX = "bearer-";
 
@@ -4665,20 +4935,45 @@ const BRIDGE_WS_PATH = "/api/live-bets";
 
 const BRIDGE_WS_CHANNEL_RE = /^[a-z0-9-]{1,32}$/;
 
+export type BridgeSocketData = { readonly telemetry: boolean };
+
+type BridgeServeConfig = Parameters<typeof Bun.serve<BridgeSocketData>>[0];
+
 type BridgeSocket = {
+  readonly data?: BridgeSocketData | undefined;
   readonly subscriptions: readonly string[];
   subscribe: (channel: string) => void;
   unsubscribe: (channel: string) => void;
-  send: (frame: string) => number;
+  send: (
+    frame: string | Uint8Array | ArrayBuffer,
+    compress?: boolean,
+  ) => number;
+  pause: () => void;
+  resume: () => void;
   close: (code?: number, reason?: string) => void;
 };
 
 type BridgeProtocols = {
   readonly token: string | null;
   readonly echo: string | null;
+  readonly telemetry: boolean;
 };
 
-let bridgeHub: Bun.Server<undefined> | null = null;
+const wagerTelemetryHub = new WagerTelemetryHub();
+/** Bridge bits a socket subscribed to; absent for sockets that did not opt into telemetry. */
+const telemetryMasks = new WeakMap<BridgeSocket, number>();
+
+/** Topic -> transport bridge bit, from the same table that defines the topics. */
+const TOPIC_BRIDGE_BITS: ReadonlyMap<string, number> = new Map(
+  Object.values(TRANSPORT_BRIDGE_SPECIFICATION_TABLE).map(
+    (specification): [string, number] => [
+      specification.webSocketSubscriptionTopic,
+      1 << specification.bridgeOrdinal4,
+    ],
+  ),
+);
+
+let bridgeHub: Bun.Server<BridgeSocketData> | null = null;
 let bridgeRelaySocket: WebSocket | null = null;
 let bridgeRelayTimer: ReturnType<typeof setTimeout> | null = null;
 let bridgeRelayBackoffMs = 1_000;
@@ -4687,7 +4982,7 @@ let bridgeRelayStarted = false;
 let bridgeRelayLastFrameAtIso: string | null = null;
 
 /** Give the upgrade path the live server instance; `startServer` calls this after `Bun.serve`. */
-export function attachBridgeHub(server: Bun.Server<undefined>): void {
+export function attachBridgeHub(server: Bun.Server<BridgeSocketData>): void {
   bridgeHub = server;
 }
 
@@ -4715,6 +5010,7 @@ export function bridgeProtocols(req: Request): BridgeProtocols {
     token:
       bearer === undefined ? null : bearer.slice(BRIDGE_WS_TOKEN_PREFIX.length),
     echo: offered.includes(BRIDGE_WS_PROTOCOL) ? BRIDGE_WS_PROTOCOL : null,
+    telemetry: offered.includes(TELEMETRY_WS_PROTOCOL),
   };
 }
 
@@ -4757,17 +5053,35 @@ export function withBridgeUpgrade(
     );
     if (rejected !== null)
       return bridgeRefusal(rejected.status, rejected.error);
-    const { echo } = bridgeProtocols(req);
-    const upgraded = server.upgrade(
-      req,
-      echo === null ? {} : { headers: { "Sec-WebSocket-Protocol": echo } },
-    );
+    const protocols = bridgeProtocols(req);
+    const upgraded = server.upgrade(req, {
+      data: { telemetry: protocols.telemetry },
+      ...(protocols.echo === null
+        ? {}
+        : { headers: { "Sec-WebSocket-Protocol": protocols.echo } }),
+    });
     return upgraded ? undefined : bridgeRefusal(426, "upgrade_failed");
   };
 }
 
 function bridgeSend(socket: BridgeSocket, payload: unknown): void {
   sendFrameOrClose(socket, JSON.stringify(payload));
+}
+
+/**
+ * Keep the hub mask equal to the channels the socket actually subscribed to. A socket that did
+ * not offer `TELEMETRY_WS_PROTOCOL` is absent from the map and never enters the hub.
+ */
+function updateTelemetryMask(
+  socket: BridgeSocket,
+  bit: number,
+  subscribed: boolean,
+): void {
+  const current = telemetryMasks.get(socket);
+  if (current === undefined) return;
+  const next = subscribed ? current | bit : current & ~bit;
+  telemetryMasks.set(socket, next);
+  wagerTelemetryHub.add(socket, asTransportBridgeBitMask32(next));
 }
 
 /**
@@ -4779,7 +5093,11 @@ export const bridgeWebsocket = {
   // Relayed rollups go out through `bridgeHub.publish`, which drops frames for a stalled tab
   // while the socket stays open; the cap closes it so the page reconnects and resubscribes.
   ...WS_BACKPRESSURE_OPTIONS,
-  open(): void {
+  open(ws: BridgeSocket): void {
+    if (ws.data?.telemetry === true) {
+      telemetryMasks.set(ws, 0);
+      wagerTelemetryHub.add(ws, asTransportBridgeBitMask32(0));
+    }
     startBridgeRelay();
   },
   message(ws: BridgeSocket, raw: string | Buffer): void {
@@ -4808,6 +5126,8 @@ export const bridgeWebsocket = {
     }
     if (msg.type === "SUBSCRIBE") {
       ws.subscribe(msg.channel);
+      const bridgeBit = TOPIC_BRIDGE_BITS.get(msg.channel) ?? 0;
+      if (bridgeBit !== 0) updateTelemetryMask(ws, bridgeBit, true);
       bridgeSend(ws, {
         type: "SUBSCRIBED",
         channel: msg.channel,
@@ -4821,6 +5141,8 @@ export const bridgeWebsocket = {
       return;
     }
     ws.unsubscribe(msg.channel);
+    const bridgeBit = TOPIC_BRIDGE_BITS.get(msg.channel) ?? 0;
+    if (bridgeBit !== 0) updateTelemetryMask(ws, bridgeBit, false);
     bridgeSend(ws, {
       type: "UNSUBSCRIBED",
       channel: msg.channel,
@@ -4828,7 +5150,10 @@ export const bridgeWebsocket = {
       subscriptions: ws.subscriptions,
     });
   },
-  close(): void {},
+  close(ws: BridgeSocket): void {
+    wagerTelemetryHub.remove(ws);
+    telemetryMasks.delete(ws);
+  },
   error(error: Error, ws: BridgeSocket): void {
     console.error("[bridge] websocket handler failed:", error);
     try {
@@ -4838,6 +5163,16 @@ export const bridgeWebsocket = {
     }
   },
 };
+
+/**
+ * Publish one wager tick to telemetry-capable bridge sockets whose subscriptions include the
+ * frame's bridge. Text-only bridge clients are unaffected: they never enter the hub.
+ */
+export function publishWagerTick(
+  input: WagerTickInput,
+): WagerTickBroadcastResult {
+  return wagerTelemetryHub.broadcastTick(input);
+}
 
 /** Connect once to the blob gateway and republish its bridge frames onto the local hub. */
 function startBridgeRelay(): void {
@@ -5415,6 +5750,7 @@ async function serveContainedAsset(
   const textMime = ASSET_TEXT_MIMES[ext];
   if (
     textMime !== undefined &&
+    req.headers.get("range") === null &&
     negotiateEncoding(req.headers.get("accept-encoding")) !== null
   ) {
     const raw = await readFileBytes(contained);
@@ -5475,9 +5811,9 @@ async function buildLogoMetaResponse(
   );
 }
 
-function peerGames<T extends LiveBetGame>(
+function peerGames<T extends LiveBetGame, TWs>(
   req: Request,
-  server: Bun.Server<undefined>,
+  server: Bun.Server<TWs>,
   ingress: Ingress,
   games: readonly T[],
 ): readonly T[] {
@@ -5487,11 +5823,11 @@ function peerGames<T extends LiveBetGame>(
   );
 }
 
-function respondLiveBetsV2(
+function respondLiveBetsV2<TWs>(
   req: Request,
   resolved: import("../src/contracts/live_bets.v2.ts").LiveBetsV2Response,
   cors: Record<string, string>,
-  server: Bun.Server<undefined>,
+  server: Bun.Server<TWs>,
   ingress: Ingress,
 ): Response {
   const trustedPeer = peerIsTrusted(server.requestIP(req)?.address, ingress);
@@ -5570,8 +5906,8 @@ function getOrCreateWebviewMcpHandler(
   return created;
 }
 
-function attachMcpServerStop(
-  server: Bun.Server<undefined>,
+function attachMcpServerStop<TWs>(
+  server: Bun.Server<TWs>,
   owner: object,
 ): void {
   const originalStop = server.stop.bind(server);

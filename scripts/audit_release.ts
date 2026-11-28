@@ -15,11 +15,12 @@ import {
   compareReleaseTags,
   parseReleases,
 } from "../lib/ops_audit.ts";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");
 
-const tagsResult = Bun.spawnSync(["git", "tag", "--list", "docs-v*"], {
+const tagsResult = spawnSyncBounded(["git", "tag", "--list", "docs-v*"], {
   env: {
     ...Bun.env,
     GIT_CONFIG_GLOBAL: Bun.env.GIT_CONFIG_GLOBAL ?? "/dev/null",

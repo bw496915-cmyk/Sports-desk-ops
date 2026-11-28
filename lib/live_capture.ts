@@ -27,6 +27,7 @@ import {
   type ProbeBodyOptions,
   type ProbeOp,
 } from "./f402_probe.ts";
+import { spawnSyncBounded } from "./spawn_sync_bounded.ts";
 import { buildArtifact, readPendingRows } from "./live_bets.ts";
 import { clipDisplay } from "./terminal_format.ts";
 import { betTickerFile } from "./live_wagers.ts";
@@ -466,7 +467,7 @@ export function validatePaste(
 async function writeTextAtomic(path: string, text: string): Promise<void> {
   const temporary = `${path}.tmp`;
   await Bun.write(temporary, text);
-  const moved = Bun.spawnSync(["mv", "-f", temporary, path]);
+  const moved = spawnSyncBounded(["mv", "-f", temporary, path]);
   if (moved.exitCode !== 0) {
     throw new Error(`could not replace ${path} atomically`);
   }

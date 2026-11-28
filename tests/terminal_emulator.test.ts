@@ -590,3 +590,260 @@ describe("SportsDesk Terminal Emulator & Query Engine", () => {
     expect(watchDenied.stdout).toContain("--watch is only available");
   });
 });
+
+describe("profile console depth → PTY env", () => {
+  test("an explicit resolved depth is injected into the child env", async () => {
+    const depth = await executeTerminalQuery("printenv PTY_CONSOLE_DEPTH", {
+      consoleDepth: 6,
+    });
+    expect(depth.stdout).toContain("6");
+
+    const options = await executeTerminalQuery("printenv BUN_OPTIONS", {
+      consoleDepth: 6,
+      env: { BUN_OPTIONS: "--smol" },
+    });
+    expect(options.stdout).toContain("--smol --console-depth=6");
+  });
+
+  test("the registry-emitted PTY_CONSOLE_DEPTH is the fallback", async () => {
+    const depth = await executeTerminalQuery("printenv PTY_CONSOLE_DEPTH", {
+      env: { PTY_CONSOLE_DEPTH: "5" },
+    });
+    expect(depth.stdout).toContain("5");
+  });
+
+  test("an invalid explicit depth leaves the env fallback intact", async () => {
+    const fractional = await executeTerminalQuery(
+      "printenv PTY_CONSOLE_DEPTH",
+      { consoleDepth: 1.5, env: { PTY_CONSOLE_DEPTH: "3" } },
+    );
+    expect(fractional.stdout).toContain("3");
+  });
+
+  test("fractional, NaN and negative depths add no flag", async () => {
+    for (const invalid of [1.5, Number.NaN, -1]) {
+      const result = await executeTerminalQuery("printenv BUN_OPTIONS", {
+        consoleDepth: invalid,
+      });
+      expect(result.stdout).not.toContain("--console-depth");
+    }
+  });
+
+  test("a duplicate inherited depth flag is replaced, not appended", async () => {
+    const result = await executeTerminalQuery("printenv BUN_OPTIONS", {
+      consoleDepth: 6,
+      env: { BUN_OPTIONS: "--console-depth=8 --smol" },
+    });
+    const flags = result.stdout.trim();
+    expect(flags.match(/--console-depth/g)).toHaveLength(1);
+    expect(flags).toContain("--console-depth=6");
+    expect(flags).toContain("--smol");
+  });
+
+  test("the 999999 sentinel is stripped from the env, not translated to unlimited", async () => {
+    const options = await executeTerminalQuery("printenv BUN_OPTIONS", {
+      env: {
+        PTY_CONSOLE_DEPTH: "999999",
+        BUN_OPTIONS: "--console-depth=999999 --smol",
+      },
+    });
+    expect(options.stdout).not.toContain("999999");
+    expect(options.stdout).toContain("--smol");
+
+    const depth = await executeTerminalQuery("printenv PTY_CONSOLE_DEPTH", {
+      env: { PTY_CONSOLE_DEPTH: "999999" },
+    });
+    expect(depth.stdout).not.toContain("999999");
+  });
+
+  test("a malformed inherited PTY_CONSOLE_DEPTH is cleared", async () => {
+    const result = await executeTerminalQuery("printenv PTY_CONSOLE_DEPTH", {
+      env: { PTY_CONSOLE_DEPTH: "6.9" },
+    });
+    expect(result.stdout.trim()).toBe("");
+  });
+});
+
+describe("console depth diagnostic", () => {
+  test("reports the resolution chain and effective winner", async () => {
+    const result = await executeTerminalQuery("depth");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("CONSOLE DEPTH");
+    expect(result.stdout).toContain("profile env PTY_CONSOLE_DEPTH");
+    expect(result.stdout).toContain("bunfig [console].depth");
+    expect(result.stdout).toContain("effective at runtime");
+  });
+
+  test("a bunfig in the executor cwd beats the profile env", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "depth-command-"));
+    try {
+      writeFileSync(join(dir, "bunfig.toml"), "[console]\ndepth = 5\n");
+      const result = await executeTerminalQuery("depth", {
+        cwd: dir,
+        env: { PTY_CONSOLE_DEPTH: "3" },
+      });
+      expect(result.stdout).toContain("profile env PTY_CONSOLE_DEPTH : 3");
+      expect(result.stdout).toContain("bunfig [console].depth       : 5");
+      expect(result.stdout).toContain(
+        "effective at runtime         : 5 (bunfig [console].depth)",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("falls back to PTY_CONSOLE_DEPTH when no bunfig depth exists", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "depth-command-"));
+    try {
+      const result = await executeTerminalQuery("depth", {
+        cwd: dir,
+        env: { PTY_CONSOLE_DEPTH: "3" },
+      });
+      expect(result.stdout).toContain(
+        "effective at runtime         : 3 (PTY_CONSOLE_DEPTH)",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("the console-depth alias resolves to the same command", async () => {
+    const result = await executeTerminalQuery("console-depth");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("CONSOLE DEPTH");
+  });
+});
+
+test.skipIf(!hasPty || Bun.which("seq") === null)(
+  "the executor caps output at 4 MiB and reports truncation",
+  async () => {
+    const result = await executeTerminalQuery("seq 1 700000");
+
+    expect(result.truncated).toBe(true);
+    expect(result.outputBytes).toBeGreaterThan(4 * 1024 * 1024);
+    expect(Buffer.byteLength(result.stdout, "utf8")).toBeLessThanOrEqual(
+      4 * 1024 * 1024,
+    );
+    expect(result.durationMs).toBeLessThan(5_000);
+  },
+  20_000,
+);
+test.skipIf(!hasPty || Bun.which("sleep") === null)(
+  "an AbortSignal cancels a running PTY child",
+  async () => {
+    const controller = new AbortController();
+    const pending = executeTerminalQuery("sleep 5", {
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(), 50);
+
+    const result = await pending;
+
+    expect(result.durationMs).toBeLessThan(3_000);
+    expect(result.exitCode).not.toBe(0);
+  },
+  10_000,
+);
+
+test("profile --compare renders both profiles with deltas", async () => {
+  const result = await executeTerminalQuery("profile GP301 --compare BRT5229");
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toContain("PROFILE COMPARISON");
+  expect(result.stdout).toContain("GP301");
+  expect(result.stdout).toContain("BRT5229");
+  expect(result.stdout).toContain("Sharp score");
+  expect(result.stdout).toContain("Δ");
+});
+
+test("profile --compare supports the = form and --json", async () => {
+  const result = await executeTerminalQuery(
+    "profile GP301 --compare=BRT5229 --json",
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(JSON.parse(result.stdout)).toMatchObject({
+    left: { id: "GP301" },
+    right: { id: "BRT5229" },
+  });
+});
+
+test("profile --compare requires an id", async () => {
+  const result = await executeTerminalQuery("profile GP301 --compare");
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toContain("requires a customer id");
+});
+
+test("profile --compare rejects an unknown target", async () => {
+  const result = await executeTerminalQuery("profile GP301 --compare NOPE123");
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout).toContain("not found");
+});
+
+test("profiles lists the matrix with sort and limit", async () => {
+  const all = await executeTerminalQuery("profiles");
+  expect(all.exitCode).toBe(0);
+  expect(all.stdout).toContain("KNOWN CUSTOMER PROFILES");
+  expect(all.stdout).toContain("GP301");
+
+  const limited = await executeTerminalQuery("profiles --limit 3 --json");
+  expect(limited.exitCode).toBe(0);
+  expect(JSON.parse(limited.stdout)).toHaveLength(3);
+
+  const sorted = await executeTerminalQuery("profiles --sort gini");
+  expect(sorted.exitCode).toBe(0);
+  expect(sorted.stdout).toContain("sort: gini");
+});
+
+test("profiles rejects an invalid sort and limit", async () => {
+  const badSort = await executeTerminalQuery("profiles --sort profit");
+  expect(badSort.exitCode).toBe(1);
+  expect(badSort.stdout).toContain("--sort must be one of");
+
+  const badLimit = await executeTerminalQuery("profiles --limit 0");
+  expect(badLimit.exitCode).toBe(1);
+  expect(badLimit.stdout).toContain("--limit must be a positive integer");
+});
+
+test("profile --timeline renders samples and totals", async () => {
+  const result = await executeTerminalQuery("profile GP301 --timeline");
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toContain("TICKET TIMELINE");
+  expect(result.stdout).toContain("TOTAL");
+});
+
+test("profiles filters by agent, minimum score and ascending order", async () => {
+  const byAgent = await executeTerminalQuery("profiles --agent AG99 --json");
+  const agentRows = JSON.parse(byAgent.stdout) as Array<{ agentId: string }>;
+  expect(agentRows.length).toBeGreaterThan(0);
+  expect(agentRows.every((row) => row.agentId === "AG99")).toBe(true);
+
+  const byScore = await executeTerminalQuery("profiles --min-score 9 --json");
+  const scoreRows = JSON.parse(byScore.stdout) as Array<{ score: number }>;
+  expect(scoreRows.length).toBeGreaterThan(0);
+  expect(scoreRows.every((row) => row.score >= 9)).toBe(true);
+
+  const ascending = await executeTerminalQuery(
+    "profiles --sort score --asc --limit 1 --json",
+  );
+  const ascRows = JSON.parse(ascending.stdout) as Array<{ score: number }>;
+  expect(ascRows).toHaveLength(1);
+  expect(ascRows[0]?.score).toBe(1.2);
+});
+
+test("profiles rejects unknown flags and invalid filters", async () => {
+  const unknown = await executeTerminalQuery("profiles --bogus");
+  expect(unknown.exitCode).toBe(1);
+  expect(unknown.stdout).toContain("Unknown profiles flag");
+
+  const badScore = await executeTerminalQuery("profiles --min-score 99");
+  expect(badScore.exitCode).toBe(1);
+  expect(badScore.stdout).toContain("--min-score must be a number");
+
+  const badAction = await executeTerminalQuery("profiles --action HOLD");
+  expect(badAction.exitCode).toBe(1);
+  expect(badAction.stdout).toContain("--action must be one of");
+});

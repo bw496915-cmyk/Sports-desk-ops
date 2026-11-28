@@ -19,6 +19,7 @@
  */
 
 import path from "node:path";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { runAllRules, type RuleResult } from "./bun_native_rules.ts";
 
 const root = path.resolve(import.meta.dir, "..");
@@ -50,7 +51,7 @@ interface AuditTelemetryResult {
 
 function runBunFailclosedAudit(): AuditTelemetryResult {
   try {
-    const proc = Bun.spawnSync({
+    const proc = spawnSyncBounded({
       cmd: [
         process.execPath,
         "scripts/audit_bun_failclosed_edges.ts",

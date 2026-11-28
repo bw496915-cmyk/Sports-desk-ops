@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 /**
  * Cold `require()` timing for the Node.js built-ins Bun lazily initializes.
  *
@@ -28,7 +29,7 @@ function coldRequire(name: string): number | null {
     `require(${JSON.stringify(name)});`,
     `console.log(performance.now() - t);`,
   ].join("\n");
-  const proc = Bun.spawnSync([process.execPath, "-e", script], {
+  const proc = spawnSyncBounded([process.execPath, "-e", script], {
     stdout: "pipe",
     stderr: "pipe",
   });

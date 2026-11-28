@@ -868,6 +868,22 @@ describe("@sportsdesk-ops/ui modular App & panels (renderToStaticMarkup)", () =>
     expect(subMillisecond).toContain("⏱ 1 run");
     expect(subMillisecond).not.toContain("p50");
     expect(subMillisecond).not.toContain("no runs yet");
+
+    // A capped run renders the retained-tail notice with the produced byte count.
+    const truncated = renderPanel("", [
+      {
+        command: "seq 1 700000",
+        stdout: "4999\n5000\n",
+        exitCode: 0,
+        durationMs: 900,
+        timestamp: 1700000000000,
+        truncated: true,
+        outputBytes: 5_000_000,
+      },
+    ]);
+    expect(truncated).toContain('data-terminal-truncated="true"');
+    expect(truncated).toContain("Output truncated");
+    expect(truncated).toContain("4.77 MiB");
   });
 
   test("RankingsTabPanel renders 30d rankings with separate Classification and Tier columns and agency proxy conduits", () => {

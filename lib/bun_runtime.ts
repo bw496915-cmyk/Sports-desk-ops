@@ -5,6 +5,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import { spawnSyncBounded } from "./spawn_sync_bounded.ts";
 import { dirname, join, resolve } from "node:path";
 import { expandHomePath } from "./home_paths.ts";
 
@@ -121,7 +122,7 @@ function gitCmd(argv: readonly string[]): string[] {
 }
 
 function gitStdout(argv: readonly string[], cwd: string): string | undefined {
-  const proc = Bun.spawnSync({
+  const proc = spawnSyncBounded({
     cmd: gitCmd(argv),
     cwd,
     stdout: "pipe",
@@ -134,7 +135,7 @@ function gitStdout(argv: readonly string[], cwd: string): string | undefined {
 
 function gitPorcelainLineCount(cwd: string): number {
   if (!existsSync(cwd)) return 0;
-  const proc = Bun.spawnSync({
+  const proc = spawnSyncBounded({
     cmd: gitCmd(GIT_STATUS_PORCELAIN),
     cwd,
     stdout: "pipe",
@@ -264,7 +265,7 @@ export function gitWorktreeIdentities(
 ): RepoGitIdentity[] {
   requireBunRuntime();
   if (!existsSync(join(hostRepoPath, ".git"))) return [];
-  const proc = Bun.spawnSync({
+  const proc = spawnSyncBounded({
     cmd: gitCmd(GIT_WORKTREE_LIST_PORCELAIN),
     cwd: hostRepoPath,
     stdout: "pipe",

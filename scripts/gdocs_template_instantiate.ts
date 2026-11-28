@@ -21,6 +21,7 @@
  */
 
 import { parseArgs } from "node:util";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -311,7 +312,7 @@ async function main() {
   console.log(
     `[gdocs] Cloning template ${templateId} with secure generic placeholder...`,
   );
-  let cpProc = Bun.spawnSync(["gdrive", ...cpArgs], {
+  let cpProc = spawnSyncBounded(["gdrive", ...cpArgs], {
     env: minimalSubprocessEnv,
   });
 
@@ -325,7 +326,7 @@ async function main() {
     );
     const fallbackCpArgs = ["mutate", "cp", templateId, genericCloneTitle];
     if (values.parent) fallbackCpArgs.push("--parent", values.parent);
-    cpProc = Bun.spawnSync(["gdrive", ...fallbackCpArgs], {
+    cpProc = spawnSyncBounded(["gdrive", ...fallbackCpArgs], {
       env: minimalSubprocessEnv,
     });
   }
@@ -371,7 +372,7 @@ async function main() {
   // 3. R5/P5: Reset ACL Permissions to owner-only before writing any substitutions (FAIL-CLOSED)
   if (!values["skip-acl-reset"]) {
     console.log(`[gdocs] Resetting document ACL permissions to owner-only...`);
-    const permProc = Bun.spawnSync(
+    const permProc = spawnSyncBounded(
       ["gdrive", "readonly", "permissions", newDocId, "--json"],
       {
         env: minimalSubprocessEnv,
@@ -395,7 +396,7 @@ async function main() {
               console.log(
                 `[gdocs] Removing inherited non-owner permission: ${perm.id} (${perm.role})`,
               );
-              const rmPermProc = Bun.spawnSync(
+              const rmPermProc = spawnSyncBounded(
                 ["gdrive", "mutate", "remove-permission", newDocId, perm.id],
                 {
                   env: minimalSubprocessEnv,
@@ -433,7 +434,7 @@ async function main() {
       console.log(
         `[gdocs] Applying final document title securely via batch operation...`,
       );
-      const renameProc = Bun.spawnSync(
+      const renameProc = spawnSyncBounded(
         ["gdrive", "mutate", "batch", "-f", renameBatchPath],
         {
           env: minimalSubprocessEnv,
@@ -455,7 +456,7 @@ async function main() {
           `[gdocs] Applying ${Object.keys(substitutions).length} substitutions securely via sed...`,
         );
         // Do NOT pass --regex; find and replacement must be literal strings (V1)
-        const sedProc = Bun.spawnSync(
+        const sedProc = spawnSyncBounded(
           ["gdocs", "mutate", "sed", newDocId, "-f", tmpSedPath],
           {
             env: minimalSubprocessEnv,
@@ -483,7 +484,7 @@ async function main() {
     console.log(
       `[gdocs] Verifying hydrated document for unreplaced sentinels and secrets...`,
     );
-    const readProc = Bun.spawnSync(
+    const readProc = spawnSyncBounded(
       ["gdocs", "readonly", "read", newDocId, "--comments=false"],
       {
         env: minimalSubprocessEnv,
@@ -528,9 +529,12 @@ async function main() {
 
     if (!values["keep-on-failure"]) {
       console.log(`[gdocs] Auto-trashing incomplete document ${newDocId}...`);
-      const trashProc = Bun.spawnSync(["gdrive", "mutate", "trash", newDocId], {
-        env: minimalSubprocessEnv,
-      });
+      const trashProc = spawnSyncBounded(
+        ["gdrive", "mutate", "trash", newDocId],
+        {
+          env: minimalSubprocessEnv,
+        },
+      );
       if (trashProc.exitCode === 0) {
         console.error(
           `[gdocs] Incomplete document moved to Drive trash (recoverable via 'gdrive mutate untrash ${newDocId}').`,

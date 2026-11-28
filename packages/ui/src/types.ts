@@ -651,6 +651,10 @@ export interface TerminalHistoryEntry {
    * statistics must not infer "did not execute" from the duration.
    */
   readonly synthetic?: boolean;
+  /** True when the PTY output cap was hit; `stdout` holds only the retained tail. */
+  readonly truncated?: boolean;
+  /** Total bytes the command produced before the cap (byte-accurate). */
+  readonly outputBytes?: number;
 }
 
 export interface TierSwatchStyle {

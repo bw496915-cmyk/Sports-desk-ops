@@ -228,6 +228,7 @@ Usage: \`bun sportsdesk_cli.ts [command|option] [parameters...]\`
 ### 9. OPERATOR SURFACES (GSLive, stale lines, screenshots):
 * **gslive** [LOGIN] [\`--date\` YYYY-MM-DD] [\`--state\` STATE] [\`--window\` 1-31] [\`--agent\` A] [\`--bet-id\` IDS] [\`--bet-group-id\` IDS] [\`--free-bet-id\` ID] [\`--kind\` KIND] [\`--group-name\` NAME] [\`--period\` P] [\`--sport\` SID] [\`--market\` IDS] [\`--json\`]: GSLive 7-param report + bet-history sidecar links
 * **profile** <0x|username> [\`--json\`]: Polymarket PnL, win rate, positions, categories, strategy
+* **profiles** [CUSTOMER_ID] [\`--sort\` score|gini|stake|ratio|id] [\`--limit\` N] [\`--min-score\` N] [\`--action\` A] [\`--tier\` T] [\`--agent\` A] [\`--asc\`] [\`--compare\` ID] [\`--timeline\`] [\`--json\`]: Customer profile matrix, or one profile's timeline/comparison (terminal engine)
 * **combo** legs|price|wallet: CFB combo legs, product-of-legs pricing, wallet combo positions
 * **bridge** coverage|value|match: cross-domain join between the customer book and Polymarket wallets
 * **stale** \`-i\` FILE [\`--window-min\` N] [\`--json\`]: Stale-line / post-move bet cohort
@@ -1871,6 +1872,9 @@ export async function handleDashboardCli(args: string[] = []): Promise<void> {
       for (const cmdLine of commands) {
         console.log(`\x1b[36m$ ${cmdLine}\x1b[0m`);
         try {
+          // Explicit trust boundary: only the operator's --exec reaches a shell, and
+          // the source is the local dashboard.md. Never generate that file from
+          // network/model input, and never expose --exec as a service endpoint.
           const proc = Bun.spawn(["sh", "-c", cmdLine], {
             stdout: "inherit",
             stderr: "inherit",
@@ -1881,6 +1885,61 @@ export async function handleDashboardCli(args: string[] = []): Promise<void> {
         }
       }
     }
+  }
+}
+
+/**
+ * Customer profile surface: the matrix, or one profile's timeline/comparison.
+ * Delegates to the terminal engine so there is one implementation of the flags.
+ */
+export async function handleProfilesCli(args: string[] = []): Promise<void> {
+  const valueFlags = new Set([
+    "--compare",
+    "--sort",
+    "--limit",
+    "--min-score",
+    "--action",
+    "--tier",
+    "--agent",
+  ]);
+  let customerId: string | undefined;
+  let customerIndex = -1;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (
+      arg.startsWith("--compare=") ||
+      arg.startsWith("--sort=") ||
+      arg.startsWith("--limit=")
+    ) {
+      continue;
+    }
+    if (valueFlags.has(arg)) {
+      index += 1;
+      continue;
+    }
+    if (!arg.startsWith("-")) {
+      customerId = arg;
+      customerIndex = index;
+      break;
+    }
+  }
+
+  const rest = args.filter((_, index) => index !== customerIndex);
+  const wantsProfileView = rest.some(
+    (arg) => arg === "--timeline" || arg.startsWith("--compare"),
+  );
+  const baseId = customerId ?? (wantsProfileView ? "GP301" : undefined);
+  const query = baseId
+    ? ["profile", baseId, ...rest].join(" ")
+    : ["profiles", ...rest].join(" ");
+
+  const { executeTerminalQuery } = await import("../lib/terminal_emulator.ts");
+  const result = await executeTerminalQuery(query);
+  process.stdout.write(
+    result.stdout.endsWith("\n") ? result.stdout : `${result.stdout}\n`,
+  );
+  if (result.exitCode !== 0) {
+    process.exitCode = result.exitCode;
   }
 }
 
@@ -2232,6 +2291,11 @@ export async function main(): Promise<void> {
     const { runPolymarketCombo } =
       await import("../scripts/polymarket_combo_cli.ts");
     await runPolymarketCombo(rawArgs.slice(1));
+    return;
+  }
+
+  if (cmd === "profiles") {
+    await handleProfilesCli(rawArgs.slice(1));
     return;
   }
 

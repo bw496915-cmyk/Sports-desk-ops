@@ -321,30 +321,15 @@ function parseCompactLeg(header: string): {
  * fixed the two stay aligned.
  */
 /**
- * Fast zero-allocation leg counter for bet descriptions.
- * Semantically identical to `parseShortDesc(shortDesc).legs.length` without allocating
- * intermediate `LiveWagerLeg` objects or performing per-segment regex/string splitting.
+ * Leg count for a bet description.
+ *
+ * Delegates to {@link parseShortDesc}: the previous fast path split only on
+ * newlines, so it undercounted single-line compact parlays that the parser
+ * splits into several legs. Correctness wins here until profiling shows this
+ * count is hot enough to justify a shared fast splitter.
  */
 export function countShortDescLegs(shortDesc: unknown): number {
-  if (shortDesc === null || shortDesc === undefined) return 0;
-  const raw = String(shortDesc)
-    .replace(/&#x0D;?/gi, "\n")
-    .replace(/\\r\\n|\\n/g, "\n");
-  const lines = raw.split("\n");
-  let count = 0;
-  let firstNonEmpty: string | null = null;
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i]!.trim();
-    if (trimmed.length === 0) continue;
-    if (firstNonEmpty === null) {
-      firstNonEmpty = trimmed;
-      if (/^[A-Z]\.(?:[A-Z]\d+)?$/.test(trimmed)) {
-        continue;
-      }
-    }
-    count++;
-  }
-  return count;
+  return parseShortDesc(shortDesc).legs.length;
 }
 
 export function parseShortDesc(shortDesc: unknown): {

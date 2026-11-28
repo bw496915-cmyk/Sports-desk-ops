@@ -11,6 +11,7 @@
  * Usage: bun run scripts/audit_bun_surface.ts [--json] [--limit N]
  */
 import { readFileSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
@@ -143,7 +144,7 @@ function namesFromCatalog(relativePath: string): string[] {
 }
 
 function trackedSourceFiles(roots: readonly string[]): string[] {
-  const result = Bun.spawnSync({
+  const result = spawnSyncBounded({
     cmd: ["git", "ls-files", ...roots],
     cwd: ROOT,
     stdout: "pipe",

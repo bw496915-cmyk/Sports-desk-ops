@@ -53,28 +53,38 @@ export const parseCookies = (header: string | null): Record<string, string> => {
     if (eq < 0) continue;
     const k = part.slice(0, eq).trim();
     const v = part.slice(eq + 1).trim();
-    if (k) out[k] = decodeURIComponent(v);
+    if (k) {
+      try {
+        out[k] = decodeURIComponent(v);
+      } catch {
+        // Malformed escape: keep the raw value instead of throwing in auth.
+        out[k] = v;
+      }
+    }
   }
   return out;
 };
 
 /**
- * Read one cookie from a `BunRequest` when the runtime exposes its parsed
- * `CookieMap`, falling back to the header parser for plain `Request`s (the
- * in-process dispatcher and unit tests).
+ * Read one cookie via Bun's `CookieMap`. A `BunRequest` already carries a
+ * parsed map; plain `Request`s (the in-process dispatcher and unit tests) get
+ * one built from the header. CookieMap is tolerant of malformed escapes, so
+ * this never throws on a hostile Cookie header.
  */
-function cookieValue(req: Request, name: string): string | undefined {
-  const cookies = (req as Request & { readonly cookies?: Bun.CookieMap })
-    .cookies;
-  if (cookies !== undefined) {
-    try {
-      const value = cookies.get(name);
-      if (value !== null && value !== undefined) return value;
-    } catch {
-      // A malformed Cookie header falls through to the tolerant parser.
-    }
+export function requestCookieValue(
+  req: Request,
+  name: string,
+): string | undefined {
+  const candidate = (req as Request & { readonly cookies?: unknown }).cookies;
+  try {
+    const cookies =
+      candidate instanceof Bun.CookieMap
+        ? candidate
+        : new Bun.CookieMap(req.headers.get("cookie") ?? "");
+    return cookies.get(name) ?? undefined;
+  } catch {
+    return undefined;
   }
-  return parseCookies(req.headers.get("cookie"))[name];
 }
 
 export const clientIp = (
@@ -210,7 +220,7 @@ export const handleLogin = async (
     details: { rehash: outcome.rehash, role: op.role },
   });
 
-  const csrf = issueCsrf();
+  const csrf = issueCsrf({ sessionId: token });
   const secure = !isLocal(new URL(req.url).hostname);
   const res = json(
     200,
@@ -231,7 +241,7 @@ export const handleLogout = async (
   req: Request,
   revokeSession = sessionRevoke,
 ): Promise<Response> => {
-  const token = cookieValue(req, SESSION_COOKIE_NAME);
+  const token = requestCookieValue(req, SESSION_COOKIE_NAME);
   if (token) await revokeSession(token);
   auditAuth({
     action: "logout",
@@ -275,7 +285,7 @@ export const requireSession = async (
   next: (ctx: AuthedContext) => Promise<Response>,
   verifySession = sessionVerify,
 ): Promise<Response> => {
-  const token = cookieValue(req, SESSION_COOKIE_NAME);
+  const token = requestCookieValue(req, SESSION_COOKIE_NAME);
   if (!token) return json(401, { error: "unauthenticated" });
   const verified = await verifySession(token);
   if (!verified) {
@@ -297,13 +307,18 @@ export const requireCsrf = async (
   verifyCsrfFn = verifyCsrf,
 ): Promise<Response> => {
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
-    const cookieToken = cookieValue(req, CSRF_COOKIE_NAME);
+    const cookieToken = requestCookieValue(req, CSRF_COOKIE_NAME);
     const headerToken = req.headers.get(CSRF_HEADER_NAME);
+    // Login-issued tokens are bound to the session token. A request with no
+    // session cookie keeps the legacy unbound check (in-process callers/tests);
+    // an attacker cannot obtain a bound token without the session.
+    const sessionId = requestCookieValue(req, SESSION_COOKIE_NAME);
+    const tokenOptions = sessionId === undefined ? undefined : { sessionId };
     if (
       !cookieToken ||
       !headerToken ||
       cookieToken !== headerToken ||
-      !verifyCsrfFn(headerToken)
+      !verifyCsrfFn(headerToken, tokenOptions)
     ) {
       return json(403, { error: "csrf_failed" });
     }

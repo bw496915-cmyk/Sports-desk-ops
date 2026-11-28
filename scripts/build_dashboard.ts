@@ -8,6 +8,7 @@
  */
 
 import { mkdirSync } from "node:fs";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import {
@@ -58,7 +59,7 @@ function isValidTarget(raw: string | undefined): raw is BuildTarget {
 /** Short commit for the build footer; "unknown" outside a git checkout. */
 function resolveGitCommit(): string {
   try {
-    const result = Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"], {
+    const result = spawnSyncBounded(["git", "rev-parse", "--short", "HEAD"], {
       stdout: "pipe",
       stderr: "pipe",
     });

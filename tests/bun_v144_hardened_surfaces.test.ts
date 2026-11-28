@@ -94,6 +94,34 @@ test("CSRF generate(undefined, options) keeps the default secret", () => {
   );
 });
 
+test("glob extglob and brace ranges use the 1.4.4 semantics", () => {
+  expect(new Bun.Glob("**/!(*.test).ts").match("src/cart.ts")).toBe(true);
+  expect(new Bun.Glob("**/!(*.test).ts").match("src/cart.test.ts")).toBe(false);
+  expect(new Bun.Glob("src/@(app|lib)/**/*.ts").match("src/app/a/b.ts")).toBe(
+    true,
+  );
+  expect(new Bun.Glob("src/@(app|lib)/**/*.ts").match("src/other/a/b.ts")).toBe(
+    false,
+  );
+
+  expect(new Bun.Glob("shard-{1..3}.json").match("shard-2.json")).toBe(true);
+  expect(new Bun.Glob("shard-{1..3}.json").match("shard-4.json")).toBe(false);
+  expect(new Bun.Glob("n-{01..10}.txt").match("n-07.txt")).toBe(true);
+  expect(new Bun.Glob("n-{a..e}.txt").match("n-c.txt")).toBe(true);
+  expect(new Bun.Glob("n-{1..9..2}.txt").match("n-3.txt")).toBe(true);
+  expect(new Bun.Glob("n-{1..9..2}.txt").match("n-4.txt")).toBe(false);
+
+  // Zero-or-more can match nothing; `+(...)` needs at least one.
+  expect(new Bun.Glob("x/*(a|b).ts").match("x/.ts")).toBe(true);
+  expect(new Bun.Glob("x/*(a|b).ts").match("x/ab.ts")).toBe(true);
+  expect(new Bun.Glob("x/+(a|b).ts").match("x/.ts")).toBe(false);
+
+  // A parenthesis not preceded by an extglob token stays literal (Next.js routes).
+  expect(
+    new Bun.Glob("app/(marketing)/**").match("app/(marketing)/page.ts"),
+  ).toBe(true);
+});
+
 test("JSON5 rejects embedded NUL trailing tokens and escaped identifier hyphens", () => {
   expect(() => Bun.JSON5.parse("1\0 2")).toThrow(SyntaxError);
   expect(() => Bun.JSON5.parse(String.raw`{a\u002d: 1}`)).toThrow(SyntaxError);

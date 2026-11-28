@@ -115,7 +115,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:tests/bun_test_patterns.test.ts",
       "test:tests/f402_bet_ticker_delta.test.ts",
       "test:tests/nsh_frame_evidence.test.ts",
-      "test:tests/unit/contract_39_als_gc_retention.test.ts",
+      "test:tests/rbac_scope_retention.test.ts",
     ],
   },
   {
@@ -437,7 +437,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "test:tests/bun_formats_and_utilities.test.ts",
       "test:tests/token_automation.test.ts",
       "test:tests/token_theme_registry.test.ts",
-      "test:tests/token_watch_theme_store.test.ts",
+      "test:tests/verify_tokens.test.ts",
     ],
   },
   {
@@ -801,7 +801,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "surface:s3",
       "test:tests/bun_capabilities.test.ts",
       "test:tests/bun_runtime_contracts.test.ts",
-      "test:tests/bun_s3client_contract.test.ts",
+      "test:tests/bun_s3_inspect.test.ts",
     ],
   },
   {
@@ -982,6 +982,7 @@ export const BUN_SHAPES: readonly BunShape[] = [
       "surface:CSRF",
       "test:tests/bun_csrf_contract.test.ts",
       "test:tests/bun_v144_hardened_surfaces.test.ts",
+      "test:tests/http_auth.test.ts",
     ],
   },
   {
@@ -1490,6 +1491,17 @@ export const BUN_SHAPES: readonly BunShape[] = [
     ],
   },
   {
+    name: "WebSocketOptions",
+    kind: "type",
+    subsystem: "network",
+    heading: "Bun.WebSocketOptions (type)",
+    evidence: [
+      "test:tests/bun_shapes_manifest.test.ts",
+      "test:tests/bun_websocket_options.test.ts",
+      "test:tests/raw_http_proxy.test.ts",
+    ],
+  },
+  {
     name: "Image",
     kind: "value",
     subsystem: "image",
@@ -1611,8 +1623,8 @@ export const BUN_SUBMODULE_SHAPES: readonly BunSubmoduleSymbol[] = [
     evidence: [
       "surface:bun:sqlite.Database",
       "test:tests/bun_loaders_and_import_attributes.test.ts",
+      "test:tests/bun_sqlite_hooks.test.ts",
       "test:tests/candidate_cli.test.ts",
-      "test:tests/code_mode/profile_query.differential.test.ts",
     ],
   },
 ];
@@ -2005,7 +2017,6 @@ export const BUN_WEB_GLOBAL_SHAPES: readonly BunWebGlobalShape[] = [
     category: "realms",
     topic: "Error hooks",
     expectedTypeof: "function",
-    status: "declared-only",
     note: "Unhandled error reporting hook.",
   },
   {

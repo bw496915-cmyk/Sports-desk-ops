@@ -8,6 +8,7 @@
  */
 
 import { relative, resolve } from "node:path";
+import { spawnSyncBounded } from "../../../../lib/spawn_sync_bounded.ts";
 import ts from "typescript";
 import {
   collectDtsClosureFiles,
@@ -69,7 +70,7 @@ export const DEFAULT_SCAN_SKIP_PREFIXES = [
 ] as const;
 
 export function resolveRepoRoot(cwd: string = process.cwd()): string {
-  const proc = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], {
+  const proc = spawnSyncBounded(["git", "rev-parse", "--show-toplevel"], {
     cwd,
     stdout: "pipe",
     stderr: "pipe",

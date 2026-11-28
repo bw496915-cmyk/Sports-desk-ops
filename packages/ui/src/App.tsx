@@ -1415,6 +1415,10 @@ export function App(): React.ReactElement {
                 typeof json.timestamp === "number"
                   ? json.timestamp
                   : Date.now(),
+              truncated: json.truncated === true,
+              ...(typeof json.outputBytes === "number"
+                ? { outputBytes: json.outputBytes }
+                : {}),
             },
           ]);
         }

@@ -14,13 +14,14 @@ import {
   parseStagedFiles,
   typecheckableStagedFiles,
 } from "../lib/staged_check.ts";
+import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 
 const argv = Bun.argv.slice(2);
 const rootIndex = argv.indexOf("--root");
 const ROOT =
   rootIndex === -1 ? `${import.meta.dir}/..` : (argv[rootIndex + 1] ?? ".");
 
-const staged = Bun.spawnSync(
+const staged = spawnSyncBounded(
   [
     "git",
     "diff",
@@ -52,7 +53,7 @@ if (files.length === 0) {
   process.exit(0);
 }
 
-const checked = Bun.spawnSync([process.execPath, "check", ...files], {
+const checked = spawnSyncBounded([process.execPath, "check", ...files], {
   cwd: ROOT,
   stdout: "inherit",
   stderr: "inherit",

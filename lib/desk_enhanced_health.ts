@@ -3,6 +3,7 @@
  */
 
 import { existsSync, statSync } from "node:fs";
+import { spawnSyncBounded } from "./spawn_sync_bounded.ts";
 import { resolve } from "node:path";
 
 import { readF402Session, resolveF402SessionPath } from "./f402_session.ts";
@@ -203,7 +204,7 @@ function defaultGitSha(): string | null {
   }
   try {
     const root = resolve(import.meta.dirname, "..");
-    const proc = Bun.spawnSync(
+    const proc = spawnSyncBounded(
       ["git", "-C", root, "rev-parse", "--short", "HEAD"],
       {
         stdout: "pipe",

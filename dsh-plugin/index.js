@@ -42,13 +42,18 @@
 
 // ast-grep-ignore: node-child-process -- Host plugin code runs in Electron's Node main process, where the Bun global does not exist; spawning bun is the shim's whole job.
 import { resolveConfiguredRepoPath } from "./repo_path_resolve.js";
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 // ast-grep-ignore: node-fs-read-write-file -- same runtime: Bun.file() is not defined in Electron's Node, so whole-file reads and the capture-store listing go through node:fs.
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  accessSync,
+  constants as fsConstants,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+} from "node:fs";
 import { homedir } from "node:os";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
+import { delimiter, isAbsolute, join, resolve } from "node:path";
 
 export const name = "sportsdesk-ops";
 
@@ -1579,48 +1584,200 @@ function excerpt(text) {
  * and 2 for "bad argument", and collapsing those into a thrown error would hide which one
  * happened. A timeout is reported as timed_out, never as a failed gate or a pass.
  *
+ * Node-only on purpose: this plugin runs in Electron's Node main process, where Bun.spawn,
+ * Bun.which and Bun.nanoseconds do not exist. Executables are resolved against PATH first so a
+ * missing binary is a typed ERR_SPAWN_NOT_FOUND instead of a generic spawn failure, and a
+ * timeout escalates SIGTERM -> SIGKILL after a short grace period.
+ *
  * @param {string} bin
  * @param {string[]} argv
- * @param {{ cwd: string, timeoutMs: number }} options
- * @returns {Promise<{ ok: boolean, exitCode: number | null, timedOut: boolean, stdout: string, stderr: string, durationMs: number, spawnError: string | null }>}
+ * @param {{ cwd: string, timeoutMs: number, env?: Record<string, string | undefined> }} options
+ * @returns {Promise<{ ok: boolean, exitCode: number | null, timedOut: boolean, stdout: string, stderr: string, durationMs: number, spawnError: string | null, errorCode: "ERR_SPAWN_NOT_FOUND" | "ERR_SPAWN_TIMEOUT" | "ERR_SPAWN_NONZERO" | "ERR_SPAWN_OUTPUT_LIMIT" | null, signal: string | null, truncated: boolean }>}
  */
-async function runProcess(bin, argv, options) {
-  const startedAt = Date.now();
+const KILL_GRACE_MS = 2_000;
+const MAX_PROCESS_OUTPUT_BYTES = 4 * 1024 * 1024;
+
+function isExecutableFile(candidate) {
   try {
-    const { stdout, stderr } = await execFileAsync(bin, argv, {
-      cwd: options.cwd,
-      timeout: options.timeoutMs,
-      maxBuffer: 64 * 1024 * 1024,
-      encoding: "utf8",
-    });
+    if (!statSync(candidate).isFile()) return false;
+    accessSync(candidate, fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve one executable against PATH before spawning; null when nothing matches. */
+function resolveExecutable(bin, cwd) {
+  if (bin.includes("/") || bin.includes("\\")) {
+    const candidate = isAbsolute(bin)
+      ? bin
+      : resolve(cwd ?? process.cwd(), bin);
+    return isExecutableFile(candidate) ? candidate : null;
+  }
+  const extensions =
+    process.platform === "win32"
+      ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM").split(";")
+      : [""];
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    if (dir === "") continue;
+    for (const extension of extensions) {
+      const candidate = join(dir, `${bin}${extension}`);
+      if (isExecutableFile(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+/** Read a child stream up to `maxBytes`; on overflow, kill the child and mark it truncated. */
+async function readBoundedText(stream, maxBytes, onLimit) {
+  if (stream === null) return { text: "", truncated: false };
+  const chunks = [];
+  let total = 0;
+  let truncated = false;
+  try {
+    for await (const chunk of stream) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      if (total + buffer.length > maxBytes) {
+        const remaining = maxBytes - total;
+        if (remaining > 0) {
+          chunks.push(buffer.subarray(0, remaining));
+          total += remaining;
+        }
+        truncated = true;
+        onLimit();
+        stream.destroy();
+        break;
+      }
+      chunks.push(buffer);
+      total += buffer.length;
+    }
+  } catch {
+    // The stream was destroyed after the cap (or by the child exit); keep what was read.
+  }
+  return { text: Buffer.concat(chunks, total).toString("utf8"), truncated };
+}
+
+async function runProcess(bin, argv, options) {
+  const startedAt = process.hrtime.bigint();
+  const elapsedMs = () =>
+    Math.round(Number(process.hrtime.bigint() - startedAt) / 1e6);
+  const base = {
+    ok: false,
+    exitCode: null,
+    timedOut: false,
+    stdout: "",
+    stderr: "",
+    durationMs: 0,
+    spawnError: null,
+    errorCode: null,
+    signal: null,
+    truncated: false,
+  };
+
+  const resolved = resolveExecutable(bin, options.cwd);
+  if (resolved === null) {
     return {
-      ok: true,
-      exitCode: 0,
-      timedOut: false,
-      stdout: String(stdout ?? ""),
-      stderr: String(stderr ?? ""),
-      // ast-grep-ignore: perf-now-timing -- the Host runtime is Electron Node, where Bun.nanoseconds is undefined; this duration is reported, not used for ordering.
-      durationMs: Date.now() - startedAt,
-      spawnError: null,
-    };
-  } catch (error) {
-    const exitCode = typeof error?.code === "number" ? error.code : null;
-    const timedOut = error?.killed === true && error?.signal === "SIGTERM";
-    const spawnError =
-      exitCode === null && !timedOut
-        ? `could not start ${bin}: ${error?.message ?? String(error)}`
-        : null;
-    return {
-      ok: false,
-      exitCode,
-      timedOut,
-      stdout: String(error?.stdout ?? ""),
-      stderr: String(error?.stderr ?? error?.message ?? String(error)),
-      // ast-grep-ignore: perf-now-timing -- the Host runtime is Electron Node, where Bun.nanoseconds is undefined; this duration is reported, not used for ordering.
-      durationMs: Date.now() - startedAt,
-      spawnError,
+      ...base,
+      durationMs: elapsedMs(),
+      spawnError: `could not start ${bin}: not found on PATH`,
+      errorCode: "ERR_SPAWN_NOT_FOUND",
     };
   }
+
+  return await new Promise((resolveOutcome) => {
+    let settled = false;
+    const finish = (outcome) => {
+      if (settled) return;
+      settled = true;
+      resolveOutcome(outcome);
+    };
+
+    let child;
+    try {
+      child = spawn(resolved, argv, {
+        cwd: options.cwd,
+        env: { ...process.env, ...options.env },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      finish({
+        ...base,
+        durationMs: elapsedMs(),
+        spawnError: `could not start ${bin}: ${error?.message ?? String(error)}`,
+        errorCode: "ERR_SPAWN_NOT_FOUND",
+      });
+      return;
+    }
+
+    let timedOut = false;
+    let killTimer;
+    const termTimer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGTERM");
+      killTimer = setTimeout(() => child.kill("SIGKILL"), KILL_GRACE_MS);
+    }, options.timeoutMs);
+
+    let truncated = false;
+    const stdoutPromise = readBoundedText(
+      child.stdout,
+      MAX_PROCESS_OUTPUT_BYTES,
+      () => {
+        truncated = true;
+        child.kill("SIGKILL");
+      },
+    );
+    const stderrPromise = readBoundedText(
+      child.stderr,
+      MAX_PROCESS_OUTPUT_BYTES,
+      () => {
+        truncated = true;
+        child.kill("SIGKILL");
+      },
+    );
+
+    const settle = async (code, signal, spawnError) => {
+      clearTimeout(termTimer);
+      if (killTimer) clearTimeout(killTimer);
+      const [stdout, stderr] = await Promise.all([
+        stdoutPromise,
+        stderrPromise,
+      ]);
+      const errorCode =
+        spawnError !== null
+          ? "ERR_SPAWN_NOT_FOUND"
+          : timedOut
+            ? "ERR_SPAWN_TIMEOUT"
+            : truncated || stdout.truncated || stderr.truncated
+              ? "ERR_SPAWN_OUTPUT_LIMIT"
+              : code === 0
+                ? null
+                : "ERR_SPAWN_NONZERO";
+      finish({
+        ok: errorCode === null,
+        exitCode: typeof code === "number" ? code : null,
+        timedOut,
+        stdout: stdout.text,
+        stderr: stderr.text || (spawnError ?? ""),
+        durationMs: elapsedMs(),
+        spawnError,
+        errorCode,
+        signal: signal ?? null,
+        truncated: truncated || stdout.truncated || stderr.truncated,
+      });
+    };
+
+    child.on("error", (error) => {
+      void settle(
+        null,
+        null,
+        `could not start ${bin}: ${error?.message ?? String(error)}`,
+      );
+    });
+    child.on("close", (code, signal) => {
+      void settle(code, signal, null);
+    });
+  });
 }
 
 /**
@@ -3453,11 +3610,18 @@ export function apply(ctx, config) {
     if (!git.available) {
       return "repoPath is not a git checkout. Point the plugin's repoPath config at the sportsdesk-ops checkout.";
     }
-    if (!service.reachable) {
-      return "Start the local webview service: bun run serve (from the repo root), then re-run sportsdesk_status.";
+    if (!service.skipped && !service.reachable) {
+      const probe =
+        typeof service.error === "string" && service.error !== ""
+          ? ` Last probe: ${service.error}`
+          : "";
+      return `Start the local webview service: bun run serve (from the repo root), then re-run sportsdesk_status.${probe}`;
     }
-    if (service.stale === true) {
+    if (!service.skipped && service.stale === true) {
       return "The running service predates the current source. Restart it: bun run serve";
+    }
+    if (git.diverged) {
+      return "Reconcile the diverged branch (git fetch && git status) before pushing or running ci:local.";
     }
     const failedSchedule = service.schedules?.attention?.find(
       (row) => row.lastStatus === "failed",
@@ -3505,11 +3669,21 @@ export function apply(ctx, config) {
         ) {
           return invalidArguments("service must be a boolean.");
         }
-        const git = await readGitState();
-        const service =
+        // Git and the service are independent probes: run them together.
+        const probeStartedAt = process.hrtime.bigint();
+        const [git, service] = await Promise.all([
+          readGitState(),
           request.service === false
-            ? { url: serviceUrl, reachable: null, skipped: true }
-            : await readServiceState();
+            ? Promise.resolve({
+                url: serviceUrl,
+                reachable: null,
+                skipped: true,
+              })
+            : readServiceState(),
+        ]);
+        const probeDurationMs = Math.round(
+          Number(process.hrtime.bigint() - probeStartedAt) / 1e6,
+        );
         const warnings = [];
         if (git.available && git.diverged) {
           warnings.push(
@@ -3530,6 +3704,7 @@ export function apply(ctx, config) {
           checkedAt: new Date().toISOString(),
           repo: { path: repoPath, git },
           service,
+          probeDurationMs,
           warnings,
           nextStep: nextStepFor(git, service),
         };
@@ -5313,6 +5488,121 @@ export function apply(ctx, config) {
           durationMs: result.durationMs,
           links: parsed.value,
         };
+      },
+    }),
+  );
+
+  // ---------------------------------------------------------------------------
+  // sportsdesk_console_depth — the depth chain the terminal resolves
+  // ---------------------------------------------------------------------------
+  register(
+    defineReadTool({
+      name: "sportsdesk_console_depth",
+      description:
+        "Resolve the console depth the desk's terminal will use: the profile " +
+        "PTY_CONSOLE_DEPTH, an explicit resolved option, bunfig " +
+        "[console].depth, and the effective winner. On Bun 1.4.4 a numeric " +
+        "bunfig depth beats both BUN_OPTIONS and a literal argv flag, so the " +
+        "winner is bunfig whenever that key is present. Shells " +
+        "`bun cli/console_depth.ts --json`, so the precedence has one " +
+        "implementation. Read-only.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+      output: { ...TEXT_OUTPUT, presentationMeta: (_args, value) => value },
+      isConcurrencySafe: () => true,
+      async execute() {
+        const argv = ["cli/console_depth.ts", "--json"];
+        const command = `bun ${argv.join(" ")}`;
+        const result = await runBun(argv, 15_000);
+        const parsed = parseJson(result.stdout.trim());
+        if (!result.ok || !parsed.ok) {
+          return {
+            available: false,
+            reason: result.timedOut ? "timed_out" : "cli_failed",
+            message:
+              result.spawnError === null
+                ? `\`${command}\` exited ${result.exitCode}${result.timedOut ? " (timed out)" : ""} without a JSON descriptor.`
+                : `Could not resolve console depth: ${result.spawnError}`,
+            command,
+            exitCode: result.exitCode,
+            durationMs: result.durationMs,
+            stderr: truncate(result.stderr, MAX_EXCERPT),
+          };
+        }
+        return { available: true, ok: true, command, ...parsed.value };
+      },
+    }),
+  );
+
+  // ---------------------------------------------------------------------------
+  // sportsdesk_terminal_profile — persisted terminal profile store
+  // ---------------------------------------------------------------------------
+  register(
+    defineReadTool({
+      name: "sportsdesk_terminal_profile",
+      description:
+        "Inspect the persisted terminal profile store (default " +
+        "`scratch/theme-tokens.sqlite`): each profile's stored console depth, " +
+        "sorting/compact/max-array settings, token and theme counts, plus the " +
+        "runtime console-depth chain. Opens the store read-only; a missing " +
+        "database is reported as `db.exists=false`, never as zero profiles. " +
+        "Shells `bun cli/terminal_profile.ts --json`.",
+      parameters: {
+        type: "object",
+        properties: {
+          db: {
+            type: "string",
+            description:
+              "Profile store path; defaults to scratch/theme-tokens.sqlite.",
+          },
+          profile: {
+            type: "string",
+            description: "Only report this profile id.",
+          },
+        },
+        additionalProperties: false,
+      },
+      output: { ...TEXT_OUTPUT, presentationMeta: (_args, value) => value },
+      isConcurrencySafe: () => true,
+      async execute(args) {
+        const request = args ?? {};
+        for (const key of ["db", "profile"]) {
+          const value = request[key];
+          if (
+            value !== undefined &&
+            (typeof value !== "string" || value.trim() === "")
+          ) {
+            return invalidArguments(`${key} must be a non-empty string.`);
+          }
+        }
+
+        const argv = ["cli/terminal_profile.ts", "--json"];
+        if (typeof request.db === "string")
+          argv.push("--db", request.db.trim());
+        if (typeof request.profile === "string") {
+          argv.push("--profile", request.profile.trim());
+        }
+        const command = `bun ${argv.join(" ")}`;
+        const result = await runBun(argv, 15_000);
+        const parsed = parseJson(result.stdout.trim());
+        if (!result.ok || !parsed.ok) {
+          return {
+            available: false,
+            reason: result.timedOut ? "timed_out" : "cli_failed",
+            message:
+              result.spawnError === null
+                ? `\`${command}\` exited ${result.exitCode}${result.timedOut ? " (timed out)" : ""} without a JSON descriptor.`
+                : `Could not inspect the terminal profile store: ${result.spawnError}`,
+            command,
+            exitCode: result.exitCode,
+            durationMs: result.durationMs,
+            stderr: truncate(result.stderr, MAX_EXCERPT),
+          };
+        }
+        return { available: true, ok: true, command, ...parsed.value };
       },
     }),
   );

@@ -75,7 +75,7 @@ const TEST_OR_FIXTURE_PATH_RE =
   /(?:\.test\.[jt]sx?$|\.spec\.[jt]sx?$|\/__tests__\/|^config\/fraud-research\.json$)/i;
 
 const PLACEHOLDER_HOST_RE =
-  /^(?:example\.(?:com|org|net|test)|.*\.example|.*\.invalid|.*\.test|host|mcp\.test|dashboard\.local|local|sportsdesk\.internal|schemas\.xmlsoap\.org|schema\.org|www\.w3\.org|ns\.adobe\.com|purl\.org|no-color\.org|https)$/i;
+  /^(?:example\.(?:com|org|net|test)|.*\.example|.*\.invalid|.*\.test|host|mcp\.test|.*\.local|local|sportsdesk\.internal|schemas\.xmlsoap\.org|schema\.org|www\.w3\.org|ns\.adobe\.com|purl\.org|no-color\.org|https)$/i;
 
 const HELP = `
 audit_hostnames — extract, normalize, and classify external hostnames in the repo

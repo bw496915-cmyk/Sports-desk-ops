@@ -81,6 +81,9 @@ describe("bridge hub handler", () => {
         subscriptions: [],
         subscribe: () => {},
         unsubscribe: () => {},
+        send: () => -1,
+        pause: () => {},
+        resume: () => {},
       },
       JSON.stringify({ type: "PING" }),
     );
@@ -206,6 +209,8 @@ describe("bridgeWebsocket.error", () => {
       subscribe: () => {},
       unsubscribe: () => {},
       send: () => 0,
+      pause: () => {},
+      resume: () => {},
       close: (code, reason) => {
         closes.push({ code, reason });
       },
