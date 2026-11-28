@@ -318,7 +318,7 @@ When upstream moves: bump `packageManager`, `engines.bun`, `.bun-version` and `@
 - **Source:** declared in `bun-types@1.4.5` · [reference](https://bun.com/reference/bun/color)
 - **Shape:** value: `function` · writable true · enumerable true
 - **Here:** `lib/token_automation.ts`, `cli/sportsdesk_cli.ts`
-- **Evidence:** `test:tests/bun_formats_and_utilities.test.ts`, `test:tests/token_automation.test.ts`, `test:tests/token_theme_registry.test.ts`, `test:tests/verify_tokens.test.ts`
+- **Evidence:** `test:tests/bun_formats_and_utilities.test.ts`, `test:tests/token_automation.test.ts`, `test:tests/token_theme_registry.test.ts`, `test:tests/token_watch_theme_store.test.ts`
 
 #### Bun.ColorInput (type)
 
