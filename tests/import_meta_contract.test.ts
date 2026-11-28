@@ -130,13 +130,17 @@ describe("import.meta contract", () => {
   });
 
   test("source files do not use Node's __dirname or __filename", async () => {
+    // Files whose sole purpose is cataloging or probing Bun's global/module-scoped
+    // inventory (including Node's `__dirname` / `__filename` symbols) are allowed.
+    const allowedInventoryFiles = new Set([
+      "tests/import_meta_contract.test.ts",
+      "lib/bun_globals_contract.ts",
+      "scripts/diff-bun-globals.ts",
+      "tests/bun_globals_contract.test.ts",
+    ]);
     const offenders: string[] = [];
-    // This script intentionally lists the Node module-wrapper globals as strings.
-    const dataOnly = new Set(["scripts/diff-bun-globals.ts"]);
     for (const path of trackedSourceFiles()) {
-      if (path === "tests/import_meta_contract.test.ts" || dataOnly.has(path)) {
-        continue;
-      }
+      if (allowedInventoryFiles.has(path)) continue;
       const text = await Bun.file(join(ROOT, path)).text();
       if (NODE_PATH_GLOBALS.test(text)) offenders.push(path);
     }

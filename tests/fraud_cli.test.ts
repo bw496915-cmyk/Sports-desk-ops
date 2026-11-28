@@ -146,7 +146,9 @@ describe("CLI envelope and status", () => {
     const weblogState = (sources as Record<string, unknown>[]).find(
       (source) => source["id"] === "gslive_weblogs",
     );
-    expect(weblogState?.["state"]).toBe("session_expired");
+    // A fixture root has no refresh journal, so the cause is unknown - not "401".
+    expect(weblogState?.["state"]).toBe("missing");
+    expect(String(weblogState?.["reason"])).toContain("no refresh journal");
     expect(record(result.body["config"])["exists"]).toBe(true);
   });
 

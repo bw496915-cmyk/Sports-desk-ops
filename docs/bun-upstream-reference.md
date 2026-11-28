@@ -1,43 +1,43 @@
 # Bun docs & `bun-types` (upstream canonical index)
 
-Canonical commit links for the pinned runtime (`Bun 1.4.4`, `38afee6c84fcf48c0edb2466aa4b27d287a59c30`) and its TypeScript declarations. Do not hand-maintain symbol counts or API prose here — derive them from the binary and `bun-types` with `./bin/dx bun --types`, `bun run probe:bun`, and `bun scripts/bun_shape_contracts.ts --check`.
+Canonical commit links for the pinned runtime (`Bun 1.4.4`, `a7733435cf40429e3b35c36072769df2052b80f1`) and its TypeScript declarations. Do not hand-maintain symbol counts or API prose here — derive them from the binary and `bun-types` with `./bin/dx bun --types`, `bun run probe:bun`, and `bun scripts/bun_shape_contracts.ts --check`.
 
 ## Runtime & `bun-types` SSOT
 
 | Surface           | Canonical pin                                                                                                                                     | Local verification                                                                 |
 | :---------------- | :------------------------------------------------------------------------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------- |
 | Release tag       | [`bun-v1.4.4`](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4) (`2026-10-22`)                                                             | `package.json` `engines.bun` / `.bun-version`                                      |
-| Release commit    | [`38afee6c84fcf48c0edb2466aa4b27d287a59c30`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/package.json)           | `Bun.revision` (`bun run probe:bun` vs `tests/bun_baseline.json`)                  |
-| `bun-types` root  | [`packages/bun-types` @ `38afee6c84`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/index.d.ts) | `@types/bun@1.4.4` (`./bin/dx bun --types --strict`)                               |
+| Release commit    | [`a7733435cf40429e3b35c36072769df2052b80f1`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/package.json)           | `Bun.revision` (`bun run probe:bun` vs `tests/bun_baseline.json`)                  |
+| `bun-types` root  | [`packages/bun-types` @ `38afee6c84`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/index.d.ts) | `@types/bun@1.4.4` (`./bin/dx bun --types --strict`)                               |
 | Shape catalog     | [`docs/runbooks/bun_shape_contracts_runbook.md`](./runbooks/bun_shape_contracts_runbook.md)                                                       | `bun scripts/bun_shape_contracts.ts --check` (`tests/bun_shapes_coverage.test.ts`) |
 | Docs MCP baseline | `bun.sh/docs/mcp` (scheme-less; transport endpoint, not a `bun-types` blob)                                                                       | `bun run bun:docs-mcp surfaces --check tests/bun_docs_surface_baseline.json`       |
 
-## Canonical `bun-types` files (`38afee6c84fcf48c0edb2466aa4b27d287a59c30`)
+## Canonical `bun-types` files (`a7733435cf40429e3b35c36072769df2052b80f1`)
 
 | Declaration file     | Canonical upstream link                                                                                                                                       | Scope                                                                                                                                                                          |
 | :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `index.d.ts`         | [`packages/bun-types/index.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/index.d.ts)                 | Entry reference order                                                                                                                                                          |
-| `bun.d.ts`           | [`packages/bun-types/bun.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/bun.d.ts)                     | `Bun.*` namespace, `serve`, `spawn`, `file`, `write`, `build`, `TOML`, `YAML`, `JSONL`, `JSON5`, `JSONC`, `XML`, `markdown`, `cron`, `secrets`, `Image`, `WebView`, `Terminal` |
-| `globals.d.ts`       | [`packages/bun-types/globals.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/globals.d.ts)             | Global constructors (`WebSocket`, `Worker`, `Blob`, `Request`, `Response`, `ImportMeta`)                                                                                       |
-| `extensions.d.ts`    | [`packages/bun-types/extensions.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/extensions.d.ts)       | Module loader wildcards (`*.toml`, `*.yaml`, `*.yml`, `*.jsonc`, `*.json5`, `*.xml`, `*/bun.lock`, `*.html`, `*.txt`)                                                          |
-| `overrides.d.ts`     | [`packages/bun-types/overrides.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/overrides.d.ts)         | `ReadableStream` / `Blob` consumer methods, `NodeJS.Process` (`memoryPressure`), `node:fs/promises` `exists`, `node:tls`                                                       |
-| `s3.d.ts`            | [`packages/bun-types/s3.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/s3.d.ts)                       | `Bun.S3Client`, `Bun.s3`, `S3File`, `S3Options`, `S3Stats`                                                                                                                     |
-| `sqlite.d.ts`        | [`packages/bun-types/sqlite.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/sqlite.d.ts)               | `bun:sqlite` (`Database`, `Statement`, `Changes`)                                                                                                                              |
-| `sql.d.ts`           | [`packages/bun-types/sql.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/sql.d.ts)                     | `Bun.SQL`, `Bun.sql` tagged template                                                                                                                                           |
-| `redis.d.ts`         | [`packages/bun-types/redis.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/redis.d.ts)                 | `Bun.RedisClient`, `Bun.redis`                                                                                                                                                 |
-| `shell.d.ts`         | [`packages/bun-types/shell.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/shell.d.ts)                 | `Bun.$`, `ShellPromise`, `ShellOutput`, `ShellError`                                                                                                                           |
-| `test.d.ts`          | [`packages/bun-types/test.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/test.d.ts)                   | `bun:test` (`describe`, `test`, `expect`, `expectTypeOf`, `mock`, `spyOn`, `onTestFinished`, `setSystemTime`)                                                                  |
-| `ffi.d.ts`           | [`packages/bun-types/ffi.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/ffi.d.ts)                     | `bun:ffi` (`dlopen`, `ptr`, `CString`, `FFIType`)                                                                                                                              |
-| `jsc.d.ts`           | [`packages/bun-types/jsc.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/jsc.d.ts)                     | `bun:jsc` heap/GC diagnostics                                                                                                                                                  |
-| `security.d.ts`      | [`packages/bun-types/security.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/security.d.ts)           | `Bun.Security` scanner hooks                                                                                                                                                   |
-| `html-rewriter.d.ts` | [`packages/bun-types/html-rewriter.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/html-rewriter.d.ts) | `HTMLRewriter`                                                                                                                                                                 |
+| `index.d.ts`         | [`packages/bun-types/index.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/index.d.ts)                 | Entry reference order                                                                                                                                                          |
+| `bun.d.ts`           | [`packages/bun-types/bun.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/bun.d.ts)                     | `Bun.*` namespace, `serve`, `spawn`, `file`, `write`, `build`, `TOML`, `YAML`, `JSONL`, `JSON5`, `JSONC`, `XML`, `markdown`, `cron`, `secrets`, `Image`, `WebView`, `Terminal` |
+| `globals.d.ts`       | [`packages/bun-types/globals.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/globals.d.ts)             | Global constructors (`WebSocket`, `Worker`, `Blob`, `Request`, `Response`, `ImportMeta`)                                                                                       |
+| `extensions.d.ts`    | [`packages/bun-types/extensions.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/extensions.d.ts)       | Module loader wildcards (`*.toml`, `*.yaml`, `*.yml`, `*.jsonc`, `*.json5`, `*.xml`, `*/bun.lock`, `*.html`, `*.txt`)                                                          |
+| `overrides.d.ts`     | [`packages/bun-types/overrides.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/overrides.d.ts)         | `ReadableStream` / `Blob` consumer methods, `NodeJS.Process` (`memoryPressure`), `node:fs/promises` `exists`, `node:tls`                                                       |
+| `s3.d.ts`            | [`packages/bun-types/s3.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/s3.d.ts)                       | `Bun.S3Client`, `Bun.s3`, `S3File`, `S3Options`, `S3Stats`                                                                                                                     |
+| `sqlite.d.ts`        | [`packages/bun-types/sqlite.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/sqlite.d.ts)               | `bun:sqlite` (`Database`, `Statement`, `Changes`)                                                                                                                              |
+| `sql.d.ts`           | [`packages/bun-types/sql.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/sql.d.ts)                     | `Bun.SQL`, `Bun.sql` tagged template                                                                                                                                           |
+| `redis.d.ts`         | [`packages/bun-types/redis.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/redis.d.ts)                 | `Bun.RedisClient`, `Bun.redis`                                                                                                                                                 |
+| `shell.d.ts`         | [`packages/bun-types/shell.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/shell.d.ts)                 | `Bun.$`, `ShellPromise`, `ShellOutput`, `ShellError`                                                                                                                           |
+| `test.d.ts`          | [`packages/bun-types/test.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/test.d.ts)                   | `bun:test` (`describe`, `test`, `expect`, `expectTypeOf`, `mock`, `spyOn`, `onTestFinished`, `setSystemTime`)                                                                  |
+| `ffi.d.ts`           | [`packages/bun-types/ffi.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/ffi.d.ts)                     | `bun:ffi` (`dlopen`, `ptr`, `CString`, `FFIType`)                                                                                                                              |
+| `jsc.d.ts`           | [`packages/bun-types/jsc.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/jsc.d.ts)                     | `bun:jsc` heap/GC diagnostics                                                                                                                                                  |
+| `security.d.ts`      | [`packages/bun-types/security.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/security.d.ts)           | `Bun.Security` scanner hooks                                                                                                                                                   |
+| `html-rewriter.d.ts` | [`packages/bun-types/html-rewriter.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/html-rewriter.d.ts) | `HTMLRewriter`                                                                                                                                                                 |
 
 ### Declaration vs runtime drift (`./bin/dx bun --types`)
 
 Do not hardcode member counts; run `./bin/dx bun --types` (or `./bin/dx bun --json`) to diff `bun-types@1.4.4` against the active binary. The two pinned drift IDs asserted in [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts) are:
 
-- **`dns-resolve`**: `bun-types` and [`dns` namespace](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/bun.d.ts#L2503) declare only `lookup`, `prefetch`, and `getCacheStats`, while the 1.4.4 binary also exposes the 15 `node:dns/promises` resolver methods (`resolve`, `resolve4`, `resolve6`, `resolveSrv`, `resolveTxt`, `resolveSoa`, `resolveNaptr`, `resolveMx`, `resolveCaa`, `resolveNs`, `resolvePtr`, `resolveCname`, `resolveAny`, `getServers`, `setServers`, `reverse`, `lookupService`).
-- **`websocket-global`**: [`WebSocket`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/bun.d.ts#L5178) and [`Worker`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/bun.d.ts#L714) are filed under the `bun` module page, but `Bun.WebSocket` and `Bun.Worker` are `undefined` at runtime — the constructors live on `globalThis`.
+- **`dns-resolve`**: `bun-types` and [`dns` namespace](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/bun.d.ts#L2503) declare only `lookup`, `prefetch`, and `getCacheStats`, while the 1.4.4 binary also exposes the 15 `node:dns/promises` resolver methods (`resolve`, `resolve4`, `resolve6`, `resolveSrv`, `resolveTxt`, `resolveSoa`, `resolveNaptr`, `resolveMx`, `resolveCaa`, `resolveNs`, `resolvePtr`, `resolveCname`, `resolveAny`, `getServers`, `setServers`, `reverse`, `lookupService`).
+- **`websocket-global`**: [`WebSocket`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/bun.d.ts#L5178) and [`Worker`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/bun.d.ts#L714) are filed under the `bun` module page, but `Bun.WebSocket` and `Bun.Worker` are `undefined` at runtime — the constructors live on `globalThis`.
 
 ## `Bun.XML`, `bun x` and package catalogs (measured 2026-11-18)
 
@@ -73,7 +73,7 @@ so this list is not maintained by hand.
   misreported as an entity bomb and no raw `SyntaxError` leaks through.
 - Docs coverage: `tests/bun_docs_surface_baseline.json` marks `XML` documented — the docs
   page is `bun.com/docs/runtime/xml`, pinned upstream at
-  [`docs/runtime/xml.mdx`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/runtime/xml.mdx)
+  [`docs/runtime/xml.mdx`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/docs/runtime/xml.mdx)
   — and the generated row is `#### Bun.XML` in the
   [shape catalog](./runbooks/bun_shape_contracts_runbook.md).
 - Evidence: `bun test tests/xml_feed_spine_hydrator.test.ts tests/xml_parse_sportsdesk_ops_cli.test.ts`.
@@ -160,7 +160,7 @@ plain mutable install instead of failing.
 
 ## `Bun.semver.satisfies` — wildcards and the 2^64 ceiling (measured 2026-11-18)
 
-Pinned docs: [`docs/runtime/semver.mdx`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/runtime/semver.mdx).
+Pinned docs: [`docs/runtime/semver.mdx`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/docs/runtime/semver.mdx).
 The API exposes two functions — `satisfies(version, range)` and `order(a, b)` — and `satisfies`
 takes no options object: a third argument is ignored, so node-semver's
 `{ includePrerelease: true }` has no effect. Use the npm `semver` dependency where that option
@@ -291,12 +291,132 @@ runtime (`--minimum-release-age`, `--minimum-release-age-excludes`), including a
 interpreted as seconds. The per-version exclusion (`typescript@5.9.3`) and the "security fix
 today, rest of the package waits" semantics are release-note statements, not re-measured here.
 
+<!-- bun-behavior: install-resolution-and-lockb -->
+
+## `bun install` version-selection edge cases and mutated `bun.lockb` resilience (measured 2026-11-19)
+
+- **Release-note statements (external, not re-run at upstream scale here):** the
+  [`bun-v1.4.4` release notes (`#133-bun-install-issues-closed`)](https://bun.com/blog/release-notes/bun-v1.4.4#133-bun-install-issues-closed)
+  and [`bun-v1.4.4` release tag](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4) report
+  133 `bun install` issues closed, equivalence testing across 600 generated projects (all
+  dependency types, both linkers, both lockfile formats), 7 commands across 90,000 mutated
+  `bun.lockb` files without a crash or hang, and 200,000 generated `npm-pick-manifest`
+  version-selection comparisons differing in two cases: a `latest` tag pointing to a missing
+  version, and `^1.0.0-a.0`.
+- **Measured locally** (`tests/bun_install_resolution_resilience.test.ts`, measured 2026-11-19
+  against an in-process `Bun.serve` mock registry and mutated binary `bun.lockb` fixtures):
+
+| Surface / Case                                                                         | Input / Packument                                                                                                         | Measured Result                                                                                                                   |
+| :------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------- |
+| Missing `latest` dist-tag target (`latest`, `*`, `^1.0.0`)                             | `dist-tags.latest = "9.9.9"`, `versions = ["1.0.0", "1.0.1"]`                                                             | Exit `0`, resolves fallback highest version `"1.0.1"`                                                                             |
+| `^1.0.0` vs `dist-tags.latest` (control)                                               | `dist-tags.latest = "1.0.0"`, `versions = ["1.0.0-a.0", "1.0.0", "1.0.1"]`                                                | Exit `0`, installs `"1.0.0"` (`dist-tags.latest` honored)                                                                         |
+| `^1.0.0-a.0` with stable `latest`                                                      | `dist-tags.latest = "1.0.0"`, `versions = ["1.0.0-a.0", "1.0.0", "1.0.1"]`                                                | Exit `0`, skips `latest = "1.0.0"` and installs `"1.0.1"`                                                                         |
+| `^1.0.0-a.0` on prerelease-only packument                                              | `dist-tags.latest = "1.0.0-a.1"`, `versions = ["1.0.0-a.0", "1.0.0-a.1", "1.0.0-b.0"]`                                    | Exit `0`, skips `latest = "1.0.0-a.1"` and installs `"1.0.0-b.0"`                                                                 |
+| `^1.0.0-a.0` with exact lower-bound `latest`                                           | `dist-tags.latest = "1.0.0-a.0"`, `versions = ["1.0.0-a.0", "1.0.0-a.1", "1.0.0", "1.0.1"]`                               | Exit `0`, installs `"1.0.0-a.0"`                                                                                                  |
+| `^1.0.0-a.0` tuple-bound exclusion                                                     | `dist-tags.latest = "2.0.0"`, `versions = ["1.0.1-a.0", "2.0.0"]`                                                         | Exit `1`, `No version matching "^1.0.0-a.0"`                                                                                      |
+| Synthetic & real mutated `bun.lockb` (`install --frozen-lockfile`, `pm ls`, `pm hash`) | Empty, truncated magic, garbage, zeroed 4 KiB, half-truncated, header byte-40 XOR, plus 12 deterministic slices/bit-flips | Zero crash signals (`signalCode === null`) and bounded clean exits (`InvalidLockfile`, `EndOfStream`, `Lockfile is missing data`) |
+
+<!-- bun-behavior: serve-static-vs-file-routes -->
+
+## `Bun.serve` static buffered (`.bytes()`) vs file-backed (`Bun.file()`) routes (measured 2026-11-19)
+
+`tests/bun_serve_static_vs_file_routes.test.ts` measures the differences between passing a
+startup-buffered `new Response(await Bun.file(p).bytes())` vs a lazy `new Response(Bun.file(p))`
+in `Bun.serve({ routes })`:
+
+| Behavior                 | Static buffered (`new Response(await Bun.file(p).bytes())`)          | File-backed (`new Response(Bun.file(p))`)                                                                                     |
+| :----------------------- | :------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
+| `Content-Type`           | Omitted (`null`) unless explicitly passed in `Response` headers      | Inferred from extension (e.g. `application/zip` for `.zip`)                                                                   |
+| `ETag` & `If-None-Match` | Strong quoted `ETag`; matching `If-None-Match` returns `304`         | No `ETag` (`null`)                                                                                                            |
+| `Range` requests         | Ignored (`200` full payload, no `Accept-Ranges` / `Content-Range`)   | `206` with `Accept-Ranges: bytes` + `Content-Range`; `416` (`bytes */len`) when out of range                                  |
+| `HEAD` & `POST`          | `200` (`HEAD` empty body with `Content-Length`; `POST` returns body) | `200` (`HEAD` empty body with `Content-Length`; `POST` returns body)                                                          |
+| Live disk edit           | Serves original startup-buffered bytes and unchanged `ETag`          | Serves updated bytes, updated `Content-Length`, and updated `Range` slices                                                    |
+| File deletion (`unlink`) | Continues serving `200` from memory                                  | Falls through to `fetch()` if configured (returning `fetch()`'s response), or returns `404` when no `fetch()` fallback exists |
+
+- For `/static/*` directories needing strong `ETag`, `Range`, and symlink containment, this repo uses
+  `lib/serve_file.ts` (see [`docs/runbooks/bun_server_runtime_shapes_runbook.md`](./runbooks/bun_server_runtime_shapes_runbook.md)).
+
+<!-- bun-behavior: serve-directory-routes -->
+
+## `Bun.serve` directory routes (`{ dir, statCache }`) (measured 2026-11-19)
+
+Reference: [`bun.sh/docs/runtime/http/routing#directory-routes`](https://bun.sh/docs/runtime/http/routing#directory-routes).
+`tests/bun_serve_directory_routes.test.ts` measures `{ dir }` and `{ dir, statCache: false }` on
+the active runtime (`darwin` and `linux` branches):
+
+| Surface / Case                                         | Input / Probe                                                                                                                                         | Measured Behavior                                                                                                                                                                                                                                                                                          |
+| :----------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mount path constraint                                  | `routes: { "/static": { dir } }`                                                                                                                      | Throws `TypeError`: `To mount a directory, make sure the path ends in \`/*\``                                                                                                                                                                                                                              |
+| Decoded path, MIME, `ETag` & `Last-Modified`           | `GET /static/hello.txt`, `GET /static/my%20file.txt`                                                                                                  | `200`, extension `Content-Type`, weak `ETag` (`W/"<size>-<mtime>"`), `Last-Modified`, `Accept-Ranges: bytes`                                                                                                                                                                                               |
+| Non-canonical wire paths                               | `/static/./hello.txt`, `/static/../outside.txt`, `/static//hello.txt`, `/static/sub%2Findex.html`, `/static/%68ello.txt`                              | Rejected with `404` on raw wire requests                                                                                                                                                                                                                                                                   |
+| Directory without/with `/` & missing files             | `GET /static/sub`, `GET /static/sub/`, `GET /static/missing.txt`                                                                                      | `301` (`Location: /static/sub/`), `200` (`sub/index.html`), and `404`                                                                                                                                                                                                                                      |
+| Conditional GET (`304`)                                | `If-None-Match: <weak ETag>` or `If-Modified-Since: <Last-Modified>`                                                                                  | `304 Not Modified` with empty body                                                                                                                                                                                                                                                                         |
+| `Range` & `If-Range`                                   | `Range: bytes=0-4`, `bytes=999-1000`, `If-Range` (`Last-Modified` vs stale date vs weak `ETag`)                                                       | `206` (`bytes 0-4/21`), `416` (`bytes */21`); `If-Range` matches `Last-Modified` (`206`) and falls back to full `200` on stale dates or weak `ETag`                                                                                                                                                        |
+| `statCache: false`                                     | `routes: { "/nocache/*": { dir, statCache: false } }` + disk edit                                                                                     | Serves `200` and reflects live edits with updated weak `ETag`                                                                                                                                                                                                                                              |
+| Case-sensitive routing vs FS                           | `/static/admin/*` (`403`) + `/static/*` (`{ dir }`), requesting `/static/Admin/secret.txt`                                                            | Route match is case-sensitive (`Admin` misses `/static/admin/*`), returning `200` on case-insensitive APFS (`darwin`) or `404` on case-sensitive FS                                                                                                                                                        |
+| Symlink containment (`RESOLVE_IN_ROOT` drift on macOS) | `rel-escape.txt -> ../outside.txt`, `abs-escape.txt -> <outsidePath>`, `rel-clamp.txt -> ../../../inside.txt`, `abs-inroot.txt -> /var/data/logo.txt` | **Measured macOS drift:** contrary to the docs' macOS `RESOLVE_IN_ROOT` claim, `darwin` follows escaping symlinks (`200` `"SECRET-OUTSIDE"`) and returns `404` on in-root-clamped targets; `lib/asset_path.ts` (`containedAssetPath`) + `lib/serve_file.ts` enforce `realpath` containment for `/static/*` |
+
+<!-- bun-behavior: websocket-client-options -->
+
+## `WebSocket` client options (`Bun.WebSocketOptions`) (measured 2026-11-19)
+
+Reference: [`bun.sh/reference/bun/WebSocketOptions`](https://bun.sh/reference/bun/WebSocketOptions).
+`tests/bun_websocket_options.test.ts` measures the second-argument options object against local
+`ws://`/`wss://` echo servers and HTTP/HTTPS `CONNECT` tunnel proxies (targeting
+`ws-target.local` via local proxies so host `NO_PROXY="localhost,127.0.0.1,::1"` does not bypass
+explicit proxy tests):
+
+| Option / Surface                                              | Probe / Input                                                                                                                                          | Measured Behavior                                                                                                                                                                                                                           |
+| :------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `protocols` / `protocol`                                      | `new URL(wsUrl)` + `{ protocols: ["p1", "p2"] }`, `{ protocols: "single-p" }`, `{ protocol: "solo-p" }`, `{ protocols: ["arr-p"], protocol: "str-p" }` | Sends `Sec-WebSocket-Protocol` and populates `ws.protocol`; when both are supplied at runtime, `protocols` wins (`"arr-p"`)                                                                                                                 |
+| `headers`                                                     | Plain object (`OutgoingHttpHeaders` incl. string arrays), `Headers` instance, and `[string, string][]` tuple list                                      | All three forward on the upgrade request (`X-Arr` joins with `,`, duplicate tuple names join with `, `)                                                                                                                                     |
+| `perMessageDeflate`                                           | Omitted, `{}`, `true` vs falsy `false`, `null`, `0`, `""`, and explicit `undefined`                                                                    | Default/`{}`/`true` send `Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits`; all five falsy values omit `Sec-WebSocket-Extensions` entirely                                                                             |
+| `tls` (`ca`, `rejectUnauthorized`, `servername`/`serverName`) | `Bun.file()`, `Buffer`, PEM string, `rejectUnauthorized: false`, and SAN-mismatched cert with `servername` / `serverName`                              | Rejects untrusted cert (`unable to verify the first certificate`) and SAN mismatch (`does not match certificate's altnames`); both `servername` and `serverName` pass SNI verification                                                      |
+| `tls.checkServerIdentity`                                     | Sync `undefined`, `new Error(...)`, `async () => undefined`, and `rejectUnauthorized: false` + valid `ca`                                              | Receives `(hostname, leafCert)` with `subject`/`subjectaltname` and **no** `issuerCertificate`; async Promise return is truthy and rejects; with `rejectUnauthorized: false` it still runs but its error is not enforced                    |
+| HTTP `proxy` (`CONNECT`)                                      | String URL, `new URL(...)`, `http://<user>:<pass>@...`, and `{ url, headers }` (`OutgoingHttpHeaders` / `Headers`) for `ws://` & `wss://`              | Issues `CONNECT host:port HTTP/1.1` with `Proxy-Connection: Keep-Alive`; emits Basic `Proxy-Authorization` or custom `headers` to proxy only (not leaked to origin); host `NO_PROXY` overrides explicit `proxy` for matching loopback hosts |
+| HTTPS `proxy.tls` isolation                                   | Separate `proxy.tls` + `tls`, omitted `proxy.tls` + shared `tls.ca` array, and `proxy.tls: {}` or `true`                                               | Separate `proxy.tls` runs proxy `checkServerIdentity` before target; omitted `proxy.tls` shares `tls.ca` across both hops while running top-level `checkServerIdentity` only for target; `{}`/`true` isolates proxy from top-level `tls.ca` |
+
+<!-- bun-behavior: terminal-write-buffer-source -->
+
+## `Bun.Terminal.write` & `BufferSource` (measured 2026-11-20)
+
+References: [`bun.sh/reference/bun/BufferSource`](https://bun.sh/reference/bun/BufferSource) and [`bun.sh/reference/bun/Terminal/write`](https://bun.sh/reference/bun/Terminal/write). Covered by `tests/bun_terminal_write_buffer_source.test.ts` and `lib/bun_terminal.ts` (`terminalInputByteLength`, `requireSubprocessTerminal`):
+
+| Input / Surface                         | Probe / Input                                                                           | Measured Behavior                                                                                                                                                          |
+| :-------------------------------------- | :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Strings (UTF-8 byte length)             | `""`, `"hello"`, `"€🚀"` (`.length === 3`), lone surrogate `"\uD800"` (`.length === 1`) | Returns UTF-8 byte count (`0`, `5`, `7`, and `3` for U+FFFD replacement), not UTF-16 `.length`                                                                             |
+| `ArrayBufferView` & `Buffer` slices     | `Uint8Array` / `Buffer` `.subarray(offset, end)` and `DataView(ab, 2, 3)`               | Returns exact `view.byteLength` and writes only `[byteOffset, byteOffset + byteLength)` with zero adjacent sentinel leakage                                                |
+| Raw `ArrayBuffer` & `SharedArrayBuffer` | `ArrayBuffer`, `SharedArrayBuffer`, `Uint8Array(sab)`, and `DataView(sab, 1, 2)`        | All four are accepted and return exact `byteLength`                                                                                                                        |
+| Multi-byte `TypedArray`s                | `Uint16Array`, `Int32Array`, `Float64Array`, `BigInt64Array`                            | Return `byteLength` (not element `.length`) and transmit raw native-endian bytes                                                                                           |
+| Internal buffering & `drain`            | Single 128 KiB (`131072` B) write exceeding kernel PTY ring capacity                    | Returns full `131072` immediately (no partial write), buffers internally, invokes `drain`, and delivers all 131,072 bytes with matching SHA-256 in raw mode                |
+| Detached buffers                        | Transferred `ArrayBuffer` and `Uint8Array` view over detached buffer                    | Both return `0` without throwing                                                                                                                                           |
+| Invalid inputs & closed terminal        | `null`/`undefined`, `42`/`{}`, and `write()` after `close()`                            | Throws `Error: write() requires data argument` (`null`/`undefined`), `Error: write() argument must be a string or ArrayBuffer` (`42`/`{}`), or `Error: Terminal is closed` |
+
+<!-- bun-behavior: formats-and-utilities -->
+
+## Built-in Formats & 40+ Utilities (measured 2026-11-20)
+
+Reference: [`bun.sh/#:~:text=Formats,40+%20utilities`](https://bun.sh/#:~:text=Formats,40+%20utilities). Covered by `tests/bun_formats_and_utilities.test.ts`:
+
+| Area / Surface                          | Probe / Input                                                                                                               | Measured Behavior                                                                                                                                                                           |
+| :-------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Bun.YAML`                              | Multi-doc `---`, anchors (`&b` / `<<: *b`), `stringify(v)` vs `stringify(v, null, 2)`                                       | Multi-doc `parse()` returns an array; anchors/merge keys resolve; `stringify(v)` defaults to flow syntax (`{a: 1,b: [2,3]}`), while `space: 2` emits block YAML                             |
+| `Bun.TOML` & native config imports      | `Bun.TOML.parse` / `stringify`; `import()` on `.yaml`, `.toml`, `.json5`, `.jsonc`                                          | `Bun.TOML` parses and serializes tables; dynamic `import()` resolves all four formats onto `.default`                                                                                       |
+| `Bun.JSON5` / `Bun.JSONC` / `Bun.JSONL` | Comments, trailing commas, unquoted keys, hex `0x10`, `Infinity`, `-Infinity`, `NaN`; partial JSONL chunk                   | `JSON5` parses extended literals (`Infinity`/`-Infinity`/`NaN`/`0x10`); `JSONL.parseChunk` returns complete objects with `{ done: false, error: null }` on trailing incomplete line         |
+| `Bun.markdown`                          | GFM (`tables`, `strikethrough`, `tasklists`, `autolinks`), raw `<script>` default vs `{ tagFilter: true }`, `render()`      | Raw `<script>` passes through verbatim by default unless `{ tagFilter: true }` escapes it (`&lt;script>`); `render()` invokes AST callbacks                                                 |
+| `Bun.escapeHTML`, ANSI & `Bun.color`    | HTML chars, emoji width, SGR strip/slice/wrap, `rgb(...)` → `hex` / `ansi-16m`                                              | `escapeHTML` escapes 5 chars (`'` → `&#x27;`); `stringWidth` counts wide emoji as `2` ignoring ANSI; `sliceAnsi`/`wrapAnsi` close/reopen SGR across cuts                                    |
+| `Bun.deepEquals` & `Bun.deepMatch`      | `{ a: 1, b: undefined }` vs `{ a: 1 }` (`strict` false/true); subset/object/array order                                     | `deepEquals` distinguishes `strict: true`; `deepMatch(subset, object)` expects `(subset, object)` (reversing returns `false`), and arrays require equal length                              |
+| `Bun.peek` & `Bun.peek.status`          | Fulfilled, pending, rejected promises + primitive value                                                                     | Synchronous state (`fulfilled`/`pending`/`rejected`) and value/`Error` access without `await`; non-promises pass through unchanged                                                          |
+| `Bun.randomUUIDv7` & `Bun.randomUUIDv5` | Fixed timestamp repeated `hex`/`base64url`/`buffer`; `dns`/`url`/custom UUID namespace                                      | UUIDv7 is lexicographically monotonic within the same millisecond (`buffer` = 16 bytes); UUIDv5 is deterministic per namespace                                                              |
+| Zstd, Binary & Stream helpers           | `zstdCompressSync`/`zstdCompress`, `concatArrayBuffers`, `ArrayBufferSink`, `readableStreamTo*`, `readableStreamToFormData` | Zstd roundtrips losslessly; `readableStreamToFormData(stream, boundary)` expects raw boundary token (full `Content-Type` header throws `boundary is too long`), omitting parses URL-encoded |
+| URL, Cookies & Timing                   | `pathToFileURL`/`fileURLToPath`, `Cookie`/`CookieMap`, `nanoseconds()`, `hash.crc32`                                        | Spaces percent-encode and roundtrip cleanly; `Cookie`/`CookieMap` parse & serialize flags; `nanoseconds()` is monotonic numeric                                                             |
+
 <!-- bun-behavior: bun-test-api -->
 
 ## `bun:test` API surface (measured 2026-11-18)
 
 The pinned declaration is
-[`packages/bun-types/test.d.ts`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/test.d.ts);
+[`packages/bun-types/test.d.ts`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/test.d.ts);
 the live reference section is `reference/bun/test`.
 
 - Measured exports (`import * as bunTest from "bun:test"`): `afterAll`, `afterEach`, `beforeAll`,
@@ -333,7 +453,9 @@ Measured on the pin with throwaway suites (`tests/bun_test_runner_cli.test.ts`):
 | `CLAUDECODE=1`                | hides `(pass)`/`(todo)` lines, keeps failure detail and summary counts          |
 
 Not re-measured here: `--randomize`/`--seed`, `--concurrent`, `--max-concurrency`, `--aot`,
-`--check`, coverage, snapshots, and `--environment`/`--globals`.
+`--check`, and `--environment`/`--globals` (coverage and snapshot `--update-snapshots --bail=1`
+safety are measured below under `bun test` coverage accuracy, LCOV `DA:` counts & snapshot
+safety).
 
 <!-- bun-behavior: bun-test-writing -->
 
@@ -378,8 +500,9 @@ Measured with throwaway projects (`tests/bun_test_config.test.ts`):
 | `.env.test`                           | loaded automatically by `bun test`                                                                           |
 
 Not re-measured here: `environment` (jsdom/happy-dom), `globals = "vitest"`, `reactCompiler`,
-`concurrentTestGlob`, `smol`, the mock-cleanup options, coverage options, and `[install]`
-inheritance.
+`concurrentTestGlob`, `smol`, the mock-cleanup options, and `[install]` inheritance (`coverageDir`,
+`coverageReporter`, `coverageSkipTestFiles`, `lcov`, and `coverageThreshold` are measured below
+under `bun test` coverage accuracy, LCOV `DA:` counts & snapshot safety).
 
 <!-- bun-behavior: bun-test-runtime -->
 
@@ -405,6 +528,29 @@ not encoded: a probe with `await new Promise(() => {})` did not exit within 120 
 bounded failure to assert. Timers, watch/hot mode, signal handling, and the `vitest` unhandled-error
 listener difference are also not re-measured here.
 
+<!-- bun-behavior: bun-test-coverage-and-snapshots -->
+
+## `bun test` coverage accuracy, LCOV `DA:` counts & snapshot safety (measured 2026-11-19)
+
+Reference: [`bun.com/blog/release-notes/bun-v1.4.4#bun-test`](https://bun.com/blog/release-notes/bun-v1.4.4#bun-test).
+`tests/bun_test_coverage_and_snapshots.test.ts` measures the v1.4.4 fixes against throwaway
+projects with `bunfig.toml` / CLI coverage options and isolated git worktrees:
+
+| Behavior / Case                                                        | Probe / Input                                                                                        | Measured Behavior                                                                                                                           |
+| :--------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--update-snapshots --bail=1` on early failure                         | Pre-populated 2-snapshot file; 2nd test fails under `--update-snapshots --bail=1`                    | Exits non-zero while preserving the prior `.snap` contents byte-for-byte instead of truncating the file                                     |
+| `--changed=HEAD` module graph scoping                                  | Isolated git repo with `a.ts` -> `a.test.ts` and `b.ts` -> `b.test.ts`; touch only `a.ts`            | Runs `a.test.ts` and skips `b.test.ts`                                                                                                      |
+| Skipped short-circuit, optional, logical-assign, default & break lines | Multiline `\|\|`, `&&`, `??`, `?:`, `?.`, `\|\|=`, `&&=`, `??=`, unused default, untaken `break`     | Every skipped subexpression line stays uncovered (`65.62%` lines; `DA:<line>,0` in `lcov.info`)                                             |
+| Lines after unresumed `await` / `yield`                                | Rejected `await`, never-resolving pending `await`, and single-stepped generator `yield`              | Statements after the suspension point remain uncovered (`50.00%` lines; `3-4,8-9,13-14`)                                                    |
+| Uncalled function `Uncovered Line #s` bounds                           | Uncalled function after a `//` comment and immediately adjacent to a called function                 | Reports exact declaration-to-body lines (`5-8` skipping comment line 4; `4-6` with no two-line lead-in shift)                               |
+| Executed block `break` & `import` above `class extends`                | `import { Base }` above `export class Derived extends Base() {}` plus `{ count += 1; break; }`       | Reports `100.00%` lines with `DA:1,1` and `DA:8,1`                                                                                          |
+| Switch `default:` and multiline `case` value lines                     | Executed and unexecuted `case\n  1:` and standalone `default:` branches                              | Executed branch lines record `DA:<line>,1`; unexecuted `case`/value/`default:` lines show uncovered (`6-10` / `3-5`)                        |
+| Allman-style `else` on its own line                                    | `else` on line 6, `{` on line 7, body on line 8                                                      | Uncovered `else` is attributed to line `6` and body `8` (`Uncovered Line #s`: `6,8`), not `{` on line 7                                     |
+| Top-of-file comments with non-empty `--define` object/array            | Leading `//` and `/* */` comments plus `--define CFG_OBJ={"mode":"prod"}` / `--define CFG_ARR=[...]` | Top comments and `declare` lines are excluded from `LF`/`LH`; `defined.ts` reports `100.00%` (`LF:2`/`LH:2`) and `def_top.ts` `LF:1`/`LH:1` |
+| Class `% Funcs` accounting                                             | Class with implicit constructor, field initializers, `static {}`, `async`, and generator methods     | Counts only explicit methods (`FNF:2`/`FNH:2` for 2 methods, `FNF:1`/`FNH:1` for 1 method), reporting `100.00%` `% Funcs`                   |
+| `lcov.info` `DA:` execution counts                                     | Multi-op single-shot line (`once.ts`), inline `.map()` line (`complex_hit.ts`), and 4x `for` loop    | Single-execution multi-op line records `DA:2,1`; loop body records `DA:5,4`; inline 3-element `.map()` callback records `DA:2,3`            |
+| `coverageThreshold` enforcement & defaults                             | Numeric `0.5`/`0.51`, `{ lines = 0.5 }`/`0.8`, typo `{ line = 0.8 }`, and partial `{ functions }`    | Enforces exact bounds (`0.5` pass / `0.51` fail), silently ignores unknown keys (`line`), and defaults omitted keys in a table to `0.90`    |
+
 <!-- bun-behavior: bunx-minimum-release-age -->
 
 ## `bunx --minimum-release-age` (measured 2026-11-18)
@@ -424,21 +570,218 @@ So the flag applies to packages `bunx` downloads, not just `bun install` resolut
 
 <!-- bun-behavior: bunx-trust -->
 
-## `bunx --trust` (measured 2026-11-18)
+## `bunx --trust` (measured 2026-11-21)
 
-Measured with a package whose `postinstall` writes a marker file: without `--trust` the bin still
-runs but the marker is absent; with `--trust` the marker is written. The release note extends the
-trust to the package's dependencies; only the package's own lifecycle script is re-measured here.
-`tests/bunx_download_flags.test.ts` owns both runs.
+Measured with a package (`trust-probe`) whose `postinstall` writes a marker file: without `--trust`
+the bin still runs but the marker is absent; with `--trust` the marker is written. The release
+note's dependency claim is measured too: `trust-probe` depends on `trust-dep`, whose own
+`postinstall` writes a second marker, and `--trust` runs both scripts while a plain `bunx` runs
+neither. `tests/bunx_download_flags.test.ts` owns all four runs.
+
+## Named `bun` exports: `s3`, `$`, and `sql` (measured 2026-11-20)
+
+Declared in `bun-types@1.4.4` (`s3.d.ts`, `shell.d.ts`, and `sql.d.ts` pinned above); the
+offline/in-memory contracts below were re-measured on `2026-11-20` on the local Bun binary
+(`1.4.5`). Each named export from `"bun"` is identical by reference to the corresponding `Bun.*`
+property (`s3 === Bun.s3`, `S3Client === Bun.S3Client`, `$ === Bun.$`, `sql === Bun.sql`,
+`SQL === Bun.SQL`).
+
+| Export            | Underlying Primitive                           | Primary Use                                                                 | Bun Env / Config Source                                                             | Repo Adapter / Policy                                                                                                                                                                                                  |
+| :---------------- | :--------------------------------------------- | :-------------------------------------------------------------------------- | :---------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `s3` / `S3Client` | Default `Bun.s3` (`S3Client`) / `Bun.S3Client` | S3 / Cloudflare R2 object read, write, presign, stat                        | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_ENDPOINT` (or `AWS_*`) | [`lib/r2_s3_client.ts`](../lib/r2_s3_client.ts) (`R2S3Client`)                                                                                                                                                         |
+| `$`               | `Bun.$`                                        | Cross-platform shell scripting with auto-escaped interpolation & streaming  | Inherits `process.env`; override via `.env({...})` / `.cwd(...)`                    | Tooling-only (`scripts/`, `bin/`, e.g. [`scripts/compute_dump_lag.ts`](../scripts/compute_dump_lag.ts)); argv-only `Bun.spawn` for credentials ([`lib/f402_credentials_policy.ts`](../lib/f402_credentials_policy.ts)) |
+| `sql` / `SQL`     | Default `Bun.sql` (`SQL`) / `Bun.SQL`          | Native PostgreSQL, MySQL, and SQLite client with automatic parameterization | `DATABASE_URL` / `POSTGRES_URL` (or `new SQL(url)`)                                 | [`lib/db.ts`](../lib/db.ts) (PostgreSQL TLS/pool) & [`bin/sql-query.ts`](../bin/sql-query.ts) (read-only inspector)                                                                                                    |
+
+<!-- bun-behavior: bun-s3-globals -->
+
+### `s3` and `S3Client` — S3 / Cloudflare R2
+
+The default `s3` export reads credentials from `S3_*` / `AWS_*` environment variables; instantiate
+`new S3Client(...)` when targeting multiple buckets or explicit R2 endpoints.
+
+```ts
+import { s3, S3Client } from "bun";
+
+// Default client (reads S3_* / AWS_* env vars)
+const file = s3.file("snapshots/latest.json");
+const exists = await file.exists();
+const data = exists ? await file.json() : null;
+
+// Explicit Cloudflare R2 client
+const r2 = new S3Client({
+  accessKeyId: process.env.R2_ACCESS_KEY_ID,
+  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  bucket: "sportsdesk-ops-reports",
+  endpoint: process.env.S3_ENDPOINT,
+});
+
+await r2.write("manifests/2026-11-20.yaml", Bun.YAML.stringify({ ok: true }), {
+  type: "application/yaml",
+});
+
+// Presigned URL (offline SigV4 signing, no network call)
+const url = r2.presign("manifests/2026-11-20.yaml", { expiresIn: 300 });
+```
+
+- **Lazy `S3File` handle:** Like `Bun.file()`, `s3.file()` performs no I/O until `.text()`,
+  `.bytes()`, `.json()`, `.exists()`, `.stat()`, `.write()`, or `.delete()` is awaited.
+  Synchronous `file.size` on an unhydrated `S3File` is `NaN` (not `0`); only `stat()` / `bytes()`
+  resolves object length.
+- **Repo adapter ([`lib/r2_s3_client.ts`](../lib/r2_s3_client.ts)):** Production R2 I/O uses
+  `resolveR2S3Options` / `resolveR2CredentialsAsync` and `R2S3Client`. Credential precedence is
+  `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` → `CLOUDFLARE_R2_TOKEN_ID`/`CLOUDFLARE_R2_API_TOKEN`
+  (secret derived as `sha256Hex`) → `S3_*` → `AWS_*` → `Bun.secrets` (`com.bookdeskops.sportsdesk`
+  with legacy `sportsdesk-ops` fallback); bucket precedence is `R2_BUCKET_NAME` → `S3_BUCKET` →
+  `AWS_BUCKET`; endpoint precedence is `S3_ENDPOINT` → `AWS_ENDPOINT` → `AWS_ENDPOINT_URL_S3` →
+  derived `https://<accountId>.r2.cloudflarestorage.com` from `CLOUDFLARE_ACCOUNT_ID` /
+  `R2_ACCOUNT_ID` (`R2_ENDPOINT` in [`runbooks/cloudflare_r2_and_api_runbook.md`](./runbooks/cloudflare_r2_and_api_runbook.md)
+  is an operator reference value and is not read by `resolveR2S3Options`).
+- **R2-specific edges:** `R2S3Client.writeWithMetadata` signs direct PUT requests for `x-amz-meta-*`
+  headers that Bun's writer does not expose, and `R2S3Client.stat` recovers `size` via a body read
+  when R2 HEAD omits `Content-Length`. Inline `fetch("s3://...", { s3: { accessKeyId, secretAccessKey } })`
+  credentials are forbidden (`BUN-FETCH-S3-INLINE-CREDENTIALS`).
+- **Evidence:** [`tests/bun_s3client_contract.test.ts`](../tests/bun_s3client_contract.test.ts),
+  [`tests/r2_s3_client.test.ts`](../tests/r2_s3_client.test.ts),
+  [`tests/bun_runtime_contracts.test.ts`](../tests/bun_runtime_contracts.test.ts).
+
+<!-- bun-behavior: bun-shell-globals -->
+
+### `$` (`Bun.$`) — Bun Shell
+
+`$` (`Bun.$`) is lazy (starts no process until awaited). Interpolated expressions are escaped
+automatically to prevent shell injection. Output methods (`.text()`, `.json()`, `.bytes()`,
+`.arrayBuffer()`, `.blob()`, `.lines()`) implicitly quiet echoing, whereas a bare `await` echoes to
+parent stdout; use `.quiet()` when discarding output and `.nothrow()` to inspect non-zero exits
+without throwing `ShellError` (`exitCode` + `Buffer` `stdout`/`stderr`).
+
+```ts
+import { $ } from "bun";
+
+const branch = "main";
+const sha = (await $`git rev-parse ${branch}`.quiet().text()).trim();
+
+// Stream directly from JS objects (Response, Buffer, Blob) without temp files
+const input = new Response("alpha\nbeta\ngamma\n");
+const lines = await $`grep beta < ${input}`.quiet().text();
+
+// Non-throwing exit inspection
+const res = await $`git diff --quiet`.nothrow().quiet();
+if (res.exitCode !== 0) {
+  console.error("Working tree dirty");
+}
+
+// Raw interpolation for intentional flags (never pass untrusted input here)
+const flags = "-n hello";
+const out = await $`echo ${{ raw: flags }}`.quiet().text();
+```
+
+- **Gotchas:** Passing a multi-token string as `${flags}` quotes the entire string as one argument;
+  wrap intentional flags or raw shell syntax with `${{ raw: "..." }}` (never with untrusted
+  input). `Bun.$.escape()` coerces non-strings (`null` → `"null"`, `true` → `"true"`) and is not
+  an input validator.
+- **Repo policy:** `Bun.$` / `$` is **tooling-only** (`scripts/`, `bin/`, e.g.
+  [`scripts/compute_dump_lag.ts`](../scripts/compute_dump_lag.ts)) and every call site must capture
+  output or call `.quiet()`. Library and daemon code (`lib/`, `services/`, `cli/`) and any code path
+  touching credentials, cookies, or sessions must use argv-only `Bun.spawn([argv…])` — see
+  [`lib/f402_credentials_policy.ts`](../lib/f402_credentials_policy.ts) and the credential audit
+  section below.
+- **Evidence:** [`tests/bun_shell_contract.test.ts`](../tests/bun_shell_contract.test.ts),
+  [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts).
+
+<!-- bun-behavior: bun-sql-globals -->
+
+### `sql` and `SQL` — Native SQL client
+
+`sql` (`Bun.sql`) resolves `DATABASE_URL` with a `POSTGRES_URL` fallback (both verified against
+`sqlite://:memory:` on Bun `1.4.5`); `new SQL(url)` connects explicitly to PostgreSQL, MySQL, or
+SQLite. Tagged template interpolation binds `${val}` as a prepared-statement parameter—never string
+concatenation.
+
+```ts
+import { sql, SQL } from "bun";
+
+// Default connection (DATABASE_URL / POSTGRES_URL)
+const active = await sql`
+  SELECT id, status FROM wagers
+  WHERE status = ${"OPEN"} AND stake_cents >= ${10000}
+`;
+
+// Explicit connection + transaction + dynamic identifier / bulk insert
+const db = new SQL(process.env.DATABASE_URL ?? "sqlite://:memory:");
+const col = "status";
+await db`INSERT INTO wagers ${db([{ id: 1, status: "OPEN", stake_cents: 15000 }])}`;
+const rows = await db`SELECT id, ${db(col)} FROM wagers`;
+await db.begin(async (tx) => {
+  await tx`UPDATE balances SET cents = cents - ${500} WHERE id = ${1}`;
+  await tx`UPDATE balances SET cents = cents + ${500} WHERE id = ${2}`;
+});
+```
+
+- **Gotcha (`sql(ident)` vs `${val}`):** Standard `${val}` interpolation is always bound as a
+  parameter (preventing SQL injection); use `db(columnName)` for table/column identifiers or
+  `INSERT INTO t ${db(rows)}` for bulk row objects, and allowlist any dynamic identifier before
+  passing it to `db(...)`.
+- **Repo adapters:** Application PostgreSQL queries import `sql` from [`lib/db.ts`](../lib/db.ts)
+  rather than raw `import { sql } from "bun"`. `lib/db.ts` reads `DATABASE_URL` (reusing default
+  `Bun.sql` only for local plaintext when `SPORTSDESK_DB_TLS !== "1"`) or `PGHOST`/`PGPORT`/
+  `PGUSER`/`PGPASSWORD`/`PGDATABASE` (it does **not** read `POSTGRES_URL`), rejects empty passwords
+  on non-local hosts, enforces TLS 1.3 only (`rejectUnauthorized: true`, optional
+  `SPORTSDESK_DB_CERT_FINGERPRINT` and `SPORTSDESK_DB_CA_FILE`), channel binding (`prefer`), pool
+  limits, and connect timeout (`10 s` default). Operator ad-hoc inspection uses
+  [`bin/sql-query.ts`](../bin/sql-query.ts) (`bun x sql-query` / `bun run sql:query`), which
+  enforces single-statement read-only `SELECT`/`WITH`/`EXPLAIN` queries and `--timeout` query
+  cancellation via `query.cancel()`.
+- **Evidence:** [`tests/bun_sql_contract.test.ts`](../tests/bun_sql_contract.test.ts),
+  [`tests/sql_query_cli.test.ts`](../tests/sql_query_cli.test.ts),
+  [`tests/db_tls_options.test.ts`](../tests/db_tls_options.test.ts),
+  [`tests/db_pool_options.test.ts`](../tests/db_pool_options.test.ts),
+  [`tests/db_connection_timeout.test.ts`](../tests/db_connection_timeout.test.ts).
+
+<!-- bun-behavior: blob-image-pipeline -->
+
+## `FileBlob.image()` — lazy decode, resize, encode, write (measured 2026-11-21)
+
+`Bun.file(path).image()` wraps the file in a `Bun.Image` pipeline. The reference documents the
+constructor as synchronous with the read deferred to an awaited terminal; measured here, the
+undecoded fields confirm it: `image.width` and `image.height` report `-1` until `metadata()` (or
+another terminal) decodes, after which they report the real dimensions.
+
+Measured on the pinned `Bun 1.4.5+a7733435c`:
+
+- **Chain:** `Bun.file(src).image().resize(400).webp().write(dest)` writes a WebP and returns a
+  positive byte count; the target is `image/webp` with the resized dimensions
+  ([`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts),
+  [`tests/bun_file_blob_contract.test.ts`](../tests/bun_file_blob_contract.test.ts)).
+- **Shape:** a one-dimension resize preserves aspect ratio (measured: 10×5 at width 4 → 4×2);
+  `write()` returns the encoded byte count, equal to the target's size and `bytes().byteLength`;
+  an existing target is replaced, missing parent directories are created, and a regular file in
+  the path rejects `ENOTDIR`.
+- **Laziness:** deleting the source after `image()` but before a terminal rejects `ENOENT` — the
+  deferred read happens at the terminal, not at construction.
+- **Terminals:** `bytes()` returns the encoded `Uint8Array` when the caller needs the payload — a
+  `Response` or a content ETag (`services/sportsdesk_webview_server.ts`, `scripts/optimize_assets.ts`) —
+  while `write(path)` is the file terminal and needs no separate `Bun.write`.
+- **Surface:** the twenty-one instance methods (`resize`, `webp`, `png`, `jpeg`, `avif`, `bytes`,
+  `write`, `metadata`, `placeholder`, …) are snapshotted under `prototypes` in
+  [`tests/bun_shape_members.json`](../tests/bun_shape_members.json) and drift-checked by
+  [`tests/bun_shapes_coverage.test.ts`](../tests/bun_shapes_coverage.test.ts); `WebView` is the one
+  platform-excluded prototype surface.
+- **Failure:** a non-image body rejects with a `Bun.Image` code, classified as `AvatarImageError` at
+  the boundary ([`src/lib/terminal_avatar.ts`](../src/lib/terminal_avatar.ts),
+  [`tests/terminal_avatar.test.ts`](../tests/terminal_avatar.test.ts),
+  [`lib/image_errors.test.ts`](../lib/image_errors.test.ts)).
+
+- **Evidence:** [`tests/bun_file_blob_contract.test.ts`](../tests/bun_file_blob_contract.test.ts),
+  [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts).
 
 ## Upstream doc commit pins
 
 | Pin                                                                                                                      | Tree                               | Use                                                                       |
 | :----------------------------------------------------------------------------------------------------------------------- | :--------------------------------- | :------------------------------------------------------------------------ |
-| [`38afee6c`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/README.md)                | `oven-sh/bun/docs` at `bun-v1.4.4` | Baseline runtime docs for the pinned binary                               |
-| [`6cdb3835`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/project/contributing.mdx) | `docs#contributing`                | MDX voice (same audited commit; tag `6cdb3835` is historical metadata)    |
-| [`6a380492`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/snippets)                 | `docs/snippets`                    | `guides.jsx` (guide index), `cli/*.mdx` (CLI flag blocks)                 |
-| [`b6e7b9cd`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/runtime/s3.mdx)           | `docs/runtime/s3.mdx`              | `Bun.S3Client`, `S3File`, `new Response(s3file)` 302 redirect, `ERR_S3_*` |
+| [`38afee6c`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/docs/README.md)                | `oven-sh/bun/docs` at `bun-v1.4.4` | Baseline runtime docs for the pinned binary                               |
+| [`6cdb3835`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/docs/project/contributing.mdx) | `docs#contributing`                | MDX voice (same audited commit; tag `6cdb3835` is historical metadata)    |
+| [`6a380492`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/docs/snippets)                 | `docs/snippets`                    | `guides.jsx` (guide index), `cli/*.mdx` (CLI flag blocks)                 |
+| [`b6e7b9cd`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/docs/runtime/s3.mdx)           | `docs/runtime/s3.mdx`              | `Bun.S3Client`, `S3File`, `new Response(s3file)` 302 redirect, `ERR_S3_*` |
 
 ## Related runbooks in this repo
 
@@ -542,7 +885,7 @@ The repo uses `Bun.JSONL.parse()` / `Bun.JSONL.parseChunk()` by default on JSONL
 
 ## `Bun.$` — available, but argv-only for credentials (2026-11-04 audit)
 
-[`Bun.$`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/shell.d.ts#L23) is pinned in [`bin/bun_surface.ts`](../bin/bun_surface.ts) and [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts), but [`lib/f402_credentials_policy.ts`](../lib/f402_credentials_policy.ts) enforces **argv-only (`Bun.spawn([argv…])`) for anything that touches a credential**:
+[`Bun.$`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/shell.d.ts#L23) is pinned in [`bin/bun_surface.ts`](../bin/bun_surface.ts) and [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts), but [`lib/f402_credentials_policy.ts`](../lib/f402_credentials_policy.ts) enforces **argv-only (`Bun.spawn([argv…])`) for anything that touches a credential**:
 
 | Scenario                                                              | Use                                                   | Why                                                                                             |
 | :-------------------------------------------------------------------- | :---------------------------------------------------- | :---------------------------------------------------------------------------------------------- |
@@ -555,7 +898,7 @@ token `"null"`. Validate the type before escaping, and never use escape as a cre
 
 ## When to use `Bun.allocUnsafe` (and when NOT to) — 2026-11-04 audit
 
-[`Bun.allocUnsafe(size)`](https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/packages/bun-types/bun.d.ts#L4954) returns an unzeroed `Uint8Array`. Every call site must guarantee that only written bytes are exposed to callers (pinned in [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts)):
+[`Bun.allocUnsafe(size)`](https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/packages/bun-types/bun.d.ts#L4954) returns an unzeroed `Uint8Array`. Every call site must guarantee that only written bytes are exposed to callers (pinned in [`tests/bun_capabilities.test.ts`](../tests/bun_capabilities.test.ts)):
 
 | File:line                            | Fill pattern                                    | Why it is safe                                                                                  |
 | :----------------------------------- | :---------------------------------------------- | :---------------------------------------------------------------------------------------------- |

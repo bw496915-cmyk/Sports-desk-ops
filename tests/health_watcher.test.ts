@@ -47,6 +47,7 @@ const healthyPayload = (): DeskEnhancedHealthPayload => ({
       r2Fresh: 1,
       r2Total: 1,
       r2StaleKeys: [],
+      r2UnreadableKeys: [],
       dataStaleKeys: ["f402-weblog"],
       checks: {
         ticker: "ok",

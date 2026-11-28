@@ -340,10 +340,10 @@ describe("resolveKalshiCredentials", () => {
     const resolution = await resolveKalshiCredentials({
       env: {
         KALSHI_API_KEY_ID: "env-key-id",
-        KALSHI_PRIVATE_KEY_PATH: "/tmp/generated-kalshi-key.pem",
+        KALSHI_PRIVATE_KEY_PATH: "/fixtures/generated-kalshi-key.pem",
       },
       readFile: async (path) => {
-        expect(path).toBe("/tmp/generated-kalshi-key.pem");
+        expect(path).toBe("/fixtures/generated-kalshi-key.pem");
         return PRIVATE_KEY_PEM;
       },
       getSecret: async () => null,

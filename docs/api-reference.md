@@ -106,7 +106,7 @@ Observed: the 2026-10-28 Manager HAR session is cookie-based and sent no Authori
 
 Static daemon admin token: Authorization: Bearer &lt;SPORTSDESK_ADMIN_TOKEN>, compared with crypto.timingSafeEqual (services/sportsdesk_webview_server.ts, adminRejection). The daemon answers 503 when SPORTSDESK_ADMIN_TOKEN is unset and 401 otherwise.
 
-Implementation-verified: the local daemon compares `Authorization: Bearer <token>` against `SPORTSDESK_ADMIN_TOKEN` in constant time (`services/sportsdesk_webview_server.ts:259-278`), protects `/api/watchlist` and `/api/telegram/*` (`services/sportsdesk_webview_server.ts:3246-3255`) and returns 503 when the token is not configured.
+Implementation-verified: the local daemon compares `Authorization: Bearer <token>` against `SPORTSDESK_ADMIN_TOKEN` in constant time (`services/sportsdesk_webview_server.ts:259-278`), protects `/api/watchlist` and `/api/telegram/*` (`services/sportsdesk_webview_server.ts:3498-3507`) and returns 503 when the token is not configured.
 
 ### Session lifecycle
 
@@ -1761,7 +1761,7 @@ Throws a string so the server's error boundary runs; `?trigger_error=non_error` 
 
 ### `GET /api/v1/blobs/{key}`
 
-> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:558-641` · response not captured
+> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:610-693` · response not captured
 
 **Presigned download URL for one blob**
 
@@ -1827,7 +1827,7 @@ Bearer-auth GET redirects (302) to a presigned S3/R2 GET URL (services/blob_and_
 
 ### `PUT /api/v1/blobs/{key}`
 
-> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:558-641` · response not captured
+> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:610-693` · response not captured
 
 **Bounded image upload, transcoded to WebP**
 
@@ -1899,7 +1899,7 @@ No declared fields.
 
 ### `DELETE /api/v1/blobs/{key}`
 
-> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:730-748` · response not captured
+> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:782-800` · response not captured
 
 **Delete one stored blob**
 
@@ -1970,7 +1970,7 @@ Frozen v1 live-bets endpoint (sportsdesk_webview_server.ts#GET /api/v1/live-bets
 
 ### `POST /api/v1/live-bets`
 
-> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:498-544` · response not captured
+> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:548-594` · response not captured
 
 **Publish a live-bets event to subscribers**
 
@@ -2022,7 +2022,7 @@ Bearer-auth POST {channel, event} validates the channel, serializes the event an
 
 ### `POST /api/v1/ws-tickets`
 
-> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:473-497` · response not captured
+> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:523-547` · response not captured
 
 **Short-lived one-time WebSocket ticket**
 
@@ -2236,7 +2236,7 @@ Serves telegram-miniapp-dashboard.html as text/html (services/sportsdesk_webview
 
 ### `GET /ws/live-bets`
 
-> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:749-778` · response not captured
+> **Evidence — tier B** · sources: `services/blob_and_live_bets_server.ts:801-830` · response not captured
 
 **Live-bets WebSocket upgrade**
 

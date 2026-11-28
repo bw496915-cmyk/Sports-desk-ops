@@ -51,8 +51,8 @@ describe("agent:doctor severity", () => {
 
 describe("agent:doctor report", () => {
   test("reports counts and the RESULT line", () => {
-    const report = renderReport([ok("a"), warn("b")], "/tmp/worktree");
-    expect(report).toContain("agent:doctor · /tmp/worktree");
+    const report = renderReport([ok("a"), warn("b")], "/workspace/worktree");
+    expect(report).toContain("agent:doctor · /workspace/worktree");
     expect(report).toContain("2 checks · 1 ok · 1 warn · 0 fail");
     expect(report).toContain("RESULT: PASS");
     expect(report).toContain("WARN b warning");
@@ -60,7 +60,7 @@ describe("agent:doctor report", () => {
   });
 
   test("a FAIL prints its remedy and a failing RESULT", () => {
-    const report = renderReport([fail("deps")], "/tmp/worktree");
+    const report = renderReport([fail("deps")], "/workspace/worktree");
     expect(report).toContain("FAIL deps failure");
     expect(report).toContain("fix: fix deps");
     expect(report).toContain("RESULT: FAIL");
@@ -69,7 +69,7 @@ describe("agent:doctor report", () => {
   test("OK checks never print a fix line", () => {
     const report = renderReport(
       [{ id: "a", status: "ok", title: "fine", fix: "should not print" }],
-      "/tmp/worktree",
+      "/workspace/worktree",
     );
     expect(report).not.toContain("should not print");
   });

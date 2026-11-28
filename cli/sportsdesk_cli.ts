@@ -235,6 +235,8 @@ Usage: \`bun sportsdesk_cli.ts [command|option] [parameters...]\`
 * **shot** <URL> [\`--out\` PATH] [\`--f402-login\`] [\`--profile\` DIR] [\`--format\` png|jpeg|webp]: Bun.WebView screenshot (default \`scratch/shots/\`)
 * **dashboard** [\`--exec\`] [\`--theme\` dark|light|mono|accessible] [\`--columns\` N] [\`--light\`] [\`--no-color\`] [\`--no-hyperlinks\`] [\`--kitty-graphics\`] [\`--linkify-symbols\`]: Render dashboard.md with Bun.markdown.ansi (AnsiTheme) in milliseconds
 * **dns** [\`--backend\` system|c-ares|libc] [\`--json\`]: Bun native DNS cache telemetry and prefetch inspection
+* **health** [\`--port\` N] [\`--status\`] [\`--alerts\`] [\`--schedules\`] [\`--strict\`] [\`--no-drift-fail\`] [\`--watch\`] [\`--json\`]: Structured \`/health\` (\`schemaVersion: 1\`) & \`/status\` diagnostics
+* **dev** [\`--port\` N] [\`--host\` H] [\`--companion\` ORIGIN] [\`--tab\` TAB] [\`--matrix\`] [\`--open\`] [\`--print-url\`] [\`--api-only\`]: Launch Enhanced Dashboard server with canonical route URLs
 `;
   printAnsiMarkdown(helpMd);
   return;
@@ -1480,11 +1482,10 @@ function inspectOptionsOrUsageError(args: string[]): CliInspectOptions | null {
   }
 }
 
-function getArgValue(
+function getOptionalArgValue(
   args: string[],
   flags: string[],
-  defaultValue: string,
-): string {
+): string | undefined {
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
     const value = args[i + 1];
@@ -1492,7 +1493,15 @@ function getArgValue(
       return value;
     }
   }
-  return defaultValue;
+  return undefined;
+}
+
+function getArgValue(
+  args: string[],
+  flags: string[],
+  defaultValue: string,
+): string {
+  return getOptionalArgValue(args, flags) ?? defaultValue;
 }
 
 /**
@@ -1721,15 +1730,25 @@ export async function handleWireCommand(args: string[]): Promise<void> {
     const mode = getArgValue(args, ["-m", "--mode"], "B").toUpperCase() as
       "A" | "B" | "C" | "I";
     const custId = getArgValue(args, ["-c", "--customer"], "0");
-    const ip = getArgValue(args, ["--ip"], "");
+    const ip = getOptionalArgValue(args, ["--ip"]);
+    const agentId = getOptionalArgValue(args, ["--agent"]);
+    const agentOwner = getOptionalArgValue(args, ["--agent-owner"]);
+    const startDate = getOptionalArgValue(args, ["--start"]);
+    const endDate = getOptionalArgValue(args, ["--end"]);
+    const actions = getOptionalArgValue(args, ["--actions"]);
     console.log(
-      `[Wire IP Tracker] Querying getWebLog mode ${mode} (Customer: ${custId}, IP: ${ip || "ALL"})...`,
+      `[Wire IP Tracker] Querying getWebLog mode ${mode} (Customer: ${custId}, IP: ${ip ?? (mode === "C" && custId !== "0" ? custId.toLowerCase() : "ALL")})...`,
     );
     try {
       const res = await queryIpTrackerWebLog({
         mode,
         customerId: custId,
-        ip,
+        ...(ip !== undefined ? { ip } : {}),
+        ...(agentId !== undefined ? { agentId } : {}),
+        ...(agentOwner !== undefined ? { agentOwner } : {}),
+        ...(startDate !== undefined ? { startDate } : {}),
+        ...(endDate !== undefined ? { endDate } : {}),
+        ...(actions !== undefined ? { actions } : {}),
       });
       console.log(
         `[Wire IP Tracker] Mode ${res.mode} returned ${res.rowCount} row(s) at ${res.queryTimestamp}`,
@@ -2123,6 +2142,65 @@ export async function main(): Promise<void> {
       firstLower === "live_bets" ? "live-bets" : firstLower,
       ...rawArgs.slice(1),
     ]);
+    return;
+  }
+
+  if (firstLower === "health") {
+    const { runHealthCli } = await import("../lib/health_cli.ts");
+    process.exitCode = await runHealthCli(rawArgs.slice(1));
+    return;
+  }
+
+  if (firstLower === "dev") {
+    const {
+      devDashboardHelpText,
+      parseDevDashboardCliArgs,
+      resolveDashboardPrintUrl,
+      withResolvedListenArgs,
+    } = await import("../lib/dev_dashboard_cli.ts");
+    const devArgs = rawArgs.slice(1);
+    const parsed = parseDevDashboardCliArgs(devArgs, Bun.env, process.execArgv);
+    if (!parsed.ok) {
+      console.error(parsed.error);
+      process.exitCode = 2;
+      return;
+    }
+    if (parsed.flags.help) {
+      console.log(devDashboardHelpText());
+      return;
+    }
+    if (parsed.flags.printUrl) {
+      const resolved = resolveDashboardPrintUrl(parsed.flags);
+      if (!resolved.ok) {
+        console.error(resolved.error);
+        process.exitCode = 2;
+        return;
+      }
+      console.log(resolved.url);
+      return;
+    }
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "run",
+        resolve(import.meta.dir, "../scripts/dev_dashboard.ts"),
+        // The parent resolved the listen address from CLI flags, the runtime `--port`,
+        // BUN_PORT / PORT / NODE_PORT, and HOST. A nested `bun run` drops the parent's
+        // runtime flags (measured: the child sees only `--bun` in execArgv), so the
+        // resolved values are forwarded explicitly.
+        ...withResolvedListenArgs(
+          devArgs,
+          parsed.flags.port,
+          parsed.flags.hostname,
+        ),
+      ],
+      {
+        stdin: "inherit",
+        stdout: "inherit",
+        stderr: "inherit",
+      },
+    );
+    process.exitCode = await child.exited;
     return;
   }
 

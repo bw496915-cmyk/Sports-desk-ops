@@ -863,7 +863,7 @@ describe("sportsdesk-fraud cross-ref governance & R2 lineage envelope", () => {
     for (const badArgv of [
       ["C001", "C002", "--input", "live.json"],
       ["C001", "C002", "--input=foo.bin"],
-      ["C001", "C002", "--file", "/tmp/wagers.json"],
+      ["C001", "C002", "--file", "/fixtures/wagers.json"],
       ["C001", "C002", "tests/fixtures/fraud/live-wagers.json"],
       ["C001", "C002", "scratch/wagers.sqlite"],
       ["C001", "C002", "scratch/spine.dodbin"],

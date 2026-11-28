@@ -8,11 +8,16 @@
 
 import { describe, expect, it } from "bun:test";
 import { unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { executeTerminalQuery } from "../lib/terminal_emulator.ts";
 import { TerminalSession } from "../lib/bun_terminal.ts";
 
 const createProbePath = () =>
-  `/tmp/pty_injection_exploit_probe_${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2)}.txt`;
+  join(
+    tmpdir(),
+    `pty_injection_exploit_probe_${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2)}.txt`,
+  );
 
 const cleanFile = (path: string) => {
   try {

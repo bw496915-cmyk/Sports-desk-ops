@@ -51,13 +51,22 @@ describe("terminal avatar pipeline", () => {
     const forced = buildAnsiTheme({ colors: true, columns: 0 }, {}, false);
     expect(forced.colors).toBe(true);
     expect(forced.columns).toBe(0);
+
+    const forceOverridesNoColor = buildAnsiTheme(
+      {},
+      { NO_COLOR: "1", FORCE_COLOR: "1" },
+      false,
+    );
+    expect(forceOverridesNoColor.colors).toBe(true);
+    const forceZero = buildAnsiTheme({}, { FORCE_COLOR: "0" }, true);
+    expect(forceZero.colors).toBe(false);
   });
 
   test("renders Markdown with a local-file Kitty image only", () => {
     const markdown = renderMarkdownWithAvatar("## Synced", {
       colors: false,
       columns: 0,
-      avatarPath: "/tmp/avatar.png",
+      avatarPath: "/fixtures/avatar.png",
     });
     expect(markdown).toContain("Synced");
     expect(markdown).toContain("avatar");

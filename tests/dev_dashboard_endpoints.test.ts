@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
-import type { Subprocess } from "bun";
+import type { Server, Subprocess } from "bun";
 
 describe("Dev Dashboard Endpoints (scripts/dev_dashboard.ts)", () => {
   let proc: Subprocess;
   let baseUrl: string;
+  let mockR2Server: Server<undefined>;
+  let mockR2BaseUrl: string;
 
   /** Bind an ephemeral port, read it, release it for the subprocess. */
   function reservePort(): number {
@@ -35,6 +37,21 @@ describe("Dev Dashboard Endpoints (scripts/dev_dashboard.ts)", () => {
   }
 
   beforeAll(async () => {
+    mockR2Server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === "/assets/ARCH-Guide.webp") {
+          return new Response(Bun.file("docs/assets/ARCH-Guide.webp"), {
+            headers: { "content-type": "image/webp" },
+          });
+        }
+        return new Response("Not Found", { status: 404 });
+      },
+    });
+    mockR2BaseUrl = `http://127.0.0.1:${mockR2Server.port}`;
+
     // Parallel test workers share the OS network namespace, so a fixed port lets two
     // copies of this file talk to each other's server (observed: one copy fails while
     // the other holds 4055). Reserve an ephemeral port and retry if it is taken.
@@ -48,6 +65,7 @@ describe("Dev Dashboard Endpoints (scripts/dev_dashboard.ts)", () => {
           SPORTSDESK_AUTH_DISABLED: "1",
           SPORTSDESK_LIVE_WAGERS_JSON:
             "tests/fixtures/live-wagers.partial.json",
+          SPORTSDESK_R2_PUBLIC_BASE: mockR2BaseUrl,
         },
         stdout: "pipe",
         stderr: "pipe",
@@ -60,6 +78,7 @@ describe("Dev Dashboard Endpoints (scripts/dev_dashboard.ts)", () => {
 
   afterAll(() => {
     proc.kill();
+    mockR2Server?.stop(true);
   });
 
   describe("Static directory routes", () => {
@@ -439,9 +458,7 @@ describe("Dev Dashboard Endpoints (scripts/dev_dashboard.ts)", () => {
         };
       };
       expect(json.key).toBe("assets/ARCH-Guide.webp");
-      expect(json.publicUrl).toBe(
-        "https://pub-d061f943df0e4477ba7ff200721eddb1.r2.dev/assets/ARCH-Guide.webp",
-      );
+      expect(json.publicUrl).toBe(`${mockR2BaseUrl}/assets/ARCH-Guide.webp`);
       expect(json.fetchedBytes).toBeGreaterThan(0);
       expect(json.report.available).toBe(true);
       expect(json.report.format).toBe("webp");

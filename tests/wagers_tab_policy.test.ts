@@ -95,7 +95,7 @@ describe("wagers tab policy runtime stamp", () => {
     const fallback = wagersTabPolicyPath();
     expect(fallback.endsWith("packages/ui/src/config/wagers.toml")).toBe(true);
 
-    process.env.WAGERS_TAB_POLICY_PATH = "/tmp/custom-wagers.toml";
-    expect(wagersTabPolicyPath()).toBe("/tmp/custom-wagers.toml");
+    process.env.WAGERS_TAB_POLICY_PATH = "/fixtures/custom-wagers.toml";
+    expect(wagersTabPolicyPath()).toBe("/fixtures/custom-wagers.toml");
   });
 });

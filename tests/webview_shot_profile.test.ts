@@ -41,8 +41,8 @@ describe("parseShotArgs", () => {
 
   test("--out and --profile take a file:// URL but refuse other schemes", () => {
     expect(
-      parseShotArgs(["https://x", "--out=file:///tmp/a%20b.png"])?.out,
-    ).toBe("/tmp/a b.png");
+      parseShotArgs(["https://x", "--out=file:///fixtures/a%20b.png"])?.out,
+    ).toBe("/fixtures/a b.png");
     expect(() =>
       parseShotArgs(["https://x", "--profile", "https://evil.example/p"]),
     ).toThrow("only local paths and file:// URLs are accepted, not https:");
@@ -197,8 +197,8 @@ describe("navigateWithRetry", () => {
 
 describe("renderShotTable", () => {
   const base = {
-    screenshot: "/tmp/s.png",
-    screenshotUrl: "file:///tmp/s.png",
+    screenshot: "/fixtures/s.png",
+    screenshotUrl: "file:///fixtures/s.png",
     bytes: 10,
     sha256: "ab".repeat(32),
     mimeType: "image/png",

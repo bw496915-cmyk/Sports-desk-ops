@@ -50,13 +50,13 @@ describe("Bun upstream reference: XML, bun x and catalogs", () => {
       "https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4",
     );
     expect(doc).toContain(
-      "https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/runtime/xml.mdx",
+      "https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/docs/runtime/xml.mdx",
     );
     expect(doc).toContain("bun.com/blog/bun-v1.4.4");
     expect(doc).toContain("ERR_DOD_CSR_CONSERVATION_BREACH");
     expect(doc).toContain("tests/bun_x_cli_help.test.ts");
     expect(doc).toContain(
-      "https://github.com/oven-sh/bun/blob/38afee6c84fcf48c0edb2466aa4b27d287a59c30/docs/runtime/semver.mdx",
+      "https://github.com/oven-sh/bun/blob/a7733435cf40429e3b35c36072769df2052b80f1/docs/runtime/semver.mdx",
     );
     for (const flag of [
       "--immutable",
@@ -178,5 +178,36 @@ describe("Bun upstream reference: XML, bun x and catalogs", () => {
       shapes?: Record<string, { documented?: boolean }>;
     }>("tests/bun_docs_surface_baseline.json");
     expect(baseline.shapes?.XML?.documented).toBe(true);
+  });
+
+  test("documents named bun exports s3, $, and sql with verified repo paths", async () => {
+    const behaviors = await readBunReleaseBehaviors(ROOT);
+    const ids = new Set(behaviors.map((behavior) => behavior.id));
+    for (const id of [
+      "bun-s3-globals",
+      "bun-shell-globals",
+      "bun-sql-globals",
+    ]) {
+      expect(ids.has(id)).toBe(true);
+    }
+
+    const doc = await read("docs/bun-upstream-reference.md");
+    expect(doc).toContain("## Named `bun` exports: `s3`, `$`, and `sql`");
+
+    const citedFiles = [
+      "lib/r2_s3_client.ts",
+      "lib/db.ts",
+      "bin/sql-query.ts",
+      "lib/f402_credentials_policy.ts",
+      "scripts/compute_dump_lag.ts",
+      "tests/bun_s3client_contract.test.ts",
+      "tests/bun_shell_contract.test.ts",
+      "tests/bun_sql_contract.test.ts",
+    ] as const;
+
+    for (const path of citedFiles) {
+      expect(doc).toContain(path);
+      expect(await Bun.file(join(ROOT, path)).exists()).toBe(true);
+    }
   });
 });

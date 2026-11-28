@@ -33,6 +33,7 @@
     "packages/nsh-desk/components",
     "packages/nsh-desk/store.ts",
     "packages/nsh-desk/ui",
-    "packages/ui"
+    "packages/ui",
+    "workers"
   ]
 }

@@ -9,7 +9,9 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
+  ORACLE_MANIFEST_PIN_PATH,
   RUNTIME_PIN_DOCS,
+  assertOracleManifestBunPin,
   assertWorkspaceBunPins,
   checkRuntimePinDocs,
   readBunRuntimePin,
@@ -28,6 +30,7 @@ const ROOT = join(MODULE_DIR, "..");
 function main(): void {
   const pin = readBunRuntimePin(ROOT);
   const workspaces = assertWorkspaceBunPins(ROOT, pin);
+  assertOracleManifestBunPin(ROOT, pin);
   const docs: Record<string, string> = {};
   for (const file of RUNTIME_PIN_DOCS) {
     docs[file] = readFileSync(join(ROOT, file), "utf8");
@@ -41,7 +44,7 @@ function main(): void {
   }
   checkR2SlaRunbook(readFileSync(join(ROOT, R2_SLA_RUNBOOK_PATH), "utf8"));
   console.log(
-    `check:derived-contracts: ok (bun ${pin}, ${workspaces.length} workspace engines, ${RUNTIME_PIN_DOCS.length} pin docs, ${R2_SLA_RUNBOOK_PATH})`,
+    `check:derived-contracts: ok (bun ${pin}, ${workspaces.length} workspace engines, ${ORACLE_MANIFEST_PIN_PATH}, ${RUNTIME_PIN_DOCS.length} pin docs, ${R2_SLA_RUNBOOK_PATH})`,
   );
 }
 

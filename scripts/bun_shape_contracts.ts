@@ -13,6 +13,7 @@
  * The links file is the only network-derived input, refreshed deliberately, so the
  * catalog can be regenerated or verified from a clean checkout without touching bun.com.
  */
+import { writeSync } from "node:fs";
 import path from "node:path";
 import {
   ABSENT_DOM_GLOBALS,
@@ -20,6 +21,7 @@ import {
   BUN_SHAPE_PINS,
   BUN_SUBMODULE_SHAPES,
   BUN_WEB_GLOBAL_SHAPES,
+  PROTOTYPE_SNAPSHOT_EXCLUDED,
   RUNTIME_ONLY_SHAPES,
   SHAPE_SECTIONS,
   VOLATILE_SHAPES,
@@ -175,13 +177,27 @@ function link(
 export async function renderBunShapeContractsCatalog(
   root: string = process.cwd(),
 ): Promise<{ readonly markdown: string; readonly okLinks: number }> {
+  const traceCatalog = process.env.SPORTSDESK_TRACE_CATALOG === "1";
+  if (traceCatalog) {
+    writeSync(
+      2,
+      `\ncatalog-process pid=${process.pid} revision=${Bun.revision}\n`,
+    );
+  }
   const files = await listBunShapeScannedFiles(root);
+  let parsedFiles = 0;
   const perShape = new Map<string, Map<string, number>>();
   const perSubmodule = new Map<string, Map<string, number>>();
   const perWebGlobal = new Map<string, Map<string, number>>();
   for (const file of files) {
     const text = await Bun.file(path.join(root, file)).text();
     const { hits, submodules, webGlobals } = scanBunShapeSource(file, text);
+    if (traceCatalog) {
+      writeSync(
+        2,
+        `\ncatalog-parsed ${++parsedFiles} pid=${process.pid} wall_ms=${Date.now()}\n`,
+      );
+    }
     for (const [hit, count] of hits) {
       const m = perShape.get(hit) ?? new Map<string, number>();
       m.set(file, (m.get(file) ?? 0) + count);
@@ -276,6 +292,14 @@ export async function renderBunShapeContractsCatalog(
           if (members.length > 0) {
             out.push(
               `- **Members (${members.length}):** ${members.length <= 12 ? members.map((m) => `\`${m}\``).join(", ") : "snapshot in tests/bun_shape_members.json"}`,
+            );
+          }
+          const prototypeMembers = PROTOTYPE_SNAPSHOT_EXCLUDED.has(shape.name)
+            ? []
+            : surfacePrototypeMembers(value);
+          if (prototypeMembers.length > 0) {
+            out.push(
+              `- **Instance members (${prototypeMembers.length}):** ${prototypeMembers.length <= 12 ? prototypeMembers.map((m) => `\`${m}\``).join(", ") : "snapshot in tests/bun_shape_members.json"}`,
             );
           }
         }

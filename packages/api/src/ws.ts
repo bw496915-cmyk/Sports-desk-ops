@@ -7,17 +7,31 @@ import {
   DASHBOARD_WS_TOPICS,
   type DashboardWsTopic,
 } from "@sportsdesk-ops/contracts";
+import type { ServerWebSocket } from "bun";
 import type { DashboardServerTelemetry } from "./types.ts";
 
 export { DASHBOARD_WS_TOPICS, type DashboardWsTopic };
 
+export type DashboardWsBinaryType = NonNullable<ServerWebSocket["binaryType"]>;
+
+const UTF8_DECODER = new TextDecoder();
+
 export interface WsLike {
   readonly subscriptions?: readonly string[] | undefined;
+  /** Present on a real `ServerWebSocket`; configured in `open()` to control binary frame delivery. */
+  binaryType?: DashboardWsBinaryType;
   subscribe(topic: string): void;
   unsubscribe(topic: string): void;
   send(data: string): unknown;
+  /** Live send buffer depth in bytes on a `Bun.ServerWebSocket`. */
+  getBufferedAmount?(): number;
   /** Present on a real `ServerWebSocket`; used to evict a socket that dropped a frame. */
   close?(code?: number, reason?: string): unknown;
+}
+
+export interface DashboardWsHandlerOptions {
+  /** Preferred Bun `ServerWebSocket.binaryType` for incoming binary control frames (default: `"uint8array"`). */
+  readonly binaryType?: DashboardWsBinaryType;
 }
 
 export interface DashboardWsStatusPayload {
@@ -38,7 +52,11 @@ export interface DashboardWsStatusPayload {
 
 export function createDashboardWebSocketHandler<TWs extends WsLike>(
   clients: Set<TWs>,
+  options?: DashboardWsHandlerOptions,
 ) {
+  const preferredBinaryType: DashboardWsBinaryType =
+    options?.binaryType ?? "uint8array";
+
   const websocket = {
     // Dashboard control messages are tiny; the uWS defaults (16 MB) would let a stuck
     // or hostile client buffer megabytes and mask a dead consumer on this socket.
@@ -48,6 +66,9 @@ export function createDashboardWebSocketHandler<TWs extends WsLike>(
     idleTimeout: 120,
     sendPings: true,
     open(ws: TWs) {
+      if ("binaryType" in ws) {
+        ws.binaryType = preferredBinaryType;
+      }
       ws.subscribe("dashboard");
       ws.subscribe("live-bets");
       ws.subscribe("syndicate-alerts");
@@ -66,7 +87,15 @@ export function createDashboardWebSocketHandler<TWs extends WsLike>(
         const str =
           typeof message === "string"
             ? message
-            : new TextDecoder().decode(message);
+            : UTF8_DECODER.decode(
+                message instanceof ArrayBuffer
+                  ? new Uint8Array(message)
+                  : new Uint8Array(
+                      message.buffer,
+                      message.byteOffset,
+                      message.byteLength,
+                    ),
+              );
         if (str.startsWith("{")) {
           const parsed = JSON.parse(str) as {
             action?: "subscribe" | "unsubscribe";

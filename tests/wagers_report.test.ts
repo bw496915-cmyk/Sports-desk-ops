@@ -29,8 +29,14 @@ import {
   takeTop,
   toColumnar,
 } from "../lib/wagers_report.ts";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { WagerRow } from "../types/wagers";
-import { loadConfig, resetConfig } from "../lib/wagers_config.ts";
+import {
+  getDefaultCsvPath,
+  loadConfig,
+  resetConfig,
+} from "../lib/wagers_config.ts";
 
 async function testConfig() {
   resetConfig();
@@ -61,6 +67,10 @@ describe("wagers config", () => {
     expect(Object.keys(cfg.states)).toContain("cancel");
     expect(cfg.columns.state).toBe(40);
     expect(cfg.columns.ticket).toBe(4);
+    expect(cfg.default.csvPath.startsWith("~/")).toBe(true);
+    expect(getDefaultCsvPath(cfg)).toBe(
+      join(homedir(), cfg.default.csvPath.slice(2)),
+    );
   });
 
   test("rejects an invalid config", async () => {

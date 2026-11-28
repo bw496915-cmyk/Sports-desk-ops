@@ -3,10 +3,10 @@
   "host": "https://www.fantasy402.com",
   "pinnedAt": "2026-11-03",
   "runtime": {
-    "bunVersion": "1.4.4",
-    "bunRevision": "38afee6c84fcf48c0edb2466aa4b27d287a59c30",
+    "bunVersion": "1.4.5",
+    "bunRevision": "a7733435cf40429e3b35c36072769df2052b80f1",
     "jscRevision": "d6375c72affe0f70222cdcb45012b10f0bf3a9d5",
-    "bunExecutablePath": "/Users/nolarose/.bun/bin/bun"
+    "bunExecutablePath": "~/.bun/bin/bun"
   },
   "artifacts": {
     "app/setting/version.js": {

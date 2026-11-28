@@ -272,8 +272,8 @@ describe("xml-parse · live runtime preflight", () => {
 
   test("rejects local JSON surfaces and non-HTTP feeds", () => {
     for (const feed of [
-      "/var/tmp/feed.xml",
-      "file:///tmp/feed.xml",
+      "/fixtures/feed.xml",
+      "file:///fixtures/feed.xml",
       "https://x/feed.json",
       "https://x/feed.jsonl?x=1",
       "https://x/feed.sqlite",

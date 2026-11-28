@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { assertAllowlistBypassNotInCi } from "../lib/schema_manifest_db_parity.ts";
 
 const repoRoot = resolve(import.meta.dir, "..");
@@ -26,10 +27,14 @@ describe("schema CI gate", () => {
         ...Bun.env,
         CI: "true",
         SPORTSDESK_SCHEMA_SNAPSHOT_QUIET: "1",
-        SPORTSDESK_SCHEMA_SNAPSHOT_JSON:
-          "/tmp/sportsdesk-schema-ci.snapshot.json",
-        SPORTSDESK_SCHEMA_SNAPSHOT_BIN:
-          "/tmp/sportsdesk-schema-ci.manifest.bin",
+        SPORTSDESK_SCHEMA_SNAPSHOT_JSON: join(
+          tmpdir(),
+          "sportsdesk-schema-ci.snapshot.json",
+        ),
+        SPORTSDESK_SCHEMA_SNAPSHOT_BIN: join(
+          tmpdir(),
+          "sportsdesk-schema-ci.manifest.bin",
+        ),
       },
       stdout: "pipe",
       stderr: "pipe",

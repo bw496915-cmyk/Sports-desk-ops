@@ -4,6 +4,14 @@
  */
 
 import {
+  parseWeblogAccountCoverage,
+  type WeblogAccountCoverage,
+} from "./f402_weblog_capture.ts";
+import {
+  resolveR2ProbeTransport,
+  type R2ProbeFetcher,
+} from "./r2_probe_fetch.ts";
+import {
   BRIDGE_STALENESS_TARGETS,
   evaluateProbe,
   parseLastModified,
@@ -14,10 +22,17 @@ import {
   type StalenessTarget,
 } from "./r2_staleness.ts";
 
+/**
+ * The transport moved to `lib/r2_probe_fetch.ts` so the alerter and the live-feed reader use the
+ * same one; the name stays for callers and tests written against this module.
+ */
+export { createR2S3ProbeFetcher as createR2PipelineS3Fetcher } from "./r2_probe_fetch.ts";
+
 /** Data older than this is surfaced as `dataStale` (distinct from publish SLA stale). */
 export const R2_DATA_STALE_SECONDS = 86_400;
 
 export interface R2PipelineSinkKpi {
+  readonly accountCoverage?: WeblogAccountCoverage | null;
   readonly lastModified: string | null;
   /** Age of the published `latest.json` pointer (publish / Last-Modified). */
   readonly ageSeconds: number | null;
@@ -33,10 +48,7 @@ export interface R2PipelineSinkKpi {
 export type R2PipelineKpis = Readonly<Record<string, R2PipelineSinkKpi>>;
 
 /** Injectable for tests (avoids requiring full Bun `fetch` surface). */
-export type R2PipelineFetcher = (
-  url: string,
-  init: { readonly method: "HEAD" | "GET" },
-) => Promise<Response>;
+export type R2PipelineFetcher = R2ProbeFetcher;
 
 /** @deprecated Use {@link R2PipelineFetcher}. */
 export type R2HeadFetcher = R2PipelineFetcher;
@@ -104,21 +116,34 @@ async function readJsonBody(
   }
 }
 
-async function resolveDataWindowToMs(
+async function resolvePipelineDataEvidence(
   target: StalenessTarget,
   fetchImpl: R2PipelineFetcher,
-): Promise<number | null> {
+): Promise<{
+  windowToMs: number | null;
+  accountCoverage: WeblogAccountCoverage | null;
+}> {
   const latestUrl = publicUrlFor(target);
   const latest = await readJsonBody(latestUrl, fetchImpl);
-  if (latest === null) return null;
+  if (latest === null) return { windowToMs: null, accountCoverage: null };
 
   const inlineEnd = parseDataWindowEndMs(latest);
   const artifactUrl = artifactUrlFromPointer(latest);
-  if (artifactUrl === null) return inlineEnd;
+  if (artifactUrl === null)
+    return {
+      windowToMs: inlineEnd,
+      accountCoverage: parseWeblogAccountCoverage(
+        isRecord(latest) ? latest.coverage : null,
+      ),
+    };
 
   const rollup = await readJsonBody(artifactUrl, fetchImpl);
-  if (rollup === null) return inlineEnd;
-  return parseDataWindowEndMs(rollup) ?? inlineEnd;
+  return {
+    windowToMs: parseDataWindowEndMs(rollup) ?? inlineEnd,
+    accountCoverage: parseWeblogAccountCoverage(
+      isRecord(rollup) ? rollup.coverage : null,
+    ),
+  };
 }
 
 function applyDataAge(
@@ -143,25 +168,22 @@ function applyDataAge(
   };
 }
 
-const DEFAULT_R2_PROBE_TIMEOUT_MS = 5_000;
-
 export async function probeR2PipelineKpis(
   now: Date = new Date(),
-  fetchImpl: R2PipelineFetcher = (url, init) =>
-    fetch(url, {
-      ...init,
-      signal: AbortSignal.timeout(DEFAULT_R2_PROBE_TIMEOUT_MS),
-    }),
+  fetchImpl?: R2PipelineFetcher,
 ): Promise<R2PipelineKpis> {
+  const { fetch: resolvedFetch } = await resolveR2ProbeTransport(fetchImpl);
   const nowMs = now.getTime();
   const out: Record<string, R2PipelineSinkKpi> = {};
   await Promise.all(
     BRIDGE_STALENESS_TARGETS.map(async (target) => {
       const url = publicUrlFor(target);
-      const [probe, windowToMs] = await Promise.all([
+      const [probe, evidence] = await Promise.all([
         (async (): Promise<StalenessProbe> => {
           try {
-            const response = await fetchImpl(url, { method: "HEAD" as const });
+            const response = await resolvedFetch(url, {
+              method: "HEAD" as const,
+            });
             return {
               target,
               status: response.status,
@@ -178,7 +200,7 @@ export async function probeR2PipelineKpis(
             };
           }
         })(),
-        resolveDataWindowToMs(target, fetchImpl),
+        resolvePipelineDataEvidence(target, resolvedFetch),
       ]);
       const verdict = evaluateProbe(probe, nowMs);
       const base: R2PipelineSinkKpi = {
@@ -188,17 +210,25 @@ export async function probeR2PipelineKpis(
             : new Date(probe.lastModifiedMs).toISOString(),
         ageSeconds:
           verdict.ageMs === null ? null : Math.round(verdict.ageMs / 1000),
-        stale:
-          verdict.state === "stale" ||
-          verdict.state === "missing" ||
-          verdict.state === "error",
+        // Any non-fresh state means the pointer is not trustworthy; deriving it this way
+        // keeps a future state from silently reading as healthy.
+        stale: verdict.state !== "fresh",
         state: verdict.state,
         reason: verdict.reason,
         dataAgeSeconds: null,
         dataStale: false,
         dataWindowToMs: null,
       };
-      out[SINK_ID(target.key)] = applyDataAge(base, windowToMs, nowMs);
+      out[SINK_ID(target.key)] = applyDataAge(
+        {
+          ...base,
+          ...(SINK_ID(target.key) === "f402-weblog"
+            ? { accountCoverage: evidence.accountCoverage }
+            : {}),
+        },
+        evidence.windowToMs,
+        nowMs,
+      );
     }),
   );
   return out;

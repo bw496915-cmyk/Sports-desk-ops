@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSyncBounded } from "./spawn_sync_bounded.ts";
 import { dirname, join, resolve } from "node:path";
+import { expandHomePath } from "./home_paths.ts";
 
 /** Git executable name — constant argv segment (never interpolate a path here). */
 export const GIT = "git" as const;
@@ -347,12 +348,17 @@ export function compareBunToOracleManifest(
       `bunRevision: want ${expectedRevision} got ${Bun.revision}`,
     );
   }
+  const resolvedExpectedExec = expectedExec
+    ? expandHomePath(expectedExec)
+    : undefined;
   if (
     options.strictExecPath &&
-    expectedExec &&
-    expectedExec !== process.execPath
+    resolvedExpectedExec &&
+    resolvedExpectedExec !== process.execPath
   ) {
-    mismatches.push(`execPath: want ${expectedExec} got ${process.execPath}`);
+    mismatches.push(
+      `execPath: want ${resolvedExpectedExec} got ${process.execPath}`,
+    );
   }
   return { manifestPath, ok: mismatches.length === 0, mismatches };
 }

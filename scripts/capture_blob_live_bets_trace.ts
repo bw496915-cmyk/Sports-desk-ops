@@ -15,6 +15,7 @@ import {
   createBlobLiveBetsServer,
   type BlobStore,
 } from "../services/blob_and_live_bets_server.ts";
+import { decodeWsEventText } from "../src/lib/binary_type.ts";
 
 const API_TOKEN = "trace-api-token-not-a-secret";
 const TICKET_SECRET = "trace-ticket-secret-not-a-secret";
@@ -129,40 +130,47 @@ function wsStep(name: string, ticket: string, channel: string): Promise<Step> {
       "live-bets.v1",
       `ticket.${ticket}`,
     ]);
+    ws.binaryType = "arraybuffer";
     const timer = setTimeout(() => reject(new Error("ws timeout")), 5000);
     ws.onopen = () => {
       frames.push({ direction: "send", data: "ping" });
       ws.send(JSON.stringify({ type: "PING" }));
     };
     ws.onmessage = (event) => {
-      const text = String(event.data);
-      frames.push({ direction: "receive", data: text });
-      const parsed = JSON.parse(text) as { type?: string };
-      if (parsed.type === "PONG") {
-        ws.send(JSON.stringify({ type: "SUBSCRIBE", channel }));
-      } else if (parsed.type === "SUBSCRIBED") {
-        ws.send(JSON.stringify({ type: "UNSUBSCRIBE", channel }));
-      } else if (parsed.type === "UNSUBSCRIBED") {
-        clearTimeout(timer);
-        frames.push({ direction: "close", data: "101" });
-        ws.close();
-        resolve({
-          name,
-          request: {
-            method: "GET",
-            path: "/ws/live-bets",
-            headers: {
-              "sec-websocket-protocol": "live-bets.v1, ticket.<redacted>",
+      void (async () => {
+        const text = await decodeWsEventText(event.data);
+        if (text === null) return;
+        frames.push({ direction: "receive", data: text });
+        const parsed = JSON.parse(text) as { type?: string };
+        if (parsed.type === "PONG") {
+          ws.send(JSON.stringify({ type: "SUBSCRIBE", channel }));
+        } else if (parsed.type === "SUBSCRIBED") {
+          ws.send(JSON.stringify({ type: "UNSUBSCRIBE", channel }));
+        } else if (parsed.type === "UNSUBSCRIBED") {
+          clearTimeout(timer);
+          frames.push({ direction: "close", data: "101" });
+          ws.close();
+          resolve({
+            name,
+            request: {
+              method: "GET",
+              path: "/ws/live-bets",
+              headers: {
+                "sec-websocket-protocol": "live-bets.v1, ticket.<redacted>",
+              },
             },
-          },
-          response: {
-            status: 101,
-            contentType: null,
-            body: "switching protocols",
-          },
-          websocket: frames,
-        });
-      }
+            response: {
+              status: 101,
+              contentType: null,
+              body: "switching protocols",
+            },
+            websocket: frames,
+          });
+        }
+      })().catch((err) => {
+        clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      });
     };
     ws.onerror = () => {
       clearTimeout(timer);

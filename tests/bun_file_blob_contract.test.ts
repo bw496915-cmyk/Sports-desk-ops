@@ -22,6 +22,8 @@ function temp(): string {
   return mkdtempSync(join(tmpdir(), "bun-file-contract-"));
 }
 
+// @bun-behavior: blob-image-pipeline
+
 // Blob.exists() exists at runtime but is not in @types/bun 1.4.4.
 function blobExists(blob: Blob): Promise<boolean> {
   return (blob as Blob & { exists(): Promise<boolean> }).exists();
@@ -216,5 +218,159 @@ describe("Bun.image", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test("write() equals bytes(), preserves aspect ratio, and overwrites", async () => {
+    const dir = temp();
+    try {
+      const src = join(dir, "rect.png");
+      await Bun.write(
+        src,
+        await new Bun.Image(Uint8Array.fromBase64(ONE_PX_PNG))
+          .resize(10, 5)
+          .png()
+          .bytes(),
+      );
+      const encoded = await Bun.file(src).image().resize(4).webp().bytes();
+      // One dimension scales proportionally: 10x5 resized by width 4 -> 4x2.
+      expect(await new Bun.Image(encoded).metadata()).toEqual({
+        width: 4,
+        height: 2,
+        format: "webp",
+      });
+
+      const out = join(dir, "out.webp");
+      const written = await Bun.file(src).image().resize(4).webp().write(out);
+      expect(written).toBe(encoded.byteLength);
+      expect(Bun.file(out).size).toBe(written);
+      expect(
+        Buffer.from(await Bun.file(out).arrayBuffer()).equals(
+          Buffer.from(encoded),
+        ),
+      ).toBe(true);
+
+      // write() replaces the target rather than appending to it.
+      await Bun.write(out, "not an image");
+      const rewritten = await Bun.file(src).image().resize(4).webp().write(out);
+      expect(rewritten).toBe(encoded.byteLength);
+      expect(Bun.file(out).size).toBe(encoded.byteLength);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("write() creates missing parents and fails on a non-directory parent", async () => {
+    const dir = temp();
+    try {
+      const src = join(dir, "one.png");
+      await Bun.write(src, Buffer.from(ONE_PX_PNG, "base64"));
+
+      const nested = join(dir, "deep", "a", "b", "out.webp");
+      const written = await Bun.file(src).image().webp().write(nested);
+      expect(written).toBeGreaterThan(0);
+      expect(await Bun.file(nested).exists()).toBe(true);
+
+      // Bun.write creates directories, but a regular file in the path is ENOTDIR.
+      const blocker = join(dir, "blocker");
+      await Bun.write(blocker, "x");
+      const error = await Bun.file(src)
+        .image()
+        .webp()
+        .write(join(blocker, "out.webp"))
+        .then(
+          () => null,
+          (reason: unknown) => reason,
+        );
+      expect((error as { code?: string } | null)?.code).toBe("ENOTDIR");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("image() defers the source read until a terminal runs", async () => {
+    const dir = temp();
+    try {
+      const src = join(dir, "gone.png");
+      await Bun.write(src, Buffer.from(ONE_PX_PNG, "base64"));
+      const pending = Bun.file(src).image();
+      rmSync(src);
+      const error = await pending.metadata().then(
+        () => null,
+        (reason: unknown) => reason,
+      );
+      expect((error as { code?: string } | null)?.code).toBe("ENOENT");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+async function readStreamText(
+  stream: ReadableStream<Uint8Array> | null,
+): Promise<string> {
+  if (!stream) return "";
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let out = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      out += decoder.decode(value, { stream: true });
+    }
+    return out + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function readStreamAsyncIterText(
+  stream: ReadableStream<Uint8Array> | null,
+): Promise<string> {
+  if (!stream) return "";
+  const decoder = new TextDecoder();
+  let out = "";
+  for await (const chunk of stream) {
+    out += decoder.decode(chunk, { stream: true });
+  }
+  return out + decoder.decode();
+}
+
+describe("In-memory body streams (v1.4.4)", () => {
+  test("Response.body, Request.body, and Blob.stream() round-trip via getReader() and for-await", async () => {
+    const utf8 = "hello-🚀-desk";
+    const large = "x".repeat(64 * 1024);
+
+    for (const payload of ["", utf8, large]) {
+      expect(await readStreamText(new Response(payload).body)).toBe(payload);
+      expect(await readStreamAsyncIterText(new Response(payload).body)).toBe(
+        payload,
+      );
+
+      expect(
+        await readStreamText(
+          new Request("http://example.com", {
+            method: "POST",
+            body: payload,
+          }).body,
+        ),
+      ).toBe(payload);
+      expect(
+        await readStreamAsyncIterText(
+          new Request("http://example.com", {
+            method: "POST",
+            body: payload,
+          }).body,
+        ),
+      ).toBe(payload);
+    }
+
+    const blobParts = ["hello-🚀", "-desk"];
+    expect(await readStreamText(new Blob(blobParts).stream())).toBe(utf8);
+    expect(await readStreamAsyncIterText(new Blob(blobParts).stream())).toBe(
+      utf8,
+    );
+    expect(await readStreamText(new Blob([]).stream())).toBe("");
+    expect(await readStreamText(new Blob([large]).stream())).toBe(large);
   });
 });

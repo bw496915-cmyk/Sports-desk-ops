@@ -9,6 +9,7 @@
  * back silently; the caller decides what to do with an error.
  */
 
+import { resolveR2ProbeTransport } from "./r2_probe_fetch.ts";
 import { R2_PUBLIC_BASE } from "./r2_staleness.ts";
 
 export interface LiveFeedObject {
@@ -39,6 +40,27 @@ function observedAtOf(doc: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
+/**
+ * The live-feed reader hits the same public base as the freshness probes, so it inherits their
+ * transport: presigned when credentials resolve, anonymous otherwise. An injected fetcher (tests,
+ * or an explicit `baseUrl`) wins and is never wrapped; a foreign base URL passes through the
+ * presign wrapper untouched because only `R2_PUBLIC_BASE` keys are signed.
+ */
+async function resolveLiveFeedFetch(
+  injected: LiveFeedFetcher | undefined,
+): Promise<LiveFeedFetcher> {
+  if (injected !== undefined) return injected;
+  const { fetch: probeFetch } = await resolveR2ProbeTransport();
+  return (url, init) => {
+    const signal = init?.signal ?? undefined;
+    return probeFetch(url, {
+      method: "GET",
+      ...(init?.headers === undefined ? {} : { headers: init.headers }),
+      ...(signal === undefined ? {} : { signal }),
+    });
+  };
+}
+
 /** Fetch one published live artifact. Throws on transport, HTTP or JSON failure. */
 export async function fetchLiveFeedObject(
   key: string,
@@ -46,7 +68,7 @@ export async function fetchLiveFeedObject(
 ): Promise<LiveFeedObject> {
   const base = (options.baseUrl ?? R2_PUBLIC_BASE).replace(/\/$/, "");
   const url = `${base}/${key.replace(/^\//, "")}`;
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = await resolveLiveFeedFetch(options.fetchImpl);
   const controller = new AbortController();
   const timer = setTimeout(
     () => controller.abort(),

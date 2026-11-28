@@ -22,9 +22,9 @@ import { listSourceFiles } from "./source_files.ts";
 
 /** The exact upstream artifacts this table is written against. */
 export const BUN_SHAPE_PINS = {
-  bunVersion: "1.4.4",
-  bunCommit: "38afee6c84fcf48c0edb2466aa4b27d287a59c30",
-  typesVersion: "1.4.4",
+  bunVersion: "1.4.5",
+  bunCommit: "a7733435cf40429e3b35c36072769df2052b80f1",
+  typesVersion: "1.4.5",
 } as const;
 
 export const SHAPE_SUBSYSTEMS = [
@@ -233,6 +233,16 @@ export const VOLATILE_SHAPES: ReadonlySet<string> = new Set([
   "argv",
   "stdin",
   "stdout",
+]);
+
+/**
+ * Shapes whose prototype surface comes from the host platform rather than the
+ * Bun pin (`WebView` is the host WebKit build), so comparing it against a
+ * snapshot generated on another platform would report false drift. Their static
+ * surface stays ratcheted under `shapes`.
+ */
+export const PROTOTYPE_SNAPSHOT_EXCLUDED: ReadonlySet<string> = new Set([
+  "WebView",
 ]);
 
 /** Properties every function inherits that say nothing about the API surface. */

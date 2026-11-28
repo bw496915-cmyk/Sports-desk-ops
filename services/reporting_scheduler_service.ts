@@ -49,6 +49,7 @@ export const BRIDGE_SCHEDULE_IDS = [
   "sched_bridge_weblog_hourly",
   "sched_agent_tree_hourly",
   "sched_customer_profiles_6h",
+  "sched_customer_history_15m",
   "sched_customer_decision_rankings_daily",
   "sched_f402_session_refresh",
   "sched_weblog_sentinel_daily",
@@ -93,6 +94,23 @@ export interface ScheduleDefinition {
   readonly shellJob?: ShellJobSpec;
   enabled: boolean;
   lastTriggeredAt?: string;
+  /**
+   * Outcome of the last dispatch, or absent when the schedule has never fired. `/api/status`
+   * publishes this so a job that never armed (unmet requirement, cron not started) is visible
+   * instead of being indistinguishable from a job that has been succeeding hourly.
+   */
+  lastRun?: ScheduleRunState;
+}
+
+/** What `/api/status` reports about one schedule's last attempt. */
+export interface ScheduleRunState {
+  /** ISO-8601 timestamp of the dispatch. */
+  readonly at: string;
+  readonly status: "ok" | "failed" | "skipped";
+  /** Operator-facing reason: the runner's `reason`, or the unmet requirement names. */
+  readonly detail: string | null;
+  /** Requirement names that were unmet at fire time; empty unless the run was skipped. */
+  readonly missing: readonly string[];
 }
 
 export interface GeneratedReport {
@@ -229,27 +247,7 @@ export class ReportingSchedulerService {
         started.push(`${s.scheduleTime} (${s.tz ?? "America/New_York"})`);
         return startInProcessCron(
           cronExpr,
-          async () => {
-            s.lastTriggeredAt = new Date().toISOString();
-            if (s.reportType === "TEN_MINUTE_POSITIONS_PULSE") {
-              await runLivePositionsPulse({
-                schedule: cronExpr,
-                ...(s.targetChatId ? { chatIdOverride: s.targetChatId } : {}),
-              });
-            } else if (s.reportType === "BRIDGE_ROLLUP_DIGEST") {
-              await this.dispatchBridgeDigest(s.bridgeJobs, s.targetChatId);
-            } else if (s.reportType === "SHELL_CAPTURE") {
-              if (s.shellJob === undefined) {
-                console.warn(
-                  `[Reporting Scheduler] ${s.id}: SHELL_CAPTURE without shellJob is a no-op`,
-                );
-              } else {
-                await shellCaptureRunner(s.shellJob);
-              }
-            } else {
-              await this.dispatchReportNow(s.reportType, s.targetChatId);
-            }
-          },
+          () => this.dispatchSchedule(s, cronExpr),
           { tz: s.tz ?? "America/New_York" },
         );
       });
@@ -327,7 +325,7 @@ export class ReportingSchedulerService {
         scheduleTime: "7 * * * *",
         reportType: "BRIDGE_ROLLUP_DIGEST",
         description:
-          "Runs the WebLog corpus rollup hourly at minute 7 and sends an on-change Mode 6 digest. Overlaps are skipped.",
+          "Captures Mode A for recent live pending accounts, then publishes the scoped WebLog rollup hourly at minute 7. On-change Mode 6 digest; overlaps are skipped.",
         tz: "America/Chicago",
         bridgeJobs: ["weblog"],
         enabled: true,
@@ -369,6 +367,31 @@ export class ReportingSchedulerService {
             "scripts/build_customer_profiles.ts",
           ],
           requires: ["file:enriched_customers_full.json"],
+        },
+        enabled: true,
+      },
+      {
+        id: "sched_customer_history_15m",
+        name: "Retained Customer History Projection (15m)",
+        scheduleTime: "12,27,42,57 * * * *",
+        reportType: "SHELL_CAPTURE",
+        description:
+          "Captures scoped Fantasy402 graded wagers when configured, then refreshes the private dashboard projection. Missing configuration skips the job; failures preserve the last good projection.",
+        tz: "America/Chicago",
+        shellJob: {
+          bin: "bun",
+          args: [
+            "--no-orphans",
+            "--no-env-file",
+            "run",
+            "scripts/refresh_customer_history.ts",
+          ],
+          requires: [
+            "SPORTSDESK_CUSTOMER_HISTORY_PROJECTOR",
+            "SPORTSDESK_CUSTOMER_HISTORY_SOURCES",
+            "SPORTSDESK_CUSTOMER_HISTORY_JSON",
+          ],
+          timeoutSeconds: 240,
         },
         enabled: true,
       },
@@ -461,6 +484,94 @@ export class ReportingSchedulerService {
         enabled: true,
       },
     ];
+  }
+
+  /**
+   * Run one schedule's work now and record the outcome, exactly as the cron tick would. Public so
+   * a test can fire a schedule without arming `Bun.cron`; it is not an operator entrypoint.
+   */
+  public async runScheduleNow(id: string): Promise<void> {
+    const schedule = this.schedules.get(id);
+    if (schedule === undefined) throw new Error(`no schedule ${id}`);
+    await this.dispatchSchedule(schedule, schedule.scheduleTime);
+  }
+
+  private async dispatchSchedule(
+    schedule: ScheduleDefinition,
+    cronExpr: string,
+  ): Promise<void> {
+    schedule.lastTriggeredAt = new Date().toISOString();
+    try {
+      if (schedule.reportType === "TEN_MINUTE_POSITIONS_PULSE") {
+        await runLivePositionsPulse({
+          schedule: cronExpr,
+          ...(schedule.targetChatId
+            ? { chatIdOverride: schedule.targetChatId }
+            : {}),
+        });
+        schedule.lastRun = {
+          at: schedule.lastTriggeredAt,
+          status: "ok",
+          detail: null,
+          missing: [],
+        };
+      } else if (schedule.reportType === "BRIDGE_ROLLUP_DIGEST") {
+        await this.dispatchBridgeDigest(
+          schedule.bridgeJobs,
+          schedule.targetChatId,
+        );
+        schedule.lastRun = {
+          at: schedule.lastTriggeredAt,
+          status: "ok",
+          detail: null,
+          missing: [],
+        };
+      } else if (schedule.reportType === "SHELL_CAPTURE") {
+        if (schedule.shellJob === undefined) {
+          console.warn(
+            `[Reporting Scheduler] ${schedule.id}: SHELL_CAPTURE without shellJob is a no-op`,
+          );
+          schedule.lastRun = {
+            at: schedule.lastTriggeredAt,
+            status: "failed",
+            detail: "SHELL_CAPTURE schedule has no shellJob",
+            missing: [],
+          };
+        } else {
+          const outcome = await shellCaptureRunner(schedule.shellJob);
+          schedule.lastRun = {
+            at: schedule.lastTriggeredAt,
+            status: outcome.status,
+            detail:
+              outcome.status === "skipped"
+                ? `missing ${outcome.missing.join(",")}`
+                : outcome.status === "failed"
+                  ? outcome.reason
+                  : null,
+            missing: outcome.status === "skipped" ? outcome.missing : [],
+          };
+        }
+      } else {
+        await this.dispatchReportNow(
+          schedule.reportType,
+          schedule.targetChatId,
+        );
+        schedule.lastRun = {
+          at: schedule.lastTriggeredAt,
+          status: "ok",
+          detail: null,
+          missing: [],
+        };
+      }
+    } catch (error) {
+      schedule.lastRun = {
+        at: schedule.lastTriggeredAt,
+        status: "failed",
+        detail: error instanceof Error ? error.message : String(error),
+        missing: [],
+      };
+      throw error;
+    }
   }
 
   private initDefaultSchedules(): void {

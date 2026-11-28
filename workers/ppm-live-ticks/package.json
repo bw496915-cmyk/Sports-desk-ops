@@ -1,0 +1,15 @@
+{
+  "name": "@sportsdesk-ops/ppm-live-ticks-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "types": "wrangler types --env-interface Env",
+    "check": "bun check --no-script --timing -p tsconfig.json",
+    "typecheck": "bun check --no-script --timing -p tsconfig.json",
+    "test": "bun test --check tests/",
+    "dry-run": "wrangler deploy --dry-run --outdir dist",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  }
+}

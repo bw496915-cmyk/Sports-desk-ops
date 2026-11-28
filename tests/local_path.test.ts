@@ -5,14 +5,16 @@ import { UsageError } from "../lib/usage_error.ts";
 
 describe("toLocalPath", () => {
   test("file:// URLs become paths, with percent-escapes decoded", () => {
-    expect(toLocalPath("file:///tmp/a%20b/shot.png")).toBe("/tmp/a b/shot.png");
+    expect(toLocalPath("file:///fixtures/a%20b/shot.png")).toBe(
+      "/fixtures/a b/shot.png",
+    );
   });
 
   test("plain paths pass through, relative ones stay relative", () => {
     expect(toLocalPath("scratch/webview-profile")).toBe(
       "scratch/webview-profile",
     );
-    expect(toLocalPath("/tmp/x.png")).toBe("/tmp/x.png");
+    expect(toLocalPath("/fixtures/x.png")).toBe("/fixtures/x.png");
     expect(toLocalPath("C:\\cfg\\desk.yaml")).toBe("C:\\cfg\\desk.yaml");
   });
 

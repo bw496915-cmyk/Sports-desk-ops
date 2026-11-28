@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { CFunction, cc, type Pointer } from "bun:ffi";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -119,4 +120,70 @@ test("glob extglob and brace ranges use the 1.4.4 semantics", () => {
   expect(
     new Bun.Glob("app/(marketing)/**").match("app/(marketing)/page.ts"),
   ).toBe(true);
+});
+
+test("JSON5 rejects embedded NUL trailing tokens and escaped identifier hyphens", () => {
+  expect(() => Bun.JSON5.parse("1\0 2")).toThrow(SyntaxError);
+  expect(() => Bun.JSON5.parse(String.raw`{a\u002d: 1}`)).toThrow(SyntaxError);
+});
+
+test("gzipSync and deflateSync honor non-default strategy and memLevel options", () => {
+  const payload = Buffer.from("a".repeat(2000) + "b".repeat(2000));
+  const def = Bun.gzipSync(payload, { strategy: 0 }).byteLength;
+  const huff = Bun.gzipSync(payload, { strategy: 2 }).byteLength;
+  const rle = Bun.gzipSync(payload, { strategy: 3 }).byteLength;
+  expect(huff).toBeGreaterThan(def);
+  expect(rle).toBeLessThanOrEqual(def);
+  expect(
+    Bun.gunzipSync(Bun.gzipSync(payload, { memLevel: 1, strategy: 3 })),
+  ).toEqual(payload);
+});
+
+test("JSONL.parse and parseChunk advance past returned values on stray , ] } and blank lines", () => {
+  const c1 = Bun.JSONL.parseChunk("1,");
+  expect(c1.values).toEqual([1]);
+  expect(c1.read).toBe(1);
+  expect(c1.done).toBe(false);
+
+  const c2 = Bun.JSONL.parseChunk("\n\n1,");
+  expect(c2.values).toEqual([1]);
+  expect(c2.read).toBe(3);
+
+  expect(Bun.JSONL.parse("\n\n1,")).toEqual([1]);
+  expect(Bun.JSONL.parseChunk("1]").values).toEqual([1]);
+  expect(Bun.JSONL.parseChunk("\n\n1}").values).toEqual([1]);
+});
+
+test("markdown.ansi keeps inline code attached to trailing punctuation without mid-word wrap", () => {
+  const stripped = Bun.stripANSI(
+    Bun.markdown.ansi("0123456789 `code`.\n", { width: 16 } as never),
+  );
+  expect(stripped).toContain("code.");
+  expect(stripped).not.toContain("code\n.");
+});
+
+test("bun:ffi cc() symbol .ptr points to the compiled C function address", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bun-ffi-cc-ptr-"));
+  try {
+    const src = join(dir, "add.c");
+    writeFileSync(src, "int add42(int x) { return x + 42; }\n");
+    const { symbols } = cc({
+      source: src,
+      symbols: { add42: { args: ["i32"], returns: "i32" } },
+    });
+    const add42 = symbols.add42 as unknown as {
+      (x: number): number;
+      readonly ptr: Pointer;
+    };
+    expect(add42(8)).toBe(50);
+    expect(Number(add42.ptr)).toBeGreaterThan(0);
+    const fn = CFunction({
+      ptr: add42.ptr,
+      args: ["i32"],
+      returns: "i32",
+    });
+    expect(fn(8)).toBe(50);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

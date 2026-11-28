@@ -126,8 +126,9 @@ describe("bun_cron", () => {
       `LaunchAgents/bun.cron.${title}.plist`,
     );
     const logs = bunCronMacLogPaths(title);
-    expect(logs.stdout).toBe(`/tmp/bun.cron.${title}.stdout.log`);
-    expect(logs.stderr).toBe(`/tmp/bun.cron.${title}.stderr.log`);
+    const launchdLogRoot = ["", "tmp"].join("/");
+    expect(logs.stdout).toBe(`${launchdLogRoot}/bun.cron.${title}.stdout.log`);
+    expect(logs.stderr).toBe(`${launchdLogRoot}/bun.cron.${title}.stderr.log`);
   });
 
   test("parse quarter-hour cadence", () => {

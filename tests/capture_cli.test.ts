@@ -147,7 +147,7 @@ describe("argument parsing and allowlist", () => {
       "--mode=live",
       "--ops",
       "getWebLog",
-      "--out=/tmp/x",
+      "--out=/fixtures/x",
       "--timeout-ms",
       "1500",
       "--dry-run",
@@ -157,7 +157,7 @@ describe("argument parsing and allowlist", () => {
     if (!parsed.ok) return;
     expect(parsed.options.mode).toBe("live");
     expect(parsed.options.opsArg).toBe("getWebLog");
-    expect(parsed.options.out).toBe("/tmp/x");
+    expect(parsed.options.out).toBe("/fixtures/x");
     expect(parsed.options.timeoutMs).toBe(1500);
     expect(parsed.options.dryRun).toBe(true);
     expect(parsed.options.json).toBe(true);

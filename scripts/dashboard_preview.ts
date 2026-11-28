@@ -12,6 +12,7 @@
  */
 import { pickApiTarget } from "../lib/dashboard_preview_routing.ts";
 import { serveDashboardAsset } from "../lib/dashboard_static.ts";
+import { decodeBinaryFrameText } from "../src/lib/binary_type.ts";
 
 const PORT = Number(process.env.PORT ?? 4174);
 const API = process.env.DESK_API ?? "http://127.0.0.1:4020";
@@ -52,8 +53,7 @@ const server = Bun.serve({
       const upstream = await fetch(target + url.pathname + url.search, {
         method: req.method,
         headers,
-        body:
-          req.method === "GET" || req.method === "HEAD" ? undefined : req.body,
+        body: req.method === "GET" || req.method === "HEAD" ? null : req.body,
       });
       const outHeaders = new Headers(upstream.headers);
       outHeaders.delete("content-encoding");
@@ -69,14 +69,15 @@ const server = Bun.serve({
   },
   websocket: {
     open(ws) {
+      ws.binaryType = "uint8array";
       ws.send(JSON.stringify({ type: "ack", topics: ["preview"] }));
     },
     message(ws, message) {
       try {
-        const parsed =
-          typeof message === "string"
-            ? (JSON.parse(message) as { action?: unknown; topics?: unknown })
-            : null;
+        const parsed = JSON.parse(decodeBinaryFrameText(message)) as {
+          action?: unknown;
+          topics?: unknown;
+        };
         if (parsed?.action === "subscribe") {
           ws.send(
             JSON.stringify({

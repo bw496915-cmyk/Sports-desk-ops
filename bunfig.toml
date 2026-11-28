@@ -70,12 +70,19 @@ options = { sortImports = true }
 # MACHINE_OWNED_INSTALL_KEYS). Non-machine keys are safe and are pinned here.
 #
 # `exact` makes `bun add` write the resolved version instead of a caret range, matching the
-# exact-pin policy the root manifest already follows. `ignoreScripts` is a no-op today — the root
-# `trustedDependencies` is `[]` and the root has no install lifecycle — and keeps it that way if a
-# dependency or a `prepare` script is ever added. Both are project keys, not machine overrides.
+# exact-pin policy the root manifest already follows. `exact` is a project key, not a machine
+# override.
+#
+# Do not set `ignoreScripts` here. On 1.4.4 Bun applies `[install].ignoreScripts` to pack/publish
+# lifecycle too, not just install scripts: measured in a scratch package, `bun publish --dry-run`
+# ran `prepack` without it and silently skipped it with it (and `NPM_CONFIG_IGNORE_SCRIPTS=false`
+# does not override). `packages/contracts` ships `dist/`, is built by `prepack`, and `dist/` is
+# gitignored, so suppressing it publishes a tarball without `dist/`. Third-party install scripts
+# stay blocked by the root `trustedDependencies: []` allowlist (verified on 1.4.4: a tarball
+# dependency's postinstall marker does not run with `[]`, and does with the package listed); the
+# only lifecycle script in this workspace is `packages/contracts`' `prepack`.
 [install]
 exact = true
-ignoreScripts = true
 
 # Native Bun lint config. Only the native linter reads it. That linter exists on the 1.4.5
 # canary (`bun lint --no-script`), which the CI `lint-native` job runs, and is expected in
@@ -112,19 +119,22 @@ correctness = "warn"
 
 [lint.rules]
 # Off by default upstream: `with {}` is a leftover shell or a placeholder for a
-# missing `type`. Bun 1.4.4 has no native `bun lint` command (it resolves to the
-# package script and `--no-script` does not bypass it), so locally oxlint cannot
-# enforce this rule and tests/module_attributes.test.ts covers the intent; the CI
-# `lint-native` job on the canary runtime enforces it natively.
+# missing `type`. Mirrored in `.oxlintrc.json` for canary native `bun lint --no-script`
+# (CI's `lint-native` job); `tests/module_attributes.test.ts` enforces the same intent on
+# the pinned 1.4.4 runtime where native `bun lint` is absent.
 "unicorn/require-module-attributes" = "error" # https://bun.com/docs/lint/rules/unicorn/require-module-attributes
-# Enforced today by oxlint 1.90 (.oxlintrc.json), which ships the same unicorn rule. Measured
-# with a probe: `.map(fn).flat()` and `.flat(1)` are reported and fixed to `.flatMap(fn)`;
-# `.flat(2)`/`.flat(Infinity)` are not (different semantics), and this repo has zero hits.
+# Mirrored in `.oxlintrc.json`. Measured with a probe: `.map(fn).flat()` and `.flat(1)`
+# are reported and fixed to `.flatMap(fn)`; `.flat(2)`/`.flat(Infinity)` are not (different
+# semantics), and this repo has zero hits.
 "unicorn/prefer-array-flat-map" = "error" # https://bun.com/docs/lint/rules/unicorn/prefer-array-flat-map
 "eqeqeq" = ["error", "smart"] # same policy as .oxlintrc.json; "smart" keeps the `x == null` guards
 "@typescript-eslint/no-explicit-any" = "error"
 "@typescript-eslint/no-require-imports" = "error"
 "preserve-caught-error" = "warn"
+"bun:test/prefer-snapshot-hint" = "error" # https://bun.com/docs/lint/rules/bun-test/prefer-snapshot-hint
+"bun:test/no-large-snapshots" = "error" # https://bun.com/docs/lint/rules/bun-test/no-large-snapshots
+"bun:test/no-interpolation-in-snapshots" = "error" # https://bun.com/docs/lint/rules/bun-test/no-interpolation-in-snapshots
+"bun/no-literal-temp-dir" = "error" # https://bun.com/docs/lint/rules/bun/no-literal-temp-dir
 
 # Type-aware gate: mirror .oxlintrc.type-aware.json, whose correctness category is off and
 # whose eight rules are the only type-aware errors. `bun lint --type-aware` turns on Bun's

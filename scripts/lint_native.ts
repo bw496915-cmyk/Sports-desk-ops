@@ -6,10 +6,11 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { spawnSyncBounded } from "../lib/spawn_sync_bounded.ts";
 import { join } from "node:path";
 
-export function hasNativeBunLint(bin: string, probeDir = "/tmp"): boolean {
+export function hasNativeBunLint(bin: string, probeDir = tmpdir()): boolean {
   try {
     const res = spawnSyncBounded([bin, "lint", "--help"], {
       cwd: probeDir,
@@ -39,6 +40,10 @@ export function candidateBunLintBins(
 
   const home = env.HOME?.trim();
   if (home) {
+    const canaryInstallBin = join(home, ".bun-canary", "bin", "bun");
+    if (existsSync(canaryInstallBin)) {
+      candidates.push(canaryInstallBin);
+    }
     const binDir = join(home, ".bun", "bin");
     if (existsSync(binDir)) {
       try {
