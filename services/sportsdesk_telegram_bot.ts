@@ -161,6 +161,34 @@ function plainPreview(html: string): string {
     .slice(0, 160);
 }
 
+import { createStateMachine, defineStateGraph } from "../lib/state_machine.ts";
+
+export const TELEGRAM_POLLING_STATES = ["idle", "polling", "stopping"] as const;
+export type TelegramPollingStateKind = (typeof TELEGRAM_POLLING_STATES)[number];
+
+export const TELEGRAM_POLLING_GRAPH = defineStateGraph(
+  "TelegramInboundPolling",
+  TELEGRAM_POLLING_STATES,
+  {
+    idle: ["polling"],
+    polling: ["stopping", "idle"],
+    stopping: ["idle"],
+  },
+);
+
+type TelegramPollingSnapshot =
+  | { readonly kind: "idle" }
+  | {
+      readonly kind: "polling";
+      readonly abort: AbortController;
+      readonly loop: Promise<void>;
+    }
+  | {
+      readonly kind: "stopping";
+      readonly abort: AbortController;
+      readonly loop: Promise<void>;
+    };
+
 export class SportsDeskTelegramService {
   private readonly botToken: string;
   private readonly defaultChatId: string;
@@ -174,7 +202,12 @@ export class SportsDeskTelegramService {
   private readonly scheduledReports: ScheduledReportTask[] = [];
   private readonly fetchSession: Pick<Bun.FetchSession, "fetch" | "close">;
   private reportGenerator: ReportGenerator | null = null;
-  private pollingAbort: AbortController | null = null;
+  private readonly pollingMachine = createStateMachine<TelegramPollingSnapshot>(
+    {
+      graph: TELEGRAM_POLLING_GRAPH,
+      initial: { kind: "idle" },
+    },
+  );
   private readonly activityLogPath: string | null;
 
   /**
@@ -1239,7 +1272,11 @@ export class SportsDeskTelegramService {
     return {
       ...base,
       bot: me.result ? { username: me.result.username } : null,
-      inbound: webhookUrl ? "webhook" : this.pollingAbort ? "polling" : "none",
+      inbound: webhookUrl
+        ? "webhook"
+        : this.pollingMachine.kind === "polling"
+          ? "polling"
+          : "none",
       webhook: hook.ok
         ? {
             url: webhookUrl,
@@ -1253,6 +1290,10 @@ export class SportsDeskTelegramService {
     };
   }
 
+  public get pollingState(): TelegramPollingStateKind {
+    return this.pollingMachine.kind;
+  }
+
   /** Registers TELEGRAM_WEBHOOK_URL with Telegram; refuses without a secret so the endpoint can authenticate callers. */
   public async setWebhook(): Promise<{ ok: boolean; description?: string }> {
     if (!this.webhookUrl) {
@@ -1261,7 +1302,7 @@ export class SportsDeskTelegramService {
     if (!this.webhookSecret) {
       return { ok: false, description: "TELEGRAM_WEBHOOK_SECRET is not set" };
     }
-    this.stopPolling();
+    await this.stopPollingAsync();
     const res = await this.api<boolean>("setWebhook", {
       url: this.webhookUrl,
       secret_token: this.webhookSecret,
@@ -1287,37 +1328,79 @@ export class SportsDeskTelegramService {
 
   /** Long-polls getUpdates until {@link stopPolling}; Telegram rejects this while a webhook is set. */
   public async startPolling(): Promise<void> {
-    if (this.pollingAbort) return;
+    if (this.pollingMachine.state.kind === "stopping") {
+      await this.pollingMachine.state.loop;
+    }
+    if (this.pollingMachine.state.kind === "polling") return;
+
     const abort = new AbortController();
-    this.pollingAbort = abort;
     let offset = 0;
     console.log("[Telegram] Polling for updates (Ctrl+C to stop)");
-    while (!abort.signal.aborted) {
-      const res = await this.api<TelegramUpdate[]>(
-        "getUpdates",
-        { offset, timeout: 25, allowed_updates: ["message", "callback_query"] },
-        35_000,
-        abort.signal,
-      );
-      if (abort.signal.aborted) break;
-      if (!res.ok) {
-        console.error(`[Telegram] getUpdates failed: ${res.description}`);
-        if (res.error_code === 409) break;
-        await Bun.sleep(5_000);
-        continue;
+
+    let loop!: Promise<void>;
+    loop = (async (): Promise<void> => {
+      try {
+        while (!abort.signal.aborted) {
+          const res = await this.api<TelegramUpdate[]>(
+            "getUpdates",
+            {
+              offset,
+              timeout: 25,
+              allowed_updates: ["message", "callback_query"],
+            },
+            35_000,
+            abort.signal,
+          );
+          if (abort.signal.aborted) break;
+          if (!res.ok) {
+            console.error(`[Telegram] getUpdates failed: ${res.description}`);
+            if (res.error_code === 409) break;
+            await Bun.sleep(5_000);
+            continue;
+          }
+          for (const update of res.result ?? []) {
+            offset = update.update_id + 1;
+            await this.handleUpdate(update).catch((err) =>
+              console.error("[Telegram] update handler failed:", err),
+            );
+          }
+        }
+      } finally {
+        const current = this.pollingMachine.state;
+        if (
+          (current.kind === "polling" || current.kind === "stopping") &&
+          current.abort === abort
+        ) {
+          this.pollingMachine.transition({ kind: "idle" }, "poll_exited");
+        }
       }
-      for (const update of res.result ?? []) {
-        offset = update.update_id + 1;
-        await this.handleUpdate(update).catch((err) =>
-          console.error("[Telegram] update handler failed:", err),
-        );
-      }
-    }
-    this.pollingAbort = null;
+    })();
+
+    this.pollingMachine.transition(
+      { kind: "polling", abort, loop },
+      "start_polling",
+    );
+    await loop;
   }
 
   public stopPolling(): void {
-    this.pollingAbort?.abort();
+    const snap = this.pollingMachine.state;
+    if (snap.kind === "polling") {
+      this.pollingMachine.transition(
+        { kind: "stopping", abort: snap.abort, loop: snap.loop },
+        "stop_polling",
+      );
+      snap.abort.abort();
+    }
+  }
+
+  /** Signals {@link stopPolling} and awaits full drain of any in-flight `getUpdates` request. */
+  public async stopPollingAsync(): Promise<void> {
+    this.stopPolling();
+    const snap = this.pollingMachine.state;
+    if (snap.kind === "stopping") {
+      await snap.loop;
+    }
   }
 
   public async handleUpdate(update: TelegramUpdate): Promise<void> {

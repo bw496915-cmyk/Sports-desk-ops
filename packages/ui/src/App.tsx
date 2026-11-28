@@ -63,6 +63,7 @@ import {
   DESK_API_ROUTES,
   deskApiUrl,
 } from "./api_routes.ts";
+import { startDashboardWsLifecycle } from "./ws_connection_machine.ts";
 import { browserDeskRequestHeaders } from "./api_request.ts";
 import { DASHBOARD_META } from "./config/dashboard.ts";
 import { TOKENS_TOML_VERSION } from "./tokens.registry.generated.ts";
@@ -952,15 +953,18 @@ export function App(): React.ReactElement {
         };
       })
       .then((json) => {
-        if (json?.targets) {
-          debugDashboardTrace("loaded DCE build matrix", json);
-          setBuildMatrixRows(json.targets);
-          setBuildMatrixGeneratedAt(
-            typeof json.generatedAt === "string" ? json.generatedAt : null,
+        if (!Array.isArray(json?.targets)) {
+          throw new Error(
+            `GET /api/build-matrix${force ? "?refresh=1" : ""} returned malformed payload (missing targets array)`,
           );
-          setBuildMatrixCompiledMs(Math.round(performance.now() - startedAt));
-          setBuildMatrixStaticDir(json.staticDir ?? null);
         }
+        debugDashboardTrace("loaded DCE build matrix", json);
+        setBuildMatrixRows(json.targets);
+        setBuildMatrixGeneratedAt(
+          typeof json.generatedAt === "string" ? json.generatedAt : null,
+        );
+        setBuildMatrixCompiledMs(Math.round(performance.now() - startedAt));
+        setBuildMatrixStaticDir(json.staticDir ?? null);
       })
       .catch((err) => {
         const msg = err instanceof Error ? err.message : String(err);
@@ -1572,84 +1576,57 @@ export function App(): React.ReactElement {
   useEffect(() => {
     void fetchDashboard();
 
-    // Hot-reload WebSocket connection with React StrictMode-safe lifecycle
-    let isMounted = true;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
-
-    ws.onopen = () => {
-      if (isMounted) {
-        setConnected(true);
-        try {
-          ws.send(
-            JSON.stringify({
-              action: "subscribe",
-              topics: [
-                "dashboard",
-                "live-bets",
-                "syndicate-alerts",
-                "tiers-updated",
-              ],
-            }),
-          );
-        } catch {
-          // signal-honesty: intentional-ignore-ws-subscribe-on-closing
-        }
-      } else {
-        ws.close();
-      }
-    };
-    ws.onclose = () => {
-      if (isMounted) setConnected(false);
-    };
-    ws.onmessage = (event) => {
-      if (!isMounted || typeof event.data !== "string") return;
-      const action = parseDashboardWsSignal(event.data);
-      switch (action.kind) {
-        case "reload":
-          void fetchDashboard();
-          void fetchLiveWagers();
-          void fetchBetTicker();
-          void fetchCustomersCohorts();
-          void fetchRankings();
-          void fetchTiersConfig();
-          break;
-        case "dashboard-updated":
-          void fetchDashboard();
-          break;
-        case "wagers-updated":
-          void fetchLiveWagers();
-          void fetchBetTicker();
-          break;
-        case "tiers-updated":
-          if (action.tiers) {
-            setTiersConfig(action.tiers as unknown as TierStyleConfig);
-          } else {
+    const lifecycle = startDashboardWsLifecycle({
+      url: `${protocol}//${window.location.host}/ws`,
+      subscribeTopics: [
+        "dashboard",
+        "live-bets",
+        "syndicate-alerts",
+        "tiers-updated",
+      ],
+      onConnectedChange: setConnected,
+      onTextMessage: (raw) => {
+        const action = parseDashboardWsSignal(raw);
+        switch (action.kind) {
+          case "reload":
+            void fetchDashboard();
+            void fetchLiveWagers();
+            void fetchBetTicker();
+            void fetchCustomersCohorts();
+            void fetchRankings();
             void fetchTiersConfig();
-          }
-          break;
-        case "alerts-updated":
-          fetchAlerts();
-          fetchHealth();
-          break;
-        case "automations-updated":
-          void fetchR2Pipeline(true);
-          break;
-        case "ack":
-        case "ignore":
-          break;
-      }
-    };
+            break;
+          case "dashboard-updated":
+            void fetchDashboard();
+            break;
+          case "wagers-updated":
+            void fetchLiveWagers();
+            void fetchBetTicker();
+            break;
+          case "tiers-updated":
+            if (action.tiers) {
+              setTiersConfig(action.tiers as unknown as TierStyleConfig);
+            } else {
+              void fetchTiersConfig();
+            }
+            break;
+          case "alerts-updated":
+            fetchAlerts();
+            fetchHealth();
+            break;
+          case "automations-updated":
+            void fetchR2Pipeline(true);
+            break;
+          case "ack":
+          case "ignore":
+            break;
+        }
+      },
+    });
 
     return () => {
-      isMounted = false;
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      } else if (ws.readyState === WebSocket.CONNECTING) {
-        // Wait for handshake to finish before closing to avoid browser
-        // "WebSocket is closed before the connection is established" warning in React StrictMode
-        ws.onopen = () => ws.close();
-      }
+      lifecycle.dispose();
     };
   }, []);
 

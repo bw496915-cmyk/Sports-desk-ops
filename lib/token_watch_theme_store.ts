@@ -81,7 +81,35 @@ export interface ThemeSyncOptions {
   readonly onError?: (error: unknown) => void;
 }
 
+import { createStateMachine, defineStateGraph } from "./state_machine.ts";
+
+export const THEME_SYNC_STATES = [
+  "idle",
+  "syncing_clean",
+  "syncing_dirty",
+  "stopped",
+] as const;
+export type ThemeSyncStateKind = (typeof THEME_SYNC_STATES)[number];
+
+export const THEME_SYNC_GRAPH = defineStateGraph(
+  "ThemeSyncController",
+  THEME_SYNC_STATES,
+  {
+    idle: ["syncing_dirty", "stopped"],
+    syncing_clean: ["syncing_dirty", "idle", "stopped"],
+    syncing_dirty: ["syncing_clean", "syncing_dirty", "idle", "stopped"],
+    stopped: [],
+  },
+);
+
+type ThemeSyncSnapshot =
+  | { readonly kind: "idle"; readonly lastRun: Promise<void> | null }
+  | { readonly kind: "syncing_clean"; readonly flight: Promise<void> }
+  | { readonly kind: "syncing_dirty"; readonly flight: Promise<void> }
+  | { readonly kind: "stopped"; readonly lastRun: Promise<void> | null };
+
 export interface ThemeSyncController {
+  readonly state?: ThemeSyncStateKind;
   readonly trigger: () => void;
   idle(): Promise<void>;
   stop(): void;
@@ -122,11 +150,11 @@ function foreignHookError(): Error & { code: "ERR_THEME_HOOKS_FOREIGN" } {
  * Attach `onInsert`/`onUpdate`/`onDelete` hooks that run `sync` serially for writes to
  * `profile_themes`.
  *
- * A trigger marks the state dirty and starts a run only when none is running; the run loops
- * while dirty, so a burst of writes coalesces instead of stacking. The default sync is
+ * A trigger transitions `idle -> syncing_dirty` (or `syncing_clean -> syncing_dirty` while a sync
+ * is already in flight), so a burst of writes coalesces instead of stacking. The default sync is
  * `syncIfChanged`, which fingerprints the snapshot before rewriting `.env`, `.env.example` and
  * the generated theme LUT. A rejecting sync rejects `idle()` (and reaches `onError`), leaves
- * `syncs` unchanged and clears the running flag so the next write can start a fresh run.
+ * `syncs` unchanged and transitions back to `idle` so the next write can start a fresh run.
  */
 export function attachThemeSyncHooks(
   db: Database,
@@ -141,22 +169,26 @@ export function attachThemeSyncHooks(
 
   const sync = options.sync ?? syncIfChanged;
   const onError = options.onError;
-  let running = false;
-  let dirty = false;
-  let stopped = false;
   let syncs = 0;
-  let current: Promise<void> | null = null;
+
+  const machine = createStateMachine<ThemeSyncSnapshot>({
+    graph: THEME_SYNC_GRAPH,
+    initial: { kind: "idle", lastRun: null },
+  });
 
   const startRun = (): void => {
-    running = true;
-    const run = (async (): Promise<void> => {
+    let runPromise!: Promise<void>;
+    runPromise = (async (): Promise<void> => {
       // The hook runs while the writer's statement still holds the connection; querying from
       // that stack throws "This database connection is busy executing a query". Yield once so
       // the first sync starts after the write call stack unwinds.
       await Promise.resolve();
       try {
-        while (dirty) {
-          dirty = false;
+        while (machine.kind === "syncing_dirty") {
+          machine.transition(
+            { kind: "syncing_clean", flight: runPromise },
+            "pass_start",
+          );
           await sync(db, state, targets);
           syncs += 1;
         }
@@ -164,20 +196,39 @@ export function attachThemeSyncHooks(
         onError?.(error);
         throw error;
       } finally {
-        running = false;
+        if (
+          machine.kind === "syncing_clean" ||
+          machine.kind === "syncing_dirty"
+        ) {
+          machine.transition({ kind: "idle", lastRun: runPromise }, "settled");
+        }
       }
     })();
     // idle() observers receive the rejection; this handler only keeps an unobserved failure
     // from surfacing as an unhandled rejection when nobody awaits idle().
-    run.catch(() => {});
-    current = run;
+    runPromise.catch(() => {});
+    machine.transition(
+      { kind: "syncing_dirty", flight: runPromise },
+      "trigger_from_idle",
+    );
   };
 
   const trigger = (): void => {
-    if (stopped) return;
-    dirty = true;
-    if (running) return;
-    startRun();
+    const snap = machine.state;
+    switch (snap.kind) {
+      case "stopped":
+      case "syncing_dirty":
+        return;
+      case "syncing_clean":
+        machine.transition(
+          { kind: "syncing_dirty", flight: snap.flight },
+          "coalesce_dirty",
+        );
+        return;
+      case "idle":
+        startRun();
+        return;
+    }
   };
 
   const hook = (
@@ -191,8 +242,13 @@ export function attachThemeSyncHooks(
   };
 
   const stop = (): void => {
-    if (stopped) return;
-    stopped = true;
+    const snap = machine.state;
+    if (snap.kind === "stopped") return;
+    const lastRun =
+      snap.kind === "syncing_clean" || snap.kind === "syncing_dirty"
+        ? snap.flight
+        : snap.lastRun;
+    machine.transition({ kind: "stopped", lastRun }, "stop");
     attachedDatabases.delete(db);
     if (db.onInsert === hook) db.onInsert = null;
     if (db.onUpdate === hook) db.onUpdate = null;
@@ -205,8 +261,21 @@ export function attachThemeSyncHooks(
   attachedDatabases.add(db);
 
   return {
+    get state() {
+      return machine.kind;
+    },
     trigger,
-    idle: () => current ?? Promise.resolve(),
+    idle: () => {
+      const snap = machine.state;
+      switch (snap.kind) {
+        case "syncing_clean":
+        case "syncing_dirty":
+          return snap.flight;
+        case "idle":
+        case "stopped":
+          return snap.lastRun ?? Promise.resolve();
+      }
+    },
     stop,
     get syncs() {
       return syncs;

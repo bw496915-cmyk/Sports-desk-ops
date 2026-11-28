@@ -11,7 +11,47 @@ import {
   type AuditEntry,
 } from "./audit_log.ts";
 import { sendTelegramAlert } from "./telegram.ts";
+import { createStateMachine, defineStateGraph } from "./state_machine.ts";
 import { loadTomlConfig, type WagerTiersConfig } from "./wager_config.ts";
+
+export const ALERT_DELIVERY_STATES = [
+  "queued",
+  "delivered",
+  "dead",
+  "acknowledged",
+] as const;
+export type AlertDeliveryStateKind = (typeof ALERT_DELIVERY_STATES)[number];
+
+/**
+ * Monotonic alert delivery lifecycle:
+ * - `queued` -> `delivered` | `dead` | `acknowledged` (or idempotent `queued`)
+ * - `delivered` -> `acknowledged` (cannot regress to `dead` or `queued`)
+ * - `dead` -> `acknowledged` (cannot transition to `delivered` or `queued`; DLQ replay mints a new UUID)
+ * - `acknowledged` is terminal (only idempotent `acknowledged`)
+ */
+export const ALERT_DELIVERY_GRAPH = defineStateGraph(
+  "AlertDelivery",
+  ALERT_DELIVERY_STATES,
+  {
+    queued: ["queued", "delivered", "dead", "acknowledged"],
+    delivered: ["delivered", "acknowledged"],
+    dead: ["dead", "acknowledged"],
+    acknowledged: ["acknowledged"],
+  },
+);
+
+export const ALERT_DISPATCHER_STATES = ["stopped", "idle", "sweeping"] as const;
+export type AlertDispatcherStateKind = (typeof ALERT_DISPATCHER_STATES)[number];
+
+export const ALERT_DISPATCHER_GRAPH = defineStateGraph(
+  "AlertDispatcher",
+  ALERT_DISPATCHER_STATES,
+  {
+    stopped: ["idle", "sweeping", "stopped"],
+    idle: ["sweeping", "stopped"],
+    sweeping: ["sweeping", "idle", "stopped"],
+  },
+);
 
 export type AlertTier = "CRITICAL" | "STEAM" | "LATENCY" | "RECREATIONAL";
 
@@ -157,6 +197,14 @@ export interface ReconstructedAlertState {
   lastDeliveryAt: string | null;
 }
 
+function advanceDeliveryStatus(
+  current: AlertDeliveryStateKind | undefined,
+  next: AlertDeliveryStateKind,
+): AlertDeliveryStateKind {
+  if (current === undefined) return next;
+  return ALERT_DELIVERY_GRAPH.canTransition(current, next) ? next : current;
+}
+
 /**
  * Replays recent audit log entries to recover in-flight queue state.
  * Survives process restarts without dropping alerts or duplicate-sending delivered alerts.
@@ -168,6 +216,8 @@ export function recoverAlertState(now = new Date()): ReconstructedAlertState {
   const failCounts = new Map<string, number>();
   const retrySchedules = new Map<string, number>();
   const queued = new Map<string, QueuedAlert>();
+  const queuedPayloads = new Map<string, QueuedAlert>();
+  const statusByDelivery = new Map<string, AlertDeliveryStateKind>();
   const surveilledWagers = new Set<string>();
   let lastDeliveryAt: string | null = null;
 
@@ -202,17 +252,23 @@ export function recoverAlertState(now = new Date()): ReconstructedAlertState {
     const deliveryId = details?.deliveryId as string | undefined;
     if (!deliveryId) continue;
 
+    const currentStatus = statusByDelivery.get(deliveryId);
     if (entry.category === "alert_delivered") {
-      delivered.add(deliveryId);
-      queued.delete(deliveryId);
-      lastDeliveryAt = entry.ts;
+      const next = advanceDeliveryStatus(currentStatus, "delivered");
+      statusByDelivery.set(deliveryId, next);
+      if (next === "delivered") {
+        lastDeliveryAt = entry.ts;
+      }
     } else if (entry.category === "alert_dead") {
-      dead.add(deliveryId);
-      queued.delete(deliveryId);
+      statusByDelivery.set(
+        deliveryId,
+        advanceDeliveryStatus(currentStatus, "dead"),
+      );
     } else if (entry.category === "alert_acknowledged") {
-      acknowledged.add(deliveryId);
-      dead.delete(deliveryId);
-      queued.delete(deliveryId);
+      statusByDelivery.set(
+        deliveryId,
+        advanceDeliveryStatus(currentStatus, "acknowledged"),
+      );
     } else if (entry.category === "alert_delivery_failed") {
       const attemptN = Number(details?.attemptN ?? 1);
       failCounts.set(
@@ -226,12 +282,10 @@ export function recoverAlertState(now = new Date()): ReconstructedAlertState {
         retrySchedules.set(deliveryId, nextRetryAt);
       }
     } else if (entry.category === "alert_queued") {
-      if (
-        !delivered.has(deliveryId) &&
-        !dead.has(deliveryId) &&
-        !acknowledged.has(deliveryId)
-      ) {
-        queued.set(deliveryId, {
+      const next = advanceDeliveryStatus(currentStatus, "queued");
+      statusByDelivery.set(deliveryId, next);
+      if (!queuedPayloads.has(deliveryId)) {
+        queuedPayloads.set(deliveryId, {
           deliveryId,
           tier: (details?.tier as AlertTier) ?? "CRITICAL",
           wagerId: (details?.wagerId as string) ?? "",
@@ -241,6 +295,28 @@ export function recoverAlertState(now = new Date()): ReconstructedAlertState {
           createdAt: (details?.createdAt as string) ?? entry.ts,
         });
       }
+    }
+  }
+
+  // Materialize strictly disjoint state partitions from the per-delivery state machine.
+  for (const [deliveryId, status] of statusByDelivery) {
+    switch (status) {
+      case "queued": {
+        const alert = queuedPayloads.get(deliveryId);
+        if (alert !== undefined) {
+          queued.set(deliveryId, alert);
+        }
+        break;
+      }
+      case "delivered":
+        delivered.add(deliveryId);
+        break;
+      case "dead":
+        dead.add(deliveryId);
+        break;
+      case "acknowledged":
+        acknowledged.add(deliveryId);
+        break;
     }
   }
 
@@ -318,6 +394,11 @@ export interface AlertDispatcherOptions {
     ((attemptN: number, customRetryAfterSec?: number) => number) | undefined;
 }
 
+type AlertDispatcherSnapshot =
+  | { readonly kind: "stopped"; readonly timer: null }
+  | { readonly kind: "idle"; readonly timer: Timer }
+  | { readonly kind: "sweeping"; readonly timer: Timer | null };
+
 /**
  * Surveillance Alert Dispatcher.
  * Periodically drains queued alerts, handles retry backoff on failure,
@@ -329,8 +410,10 @@ export class AlertDispatcher {
   private rateLimitMs: number;
   private sweepIntervalMs: number;
   private backoffFn: (attemptN: number, customRetryAfterSec?: number) => number;
-  private timer: Timer | null = null;
-  private isSweeping = false;
+  private readonly machine = createStateMachine<AlertDispatcherSnapshot>({
+    graph: ALERT_DISPATCHER_GRAPH,
+    initial: { kind: "stopped", timer: null },
+  });
   private lastSendTime = 0;
   private retrySchedule = new Map<string, number>();
 
@@ -342,6 +425,10 @@ export class AlertDispatcher {
     this.backoffFn = opts?.calculateBackoff ?? calculateBackoffSec;
   }
 
+  get state(): AlertDispatcherStateKind {
+    return this.machine.kind;
+  }
+
   private liveMetrics: AlertHealthMetrics | null = null;
   private lastMetricsSync = 0;
   private readonly METRICS_CACHE_MS = 15_000;
@@ -351,8 +438,12 @@ export class AlertDispatcher {
    * Public for deterministic unit testing and immediate on-demand flushes.
    */
   async sweepOnce(): Promise<{ sent: number; failed: number; dead: number }> {
-    if (this.isSweeping) return { sent: 0, failed: 0, dead: 0 };
-    this.isSweeping = true;
+    const initial = this.machine.state;
+    if (initial.kind === "sweeping") return { sent: 0, failed: 0, dead: 0 };
+    this.machine.transition(
+      { kind: "sweeping", timer: initial.timer },
+      "sweep_start",
+    );
 
     let sent = 0;
     let failed = 0;
@@ -465,7 +556,20 @@ export class AlertDispatcher {
         }
       }
     } finally {
-      this.isSweeping = false;
+      const current = this.machine.state;
+      if (current.kind === "sweeping") {
+        if (current.timer !== null) {
+          this.machine.transition(
+            { kind: "idle", timer: current.timer },
+            "sweep_done",
+          );
+        } else {
+          this.machine.transition(
+            { kind: "stopped", timer: null },
+            "sweep_done",
+          );
+        }
+      }
       this.lastMetricsSync = 0;
     }
 
@@ -518,25 +622,36 @@ export class AlertDispatcher {
    * Starts the background sweep timer with an unref'd handle.
    */
   start(): void {
-    if (this.timer) return;
+    const snap = this.machine.state;
+    if (snap.timer !== null) return;
     setActiveDispatcher(this);
-    this.timer = setInterval(() => {
+    const timer = setInterval(() => {
       this.sweepOnce().catch((err) => {
         if (Bun.env.DEBUG_TRACE === "1") {
           console.warn("[alert_dispatcher] sweep error:", err);
         }
       });
     }, this.sweepIntervalMs);
-    (this.timer as unknown as { unref?: () => void }).unref?.();
+    (timer as unknown as { unref?: () => void }).unref?.();
+    if (snap.kind === "sweeping") {
+      this.machine.transition({ kind: "sweeping", timer }, "start_timer");
+    } else {
+      this.machine.transition({ kind: "idle", timer }, "start_timer");
+    }
   }
 
   /**
    * Stops the background sweep timer.
    */
   stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
+    const snap = this.machine.state;
+    if (snap.timer !== null) {
+      clearInterval(snap.timer);
+    }
+    if (snap.kind === "sweeping") {
+      this.machine.transition({ kind: "sweeping", timer: null }, "stop_timer");
+    } else if (snap.kind !== "stopped") {
+      this.machine.transition({ kind: "stopped", timer: null }, "stop_timer");
     }
     if (activeDispatcherInstance === this) {
       setActiveDispatcher(null);
@@ -752,19 +867,24 @@ export function listAlerts(
     if (!deliveryId) continue;
 
     if (entry.category === "alert_queued") {
-      alertMap.set(deliveryId, {
-        deliveryId,
-        wagerId: (details?.wagerId as string) ?? entry.target ?? "",
-        tier: (details?.tier as AlertTier) ?? "CRITICAL",
-        status: "queued",
-        payload: (details?.payload as AlertPayload) ?? {
-          customerId: "UNKNOWN",
-        },
-        createdAt: (details?.createdAt as string) ?? entry.ts,
-        updatedAt: entry.ts,
-        retriedFrom: details?.retriedFrom as string | undefined,
-        attempts: 0,
-      });
+      const existing = alertMap.get(deliveryId);
+      if (!existing) {
+        alertMap.set(deliveryId, {
+          deliveryId,
+          wagerId: (details?.wagerId as string) ?? entry.target ?? "",
+          tier: (details?.tier as AlertTier) ?? "CRITICAL",
+          status: "queued",
+          payload: (details?.payload as AlertPayload) ?? {
+            customerId: "UNKNOWN",
+          },
+          createdAt: (details?.createdAt as string) ?? entry.ts,
+          updatedAt: entry.ts,
+          retriedFrom: details?.retriedFrom as string | undefined,
+          attempts: 0,
+        });
+      } else {
+        existing.status = advanceDeliveryStatus(existing.status, "queued");
+      }
     } else if (entry.category === "alert_delivery_failed") {
       const existing = alertMap.get(deliveryId);
       const record: AlertRecord = existing ?? {
@@ -793,9 +913,12 @@ export function listAlerts(
         createdAt: entry.ts,
         updatedAt: entry.ts,
       };
-      record.status = "delivered";
-      record.messageId = details?.messageId as number | undefined;
-      record.updatedAt = entry.ts;
+      const next = advanceDeliveryStatus(existing?.status, "delivered");
+      if (next === "delivered") {
+        record.status = "delivered";
+        record.messageId = details?.messageId as number | undefined;
+        record.updatedAt = entry.ts;
+      }
       alertMap.set(deliveryId, record);
     } else if (entry.category === "alert_dead") {
       const existing = alertMap.get(deliveryId);
@@ -808,10 +931,16 @@ export function listAlerts(
         createdAt: entry.ts,
         updatedAt: entry.ts,
       };
-      record.status = "dead";
-      record.attempts = Number(details?.afterAttempts ?? record.attempts ?? 1);
-      record.finalError = (details?.finalError as string) ?? record.finalError;
-      record.updatedAt = entry.ts;
+      const next = advanceDeliveryStatus(existing?.status, "dead");
+      if (next === "dead") {
+        record.status = "dead";
+        record.attempts = Number(
+          details?.afterAttempts ?? record.attempts ?? 1,
+        );
+        record.finalError =
+          (details?.finalError as string) ?? record.finalError;
+        record.updatedAt = entry.ts;
+      }
       alertMap.set(deliveryId, record);
     } else if (entry.category === "alert_acknowledged") {
       const existing = alertMap.get(deliveryId);
@@ -824,11 +953,14 @@ export function listAlerts(
         createdAt: entry.ts,
         updatedAt: entry.ts,
       };
-      record.status = "acknowledged";
-      record.acknowledgedBy =
-        (details?.acknowledgedBy as string) ?? entry.actor?.username;
-      record.acknowledgedNotes = details?.notes as string | undefined;
-      record.updatedAt = entry.ts;
+      const next = advanceDeliveryStatus(existing?.status, "acknowledged");
+      if (next === "acknowledged") {
+        record.status = "acknowledged";
+        record.acknowledgedBy =
+          (details?.acknowledgedBy as string) ?? entry.actor?.username;
+        record.acknowledgedNotes = details?.notes as string | undefined;
+        record.updatedAt = entry.ts;
+      }
       alertMap.set(deliveryId, record);
     }
   }

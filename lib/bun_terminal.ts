@@ -23,6 +23,28 @@ import {
   createKillEscalation,
   type KillEscalation,
 } from "./kill_escalation.ts";
+import { createStateMachine, defineStateGraph } from "./state_machine.ts";
+
+export const TERMINAL_SESSION_STATES = [
+  "unstarted",
+  "authorizing",
+  "running",
+  "stopping",
+  "exited",
+] as const;
+export type TerminalSessionStateKind = (typeof TERMINAL_SESSION_STATES)[number];
+
+export const TERMINAL_SESSION_GRAPH = defineStateGraph(
+  "TerminalSession",
+  TERMINAL_SESSION_STATES,
+  {
+    unstarted: ["authorizing", "running"],
+    authorizing: ["unstarted", "running"],
+    running: ["stopping", "exited"],
+    stopping: ["stopping", "exited"],
+    exited: [],
+  },
+);
 
 export const BUN_TERMINAL_DOCS = bunUrl(
   "/docs/runtime/child-process#terminal-pty-support",
@@ -207,8 +229,15 @@ export async function spawnInPtyUntil(
   options: SpawnInPtyUntilOptions = {},
 ): Promise<PtyRunUntilResult> {
   let raw = "";
+  const defaultTerm =
+    !Bun.env.TERM || Bun.env.TERM === "dumb" ? "xterm-256color" : Bun.env.TERM;
   const proc = Bun.spawn([...cmd], {
     cwd: options.cwd ?? process.cwd(),
+    env: {
+      ...Bun.env,
+      TERM: defaultTerm,
+      ...options.env,
+    },
     terminal: {
       cols: options.cols ?? 120,
       rows: options.rows ?? 40,
@@ -425,7 +454,18 @@ export interface TerminalSessionOptions extends NativeSpawnPassThrough {
  *    preserved in `.raw` for terminal replay; `.text` strips escapes for assertions.
  * 3. Resource safety: implements `[Symbol.asyncDispose]` for seamless `await using`.
  */
+type TerminalSessionSnapshot =
+  | { readonly kind: "unstarted" }
+  | { readonly kind: "authorizing" }
+  | { readonly kind: "running" }
+  | { readonly kind: "stopping" }
+  | { readonly kind: "exited"; readonly exitCode: number };
+
 export class TerminalSession implements AsyncDisposable {
+  private readonly _machine = createStateMachine<TerminalSessionSnapshot>({
+    graph: TERMINAL_SESSION_GRAPH,
+    initial: { kind: "unstarted" },
+  });
   private _proc: ReturnType<typeof Bun.spawn> | null = null;
   private _term: Bun.Terminal | null = null;
   private _raw: string = "";
@@ -436,6 +476,7 @@ export class TerminalSession implements AsyncDisposable {
   private readonly _maxOutputBytes: number;
   private _killEscalation: KillEscalation | null = null;
   private readonly _decoder = new TextDecoder();
+  private _decoderFlushed = false;
   private _exitCode: number | null = null;
   private _ptyExitCode: number | null = null;
   private _signalCode: Bun.Subprocess["signalCode"] = null;
@@ -500,13 +541,26 @@ export class TerminalSession implements AsyncDisposable {
 
   /** Starts the subprocess attached to the PTY. */
   async start(cmd: readonly string[]): Promise<void> {
-    if (this._proc !== null) {
+    const readState = (): TerminalSessionStateKind => this._machine.kind;
+    if (readState() !== "unstarted") {
       throw new Error("TerminalSession is already started");
     }
 
     if (this._options.authorize) {
-      const allowed = await this._options.authorize(cmd);
+      this._machine.transition({ kind: "authorizing" }, "authorize_start");
+      let allowed = false;
+      try {
+        allowed = await this._options.authorize(cmd);
+      } catch (error) {
+        if (readState() === "authorizing") {
+          this._machine.transition({ kind: "unstarted" }, "authorize_error");
+        }
+        throw error;
+      }
       if (!allowed) {
+        if (readState() === "authorizing") {
+          this._machine.transition({ kind: "unstarted" }, "authorize_denied");
+        }
         throw new TerminalUnauthorizedError(
           `Command execution rejected by authorization policy: ${cmd.join(" ")}`,
         );
@@ -566,6 +620,7 @@ export class TerminalSession implements AsyncDisposable {
       },
       exit: (_terminal, ptyCode, signal) => {
         this._ptyExitCode = ptyCode;
+        this._flushDecoderOnce();
         this._resolvePtyClosed?.();
         this._options.onPtyClose?.(ptyCode, signal);
         this._emitAudit({
@@ -629,10 +684,24 @@ export class TerminalSession implements AsyncDisposable {
       spawnOptions.timeout = this._options.timeoutMs;
     }
 
-    const proc = Bun.spawn([...cmd], spawnOptions);
+    let proc: ReturnType<typeof Bun.spawn>;
+    try {
+      proc = Bun.spawn([...cmd], spawnOptions);
+    } catch (error) {
+      try {
+        term.close();
+      } catch {
+        // ignore cleanup failure
+      }
+      if (readState() === "authorizing") {
+        this._machine.transition({ kind: "unstarted" }, "spawn_failed");
+      }
+      throw error;
+    }
 
     this._proc = proc;
     this._term = term;
+    this._machine.transition({ kind: "running" }, "spawned");
     this._killEscalation = createKillEscalation(proc, {
       graceMs: this._options.killGraceMs ?? 2_000,
       onEscalate: (graceMs) => {
@@ -658,9 +727,14 @@ export class TerminalSession implements AsyncDisposable {
       this._signalCode = proc.signalCode;
       this._resourceUsage = proc.resourceUsage();
       this._exitedAt = Date.now();
-      const final = this._decoder.decode();
-      if (final && this._maxOutputBytes === Number.POSITIVE_INFINITY) {
-        this._raw += final;
+      if (this._ptyExitCode !== null) {
+        this._flushDecoderOnce();
+      }
+      if (this._machine.kind !== "exited") {
+        this._machine.transition(
+          { kind: "exited", exitCode: code },
+          "proc_exited",
+        );
       }
       this._emitAudit({
         type: "exit",
@@ -678,6 +752,9 @@ export class TerminalSession implements AsyncDisposable {
             timeoutMs: this._options.timeoutMs!,
             timestamp: Date.now(),
           });
+          if (this._machine.kind === "running") {
+            this._machine.transition({ kind: "stopping" }, "timeout");
+          }
           this._killEscalation?.terminate();
         }
       }, this._options.timeoutMs);
@@ -729,10 +806,7 @@ export class TerminalSession implements AsyncDisposable {
     const drainPty = async (): Promise<void> => {
       if (!this._ptyClosedPromise) return;
       await Promise.race([this._ptyClosedPromise, Bun.sleep(25)]);
-      const final = this._decoder.decode();
-      if (final) {
-        this._raw += final;
-      }
+      this._flushDecoderOnce();
     };
 
     if (!effectiveTimeout || effectiveTimeout <= 0) {
@@ -744,6 +818,9 @@ export class TerminalSession implements AsyncDisposable {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
+        if (this._machine.kind === "running") {
+          this._machine.transition({ kind: "stopping" }, "wait_timeout");
+        }
         this._killEscalation?.terminate();
         reject(
           new TerminalTimeoutError(
@@ -846,6 +923,12 @@ export class TerminalSession implements AsyncDisposable {
   /** Send a termination signal to the subprocess. */
   stop(signal: "SIGTERM" | "SIGKILL" = "SIGTERM"): void {
     if (this._proc && this.active) {
+      if (
+        this._machine.kind === "running" ||
+        this._machine.kind === "stopping"
+      ) {
+        this._machine.transition({ kind: "stopping" }, "stop");
+      }
       this._emitAudit({
         type: "stop",
         signal,
@@ -892,6 +975,11 @@ export class TerminalSession implements AsyncDisposable {
       }
     }
     this.close();
+  }
+
+  /** Explicit lifecycle phase (`unstarted | authorizing | running | stopping | exited`). */
+  get state(): TerminalSessionStateKind {
+    return this._machine.kind;
   }
 
   /** Combined raw ANSI output (stdout + stderr multiplexed) preserved for accurate terminal replay. */
@@ -964,7 +1052,9 @@ export class TerminalSession implements AsyncDisposable {
 
   /** Whether the subprocess is currently running. */
   get active(): boolean {
-    return this._proc !== null && this._exitCode === null;
+    return (
+      this._machine.kind === "running" || this._machine.kind === "stopping"
+    );
   }
 
   /** Process ID of the spawned child process. */
@@ -992,6 +1082,15 @@ export class TerminalSession implements AsyncDisposable {
   /** Readonly log of all recorded audit events for this session. */
   get auditEvents(): readonly TerminalAuditEvent[] {
     return this._auditEvents;
+  }
+
+  private _flushDecoderOnce(): void {
+    if (this._decoderFlushed) return;
+    this._decoderFlushed = true;
+    const final = this._decoder.decode();
+    if (final && this._maxOutputBytes === Number.POSITIVE_INFINITY) {
+      this._raw += final;
+    }
   }
 
   private _cleanupTimeout(): void {
